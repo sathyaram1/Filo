@@ -225,7 +225,7 @@ test('l\'interruttore accende e spegne mandando solo «attivo», anche con una b
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     id: 'potatura', nome: 'Potatura dei rami', testo: 'Pota i rami vecchi.', giorni: [1], ora: '01:00', ambito: 'rami', urgenza: 5,
-    modello: 'haiku', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    modello: 'haiku', sforzo: 'high', tettoUsd: null, attivo: true, domandaFineTurno: '',
   });
   await expect(p.locator('[data-campo="testo"]')).toHaveValue('Bozza da non mandare');
   await expect(p.locator('[data-campo="attivo"]'), 'una levetta sola per un ricorrente che c’è già').toHaveCount(0);
