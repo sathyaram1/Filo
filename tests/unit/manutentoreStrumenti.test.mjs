@@ -142,13 +142,17 @@ test('taccuino sezione manda la sola sezione con la versione letta; vuota, senza
     [['taccuino', 'sezione', 'stato', '-', '--versione', '7'], ' \n', /la sezione «stato» da stdin è vuota/],
     [['taccuino', 'sezione', 'stato', '-'], 'N 3', /taccuino sezione vuole --versione <V>/],
     [['taccuino', 'sezione', '-', '--versione', '7'], 'N 3', /vuole il nome della sezione/],
-    [['taccuino', 'sezione', '## Stato', '-', '--versione', '7'], 'N 3', /vuole il nome della sezione/],
   ]) {
     const no = lancia(argv, {}, input);
     assert.notEqual(no.status, 0, argv.join(' '));
     assert.deepEqual(no.inviati, [], argv.join(' '));
     assert.match(no.out, motivo);
   }
+  // La forma del nome la giudica il server, una regola in un posto solo: lo strumento passa il nome com'è.
+  const storto = lancia(['taccuino', 'sezione', 'Stato Oggi', '-', '--versione', '7'],
+    { 'taccuino.sezione': { ok: false, reason: 'malformed', detail: 'sezione è il nome di un\'intestazione del taccuino, una parola minuscola' } }, 'N 3');
+  assert.deepEqual(storto.inviati.map((x) => x.dati.sezione), ['Stato Oggi']);
+  assert.match(storto.out, /RIFIUTATO dal server: malformed: .*una parola minuscola/);
 });
 
 test('il biglietto passato con --ticket non entra nei testi scritti', () => {
