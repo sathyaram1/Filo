@@ -945,10 +945,13 @@ export function sommaSottoAgente(rep, sub) {
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
   for (const n of Array.isArray(sub.notes) ? sub.notes : []) {
     // Le note sui tagli degli elenchi si rifanno qui sotto sui conti sommati.
-    if (/^(strumenti falliti|attese oltre)/.test(n)) continue;
+    if (/^(strumenti falliti|attese oltre)/.test(n) || n.startsWith(`${NOTA_RIFIUTI}:`)) continue;
     const nota = `sotto-agente: ${n}`;
     if (!rep.notes.includes(nota)) rep.notes.push(nota);
   }
+  const rifiuti = rifiutiDi(rep);
+  const suoi = sub.rifiutiScrittura || leggiNotaRifiuti((sub.notes || []).find((n) => String(n).startsWith(`${NOTA_RIFIUTI}:`))) || rifiutiVuoti();
+  for (const parte of ['nonLetto', 'modificato']) for (const k of Object.keys(rifiuti[parte])) rifiuti[parte][k] += Number(suoi[parte] && suoi[parte][k]) || 0;
   rep.falliti = [...(rep.falliti || []), ...(Array.isArray(sub.falliti) ? sub.falliti : [])];
   rep.attese = [...(rep.attese || []), ...(Array.isArray(sub.attese) ? sub.attese : [])];
   rep.atteseOltre30 = (Number(rep.atteseOltre30) || 0) + (Number(sub.atteseOltre30) || 0);
