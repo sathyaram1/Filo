@@ -99,7 +99,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict'
     ? { reply: { outcome: 'fix', phase2: {
       findings: [{ level: 2, text: 'il pulsante non salva', decision: false }],
-      derived: [{ level: 0, text: 'caso raro', decision: false }],
+      derived: [{ level: 1, text: 'caso raro', decision: false }],
       budgets: { cap2: { cap: 5, used: 1, left: 4 } },
       instructions: 'FASE 2 — SEGRETO DEL SERVER: correggi solo questo.',
     } } }
