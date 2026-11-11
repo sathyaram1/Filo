@@ -1228,7 +1228,7 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     '«[2i]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
     '  [2i] il pulsante non salva se il titolo è vuoto: passi …',
-    '  [0e] con la finestra sotto i 300 pixel il menu esce dallo schermo: c’era già su main"',
+    '  [e] con la finestra sotto i 300 pixel il menu esce dallo schermo: c’era già su main"',
     'Poi SEGUI la risposta stampata dal comando: dice cosa succede adesso.',
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',
