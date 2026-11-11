@@ -75,7 +75,7 @@ import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
-import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
