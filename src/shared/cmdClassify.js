@@ -2109,7 +2109,8 @@
       const piene = parole.filter(Boolean);
       if (piene.length) out.push(piene[piene.length - 1]);
     }
-    return out;
+    // Un gruppo fra gli argomenti lascia in `$_` ciò che stampa: si sa solo eseguendolo (#2392).
+    return out.some((v) => v.includes(SEGNO_GRUPPO)) ? null : out;
   }
   const comeParola = (v) => (/^[\w./:=@%+,-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`);
 
