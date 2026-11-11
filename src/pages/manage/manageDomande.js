@@ -713,6 +713,8 @@
     const frase = el('p', 'mg-dq-esito');
     if (da) frase.append('Risposta automatica col principio di ', legame('domanda', da), '.');
     else frase.textContent = 'Risposta automatica.';
+    const ripresa = ripresaDetta(d);
+    if (ripresa) frase.append(' ', ripresa);
     if (!da) return frase;
     const fonte = trova(da);
     if (!fonte) chiediFonte(da);
