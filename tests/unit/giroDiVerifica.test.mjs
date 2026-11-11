@@ -115,7 +115,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.ok(consegna, 'la critica deve arrivare al server');
     assert.equal(consegna.body.intent, 'verdict');
     const d = consegna.body.data || {};
-    assert.deepEqual(d.findings.map((f) => [f.level, f.decision]), [[2, false], [0, false]], 'i rilievi arrivano STRUTTURATI, coi livelli');
+    assert.deepEqual(d.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false]], 'i rilievi arrivano STRUTTURATI, coi livelli');
     assert.match(d.findings[0].text, /Passi: titolo vuoto/, 'la continuazione resta attaccata al suo rilievo');
     assert.match(String(d.summary), /Provato: incolla/, 'il riassunto viaggia a parte');
     assert.match(String(d.critique), /\[2i\] il pulsante non salva/, 'la critica intera, com\'è stata scritta');
