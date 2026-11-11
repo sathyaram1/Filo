@@ -835,7 +835,7 @@ test('config/routines si rilegge una volta al minuto, non a ogni invocazione —
   let chiamate = 0;
   const fetchImpl = async () => {
     chiamate += 1;
-    return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' } } }) };
+    return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' } } }) };
   };
   const leggi = (now) => leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' }, copiaDir: dir, now });
 
