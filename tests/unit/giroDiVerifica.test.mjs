@@ -220,11 +220,11 @@ test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4
   const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass', derived: null } }));
   try {
     const riassunto = `Provato ${'x'.repeat(4500)}.`;
-    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2i] in fondo\n[0i] raro`], ENV(casa, port));
+    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2i] in fondo\n[e] altrove`], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
-    assert.ok(inviato.critique.endsWith('[2i] in fondo\n[0i] raro'), 'il testo arriva intero');
-    assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
+    assert.ok(inviato.critique.endsWith('[2i] in fondo\n[e] altrove'), 'il testo arriva intero');
+    assert.deepEqual(inviato.findings.map((f) => [f.level, f.sede]), [[2, 'i'], [null, 'e']]);
   } finally { srv.close(); togliCartella(casa); }
 });
 
