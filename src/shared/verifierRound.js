@@ -200,6 +200,8 @@
     for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
       if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return m[0]; }
     }
+    const sede = QUADRA_SEDE.exec(testo);
+    if (sede) return sede[0];
     // La quadra SPAIATA col contenuto lunghissimo: una parentesi dimenticata è lo stesso errore
     // di battitura della virgoletta che manca, e non deve costare una bocciatura.
     const spaiata = QUADRA_APERTA.exec(testo) || QUADRA_CHIUSA.exec(testo);
