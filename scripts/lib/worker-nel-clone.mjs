@@ -90,6 +90,8 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti } = {}) {
     `(\`${m.principale}\`) è di chi guida il giro: lì non scrivi e non lanci niente.`,
     `La shell riparte ogni volta dalla cartella della sessione: ogni comando comincia con \`cd "${dir}" && …\`,`,
     `e Read, Edit e Write vogliono percorsi sotto \`${dir}\`. Il salvataggio automatico segue il file che modifichi.`,
+    `Grep e Glob senza \`path\`, e i sotto-agenti senza la cartella nel compito, cercano nella cartella della sessione:`,
+    `un file letto lì per Edit non è letto qui, e la modifica viene rifiutata (#2188).`,
   ];
   if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {
