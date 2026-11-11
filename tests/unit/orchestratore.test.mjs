@@ -548,17 +548,21 @@ test('regolaFile e siSovrappongono', () => {
 test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
   const p = { num: 7, slug: 'sette', derivatiAperti: [] };
   const der = [
-    { level: 2, sede: 'e', text: 'esterno uno' },
-    { level: 1, sede: 'i', text: 'interno A' },
-    { level: 0, sede: 'v', text: 'vicino B' },
+    { level: null, sede: 'e', text: 'esterno uno' },
+    { level: 2, sede: 'i', text: 'interno A' },
+    // Lo stato scritto con la scala a quattro livelli (#2339): uno 0 interno vale 1, un vicino è esterno.
+    { level: 0, sede: 'i', text: 'interno zero' },
+    { level: 1, sede: 'v', text: 'vicino B' },
     { level: 1, sede: 'i', decision: true, text: 'scelta C?' },
   ];
   const d = derivatiDaAprire(p, der);
-  assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
-  assert.deepEqual(d.map((x) => x.priorita), [1, 1, 1], 'un 2 nasce a 1: la 2 la mette solo il manutentore');
+  assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'vicino B', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
+  assert.deepEqual(d.map((x) => x.priorita), [null, null, 1, 1], 'gli esterni nascono senza priorità; un 2 nasce a 1: la 2 la mette solo il manutentore');
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
+  assert.match(d[0].testo, /- \[e\] esterno uno/);
+  assert.match(d[3].testo, /- \[2i\] interno A\n- \[1i\] interno zero/);
   p.derivatiAperti.push({ chiave: d[0].chiave });
-  assert.equal(derivatiDaAprire(p, der).length, 2);
+  assert.equal(derivatiDaAprire(p, der).length, 3);
 });
 
 test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuovo, anche dopo pratiche registrate col solo gruppo', () => {
