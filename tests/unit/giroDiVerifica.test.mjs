@@ -126,7 +126,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.match(r.so, /esito=fix/);
     assert.match(r.so, /SEGRETO DEL SERVER/, 'le istruzioni della fase 2 vengono stampate come arrivano');
     assert.match(r.so, /\[2i\] il pulsante non salva/);
-    assert.match(r.so, /\[0i\] caso raro/);
+    assert.match(r.so, /\[1i\] caso raro/);
     assert.match(r.so, /cap2: 4 giri residui su 5/);
 
     // Lo specchio locale dice che c'e' una correzione in sospeso.
