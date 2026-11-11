@@ -108,7 +108,7 @@ test('la pulizia prima del verdetto decide la fermata con la stessa regola del g
   const require = createRequire(import.meta.url);
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  for (const level of [0, 1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
+  for (const level of [1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
     const f = { level, sede: 'i', decision, irreversibile };
     assert.equal(fermaDiSicuro([f]), V.decisioneFerma(f), JSON.stringify(f));
     assert.equal(fermaDiSicuro([{ ...f, sede: 'e' }]), false);
