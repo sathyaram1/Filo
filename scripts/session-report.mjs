@@ -712,6 +712,15 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
           const voce = { strumento: chiamata.nome, ...(chiamata.cosa ? { cosa: chiamata.cosa } : {}), errore: rigaErrore(b.content), dopo: '' };
           rep.falliti.push(voce);
           senzaSeguito.push({ voce, chiamata });
+          if (chiamata.scrittura) {
+            const testo = testoDi(b.content);
+            const r = rifiutiDi(rep);
+            if (RIFIUTO_NON_LETTO.test(testo)) r.nonLetto[chiamata.scrittura.causa] += 1;
+            else if (RIFIUTO_MODIFICATO.test(testo)) r.modificato[chiamata.scrittura.shellInMezzo ? 'shell' : 'senzaShell'] += 1;
+          }
+        } else if (chiamata.file) {
+          letti.add(chiamata.file);
+          tocchi.set(chiamata.file, chiamata.ordine);
         }
         if (Array.isArray(finestreAgent) && Number.isFinite(ms)) {
           const f = finestreAgent.find((x) => x.id === b.tool_use_id);
