@@ -673,7 +673,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgRiservatiSwitch) mgRiservatiSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
       mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
