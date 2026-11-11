@@ -666,8 +666,11 @@ test('riaperta dalla Cronologia, la chat racconta come fermata l’azione fermat
   }, { timeout: 10_000 }).toBeTruthy();
   await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
   const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
-  const nota = riaperta.locator('.dash-bubble-note[data-replay]').first();
-  await expect(nota).toHaveText("Ha eseguito un comando e fermato un'azione", { timeout: 10_000 });
+  // Riaperta, ogni azione ha la sua riga (#1294): il comando fatto e l'apertura fermata, mai raccontata come fatta.
+  const righe = riaperta.locator('.dash-bubble-filo .dash-activity-row');
+  await expect(righe.filter({ hasText: 'Comando eseguito' })).toHaveCount(1, { timeout: 10_000 });
+  await expect(righe.filter({ hasText: '🔒' })).toHaveCount(1);
+  await expect(righe.filter({ hasText: /^✓.*Aperta/ })).toHaveCount(0);
 
   await modelloFinto(app, { giri: [{ text: 'No, non l’ho aperta.' }] });
   await riaperta.locator('#input').fill('l’hai aperta la pagina?');
@@ -960,6 +963,84 @@ test('dopo l’OK un comando dettato dall’utente col suo codice parte, dove Fi
     await clickConfirm(page, 'ok', { timeout: 8_000 });
     await expect.poll(() => existsSync(file), { timeout: 10_000 }).toBe(true);
     await expect(page.locator('.dash-activity-row', { hasText: 'Non ho eseguito' })).toHaveCount(0);
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+// Il comando col codice proposto PRIMA che Filo lo leggesse: il bottone resta, e il blocco arriva solo all'OK.
+async function propostaPoiLettura(app, page, file, casa) {
+  await preparaModelli(app);
+  await senzaAccoglienza(app, page);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 't1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `touch "${file}"` }) }] },
+      { text: 'Ti preparo il file, se mi dai l’OK.' },
+    ],
+  });
+  await page.locator('#input').fill(`prepara il file della nota nella cartella ${casa}`);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'touch' }).last()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+  await modelloARegole(app);
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+}
+// Solo le chiamate della chat: la home in sottofondo chiede anche lei al modello, senza strumenti.
+const chiamateDellaChat = (app) => app.evaluate(() => globalThis.__visti.filter((m) => {
+  const t = JSON.stringify(m);
+  return !t.includes('preparare la dashboard') && !t.includes('scritto in un campo editabile');
+}).length);
+
+// #1373 — dopo l'OK Filo riprende con l'esito, ma non dopo un segreto fermato: il modello cercherebbe un'altra strada.
+test('dopo l’OK un comando col codice letto e non dettato dall’utente si ferma, e Filo non riparte', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const casa = cartellaInCasa('filo-uscite-ferma-');
+  const file = join(casa, `nota-${CODICE}.txt`);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtab(app);
+    await propostaPoiLettura(app, page, file, casa);
+    const prima = await chiamateDellaChat(app);
+    await page.locator('.dash-action-btn', { hasText: 'touch' }).first().click();
+    await clickConfirm(page, 'ok', { timeout: 8_000 });
+    await expect(page.locator('.dash-action-btn', { hasText: '🔒' })).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
+    expect(existsSync(file), 'il comando col codice è partito').toBe(false);
+    expect(await chiamateDellaChat(app), 'dopo il blocco il modello non riparte').toBe(prima);
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+// #1685 — riaperta, una conferma rimasta senza risposta ritrova il suo bottone: dopo un riavvio il codice letto da
+// fuori non esce nemmeno da lì.
+test('riaperta dopo un riavvio, il bottone di una conferma rimasta in sospeso non porta fuori il codice letto', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  const casa = cartellaInCasa('filo-uscite-sospesa-');
+  const file = join(casa, `nota-${CODICE}.txt`);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtab(app);
+    await propostaPoiLettura(app, page, file, casa);
+    const id = await app.evaluate(async () => {
+      const l = await globalThis.SN_FILO_CHATS.list();
+      const c = l.find((x) => x.messages.some((m) => String(m.text || '').startsWith('prepara il file della nota')));
+      return c && c.id;
+    });
+    await app.evaluate(() => globalThis.SN_SEGRETI_LETTI.svuota());
+    await app.evaluate((_e, c) => globalThis.SN_CONTESTO_FILO.dimentica(c), id);
+    await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), id);
+    const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${id}`);
+    const btn = riaperta.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'touch' });
+    await expect(btn, 'riaperta, la conferma in sospeso ha il suo bottone').toBeVisible({ timeout: 10_000 });
+    await btn.click();
+    await clickConfirm(riaperta, 'ok', { timeout: 8_000 });
+    await riaperta.waitForTimeout(1500);
+    expect(existsSync(file), 'il bottone riaperto ha fatto uscire il codice letto').toBe(false);
   } finally {
     rmSync(casa, { recursive: true, force: true });
   }

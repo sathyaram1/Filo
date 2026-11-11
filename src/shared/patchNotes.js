@@ -9,6 +9,19 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.274', date: '2026-11-08',
+      features: [
+        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
+      ],
+      fixes: [
+        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni: dei file, delle pagine aperte, degli appunti, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
+        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
+        { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
+        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
+        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
+      ],
+    },
+    {
       version: '0.2.273', date: '2026-11-08',
       features: [
         { testo: 'Sotto i tuoi messaggi nella home trovi Copia, Modifica e Cita. Modifica rimette nel campo il testo e gli allegati, Cita lo riprende in testa al messaggio dopo.', segnalazione: 2096 },
@@ -40,6 +53,7 @@
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],
+      features: [],
     },
     {
       version: '0.2.270', date: '2026-11-07',

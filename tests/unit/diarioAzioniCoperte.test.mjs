@@ -19,7 +19,10 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ATTIVITA = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-attivita.js'), 'utf8');
+// Le righe e le etichette dei guasti stanno nel modulo condiviso (le legge anche la chat riaperta), i verbi nella home.
+const ATTIVITA = [
+  join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-attivita.js'), join(ROOT, 'src', 'shared', 'righeAttivita.js'),
+].map((f) => readFileSync(f, 'utf8')).join('\n');
 
 function registro() {
   globalThis.self = globalThis;
@@ -34,14 +37,14 @@ function registro() {
 // intero per tre elenchi di nomi.
 function chiavi(nome) {
   const dopo = ATTIVITA.split(`const ${nome}`)[1];
-  assert.ok(dopo, `${nome} non si trova più in dashboard-attivita.js`);
+  assert.ok(dopo, `${nome} non si trova più nelle tabelle del diario`);
   const blocco = dopo.split('\n  };')[0];
   return [...blocco.matchAll(/(^|[\s{])([A-Z][A-Z_]+):/gm)].map((m) => m[2]);
 }
 
 function soloBottone() {
   const dopo = ATTIVITA.split('const SOLO_BOTTONE = ')[1];
-  assert.ok(dopo, 'SOLO_BOTTONE non si trova più in dashboard-attivita.js');
+  assert.ok(dopo, 'SOLO_BOTTONE non si trova più nelle tabelle del diario');
   return JSON.parse(dopo.split(';')[0].replace(/'/g, '"'));
 }
 
@@ -76,7 +79,7 @@ test('le tabelle del diario non nominano azioni che non esistono più', () => {
 test('ogni azione proposta ha la sua riga nel diario', () => {
   const proposte = chiavi('ACTIVITY_VERBS_PROPOSTI');
   const righe = chiavi('ACTIVITY_ROWS');
-  assert.ok(proposte.length, 'ACTIVITY_VERBS_PROPOSTI non si trova più in dashboard-attivita.js');
+  assert.ok(proposte.length, 'ACTIVITY_VERBS_PROPOSTI non si trova più nelle tabelle del diario');
   assert.deepEqual(proposte.filter((t) => !righe.includes(t)), [], 'verbi della proposta senza riga in ACTIVITY_ROWS');
 });
 

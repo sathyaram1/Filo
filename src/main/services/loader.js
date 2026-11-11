@@ -77,6 +77,8 @@ require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalo
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
 require(path.join(SHARED, 'rispostaA.js'));  // #1620 — la risposta a un messaggio preciso: riferimento e citazione
+require(path.join(SHARED, 'esitoAzione.js'));  // #1294 — com'è andata ogni azione, per l'archivio delle chat
+require(path.join(SHARED, 'righeAttivita.js'));  // #1294 — le parole del diario, uguali in diretta e nella chat riaperta
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
 require(path.join(SHARED, 'filoAccaduti.js'));  // #1561 — cosa di azioni, sistema ed editor entra nel filo (logica pura)

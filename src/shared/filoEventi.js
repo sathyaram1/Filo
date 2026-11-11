@@ -259,6 +259,30 @@
     };
   }
 
+  // Un sì o un no al bottone dato dopo il turno (#1685): le voci chiudono quelle aperte della risposta che le aveva
+  // proposte (regola in src/shared/esitoAzione.js). Ritorna il messaggio con quelle rimaste senza, o null se non ne resta.
+  function unisciConferma(c, ev) {
+    const E = global.SN_ESITO;
+    const msg = ev.msg;
+    if (!E || msg.role !== 'filo' || msg.confermaDopo !== true || msg.text.trim() || !Array.isArray(msg.esiti)) return msg;
+    const { resto, toccati } = E.unisciDopo(c.messages, msg.esiti);
+    if (!toccati.length) return msg;
+    const i = toccati[toccati.length - 1];
+    const dentro = c.messages[i];
+    const unione = (a, b) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])])];
+    const nomi = (Array.isArray(msg.actions) ? msg.actions : []).filter((t) => typeof t === 'string');
+    const actions = unione(dentro.actions, nomi.filter((t) => !resto.some((v) => v.type === t)));
+    c.messages[i] = {
+      ...dentro,
+      ...(actions.length ? { actions } : {}),
+      ...(msg.cambi ? { cambi: unione(dentro.cambi, msg.cambi) } : {}),
+      ...(msg.guardate ? { guardate: unione(dentro.guardate, msg.guardate) } : {}),
+    };
+    (c._ids[i] = c._ids[i] || []).push(ev.id);
+    if (!resto.length) return null;
+    return { ...msg, esiti: resto, actions: nomi.filter((t) => resto.some((v) => v.type === t)) };
+  }
+
   // Piega un evento nello stato. Un id già visto non conta due volte: è la regola che rende ripetibili import e
   // sincronizzazione. Ritorna quante cose una cancellazione ha tolto (zero per gli altri eventi).
   function applica(stato, ev) {
@@ -283,13 +307,16 @@
         // Un messaggio di Filo che si fonde col suo di prima (#869; quando, lo decide chi scrive: src/shared/filoCoda.js)
         // lo riscrive con tutto quello che è successo, e su disco restano tutti e due.
         const ultimo = c.messages[c.messages.length - 1];
-        if (ev.msg.fonde && ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
+        const resta = unisciConferma(c, ev);
+        if (!resta) {
+          // entrato tutto nella risposta che l'aveva proposto
+        } else if (ev.msg.fonde && ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
           const { fonde: _f, ...fuso } = ev.msg;
           c.messages[c.messages.length - 1] = { ...fuso, ts: ultimo.ts };
           c._disp[c.messages.length - 1] = ev.dispositivo;
           (c._ids[c.messages.length - 1] = c._ids[c.messages.length - 1] || []).push(ev.id);
         } else {
-          c.messages.push({ ...ev.msg, ts: ev.ts });
+          c.messages.push({ ...resta, ts: ev.ts });
           c._disp.push(ev.dispositivo);
           c._ids.push([ev.id]);
         }

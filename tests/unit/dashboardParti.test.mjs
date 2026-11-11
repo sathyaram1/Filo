@@ -53,6 +53,7 @@ test('una parte si carica senza toccare il DOM e registra il suo SN_DASH_*', () 
       SN_MSG: { MSG: new Proxy({}, { get: (_, k) => String(k) }) },
       SN_CONST: { STORAGE_KEYS: new Proxy({}, { get: (_, k) => String(k) }) },
       SN_ONBOARDING: { RESUME_NOTE: '' },
+      SN_RIGHE_ATTIVITA: {},
     };
     sandbox.self = sandbox;
     vm.createContext(sandbox);
@@ -75,6 +76,7 @@ test('dashboard.js inizializza tutte le parti che carica', () => {
       SN_MSG: { MSG: new Proxy({}, { get: (_, k) => String(k) }) },
       SN_CONST: { STORAGE_KEYS: new Proxy({}, { get: (_, k) => String(k) }) },
       SN_ONBOARDING: { RESUME_NOTE: '' },
+      SN_RIGHE_ATTIVITA: {},
     };
     sandbox.self = sandbox;
     vm.createContext(sandbox);

@@ -209,6 +209,9 @@ function messaggiDi(chats) {
         text: String(m.text == null ? '' : m.text),
         ts: m.ts,
         actions: Array.isArray(m.actions) ? m.actions : [],
+        // Com'è andata ogni azione: riletta, la risposta la racconta al modello (#1294).
+        ...(Array.isArray(m.esiti) && m.esiti.length ? { esiti: m.esiti } : {}),
+        ...(m.confermaDopo === true ? { confermaDopo: true } : {}),
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
@@ -266,12 +269,14 @@ function esitiDellaScheda(storia, chatMsgs) {
   for (let i = h.length - 1; i >= 0 && j >= 0; i--) {
     const m = h[i];
     if (!m || m.role !== 'filo' || m.interrotto) continue;
+    // Una ripresa chiusa muta non è un messaggio del filo: non deve prendere il posto della risposta che chiedeva l'OK.
+    if (!String(m.text || '').trim() && !(Array.isArray(m.actions) && m.actions.length)) continue;
     let k = j;
     while (k >= 0 && !stesso(m, chatMsgs[k])) k--;
     if (k < 0) continue;
     // Un sì dato nel popup è un esito anche senza `_output` (una lezione fissata non ne ha): senza, il modello non sapeva
-    // che l'utente aveva confermato (#1396).
-    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && (a._output || a._confirmed));
+    // che l'utente aveva confermato (#1396). Un no anche (#1373).
+    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && (a._output || a._confirmed || a._rifiutata));
     const rd = Array.isArray(m.reasoningDetails) && m.reasoningDetails.length ? m.reasoningDetails : null;
     if (conEsiti || rd) out.set(FC().chiave(chatMsgs[k]), { azioni: conEsiti ? m.actions : [], ...(rd ? { reasoningDetails: rd } : {}) });
     j = k - 1;
@@ -421,12 +426,12 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     return memo && Array.isArray(memo.dopo) ? memo.dopo : null;
   };
   // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono. Anche uno il
-  // cui esito la scheda ha visto cambiare dopo (un sì nel popup, #1396; la pagina aperta che si sposta da sé su un sito
+  // cui esito la scheda ha visto cambiare dopo (un sì o un no nel popup, #1396, #1373; la pagina aperta che si sposta da sé su un sito
   // bloccato, #590): il giro lo darebbe com'era, l'esito vero lo porta la risposta sola.
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
   const cambiataDopo = (k) => {
     const s = dallaScheda.get(k);
-    return !!s && s.azioni.some((a) => a && (a._confirmed || (a._output && a._output.dopo)));
+    return !!s && s.azioni.some((a) => a && (a._confirmed || a._rifiutata || a._rispostaDopo || (a._output && a._output.dopo)));
   };
   const giroDi = (m) => {
     const k = FC().chiave(m);

@@ -23,7 +23,7 @@
   function haContenuto(m) {
     if (!m || typeof m !== 'object') return false;
     return !!(String(m.text == null ? '' : m.text).trim() || (Array.isArray(m.actions) && m.actions.length)
-      || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length));
+      || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length) || (Array.isArray(m.esiti) && m.esiti.length));
   }
 
   // `trovaChat(id)`: la chat del filo con quell'id, per la risposta citata da un messaggio (#1620).
@@ -36,6 +36,9 @@
     const citata = m.rispostaA && R ? R.risolvi(m.rispostaA, trovaChat) : null;
     if (citata) v.rispostaA = citata;
     if (Array.isArray(m.actions) && m.actions.length) v.actions = m.actions.slice();
+    // Com'è andata ogni azione (#1294): riaperta, la chat la racconta riga per riga, coi bottoni dei file.
+    if (Array.isArray(m.esiti) && m.esiti.length) v.esiti = m.esiti.slice();
+    if (m.confermaDopo === true) v.confermaDopo = true;
     if (Array.isArray(m.cambi) && m.cambi.length) v.cambi = m.cambi.slice();
     if (Number(m.images) > 0) v.images = Number(m.images);
     if (Array.isArray(m.fotoInMemoria) && m.fotoInMemoria.length) v.fotoInMemoria = m.fotoInMemoria.slice();

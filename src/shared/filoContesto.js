@@ -279,19 +279,27 @@
     // I ricordi ripescati da soli stanno nel messaggio dell'utente del loro turno, non qui.
     const azioni = esito && Array.isArray(esito.azioni) ? esito.azioni.filter((a) => !(a && a._auto)) : [];
     const oss = azioni.length && typeof osserva === 'function' ? osserva(azioni) : '';
+    // Com'è andata ogni azione, comprese la fallita e la proposta ferma sulla conferma (#1294, #1130.2): dal disco, quindi
+    // uguale in ogni scheda e dopo un riavvio. Un OK dato dopo il turno lo dice già il filo davanti al messaggio dopo.
+    const ES = global.SN_ESITO;
+    const voci = ES ? ES.daRaccontare(m.esiti, !!oss) : [];
+    const storia = ES && !m.confermaDopo && voci.length ? ES.perModello(voci) : '';
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
-    else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    if (storia) parti.push(storia);
     // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
     if (!oss && Array.isArray(m.guardate) && m.guardate.length) {
       const E = global.SN_ESTERNO;
       const nomi = m.guardate.map((n) => `«${E ? E.perCanaleSistema(n) : String(n)}»`).join(', ');
       parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
     }
-    const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
+    // Un turno di Filo senza niente da dire non va al modello (#1294): un «(nessun testo)» gli insegnava a rispondere a vuoto.
+    if (parti.length === (cambia ? 1 : 0)) return null;
+    const out = { role: 'assistant', content: parti.join('\n\n') };
+    const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda. Verso Claude parte solo col prefisso con
     // cui è nato (src/main/services/providers/ragionamentoRimandato.js).
-    const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     if (rd) out.reasoning_details = rd;
     return out;
   }
@@ -301,7 +309,10 @@
   // la risposta segue la sua domanda: con un'altra conversazione in mezzo il giro non è più quello che il modello ha visto.
   function conGiro(m, prima, giro) {
     if (!giro || !Array.isArray(giro.messaggi) || !prima || prima.chat !== m.chat || prima.role !== 'user') return null;
-    const finale = { role: 'assistant', content: String(giro.testo == null ? '' : giro.testo) || '(nessun testo)' };
+    const testo = String(giro.testo == null ? '' : giro.testo);
+    // Chiuso sugli esiti senza una frase (#1130): il giro finisce con loro, senza un turno vuoto dopo.
+    if (!testo.trim() && giro.messaggi.length) return giro.messaggi.slice();
+    const finale = { role: 'assistant', content: testo || '(nessun testo)' };
     if (Array.isArray(giro.reasoningDetails) && giro.reasoningDetails.length) finale.reasoning_details = giro.reasoningDetails;
     return [...giro.messaggi, finale];
   }
@@ -400,7 +411,9 @@
     const rendiIl = (i, prima) => {
       const m = lista[i];
       const g = m.role !== 'user' && typeof giro === 'function' ? conGiro(m, prima, giro(m)) : null;
-      return g || [rendi(m, prima, opzioni(i))];
+      if (g) return g;
+      const r = rendi(m, prima, opzioni(i));
+      return r ? [r] : [];
     };
     const memo = new Map();
     const pesa = (i) => {

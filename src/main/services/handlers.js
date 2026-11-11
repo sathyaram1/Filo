@@ -3357,10 +3357,14 @@ async function eseguiAzioneFilo(action, {
               });
             } catch (_) {}
           }
-          return { executed: !!(r && r.id), kept: false };
+          if (r && r.id) return { executed: true, kept: false };
+          return { executed: false, kept: false, output: { error: 'il server delle segnalazioni non l\'ha presa' } };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);
-          return { executed: false, kept: false };
+          // Il perché resta nel diario e arriva al modello (#1294): una frase, non il messaggio grezzo.
+          const CE = globalThis.SN_CHAT_ERRORS;
+          const frase = CE && typeof CE.friendly === 'function' ? CE.friendly(e) : '';
+          return { executed: false, kept: false, output: { error: frase || 'invio non riuscito' } };
         }
       }
       case 'IMPOSTA_PREFERENZA': {
@@ -5590,7 +5594,7 @@ function observationsForPrompt(tutte) {
     schedeChiuseForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
   ].filter(Boolean).join('\n\n');
@@ -5631,6 +5635,7 @@ function proxyUnavailableForPrompt(actions) {
 const descriviPerModello = (...a) => globalThis.SN_AZIONI_PER_MODELLO.descrivi(...a);
 const interruptedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.interrotte(...a);
 const confirmedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.confermate(...a);
+const rifiutateForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.rifiutate(...a);
 
 // Le pagine aperte con NAVIGA che si sono spostate da sé su un sito bloccato quando il turno era
 // già finito (la scheda le ha segnate `_output.dopo`): il modello le aveva date per aperte.
@@ -6436,7 +6441,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, dopoOk = null, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // #2085 — le schede lasciate nel campo: valgono solo quelle il cui gettone è ancora nel testo.
   const gettoni = internal || !globalThis.SN_SCHEDE_IN_CHAT ? []
@@ -6675,6 +6680,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       }
       const obs = observationsForPrompt(fuori ? [...(Array.isArray(m.actions) ? m.actions : []), fuori] : m.actions);
       if (obs) parts.push(obs);
+      // Com'è andata (#1294): dall'archivio se la storia viene da lì, se no le proposte ancora ferme sulla conferma, che
+      // gli esiti da leggere non dicono (#1130.2).
+      const ES = globalThis.SN_ESITO;
+      const voci = Array.isArray(m.esiti) && m.esiti.length ? m.esiti
+        : ES.vociArchivio((Array.isArray(m.actions) ? m.actions : []).filter((a) => a && a._confirm));
+      const storia = m.confermaDopo ? '' : ES.perModello(ES.daRaccontare(voci, !!obs));
+      if (storia) parts.push(storia);
       const extra = parts.join('\n\n');
       if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;
       // Il ragionamento del turno passato torna al modello così com'era
@@ -6684,12 +6696,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       // col prefisso con cui è nato (providers/ragionamentoRimandato.js).
       if (Array.isArray(m.reasoningDetails) && m.reasoningDetails.length) msg.reasoning_details = m.reasoningDetails;
     }
+    // Un turno senza niente da dire non va al modello (#1294).
+    if (!String(msg.content || '').trim()) continue;
     threadMessages.push(msg);
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
   const notaCitazione = FCx.notaRisposta(citazione.citata);
-  const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
+  // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
+  const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
+  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
   const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
@@ -7037,7 +7053,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const dopo = await appendToChatArchive(chatId, {
+      role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
+    }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
@@ -7348,7 +7366,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
-  textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // #1373 — dopo l'OK il modello riprende sempre: a lavoro finito non ha niente da aggiungere, e il silenzio è la risposta.
+  const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
+  textReply = String(textReply || '').trim() || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -7407,16 +7427,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
-  if (chatId) {
-    // Nell'archivio solo ciò che è successo, più le azioni fermate (#810) che riaperta racconta come tali.
-    // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
+  // Una ripresa dopo l'OK chiusa muta non lascia niente nella conversazione (#1373).
+  if (chatId && !mutoDopoOk) {
+    // `actions`: ciò che è successo, più le azioni fermate (#810). `esiti`: com'è andata ognuna, anche la fallita e quella
+    // ferma sulla conferma (#1294, #1130.2). Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(
       chatId,
       {
-        role: 'filo', text: textReply, actions: successe, classeLetta,
+        role: 'filo', text: textReply, actions: successe, esiti: renderedActions, classeLetta,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
@@ -7479,7 +7500,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   } catch (_) {}
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
-  } else {
+  } else if (!mutoDopoOk) {
     // I seguiti letti sono parte della domanda a cui la risposta risponde.
     const domandaIntera = [String(userMessage || ''), ...testiDeiSeguiti].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
@@ -8499,6 +8520,8 @@ async function chiudiEClassifica(chatId, { fine = false, via = '' } = {}) {
   if (via) { try { prima = await FiloChats.get(chatId); } catch (_) {} }
   const chat = await FiloChats.close(chatId, { fine });
   if (!chat) { if (via === 'uscita') contaSe('uscitaFinita', chatId); return null; } // chat vuota o inesistente
+  // #1443.2 — chiusa apposta in una home: le altre che la stavano continuando la lasciano subito, non a classificazione finita.
+  if (fine && chat.finita) { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, finita: chat.id }); } catch (_) {} }
   const contata = !!via && !chat.app && ((prima && !prima.closedAt) || via === 'risposta_tardiva')
     && !!(await contaSe('chatChiusa', chat.id, { via, ...misuraDellaChat(chat) }));
   if (via === 'uscita' && !contata) contaSe('uscitaFinita', chat.id);
@@ -8901,7 +8924,9 @@ async function giudicaBlocco(query, items) {
 
 // `avanzamento(fatte, totali)`: schede giudicate su quelle da giudicare. Il
 // totale cala quando la parte ordinata per somiglianza si ferma prima della fine.
-async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
+// `tutto`: «svuota l'archivio», detto dal modello (#1294): tutte, senza giudice e senza indovinarlo dalle parole.
+async function archivioDaCancellare(query, { avanzamento = () => {}, tutto = false } = {}) {
+  if (tutto) return { ok: true, tutto: true, results: (await ArchivedTabs.list()).map(({ embedding, ...meta }) => meta) };
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: [] };
   const settings = await getEffectiveSettings();
@@ -8952,10 +8977,9 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   } catch (e) {
     return { ok: false, error: 'giudizio', detail: e?.message || String(e) };
   }
-  // «Svuota l'archivio» non ha parole da confrontare: le pagine di casa seguono il giudice, che ha preso tutte le altre.
+  // Le pagine che non vanno al giudice si confrontano per parole: «svuota l'archivio» arriva con `tutto`, non da qui.
   const parole = paroleDellaRichiesta(q);
-  const tutto = !parole.length && trovate.length === scored.length + senzaVettore.length;
-  const casaPresa = diCasa.filter((it) => tutto || casaPertinente(parole, it));
+  const casaPresa = diCasa.filter((it) => casaPertinente(parole, it));
   return { ok: true, results: [...trovate, ...casaPresa].map(({ embedding, ...meta }) => meta) };
 }
 

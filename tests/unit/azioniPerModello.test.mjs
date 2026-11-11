@@ -71,6 +71,20 @@ test('conferma arrivata dopo il turno: il riepilogo porta la nota e dice che il 
   assert.equal(A.confermate(null), '');
 });
 
+test('#1373 un no nel popup arriva al modello come non fatto, col testo salvato nel recinto; un sì dopo lo toglie', () => {
+  const r = A.rifiutate([
+    { type: 'SALVA_LEZIONE', testo: LEZIONE, _confirm: { level: 2 }, _rifiutata: true },
+    { type: 'SALVA_LEZIONE', testo: 'ancora in attesa', _confirm: { level: 2 } },
+  ]);
+  assert.match(r, /^\[L'utente ha detto NO alla conferma[^\n]*non è stato fatto\.\n- Filo vuole ricordare[\s\S]*«voce 1»/);
+  assert.match(r, /Non riproporlo da te/);
+  assert.ok(r.includes(APRE) && r.includes(LEZIONE), 'il testo salvato sta nel recinto');
+  assert.ok(!r.includes('ancora in attesa'), 'una proposta senza risposta non è un no');
+  assert.equal(A.rifiutate([{ type: 'SALVA_LEZIONE', testo: LEZIONE, _rifiutata: true, _confirmed: true, _executed: true }]), '',
+    'detto sì dopo il no, la proposta non è più rifiutata');
+  assert.equal(A.rifiutate(null), '');
+});
+
 test('turno interrotto: anche le cose già fatte portano la nota', () => {
   const r = A.interrotte([{ type: 'TIMER', secondi: 600, etichetta: 'pasta', _executed: true }]);
   assert.match(r, /ERANO GIÀ STATE FATTE:\n- [^\n]*«voce 1»/);

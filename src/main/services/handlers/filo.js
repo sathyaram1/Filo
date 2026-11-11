@@ -56,7 +56,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
       fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, rispostaA: msg.rispostaA || null, schede: msg.schede, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, dopoOk: msg.internal && Array.isArray(msg.dopoOk) ? msg.dopoOk.slice(0, 100) : null, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, rispostaA: msg.rispostaA || null, schede: msg.schede, sender });
       return { ok: true, ...r };
     } catch (e) {
       // La chat non è un log: a turno fallito l'utente deve leggere cosa non ha funzionato, non il
@@ -499,7 +499,12 @@ module.exports = function register(on, ctx) {
     // Un'azione confermata dopo il turno (bottone, pannello): la riga senza testo che la racconta.
     const actions = (Array.isArray(msg.actions) ? msg.actions : [])
       .filter((t) => typeof t === 'string' && /^[A-Z_]{2,40}$/.test(t)).slice(0, 20).map((type) => ({ type }));
-    if (!id || (!text.trim() && !actions.length)) return { ok: false, error: 'niente da archiviare' };
+    // Com'è andata, anche quando non è riuscita (#1294): la forma la rifà toStoredMessage.
+    const esiti = (Array.isArray(msg.esiti) ? msg.esiti : []).slice(0, 20)
+      .map((v) => (v && typeof v === 'object' ? globalThis.SN_ESITO.voceArchivio(v) : null)).filter(Boolean);
+    if (!id || (!text.trim() && !actions.length && !esiti.length)) return { ok: false, error: 'niente da archiviare' };
+    // Un OK dato dopo resta nella conversazione del bottone, ma non la fa rinascere se intanto è stata cancellata.
+    if (esiti.length && !(await FiloChats.get(id))) return { ok: false, error: 'chat inesistente' };
     // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
@@ -515,7 +520,8 @@ module.exports = function register(on, ctx) {
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     // Una riga di Filo scritta dalla pagina non è passata dal giudizio dei collegamenti (#1505): riaperta, non ne ha.
     await FiloChats.append(id, {
-      role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+      role, text, ...(actions.length ? { actions } : {}), ...(role === 'filo' && esiti.length ? { esiti, confermaDopo: true } : {}),
+      ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
       ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
       ...(role === 'filo' ? { senzaVerdetto: true } : {}),
     });

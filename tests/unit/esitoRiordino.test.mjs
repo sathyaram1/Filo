@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import '../../src/shared/messages.js';
 import '../../src/shared/esitoAzione.js';
 import '../../src/shared/tabTriage.js';
+import '../../src/shared/righeAttivita.js';
 import '../../src/pages/dashboard/dashboard-attivita.js';
 
 const { esitoRiordino } = globalThis.SN_DASH_ATTIVITA;
