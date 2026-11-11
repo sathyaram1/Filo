@@ -301,7 +301,6 @@
     fraseErrore: fraseErrore,
     fraseAccesso: fraseAccesso,
     impronta: impronta,
-    rispostaPerCard: rispostaPerCard,
   };
 
   if (global.document) avvia();
