@@ -25,7 +25,7 @@ const domanda = (titolo) => ({
   ],
   consiglio: { opzione: 0, perche: 'Filo è caldo.' },
 });
-const CRITICA = 'Provato tutto.\n[2i] Non salva.\n[1i?] Il bordo è grigio freddo: caldo come il resto?\n[1e?] Il menu delle schede è lento: un indice?';
+const CRITICA = 'Provato tutto.\n[2i] Non salva.\n[1i?] Il bordo è grigio freddo: caldo come il resto?\n[e?] Il menu delle schede è lento: un indice?';
 
 test('ogni rilievo col «?» prende la sua domanda nell\'ordine della critica; gli altri restano senza', () => {
   const f = V.parseFindings(CRITICA).findings;
