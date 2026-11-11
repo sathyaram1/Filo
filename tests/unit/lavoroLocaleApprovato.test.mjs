@@ -190,8 +190,11 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
     } else if (SOLO_SANA.has(nome)) {
       assert.doesNotMatch(testo, /['"`](segna|togli|migra)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo chiedere la sanatoria`);
       assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['sana'], `${f}: l'unica op è «sana»`);
+    } else if (SOLO_COPRI.has(nome)) {
+      assert.doesNotMatch(testo, /['"`](segna|togli|migra|sana)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo coprire le note del manutentore`);
+      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['copri'], `${f}: l'unica op è «copri»`);
     } else if (SOLO_CHIAMATA.has(nome)) {
-      assert.doesNotMatch(testo, /['"`](segna|togli|migra|sana)['"`]|\bop\s*:|fiducia_segna|fieldPaths=fiducia/, `${f} deve solo portare la richiesta di chi chiama`);
+      assert.doesNotMatch(testo, /['"`](segna|togli|migra|sana|copri)['"`]|\bop\s*:|fiducia_segna|fieldPaths=fiducia/, `${f} deve solo portare la richiesta di chi chiama`);
     } else {
       assert.doesNotMatch(testo, /ownerFiducia|owner-fiducia|fiducia_segna|fieldPaths=fiducia/, `${f} apre una strada alla fiducia`);
     }
