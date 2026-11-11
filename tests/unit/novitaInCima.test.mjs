@@ -10,7 +10,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { aggiunteSottoUscite, registroDa, sottoUsciteSuMain, spostaInCima, FILE_NOVITA } from '../../scripts/lib/novita-in-cima.mjs';
+import { aggiunteSottoUscite, chiaviDoppie, registroDa, sottoUsciteSuMain, spostaInCima, testoRiportaInCima, FILE_NOVITA } from '../../scripts/lib/novita-in-cima.mjs';
 import { riportaNelClone } from '../../scripts/routine-channel.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
