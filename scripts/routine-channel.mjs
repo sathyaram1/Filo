@@ -330,8 +330,9 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
-// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
-export const ID_IMMAGINE_RE = /^(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
+// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K; con `uM.` davanti sono
+// dell'unita M di un pacchetto (#2267). Specchio di ID_RE in routine/immagini.js del server.
+export const ID_IMMAGINE_RE = /^(u\d{1,2}\.)?(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
 
 /**
  * Chi chiede un'immagine: l'id, e il biglietto se passato (davanti all'id o con `--ticket`, uguali se
