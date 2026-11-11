@@ -577,7 +577,7 @@ export function rilieviConDomanda(findings, domande) {
   const lista = Array.isArray(findings) ? findings.map((f) => ({ ...f })) : [];
   const conSegno = lista.map((f, i) => ({ f, n: i + 1 })).filter((x) => x.f.decision);
   const d = Array.isArray(domande) ? domande : [];
-  const riga = (x) => `[${x.f.level}${x.f.sede}?] ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
+  const riga = (x) => `${typeof VERIFIER_ROUND.findingTag === 'function' ? VERIFIER_ROUND.findingTag(x.f) : `[${x.f.sede === 'e' ? 'e' : `${x.f.level}i`}?]`} ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
   if (conSegno.length > d.length) {
     const senza = conSegno.slice(d.length);
     return { ok: false, errore: `${senza.length === 1 ? `il rilievo ${senza[0].n}` : `i rilievi ${senza.map((x) => x.n).join(', ')}`} col «?» `
