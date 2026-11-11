@@ -316,7 +316,7 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (somma) dati.somma = true;
   if (cursore !== undefined) dati.cursore = String(cursore);
   if (limite !== undefined) dati.limite = Number(limite);
-  return { ok: true, dati, tutte, cache, json: argv.includes('--json') };
+  return { ok: true, dati, tutte, cache, rifiuti, json: argv.includes('--json') };
 }
 
 const dollari = (n) => `${(Number(n) || 0).toFixed(2)} $`;
