@@ -235,6 +235,13 @@ test('sblocca vuole il numero del feedback fermo; il resto è la nota dell\'owne
   assert.equal(M.richiestaSblocca(['dodici']).ok, false);
 });
 
+test('#2215: dopo lo sblocco di un guasto la riga non dice «nota scritta»: nelle note non è scritto niente', () => {
+  assert.equal(M.rigaNotaOSblocco({ numero: '1919', sbloccato: 'guasto', notaScritta: false }),
+    '#1919: sbloccato (guasto), nelle note non ho scritto niente: il lavoro riparte con chi lo prende dopo.');
+  assert.match(M.rigaNotaOSblocco({ numero: '1919', sbloccato: 'processo' }), /^#1919: nota scritta, il lavoro fermo \(processo\) riparte/);
+  assert.equal(M.rigaNotaOSblocco({ numero: '7' }), '#7: nota scritta.');
+});
+
 // ── SPEC-MANUTENTORE: il canale della chiave, il contesto piccolo e intero, le indicazioni, il redattore ──
 
 import { readFileSync } from 'node:fs';
