@@ -1452,4 +1452,10 @@ export function controlliLocali(cmd, argv) {
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
-if (isMain) process.exit(await main(process.argv.slice(2)));
+// L'uscita si chiude dopo che stdout e stderr hanno scritto tutto: in una pipe un exit subito tagliava ai primi 64 KB
+// proprio le righe in coda (rami del server, avvisi). Sentinella: tests/unit/manutentore.test.mjs.
+if (isMain) {
+  const codice = await main(process.argv.slice(2));
+  await Promise.all([process.stdout, process.stderr].map((s) => new Promise((fatto) => s.write('', fatto))));
+  process.exit(codice);
+}
