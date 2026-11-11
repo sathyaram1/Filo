@@ -114,14 +114,18 @@ test('D88: il giro paga il bilancio più alto che i rilievi possono pagare, e ch
   const insieme = decide([f(3, 'i', 'a'), f(2, 'i', 'b')], { count3: 5 });
   assert.equal(insieme.consume, 'cap2');
   assert.deepEqual([insieme.counts.count3, insieme.counts.count2], [5, 1]);
-  // Un 1 e uno 0 senza più bilanci salgono sul giro del 2, come prima.
-  const sale = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], { count1: 1 });
-  assert.deepEqual(livelli(sale.fix), ['2i', '1i', '0i']);
+  // Due 1 senza più bilanci salgono sul giro del 2, come prima.
+  const sale = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')], { count1: 1 });
+  assert.deepEqual(livelli(sale.fix), ['2i', '1i', '1i']);
   assert.equal(sale.consume, 'cap2');
-  // Un vicino non paga e non fa partire niente, nemmeno con cap0 aperto.
-  const vicino = decide([f(2, 'v', 'accanto')], {}, { ...CAPS, cap0: 1 });
-  assert.deepEqual(vicino.fix, []);
-  assert.deepEqual(livelli(vicino.derived), ['2v']);
+  // Un esterno non paga e non fa partire niente; nemmeno un vicino dello stato vecchio, che ora è esterno.
+  for (const fuori of [f(null, 'e', 'altrove'), f(2, 'v', 'accanto')]) {
+    const d = decide([fuori]);
+    assert.deepEqual(d.fix, []);
+    assert.deepEqual(d.derived, []);
+    assert.equal(d.consume, null);
+    assert.deepEqual(d.external.map((x) => [x.level, x.sede, x.priority]), [[null, 'e', null]]);
+  }
   // Un 1 col ? resta fuori anche se il giro parte.
   const domanda = decide([f(2, 'i', 'non salva'), f(1, 'i', 'A o B?', true)], { count2: 4 });
   assert.deepEqual(livelli(domanda.fix), ['2i']);
