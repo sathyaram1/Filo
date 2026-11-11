@@ -215,16 +215,84 @@ test('il clone del server si cerca dove lo mettono le routine e la sessione loca
   }
 });
 
-test('nelle routine il clone del server non si aggiorna: niente richiesta già rifiutata, ma da quando è (#2340)', async (t) => {
+test('il clone del server si cerca accanto al repo anche da una sua worktree, come fanno chiusura e verifica locali', () => {
+  const ci = new Set([join(resolve('/x/filo-security'), '.git'), join(resolve('/x/filo-security'), 'functions', 'tools', 'server-fondi.js')]);
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo/.claude/worktrees/w', env: {}, esiste: (p) => ci.has(p) }), { dir: resolve('/x/filo-security') });
+});
+
+// Il server su un'origine locale: main, poi lavori spinti dopo che il clone è nato (come nella sessione cloud).
+function serverConOrigine(t, { corto = false } = {}) {
+  const base = cartellaTemporanea('manutentore-origine');
+  t.after(() => togliCartella(base));
+  const origine = join(base, 'server.git');
+  const lavoro = join(base, 'lavoro');
+  const g = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '--bare', origine], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '-b', 'main', lavoro], { stdio: 'ignore' });
+  g(lavoro, 'config', 'user.email', 't@t'); g(lavoro, 'config', 'user.name', 't'); g(lavoro, 'config', 'commit.gpgsign', 'false');
+  mkdirSync(join(lavoro, 'functions', 'src'), { recursive: true });
+  writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), 'x'); g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'inizio');
+  g(lavoro, 'remote', 'add', 'origin', origine); g(lavoro, 'push', '-q', 'origin', 'main');
+  const clone = join(base, 'filo-security');
+  execFileSync('git', ['clone', '-q', ...(corto ? ['--depth', '1'] : []), '--single-branch', '--branch', 'main', pathToFileURL(origine).href, clone], { stdio: 'ignore' });
+  g(clone, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+  const spingi = (ramo, msg) => {
+    g(lavoro, 'checkout', '-q', '-B', 'tmp', 'main');
+    writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), ramo); g(lavoro, 'commit', '-qam', msg);
+    g(lavoro, 'push', '-q', 'origin', `tmp:refs/heads/${ramo}`);
+  };
+  return { origine, clone, spingi };
+}
+
+test('nelle routine il clone del server si aggiorna da sé, anche poco profondo e con solo main: i lavori nati dopo si vedono (#2340)', async (t) => {
   const leggi = catturaConsole(t);
   const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
-  const server = repoConRami([['claude/uno', 'functions/src/x.js', '#31 uno']]);
-  t.after(() => { togliCartella(app); togliCartella(server); });
-  assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', server], { root: app, env: {} }), 0);
+  t.after(() => togliCartella(app));
+  const { clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  spingi('claude/due', '#32 due');
+  assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.match(out, /^claude\/due sul server \(#32\)/m);
+  assert.doesNotMatch(out, /NON aggiornati/);
+  assert.equal(await M.main(['incroci', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+});
+
+test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce lo dice, col clone com\'era (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(app));
+  const { origine, clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/uno sul server \(#31\)/m);
+  // Un'origine che non risponde: l'avviso, e i rami di prima restano.
+  togliCartella(origine);
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
   const out = leggi();
   assert.match(out, /^claude\/uno sul server/m);
-  assert.match(out, /Rami del server dal clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/);
-  assert.doesNotMatch(out, /non si sono aggiornati/, 'il biglietto del manutentore non chiede git-server, che gli dice sempre di no');
+  assert.match(out, /Rami del server NON aggiornati \(.+\): sono quelli del clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\./);
+  // Un clone poco profondo che non si completa lo dice: i lavori del server probabilmente mancano.
+  const { origine: o2, clone: c2 } = serverConOrigine(t, { corto: true });
+  togliCartella(o2);
+  assert.equal(await M.main(['rami', '--clone-server', c2], { root: app, env: {} }), 0);
+  assert.match(leggi(), /clone poco profondo.*i lavori del server mancano/);
+});
+
+test('il contesto intero e quello piccolo portano anche i rami del server, coi file col prefisso (#2340)', () => {
+  const rami = [
+    { ramo: 'worker/A-1', repo: 'server', data: '2026-11-11T10:00:00Z', avanti: 2, file: ['functions/src/x.js'], feedback: ['900'] },
+    { ramo: 'worker/A-1', data: '2026-11-11T10:00:00Z', avanti: 1, file: ['scripts/y.mjs'], feedback: ['900'] },
+  ];
+  const intero = M.testoIntero({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [], rami });
+  assert.match(intero, /## Rami in corso \(2\)/);
+  assert.match(intero, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  const piccolo = M.testoPiccolo({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [{ num: '900', priorita: 3 }], rami });
+  assert.ok(piccolo.ok, piccolo.motivo);
+  assert.match(piccolo.testo, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  assert.match(piccolo.testo, /^worker\/A-1 \(#900\), 1 commit, 2026-11-11: scripts\/y\.mjs$/m);
 });
 
 test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
