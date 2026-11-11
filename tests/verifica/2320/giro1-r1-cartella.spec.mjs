@@ -45,7 +45,7 @@ test('r1 lanciato dal clone, lo strumento lavora sul clone o dice su quale carte
 
   const env = { ...process.env };
   delete env.FILO_REPO_ROOT;
-  const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'novita-in-cima.mjs')], { cwd: clone, env, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [tool], { cwd: clone, env, encoding: 'utf8' });
   const uscita = `${r.stdout}\n${r.stderr}`;
   const sulClone = uscita.includes('r1-2320');
   const diceDove = uscita.includes(ROOT) || /cartella|clone/i.test(uscita);
