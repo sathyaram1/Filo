@@ -578,6 +578,16 @@ test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuov
   assert.deepEqual(derivatiDaAprire(vecchia, [alfa, beta]).map((d) => d.titolo), ['coda BETA disordinata']);
 });
 
+test('chiavi registrate con la scala a quattro (#2339): «2e:», «1v:», «0i:» valgono come esterno ed 1, e non riaprono', () => {
+  const p = { num: 7, slug: 'sette', derivatiAperti: [{ chiavi: ['2e:esterno vecchio', '1v:vicino vecchio', '0i:raro vecchio'] }] };
+  const der = [
+    { level: null, sede: 'e', text: 'esterno vecchio' },
+    { level: 1, sede: 'v', text: 'vicino vecchio' },
+    { level: 0, sede: 'i', text: 'raro vecchio' },
+  ];
+  assert.deepEqual(derivatiDaAprire(p, der), []);
+});
+
 test('giro intero con un rimasto messo da parte a ogni giro: ogni rilievo in un feedback solo', async () => {
   const b = banco({ verdetti: ['fixed', 'fixed', 'pass'] });
   const giri = [[{ level: 2, sede: 'i', text: 'ALFA' }], [{ level: 2, sede: 'i', text: 'ALFA' }, { level: 2, sede: 'i', text: 'BETA' }]];
