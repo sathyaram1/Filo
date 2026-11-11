@@ -40,7 +40,8 @@ test('le fette delle due attese restano sotto il timeout predefinito di una chia
 test('l’attesa e il rilascio del worker leggono lo stesso criterio di lavoro vivo', () => {
   const sorgente = readFileSync(CANALE, 'utf8');
   assert.doesNotMatch(sorgente, /cosa:\s*\[\s*'processi'\s*\]/, 'un criterio scritto a mano');
-  assert.equal(sorgente.match(/cosa: SEGNI_RILASCIO_WORKER\b/g)?.length, 2);
+  assert.equal(sorgente.match(/cosa: SEGNI_RILASCIO_WORKER\b/g)?.length, 1, 'una lettura sola, in lavoroVivoDelWorker');
+  assert.equal(sorgente.match(/await lavoroVivoDelWorker\(\)/g)?.length, 2, 'la chiamano l\'attesa e il rilascio');
 });
 
 test('l’elenco d’uso del canale nomina ogni suo comando', () => {
