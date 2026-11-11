@@ -514,7 +514,8 @@ export function stimaDurataControlli(nSpec) {
   const n = Math.max(0, Math.floor(Number(nSpec) || 0));
   const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
   const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
-  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${n} spec, circa mezzo minuto l'uno con un worker).` };
+  const cosa = n ? `unit più ${n} spec, circa mezzo minuto l'uno con un worker` : 'solo unit, nessuno spec scelto';
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (${cosa}).` };
 }
 
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
