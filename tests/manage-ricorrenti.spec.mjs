@@ -183,6 +183,38 @@ test('Modifica e Salva mandano i campi ripuliti, solo i toccati cambiano, e la r
   await expect(r.getByRole('button', { name: 'Modifica' })).toBeFocused();
 });
 
+// #2303: il tetto di costo per corsa sta accanto a modello e sforzo, con la sua stima; vuoto è quello automatico.
+test('il tetto di costo per corsa: automatico dalla mediana, scritto dall\'owner, rifiutato col numero se storto', async ({ openTab }) => {
+  const page = await apri(openTab);
+  const r = riga(page, 'rev-domande');
+  await expect(r.locator('.mg-rc-tetto')).toHaveText('tetto 124 $ (automatico)');
+  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /Una corsa costa di solito 61,7 \$ \(mediana di 3\), circa 1\.875 \$ al mese\./);
+  await expect(riga(page, 'potatura').locator('.mg-rc-tetto')).toHaveText('senza tetto');
+  await r.getByRole('button', { name: 'Modifica' }).click();
+  const form = r.locator('form.mg-rc-form');
+  const tetto = form.locator('[data-campo="tettoUsd"]');
+  await expect(tetto).toHaveValue('');
+  await expect(tetto).toHaveAttribute('placeholder', 'automatico, 124 $');
+  await expect(form.locator('.mg-rc-tetto-stima')).toHaveText('di solito 61,7 $ a corsa');
+  await tetto.fill('tanti');
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form.locator('.mg-rc-form-msg')).toHaveText('Il tetto di costo è un numero di dollari da 0,01 a 10000, o vuoto per quello automatico.');
+  expect(await inviati(page, 'ricorrente_salva')).toHaveLength(0);
+  await tetto.fill('90,5');
+  await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-tetto.png', fullPage: true });
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form).toHaveCount(0);
+  const [salva] = await inviati(page, 'ricorrente_salva');
+  expect(salva.ricorrente.tettoUsd).toBe(90.5);
+  // Riaperto, il tetto scritto c'è; svuotato, torna automatico.
+  await r.getByRole('button', { name: 'Modifica' }).click();
+  await expect(form.locator('[data-campo="tettoUsd"]')).toHaveValue('90.5');
+  await form.locator('[data-campo="tettoUsd"]').fill('');
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form).toHaveCount(0);
+  expect((await inviati(page, 'ricorrente_salva')).pop().ricorrente.tettoUsd).toBeNull();
+});
+
 test('un rifiuto del server si legge accanto al modulo col suo dettaglio, e quello scritto resta', async ({ openTab }) => {
   const page = await apri(openTab, { rifiuta: 'il nome «Potatura dei rami» è già di un altro ricorrente' });
   const r = riga(page, 'rev-domande');
