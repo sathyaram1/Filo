@@ -283,6 +283,15 @@ test('git: le righe della configurazione, chiave per chiave', () => {
 });
 
 const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
+// Con la sonda vera il contesto è quello che il main dà su questo sistema (perimetroLettura): `win: false` su
+// Windows toglierebbe l'unità dal percorso, e la sonda guarderebbe una cartella che non esiste (#2334).
+const QUI = { win: process.platform === 'win32', maiuscole: process.platform === 'win32' || process.platform === 'darwin', shell: 'sh' };
+const sondaVera = (cwd, home) => ({ ...QUI, cwd, home, gitLancia: T.gitLanciaIn });
+
+test('le prove con la sonda git vera non presumono il sistema: il contesto lo dà sondaVera', () => {
+  const src = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /win: (?:false|true)[^\n]*gitLancia: T\.gitLanciaIn/);
+});
 // git lancia fsmonitor con la sua shell, anche su Windows: touch c'è ovunque ci sia git.
 const programmaSegno = (segno) => `touch "${segno.replace(/\\/g, '/')}"`;
 // La prova vale solo se il programma del repository parte davvero quando lo lancia git.
@@ -308,7 +317,7 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     assert.equal(T.gitLanciaIn(ostile), 'si');
     assert.equal(T.gitLanciaIn(join(ostile, '.git')), 'si', 'anche da dentro la cartella .git');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    const ctx = { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn };
+    const ctx = sondaVera(ostile, base);
     assert.equal(C.classify('git status', ctx), 2);
     assert.equal(C.classify('git status', { ...ctx, cwd: sano }), 1);
     // La shell che scioglie un asterisco porta in una cartella che la sonda non vede: si chiede.
@@ -356,7 +365,7 @@ test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repo
     assert.equal(T.gitLanciaIn(nudo), 'si');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
     for (const cmd of ['git status', 'git diff']) {
-      assert.equal(C.classify(cmd, { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2, cmd);
+      assert.equal(C.classify(cmd, sondaVera(ostile, base)), 2, cmd);
     }
     segnoVero(ostile, segno);
   } finally {
@@ -404,7 +413,7 @@ test('git: un programma d\'avvio che una lettura fa partire fa chiedere; quelli 
     assert.equal(T.gitLanciaIn(ostile), 'si');
     for (const d of [dev, dev2]) assert.equal(T.gitLanciaIn(d), '', 'un hook di sola scrittura non fa chiedere');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    const ctx = (cwd) => ({ cwd, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn });
+    const ctx = (cwd) => sondaVera(cwd, base);
     for (const cmd of ['git status', 'git diff']) {
       assert.equal(C.classify(cmd, ctx(ostile)), 2, cmd);
       const costo = AL.costoFor({ type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: ctx(ostile) });
@@ -439,7 +448,7 @@ test('git: un programma d\'avvio di lettura in un sottomodulo fa chiedere come n
     assert.equal(T.gitLanciaIn(parent), 'si');
     assert.equal(T.gitLanciaIn(join(parent, 'sub')), 'si', 'anche da dentro il sottomodulo');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    assert.equal(C.classify('git status', { cwd: parent, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2);
+    assert.equal(C.classify('git status', sondaVera(parent, base)), 2);
     segnoVero(parent, segno);
   } finally {
     togliCartella(base);
@@ -495,7 +504,7 @@ test('git: le chiavi che scrivono VS Code, GitHub CLI e husky non fanno chiedere
     g('config', 'remote.origin.gh-resolved', 'base');
     g('config', 'core.hooksPath', '.husky/_');
     assert.equal(T.gitLanciaIn(repo), '');
-    assert.equal(C.classify('git status', { cwd: repo, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 1);
+    assert.equal(C.classify('git status', sondaVera(repo, base)), 1);
     // La cartella spostata si segue: un hook di lettura lì dentro fa chiedere, anche da una sottocartella.
     mkdirSync(join(repo, '.husky', '_'), { recursive: true });
     mkdirSync(join(repo, 'src'));
