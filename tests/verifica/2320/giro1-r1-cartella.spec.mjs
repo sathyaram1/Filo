@@ -39,6 +39,10 @@ test('r1 lanciato dal clone, lo strumento lavora sul clone o dice su quale carte
   writeFileSync(join(clone, 'src', 'shared', 'patchNotes.js'), registro(['Di main', RIGA]));
   git(['commit', '-qam', 'riga del ramo']);
 
+  const tool = join(ROOT, 'scripts', 'novita-in-cima.mjs');
+  const controllo = spawnSync(process.execPath, [tool], { cwd: clone, env: { ...process.env, FILO_REPO_ROOT: clone }, encoding: 'utf8' });
+  expect(controllo.stdout, 'col clone indicato a mano la riga si vede').toContain('r1-2320');
+
   const env = { ...process.env };
   delete env.FILO_REPO_ROOT;
   const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'novita-in-cima.mjs')], { cwd: clone, env, encoding: 'utf8' });
