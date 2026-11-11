@@ -109,7 +109,7 @@ const indice = (righe, re) => righe.findIndex((r) => re.test(r));
 test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, rilievi aperti come feedback, worktree tolti', async () => {
   let filo = null;
   const b = banco({
-    verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }],
+    verdetti: ['fixed', 'pass'], derived: [{ level: null, sede: 'e', text: 'altro lavoro Z' }],
     risposte: [[/server-fondi-pratica/, (riga, o) => { filo = o.env && o.env.FILO_PUBLIC_REPO; }]],
   });
   const fine = await b.motore.avvia();
