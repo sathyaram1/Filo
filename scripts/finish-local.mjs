@@ -183,9 +183,9 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
- * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
- * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
+ * I file da cui scegliere gli spec: il ramo contro `base`; in un giro di riallineamento SOLO quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il lavoro l'ha già
+ * provato la verifica e il lato di main la sua suite: senza file risolti restano gli unit (#1907, #2237).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
