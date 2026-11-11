@@ -1957,19 +1957,26 @@ if (isMain) {
     const { stopBeat } = await import('./lib/routine-beat.mjs');
     const ticket = args[0];
     const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+    const rilascioForzato = (extra, mio, env = {}) => {
+      const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+        ...extra, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, ...env } });
+      const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+      if (!ok) stopBeat(ROOT, { ticket });
+      const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+      return { ok, motivo };
+    };
     const esito = await veglia({
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
-      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
-      rilascia: (guasto, mio, quadro) => {
-        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
-          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, [ENV_QUADRO_FERMO]: String(quadro || '') } });
-        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
-        if (!ok) stopBeat(ROOT, { ticket });
-        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
-        return { ok, motivo };
+      rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
+      // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
+      costo: async (s) => {
+        const { costoDeiFile } = await import('./session-report.mjs');
+        return costoDeiFile((s.tracce && s.tracce.file) || [], { since: Number.isFinite(s.dalMs) ? new Date(s.dalMs).toISOString() : '' });
       },
+      rilasciaOltre: (oltre, mio) => rilascioForzato(['--oltre-tetto', `${oltre.usd}:${oltre.tettoUsd}`], mio),
     });
     console.log(esito.testo);
     process.exit(esito.uscita);
