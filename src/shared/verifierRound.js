@@ -363,10 +363,10 @@
     };
   }
 
-  /** La sede canonica: `e` e `v` come scritte, tutto il resto (anche l'assenza) interno. PURA. */
+  /** La sede canonica: `e` come scritta, e il `v` dello stato vecchio è esterno; il resto (anche l'assenza) interno. PURA. */
   function sedeDi(raw) {
     const s = String(raw == null ? '' : raw).trim().toLowerCase();
-    return s === 'e' || s === 'v' ? s : 'i';
+    return s === 'e' || s === 'v' ? 'e' : 'i';
   }
 
   /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono). PURA. */
