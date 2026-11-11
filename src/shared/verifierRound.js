@@ -646,16 +646,18 @@
    * Come i rilievi che un lavoro non corregge diventano feedback derivati
    * (decisione dell'owner del 2026-09-27). PURA. Tre tipi di gruppo:
    *   - `esterno`: un rilievo con sede `e`, da solo (anche col `?`: la domanda
-   *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
-   *   - `decisione`: un interno o vicino col `?`, da solo (anche un 2 col `?`
-   *     che intanto si corregge: porta `inCorrezione`);
-   *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
-   *     non corretti) in un feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
+   *     viaggia nel suo feedback), senza livello e con `priority: null`: lo
+   *     classifica chi classifica ogni feedback nuovo (#2339);
+   *   - `decisione`: un interno col `?`, da solo (anche un 2 col `?` che
+   *     intanto si corregge: porta `inCorrezione`);
+   *   - `rimasti`: TUTTI gli altri interni messi da parte dal bilancio in un
+   *     feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
    * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
-   * più `sede`, `level`, `priority` e `decision` canonici. Ordine: i gruppi da
-   * soli come arrivano, `rimasti` in fondo.
-   * @returns {Array<{ tipo: 'esterno'|'decisione'|'rimasti', priority: number, decision: boolean, findings: object[] }>}
+   * più `sede`, `level`, `priority` e `decision` canonici (lo stato della scala
+   * vecchia come in normalizeFindings). Ordine: i gruppi da soli come arrivano,
+   * `rimasti` in fondo.
+   * @returns {Array<{ tipo: 'esterno'|'decisione'|'rimasti', priority: number|null, decision: boolean, findings: object[] }>}
    */
   function derivedGroups(input) {
     let list = input;
@@ -667,13 +669,17 @@
     let rimasti = null;
     for (const f of list) {
       if (!f || typeof f !== 'object') continue;
-      const level = Number(f.level);
+      const sede = sedeDi(f.sede);
+      if (sede === 'e') {
+        const item = Object.assign({}, f, { level: null, sede, priority: null, decision: f.decision === true });
+        groups.push({ tipo: 'esterno', priority: null, decision: item.decision, findings: [item] });
+        continue;
+      }
+      const level = Number(f.level) === 0 ? 1 : Number(f.level);
       if (!LEVELS.includes(level)) continue;
-      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : prioritaDiNascita(level);
-      const item = Object.assign({}, f, { level, sede: sedeDi(f.sede), priority, decision: f.decision === true });
-      if (item.sede === 'e') {
-        groups.push({ tipo: 'esterno', priority, decision: item.decision, findings: [item] });
-      } else if (item.decision) {
+      const priority = PRIORITA.includes(Number(f.priority)) ? Number(f.priority) : prioritaDiNascita(level);
+      const item = Object.assign({}, f, { level, sede, priority, decision: f.decision === true });
+      if (item.decision) {
         groups.push({ tipo: 'decisione', priority, decision: true, findings: [item] });
       } else {
         if (!rimasti) rimasti = { tipo: 'rimasti', priority, decision: false, findings: [] };
