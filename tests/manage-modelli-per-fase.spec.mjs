@@ -154,7 +154,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await scegli(page, 'new-work', 'effort', 'max');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Primo lavoro: salvato.');
   expect((await sulServer(app)).roleModels['new-work']).toEqual({ effort: 'max' });
-  expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([['roleModels.verifier.model'], ['roleModels.`new-work`.effort']]);
+  expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([['roleModels.`verifier-riallineamento`.effort'], ['roleModels.verifier.model'], ['roleModels.`new-work`.effort']]);
 
   page = await riapri(page);
   await expect(page.locator('select[data-ruolo="verifier"][data-campo="model"]')).toHaveValue('sonnet');
