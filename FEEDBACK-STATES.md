@@ -278,7 +278,7 @@ all'owner, il freno.
   Gestione → Automazioni). Senza N vale il freno.
 - **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché
   `sblocca` del manutentore o dell'owner, una loro nota o un'attesa sulla correzione non lo sbloccano; gli altri
-  lavori vanno avanti. Lo `sblocca` del manutentore su un guasto non scrive nelle note (il testo resta nello stato,
+  lavori vanno avanti. Lo sblocco del manutentore su un guasto, anche scritto come nota, non scrive nelle note (il testo resta nello stato,
   `ultimoSblocco`), quindi non sporca chi riprende (#2215). Una **domanda di processo** nel rilascio (`--processo`)
   ferma il lavoro allo stesso modo e sveglia il manutentore, non l'owner; la sua risposta è una nota, che chi
   riprende legge; col manutentore spento resta nelle note e il lavoro non si ferma.
