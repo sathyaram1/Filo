@@ -2250,6 +2250,8 @@
     gitConfigLancia,
     // Per la sentinella che prova su ogni nome le forme che scrivono o eseguono: chi aggiunge un nome la deve aggiornare.
     nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ], git: [...GIT_READ] }),
+    // Per la sentinella che prova ogni segno interno scritto a mano.
+    segniInterni,
     cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
