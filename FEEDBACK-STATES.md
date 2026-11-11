@@ -317,7 +317,11 @@ per un primo lavoro la voce normale fa prima la ricerca «già risolto su main»
 anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
 con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine, né un
 feedback legato a un'altra sessione accesa che non ha ancora preso il suo biglietto (entro
-la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Quando
+la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Una
+sessione accesa che riceve un no al posto del biglietto (tetto per chiave, N pieno, o
+altro) si chiude, e il suo feedback torna libero subito. Sotto N una sessione libera
+prende prima il prossimo dell'ordine, poi il resto, e non il posto che una sessione accesa
+per l'ordine e ancora in viaggio sta per prendere. Quando
 una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
 lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
 dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
