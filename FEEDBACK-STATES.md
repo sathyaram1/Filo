@@ -308,7 +308,10 @@ fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella de
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
 semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
 dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
-accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione al suo
+accendono una sessione per ciascuno fino ai posti liberi, e per ogni routine non più di
+quanti biglietti al minuto il server dà alla sua chiave, meno uno per il manutentore: le
+altre vanno all'altro account o al giro dopo (#2343). Una priorità 3 già in viaggio non
+conta fra le pronte e, come le sessioni vive sulle 3, non occupa un posto di N. Legano ogni sessione al suo
 numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
 per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
 anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
