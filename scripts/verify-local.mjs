@@ -628,7 +628,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const serverFermo = partenzaServer === String((server && server.sha) || '');
   if (sha && partenza && sha === partenza && serverFermo) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
-    // Fermano solo gli interni: un vicino non corretto esce coi rimasti, qualunque livello porti scritto.
+    // Fermano solo gli interni.
     const gravi = pending.filter((f) => ROUND.sedeDi(f.sede) === 'i' && Number(f.level) >= 2);
     const lievi = pending.filter((f) => !gravi.includes(f));
     if (gravi.length) {
