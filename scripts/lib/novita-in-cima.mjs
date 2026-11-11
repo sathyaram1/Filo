@@ -320,6 +320,18 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
       const e = cima.elenchi[chiave];
       attesi[0][chiave] = [...(attesi[0][chiave] || []), ...portate(chiave)];
       if (!e) {
+        const corpo = daPortare[chiave].map((t) => `${rProp}  ${t},\n`).join('');
+        // Al posto dove main scrive lo stesso elenco: un suo `features` nello stesso blocco diventa un conflitto del
+        // rebase, non una chiave doppia che ne cancella le righe in silenzio (#2320).
+        const correzioni = chiave === 'features' && cima.elenchi.fixes && cima.elenchi.fixes.prop;
+        if (correzioni && rientro(src, correzioni.inizio) !== null) {
+          const voci = Object.entries(attesi[0]).filter(([k]) => k !== chiave);
+          voci.splice(voci.findIndex(([k]) => k === 'fixes'), 0, [chiave, attesi[0][chiave]]);
+          attesi[0] = Object.fromEntries(voci);
+          const da = inizioRiga(src, correzioni.inizio);
+          modifiche.push({ da, a: da, testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
+          continue;
+        }
         const ultima = cima.props[cima.props.length - 1];
         const v = virgolaDopo(src, ultima, cima.chiudeOggetto);
         if (v) modifiche.push(v);
