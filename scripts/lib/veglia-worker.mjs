@@ -113,20 +113,6 @@ const pulito = (t) => String(t || '').replace(/\\/g, '/').replace(/["`$]/g, "'")
 const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 60);
 
 /**
- * L'attesa che Claude Code dichiara prima di ritentare una richiesta al fornitore (limite di frequenza, servizio
- * sovraccarico): la riga di sistema `api_error` col suo `retryInMs`. Fino alla sua fine il silenzio non è un fermo (#2303).
- * @returns {{ inizioMs: number, finoMs: number, tentativo: number, di: number } | null} PURA.
- */
-export function attesaDichiarata(o) {
-  if (!o || o.type !== 'system' || o.subtype !== 'api_error') return null;
-  const ms = Date.parse(String(o.timestamp || ''));
-  const attesa = Number(o.retryInMs);
-  if (!Number.isFinite(ms) || !Number.isFinite(attesa) || attesa <= 0) return null;
-  const intero = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : 0);
-  return { inizioMs: ms, finoMs: ms + attesa, tentativo: intero(o.retryAttempt), di: intero(o.maxRetries) };
-}
-
-/**
  * L'ultimo passo di un transcript, senza il testo del worker: lo strumento chiamato per ultimo (ora, risposta avuta),
  * di che tipo è l'ultima riga, il modello dell'ultimo turno e l'attesa dichiarata che finisce più tardi. PURA.
  */
