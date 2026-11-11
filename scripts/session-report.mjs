@@ -623,6 +623,11 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // Nome, descrizione e forma di ogni chiamata, per i falliti e le attese; i falliti che aspettano la chiamata dopo.
   const chiamate = new Map();
   let senzaSeguito = [];
+  // Per la causa dei rifiuti di scrittura: i percorsi letti o scritti (con l'ordine dell'ultima volta) e i comandi.
+  const letti = new Set();
+  const tocchi = new Map();
+  const comandi = [];
+  let ultimaShell = -1;
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
