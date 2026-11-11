@@ -231,6 +231,34 @@ test('lo strumento dopo il rebase: sposta, committa solo il registro, e una seco
   assert.deepEqual([ancora.ok, ancora.spostate.length, ancora.commit], [true, 0, '']);
 });
 
+test('il features aperto dallo strumento e quello scritto intanto da main nello stesso blocco: il rebase si ferma, le righe di main non spariscono (#2320)', () => {
+  const dir = cartellaTemporanea('novita-doppia-');
+  fatte.push(dir);
+  git(dir, ['init', '-q', '--initial-branch=main']);
+  identita(dir);
+  const main = [{ v: '0.2.258', fixes: ['Correzione di main'] }, { v: '0.2.257', features: ['Uscita'] }];
+  scrivi(dir, 'package.json', '{\n  "name": "filo",\n  "version": "0.2.257"\n}\n');
+  scrivi(dir, FILE_NOVITA, sorgente(main));
+  committa(dir, 'inizio');
+  git(dir, ['checkout', '-qb', 'worker/2320']);
+  const tardiva = sorgente([main[0], { v: '0.2.257', features: ['Uscita', R1] }]);
+  scrivi(dir, FILE_NOVITA, tardiva);
+  committa(dir, 'il lavoro, sotto la versione uscita');
+  const r = spostaInCima(tardiva, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.257' }, oggi: OGGI });
+  assert.equal(r.ok, true, r.motivo);
+  scrivi(dir, FILE_NOVITA, r.src);
+  committa(dir, 'novità: una riga del ramo da versioni uscite al blocco 0.2.258');
+  git(dir, ['checkout', '-q', 'main']);
+  scrivi(dir, FILE_NOVITA, sorgente([{ v: '0.2.258', features: ['Di main, #1397', 'Di main, #884'], fixes: ['Correzione di main'] }, main[1]]));
+  committa(dir, 'main scrive il suo features nello stesso blocco');
+  git(dir, ['checkout', '-q', 'worker/2320']);
+  let fermo = false;
+  try { git(dir, ['rebase', '-q', 'main']); } catch (_) { fermo = true; }
+  const dopo = readFileSync(join(dir, FILE_NOVITA), 'utf8');
+  if (fermo) git(dir, ['rebase', '--abort']);
+  assert.ok(fermo, `il rebase è passato liscio e il registro ha ${JSON.stringify(chiaviDoppie(dopo))} come chiavi doppie:\n${dopo}`);
+});
+
 test('prima del rebase lo strumento riconosce la riga che finirà sotto la versione uscita su main, e non tocca il ramo (#2130)', async () => {
   const s = scena({ rebase: false });
   const sulRamo = readFileSync(join(s.work, FILE_NOVITA), 'utf8');
