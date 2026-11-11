@@ -399,7 +399,7 @@
    */
   function bloccaSuUnRilievo(chi) {
     return `${chi} porta «blocca»: su un rilievo non si scrive, decidono il livello e il segno. Fermano il lavoro `
-      + 'un interno [3i?] e una scelta difficile da disfare [2i?!]; un [2i?] si corregge con l\'opzione che consigli e '
+      + 'un interno [3i?] e una scelta difficile da disfare ([2i?!], a ogni livello); un [2i?] si corregge con l\'opzione che consigli e '
       + 'la domanda esce in un feedback suo; gli altri col «?» vanno da parte con la loro domanda. '
       + 'Togli «blocca» dal JSON (e, se serve, cambia il segno).';
   }
