@@ -122,7 +122,8 @@ export function formatta(result, { da, a, quando = dataOra } = {}) {
   out.push('', `Totali: ${t.lavori} ${t.lavori === 1 ? 'lavoro' : 'lavori'}, ${t.giri} giri`
     + (t.nonRegistrati ? ` (più ${t.nonRegistrati} non registrati)` : ''));
   out.push(...tabella([['livello', 'trovati', 'esterni', 'corretti', 'giri pagati'],
-    ...LIVELLI.map((n) => [String(n), t.perLivello[n].trovati, t.perLivello[n].esterni, t.perLivello[n].corretti, t.perLivello[n].pagati])]));
+    ...LIVELLI.filter((n) => (n !== 0 && n !== SENZA_LIVELLO) || Object.values(t.perLivello[n]).some(Boolean))
+      .map((n) => [n === SENZA_LIVELLO ? 'senza livello' : String(n), t.perLivello[n].trovati, t.perLivello[n].esterni, t.perLivello[n].corretti, t.perLivello[n].pagati])]));
   out.push(`  esiti: ${ESITI.map((e) => `${e} ${t.perEsito[e]}`).join(' · ')}${t.senzaEsito ? ` · senza esito ${t.senzaEsito}` : ''}`);
   return out.join('\n');
 }
