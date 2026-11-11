@@ -102,7 +102,7 @@ const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : 
 
 // Le regole del giro: le stesse del server e degli strumenti delle routine
 // (fonte unica). Lette dal progetto, accanto a questo file: in locale non c'è
-// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap0)
+// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap1)
 // invece non stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
 const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
