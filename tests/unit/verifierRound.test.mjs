@@ -156,7 +156,7 @@ test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se un 
 });
 
 test('livello 3 con cap3 e i bilanci sotto esauriti → stop, decide l\'owner; un 2 a bilanci esauriti non ferma', () => {
-  const d = decide([f(3, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count3: 5, count2: 5, count1: 2 });
+  const d = decide([f(3, 'rotto'), f(1, 'bordo'), f(1, 'raro')], { count3: 5, count2: 5, count1: 2 });
   assert.equal(d.stop, true);
   assert.equal(d.blocking.length, 1);
   assert.deepEqual(d.fix, []);
