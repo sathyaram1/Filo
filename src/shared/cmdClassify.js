@@ -2012,6 +2012,8 @@
     // Il carattere del SEGNAPOSTO scritto da chi manda il comando farebbe passare un `$_` vero per un gruppo.
     if (cmd.includes('')) return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
+    // I segni interni (SEGNAPOSTO, SEGNI_INERTI) scritti da chi manda il comando si farebbero passare per un gruppo già misurato.
+    if (/[-]/.test(cmd)) return TRE;
     if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
