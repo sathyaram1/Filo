@@ -299,21 +299,20 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  // La proposta ferma sulla conferma chiude il turno; dopo l'OK il modello riparte con l'esito e lo dice (#1373).
-  // Il modello finto si cambia solo a ripresa chiusa: prima, la ripresa leggerebbe il giro del messaggio dopo.
+  // La frase la dice la ripresa dopo l'OK (#1373): scritta anche col giro della proposta, comparirebbe due volte.
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
-  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa(app, chat);
 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
-  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa(app, chat);
 
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
   await bolla.locator('.dash-cambi-segno').hover();
