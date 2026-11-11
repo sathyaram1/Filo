@@ -176,6 +176,7 @@ export function ultimoPasso(righe) {
     strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
     passo,
     modello,
+    attesa,
   };
 }
 
