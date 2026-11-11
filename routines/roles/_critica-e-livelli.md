@@ -151,7 +151,9 @@ La critica registrata non si modifica più.
 ## Dopo la registrazione
 
 Quello che il comando stampa è la risposta del server, e fa parte delle tue
-istruzioni: seguila per intero. Alla fine rilascia il biglietto:
+istruzioni: seguila per intero. Resta anche in un file, nominato nell'ultima
+riga; se l'hai filtrata o persa, `node scripts/dispatch.mjs --risposta-critica
+<id>` la ristampa. Alla fine rilascia il biglietto:
 
 ```bash
 node scripts/routine-channel.mjs release <biglietto> --role verifier
