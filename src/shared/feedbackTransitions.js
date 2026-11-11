@@ -139,9 +139,9 @@
   // caratteri equivale a leggerlo. La misura è larga apposta e cambiarla non rompe i vecchi.
   const CIPHER_PAD = 32;
 
-  // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────
-  // I NUMERI non stanno qui. Li detta l'owner dalla dashboard (doc Firestore
-  // `config/routines`, campi `cap3`, `cap2`, `cap1`, `cap0`, Gestione →
+  // ── I tre bilanci dei giri di correzione (feedback #561, §4; tre dal #2339) ──
+  // I NUMERI non stanno qui. Li scrivono owner e manutentore (doc Firestore
+  // `config/routines`, campi `cap3`, `cap2`, `cap1`, Gestione →
   // Automazioni) e li applica il SERVER quando registra la critica — mai il
   // prompt, mai un conteggio dichiarato dal client. Dal 2026-09-16 nel codice
   // non c'è un default: chi ha bisogno dei bilanci li legge dal server, e se
