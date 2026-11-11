@@ -21,7 +21,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   `tests/rossi-noti.json` (`contenitore.specs` per i contenitori delle routine,
   `specs` per la macchina di chi sviluppa). Un rosso nato mentre giravano
   insieme anche le tue prove può essere solo macchina carica: rilancia quello
-  spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
+  spec da solo prima di farne un rilievo; in dubbio confronta con `main`:
+  `node scripts/spec-su-main.mjs tests/<nome>.spec.mjs` lo corre sul ramo e
+  su `origin/main` appena scaricata, senza ripetizioni, e dice di chi è il
+  rosso.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
 - Nel contenitore delle routine `npx playwright test` si accende da solo lo
