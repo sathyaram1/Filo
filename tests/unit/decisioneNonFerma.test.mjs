@@ -138,7 +138,7 @@ test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pul
   const VL = await import('../../scripts/verify-local.mjs');
   const SHA = 'a'.repeat(40);
   const s = VL.withRequest({}, 'r', { request: 'x', sha: SHA });
-  const r = VL.withCritique(s, 'r', { critique: 'Provato.\n[2i?] A o B? Consiglio A.\n[1e] altrove', sha: SHA, caps: CAPS });
+  const r = VL.withCritique(s, 'r', { critique: 'Provato.\n[2i?] A o B? Consiglio A.\n[e] altrove', sha: SHA, caps: CAPS });
   assert.equal(r.outcome, 'fix');
   assert.deepEqual(VL.numeriMessiDaParte(r.state.r), [2], 'solo l\'esterno: il 2 col ? si corregge');
   const coda = VL.codaText({ findings: r.decision.fix, derived: r.decision.derived, external: r.decision.external, budgets: r.decision.budgets, branch: 'r', instructions: 'CODA' });
