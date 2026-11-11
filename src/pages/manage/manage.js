@@ -1268,7 +1268,9 @@
 
   function aggiornaStime() {
     for (const [id, s] of roleStime) {
-      const stima = RM.stimaDi(id, roleScelta(`${id}.effort`) || '');
+      // Non letta, la scelta non ha ancora un costo da mostrare: sarebbe già una risposta.
+      const v = roleScelta(`${id}.effort`);
+      const stima = v === null ? null : RM.stimaDi(id, v);
       s.textContent = stima ? stima.testo : '';
       s.title = stima ? stima.perche : '';
     }
