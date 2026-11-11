@@ -26,7 +26,7 @@ export function testoAttesa(esito, uscita, fetta = FETTA_MS) {
   if (uscita === USCITA_LIBERA) {
     return esito && esito.processiVisti === false
       ? 'Qui i processi non si leggono: controlla da te che i comandi in sottofondo siano finiti, poi prosegui.'
-      : 'Finito: nessun tuo processo lavora più nella cartella. Leggi l’esito dei comandi in sottofondo e prosegui.';
+      : 'Finito: nessun tuo processo lavora più nella cartella e nessun tuo sotto-agente è al lavoro. Leggi l’esito di quello che girava in sottofondo e prosegui.';
   }
   return `${testoLavoroVivo(esito, 'finito di aspettare')} Rilancia lo stesso comando, subito: ogni chiamata aspetta al massimo ${Math.round(fetta / 1000)} secondi.`;
 }
