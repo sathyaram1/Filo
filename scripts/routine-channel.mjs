@@ -152,7 +152,7 @@ import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-
 import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
-  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER,
+  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER, cartelleDelLavoro,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
