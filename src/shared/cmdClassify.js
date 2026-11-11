@@ -2016,7 +2016,7 @@
     if (cmd.includes('')) return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     if ([...segniInterni()].some((s) => cmd.includes(s))) return TRE;
-    if (/[-]/.test(cmd)) return TRE;
+    if (/[TOGLIMI-]/.test(cmd)) return TRE;
     if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
