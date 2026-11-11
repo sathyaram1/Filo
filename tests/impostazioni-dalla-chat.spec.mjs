@@ -163,6 +163,7 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'blocca facebook.com');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com', { timeout: 3_000 });
