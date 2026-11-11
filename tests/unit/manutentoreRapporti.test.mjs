@@ -31,7 +31,7 @@ function serverFinto(t, risposte) {
 }
 
 test('la richiesta: numero, sotto-numeri, finestra per date o per giorni, pagine', () => {
-  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, cache: false, json: false });
+  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, cache: false, rifiuti: false, json: false });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '#1790', '--sottonumeri', '--somma'], NOW).dati, { numero: '1790', sottonumeri: true, somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni', '7', '--somma'], NOW).dati, { da: '2026-10-28T12:00:00.000Z', somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni=2', '--a', '2026-11-01'], NOW).dati, { da: '2026-10-30T00:00:00.000Z', a: '2026-11-01' });
