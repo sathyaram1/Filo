@@ -75,6 +75,23 @@ test('con `misura` conta la stampa intera: un testo fisso accanto al payload rid
   assert.equal(readFileSync(p.fileEsterni['feedback.text'], 'utf8'), entrata.feedback.text);
 });
 
+// #2237.4: la risposta a un verdetto è lunga e il server non la ristampa.
+test('la risposta di --record-verifier si salva intera nella cartella della consegna, e la stampa dice dove', () => {
+  const testo = `stato x: esito=fail\n${'rilievo àèì\n'.repeat(5000)}`;
+  const riga = rispostaSuFile(() => scriviRispostaVerifica(ROOT, testo, BASE));
+  const file = riga.match(/nel file (\S+):/)[1];
+  assert.ok(file.startsWith(cartellaConsegna(ROOT, BASE)), file);
+  assert.equal(readFileSync(file, 'utf8'), testo, 'nessun troncamento');
+  const fallita = rispostaSuFile(() => { throw new Error('disco pieno'); });
+  assert.match(fallita, /Non ho potuto salvare.*disco pieno.*stampata qui sopra/, 'un file mancato si dice, non si tace');
+});
+
+test('dispatch salva la risposta del verdetto dopo averla stampata', () => {
+  const src = readFileSync(resolve(import.meta.dirname, '..', '..', 'scripts', 'dispatch.mjs'), 'utf8');
+  const ramo = src.slice(src.indexOf("flag === '--record-verifier'"), src.indexOf("flag === '--record-fixed'"));
+  assert.match(ramo, /rispostaSuFile\(\(\) => scriviRispostaVerifica\(ROOT, risposta\)\)/);
+});
+
 test('due progetti diversi non condividono la cartella', () => {
   assert.notEqual(cartellaConsegna(ROOT, BASE), cartellaConsegna(resolve(BASE, 'altro'), BASE));
 });
