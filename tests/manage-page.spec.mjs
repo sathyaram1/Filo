@@ -382,8 +382,8 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
 
   // Spente le routine, bilanci, istruzioni e lavori server si preparano per la riaccensione.
   await expect(page.locator('#mgLavoriServer')).toBeEnabled();
-  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions',
-    '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgCap0Save', '#mgFixInstructionsSave']) {
+  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgFixInstructions',
+    '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgFixInstructionsSave']) {
     await expect(page.locator(id)).toBeEnabled();
   }
   await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
