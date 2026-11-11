@@ -232,7 +232,7 @@ export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
  * Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
  */
 export function derivatiDaAprire(p, derived) {
-  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
+  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))).map(chiaveDiOggi));
   const nuovi = ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
   return ROUND.derivedGroups(nuovi).map((g) => {
     const chiavi = g.findings.map(chiaveRilievo);
