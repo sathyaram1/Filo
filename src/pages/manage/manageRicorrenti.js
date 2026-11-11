@@ -288,7 +288,7 @@
 
   // ── Il tetto di costo della corsa (#2303) ────────────────────────────────
 
-  const dollari = (n) => `${(Math.round(Number(n) * 100) / 100).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
+  const dollari = (n) => `${(Math.round(Number(n) * 100) / 100).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
 
   function tettoTesto(t) {
     if (!t || !(Number(t.usd) > 0)) return 'senza tetto';
