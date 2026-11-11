@@ -1868,6 +1868,8 @@
         if (i < 0) return TRE;
         out += `Write-Output ${SEGNAPOSTO}`;
       } else if (/^(?:[@$]?\(|!|-not(?![\w-]))/i.test(resto)) {
+        // In sh, bash e zsh `$(…)` in testa esegue come comando ciò che stampa, e `@(…)` è un nome da espandere (#2392).
+        if (shellPosix(c) && /^(?:(?:!|-not(?![\w-]))\s*)*[@$]\(/i.test(resto)) return TRE;
         const r = espressione(s, i, gruppo);
         if (!r) return TRE;
         lasciato += r.lasciato;
