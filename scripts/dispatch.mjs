@@ -1600,7 +1600,9 @@ export function derivatiAperti(derived) {
     if (!f || typeof f !== 'object') continue;
     const rilievi = Array.isArray(f.findings) ? f.findings.filter((x) => x && typeof x === 'object') : [f];
     const num = String(f.num || '').trim();
-    const priorita = Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null);
+    // Un esterno nasce senza livello né priorità (#2339): Number(null) varrebbe 0, una priorità inventata.
+    const numero = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+    const priorita = numero(f.priority) ?? numero(f.level);
     const gia = num ? perNumero.get(num) : null;
     if (gia) {
       gia.rilievi.push(...rilievi);
