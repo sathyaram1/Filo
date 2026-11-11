@@ -472,9 +472,9 @@
 
   // ── I bilanci ─────────────────────────────────────────────────────────────
   //
-  // Quattro bilanci per feedback, uno per livello (dal 2026-09-23; prima i
-  // livelli 3 e 2 ne condividevano uno). I numeri li detta SOLO l'owner dalla
-  // dashboard (config/routines): nel codice non c'è un default (decisione del
+  // Tre bilanci per feedback, uno per livello (dal #2339; prima quattro). I
+  // numeri li scrivono l'owner dalla dashboard e il manutentore
+  // (config/routines): nel codice non c'è un default (decisione del
   // 2026-09-16), e un bilancio mancante non vale 0 né altro — decideRound si
   // ferma con un errore che dice quale manca. Il tetto alto è lo stesso della
   // dashboard. I NOMI sono anche in feedbackTransitions.js (VERIFIER_CAP_KEYS)
