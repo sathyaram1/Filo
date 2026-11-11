@@ -415,18 +415,36 @@ export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Ripar
 
 /**
  * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio, quadro)`
- * dichiara il guasto), altrimenti alla fine della fetta. I testi sono fissi: niente del worker arriva a chi guida il giro.
- * @returns {Promise<{ uscita: number, testo: string, guasto?: string }>}
+ * dichiara il guasto), altrimenti alla fine della fetta. Un compito col tetto di costo (#2303) si misura con `costo(s)`
+ * una volta per fetta, e oltre il tetto `rilasciaOltre(oltre, mio)` lo ferma. I testi sono fissi: niente del worker
+ * arriva a chi guida il giro.
+ * @returns {Promise<{ uscita: number, testo: string, guasto?: string, oltreTetto?: object }>}
  */
 export async function veglia({
-  leggi, rilascia, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+  leggi, rilascia, costo = null, rilasciaOltre = null, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
   fetta = FETTA_MS, passo = PASSO_MS, soglia = SOGLIA_FERMO_MS,
 } = {}) {
   const fine = adesso() + fetta;
+  let misurato = false;
   for (;;) {
-    const s = leggi();
+    const s = await leggi();
     const g = giudica({ ...s, adesso: adesso(), soglia });
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
+    if (!misurato && costo && rilasciaOltre && s && s.tettoUsd > 0) {
+      misurato = true;
+      const oltre = oltreIlTetto(s, await costo(s));
+      if (oltre) {
+        const r = await rilasciaOltre(oltre, s.mio);
+        const esito = r && r.ok
+          ? 'biglietto rilasciato, il compito non riparte'
+          : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+        return {
+          uscita: USCITA_FERMO,
+          oltreTetto: oltre,
+          testo: `Compito oltre il tetto di costo della corsa (${oltre.usd} $ su ${oltre.tettoUsd} $): ${esito}. Chiudi il giro: non chiedere biglietti e non lanciare altri worker.`,
+        };
+      }
+    }
     const minuti = Math.round(g.fermoMs / 60000);
     if (g.stato === 'fermo' || g.stato === 'chiuso') {
       const chiuso = g.stato === 'chiuso';
