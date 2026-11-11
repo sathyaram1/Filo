@@ -79,7 +79,7 @@ test('con `misura` conta la stampa intera: un testo fisso accanto al payload rid
 test('la risposta di --record-verifier si salva intera nella cartella della consegna, e la stampa dice dove', () => {
   const testo = `stato x: esito=fail\n${'rilievo àèì\n'.repeat(5000)}`;
   const riga = rispostaSuFile(() => scriviRispostaVerifica(ROOT, testo, BASE));
-  const file = riga.match(/nel file (\S+):/)[1];
+  const file = riga.match(/nel file (.+): rileggila/)[1];
   assert.ok(file.startsWith(cartellaConsegna(ROOT, BASE)), file);
   assert.equal(readFileSync(file, 'utf8'), testo, 'nessun troncamento');
   const fallita = rispostaSuFile(() => { throw new Error('disco pieno'); });
