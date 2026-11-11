@@ -2121,6 +2121,7 @@ if (isMain) {
     const opzioniRilascio = {
       ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
       ...(processo ? { processo } : {}),
+      ...(oltreTetto ? { oltreTetto } : {}),
     };
     const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined, spedito);
     if (r.avviso) console.error(r.avviso);
