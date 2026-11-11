@@ -107,7 +107,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   try {
     const r = await esegui([
       '--record-verifier', 'fid-901',
-      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[0i] caso raro',
+      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[1i] caso raro',
     ], ENV(casa, port));
     assert.equal(r.code, 0, `la critica doveva essere accettata (stderr: ${r.se})`);
 
