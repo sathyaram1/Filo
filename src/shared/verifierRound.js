@@ -407,20 +407,24 @@
   /**
    * Un elenco di rilievi arrivato da fuori (dal client, da un file) portato
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
-   * scala, testo vuoto. Un rilievo STRUTTURATO senza sede vale interno: è
-   * la forma dei client non aggiornati e dello stato già scritto, dove la
-   * sede non esisteva; l'obbligo vale sul testo della critica. PURA.
+   * scala in un interno, testo vuoto. Un rilievo STRUTTURATO senza sede vale
+   * interno: è la forma dei client non aggiornati e dello stato già scritto,
+   * dove la sede non esisteva; l'obbligo vale sul testo della critica. Lo stato
+   * scritto con la scala a quattro livelli si legge così: uno 0 interno vale 1,
+   * un vicino è esterno, e un esterno perde il livello (`level: null`). PURA.
    */
   function normalizeFindings(list) {
     if (!Array.isArray(list)) return [];
     const out = [];
     for (const f of list) {
       if (!f || typeof f !== 'object') continue;
-      const level = Number(f.level);
-      if (!LEVELS.includes(level)) continue;
+      const sede = sedeDi(f.sede);
+      const scritto = f.level == null || f.level === '' ? NaN : Number(f.level);
+      const level = sede === 'e' ? null : (scritto === 0 ? 1 : scritto);
+      if (sede === 'i' && !LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      const rilievo = { level, sede: sedeDi(f.sede), text, decision: f.decision === true };
+      const rilievo = { level, sede, text, decision: f.decision === true };
       // Il «!» vale solo su una scelta: senza «?» non c'è niente da disfare.
       if (rilievo.decision && f.irreversibile === true) rilievo.irreversibile = true;
       // La domanda di un rilievo col `?` (#1790) viaggia con lui: la controlla e la adotta il server, con SN_DOMANDE.
