@@ -101,24 +101,39 @@
   // Il segno «?» si accetta anche PRIMA della lettera («[1?i]»), e il «!» prima
   // del «?» («[2i!?]»): il significato è lo stesso e respingerlo costerebbe un
   // giro per un ordine di due caratteri.
-  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(?:(\\?)\\s*)?([ievIEV])\\s*(\\?\\s*!|!\\s*\\?|\\?|!)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  // Il livello è facoltativo nella forma, perché l'esterno non lo porta: le combinazioni sbagliate (0, «v», un
+  // esterno col livello, un interno senza) si leggono qui per respingerle col perché (motivoDelRifiuto).
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])?\\s*(?:(\\?)\\s*)?([ievIEV])\\s*(\\?\\s*!|!\\s*\\?|\\?|!)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   // La forma VECCHIA, col solo livello: si riconosce per respingerla con la
   // spiegazione giusta, non per leggerla.
   const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   const SPIEGAZIONE_SEGNO = 'il segno «!» (scelta difficile da disfare) va con il «?» della decisione: [2i?!]';
+  // Una sede nuda fra quadre in mezzo a una riga («… [e] …») è un secondo rilievo senza a capo, non testo.
+  const QUADRA_SEDE = /\[{1,2}\s*(?:\?\s*)?[ievIEV]\s*[?!]*\s*\]{1,2}/;
 
-  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segni «?» e «!», testo. PURA. */
+  /** I gruppi di FINDING_LINE come rilievo: livello (null se non c'è), sede minuscola, segni «?» e «!», testo. PURA. */
   function rilievoDa(m) {
     const dopo = String(m[4] || '');
-    const f = { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || dopo.includes('?') };
+    const f = { level: m[1] == null ? null : Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || dopo.includes('?') };
     if (dopo.includes('!')) f.irreversibile = true;
     return f;
   }
 
-  /** Una riga di FINDING_LINE col «!» ma senza «?»: si respinge invece di leggerla. PURA. */
-  function segnoSenzaDecisione(m) {
+  /** Perché una riga di FINDING_LINE non si legge come rilievo, '' se si legge. PURA. */
+  function motivoDelRifiuto(m) {
     const f = rilievoDa(m);
-    return f.irreversibile === true && !f.decision;
+    if (f.level === 0) return SPIEGAZIONE_ZERO;
+    if (f.sede === 'v') return SPIEGAZIONE_VICINO;
+    if (f.sede === 'e' && f.level !== null) return SPIEGAZIONE_ESTERNO;
+    if (f.sede === 'i' && f.level === null) return SPIEGAZIONE_INTERNO;
+    if (f.irreversibile === true && !f.decision) return SPIEGAZIONE_SEGNO;
+    return '';
+  }
+
+  /** Il motivo per la forma senza sede: lo 0 dice prima che il livello non c'è più. PURA. */
+  function motivoSenzaSede(raw) {
+    const m = FINDING_LINE_SENZA_SEDE.exec(raw);
+    return m && Number(m[1]) === 0 ? SPIEGAZIONE_ZERO : SPIEGAZIONE_SEDE;
   }
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
