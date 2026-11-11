@@ -742,7 +742,7 @@ test('quando il testo in coda manca, il messaggio non tace', () => {
 
 test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la stessa risposta senza scrivere né ripagare; un\'altra è respinta', () => {
   let s = withRequest({}, 'b', { request: 'X', sha: SHA });
-  const testo = 'Provato.\n[2i] rotto\n[0i] raro';
+  const testo = 'Provato.\n[2i] rotto\n[1i] raro';
   const prima = withCritique(s, 'b', { critique: testo, sha: SHA });
   assert.equal(prima.outcome, 'fix');
   s = prima.state;
