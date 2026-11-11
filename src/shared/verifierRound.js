@@ -275,7 +275,7 @@
       // manca invece di lasciarla fra le righe «scritte male» senza motivo.
       if (FINDING_LINE_SENZA_SEDE.test(raw)) {
         flush();
-        out.push({ riga: `${raw.trim()} (${SPIEGAZIONE_SEDE})`, pezzo: '' });
+        out.push({ riga: `${raw.trim()} (${motivoSenzaSede(raw)})`, pezzo: '' });
         continue;
       }
       // La regola per intero sta su QUADRA_OVUNQUE: le quadre col livello dentro sono sempre un
