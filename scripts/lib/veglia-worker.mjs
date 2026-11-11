@@ -13,6 +13,10 @@ import { leggiMeta, rigaSintetica } from '../session-report.mjs';
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
 export const SOGLIA_FERMO_MS = 20 * 60 * 1000;
+// Un worker che ha già reso il suo esito non tornerà a rilasciare: dopo la chiusura basta il tempo del rilascio che stava
+// per fare (spinta e rapporto), non venti minuti di posto occupato (#2324).
+export const SOGLIA_CHIUSO_MS = 2 * 60 * 1000;
+const CHIUSURE = new Set(['SubagentHandback']);
 // Sotto i due minuti del tempo di serie di una chiamata: un timeout dimenticato non la uccide a metà rilascio.
 export const FETTA_MS = 90 * 1000;
 export const PASSO_MS = 10 * 1000;
