@@ -422,6 +422,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'non fidarti più dei download da example.org');
   expect((await domanda('Siti fidati per i programmi → togli example.org')).hasInput).toBeFalsy();
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).downloads.trustedSites, { timeout: 5_000 }).toEqual(['github.com']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.com', { timeout: 3_000 });
