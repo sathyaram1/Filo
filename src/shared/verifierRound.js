@@ -25,23 +25,22 @@
 (function (global) {
   'use strict';
 
-  // I livelli della scala delle priorità di Filo (routines/roles/
-  // _critica-e-livelli.md): il metro è la frequenza, 3 sicurezza/soldi/Filo
-  // inutilizzabile sul cammino normale, 2 funzione rotta nel caso normale,
-  // 1 di rado, 0 cosmetico raro.
-  const LEVELS = [0, 1, 2, 3];
-  // La SEDE di un rilievo, indipendente dal livello (decisione dell'owner del
-  // 2026-09-22): `i` interno (tocca a questo lavoro: lo scenario della
-  // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro), `v`
-  // vicino (un altro lavoro, ma in un file che il ramo modifica già: decisione
-  // del 2026-09-27). Il giro lo decidono solo gli interni: un vicino entra in una
-  // correzione che parte comunque, e non paga nessun bilancio (2026-10-12, #1202);
-  // ogni esterno esce subito in un feedback suo con la priorità del livello, salvo il 2 che nasce a 1.
-  const SEDI = ['i', 'e', 'v'];
+  // La scala a tre livelli (decisione dell'owner dell'08/11/2026, #2339): il livello misura il lavoro rispetto al suo
+  // obiettivo. La scala intera sta in routines/roles/_livelli-e-sede.md.
+  const LEVELS = [1, 2, 3];
+  // La SEDE: `i` se il difetto riguarda l'obiettivo del feedback o l'ha introdotto il ramo, e solo lui prende un
+  // livello; `e` tutto il resto, che esce in un feedback nuovo senza livello, classificato dopo come ogni altro.
+  const SEDI = ['i', 'e'];
   // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
   // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
   const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
-  const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro (per esempio [2i], [1v], [1e?])';
+  const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se il difetto riguarda l\'obiettivo del feedback o l\'ha introdotto il ramo (per esempio [2i], [1i?]); tutto il resto è esterno e si scrive [e], senza livello';
+  // La scala vecchia (livello 0, sede «vicino», livello su un esterno) si respinge dicendo cosa è cambiato: scritta
+  // durante il passaggio non deve perdersi in silenzio.
+  const SPIEGAZIONE_ZERO = 'il livello 0 non c\'è più (scala a tre livelli dall\'08/11/2026): un caso molto raro, un miglioramento incerto o un problema raro o molto meno grave dell\'originale sono un 1 ([1i]); un difetto che non riguarda l\'obiettivo e che il ramo non ha introdotto è esterno, [e], senza livello';
+  const SPIEGAZIONE_VICINO = 'la sede «vicino» non c\'è più (dall\'08/11/2026): un difetto che non riguarda l\'obiettivo del feedback e che il ramo non ha introdotto è esterno anche se sta in un file che il ramo modifica, e non prende livello: [e] testo';
+  const SPIEGAZIONE_ESTERNO = 'un rilievo esterno non prende livello (dall\'08/11/2026): diventa un feedback nuovo, classificato dopo come gli altri. Scrivi [e] testo, o [e?] se chiede una decisione';
+  const SPIEGAZIONE_INTERNO = 'un rilievo interno prende un livello fra 1 e 3: [3i], [2i], [1i]';
 
   // Tetto ai rilievi di una critica: oltre non è una critica, è un elenco generato.
   const MAX_FINDINGS = 40;
