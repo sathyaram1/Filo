@@ -258,11 +258,11 @@ test('#1555.1 una prova che copre un interno e un esterno perde prima del verdet
     outcome: 'fix',
     phase2: {
       findings: [{ level: 2, sede: 'i', text: 'Col titolo vuoto il salvataggio non parte.' }],
-      derived: [{ level: 1, sede: 'e', text: 'Il menu delle schede si chiude da solo.', num: '#901.1' }],
+      derived: [{ level: null, sede: 'e', text: 'Il menu delle schede si chiude da solo.', priority: null, num: '#901.1' }],
     },
   });
   t.after(() => srv.close());
-  const critica = 'Provato il salvataggio da menu e da scorciatoia, col titolo vuoto e lungo.\n[2i] Col titolo vuoto il salvataggio non parte.\n[1e] Il menu delle schede si chiude da solo.';
+  const critica = 'Provato il salvataggio da menu e da scorciatoia, col titolo vuoto e lungo.\n[2i] Col titolo vuoto il salvataggio non parte.\n[e] Il menu delle schede si chiude da solo.';
   const fermo = await esegui(['--record-verifier', 'fid-901', critica], casa, port);
   assert.notEqual(fermo.code, 0, fermo.out);
   assert.match(fermo.out, /giro2-r1-r2-misto\.spec\.mjs: il rilievo 2 è esterno; copre anche r1, che resta/);
