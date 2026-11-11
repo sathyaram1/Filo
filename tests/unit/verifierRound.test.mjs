@@ -52,7 +52,7 @@ test('parseFindings: senza righe col livello → zero rilievi (è il pass), qual
 test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', () => {
   const tanti = Array.from({ length: 60 }, (_, i) => ({ level: 1, text: `r${i}` }));
   assert.equal(R.normalizeFindings(tanti).length, R.MAX_FINDINGS);
-  const lungo = R.normalizeFindings([{ level: 0, text: 'x'.repeat(R.MAX_FINDING_TEXT + 1000), decision: 'sì' }])[0];
+  const lungo = R.normalizeFindings([{ level: 1, text: 'x'.repeat(R.MAX_FINDING_TEXT + 1000), decision: 'sì' }])[0];
   assert.equal(lungo.text.length, R.MAX_FINDING_TEXT);
   assert.equal(lungo.decision, false);
   // Un rilievo coi suoi passi (5000 caratteri) resta INTERO: il tetto del
