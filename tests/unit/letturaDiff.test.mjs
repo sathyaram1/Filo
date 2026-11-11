@@ -288,7 +288,7 @@ test('i testi: la verifica piena lancia la lettura, chiusura e chi risolve si fa
   for (const n of ['verifier-riallineamento.md', 'secaudit.md']) assert.doesNotMatch(ruolo(n), /Un conto, un posto/, n);
   const lettore = ruolo('lettura-diff.md');
   assert.match(lettore, /non modifichi file e non fai commit/);
-  assert.match(lettore, /## Il livello dei tuoi rilievi[\s\S]*Il metro è la frequenza/);
+  assert.match(lettore, /## Il livello dei tuoi rilievi[\s\S]*### Il livello: la modifica misurata sul suo obiettivo/);
   const agente = readFileSync(join(REPO, '.claude', 'agents', 'routine-lettura.md'), 'utf8');
   assert.match(agente, /^tools: Bash, Read, Grep, Glob$/m, 'il lettore non ha strumenti per scrivere');
 });
