@@ -237,7 +237,7 @@ test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#
   g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
   g('checkout', '-q', 'main');
   // Il comando vero, con la radice nel repo finto: --preserve-symlinks la tiene lì.
-  for (const d of ['scripts', 'src', 'node_modules']) symlinkSync(join(RADICE, d), join(repo, d), 'dir');
+  for (const d of ['scripts', 'src', 'node_modules']) symlinkSync(join(RADICE_DEL_REPO, d), join(repo, d), 'dir');
   const env = { ...process.env };
   delete env.FILO_SERVER_CLONE;
   const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath, '--preserve-symlinks', '--preserve-symlinks-main',
