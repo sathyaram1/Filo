@@ -767,7 +767,7 @@
     if (s) parts.push(s);
     const esterni = Array.isArray(d.external) ? d.external.length : 0;
     if (esterni) {
-      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non riguarda l\'obiettivo e non l\'ha introdotto il ramo): diventa un feedback nuovo' : `${esterni} rilievi sono esterni (non riguardano l'obiettivo e non li ha introdotti il ramo): diventano feedback nuovi`}, senza livello, classificati come ogni altro feedback.`);
+      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non riguarda l\'obiettivo e non l\'ha introdotto il ramo): diventa un feedback nuovo, senza livello, classificato' : `${esterni} rilievi sono esterni (non riguardano l'obiettivo e non li ha introdotti il ramo): diventano feedback nuovi, senza livello, classificati`} come ogni altro feedback.`);
     }
     if (d.stop) {
       const alManutentore = Array.isArray(d.blocking) && d.blocking.some((f) => destinatarioDelFermo(f) === 'manutentore');
