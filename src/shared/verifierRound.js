@@ -533,8 +533,8 @@
    * L'esito di un giro, calcolato dai livelli e dai bilanci (spec §4). PURA.
    *
    * Regole:
-   *   - ferma il lavoro un rilievo che chiede una decisione se è un 3, o un 2
-   *     su una scelta difficile da disfare (`[2i?!]`: decisioneFerma);
+   *   - ferma il lavoro un rilievo che chiede una decisione se è un 3, o se è
+   *     una scelta difficile da disfare a qualunque livello (`?!`: decisioneFerma);
    *   - un rilievo di livello X paga col bilancio di X; finito quello, col più
    *     alto ancora aperto sotto X (D88, #744), anche se nient'altro fa
    *     partire il giro (livelloCheLoPaga);
