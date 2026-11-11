@@ -1202,9 +1202,8 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
   const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
   if (!branch) return guasto('nessun ramo di cui calcolare il diff');
   // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
-  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
-  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
-  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  // diff di modifiche già fuse. Niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', refspecMain(main)]);
   const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
   if (!baseSha.ok) {
     return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
