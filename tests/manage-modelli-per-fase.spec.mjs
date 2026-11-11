@@ -133,11 +133,17 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   let page = await apri(openTab);
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
-  await expect(page.locator('#mgRoleModels select')).toHaveCount(10);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco', 'Manutentore']);
+  await expect(page.locator('#mgRoleModels select')).toHaveCount(12);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Verifica dopo un riallineamento', 'Correzione', 'Controllo cieco', 'Manutentore']);
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
+  // La verifica dopo un riallineamento dice cosa vale senza una scelta: la sua partenza, o quella della Verifica (#2344).
+  await expect(tendina(page, 'verifier-riallineamento', 'effort').locator('.sn-select-value')).toHaveText('medium (partenza)');
+  await expect(tendina(page, 'verifier-riallineamento', 'model').locator('.sn-select-value')).toHaveText('Come in Verifica');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
+  await scegli(page, 'verifier-riallineamento', 'effort', 'low');
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica dopo un riallineamento: salvato.');
+  expect((await sulServer(app)).roleModels['verifier-riallineamento']).toEqual({ effort: 'low' });
 
   await scegli(page, 'verifier', 'model', 'Sonnet');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica: salvato.');
