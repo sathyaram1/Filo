@@ -180,21 +180,21 @@ test('il segno ? → stop al livello 3 e su una scelta difficile da disfare a og
   assert.equal(uno.stop, false);
   assert.deepEqual(uno.fix, []);
   assert.equal(uno.derived.length, 1);
-  const zero = decide([f(0, 'raro, gusto?', true), f(1, 'bordo')]);
-  assert.equal(zero.fix.length, 1, 'lo 0 che chiede una decisione non si corregge nemmeno insieme ad altro');
-  assert.equal(zero.derived.length, 1);
+  const conAltro = decide([f(1, 'raro, gusto?', true), f(2, 'rotto')]);
+  assert.equal(conAltro.fix.length, 1, 'l\'1 che chiede una decisione non si corregge nemmeno insieme ad altro');
+  assert.equal(conAltro.derived.length, 1);
 });
 
 test('i bilanci si normalizzano: fuori scala si stringe, assenti → i default ESPLICITI del chiamante, contatori negativi → 0', () => {
-  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap3: 5, cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap3: 5, cap2: 10, cap1: 0 });
   assert.deepEqual(R.normalizeCaps(null, CAPS), CAPS);
-  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count3: 0, count2: 0, count1: 2, count0: 0 });
+  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count3: 0, count2: 0, count1: 2 });
 });
 
 test('bilanci a zero dal 3 in giù: il primo 3 → stop subito (scelta possibile dell\'owner); dal 2 in giù: il primo 2 va da parte, non ferma', () => {
-  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 0, cap1: 0, cap0: 0 }).stop, true);
-  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 5, cap1: 2, cap0: 0 }).consume, 'cap2', 'D88: col bilancio dei 2 aperto il 3 si corregge');
-  const due = decide([f(2, 'rotto')], {}, { cap3: 5, cap2: 0, cap1: 0, cap0: 0 });
+  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 0, cap1: 0 }).stop, true);
+  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 5, cap1: 2 }).consume, 'cap2', 'D88: col bilancio dei 2 aperto il 3 si corregge');
+  const due = decide([f(2, 'rotto')], {}, { cap3: 5, cap2: 0, cap1: 0 });
   assert.equal(due.stop, false);
   assert.equal(due.derived.length, 1);
 });
