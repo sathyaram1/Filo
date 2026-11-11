@@ -1540,6 +1540,7 @@
     linkGitHub: linkGitHub,
     gruppiDiBlocchi: gruppiDiBlocchi,
     outcomeMessage: outcomeMessage,
+    rispostaPerCard: rispostaPerCard,
     skipOutcomeMessage: skipOutcomeMessage,
     skipsHeadline: skipsHeadline,
     skipReasonNote: skipReasonNote,
