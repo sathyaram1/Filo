@@ -342,8 +342,8 @@ test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo
 });
 
 test('parseFindings: titolo Markdown, citazione ed elenco con le lettere davanti al livello sono rilievi (giro 11 su #561)', () => {
-  const p = R.parseFindings('Provato.\n### [2i] rotto uno\n> [1i] rotto due\na) [0i] rotto tre\nb) [1i?] gusto');
-  assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false], [0, false], [1, true]]);
+  const p = R.parseFindings('Provato.\n### [2i] rotto uno\n> [1i] rotto due\na) [e] rotto tre\nb) [1i?] gusto');
+  assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false], [null, false], [1, true]]);
   assert.equal(R.unparsedLevelLines('Provato.\n### [2i] rotto').length, 0, 'non è una riga da sistemare: è un rilievo');
 });
 
