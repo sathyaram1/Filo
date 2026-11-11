@@ -146,8 +146,8 @@ test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pul
   // Nessun commit dopo la critica: il 2 non è stato corretto, e un 2 interno lasciato lì ferma, come sempre.
   const c = VL.withFixed(r.state, 'r', { report: 'niente di nuovo', sha: SHA });
   assert.equal(c.outcome, 'stop');
-  // Un vicino da solo non fa partire niente nemmeno qui, con cap0 sopra zero.
-  const v = VL.withCritique(VL.withRequest({}, 'v', { request: 'x', sha: SHA }), 'v', { critique: 'Provato.\n[2v] nel file vicino', sha: SHA, caps: { ...CAPS, cap0: 3 } });
+  // Un esterno da solo non fa partire niente nemmeno qui, anche con un cap0 rimasto dalla scala vecchia.
+  const v = VL.withCritique(VL.withRequest({}, 'v', { request: 'x', sha: SHA }), 'v', { critique: 'Provato.\n[e] nel file che il ramo modifica', sha: SHA, caps: { ...CAPS, cap0: 3 } });
   assert.equal(v.outcome, 'pass');
 });
 
