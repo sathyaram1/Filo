@@ -274,7 +274,7 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN, fornitoreFinoMs: NaN };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN, fornitoreFinoMs: NaN, file: [] };
   const ultimoMs = Math.max(...file.map((f) => f.m));
   const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
   const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
