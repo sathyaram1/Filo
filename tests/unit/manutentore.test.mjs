@@ -11,7 +11,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const M = await import('../../scripts/manutentore.mjs');
 const { incrociFraRami } = await import('../../scripts/lib/su-main.mjs');
 const { cartellaCloneServer } = await import('../../scripts/lib/git-server.mjs');
-const RADICE_DEL_REPO = resolve(new URL('../..', import.meta.url).pathname);
+const RADICE_DEL_REPO = fileURLToPath(new URL('../..', import.meta.url));
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
   file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
