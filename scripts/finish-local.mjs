@@ -210,6 +210,22 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
 }
 
 /**
+ * Scarica main su origin/main. Il refspec è esplicito: in un clone a ramo singolo `fetch origin main` muove solo
+ * FETCH_HEAD, e i controlli fondevano e sceglievano gli spec su un main vecchio senza dirlo (#2237.3).
+ */
+export function aggiornaMain(root = ROOT) {
+  const fetchOk = git(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
+  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
+  return { fetchOk, remoteRefOk };
+}
+
+/** La riga che dice su quale commit di main si confronta e si prova la fusione. PURA. */
+export function testoBaseMain({ base, sha, fetchOk }) {
+  const corto = String(sha || '').slice(0, 8) || '(commit illeggibile)';
+  return `▸ Linea principale: ${base} a ${corto}${fetchOk ? ', appena scaricata' : ', NON aggiornata (lo scaricamento non è riuscito)'}.`;
+}
+
+/**
  * La BASE del confronto per scegliere gli spec mirati. PURA.
  *
  * Il confronto DEVE partire dallo stato REMOTO della linea principale: su una
