@@ -155,7 +155,7 @@ function battitoDi(clone, pid, ticket = T1) {
 
 const ambiente = (clone, extra = {}) => ({
   ...process.env, FILO_REPO_ROOT: clone, FILO_DISPATCH_STATE_DIR: join(clone, '..', 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE: '1',
-  FILO_ROUTINE_TICKET: '', ...extra,
+  FILO_ROUTINE_TICKET: '', FILO_SERVER_CLONE: join(clone, '..', 'filo-security'), ...extra,
 });
 const lineaPrincipale = (clone) => spawnSync(process.execPath, [DISPATCH, '--linea-principale'], { encoding: 'utf8', env: ambiente(clone) });
 
