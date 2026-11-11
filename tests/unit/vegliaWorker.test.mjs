@@ -489,12 +489,19 @@ describe('il worker che ha chiuso senza rilasciare', () => {
   test('la veglia lo rilascia subito col guasto «strumento worker», non dopo venti minuti', async () => {
     let t = ORA;
     const visti = [];
-    const e = await veglia({
-      adesso: () => t, dorme: async (ms) => { t += ms; },
-      leggi: () => ({ mio: true, finito: false, tempi: [ORA], processi: 0, chiusoMs: ORA, tracce: { viste: true, attesa: null, elenco: [] } }),
-      rilascia: (g, mio) => { visti.push({ g, mio, a: t }); return { ok: true }; },
-    });
+    // Chi guida rilancia la veglia finché esce con 5, come dice il suo ruolo.
+    let e;
+    let giri = 0;
+    do {
+      giri += 1;
+      e = await veglia({
+        adesso: () => t, dorme: async (ms) => { t += ms; },
+        leggi: () => ({ mio: true, finito: false, tempi: [ORA], processi: 0, chiusoMs: ORA, tracce: { viste: true, attesa: null, elenco: [] } }),
+        rilascia: (g, mio) => { visti.push({ g, mio, a: t }); return { ok: true }; },
+      });
+    } while (e.uscita === USCITA_LAVORA && giri < 20);
     assert.equal(e.uscita, USCITA_FERMO);
+    assert.equal(giri, 2, 'due fette, non le quattordici dei venti minuti');
     assert.equal(visti.length, 1);
     assert.ok(visti[0].a - ORA <= SOGLIA_CHIUSO_MS + 10_000, `rilasciato ${(visti[0].a - ORA) / 1000} s dopo l’handback`);
     assert.match(visti[0].g, /^guasto: strumento worker: il worker ha chiuso la sessione alle 05:35:50 UTC senza rilasciare il biglietto/);
