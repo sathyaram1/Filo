@@ -243,28 +243,29 @@ test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle
   for (const c of condizioni) assert.equal(c, '!isAdmin', `un controllo dipende da altro che l'essere owner: ${c}`);
 });
 
-test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 messi da parte', async () => {
+test('le stampe del giro locale e delle routine dicono i tre bilanci e i 2 messi da parte', async () => {
   const VL = await import('../../scripts/verify-local.mjs');
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const finito = decide([f(2, 'i', 'non salva')], FINITI[2]);
-  assert.equal(VL.bilanciResiduiText(finito.budgets), 'cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1 · cap0: 0 giri residui su 0');
+  assert.equal(VL.bilanciResiduiText(finito.budgets), 'cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1');
   assert.equal(VL.bilanciResiduiText(null), '');
-  assert.match(VL.dueDaParteText(finito.derived), /^I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\.$/);
-  assert.equal(VL.dueDaParteText([f(1, 'i', 'x'), f(2, 'e', 'y')]), '', 'un 1 messo da parte o un 2 esterno non sono il caso');
-  // La coda della fase 2 in locale: quattro bilanci.
+  assert.match(VL.dueDaParteText(finito.derived), /^I bilanci delle correzioni dei livelli 2 e 1 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\.$/);
+  assert.equal(VL.dueDaParteText([f(1, 'i', 'x'), f(null, 'e', 'y')]), '', 'un 1 messo da parte o un esterno non sono il caso');
+  // La coda della fase 2 in locale: tre bilanci.
   const fix = decide([f(3, 'i', 'perde i dati'), f(2, 'i', 'a')], { count2: 4 });
   const coda = VL.codaText({ findings: fix.fix, derived: fix.derived, external: [], budgets: fix.budgets, branch: 'claude/x', instructions: 'CODA' });
-  assert.match(coda, /Bilanci: cap3: 4 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
-  // La risposta del server stampata dalle routine: pass coi 2 usciti, e i quattro bilanci.
+  assert.match(coda, /Bilanci: cap3: 4 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1(?! ·)/);
+  assert.doesNotMatch(coda, /cap0/);
+  // La risposta del server stampata dalle routine: pass coi 2 usciti, e i tre bilanci.
   const pass = verifierReplyText({ outcome: 'pass', derived: [{ level: 2, sede: 'i', text: 'non salva', priority: 2, num: '#7.1' }], budgets: finito.budgets });
   assert.match(pass, /#7\.1, priorità 2, rimasti del giro: 1 rilievo \(\[2i\]\)/);
-  assert.match(pass, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro/);
-  assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1 · cap0: 0 giri residui su 0/);
+  assert.match(pass, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro/);
+  assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1(?! ·)/);
   const stop = verifierReplyText({ outcome: 'stop', motivo: 'loop', blocking: [f(3, 'i', 'perde i dati')], sospesi: [], derived: [], budgets: decide([f(3, 'i', 'x')], FINITI[3]).budgets });
-  assert.match(stop, /un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3 o su una scelta difficile da disfare/);
+  assert.match(stop, /un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3\): decide l'owner\. Una scelta difficile da disfare ferma anche lei, e va al manutentore/);
   assert.match(stop, /Bilanci: cap3: 0 giri residui su 5/);
   const fase2 = verifierReplyText({ outcome: 'fix', phase2: { findings: [f(1, 'i', 'bordo')], derived: [{ level: 2, sede: 'i', text: 'a', priority: 2, num: '#7.2' }], budgets: finito.budgets, instructions: 'FASE 2' } });
-  assert.match(fase2, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti/);
+  assert.match(fase2, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti/);
   assert.ok(fase2.indexOf('I bilanci delle correzioni dei livelli') < fase2.indexOf('FASE 2'), 'prima delle istruzioni');
 });
 
