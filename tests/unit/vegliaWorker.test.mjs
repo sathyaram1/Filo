@@ -211,6 +211,41 @@ describe('i segni di vita, letti dove stanno', () => {
   });
 });
 
+// #2303: l'audit fermo per venti minuti, padre e sotto-agenti insieme, era probabilmente su un limite del fornitore. Un
+// worker che aspetta un ritentativo dichiarato non è fermo fino alla fine dell'attesa; dopo, il silenzio torna a contare.
+describe('l\'attesa dichiarata dal fornitore', () => {
+  /** Una traccia ferma da `fa` minuti, la cui ultima riga dichiara un ritentativo fra `attesaMin` minuti (null: nessuna). */
+  const inAttesa = ({ fa, attesaMin }) => {
+    const dir = cartella('filo-veglia-fornitore-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const ora = Date.now() - fa * MIN;
+    const f = join(sub, 'agent-w1.jsonl');
+    const errore = attesaMin === null ? [] : [{ type: 'system', subtype: 'api_error', level: 'error', timestamp: new Date(ora).toISOString(), retryInMs: attesaMin * MIN, retryAttempt: 4, maxRetries: 10 }];
+    writeFileSync(f, righe(uso('t1', 'Bash', { command: 'ls' }, ora - MIN), risposta('t1', ora - MIN + 500), ...errore));
+    utimesSync(f, new Date(ora), new Date(ora));
+    return dir;
+  };
+  const segni = (configDir) => segniDiVita({ root: clone({ prima: 60 }).work, ticket: B, sessione: SID, configDir });
+
+  test('fermo da venticinque minuti dentro un\'attesa di un\'ora: lavora, e il battito dice «adesso»', () => {
+    const adesso = Date.now();
+    const v = segni(inAttesa({ fa: 25, attesaMin: 60 }));
+    assert.equal(giudica({ ...v, adesso }).stato, 'lavora');
+    assert.equal(attivitaPerBattito(v, adesso).attivitaMs, adesso);
+    assert.equal(giudica({ ...segni(inAttesa({ fa: 25, attesaMin: null })), adesso }).stato, 'fermo', 'lo stesso silenzio senza attesa dichiarata');
+  });
+
+  test('a attesa finita da venti minuti è fermo, e il quadro la dice', () => {
+    const v = segni(inAttesa({ fa: 45, attesaMin: 24 }));
+    const g = giudica({ ...v, adesso: Date.now() });
+    assert.equal(g.stato, 'fermo');
+    assert.ok(g.fermoMs >= 20 * MIN && g.fermoMs < 22 * MIN, `fermo da ${g.fermoMs}`);
+    assert.match(quadroDelFermo(v), /Ultima attesa dichiarata dal fornitore: dalle \d\d:\d\d:\d\d UTC alle \d\d:\d\d:\d\d UTC, tentativo 4 di 10\./);
+    assert.doesNotMatch(quadroDelFermo(segni(inAttesa({ fa: 45, attesaMin: null }))), /attesa dichiarata/);
+  });
+});
+
 function fintoServer() {
   const ricevute = [];
   const srv = createServer((req, res) => {
