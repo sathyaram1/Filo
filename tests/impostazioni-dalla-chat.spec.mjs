@@ -293,24 +293,21 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  // Dopo l'OK il modello riparte con l'esito e, già detto tutto, chiude muto (#1373): si aspetta che abbia chiuso.
-  const ripresaChiusa = async () => {
-    await expect.poll(() => app.evaluate(() => globalThis.__imp_giri), { timeout: 8_000 }).toBe(2);
-    await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
-  };
-  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: '' }]);
+  // La proposta ferma sulla conferma chiude il turno; dopo l'OK il modello riparte con l'esito e lo dice (#1373).
+  // Il modello finto si cambia solo a ripresa chiusa: prima, la ripresa leggerebbe il giro del messaggio dopo.
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
-  await ripresaChiusa();
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
-  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: '' }]);
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
-  await ripresaChiusa();
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
   await bolla.locator('.dash-cambi-segno').hover();
