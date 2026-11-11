@@ -88,7 +88,7 @@ test('[3i?] ferma per l\'owner; un «?!» ferma a ogni livello, per il manutento
 });
 
 test('[2i?] a bilanci finiti dal 2 in giù va da parte come un 2: domanda nel suo feedback, niente applicato, niente fermo', () => {
-  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
+  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5 });
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix, []);
   assert.equal(d.derived.length, 1);
