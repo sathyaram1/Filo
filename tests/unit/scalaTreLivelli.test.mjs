@@ -44,6 +44,14 @@ test('lo 0, il vicino e l\'esterno col livello sono respinti, e il rifiuto dice 
   }
 });
 
+test('un indice di codice citato nei passi («righe[i]», «a[e]») non è un secondo rilievo; una sede staccata in mezzo alla riga sì', () => {
+  const testo = 'Provato.\n[2i] Il salvataggio non parte.\n    nel ciclo, `righe[i]` resta vuoto, e lista[e] pure; f(x)[i] anche';
+  assert.deepEqual(R.unparsedLevelLines(testo), []);
+  assert.equal(R.parseFindings(testo).findings.length, 1);
+  assert.equal(R.unparsedLevelLines('Provato.\n[2i] non salva [e] il menu altrove').length, 1);
+  assert.equal(R.unparsedLevelLines('Provato.\n[2i] non salva\n    poi [e] il menu altrove').length, 1);
+});
+
 test('un esterno non prende livello e diventa un feedback nuovo: niente bilancio, niente fermo', () => {
   const d = decide('Provato.\n[e] il menu altrove si chiude\n[e?] scelta su un altro lavoro');
   assert.equal(d.stop, false);
