@@ -63,17 +63,16 @@ test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', ()
 
 // ── I bilanci (spec §4) ──────────────────────────────────────────────────────
 
-test('nessun default nel codice: senza uno dei quattro bilanci decideRound si ferma e dice quale manca', () => {
+test('nessun default nel codice: senza uno dei tre bilanci decideRound si ferma e dice quale manca', () => {
   assert.equal(globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS, undefined);
-  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap3: 5, cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
-  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
-  assert.throws(() => R.decideRound({ findings: [], caps: { cap3: 5, cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
-  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 5, cap1: 2, cap0: 0 }), []);
-  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap3: 5, cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
+  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap3: 5, cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1 —/, 'un cap0 non sostituisce il cap1 che manca');
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /mancanti: cap3, cap2, cap1 —/);
+  assert.throws(() => R.decideRound({ findings: [], caps: { cap3: 5, cap2: '', cap1: 'due' } }), /cap2, cap1/);
+  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 5, cap1: 2 }), []);
+  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap3: 5, cap1: 2 }), [], 'i default espliciti del chiamante contano');
   assert.equal(R.capKeyOf(3), 'cap3', 'un bilancio per livello: il 3 non paga più dal 2');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
-  assert.equal(R.capKeyOf(0), 'cap0');
 });
 
 test('nessun rilievo → pass, nessun bilancio consumato', () => {
