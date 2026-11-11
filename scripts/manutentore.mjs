@@ -157,7 +157,7 @@ function ultimoAggiornamentoDel(dir) {
 export function rigaCloneComEra(dir, ms, { motivo = '', corto = false } = {}) {
   const quando = Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'un momento che non so';
   const parziale = corto ? ' È un clone poco profondo, come quello con cui parte una sessione cloud: probabilmente ha solo main e il ramo della sessione, e i lavori del server mancano.' : '';
-  return `AVVISO: i rami del server non si sono aggiornati${motivo ? ` (${motivo})` : ''}: sono quelli del clone ${dir} com'era alle ${quando}.${parziale}`;
+  return `Rami del server NON aggiornati${motivo ? ` (${motivo})` : ''}: sono quelli del clone ${dir} com'era alle ${quando}.${parziale}`;
 }
 
 /** Un lavoro in un incrocio: il ramo, dove sta e il primo feedback. PURA. */
