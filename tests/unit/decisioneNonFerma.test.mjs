@@ -21,10 +21,10 @@ const tag = (list) => list.map(R.findingTag);
 // ── Il segno «!» ────────────────────────────────────────────────────────────
 
 test('il lettore accetta il «!» dopo il «?», anche nell\'ordine inverso o col «?» prima della lettera', () => {
-  const p = R.parseFindings('Provato.\n[2i?!] cambia il formato del file salvato\n[2?i!] b\n- [3i!?] c\n[1v?] d');
+  const p = R.parseFindings('Provato.\n[2i?!] cambia il formato del file salvato\n[2?i!] b\n- [3i!?] c\n[e?] d');
   assert.deepEqual(p.rifiutati, []);
   assert.deepEqual(p.findings.map((f) => [f.level, f.sede, f.decision, f.irreversibile === true]), [
-    [2, 'i', true, true], [2, 'i', true, true], [3, 'i', true, true], [1, 'v', true, false],
+    [2, 'i', true, true], [2, 'i', true, true], [3, 'i', true, true], [null, 'e', true, false],
   ]);
   assert.equal(p.findings[0].text, 'cambia il formato del file salvato');
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i?!] a\n[2?i!] b'), []);
