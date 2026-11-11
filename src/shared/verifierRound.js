@@ -716,7 +716,7 @@
 
   // ── Testi ─────────────────────────────────────────────────────────────────
 
-  /** Un rilievo come riga di elenco: «- [2i] testo», «- [1v] testo», «- [1e?] testo». PURA. */
+  /** Un rilievo come riga di elenco: «- [2i] testo», «- [1i?] testo», «- [e] testo». PURA. */
   function formatFinding(f) {
     const text = String((f && f.text) || '').replace(/\n/g, '\n  ');
     return `- ${findingTag(f)} ${text}`;
