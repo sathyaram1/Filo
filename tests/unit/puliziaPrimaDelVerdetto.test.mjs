@@ -54,7 +54,7 @@ test('fra le prove scritte escono intere quelle coi soli numeri di rilievi che e
 });
 
 test('rinominata senza il numero, una prova che ha ancora il caso di un rilievo che esce non passa; tolto il caso, passa', () => {
-  const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }];
+  const findings = [{ level: 2, sede: 'i' }, { level: null, sede: 'e' }];
   const prova = 'tests/verifica/42/giro1-r1-misto.spec.mjs';
   const conCaso = "test('r1 col titolo vuoto non salva', () => {});\ntest(\"r2 il menu delle schede si chiude\", () => {});\n";
   const fuori = proveDaToglierePrimaDelVerdetto([prova], findings, { [prova]: conCaso });
