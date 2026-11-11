@@ -53,7 +53,6 @@
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],
-      features: [],
     },
     {
       version: '0.2.270', date: '2026-11-07',

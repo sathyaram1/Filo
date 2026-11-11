@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { prossimaVersione, CAMPO, aggiunteSottoUscite as aggiunte, registroDa } from '../../scripts/lib/novita-in-cima.mjs';
+import { prossimaVersione, CAMPO, aggiunteSottoUscite as aggiunte, chiaviDoppie, registroDa, testoChiaviDoppie } from '../../scripts/lib/novita-in-cima.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -185,6 +185,11 @@ test('nessun blocco del changelog è vuoto (almeno una feature o un fix)', () =>
   for (const n of PN.NOTES) {
     assert.ok(righe(n).length > 0, `il blocco ${n.version} non ha né features né fixes`);
   }
+});
+
+test('nessun blocco scrive due volte la stessa chiave: vincerebbe l\'ultima e le righe dell\'altra sparirebbero (#2320)', () => {
+  const doppie = chiaviDoppie(readFileSync(join(ROOT, 'src', 'shared', 'patchNotes.js'), 'utf8'));
+  assert.deepEqual(doppie, [], `${testoChiaviDoppie(doppie)}. Succede quando un rebase unisce due elenchi aperti nello stesso blocco da strade diverse.`);
 });
 
 test('le versioni sono ordinate dalla più recente alla più vecchia, senza duplicati', () => {

@@ -143,8 +143,8 @@ function proprieta(src, apre) {
   return { chiude, props };
 }
 
-/** La mappa del registro nel sorgente: per ogni blocco i suoi limiti e, per features e fixes, l'elenco e i suoi elementi. */
-function mappaSorgente(src) {
+/** I blocchi del registro nel sorgente, ognuno coi suoi limiti e le sue proprietà. */
+function blocchiSorgente(src) {
   const m = /\bconst\s+NOTES\s*=\s*\[/.exec(src);
   if (!m) throw new Error('non trovo «const NOTES = [»');
   const apre = m.index + m[0].length - 1;
@@ -154,14 +154,48 @@ function mappaSorgente(src) {
     blocchi: blocchi.map((b) => {
       if (src[b.inizio] !== '{') throw new Error(`un blocco del registro non è un oggetto (carattere ${b.inizio})`);
       const { chiude: fineOggetto, props } = proprieta(src, b.inizio);
+      return { ...b, chiudeOggetto: fineOggetto, props };
+    }),
+  };
+}
+
+/**
+ * Le proprietà scritte due volte nello stesso blocco: eseguito, l'oggetto tiene solo l'ultima e le righe dell'altra
+ * spariscono senza errore, anche al confronto (#2320). `[{ version, chiave }]`; lancia se il testo non si legge. PURA.
+ */
+export function chiaviDoppie(src) {
+  const out = [];
+  blocchiSorgente(src).blocchi.forEach((b, k) => {
+    const v = b.props.find((p) => p.nome === 'version');
+    const scritta = v && /^(['"`])([^'"`\\]*)\1/.exec(src.slice(v.valore, v.fine));
+    const version = scritta ? scritta[2] : `n. ${k + 1}`;
+    const nomi = b.props.map((p) => p.nome).filter(Boolean);
+    for (const chiave of new Set(nomi.filter((n, i) => nomi.indexOf(n) !== i))) out.push({ version, chiave });
+  });
+  return out;
+}
+
+/** Il motivo da stampare per le chiavi doppie di chiaviDoppie. PURA. */
+export function testoChiaviDoppie(doppie) {
+  const dove = doppie.map((d) => `nel blocco ${d.version} «${d.chiave}»`).join(', ');
+  return `${dove} ${doppie.length === 1 ? 'è scritto' : 'sono scritti'} due volte: vale solo l'ultimo, e le righe dell'altro spariscono dal registro. `
+    + 'Uniscili in uno solo, poi rilancia';
+}
+
+/** La mappa del registro nel sorgente: per ogni blocco i suoi limiti e, per features e fixes, l'elenco e i suoi elementi. */
+function mappaSorgente(src) {
+  const { apre, chiude, blocchi } = blocchiSorgente(src);
+  return {
+    apre, chiude,
+    blocchi: blocchi.map((b) => {
       const elenchi = {};
-      for (const p of props) {
+      for (const p of b.props) {
         if (!CHIAVI.includes(p.nome)) continue;
         if (src[p.valore] !== '[') throw new Error(`«${p.nome}» non è un elenco scritto per esteso (carattere ${p.valore})`);
         const e = elementi(src, p.valore);
         elenchi[p.nome] = { prop: p, apre: p.valore, chiude: e.chiude, elementi: e.elementi };
       }
-      return { ...b, chiudeOggetto: fineOggetto, props, elenchi };
+      return { ...b, elenchi };
     }),
   };
 }
@@ -209,6 +243,10 @@ const json = (x) => JSON.stringify(x);
 export function spostaInCima(src, { prima, manifesto, oggi }) {
   let dopo;
   try { dopo = registroDa(src); } catch (e) { return { ok: false, motivo: `il registro non si esegue: ${e.message}` }; }
+  // Prima del conteggio: con una chiave doppia il blocco eseguito ha meno righe di main, e il conteggio non vede niente.
+  let doppie;
+  try { doppie = chiaviDoppie(src); } catch (e) { return { ok: false, motivo: `non riesco a leggere il registro: ${e.message}` }; }
+  if (doppie.length) return { ok: false, motivo: testoChiaviDoppie(doppie) };
   const uscita = String((manifesto && manifesto.version) || '');
   const p = prossimaVersione(manifesto);
   if (p.errore) return { ok: false, motivo: p.errore };
@@ -282,10 +320,21 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
       const e = cima.elenchi[chiave];
       attesi[0][chiave] = [...(attesi[0][chiave] || []), ...portate(chiave)];
       if (!e) {
+        const corpo = daPortare[chiave].map((t) => `${rProp}  ${t},\n`).join('');
+        // Al posto dove main scrive lo stesso elenco: un suo `features` nello stesso blocco diventa un conflitto del
+        // rebase, non una chiave doppia che ne cancella le righe in silenzio (#2320).
+        const correzioni = chiave === 'features' && cima.elenchi.fixes && cima.elenchi.fixes.prop;
+        if (correzioni && rientro(src, correzioni.inizio) !== null) {
+          const voci = Object.entries(attesi[0]).filter(([k]) => k !== chiave);
+          voci.splice(voci.findIndex(([k]) => k === 'fixes'), 0, [chiave, attesi[0][chiave]]);
+          attesi[0] = Object.fromEntries(voci);
+          const da = inizioRiga(src, correzioni.inizio);
+          modifiche.push({ da, a: da, testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
+          continue;
+        }
         const ultima = cima.props[cima.props.length - 1];
         const v = virgolaDopo(src, ultima, cima.chiudeOggetto);
         if (v) modifiche.push(v);
-        const corpo = daPortare[chiave].map((t) => `${rProp}  ${t},\n`).join('');
         modifiche.push({ da: inizioRiga(src, cima.chiudeOggetto), a: inizioRiga(src, cima.chiudeOggetto), testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
         continue;
       }
