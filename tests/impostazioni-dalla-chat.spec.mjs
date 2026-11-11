@@ -293,17 +293,24 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
+  // Dopo l'OK il modello riparte con l'esito e, già detto tutto, chiude muto (#1373): si aspetta che abbia chiuso.
+  const ripresaChiusa = async () => {
+    await expect.poll(() => app.evaluate(() => globalThis.__imp_giri), { timeout: 8_000 }).toBe(2);
+    await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  };
+  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: '' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa();
 
-  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
+  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: '' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa();
 
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
   await bolla.locator('.dash-cambi-segno').hover();
