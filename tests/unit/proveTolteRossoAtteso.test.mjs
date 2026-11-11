@@ -183,7 +183,7 @@ const REPORT = 'Corretto il rilievo 1: il pannello della pausa non cancella più
 function giroLocale(prova) {
   const t = giro({ [PROVA]: prova });
   const r = withCritique(withRequest({}, RAMO, { request: 'la pausa del server si scrive dal pannello', sha: t.avvio }), RAMO, {
-    critique: t.critica, sha: t.shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
+    critique: t.critica, sha: t.shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1 },
   });
   assert.equal(r.outcome, 'fix', r.reason);
   mkdirSync(resolve(t.dir, '.claude'), { recursive: true });
