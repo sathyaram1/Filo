@@ -100,23 +100,26 @@ test('un giro si conta sul livello PIÙ ALTO in elenco: un 2 e tre 1 → cap2, n
   assert.equal(d.counts.count2, 1);
 });
 
-test('cap0 a zero: soli 0 → derivato; in elenco con livelli più alti rientrano nel giro', () => {
-  const soli = decide([f(0, 'raro'), f(0, 'rarissimo')]);
+test('cap1 a zero: soli 1 → derivato; in elenco con livelli più alti rientrano nel giro', () => {
+  const caps = { cap3: 5, cap2: 5, cap1: 0 };
+  const soli = decide([f(1, 'raro'), f(1, 'rarissimo')], {}, caps);
   assert.deepEqual(soli.fix, []);
   assert.equal(soli.derived.length, 2);
   assert.equal(soli.consume, null, 'niente corretto, niente pagato');
-  const insieme = decide([f(1, 'bordo'), f(0, 'raro')]);
-  assert.deepEqual(insieme.fix.map((x) => x.level), [1, 0]);
-  assert.equal(insieme.consume, 'cap1');
-  assert.equal(insieme.counts.count0, 0, 'gli 0 corretti insieme ad altro non pagano da cap0');
+  const insieme = decide([f(2, 'non salva'), f(1, 'raro')], {}, caps);
+  assert.deepEqual(insieme.fix.map((x) => x.level), [2, 1]);
+  assert.equal(insieme.consume, 'cap2');
+  assert.equal(insieme.counts.count1, 0, 'gli 1 corretti insieme a un 2 non pagano da cap1');
 });
 
-test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => {
-  const d = decide([f(0, 'raro')], {}, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
-  assert.equal(d.fix.length, 1);
-  assert.equal(d.consume, 'cap0');
-  const dopo = decide([f(0, 'raro')], d.counts, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
-  assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
+test('uno 0 dello stato scritto con la scala vecchia vale 1: paga cap1, e un cap0 rimasto non paga niente', () => {
+  const d = decide([f(0, 'raro')]);
+  assert.deepEqual(d.fix.map((x) => x.level), [1]);
+  assert.equal(d.consume, 'cap1');
+  const vecchio = decide([f(0, 'raro')], { count1: 2 }, { ...CAPS, cap0: 5 });
+  assert.deepEqual(vecchio.fix, [], 'finito cap1 il rilievo va da parte: cap0 non esiste più');
+  assert.equal(vecchio.consume, null);
+  assert.deepEqual(vecchio.derived.map((x) => [x.level, x.priority]), [[1, 1]]);
 });
 
 test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () => {
