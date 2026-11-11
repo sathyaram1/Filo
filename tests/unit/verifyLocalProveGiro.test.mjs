@@ -138,7 +138,7 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   const buona = { ok: true, sha: PULIZIA, files: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'], cancellate: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'] };
   const critica = (derived) => {
     const s = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
-      critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 },
+      critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2 },
     }).state;
     s.r.pending.derived = derived;
     return s;
