@@ -1751,6 +1751,9 @@
     .mg-rc-giorni .mg-chip { min-width: 42px; justify-content: center; padding: 7px 8px; }
     .mg-rc-anteprima { font-size: 12px; color: var(--sn-muted); padding-bottom: 8px; }
     .mg-rc-anteprima--no { color: var(--sn-error); }
+    /* Il tetto in dollari tiene «automatico, 124 $» senza tagliarlo; la stima gli sta accanto, sottovoce. */
+    .sn-page .mg-cp-scelta input.mg-rc-tetto-campo { width: 132px; }
+    .mg-rc-tetto-stima { font-size: 12px; color: var(--sn-muted); align-self: center; }
     :root[data-sn-theme="dark"] .mg-rc-form input[type="time"] { color-scheme: dark; }
     :root[data-sn-theme="light"] .mg-rc-form input[type="time"] { color-scheme: light; }
     .mg-rc-form .mg-cp-azioni { margin: 2px 0 0; }
