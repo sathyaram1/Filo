@@ -108,7 +108,7 @@ const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(__dirname, '..', 'src', 'shared', 'verifierRound.js'));
 const ROUND = globalThis.SN_VERIFIER_ROUND;
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 
 // ─── I bilanci del giro si leggono dal server ────────────────────────────────
 //
