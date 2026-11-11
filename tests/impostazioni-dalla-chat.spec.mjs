@@ -395,6 +395,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'blocca example.org');
   await domanda('Siti bloccati → aggiungi example.org');
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com\nexample.org', { timeout: 3_000 });
