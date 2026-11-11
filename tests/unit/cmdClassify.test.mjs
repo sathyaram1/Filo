@@ -1407,7 +1407,8 @@ test('#2392 — una sottoshell di sola lettura in bash e sh resta una lettura; $
     for (const cmd of ['(echo ciao)', '(ls "/home/u/proj" | wc -l)', 'echo (pwd)', '(ls) && (pwd)']) {
       assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
     }
-    for (const cmd of ['(rm x)', '(echo --output=x); git log $_', '(echo ciao); git log $_']) {
+    // La sottoshell non cambia il `$_` di chi la lancia: resta quello del comando prima.
+    for (const cmd of ['(rm x)', 'echo --output=x; (pwd); git log $_', 'echo --output=x; ls (pwd); git log $_']) {
       assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
     }
     // Il segno interno scritto da chi manda il comando non si fa passare per un gruppo già misurato.
