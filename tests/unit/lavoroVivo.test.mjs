@@ -11,6 +11,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
+import { claudeConSottoAgenti } from '../helpers/sottoAgenti.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
   TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation, cartelleDelLavoro,
