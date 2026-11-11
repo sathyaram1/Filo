@@ -597,7 +597,7 @@ async function setLavoriServer(on, idToken) {
 // nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
 // da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
 // è un valore valido per tutti.
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
   const out = { fixInstructions: '', giroStretto: false };
