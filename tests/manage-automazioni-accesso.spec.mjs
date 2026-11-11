@@ -33,6 +33,9 @@ test('accesso dal banner: le impostazioni sbloccate sono quelle lette dal server
   await expect(page.locator('#mgAutoApproveNonFidato')).not.toBeChecked();
   await expect(page.locator('#mgAutoApproveFidato')).toBeChecked();
   await expect(page.locator('#mgCap3')).toHaveValue('7');
+  await expect(page.locator('#mgCap2')).toHaveValue('3');
+  await expect(page.locator('#mgCap1')).toHaveValue('1');
+  await expect(page.locator('#mgCap0')).toHaveCount(0);
   await expect(page.locator('#mgFixInstructions')).toHaveValue('Istruzioni del server');
   await expect(page.locator('#mgGiroStretto')).toBeChecked();
   await expect(page.locator('#mgMaxSessions')).toHaveValue('4');
