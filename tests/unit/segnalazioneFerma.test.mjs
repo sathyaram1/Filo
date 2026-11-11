@@ -73,7 +73,7 @@ test('il compito della verifica locale insegna il formato che il lettore accetta
 
 test('il perimetro del giro stretto scrive i rilievi con la sede, nella forma di ripiego', () => {
   const nota = perimetroNote('chiusura', { rilievi: [{ level: 2, sede: 'e', text: 'x', decision: true }, { level: 1, text: 'y' }] });
-  assert.match(nota, /- \[2e\?\] x/);
+  assert.match(nota, /- \[e\?\] x/, 'un esterno non porta livello, nemmeno se lo stato vecchio ne ha uno');
   assert.match(nota, /- \[1i\] y/);
 });
 
