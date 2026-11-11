@@ -143,8 +143,8 @@ function proprieta(src, apre) {
   return { chiude, props };
 }
 
-/** La mappa del registro nel sorgente: per ogni blocco i suoi limiti e, per features e fixes, l'elenco e i suoi elementi. */
-function mappaSorgente(src) {
+/** I blocchi del registro nel sorgente, ognuno coi suoi limiti e le sue proprietà. */
+function blocchiSorgente(src) {
   const m = /\bconst\s+NOTES\s*=\s*\[/.exec(src);
   if (!m) throw new Error('non trovo «const NOTES = [»');
   const apre = m.index + m[0].length - 1;
@@ -154,8 +154,42 @@ function mappaSorgente(src) {
     blocchi: blocchi.map((b) => {
       if (src[b.inizio] !== '{') throw new Error(`un blocco del registro non è un oggetto (carattere ${b.inizio})`);
       const { chiude: fineOggetto, props } = proprieta(src, b.inizio);
+      return { ...b, chiudeOggetto: fineOggetto, props };
+    }),
+  };
+}
+
+/**
+ * Le proprietà scritte due volte nello stesso blocco: eseguito, l'oggetto tiene solo l'ultima e le righe dell'altra
+ * spariscono senza errore, anche al confronto (#2320). `[{ version, chiave }]`; lancia se il testo non si legge. PURA.
+ */
+export function chiaviDoppie(src) {
+  const out = [];
+  blocchiSorgente(src).blocchi.forEach((b, k) => {
+    const v = b.props.find((p) => p.nome === 'version');
+    const scritta = v && /^(['"`])([^'"`\\]*)\1/.exec(src.slice(v.valore, v.fine));
+    const version = scritta ? scritta[2] : `n. ${k + 1}`;
+    const nomi = b.props.map((p) => p.nome).filter(Boolean);
+    for (const chiave of new Set(nomi.filter((n, i) => nomi.indexOf(n) !== i))) out.push({ version, chiave });
+  });
+  return out;
+}
+
+/** Il motivo da stampare per le chiavi doppie di chiaviDoppie. PURA. */
+export function testoChiaviDoppie(doppie) {
+  const dove = doppie.map((d) => `nel blocco ${d.version} «${d.chiave}»`).join(', ');
+  return `${dove} ${doppie.length === 1 ? 'è scritto' : 'sono scritti'} due volte: vale solo l'ultimo, e le righe dell'altro spariscono dal registro. `
+    + 'Uniscili in uno solo, poi rilancia';
+}
+
+/** La mappa del registro nel sorgente: per ogni blocco i suoi limiti e, per features e fixes, l'elenco e i suoi elementi. */
+function mappaSorgente(src) {
+  const { apre, chiude, blocchi } = blocchiSorgente(src);
+  return {
+    apre, chiude,
+    blocchi: blocchi.map((b) => {
       const elenchi = {};
-      for (const p of props) {
+      for (const p of b.props) {
         if (!CHIAVI.includes(p.nome)) continue;
         if (src[p.valore] !== '[') throw new Error(`«${p.nome}» non è un elenco scritto per esteso (carattere ${p.valore})`);
         const e = elementi(src, p.valore);
