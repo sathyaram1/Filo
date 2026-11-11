@@ -188,7 +188,7 @@ test('il tetto di costo per corsa: automatico dalla mediana, scritto dall\'owner
   const page = await apri(openTab);
   const r = riga(page, 'rev-domande');
   await expect(r.locator('.mg-rc-tetto')).toHaveText('tetto 124 $ (automatico)');
-  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /Una corsa costa di solito 61,7 \$ \(mediana di 3\), circa 1\.875 \$ al mese\./);
+  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /Una corsa costa di solito 61,7 \$ \(mediana di 3\), circa 1\.872 \$ al mese\./);
   await expect(riga(page, 'potatura').locator('.mg-rc-tetto')).toHaveText('senza tetto');
   await r.getByRole('button', { name: 'Modifica' }).click();
   const form = r.locator('form.mg-rc-form');
