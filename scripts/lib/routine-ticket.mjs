@@ -109,6 +109,24 @@ export function writeTicket(root, ticket) {
   }
 }
 
+/**
+ * Il tetto di costo della corsa di un compito (#2303) nel marcatore del suo biglietto: lo legge la veglia di chi guida il
+ * giro. Solo sul marcatore di QUEL biglietto; un tetto non positivo lo toglie. Best-effort: false se non scritto.
+ */
+export function annotaTetto(root, ticket, tettoUsd) {
+  const m = readMarkerFrom(root);
+  if (!m || String(m.ticket || '') !== String(ticket || '')) return false;
+  const usd = Number(tettoUsd);
+  const out = { ...m };
+  if (Number.isFinite(usd) && usd > 0) out.tettoUsd = usd; else delete out.tettoUsd;
+  try {
+    writeFileSync(ticketFile(root), JSON.stringify(out, null, 2) + '\n', 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export function clearTicket(root) {
   try {
     const f = ticketFile(root);
