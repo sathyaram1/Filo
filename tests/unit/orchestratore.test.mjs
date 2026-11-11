@@ -991,6 +991,9 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
   rete = true;
   assert.equal(await apriDerivatiDi(dep, p), 0);
   assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
+  // L'esterno nasce senza priorità (#2339): «--priorita null» farebbe respingere il feedback dallo strumento.
+  assert.equal(comandi[0], '- --locale');
+  assert.equal(comandi[1], '- --locale --priorita 1');
   assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
 });
 
