@@ -4,9 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 
 const M = await import('../../scripts/manutentore.mjs');
 const { incrociFraRami } = await import('../../scripts/lib/su-main.mjs');
