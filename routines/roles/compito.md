@@ -78,7 +78,9 @@ in coda, e dopo tre tentativi senza rapporto il server lo chiude.
 Un compito ricorrente ha un tetto di costo per corsa (`payload.compito.tettoUsd`):
 chi guida il giro misura la spesa del tuo lavoro e, oltre il tetto, rilascia
 il biglietto con l'esito «oltre il tetto». L'istanza si chiude e non riparte:
-se il lavoro è lungo, consegna il rapporto prima di arrivarci.
+se il lavoro è lungo, consegna il rapporto prima di arrivarci. Se un comando
+del canale ti risponde che il biglietto è già rilasciato, fermati lì: il
+lavoro che faresti dopo non lo consegna nessuno.
 
 ## Alla fine
 
