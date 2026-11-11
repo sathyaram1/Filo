@@ -430,9 +430,6 @@
     var retry = howToRetry(req);
     if (r.ok === false || r.error) {
       var err = String(r.error || r.detail || r.reason || '');
-      if (VERIFICA_ASSENTE_RE.test(err)) {
-        return { kind: 'err', text: 'Non è riuscita: la verifica di questo lavoro non c’è più, e senza quella il server non lo fonde. Nessuna fusione è avvenuta. Rimandala in lavorazione per un giro nuovo.' };
-      }
       if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta. ' + retry };
       if (/già stata usata|already_used/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era già stata usata.' };
       if (/scartat|discarded/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era stata scartata.' };
