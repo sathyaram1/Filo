@@ -320,7 +320,7 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   await configureModel(app);
 
   const visibile = 'Rispondi breve e dammi del tu.';
-  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: 'Ok, così.' }]);
+  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: '' }, { text: 'Ok, così.' }]);
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
@@ -329,6 +329,9 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   expect(haInvisibili(popup.text)).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(visibile);
+  // La ripresa muta dopo l'OK (#1373) finisce prima del turno dopo.
+  await expect.poll(() => app.evaluate(() => globalThis.__stile_calls.length), { timeout: 8_000 }).toBe(2);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   await page.locator('#input').fill('ciao');
   await page.locator('#sendBtn').click();
