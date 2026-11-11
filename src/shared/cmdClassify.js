@@ -755,7 +755,8 @@
   const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
-  const SEGNAPOSTO = '$_\uE000';
+  const SEGNO_GRUPPO = '\uE000';
+  const SEGNAPOSTO = `$_${SEGNO_GRUPPO}`;
   // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
   const APICE_TESTO = '\u02BC';
   const VIRGOLETTE_TESTO = '\u02BA';
