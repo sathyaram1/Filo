@@ -139,12 +139,13 @@ test('D88: la nota del giro dice quale bilancio ha pagato quando non è quello d
   assert.match(nota, /Il giro lo paga il bilancio del livello 1: quello del livello 2 è finito\./);
   assert.doesNotMatch(nota, /feedback dei rimasti|non corretti in questo giro/);
   const tre = [f(3, 'i', 'perde i dati')];
-  assert.match(R.roundNote({ findings: tre, decision: decide(tre, { count3: 5, count2: 4 }, { ...CAPS, cap1: 0, cap0: 1 }) }),
-    /Il giro lo paga il bilancio del livello 0: quelli dei livelli da 3 a 1 sono finiti\./);
+  assert.match(R.roundNote({ findings: tre, decision: decide(tre, { count3: 5, count2: 4 }) }),
+    /Il giro lo paga il bilancio del livello 1: quelli dei livelli da 3 a 2 sono finiti\./);
   // Chi paga col suo bilancio, o un 1 che sale sul giro di un 2: la riga non c'è.
   assert.doesNotMatch(R.roundNote({ findings: list, decision: decide(list) }), /Il giro lo paga/);
-  const vicino = [f(1, 'i', 'qui'), f(3, 'v', 'accanto')];
-  assert.doesNotMatch(R.roundNote({ findings: vicino, decision: decide(vicino) }), /Il giro lo paga/);
+  // Un esterno non ha livello: non è «il rilievo più grave» del giro.
+  const esterno = [f(1, 'i', 'qui'), f(null, 'e', 'accanto')];
+  assert.doesNotMatch(R.roundNote({ findings: esterno, decision: decide(esterno) }), /Il giro lo paga/);
 });
 
 test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner non dipende dal bilancio (#1202)', () => {
