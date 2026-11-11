@@ -1439,6 +1439,24 @@ test('#2392 — in una shell posix una sostituzione in testa a un comando chiede
   assert.equal(C.classify('$(Get-ChildItem "$env:USERPROFILE\\Downloads").Count', WIN), 1);
 });
 
+// In bash `$_` dopo `echo $(cat f)` vale ciò che il file contiene: `git log $_` può diventare `git log --output=~/.bashrc`.
+test('#2392 — dopo una sostituzione fra gli argomenti `$_` è un valore ignoto', () => {
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { cwd: '/home/u/proj', home: '/home/u', shell };
+    for (const cmd of ['echo $(echo --output=/home/u/.bashrc); git log $_', 'echo $(cat f); git log $_', 'echo $(cat f) && git log -1 $_',
+      'echo $(cat f) {,}; git log $_', 'echo $(cat f)x; git log $_', 'echo "$(cat f)"; git log $_']) {
+      assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    }
+    assert.equal(C.classify('echo $(cat f) x; git log $_', ctx), 1, `${shell}: l'ultimo argomento scritto resta noto`);
+  }
+});
+
+// Una copia del rifiuto col segno scritto a mano resta indietro quando i segni cambiano: il rifiuto si costruisce dalle definizioni.
+test('#2392 — i segni interni non si confrontano scritti a mano', () => {
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'), 'utf8');
+  assert.doesNotMatch(src, /includes\(\s*['"`](?:[-]|\\u[Ee][0-9A-Fa-f]{3})/);
+});
+
 test('#1994 — in cmd le variabili col nome che comincia per = non nascondono un\'opzione', () => {
   const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
   for (const cmd of ['git log --out%=ExitCode:~0,0%put=x', 'git log --output%=ExitCodeAscii:~0,0%=x', 'git log --out%=C:~0,0%put=x']) {
