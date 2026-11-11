@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { aggiornaMain, testoBaseMain } from './finish-local.mjs';
 import { apriProvaSulCommit } from './lib/unit-sulla-fusione.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
+import { absolutizeOutput, pinnedRepoRoot } from './lib/tools-pin.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Dalla copia fissata degli strumenti il progetto vero lo dice la copia, come per gli altri strumenti dei ruoli.
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 
 /** Gli spec chiesti, nella forma `tests/<nome>.spec.mjs`; `errore` se uno non ha quella forma. PURA. */
 export function specDaArgomenti(args) {
