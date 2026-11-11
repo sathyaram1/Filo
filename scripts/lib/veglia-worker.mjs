@@ -356,17 +356,21 @@ export async function veglia({
     const g = giudica({ ...s, adesso: adesso(), soglia });
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
     const minuti = Math.round(g.fermoMs / 60000);
-    if (g.stato === 'fermo') {
+    if (g.stato === 'fermo' || g.stato === 'chiuso') {
+      const chiuso = g.stato === 'chiuso';
       const quadro = quadroDelFermo(s);
-      const guasto = testoGuasto({ fermoMs: g.fermoMs, attesa: s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro });
+      const guasto = testoGuasto({
+        fermoMs: g.fermoMs, attesa: chiuso ? null : s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro, chiusoMs: chiuso ? s.chiusoMs : NaN,
+      });
       const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok
         ? 'biglietto rilasciato con un guasto dichiarato'
         : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+      const cosa = chiuso ? 'Worker chiuso senza rilasciare il biglietto' : `Worker fermo da ${minuti} minuti senza segni di vita`;
       return {
         uscita: USCITA_FERMO,
         guasto,
-        testo: `Worker fermo da ${minuti} minuti senza segni di vita: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
+        testo: `${cosa}: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
       };
     }
     if (adesso() + passo >= fine) {
