@@ -672,15 +672,23 @@
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
     else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
-    // Una ripresa che non ha spostato il lavoro lo dice (#1577): non serviva, o accodata al giro dopo.
-    else if (e && e.ok && d.stato === 'chiusa' && e.nonServiva) testo = 'Non serviva: il lavoro è già fuso con questa scelta.';
-    else if (e && e.ok && d.stato === 'chiusa' && e.accodata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: la prende il prossimo giro di lavoro.`;
-    else if (e && e.ok && d.stato === 'chiusa' && e.rimandata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: il lavoro torna in verifica con la tua risposta.`;
-    else if (e && e.ok && d.stato === 'chiusa' && e.lavoroArchiviato) testo = 'Il lavoro è archiviato: la risposta non lo riapre.';
     // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
-    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
+    else if (e && e.ok && d.stato === 'chiusa') testo = ripresaDetta(d) || `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
+  }
+
+  // Una ripresa che non ha spostato il lavoro lo dice (#1577), anche nella risposta automatica (#2149.1): '' se è
+  // ripartito come dice la scelta.
+  function ripresaDetta(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
+    if (!e || !e.ok || d.stato !== 'chiusa') return '';
+    const il = e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : '';
+    if (e.nonServiva) return 'Non serviva: il lavoro è già fuso con questa scelta.';
+    if (e.accodata) return `Fatto${il}: la prende il prossimo giro di lavoro.`;
+    if (e.rimandata) return `Fatto${il}: il lavoro torna in verifica con la risposta.`;
+    if (e.lavoroArchiviato) return 'Il lavoro è archiviato: la risposta non lo riapre.';
+    return '';
   }
 
   // Chiusa dalla revisione perché un lavoro fuso l'ha attuata (#2006): { id, num }, o null.
