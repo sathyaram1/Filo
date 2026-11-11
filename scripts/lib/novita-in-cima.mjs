@@ -324,7 +324,7 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
         // Al posto dove main scrive lo stesso elenco: un suo `features` nello stesso blocco diventa un conflitto del
         // rebase, non una chiave doppia che ne cancella le righe in silenzio (#2320).
         const correzioni = chiave === 'features' && cima.elenchi.fixes && cima.elenchi.fixes.prop;
-        if (false && correzioni && rientro(src, correzioni.inizio) !== null) {
+        if (correzioni && rientro(src, correzioni.inizio) !== null) {
           const voci = Object.entries(attesi[0]).filter(([k]) => k !== chiave);
           voci.splice(voci.findIndex(([k]) => k === 'fixes'), 0, [chiave, attesi[0][chiave]]);
           attesi[0] = Object.fromEntries(voci);
