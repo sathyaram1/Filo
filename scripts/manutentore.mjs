@@ -133,12 +133,13 @@ export function rigaRamo(r) {
 
 /**
  * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no quello dei lavori server
- * (cartellaCloneServer: una ricerca sola per routine e manutentore), se no accanto al checkout di Filo (la sessione
- * locale). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ * (cartellaCloneServer), se no accanto al checkout di Filo anche da una sua worktree (cartellaDelServer, la ricerca di
+ * chiusura e verifica locali). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
  */
 export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
   const dato = String(scelta || '').trim();
-  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), join(dirname(resolve(root)), 'filo-security')];
+  const accanto = dato ? '' : cartellaDelServer(root, esiste);
+  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security')];
   const dir = cercati.find((d) => esiste(join(d, '.git')));
   return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
 }
@@ -151,10 +152,11 @@ function ultimoAggiornamentoDel(dir) {
   return NaN;
 }
 
-/** La riga che dice di quando sono i rami del server letti senza aggiornare il clone. PURA. */
-export function rigaCloneComEra(dir, ms) {
+/** L'avviso dei rami del server letti da un clone che non si è aggiornato. PURA. */
+export function rigaCloneComEra(dir, ms, { motivo = '', corto = false } = {}) {
   const quando = Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'un momento che non so';
-  return `Rami del server dal clone ${dir} com'era alle ${quando}: nelle routine il manutentore non lo aggiorna, perché il server non dà git verso filo-security al suo biglietto.`;
+  const parziale = corto ? ' È un clone poco profondo, come quello con cui parte una sessione cloud: probabilmente ha solo main e il ramo della sessione, e i lavori del server mancano.' : '';
+  return `AVVISO: i rami del server non si sono aggiornati${motivo ? ` (${motivo})` : ''}: sono quelli del clone ${dir} com'era alle ${quando}.${parziale}`;
 }
 
 /** Un lavoro in un incrocio: il ramo, dove sta e il primo feedback. PURA. */
