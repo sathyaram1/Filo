@@ -29,15 +29,45 @@ const LANCI = new Set(['Agent', 'Task']);
 
 /**
  * Il giudizio su un worker, da segni già letti. PURA.
- * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella.
- * @returns {{ stato: 'finito'|'lavora'|'fermo', fermoMs: number }}
+ * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella; `chiusoMs`: quando
+ * il worker ha chiuso la sua sessione (NaN se lavora ancora).
+ * @returns {{ stato: 'finito'|'lavora'|'chiuso'|'fermo', fermoMs: number }}
  */
-export function giudica({ finito = false, processi = 0, tempi = [], adesso = Date.now(), soglia = SOGLIA_FERMO_MS } = {}) {
+export function giudica({
+  finito = false, processi = 0, tempi = [], chiusoMs = NaN, adesso = Date.now(), soglia = SOGLIA_FERMO_MS, sogliaChiuso = SOGLIA_CHIUSO_MS,
+} = {}) {
   if (finito) return { stato: 'finito', fermoMs: 0 };
   const noti = tempi.filter((t) => Number.isFinite(t));
   if (processi > 0 || !noti.length) return { stato: 'lavora', fermoMs: 0 };
   const fermoMs = Math.max(0, adesso - Math.max(...noti));
+  if (Number.isFinite(chiusoMs) && fermoMs >= sogliaChiuso) return { stato: 'chiuso', fermoMs };
   return { stato: fermoMs >= soglia ? 'fermo' : 'lavora', fermoMs };
+}
+
+/**
+ * Quando un transcript ha chiuso la sua sessione: l'ultimo turno dell'assistente rende l'esito (handback) o finisce
+ * senza strumenti. Un messaggio arrivato dopo (una notifica che lo risveglia) la riapre. NaN se lavora ancora. PURA.
+ */
+export function chiusuraDi(righe) {
+  let chiuso = NaN;
+  let consegna = '';
+  for (const r of righe) {
+    let o;
+    try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
+    if (!o || typeof o !== 'object') continue;
+    const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    if (o.type === 'assistant') {
+      if (rigaSintetica(o.message)) { chiuso = NaN; continue; }
+      const usi = c.filter((x) => x && x.type === 'tool_use');
+      const resa = usi.find((x) => CHIUSURE.has(String(x.name || '')));
+      const ms = Date.parse(String(o.timestamp || ''));
+      if (resa) { chiuso = ms; consegna = String(resa.id || ''); } else if (usi.length) { chiuso = NaN; } else if (o.message && o.message.stop_reason === 'end_turn') { chiuso = ms; consegna = ''; }
+    } else if (o.type === 'user') {
+      const soloEsito = c.length > 0 && c.every((x) => x && x.type === 'tool_result' && consegna && x.tool_use_id === consegna);
+      if (!soloEsito) chiuso = NaN;
+    }
+  }
+  return chiuso;
 }
 
 /** L'ultimo strumento chiesto e rimasto senza risposta, dalle righe di un transcript. PURA. */
