@@ -2585,7 +2585,7 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
+  await stubCaps(page, { cap2: 3, cap1: 2, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const cap2 = page.locator('#mgCap2');
