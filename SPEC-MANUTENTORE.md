@@ -182,10 +182,11 @@ lavoro. Il lavoro che l'ha dichiarato resta fermo finché il manutentore non lo
 sblocca con una nota o finché una correzione non lo riguarda: il guasto arriva
 a chi deve indagare e non si ripete da solo (#1589 si è guastato sette volte in
 una notte). Il caso «ambiente rotto per tutti» lo copre la pausa del pacemaker
-sulle accensioni nate morte. Lo sblocco di un guasto (`sblocca`) non scrive
-nelle note che i worker leggono: il testo resta nello stato del feedback, e chi
-riprende nasce pulito (#2215; una nota invece arriva a chi riprende, e su un
-lavoro server lo tiene locale finché l'owner non la copre).
+sulle accensioni nate morte. Lo sblocco di un guasto (`sblocca`, o una `nota`
+su un lavoro fermo per guasto) non scrive nelle note che i worker leggono: il
+testo resta nello stato del feedback, e chi riprende nasce pulito (#2215; ogni
+altra nota invece arriva a chi riprende, e su un lavoro server lo tiene locale
+finché l'owner non la copre).
 
 **Un guasto suo** (#1249.3, #1249.4). La regola intera sta qui: gli altri testi
 rimandano a questo paragrafo e non la riscrivono. Una sessione del manutentore
