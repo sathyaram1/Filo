@@ -362,9 +362,12 @@ test('aspetta e il rilascio di un worker vedono anche i processi nel clone del s
 });
 
 test('le cartelle del lavoro: il clone del server che esiste, una volta sola; nessuna se non c\'è', () => {
-  const esiste = (p) => p.startsWith('/c/');
-  assert.deepEqual(cartelleDelLavoro('/r', { clone: '/c/filo-security', dalCheckout: '/c/filo-security/functions', esiste }), ['/c/filo-security']);
-  assert.deepEqual(cartelleDelLavoro('/r', { clone: '/x/filo-security', dalCheckout: '', esiste }), []);
+  // I percorsi passano da resolve come nello strumento: su Windows '/c/…' diventa 'C:\c\…'.
+  const C = resolve('/c');
+  const esiste = (p) => p.startsWith(C + sep);
+  const clone = join(C, 'filo-security');
+  assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone, dalCheckout: join(clone, 'functions'), esiste }), [clone]);
+  assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone: resolve('/x/filo-security'), dalCheckout: '', esiste }), []);
 });
 
 test('un rilascio con la cartella di un altro biglietto non committa, non spedisce e non tocca il marcatore', async () => {
