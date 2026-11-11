@@ -795,10 +795,10 @@ async function main() {
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
   // la base del diff per gli spec mirati e la guardia sul ramo rimasto indietro.
-  const fetchOk = git(['fetch', 'origin', MAIN]).ok;
-  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`]).ok;
+  const { fetchOk, remoteRefOk } = aggiornaMain(ROOT);
   const { base, note } = resolveDiffBase({ fetchOk, remoteRefOk });
   if (note) console.log(`\n${note}`);
+  console.log(`\n${testoBaseMain({ base, sha: git(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]).out, fetchOk })}`);
 
   {
     const behind = Number(git(['rev-list', '--count', `${shaProvato}..${base}`]).out);
