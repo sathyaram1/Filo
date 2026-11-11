@@ -123,7 +123,7 @@ test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, r
   assert.equal(filo, '/r/.claude/worktrees/sette');
   const r = b.righe();
   // Prima l'app, poi il server, come dal cancello: la pubblicazione incorpora main di Filo con la parte dell'app (#1222).
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --richiesta-owner --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --richiesta-owner --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs altro lavoro Z - --non-locale$/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
