@@ -17,9 +17,8 @@ resto lo scrivi come esterno, senza livello.
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
   richiesta, con le parole del feedback come specifica. L'unica occhiata al
   diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
-  del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
-  o se quel file è fra quelli che il ramo modifica già
-  (`git diff --name-only origin/main...HEAD`).
+  del rilievo (più sotto): se l'ha introdotto questo ramo, su quel file
+  soltanto.
 
 <!-- includi: _decisioni-owner.md -->
 
