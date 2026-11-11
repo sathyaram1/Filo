@@ -375,15 +375,21 @@
   }
 
   /**
-   * Un rilievo interno col «?» ferma il lavoro? Solo un 3, o un 2 su una scelta
-   * difficile da disfare (`!`): gli altri 2 vanno avanti con l'opzione
-   * consigliata, gli 1 e gli 0 vanno da parte (decisione dell'owner del
-   * 2026-10-12, #1202). PURA.
+   * Un rilievo interno col «?» ferma il lavoro? Un 3, o una scelta difficile da
+   * disfare (`!`) a qualunque livello: gli altri 2 vanno avanti con l'opzione
+   * consigliata, gli 1 vanno da parte (#1202; il `!` a ogni livello dal #2339). PURA.
    */
   function decisioneFerma(f) {
     if (!f || f.decision !== true) return false;
-    const n = Number(f.level);
-    return n >= 3 || (n === 2 && f.irreversibile === true);
+    return Number(f.level) >= 3 || f.irreversibile === true;
+  }
+
+  /**
+   * A chi va un rilievo che ferma: la scelta difficile da disfare al manutentore, che risponde o la porta
+   * all'owner; il resto all'owner (decisione dell'owner dell'08/11/2026, #2339). PURA.
+   */
+  function destinatarioDelFermo(f) {
+    return f && f.decision === true && f.irreversibile === true ? 'manutentore' : 'owner';
   }
 
   /**
