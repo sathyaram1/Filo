@@ -2,7 +2,7 @@
 // strumenti) e risponde «nessuna riga» senza dire quale ha letto: chi lo lancia non distingue un clone pulito da uno sbagliato.
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
