@@ -44,6 +44,7 @@ function corri(albero, specs, etichetta) {
 }
 
 function main() {
+  absolutizeOutput(ROOT);
   const scelta = specDaArgomenti(process.argv.slice(2));
   if (scelta.errore) { console.error(scelta.errore); process.exit(1); }
   const git = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
