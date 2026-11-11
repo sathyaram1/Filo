@@ -1125,9 +1125,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const q = richiestaSblocca(argv.slice(1));
     const { chiamaOwner } = await import('./domanda.mjs');
     try {
-      await chiamaOwner({ op: 'sblocca', numero: q.numero, ...(q.testo ? { testo: q.testo } : {}) }, { funzione: 'ownerManutentore' });
+      await chiamaOwner({ op: 'sblocca', ...datiSblocca(q, q.testo) }, { funzione: 'ownerManutentore' });
     } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
-    console.log(`#${q.numero} sbloccato: lo riprende chi arriva dopo.`);
+    console.log(`${q.compito || `#${q.numero}`} sbloccato: lo riprende chi arriva dopo.`);
     return 0;
   }
   // L'indicazione dell'owner dalla chat: col suo canale se c'è, se no con la chiave (stessa riga datata).
