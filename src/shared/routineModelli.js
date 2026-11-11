@@ -41,7 +41,7 @@
   function vuotoDi(ruolo, campo) {
     const r = RUOLI.find((x) => x.id === ruolo) || {};
     if (r.partenza && r.partenza[campo]) return `${r.partenza[campo]} (partenza)`;
-    if (r.come) return `Come ${nomeRuolo(r.come)}`;
+    if (r.come) return `Come in ${nomeRuolo(r.come)}`;
     return VUOTO;
   }
 
