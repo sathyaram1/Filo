@@ -223,8 +223,8 @@ test('annulla e gli errori del server detti per l\'owner', async () => {
   assert.match((await chiama({ type: MSG.COMPITI_ELENCO })).error, /non sono ancora pubblicati/);
 });
 
-const RICORRENTE = { nome: ' Revisione delle domande ', testo: ' Leggi le domande. ', giorni: [3, 1, 1], ora: '06:00', ambito: 'domande', urgenza: '30', modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '', extra: 'x' };
-const PULITO = { nome: 'Revisione delle domande', testo: 'Leggi le domande.', giorni: [1, 3], ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '' };
+const RICORRENTE = { nome: ' Revisione delle domande ', testo: ' Leggi le domande. ', giorni: [3, 1, 1], ora: '06:00', ambito: 'domande', urgenza: '30', modello: 'opus', sforzo: 'high', tettoUsd: '90,5', attivo: true, domandaFineTurno: '', extra: 'x' };
+const PULITO = { nome: 'Revisione delle domande', testo: 'Leggi le domande.', giorni: [1, 3], ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', tettoUsd: 90.5, attivo: true, domandaFineTurno: '' };
 
 test('ricorrenti: l\'elenco va a ownerCompiti e torna coi ricorrenti, gli ambiti e l\'ora del server', async () => {
   const ambiti = A.elenco();
