@@ -386,6 +386,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'accendi il blocco della pubblicità');
   await domanda('Blocco di pubblicità e tracker → attivo');
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).adblock.enabled, { timeout: 5_000 }).toBe(true);
   await sec.bringToFront();
   await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 3_000 });
