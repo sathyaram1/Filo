@@ -402,6 +402,32 @@
     return 'scaduta senza risposta';
   }
 
+  /**
+   * La risposta del server a un sì o a uno scarto, nella forma che legge outcomeMessage. PURA.
+   * Un posto solo per Filo e per la pagina da browser: il main che ne copiava metà perdeva `esito` (#2199.6).
+   */
+  function rispostaPerCard(r, ripiego) {
+    if (!r) return { ok: false, error: 'Il server non ha risposto.' };
+    if (r.ok === false) return { ok: false, error: String(r.detail || r.reason || ripiego || 'Non è riuscita.') };
+    var out = { ok: true };
+    ['result', 'esito', 'sha', 'headSha', 'newRequest', 'realignReason', 'reason'].forEach(function (k) {
+      if (r[k] != null && r[k] !== '') out[k] = String(r[k]);
+    });
+    if (r.realigned && typeof r.realigned === 'object') {
+      out.realigned = {
+        from: String(r.realigned.from || ''),
+        to: String(r.realigned.to || ''),
+        mainSha: String(r.realigned.mainSha || ''),
+      };
+    }
+    if (Array.isArray(r.newBlocks)) out.newBlocks = r.newBlocks;
+    return out;
+  }
+
+  // Il sì che il cancello del server rifiuta perché i verdetti sono stati azzerati: la richiesta resta
+  // aperta e un altro sì risponde uguale, quindi la frase dice come se ne esce (#2199.6).
+  var VERIFICA_ASSENTE_RE = /verifica[^.]*non risulta registrata/i;
+
   // L'esito di un'approvazione, detto all'owner: mai il motivo tecnico lasciato lì da
   // interpretare, sempre cosa è successo e cosa fare adesso. PURA.
   function outcomeMessage(reply, req) {
@@ -409,6 +435,9 @@
     var retry = howToRetry(req);
     if (r.ok === false || r.error) {
       var err = String(r.error || r.detail || r.reason || '');
+      if (VERIFICA_ASSENTE_RE.test(err)) {
+        return { kind: 'err', text: 'Non è riuscita: la verifica di questo lavoro non c’è più, e senza quella il server non lo fonde. Nessuna fusione è avvenuta. Rimandala in lavorazione per un giro nuovo.' };
+      }
       if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta. ' + retry };
       if (/già stata usata|already_used/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era già stata usata.' };
       if (/scartat|discarded/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era stata scartata.' };
@@ -1512,6 +1541,7 @@
     linkGitHub: linkGitHub,
     gruppiDiBlocchi: gruppiDiBlocchi,
     outcomeMessage: outcomeMessage,
+    rispostaPerCard: rispostaPerCard,
     skipOutcomeMessage: skipOutcomeMessage,
     skipsHeadline: skipsHeadline,
     skipReasonNote: skipReasonNote,

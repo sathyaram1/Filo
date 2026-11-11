@@ -124,10 +124,18 @@ test('l\'impronta cambia quando cambia qualcosa da decidere, non quando passa il
   assert.equal(W.impronta({ pending: [r] }, null), W.impronta({ pending: [r] }));
 });
 
-test('la risposta del server arriva alle card nella forma dell\'app', () => {
+test('la risposta del server arriva alle card nella forma dell\'app, con la funzione dell\'app (#2199.6)', () => {
+  // Una copia propria della pagina divergeva da quella del main di Filo: la forma la decide il modulo condiviso.
+  assert.doesNotMatch(SORGENTE, /function rispostaPerCard/);
+  assert.match(SORGENTE, /UI\.rispostaPerCard\(await chiama\(op, req\.id\)\)/);
+  const c = {};
+  vm.runInNewContext(readFileSync(join(CARTELLA, 'filo', 'mergeApprovals.js'), 'utf8'), c);
+  const UI = c.SN_MERGE_APPROVALS;
   // La pagina gira in un altro contesto: si confrontano i dati, non i prototipi.
   const dati = (v) => JSON.parse(JSON.stringify(v));
-  assert.deepEqual(dati(W.rispostaPerCard({ ok: false, reason: 'github_no_token', detail: '' })), { ok: false, error: 'github_no_token' });
-  assert.deepEqual(dati(W.rispostaPerCard({ ok: true, result: 'merged', sha: 'x' })), { ok: true, result: 'merged', sha: 'x' });
-  assert.equal(W.rispostaPerCard(null).ok, false);
+  assert.deepEqual(dati(UI.rispostaPerCard({ ok: false, reason: 'github_no_token', detail: '' })), { ok: false, error: 'github_no_token' });
+  assert.deepEqual(dati(UI.rispostaPerCard({ ok: true, result: 'merged', sha: 'x' })), { ok: true, result: 'merged', sha: 'x' });
+  assert.equal(UI.rispostaPerCard(null).ok, false);
+  const rimandato = UI.rispostaPerCard({ ok: true, result: 'server', esito: 'rimandato' });
+  assert.match(UI.outcomeMessage(rimandato, {}).text, /torna alle routine/);
 });
