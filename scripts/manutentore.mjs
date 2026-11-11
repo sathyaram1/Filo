@@ -1356,7 +1356,8 @@ export function controlliLocali(cmd, argv) {
     return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})${senzaValore}` : '';
   };
   switch (cmd) {
-    case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
+    case 'leggi': case 'nota': return num(a, cmd);
+    case 'sblocca': { const q = richiestaSblocca(argv.slice(1)); return q.ok ? '' : q.motivo; }
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
