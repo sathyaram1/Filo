@@ -99,7 +99,11 @@ la memoria nel taccuino (§ 5). **Il contesto piccolo va per differenze**
 (08/11/2026, #2340): porta solo quello che è cambiato dall'accensione prima,
 e schede, segnali e sezioni del taccuino uguali non si ripetono. Porta tutto
 la prima accensione del giorno e quella dopo un'accensione nata morta; il
-contesto dice in testa quale dei due è. Quello che non c'è si rilegge coi
+contesto dice in testa quale dei due è (`contesto`: `tutto` col perché, o
+`differenze`). Vale come accensione prima quella che ha ricevuto il contesto e
+ha chiuso bene il turno: dopo una sessione morta o guasta si porta tutto.
+Per differenze `schedeUscite` sono i numeri usciti dalla lista e
+`taccuino.invariate` le sezioni uguali. Quello che non c'è si rilegge coi
 comandi (`schede`, `taccuino`). Stima con Opus: da circa 46 $ a circa 31 $ al
 giorno. Si accende:
 
