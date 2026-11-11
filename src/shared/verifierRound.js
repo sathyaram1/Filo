@@ -70,7 +70,7 @@
   //
   //   [2i] Il pulsante «Salva» non salva se il titolo è vuoto: passi …
   //   [1i?] Il colore del bordo non segue il tema scuro (chiede una decisione)
-  //   [2e] Preferenze aperta in due schede cancella le modifiche (c'era già su main)
+  //   [e] Preferenze aperta in due schede cancella le modifiche (c'era già su main)
   //
   // Il `?` dopo la sede segna «chiede una decisione dell'owner» (un
   // trade-off vero, una scelta di prodotto); il `!` dopo il `?` (`[2i?!]`) dice
