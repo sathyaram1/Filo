@@ -295,12 +295,13 @@
     return `tetto ${dollari(t.usd)}${t.da === 'corse' ? ' (automatico)' : ''}`;
   }
 
+  const alMese = (t, giorni) => Number(t.mediana) * (Array.isArray(giorni) ? giorni.length : 0) * 52 / 12;
+
   /** La stima accanto al tetto: quanto costa di solito una corsa, e al mese con la cadenza scelta. */
   function stimaTesto(t, giorni) {
     const regola = 'Oltre il tetto la corsa si ferma e non riparte. Vuoto: il doppio della mediana delle ultime corse.';
     if (!t || !(Number(t.corse) > 0)) return `${regola} Nessuna corsa finita ancora: finché non ne finisce una, il tetto automatico non c’è.`;
-    const mese = Number(t.mediana) * (Array.isArray(giorni) ? giorni.length : 0) * 52 / 12;
-    return `${regola} Una corsa costa di solito ${dollari(t.mediana)} (mediana di ${t.corse}), circa ${dollari(Math.round(mese))} al mese.`;
+    return `${regola} Una corsa costa di solito ${dollari(t.mediana)} (mediana di ${t.corse}), circa ${dollari(Math.round(alMese(t, giorni)))} al mese.`;
   }
 
   // ── Il modulo ────────────────────────────────────────────────────────────
