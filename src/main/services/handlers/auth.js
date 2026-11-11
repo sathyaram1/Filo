@@ -681,7 +681,7 @@ module.exports = function register(on, ctx) {
   // (config/routines, campi in VERIFIER_CAP_KEYS più `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
-  const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+  const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
   const capsReply = (caps) => {
     const out = { ok: true, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true };
     for (const k of CAP_KEYS) out[k] = caps[k];
