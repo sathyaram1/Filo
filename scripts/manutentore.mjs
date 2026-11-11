@@ -996,6 +996,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   contesto | sveglia | stato | schede | leggi <N>
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
+  rapporti --rifiuti [--giorni G | --da D [--a D]] [--json] (per ruolo: Edit e Write rifiutati, con la causa)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…> [--server]
