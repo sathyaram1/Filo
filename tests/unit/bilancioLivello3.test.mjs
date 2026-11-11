@@ -153,7 +153,10 @@ test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner no
   const d = decide([irr], { count2: 4 });
   assert.equal(d.stop, true);
   assert.deepEqual(livelli(d.blocking), ['2i']);
-  assert.match(R.roundNote({ summary: '', findings: [irr], decision: d }), /di livello 3 o su una scelta difficile da disfare/);
+  assert.equal(d.blocking[0].destinatario, 'manutentore');
+  const nota = R.roundNote({ summary: '', findings: [irr], decision: d });
+  assert.match(nota, /Il lavoro si ferma su una scelta difficile da disfare .*: la decide il manutentore/);
+  assert.doesNotMatch(nota, /rilievo interno di livello 3/, 'non è un 3: la riga dell\'owner non c\'è');
   // Senza il segno, a bilanci finiti il 2 col ? va da parte con la domanda, senza fermare.
   const q = decide([f(2, 'i', 'A o B?', true)], FINITI[2]);
   assert.equal(q.stop, false);
