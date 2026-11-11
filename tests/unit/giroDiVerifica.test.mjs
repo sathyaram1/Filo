@@ -196,7 +196,7 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
 
     // La scala vecchia (#2339): uno 0, un vicino, un esterno col livello si respingono dicendo cosa è cambiato.
     for (const [riga, motivo] of [['[0i] raro', /il livello 0 non c'è più/], ['[1v] accanto', /la sede «vicino» non c'è più/], ['[2e] altrove', /un rilievo esterno non prende livello/]]) {
-      const vecchia = await esegui(['--record-verifier', 'fid-901', `Provato ad aprire la pagina e a salvare col titolo vuoto.\n${riga}`], ENV(casa, port));
+      const vecchia = await esegui(['--record-verifier', 'fid-901', `Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare la scheda in un'altra finestra.\n${riga}`], ENV(casa, port));
       assert.equal(vecchia.code, 1, riga);
       assert.match(vecchia.se, motivo, riga);
     }
