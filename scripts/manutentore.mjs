@@ -450,6 +450,80 @@ export function righeCache(conto, finestra = null) {
   ];
 }
 
+const STRUMENTO_SCRITTURA_RE = /^(Edit|MultiEdit|Write|NotebookEdit)(:|$)/;
+
+/**
+ * Il conto di `rapporti --rifiuti` (#2188) per ruolo e in totale: gli Edit e i Write rifiutati per file non letto o
+ * modificato dopo la lettura, con la causa dalla nota del rapporto. Un rapporto nato prima della nota si conta dagli
+ * strumenti falliti del biglietto, senza causa (`senzaCausa`) e solo fin dove l'elenco arriva. PURA.
+ */
+export function contoRifiuti(rapporti, finestra = null) {
+  const vuoto = () => {
+    const r = rifiutiVuoti();
+    r.nonLetto.senzaCausa = 0;
+    r.modificato.senzaCausa = 0;
+    return { biglietti: 0, conRapporto: 0, conRifiuti: 0, dalSoloElenco: 0, ...r };
+  };
+  const ruoli = new Map();
+  const totale = vuoto();
+  for (const b of Array.isArray(rapporti) ? rapporti : []) {
+    const rep = b && b.report && typeof b.report === 'object' ? b.report : null;
+    const ruolo = unaRiga((b && (b.ruolo || b.role)) || (rep && rep.role)) || '?';
+    if (!ruoli.has(ruolo)) ruoli.set(ruolo, vuoto());
+    const nota = rep && Array.isArray(rep.notes) ? rep.notes.find((n) => String(n).startsWith(`${NOTA_RIFIUTI}:`)) : null;
+    let r = nota ? leggiNotaRifiuti(nota) : null;
+    let dalSoloElenco = 0;
+    if (!r) {
+      r = vuoto();
+      for (const f of Array.isArray(b && b.strumentiFalliti) ? b.strumentiFalliti : []) {
+        if (!f || !STRUMENTO_SCRITTURA_RE.test(String(f.nome || ''))) continue;
+        if (RIFIUTO_NON_LETTO.test(String(f.errore || ''))) r.nonLetto.senzaCausa += 1;
+        else if (RIFIUTO_MODIFICATO.test(String(f.errore || ''))) r.modificato.senzaCausa += 1;
+      }
+      dalSoloElenco = r.nonLetto.senzaCausa + r.modificato.senzaCausa ? 1 : 0;
+    }
+    const quanti = [r.nonLetto, r.modificato].reduce((t, o) => t + Object.values(o).reduce((s, n) => s + n, 0), 0);
+    for (const g of [ruoli.get(ruolo), totale]) {
+      g.biglietti += 1;
+      g.conRapporto += rep ? 1 : 0;
+      g.conRifiuti += quanti ? 1 : 0;
+      g.dalSoloElenco += dalSoloElenco;
+      for (const parte of ['nonLetto', 'modificato']) for (const [k, n] of Object.entries(r[parte])) g[parte][k] = (g[parte][k] || 0) + n;
+    }
+  }
+  const da = finestra ? Date.parse(finestra.da) : NaN;
+  const a = finestra ? Date.parse(finestra.a) : NaN;
+  const giorni = Number.isFinite(da) && Number.isFinite(a) && a > da ? (a - da) / GIORNO_MS : 0;
+  const chiudi = (g) => {
+    const nonLettoTot = Object.values(g.nonLetto).reduce((s, n) => s + n, 0);
+    const modificatoTot = Object.values(g.modificato).reduce((s, n) => s + n, 0);
+    return Object.assign(g, { nonLettoTot, modificatoTot, nonLettoAlGiorno: giorni ? nonLettoTot / giorni : null });
+  };
+  return {
+    giorni,
+    perRuolo: [...ruoli].map(([ruolo, g]) => ({ ruolo, ...chiudi(g) })).sort((x, y) => y.nonLettoTot + y.modificatoTot - x.nonLettoTot - x.modificatoTot),
+    totale: chiudi(totale),
+  };
+}
+
+/** `rapporti --rifiuti` da leggere: una riga per ruolo col dettaglio delle cause, il totale e la media al giorno. PURA. */
+export function righeRifiuti(conto, finestra = null) {
+  const cause = (elenco, conti) => [...elenco, ['senzaCausa', 'senza causa']]
+    .filter(([k]) => Number(conti[k]) > 0).map(([k, etichetta]) => `${etichetta} ${conti[k]}`).join(', ');
+  const riga = (nome, g) => `  ${nome}: ${g.biglietti} biglietti (${g.conRifiuti} con rifiuti)`
+    + ` · non letto ${g.nonLettoTot}${g.nonLettoTot ? ` (${cause(CAUSE_NON_LETTO, g.nonLetto)})` : ''}`
+    + ` · modificato dopo la lettura ${g.modificatoTot}${g.modificatoTot ? ` (${cause(CAUSE_MODIFICATO, g.modificato)})` : ''}`;
+  const quando = finestra ? ` dal ${finestra.da} al ${finestra.a}` : '';
+  const t = conto.totale;
+  return [
+    `Edit e Write rifiutati${quando}, per ruolo:`,
+    ...conto.perRuolo.map((g) => riga(g.ruolo, g)),
+    riga('TOTALE', t),
+    ...(t.nonLettoAlGiorno !== null ? [`Non letto: ${t.nonLettoAlGiorno.toFixed(1)} al giorno su ${conto.giorni.toFixed(1)} giorni.`] : []),
+    ...(t.dalSoloElenco ? [`${t.dalSoloElenco} rapporti senza la nota dei rifiuti (nati prima): contati dagli strumenti falliti del biglietto, senza causa e fin dove l'elenco arriva.`] : []),
+  ];
+}
+
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
   const [n, ...resto] = senzaOpzioni(args);
