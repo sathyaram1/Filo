@@ -777,7 +777,8 @@ export function derivatiText(list) {
     const dove = g.tipo === 'rimasti'
       ? `un solo feedback per ${g.findings.length === 1 ? 'questo rilievo' : `questi ${g.findings.length} rilievi`}`
       : 'feedback a parte';
-    return `${g.findings.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n')}\n  → ${dove}, priorità ${g.priority} (${ROUND.groupLabel(g)})`;
+    const priorita = g.priority == null ? 'senza livello' : `priorità ${g.priority}`;
+    return `${g.findings.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n')}\n  → ${dove}, ${priorita} (${ROUND.groupLabel(g)})`;
   }).join('\n');
 }
 
