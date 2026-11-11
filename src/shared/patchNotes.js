@@ -13,6 +13,7 @@
       features: [
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
         { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
@@ -22,7 +23,6 @@
       version: '0.2.274', date: '2026-11-08',
       features: [
         { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
-        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni: dei file, delle pagine aperte, degli appunti, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
