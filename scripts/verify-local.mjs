@@ -29,7 +29,7 @@
 //     si rilancia senza argomenti: riusa la richiesta registrata.
 //
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
-//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1v]` = vicino, `[1i?]` =
+//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[e]` = esterno (senza livello), `[1i?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
