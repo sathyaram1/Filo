@@ -88,7 +88,7 @@ test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1; f
 
   const nota = R.roundNote({ summary: 'il resto regge', findings: [f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], decision: finito });
   assert.match(nota, /Nessun rilievo interno da correggere adesso/);
-  assert.match(nota, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
+  assert.match(nota, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
   assert.match(nota, /I 2 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1/);
   assert.doesNotMatch(nota, /Il lavoro si ferma|Il giro lo paga/);
   const uno = R.roundNote({ summary: '', findings: [f(2, 'i', 'non salva')], decision: zero });
