@@ -105,7 +105,7 @@ test('c\'è da correggere: la risposta resta su file, l\'ultima riga la nomina e
 test('senza una critica registrata --risposta-critica lo dice, ed esce senza toccare il server', async () => {
   const { casa } = casaSulRamo();
   const consegna = cartellaConsegna(casa);
-  rmSync(consegna, { recursive: true, force: true });
+  assert.ok(togliCartella(consegna));
   try {
     const r = await esegui(['--risposta-critica', 'fid-2316'], ENV(casa, 9));
     assert.equal(r.code, 2);
