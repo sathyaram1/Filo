@@ -73,7 +73,16 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   const notifica = strumento === "PushNotification" || (strumento === "SendUserFile" && ti.status === "proactive");
   if (notifica && input.hook_event_name === "PreToolUse") return nega(MOTIVO_NOTIFICA);
   if (strumento !== "Agent" && strumento !== "Task") return null;
-  if (input.agent_id) return null;
+  const tornato = (r) => {
+    const stato = !!r && typeof r === "object" && !Array.isArray(r) && typeof r.status === "string" ? r.status : "";
+    return stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
+  };
+  // Un sotto-agente di un worker resta intatto; se gira in sottofondo il worker riceve come aspettarlo (#2304).
+  if (input.agent_id) {
+    if (input.hook_event_name !== "PostToolUse" || tornato(input.tool_response)) return null;
+    const attesa = strumenti ? " Comando: node " + strumenti + "/scripts/routine-channel.mjs aspetta <il tuo biglietto>" : "";
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO + attesa } };
+  }
   if (input.hook_event_name === "PreToolUse") {
     if (ti.run_in_background === true) return nega(MOTIVO_SOTTOFONDO);
     const visti = [...new Set([...String(ti.prompt || "").matchAll(/--ticket[^A-Za-z0-9_-]{1,3}([A-Za-z0-9_-]{32,})/g)].map((m) => m[1]))];
