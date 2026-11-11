@@ -32,7 +32,7 @@ La priorità non è più una coda: dice quanto una cosa conta oggi.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
-| **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza, funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
+| **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
 | **2** | la rosa del giorno: i feedback più importanti fra tutti, scelti ogni mattina leggendo tutte le schede | manutentore | sempre nel suo contesto; fra questi decide ordine, pacchetti e quanti insieme |
 | **1** | da fare, ma non oggi | manutentore (e owner) | aspettano una prossima rosa |
 | **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | non si lavorano; ne esistono infiniti, e oggi conta più un'analisi per velocizzare Filo che correggerli |
