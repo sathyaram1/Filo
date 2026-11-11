@@ -194,6 +194,14 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
     assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
 
+    // La scala vecchia (#2339): uno 0, un vicino, un esterno col livello si respingono dicendo cosa è cambiato.
+    for (const [riga, motivo] of [['[0i] raro', /il livello 0 non c'è più/], ['[1v] accanto', /la sede «vicino» non c'è più/], ['[2e] altrove', /un rilievo esterno non prende livello/]]) {
+      const vecchia = await esegui(['--record-verifier', 'fid-901', `Provato ad aprire la pagina e a salvare col titolo vuoto.\n${riga}`], ENV(casa, port));
+      assert.equal(vecchia.code, 1, riga);
+      assert.match(vecchia.se, motivo, riga);
+    }
+    assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+
     // Una critica vuota non arriva più fin qui: la ferma il pavimento al
     // motivo, perché senza rilievi l'esito calcolato è «superata» (#565).
     const vuota = await esegui(['--record-verifier', 'fid-901', ''], ENV(casa, port));
