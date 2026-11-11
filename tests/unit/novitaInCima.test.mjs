@@ -157,7 +157,7 @@ test('un blocco con features scritto due volte: lo strumento si ferma e dice dov
     { v: '0.2.269', features: ['Vecchia'] },
   ];
   const ramo = conDoppio(main, '0.2.270', [R1]);
-  assert.deepEqual([...registroDa(ramo)[1].features].map(globalThis.SN_PATCH_NOTES.testo), [R1.testo], 'la scena: eseguito, il blocco tiene solo il features del ramo');
+  assert.deepEqual([...registroDa(ramo)[1].features].map(PN.testo), [R1.testo], 'la scena: eseguito, il blocco tiene solo il features del ramo');
   assert.deepEqual(chiaviDoppie(ramo), [{ version: '0.2.270', chiave: 'features' }]);
   const r = spostaInCima(ramo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.272' }, oggi: OGGI });
   assert.equal(r.ok, false);
