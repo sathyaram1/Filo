@@ -36,7 +36,7 @@ test('la richiesta: numero, sotto-numeri, finestra per date o per giorni, pagine
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni', '7', '--somma'], NOW).dati, { da: '2026-10-28T12:00:00.000Z', somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni=2', '--a', '2026-11-01'], NOW).dati, { da: '2026-10-30T00:00:00.000Z', a: '2026-11-01' });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--da', '2026-10-28', '--a', '2026-11-04T08:00Z', '--limite', '200', '--cursore', 'ab12', '--tutte'], NOW),
-    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, cache: false, json: false });
+    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, cache: false, rifiuti: false, json: false });
 });
 
 test('le richieste storte si fermano prima del server, col perché', async (t) => {
