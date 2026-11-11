@@ -25,7 +25,7 @@ test('la critica respinge la sede v, col ? prima o dopo la lettera, e dice che o
   const p = R.parseFindings('Provato tutto.\n[1v] etichetta tagliata\n- [2v?] scelta sul file vicino\n[3?V] grave nel file vicino\n[2i] qui');
   assert.deepEqual(tag(p.findings), ['2i'], 'solo l\'interno è un rilievo');
   assert.equal(p.rifiutati.length, 3);
-  for (const r of p.rifiutati) assert.match(r, /la sede «vicino» non c'è più[^)]*: \[e\] testo/);
+  for (const r of p.rifiutati) assert.match(r, /la sede «vicino» non c'è più[\s\S]*è esterno[\s\S]*non prende livello: \[e\] testo/);
   assert.doesNotMatch(p.summary, /etichetta|vicino/, 'e non finisce nel riassunto');
   assert.equal(R.unparsedLevelLines('[1v] male\n[2v?] male').length, 2, 'una riga col v è scritta male');
   assert.match(R.testoRilieviNonRiconosciuti('Provato.\n[1v] male'), /\[1v\] male \(la sede «vicino» non c'è più/);
