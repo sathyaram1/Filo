@@ -127,18 +127,19 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
-  correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
-  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12
-  (#1202) entra nella correzione solo se il giro parte comunque per gli interni,
-  altrimenti va da parte col livello scritto, e non paga nessun bilancio. Ciò che
-  il lavoro non corregge diventa SUBITO un feedback derivato,
-  figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
-  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
-  Pipeline); UNO solo per tutti gli altri (interni messi da parte
-  dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
-  fra loro, con la stessa regola sul 2); —critica con rilievi
+  correggere→ `revision_security` (dal #2339, 08/11/2026, scala a tre livelli
+  misurata sull'obiettivo: un livello, `[3i]`/`[2i]`/`[1i]`, lo prende solo un
+  difetto che riguarda l'obiettivo del feedback o che il ramo ha introdotto; tutto
+  il resto è esterno, `[e]`, senza livello; la sede «vicino» e il livello 0 non ci
+  sono più e la critica che li porta si respinge col perché; lo stato scritto prima
+  si legge con 0 → 1 e vicino → esterno). Ciò che il lavoro non corregge diventa
+  SUBITO un feedback, aperto dal server in ogni esito: ogni esterno un feedback
+  nuovo senza livello, classificato dopo come ogni altro; per ogni interno col `?` un
+  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, a
+  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore
+  (quello col `?` aspetta la risposta alla sua domanda: sopra, Pipeline); UNO solo per
+  tutti gli altri interni messi da parte dal bilancio, a priorità = il livello
+  scritto più alto fra loro, con la stessa regola sul 2); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
