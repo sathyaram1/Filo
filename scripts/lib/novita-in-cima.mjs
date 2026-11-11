@@ -31,6 +31,8 @@ export const registroDa = (src) => N().leggiRegistro(src);
 export const aggiunteSottoUscite = (prima, dopo, uscita) => N().aggiunteSottoUscite(prima, dopo, uscita);
 export const sottoUsciteSuMain = (prima, dopo, manifesto, versioneMain) => N().sottoUsciteSuMain(prima, dopo, manifesto, versioneMain);
 export const spostaInCima = (src, opzioni) => N().spostaInCima(src, opzioni);
+export const chiaviDoppie = (src) => N().chiaviDoppie(src);
+export const testoChiaviDoppie = (doppie) => N().testoChiaviDoppie(doppie);
 
 /**
  * Nel clone `root`: confronta il registro col punto in cui il ramo si stacca da main e, con `commit`, sposta e committa
