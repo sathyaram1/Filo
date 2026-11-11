@@ -157,9 +157,10 @@ lui, accenderlo non serve.
 
 ## Guasti
 
-Un guasto non ferma nessun altro lavoro. Il lavoro che l'ha dichiarato resta fermo finché non lo sblocchi tu con una
-nota, o finché una correzione non lo riguarda: indaghi la causa, apri o riusi il feedback che la corregge (con
-l'attesa del lavoro fermo su di lui), e sblocchi quando la causa è passata, dicendo nella nota cosa è cambiato. Lo
+Un guasto non ferma nessun altro lavoro. Il lavoro che l'ha dichiarato resta fermo finché non lo sblocchi tu
+(`sblocca <N> [cosa è cambiato]`), o finché una correzione non lo riguarda: indaghi la causa, apri o riusi il feedback
+che la corregge (con l'attesa del lavoro fermo su di lui), e sblocchi quando la causa è passata. Il testo dello sblocco
+resta nello stato del feedback (`leggi`), non nelle note, anche se lo scrivi come nota: chi riprende nasce pulito. Lo
 stesso guasto ripetuto su un lavoro è un segnale da seguire nel taccuino, non da sbloccare alla cieca. Il caso
 «ambiente rotto per tutti» lo copre la pausa del pacemaker sulle accensioni nate morte. Il fermo vale solo a
 manutentore acceso: spento in Automazioni, nessuno lo toglierebbe, quindi un guasto non lo mette e quelli già messi
