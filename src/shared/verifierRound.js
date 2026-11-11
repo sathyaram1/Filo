@@ -765,16 +765,17 @@
     if (s) parts.push(s);
     const esterni = Array.isArray(d.external) ? d.external.length : 0;
     if (esterni) {
-      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
+      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non riguarda l\'obiettivo e non l\'ha introdotto il ramo): diventa un feedback nuovo' : `${esterni} rilievi sono esterni (non riguardano l'obiettivo e non li ha introdotti il ramo): diventano feedback nuovi`}, senza livello, classificati come ogni altro feedback.`);
     }
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (finiti il suo bilancio e quelli dei livelli sotto), o un rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare.');
+      const alManutentore = Array.isArray(d.blocking) && d.blocking.some((f) => destinatarioDelFermo(f) === 'manutentore');
+      const allOwner = !Array.isArray(d.blocking) || !d.blocking.length || d.blocking.some((f) => destinatarioDelFermo(f) === 'owner');
+      if (allOwner) parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (finiti il suo bilancio e quelli dei livelli sotto), o un rilievo interno di livello 3 che chiede una tua decisione.');
+      if (alManutentore) parts.push('Il lavoro si ferma su una scelta difficile da disfare (dati degli utenti, formati su disco): la decide il manutentore, che te la porta se serve.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
-      if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
+      if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
-      const vicini = d.fix.filter((f) => f && sedeDi(f.sede) === 'v').length;
-      if (vicini) parts.push(`${vicini === 1 ? 'Un rilievo è vicino (di un altro lavoro, ma in un file che il ramo modifica già): si corregge' : `${vicini} rilievi sono vicini (di un altro lavoro, ma in file che il ramo modifica già): si correggono`} insieme al resto.`);
       const pagato = bilancioPagato(d);
       if (pagato) parts.push(pagato);
     } else {
