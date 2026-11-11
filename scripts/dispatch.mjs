@@ -1665,7 +1665,7 @@ export function verifierReplyText(reply, id = '<id>') {
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
   // server non manda (un server vecchio) non si inventa.
-  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1', 'cap0'];
+  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1'];
   const budgets = b && typeof b === 'object'
     ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
