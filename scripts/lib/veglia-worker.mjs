@@ -5,7 +5,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, readSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { gitIn, lavoroVivo, timbroFile, comandoLeggibile } from './branch-integrity.mjs';
+import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
 import { leggiMeta, rigaSintetica } from '../session-report.mjs';
