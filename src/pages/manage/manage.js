@@ -1254,6 +1254,22 @@
         sel.selectedIndex = -1;
         roleSelects.set(`${r.id}.${campo}`, sel);
       }
+      // Una fase con un costo da scegliere porta la stima accanto alla scelta (#2344).
+      if (RM.stimaDi(r.id, '')) {
+        const s = cella('mg-role-stima', '');
+        s.dataset.ruolo = r.id;
+        mgRoleModels.append(s);
+        roleStime.set(r.id, s);
+      }
+    }
+    aggiornaStime();
+  }
+
+  function aggiornaStime() {
+    for (const [id, s] of roleStime) {
+      const stima = RM.stimaDi(id, roleScelta(`${id}.effort`) || '');
+      s.textContent = stima ? stima.testo : '';
+      s.title = stima ? stima.perche : '';
     }
   }
 
