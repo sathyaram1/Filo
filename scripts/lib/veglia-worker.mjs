@@ -288,6 +288,7 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
     viste: true, ultimoMs, attesa, elenco,
     chiusoMs: worker ? chiusuraDi(worker.righe) : NaN,
     fornitoreFinoMs: fini.length ? Math.max(...fini) : NaN,
+    file: file.map((f) => f.p),
   };
 }
 
