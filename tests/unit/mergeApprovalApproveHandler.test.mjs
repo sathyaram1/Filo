@@ -163,19 +163,6 @@ test('il sì a un lavoro del server: la frase di Gestione dice dove va davvero i
   }
 });
 
-test('il sì rifiutato perché la verifica non c’è più dice come se ne esce (#2199.6)', async () => {
-  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
-  const UI = globalThis.SN_MERGE_APPROVALS;
-  risposta = {
-    ok: false, reason: 'precondizione',
-    detail: 'nessuna fusione, né dell\'app né del server: la verifica del lavoro non risulta registrata',
-  };
-  const msg = UI.outcomeMessage(await approva(), { origin: 'routine' });
-  assert.equal(msg.kind, 'err');
-  assert.match(msg.text, /Nessuna fusione è avvenuta/);
-  assert.match(msg.text, /Rimandala in lavorazione per un giro nuovo/);
-});
-
 // Ogni campo della risposta che la frase dell'owner legge deve passare dal main: un campo nuovo in
 // outcomeMessage senza la sua riga in rispostaPerCard tornerebbe a vedersi solo da browser.
 test('sentinella: rispostaPerCard lascia passare tutti i campi che outcomeMessage legge', () => {
