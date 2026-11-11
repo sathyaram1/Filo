@@ -162,7 +162,7 @@
     const xs = corseValide(x.costiCorse);
     const stima = { mediana: Math.round(mediana(xs) * 100) / 100, corse: xs.length };
     const scritto = Number(x.tettoUsd);
-    if (x.tettoUsd !== null && Number.isFinite(scritto) && scritto > 0) return Object.assign({ usd: scritto, da: 'owner' }, stima);
+    if (Number.isFinite(scritto) && scritto > 0) return Object.assign({ usd: scritto, da: 'owner' }, stima);
     const auto = tettoAutomatico(xs);
     return Object.assign({ usd: auto, da: auto > 0 ? 'corse' : '' }, stima);
   }
