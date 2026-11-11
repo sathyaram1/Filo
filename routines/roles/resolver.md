@@ -109,16 +109,19 @@ in più:
 
 <!-- includi: _criteri-struttura.md -->
 
-A ogni difetto il verificatore dà un livello, col metro della frequenza
-(quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
-della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa
-chiesta — o se l'ha creato il tuo ramo; **vicino** se tocca a un altro lavoro
-ma sta in un file che il tuo ramo modifica già; **esterno** se tocca a un altro
-lavoro. Usa lo stesso metro: chiudi lo scenario e le porte della stessa causa,
-col 20% dello sforzo che dà l'80% del risultato. **Niente oltre al chiesto**:
-un difetto vicino o fuori dallo scenario, o una funzione che nessuno ha
-chiesto, non si fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
-correzione aggiunge a generare i rilievi del giro dopo.
+Il verificatore dà un livello solo ai difetti che riguardano l'**obiettivo**
+del feedback (la cosa chiesta, coi suoi esempi e i casi ovvi) o che il tuo
+ramo ha **introdotto**, misurandoli sull'obiettivo: 3 se la modifica non
+risolve nella maggior parte dei casi o porta un problema più grave, 2 se
+risolve in meno dell'80% dei casi o porta un problema nuovo meno grave, 1 per
+un caso molto raro, un miglioramento incerto o un problema raro. Tutto il
+resto è **esterno**, anche in un file che il tuo ramo modifica: niente
+livello, diventa un feedback nuovo. Usa lo stesso metro: chiudi l'obiettivo e
+le porte della stessa causa, col 20% dello sforzo che dà l'80% del risultato.
+**Niente oltre al chiesto**: un difetto fuori dall'obiettivo, o una funzione
+che nessuno ha chiesto, non si fa — lo scrivi nel report e diventerà un
+feedback suo. È ciò che una correzione aggiunge a generare i rilievi del giro
+dopo, e un difetto in un'aggiunta è tuo.
 
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi
