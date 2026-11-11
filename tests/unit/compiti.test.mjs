@@ -245,6 +245,7 @@ test('ricorrenti: il salvataggio rifiuta prima del server quello che il server r
     [{ ...RICORRENTE, ora: '6:00' }, /06:30/],
     [{ ...RICORRENTE, urgenza: 100 }, /da 0 a 99/],
     [{ ...RICORRENTE, modello: 'gpt-5' }, /Modello fra/],
+    [{ ...RICORRENTE, tettoUsd: 'tanti' }, /tetto di costo è un numero di dollari/],
     [{ ...RICORRENTE, ambito: 'Non Valido!' }, /non è fra quelli/],
     [{ ...RICORRENTE, id: '../tutti' }, /identificativo/],
     [null, /oggetto/],
