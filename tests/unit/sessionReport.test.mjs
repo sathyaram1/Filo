@@ -17,7 +17,9 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
   famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore, eRilascio, valutaUso,
+  NOTA_RIFIUTI, leggiNotaRifiuti, causaNonLetto,
 } = await import('../../scripts/session-report.mjs');
+const { registrazioniDelRapporto } = await import('../../scripts/routine-channel.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
 const assistant = (id, model, usage, content, ts) => JSON.stringify({
