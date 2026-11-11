@@ -265,7 +265,7 @@ riapri D-n`): le risposte che registri nascono non fidate, e lui le rivede in Ge
 dice il perché: non si aggira.
 
 ```bash
-npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo
+npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo intero (non per differenze)
 npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]
