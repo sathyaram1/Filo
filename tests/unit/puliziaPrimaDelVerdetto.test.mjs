@@ -18,17 +18,19 @@ import { verifierReplyText } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-test('escono in ogni esito gli esterni e i `?` che contano al più 1; gli altri dipendono dai bilanci', () => {
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'e' }), true);
+test('escono in ogni esito gli esterni e i `?` di livello 1 senza `!`; gli altri dipendono dai bilanci o fermano', () => {
+  assert.equal(esceInOgniEsito({ level: null, sede: 'e' }), true);
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true }), true);
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino col ? esce sempre');
+  assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true, irreversibile: true }), false, '#2339: un 1 col ?! ferma, la prova resta a chi riprende');
   assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? si corregge con la consigliata: la prova resta');
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i' }), false, 'un 1 si corregge o esce secondo il bilancio');
-  assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), false);
+  // Lo stato scritto con la scala vecchia: il vicino è esterno, qualunque livello e segno porti.
+  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true);
+  assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), true);
 });
 
 test('fra le prove scritte escono intere quelle coi soli numeri di rilievi che escono comunque; a una mista si toglie il caso e il numero', () => {
-  const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }, { level: 0, sede: 'i', decision: true }];
+  const findings = [{ level: 2, sede: 'i' }, { level: null, sede: 'e' }, { level: 1, sede: 'i', decision: true }];
   const fuori = proveDaToglierePrimaDelVerdetto([
     'tests/verifica/42/giro1-r1-salva.spec.mjs',
     'tests/verifica/42/giro1-r2-esterno.spec.mjs',
