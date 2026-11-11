@@ -243,6 +243,10 @@ const json = (x) => JSON.stringify(x);
 export function spostaInCima(src, { prima, manifesto, oggi }) {
   let dopo;
   try { dopo = registroDa(src); } catch (e) { return { ok: false, motivo: `il registro non si esegue: ${e.message}` }; }
+  // Prima del conteggio: con una chiave doppia il blocco eseguito ha meno righe di main, e il conteggio non vede niente.
+  let doppie;
+  try { doppie = chiaviDoppie(src); } catch (e) { return { ok: false, motivo: `non riesco a leggere il registro: ${e.message}` }; }
+  if (doppie.length) return { ok: false, motivo: testoChiaviDoppie(doppie) };
   const uscita = String((manifesto && manifesto.version) || '');
   const p = prossimaVersione(manifesto);
   if (p.errore) return { ok: false, motivo: p.errore };
