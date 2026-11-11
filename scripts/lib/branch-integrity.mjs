@@ -1122,6 +1122,18 @@ export function lavoroVivo(root, {
   return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
 }
 
+/**
+ * Le cartelle fuori dal checkout dove lavorano i comandi di un worker: il clone di filo-security di un lavoro server
+ * (#2237.2: la suite del server lì `aspetta` non la vedeva). Solo quelle che esistono.
+ */
+export function cartelleDelLavoro(root, { clone = cartellaCloneServer(), dalCheckout = cartellaDelServer(root), esiste = existsSync } = {}) {
+  const viste = new Set();
+  for (const c of [clone, dalCheckout ? resolve(dalCheckout, '..') : '']) {
+    if (c && esiste(c)) viste.add(percorsoVero(resolve(c)));
+  }
+  return [...viste];
+}
+
 const MOSTRATI = 6;
 
 /** Il rifiuto, con chi lavora ancora e cosa fare: `azione` è ciò che non si è fatto. PURA. */
