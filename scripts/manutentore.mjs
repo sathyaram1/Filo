@@ -2,7 +2,7 @@
 // sveglie e novità, tutti verso l'endpoint del manutentore con la sua chiave (o il biglietto della sua sessione), mai col
 // token admin. Regole: tests/unit/manutentore.test.mjs; i sottocomandi in SOTTOCOMANDI, l'uso in `npm run manutentore`.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
