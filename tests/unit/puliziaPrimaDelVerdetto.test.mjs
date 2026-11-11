@@ -88,12 +88,14 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   require('../../src/shared/feedbackTransitions.js');
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  const caps = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
+  const caps = { cap3: 10, cap2: 10, cap1: 1 };
   for (const critica of [
-    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
-    'Provato.\n[3i?] I dati escono?\n[2v?] Il titolo accanto è tagliato?\n[1e] Fuori.',
+    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[e] Fuori.',
+    'Provato.\n[3i?] I dati escono?\n[2i?] Il titolo accanto è tagliato?\n[e] Fuori.',
+    'Provato.\n[1i?!] Il formato del registro cambia?\n[1i?] Il bordo è grigio?\n[e] Fuori.',
   ]) {
-    const { findings } = V.parseFindings(critica);
+    const { findings, rifiutati } = V.parseFindings(critica);
+    assert.deepEqual(rifiutati, []);
     const esito = V.decideRound({ findings, caps, counts: {} });
     assert.equal(esito.stop, true);
     assert.equal(esito.sospesi.length, 1, 'il secondo rilievo resta al lavoro');
