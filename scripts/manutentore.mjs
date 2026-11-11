@@ -14,7 +14,7 @@ import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './sched
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
-import { famigliaPrezzo, PREZZI } from './session-report.mjs';
+import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
