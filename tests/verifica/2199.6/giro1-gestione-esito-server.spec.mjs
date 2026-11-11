@@ -69,3 +69,20 @@ for (const [esito, frase] of [['rimandato', /torna alle routine/], ['all_owner',
     expect(await app.evaluate(() => globalThis.__chiamate2199)).toContain('approve');
   });
 }
+
+test('esplora: dopo «rimandato» il tasto', async ({ app, openTab }) => {
+  await serverFinto(app, { ok: true, result: 'server', esito: 'rimandato' });
+  const page = await openTab(MANAGE);
+  const btn = await apriConCard(page);
+  await btn.click();
+  await btn.click();
+  const stato = page.locator('#mgMergeApprovalsOrphans .sn-mac-status');
+  await expect(stato).toContainText(/torna alle routine/, { timeout: 10_000 });
+  await page.waitForTimeout(3000);
+  const info = await page.evaluate(() => {
+    const b = document.querySelector('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+    const c = document.querySelector('#mgMergeApprovalsOrphans .sn-mac-card');
+    return { c: !!c, dis: b ? b.disabled : null, cls: c ? c.className : '', st: (document.querySelector('#mgMergeApprovalsOrphans .sn-mac-status') || {}).textContent };
+  });
+  console.log('ESPLORA', JSON.stringify(info), JSON.stringify(await app.evaluate(() => globalThis.__chiamate2199)));
+});
