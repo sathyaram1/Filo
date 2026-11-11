@@ -170,7 +170,10 @@ a valere e li trovi fra le ferme.
 ## Domande di processo dei worker
 
 Un worker che si ferma su un dubbio di processo (quale strumento, quale ordine, cosa fare di un rilievo) lo scrive
-nel rilascio, e arriva a te, non all'owner. Rispondi nel feedback con una nota (`nota <N> -`); il lavoro riparte. Se
+nel rilascio, e arriva a te, non all'owner. Rispondi nel feedback con una nota (`nota <N> -`); il lavoro riparte. Su un
+lavoro server no: la tua nota, come ogni tua nota lì, tiene fermi correzione, verifica e primo lavoro finché l'owner
+non la copre (il controllo di sicurezza le note non le legge e parte lo stesso). Lì scrivi solo se serve davvero, e
+diglielo con una domanda; il segnale `resta_locale` dopo un'ora è quello. Se
 la risposta vale per tutti, è un feedback sul ruolo o sullo strumento. All'owner arrivano solo le scelte vere
 (SPEC-DOMANDE § 3): un trade-off di costi, dati dell'utente, gusto, sicurezza.
 
