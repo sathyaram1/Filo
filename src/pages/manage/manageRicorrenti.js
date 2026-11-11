@@ -26,15 +26,16 @@
   const BOZZE_KEY = 'filo.gestione.ricorrenti.bozze';
   // La settimana dell'owner parte dal lunedì (ricorrenti.js): la domenica va in fondo.
   const SETTIMANA = [1, 2, 3, 4, 5, 6, 0];
-  const CAMPI = ['nome', 'testo', 'giorni', 'ora', 'ambito', 'urgenza', 'modello', 'sforzo', 'attivo', 'domandaFineTurno'];
+  const CAMPI = ['nome', 'testo', 'giorni', 'ora', 'ambito', 'urgenza', 'modello', 'sforzo', 'tettoUsd', 'attivo', 'domandaFineTurno'];
   // Come i ricorrenti iniziali (§4.1): Opus a sforzo high, perché nessun ricorrente costruisce codice da zero.
+  // Il tetto vuoto è quello automatico (#2303): il doppio della mediana delle ultime corse.
   const PREDEFINITO = Object.freeze({
     nome: '', testo: '', giorni: [0, 1, 2, 3, 4, 5, 6], ora: '06:00', ambito: 'lavoro', urgenza: K.URGENZA.nuovo,
-    modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    modello: 'opus', sforzo: 'high', tettoUsd: '', attivo: true, domandaFineTurno: '',
   });
   // Un campo che il server non ha mandato resta vuoto: un default lì cambierebbe il ricorrente senza che l'owner lo veda.
   const VUOTO = Object.freeze({
-    nome: '', testo: '', giorni: [], ora: '', ambito: '', urgenza: '', modello: '', sforzo: '', attivo: true, domandaFineTurno: '',
+    nome: '', testo: '', giorni: [], ora: '', ambito: '', urgenza: '', modello: '', sforzo: '', tettoUsd: '', attivo: true, domandaFineTurno: '',
   });
 
   const el = {
