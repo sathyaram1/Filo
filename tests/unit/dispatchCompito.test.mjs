@@ -4,8 +4,11 @@ import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkEnvelope, buildPayload, testoDelCompito, readRoleInstructions } from '../../scripts/dispatch.mjs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { checkEnvelope, buildPayload, testoDelCompito, readRoleInstructions, tettoNelMarcatore } from '../../scripts/dispatch.mjs';
 import { normalizeRole } from '../../scripts/lib/routine-role.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const compito = (extra) => Object.assign({
   id: 'C-12', tipo: 'ricorrente', titolo: 'Riordino della coda', fiducia: 'fidato', ambito: 'coda', riservato: true,
