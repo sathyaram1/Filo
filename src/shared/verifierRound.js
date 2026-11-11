@@ -318,11 +318,12 @@
   /**
    * Legge la critica scritta dal verificatore. PURA.
    *
-   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …») o col
-   * «!» senza il «?», con la spiegazione: non diventano rilievi né riassunto, e
-   * chi registra deve respingere la critica finché ce ne sono (le altre forme
-   * storte le elenca unparsedLevelLines).
-   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e'|'v', text:string, decision:boolean, irreversibile?:true}>, rifiutati: string[] }}
+   * `rifiutati` sono le righe che sembrano un rilievo ma non si leggono, con
+   * la spiegazione: senza la sede («[2] …»), col «!» senza il «?», o nella
+   * scala vecchia (livello 0, sede «v», esterno col livello). Non diventano
+   * rilievi né riassunto, e chi registra deve respingere la critica finché ce
+   * ne sono (le altre forme storte le elenca unparsedLevelLines).
+   * @returns {{ summary: string, findings: Array<{level:number|null, sede:'i'|'e', text:string, decision:boolean, irreversibile?:true}>, rifiutati: string[] }}
    */
   function parseFindings(text) {
     const lines = normalizeCritique(text).split('\n');
@@ -332,8 +333,9 @@
     let current = null;
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
-      if (m && segnoSenzaDecisione(m)) {
-        rifiutati.push(`${raw.trim()} (${SPIEGAZIONE_SEGNO})`);
+      const motivo = m ? motivoDelRifiuto(m) : '';
+      if (motivo) {
+        rifiutati.push(`${raw.trim()} (${motivo})`);
         current = null;
         continue;
       }
@@ -343,7 +345,7 @@
         continue;
       }
       if (FINDING_LINE_SENZA_SEDE.test(raw)) {
-        rifiutati.push(`${raw.trim()} (${SPIEGAZIONE_SEDE})`);
+        rifiutati.push(`${raw.trim()} (${motivoSenzaSede(raw)})`);
         current = null;
         continue;
       }
