@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { prossimaVersione, CAMPO, aggiunteSottoUscite as aggiunte, registroDa } from '../../scripts/lib/novita-in-cima.mjs';
+import { prossimaVersione, CAMPO, aggiunteSottoUscite as aggiunte, chiaviDoppie, registroDa, testoChiaviDoppie } from '../../scripts/lib/novita-in-cima.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
