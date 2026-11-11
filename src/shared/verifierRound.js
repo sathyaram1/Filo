@@ -539,7 +539,7 @@
    *     alto ancora aperto sotto X (D88, #744), anche se nient'altro fa
    *     partire il giro (livelloCheLoPaga);
    *   - un 3 che non può pagare nemmeno così ferma il lavoro (è l'unico
-   *     livello che ferma per bilancio); un 2, un 1 o uno 0 NON fermano: vanno
+   *     livello che ferma per bilancio); un 2 o un 1 NON fermano: vanno
    *     nel feedback derivato (un 2 a priorità 1), e il giro passa se non c'è
    *     altro (decisione dell'owner del 2026-09-23);
    *   - se almeno un interno può pagare il giro parte, e ci salgono tutti gli
