@@ -13,7 +13,7 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 require(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2 };
 const F = (s) => R.parseFindings(s).findings;
 const decide = (s, counts = {}, caps = CAPS) => R.decideRound({ findings: F(s), caps, counts });
 const tag = (list) => list.map(R.findingTag);
