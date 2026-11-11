@@ -1,5 +1,5 @@
-// L'attesa in primo piano del worker sui suoi comandi in sottofondo (#2185): in cloud `sleep` e i cicli scritti nella
-// shell chiedono un permesso che nessuno approva, uno script del canale no. Regole: _contratto-worker.md § Comandi lunghi.
+// L'attesa in primo piano del worker sui suoi comandi e sotto-agenti in sottofondo (#2185, #2304): in cloud `sleep` e i
+// cicli scritti nella shell chiedono un permesso che nessuno approva, uno script del canale no. Regole: _contratto-worker.md.
 // Unit test: tests/unit/aspettaCartella.test.mjs.
 
 import { USCITA_LAVORO_VIVO, testoLavoroVivo } from './branch-integrity.mjs';
