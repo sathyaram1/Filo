@@ -755,7 +755,7 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
   assert.equal(ridata.decision.budgets.cap2.left, 4, 'i bilanci della fase 2 sono quelli del giro');
   assert.equal(JSON.stringify(ridata.state), snap, 'niente scritto');
   // La barra-n letterale è la stessa critica.
-  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2i] rotto\n[0i] raro', sha: SHA }).replayed, true);
+  assert.equal(withCritique(s, 'b', { critique: 'Provato.\\n[2i] rotto\\n[1i] raro', sha: SHA }).replayed, true);
   // Un testo diverso, o un altro commit, non è un replay.
   assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2i] rotto in un altro modo', sha: SHA }).ok, false);
   assert.equal(withCritique(s, 'b', { critique: testo, sha: ALTRO_SHA }).ok, false);
