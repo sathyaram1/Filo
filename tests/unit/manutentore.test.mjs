@@ -243,7 +243,7 @@ test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#
   delete env.FILO_SERVER_CLONE;
   const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath, '--preserve-symlinks', '--preserve-symlinks-main',
     join(repo, 'scripts', 'manutentore.mjs'), 'rami', '--senza-fetch', '--clone-server', join(repo, 'manca')],
-  { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
+  { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: TETTO_ATTESA_MS });
   assert.ok(r.stdout.length > 64 * 1024, `uscita di ${r.stdout.length} byte`);
   assert.match(r.stdout.slice(-400), /Rami del server NON letti/);
 });
