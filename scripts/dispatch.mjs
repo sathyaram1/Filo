@@ -1650,6 +1650,15 @@ export function numeraRisposta(reply, critica) {
   return r;
 }
 
+/** La riga che dice dove sta la risposta intera; un file non scritto si dice, la stampa resta. */
+export function rispostaSuFile(scrivi) {
+  try {
+    return `\n(La risposta intera è anche nel file ${scrivi()}: rileggila da lì, non si ristampa.)`;
+  } catch (e) {
+    return `\n(Non ho potuto salvare la risposta in un file: ${e.message}. Vale quella stampata qui sopra.)`;
+  }
+}
+
 export function verifierReplyText(reply, id = '<id>') {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
