@@ -494,7 +494,7 @@ function giroLocaleAperto({ external = [], derived = [] } = {}) {
 const REPORT = 'Corretto il rilievo del giro: il pulsante ora salva anche col titolo vuoto, provato a mano e con la prova.';
 
 test('con un rilievo esterno nel giro, una prova cancellata ancora rossa ferma lo stesso la consegna', () => {
-  const { dir, g, scrivi, cartella, vl } = giroLocaleAperto({ external: [{ level: 1, sede: 'e', text: 'Il bordo del menu è grigio' }] });
+  const { dir, g, scrivi, cartella, vl } = giroLocaleAperto({ external: [{ level: null, sede: 'e', text: 'Il bordo del menu è grigio' }] });
   try {
     g('rm', '-q', `${cartella}/giro1-rilievo.spec.mjs`);
     scrivi('codice.js', 'module.exports = 1;\n');
