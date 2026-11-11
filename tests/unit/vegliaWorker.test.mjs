@@ -405,11 +405,14 @@ describe('il quadro del worker fermo', () => {
 
   test('l\'ultimo passo: lo strumento chiamato per ultimo con la sua risposta, il tipo dell\'ultima riga, il modello', () => {
     const l = [conModello(uso('a', 'Bash', { command: 'npm run test:unit' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 2000)];
-    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5' });
+    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5', attesa: null });
     const p = ultimoPasso([...l, testo('segreto del worker', ORA + 5000), { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 6000).toISOString() }]);
     assert.deepEqual(p.passo, { cosa: 'sistema api_error', ms: ORA + 6000 });
+    assert.equal(p.attesa, null, 'un errore senza ritentativo dichiarato non è un\'attesa');
+    const ritenta = { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 7000).toISOString(), retryInMs: 90_000, retryAttempt: 2, maxRetries: 10 };
+    assert.deepEqual(ultimoPasso([...l, ritenta]).attesa, { inizioMs: ORA + 7000, finoMs: ORA + 97_000, tentativo: 2, di: 10 });
     assert.equal(ultimoPasso([testo('x', ORA)]).passo.cosa, 'testo del modello');
-    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '' });
+    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '', attesa: null });
   });
 
   test('un transcript che finisce dopo una risposta di strumento: il guasto dice quale, a che ora, con risposta, e il modello', () => {
