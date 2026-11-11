@@ -312,7 +312,7 @@
     const storte = righeStorte(text);
     if (!storte.length) return '';
     const righe = storte.map((r) => (r.pezzo ? `${r.riga}\n    letto come livello: «${r.pezzo}»` : r.riga));
-    return `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]»; lo stesso vale per una parentesi tonda o graffa con dentro una cifra sola («(2)»). Il livello, fra 0 e 3, va a inizio riga seguito dalla sede («i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro) e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${righe.join('\n  ')}`;
+    return `rilievi non riconosciuti. Le parentesi quadre con dentro un livello o una sede sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]»; lo stesso vale per una parentesi tonda o graffa con dentro una cifra sola («(2)»). Un rilievo interno (riguarda l'obiettivo del feedback, o l'ha introdotto il ramo) apre la riga col livello fra 1 e 3 e la «i»; uno esterno con la sola «e», senza livello; poi il testo, una riga per rilievo («[2i] testo», «[1i?] testo», «[e] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${righe.join('\n  ')}`;
   }
 
   /**
