@@ -99,7 +99,7 @@ test('c\'è da correggere: la risposta resta su file, l\'ultima riga la nomina e
     assert.equal(altro.code, 2);
     assert.equal(altro.so, '', 'niente della risposta esce su un altro ramo');
     assert.match(altro.se, /sul ramo worker\/2316, non su questo/);
-  } finally { srv.close(); rmSync(consegna, { recursive: true, force: true }); togliCartella(casa); }
+  } finally { srv.close(); togliCartella(consegna); togliCartella(casa); }
 });
 
 test('senza una critica registrata --risposta-critica lo dice, ed esce senza toccare il server', async () => {
