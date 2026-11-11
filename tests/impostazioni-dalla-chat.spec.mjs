@@ -63,6 +63,12 @@ async function modelloFinto(app, giri) {
   }, giri);
 }
 const ripristina = (app) => app.evaluate(() => { try { globalThis.__imp_restore?.(); } catch (_) {} });
+// Dopo l'OK il modello riparte da solo (#1373): il modello finto si cambia a ripresa chiusa, o la ripresa legge il giro
+// pensato per il messaggio dopo. Una proposta senza testo chiude il turno sulla conferma: la ripresa è il giro 2.
+async function ripresaChiusa(app, chat, giri = 2) {
+  await expect.poll(() => app.evaluate(() => globalThis.__imp_giri), { timeout: 8_000, message: 'dopo l\'OK il modello non è ripartito' }).toBe(giri);
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+}
 // Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme. Ferma sulla conferma, col testo il modello riparte.
 const impostaDicendo = (testo, ...arg) => ({ ...imposta(...arg), text: testo });
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
