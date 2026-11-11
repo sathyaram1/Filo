@@ -300,9 +300,12 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (cursore !== undefined && !String(cursore).trim()) return ko('--cursore è quello stampato dalla pagina prima');
   const somma = argv.includes('--somma');
   const cache = argv.includes('--cache');
-  const tutte = cache || argv.includes('--tutte');
-  if (somma && tutte) return ko(`--somma dà solo il conto, senza pagine: ${cache ? '--cache le legge tutte, va da solo' : '--tutte non serve'}`);
-  if (cache && cursore !== undefined) return ko('--cache legge la finestra intera: il cursore non serve');
+  const rifiuti = argv.includes('--rifiuti');
+  const conto = cache ? '--cache' : (rifiuti ? '--rifiuti' : '');
+  const tutte = Boolean(conto) || argv.includes('--tutte');
+  if (cache && rifiuti) return ko('o --cache o --rifiuti: un conto per volta');
+  if (somma && tutte) return ko(`--somma dà solo il conto, senza pagine: ${conto ? `${conto} le legge tutte, va da solo` : '--tutte non serve'}`);
+  if (conto && cursore !== undefined) return ko(`${conto} legge la finestra intera: il cursore non serve`);
   if (argv.includes('--sottonumeri') && !n) return ko('--sottonumeri vuole il numero del feedback');
   const dati = {};
   if (n) dati.numero = numeroDi(n);
