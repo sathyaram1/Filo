@@ -191,7 +191,7 @@ test('la prova di un esterno ancora nel ramo ferma la critica prima del server; 
   t.after(() => togliCartella(casa));
   const { srv, ricevuti, port } = await fintoServer();
   t.after(() => srv.close());
-  const critica = 'Provato il salvataggio da menu e scorciatoia: regge.\n[1e] Il menu delle schede si chiude da solo, fuori da questo lavoro.';
+  const critica = 'Provato il salvataggio da menu e scorciatoia: regge.\n[e] Il menu delle schede si chiude da solo, fuori da questo lavoro.';
   const fermo = await esegui(['--record-verifier', 'fid-901', critica], casa, port);
   assert.notEqual(fermo.code, 0);
   assert.match(fermo.out, /giro2-r1-esterno\.spec\.mjs: il rilievo 1 è esterno/);
