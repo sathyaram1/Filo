@@ -43,6 +43,7 @@
     "manutentore": "node scripts/manutentore.mjs",
     "fiducia:migra": "node scripts/fiducia-migra.mjs",
     "fiducia:sana": "node scripts/fiducia-sana.mjs",
+    "fiducia:copri": "node scripts/fiducia-copri.mjs",
     "domande:migra": "node scripts/domande-migra.mjs",
     "mittenti:migra": "node scripts/mittenti-migra.mjs",
     "db:conta": "node scripts/conta-documenti.mjs"
