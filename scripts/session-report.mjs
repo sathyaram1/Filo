@@ -268,6 +268,22 @@ export const ELENCO_MAX_VOCI = 200;
 export const ELENCO_MAX_BYTE = 60_000;
 const RIGA_ERRORE_MAX = 120;
 const RIGA_COSA_MAX = 60;
+// Il nome con cui un'attesa dichiarata dal fornitore sta fra le attese degli strumenti.
+export const ATTESA_FORNITORE = 'API';
+
+/**
+ * L'attesa che Claude Code dichiara prima di ritentare una richiesta al fornitore (limite di frequenza, servizio
+ * sovraccarico): la riga di sistema `api_error` col suo `retryInMs` (#2303). PURA.
+ * @returns {{ inizioMs: number, finoMs: number, tentativo: number, di: number } | null}
+ */
+export function attesaDichiarata(o) {
+  if (!o || o.type !== 'system' || o.subtype !== 'api_error') return null;
+  const ms = Date.parse(String(o.timestamp || ''));
+  const attesa = Number(o.retryInMs);
+  if (!Number.isFinite(ms) || !Number.isFinite(attesa) || attesa <= 0) return null;
+  const intero = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+  return { inizioMs: ms, finoMs: ms + attesa, tentativo: intero(o.retryAttempt), di: intero(o.maxRetries) };
+}
 
 /**
  * Una riga da mettere nel rapporto: una riga sola, corta, senza le stringhe lunghe che potrebbero essere un biglietto o
