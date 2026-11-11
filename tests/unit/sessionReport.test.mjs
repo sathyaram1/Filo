@@ -1070,6 +1070,24 @@ test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sott
   assert.equal(madre.notes.some((n) => /^sotto-agente: (strumenti falliti|attese oltre)/.test(n)), false);
 });
 
+// #2303: un worker fermo su un limite di frequenza del fornitore non chiama strumenti; l'attesa che Claude Code dichiara
+// prima di ritentare sta fra le attese, e arriva al biglietto come le altre.
+test('le attese dichiarate dal fornitore sopra 30 s stanno fra le attese, e arrivano al biglietto', async () => {
+  const errore = (ts, retryInMs, retryAttempt) => ({ type: 'system', subtype: 'api_error', level: 'error', timestamp: ts, retryInMs, retryAttempt, maxRetries: 10 });
+  const rep = await analizzaRighe([
+    chiama('f1', T('00:00'), 'Bash', { command: 'ls', description: 'List files' }),
+    result('f1', 'ok', T('00:01')),
+    errore(T('00:02'), 5000, 1),
+    errore(T('00:08'), 1_200_000, 2),
+    { type: 'system', subtype: 'api_error', timestamp: T('00:09') },
+  ], { role: 'compito' });
+  assert.deepEqual(rep.attese, [{ strumento: 'API', cosa: 'attesa dichiarata dal fornitore, tentativo 2 di 10', s: 1200 }]);
+  assert.equal(rep.atteseOltre30, 1);
+  assert.match(riassunto(rep)[4], /attese oltre 30 s 1/);
+  const { registrazioniDelRapporto } = await import('../../scripts/routine-channel.mjs');
+  assert.deepEqual(registrazioniDelRapporto(rep).attese, [{ cosa: 'API: attesa dichiarata dal fornitore, tentativo 2 di 10', secondi: 1200 }]);
+});
+
 test('una riga del rapporto: niente a capo, niente stringhe lunghe come un biglietto, tetto di lunghezza', () => {
   assert.equal(rigaPulita('a\n\tb\u0007c', 50), 'a b c');
   assert.equal(rigaPulita(`chiave ${FINTO_BIGLIETTO} fine`, 80), 'chiave […] fine');
