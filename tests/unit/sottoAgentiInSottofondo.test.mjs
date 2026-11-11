@@ -83,7 +83,8 @@ test('aspetta <biglietto> aspetta anche un sotto-agente in sottofondo: 5 finché
     assert.match(presto.so, /Rilancia lo stesso comando, subito/);
     const fine = await canale(dir, { FILO_ASPETTA_FETTA_MS: '30000', CLAUDE_CONFIG_DIR: chiuso, CLAUDE_CODE_SESSION_ID: SID }, 'aspetta', T);
     assert.equal(fine.code, USCITA_LIBERA, fine.so + fine.se);
-    assert.match(fine.so, /nessun tuo sotto-agente è al lavoro/);
+    // Dove i processi non si leggono (Mac, Windows) l'uscita 0 lo dice al posto del «nessun sotto-agente».
+    assert.match(fine.so, processiDiSistema() === null ? /i processi non si leggono/ : /nessun tuo sotto-agente è al lavoro/);
   } finally {
     for (const d of [dir, vivo, chiuso]) togliCartella(d);
   }
