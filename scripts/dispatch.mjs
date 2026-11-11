@@ -2131,6 +2131,8 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
+    '  --risposta-critica [<id>] [--ticket <b>]   ristampa la risposta del server all\'ultima critica',
+    '                         registrata su questo ramo (sola lettura: niente server, niente stato)',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
