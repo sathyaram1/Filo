@@ -1356,6 +1356,7 @@
     const chiave = `${ruolo}.${campo}`;
     const scelta = { chiave, valore };
     roleInAttesa.push(scelta);
+    aggiornaStime();
     setRoleMsg('Salvo…', null);
     const nome = RM.nomeRuolo(ruolo);
     // Una fila sola per tutte le tendine: le risposte arrivano nell'ordine delle scelte.
