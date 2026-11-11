@@ -760,7 +760,7 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
 });
 
-test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
+test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -769,27 +769,29 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   const cap3 = page.locator('#mgCap3');
   const cap2 = page.locator('#mgCap2');
   const cap1 = page.locator('#mgCap1');
-  const cap0 = page.locator('#mgCap0');
   const fix = page.locator('#mgFixInstructions');
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeVisible();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeVisible();
+  // La scala è a tre livelli (#2339): il bilancio dello 0 non c'è più.
+  await expect(page.locator('#mgCap0, #mgCap0Save, #mgCap0Block')).toHaveCount(0);
 
   // Da non-admin i campi sono in sola lettura (stesso contratto dello switch).
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeDisabled();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeDisabled();
   await expect(page.locator('#mgCap3Save')).toBeDisabled();
   await expect(page.locator('#mgCap2Save')).toBeDisabled();
+  await expect(page.locator('#mgCap1Save')).toBeDisabled();
   await expect(page.locator('#mgFixInstructionsSave')).toBeDisabled();
 
-  // Simula l'owner: stub della config + abilita i controlli.
-  await stubCaps(page, { cap3: 2, cap2: 7, cap1: 1, cap0: 0, fixInstructions: 'TESTO OWNER' });
+  // Simula l'owner: stub della config + abilita i controlli. Un cap0 rimasto nel documento non si mostra.
+  await stubCaps(page, { cap3: 2, cap2: 7, cap1: 1, cap0: 4, fixInstructions: 'TESTO OWNER' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps()); // rilegge dalla config stubbata
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeEnabled();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeEnabled();
   // I campi riflettono il valore della config, non un default locale.
   await expect(cap3).toHaveValue('2');
   await expect(cap2).toHaveValue('7');
   await expect(cap1).toHaveValue('1');
-  await expect(cap0).toHaveValue('0');
   await expect(fix).toHaveValue('TESTO OWNER');
+  await expect(page.locator('#mgCap0')).toHaveCount(0);
 
   // Cambia i valori e salva (ogni campo col suo bottone).
   await cap3.fill('4');
