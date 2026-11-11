@@ -194,6 +194,39 @@ for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { so
   }
 });
 
+// #2237.5: un ramo nato prima del cambio di Electron ha un altro lock; collegato al principale (44.10.2) il giro partiva
+// senza il motore che il ramo fissa (44.9.3) e la prova del giro si fermava. Un lock diverso col motore uguale resta collegato.
+test('package-lock diverso e un altro Electron nel principale: il giro delle routine installa per sé invece di collegare', () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const lockCon = (electron, extra = {}) => `${JSON.stringify({ name: 'filo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: {
+      '': { name: 'filo', version: '1.0.0' }, 'node_modules/pacchetto': { version: '1.0.0' }, 'node_modules/electron': { version: electron, dev: true }, ...extra,
+    } }, null, 2)}\n`;
+    writeFileSync(resolve(s.principale, 'package-lock.json'), lockCon('44.10.2'), 'utf8');
+    const electron = resolve(s.principale, 'node_modules', 'electron');
+    mkdirSync(electron, { recursive: true });
+    writeFileSync(resolve(electron, 'package.json'), '{"name":"electron","version":"44.10.2"}\n', 'utf8');
+
+    writeFileSync(resolve(dest, 'package-lock.json'), lockCon('44.10.2', { 'node_modules/altro': { version: '2.0.0' } }), 'utf8');
+    const stessoMotore = allineaPacchetti(dest, s.principale, { npmCi: npmMai, soloCollegati: true });
+    assert.deepEqual([stessoMotore.pacchetti, stessoMotore.lockDiverso], ['collegati', true], 'altro lock, stesso Electron: collegati, con l\'avviso');
+
+    writeFileSync(resolve(dest, 'package-lock.json'), lockCon('44.9.3'), 'utf8');
+    const avvisi = [];
+    const npmCi = npmFinto();
+    const r = allineaPacchetti(dest, s.principale, { npmCi, soloCollegati: true, avvisa: (m) => avvisi.push(m) });
+    assert.equal(r.pacchetti, 'privati', 'col motore del principale la prova del giro non partirebbe');
+    assert.equal(npmCi.chiamate, 1);
+    assert.ok(!collegato(dest));
+    assert.match(avvisi.join('\n'), /electron 44\.9\.3 \(c'è 44\.10\.2\)/);
+    assert.match(readFileSync(resolve(electron, 'package.json'), 'utf8'), /44\.10\.2/, 'il node_modules del principale non si tocca');
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 // Il contenitore col principale indietro di una libreria nuova: le prove del clone la aggiungono in secondi, un npm ci
 // nella preparazione costerebbe minuti a ogni giro. Una voce che manca dentro un pacchetto che c'è, invece, non si aggiunge.
 for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { soloCollegati: true }]]) test(`stesso package-lock, al principale manca solo una libreria nuova: il clone preparato ${strada} resta collegato; manca una voce annidata: installa per sé`, () => {
