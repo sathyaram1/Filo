@@ -2714,6 +2714,16 @@ async function finalizeBucket(bucket, fromServer) {
 let lastEmitted = null;
 export function lastChoice() { return lastEmitted; }
 
+/**
+ * Il tetto di costo della corsa di un compito (#2303) va dove la veglia di chi guida il giro lo legge: il marcatore del
+ * biglietto. Un compito senza tetto lo toglie, così un marcatore riusato non ne porta uno vecchio.
+ */
+export function tettoNelMarcatore(root, bucket, ctx) {
+  if (!bucket || bucket.role !== 'compito') return false;
+  const mk = leggiMarcatoreBiglietto(root);
+  return !!(mk && mk.ticket) && annotaTetto(root, mk.ticket, ctx && ctx.compito && ctx.compito.tettoUsd);
+}
+
 export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443): resta come
   // traccia locale di chi sta girando adesso in questa directory. La
