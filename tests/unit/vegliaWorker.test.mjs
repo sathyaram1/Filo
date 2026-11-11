@@ -460,3 +460,69 @@ describe('il quadro del worker fermo', () => {
     assert.deepEqual(p.strumento, { nome: 'Bash', ms: ORA, risposta: true });
   });
 });
+
+// #2324: il worker che ha già reso il suo esito (handback) senza rilasciare non tornerà a farlo. La veglia aspettava i
+// venti minuti del fermo con il posto occupato; ora rilascia col guasto appena la cartella è quieta da due minuti.
+describe('il worker che ha chiuso senza rilasciare', () => {
+  const ORA = Date.parse('2026-11-08T05:35:50Z');
+  const testoFinale = (ora) => ({ type: 'assistant', timestamp: new Date(ora).toISOString(), message: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'FATTO' }] } });
+  const arriva = (ora) => ({ type: 'user', timestamp: new Date(ora).toISOString(), message: { content: [{ type: 'text', text: 'notifica' }] } });
+
+  test('la chiusura: l’handback (anche con la sua risposta) o un turno finale senza strumenti; un messaggio dopo la riapre', () => {
+    assert.equal(chiusuraDi([uso('a', 'Bash', {}, ORA - 9000), risposta('a', ORA - 8000), uso('h', 'SubagentHandback', { message: 'FATTO' }, ORA)]), ORA);
+    assert.equal(chiusuraDi([uso('h', 'SubagentHandback', {}, ORA), risposta('h', ORA + 100)]), ORA);
+    assert.equal(chiusuraDi([testoFinale(ORA)]), ORA);
+    assert.ok(Number.isNaN(chiusuraDi([testoFinale(ORA), arriva(ORA + 1000)])), 'risvegliato: lavora ancora');
+    assert.ok(Number.isNaN(chiusuraDi([uso('a', 'Bash', {}, ORA)])));
+    assert.ok(Number.isNaN(chiusuraDi([])));
+  });
+
+  test('il giudizio: chiuso e quieto da due minuti senza processi; prima, o con un processo nella cartella, lavora', () => {
+    assert.deepEqual(giudica({ tempi: [ORA], chiusoMs: ORA, adesso: ORA + SOGLIA_CHIUSO_MS }), { stato: 'chiuso', fermoMs: SOGLIA_CHIUSO_MS });
+    assert.equal(giudica({ tempi: [ORA], chiusoMs: ORA, adesso: ORA + MIN }).stato, 'lavora');
+    assert.equal(giudica({ tempi: [ORA], chiusoMs: ORA, processi: 1, adesso: ORA + 30 * MIN }).stato, 'lavora', 'il rilascio che spinge è un processo');
+    assert.equal(giudica({ finito: true, tempi: [ORA], chiusoMs: ORA, adesso: ORA + 30 * MIN }).stato, 'finito');
+    assert.equal(SOGLIA_CHIUSO_MS, 2 * MIN);
+  });
+
+  test('la veglia lo rilascia subito col guasto «strumento worker», non dopo venti minuti', async () => {
+    let t = ORA;
+    const visti = [];
+    const e = await veglia({
+      adesso: () => t, dorme: async (ms) => { t += ms; },
+      leggi: () => ({ mio: true, finito: false, tempi: [ORA], processi: 0, chiusoMs: ORA, tracce: { viste: true, attesa: null, elenco: [] } }),
+      rilascia: (g, mio) => { visti.push({ g, mio, a: t }); return { ok: true }; },
+    });
+    assert.equal(e.uscita, USCITA_FERMO);
+    assert.equal(visti.length, 1);
+    assert.ok(visti[0].a - ORA <= SOGLIA_CHIUSO_MS + 10_000, `rilasciato ${(visti[0].a - ORA) / 1000} s dopo l’handback`);
+    assert.match(visti[0].g, /^guasto: strumento worker: il worker ha chiuso la sessione alle 05:35:50 UTC senza rilasciare il biglietto/);
+    assert.match(e.testo, /^Worker chiuso senza rilasciare il biglietto: biglietto rilasciato con un guasto dichiarato\. Chiudi il giro come dopo un guasto/);
+  });
+
+  test('dai transcript: conta la chiusura del worker, non quella di un suo sotto-agente', () => {
+    const vuota = cartella('filo-veglia-chiuso-');
+    const dir = cartella('filo-veglia-chiuso-claude-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const scrivi = (nome, meta, righeDi, fa) => {
+      const f = join(sub, `agent-${nome}.jsonl`);
+      writeFileSync(f, righe(...righeDi));
+      writeFileSync(join(sub, `agent-${nome}.meta.json`), JSON.stringify(meta));
+      const m = new Date(Date.now() - fa * MIN);
+      utimesSync(f, m, m);
+    };
+    writeFileSync(join(dir, FILE_REGISTRO), JSON.stringify({ voci: [{ impronta: impronta(B), ruolo: 'verifier', ora: new Date(Date.now() - 20 * MIN).toISOString() }] }));
+    // Il figlio (Explore) ha reso il suo esito; il worker no: lavora ancora.
+    scrivi('w', { agentType: 'routine-worker', spawnDepth: 1 }, [uso('a', 'Agent', { prompt: 'esplora' }, Date.now() - 6 * MIN)], 5);
+    scrivi('figlio', { agentType: 'Explore', parentAgentId: 'w', spawnDepth: 2 }, [uso('h', 'SubagentHandback', {}, Date.now() - 5 * MIN)], 5);
+    const lavora = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir: dir, leggiProcessi: () => [] });
+    assert.ok(Number.isNaN(lavora.chiusoMs), 'il figlio chiuso non chiude il worker');
+    assert.equal(giudica({ ...lavora, adesso: Date.now() }).stato, 'lavora');
+    // Il worker rende l'handback: chiuso.
+    scrivi('w', { agentType: 'routine-worker', spawnDepth: 1 }, [uso('h2', 'SubagentHandback', { message: 'FATTO' }, Date.now() - 3 * MIN)], 3);
+    const chiuso = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir: dir, leggiProcessi: () => [] });
+    assert.ok(Number.isFinite(chiuso.chiusoMs));
+    assert.equal(giudica({ ...chiuso, adesso: Date.now() }).stato, 'chiuso');
+  });
+});
