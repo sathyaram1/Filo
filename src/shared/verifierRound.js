@@ -260,9 +260,10 @@
           out.push({ riga: raw.trim(), pezzo: doppio });
           continue;
         }
-        if (segnoSenzaDecisione(m)) {
+        const motivo = motivoDelRifiuto(m);
+        if (motivo) {
           flush();
-          out.push({ riga: `${raw.trim()} (${SPIEGAZIONE_SEGNO})`, pezzo: '' });
+          out.push({ riga: `${raw.trim()} (${motivo})`, pezzo: '' });
           continue;
         }
         flush();
