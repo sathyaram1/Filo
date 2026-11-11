@@ -57,8 +57,7 @@
     const n = Number(level);
     if (n >= 3) return 'cap3';
     if (n === 2) return 'cap2';
-    if (n === 1) return 'cap1';
-    return 'cap0';
+    return 'cap1';
   }
 
   function countKeyOf(level) {
