@@ -521,7 +521,7 @@
    * poi X-2…: decisione dell'owner D88, #744); null se sono finiti tutti. PURA.
    */
   function livelloCheLoPaga(level, left) {
-    for (let n = Math.min(3, Math.max(0, Number(level) || 0)); n >= 0; n -= 1) {
+    for (let n = Math.min(3, Math.max(1, Number(level) || 1)); n >= 1; n -= 1) {
       if (left(capKeyOf(n)) > 0) return n;
     }
     return null;
