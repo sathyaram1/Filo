@@ -150,7 +150,8 @@ finale i comandi in sottofondo muoiono, e l'avviso non arriva più. Quando resta
 solo da aspettare, l'attesa in primo piano è
 `node scripts/routine-channel.mjs aspetta <biglietto>`: sta sotto il timeout
 predefinito della chiamata, esce 0 quando nessun tuo processo lavora più nella
-cartella e 5 quando lavorano ancora (rilancialo, subito). Il timeout della chiamata si
+cartella e nessun tuo sotto-agente è al lavoro, 5 quando lavorano ancora
+(rilancialo, subito). Il timeout della chiamata si
 dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
 metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
 e mezzo), `npm run finish:check` (mezzo minuto per ogni spec delle aree
