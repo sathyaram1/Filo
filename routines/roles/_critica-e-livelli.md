@@ -67,8 +67,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
   porta è chiusa e le togli il segno. Una prova che era solo esplorazione
   (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
-  quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
-  nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
+  quella di un rilievo **esterno**, o di un `[1i?]` (senza `!`), nello stesso
+  commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
   sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
   Se la critica ha un `[3i?]` o un `[2i?!]` il lavoro si ferma e i `?` restano
