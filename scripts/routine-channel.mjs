@@ -67,8 +67,9 @@
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
 //   node scripts/routine-channel.mjs aspetta <biglietto>
-//       → il worker che ha solo da aspettare i suoi comandi in sottofondo (#2185), al massimo una fetta
-//         (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella, 5 = lavorano ancora (si rilancia).
+//       → il worker che ha solo da aspettare i suoi comandi e sotto-agenti in sottofondo (#2185, #2304), al massimo una
+//         fetta (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella né sotto-agente al lavoro,
+//         5 = lavorano ancora (si rilancia).
 //
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
