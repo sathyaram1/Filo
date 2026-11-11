@@ -34,6 +34,8 @@
   // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
   // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
   const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
+  // La scala delle priorità dei feedback (0-3) non è quella dei livelli dei rilievi.
+  const PRIORITA = [0, 1, 2, 3];
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se il difetto riguarda l\'obiettivo del feedback o l\'ha introdotto il ramo (per esempio [2i], [1i?]); tutto il resto è esterno e si scrive [e], senza livello';
   // La scala vecchia (livello 0, sede «vicino», livello su un esterno) si respinge dicendo cosa è cambiato: scritta
   // durante il passaggio non deve perdersi in silenzio.
