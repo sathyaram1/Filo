@@ -391,7 +391,9 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   p.derivatiAperti = p.derivatiAperti || [];
   let falliti = 0;
   for (const d of derivatiDaAprire(p, entry.derived)) {
-    const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
+    // Un esterno nasce senza priorità (#2339): la mette chi classifica ogni feedback nuovo.
+    const priorita = d.priorita == null ? [] : ['--priorita', String(d.priorita)];
+    const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, ...priorita], { cwd: wt, input: d.testo });
     const m = /#(\d+)/.exec(String(r.out || ''));
     if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, chiavi: d.chiavi, titolo: d.titolo, num: m ? Number(m[1]) : null });
     else { falliti += 1; avvisaUnaVolta(p, `feedback non aperto per «${d.titolo}»: ${coda(r.out, 2)}`); }
