@@ -81,7 +81,8 @@ Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o 
 server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna questo ruolo con `payload.manutentore`: il
 motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
 sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo, per differenze come sopra: basta per
-una sveglia.
+una sveglia. `contesto` in testa dice `tutto` (col perché) o `differenze`; per differenze `schedeUscite` sono i numeri
+usciti dalla lista (chiusi, o scesi sotto la 2), `taccuino.sezioni` le sezioni cambiate e `taccuino.invariate` le altre.
 
 - **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
