@@ -57,7 +57,9 @@ test('finish:check stampa il commit di main prima di provare la fusione e scegli
   assert.ok(riga > main.indexOf('aggiornaMain(ROOT)'), 'prima si scarica');
   assert.ok(riga < main.indexOf('provaFusione(base'), 'poi si stampa, prima della prova della fusione');
   assert.ok(riga < main.indexOf('cambiatiPerLaScelta('), 'e prima della scelta degli spec');
-  assert.doesNotMatch(main, /git\(\['fetch', 'origin', MAIN\]\)/, 'nessun fetch senza refspec');
-  const verifica = readFileSync(resolve(ROOT, 'scripts', 'verify-local.mjs'), 'utf8');
-  assert.doesNotMatch(verifica, /\['fetch', 'origin', MAIN\]/, 'nemmeno il riallineamento della verifica locale');
+  // Un fetch di main senza il refspec, in uno strumento di chi lavora, lascia origin/main indietro in silenzio.
+  for (const f of ['finish-local.mjs', 'verify-local.mjs', 'dispatch.mjs', 'spec-su-main.mjs', 'lib/unit-sulla-fusione.mjs']) {
+    const testo = readFileSync(resolve(ROOT, 'scripts', f), 'utf8');
+    assert.doesNotMatch(testo, /\['fetch',(?: '--quiet',)? 'origin', (?:MAIN|main|'main')\]/, f);
+  }
 });
