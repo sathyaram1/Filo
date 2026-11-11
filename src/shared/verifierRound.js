@@ -547,33 +547,32 @@
    *     l'opzione consigliata, e il rilievo esce ANCHE fra i `derived` (con
    *     `inCorrezione: true`), in un feedback suo con la domanda: se l'owner
    *     sceglie diversamente, quel feedback cambia il codice già fuso (#1202);
-   *   - un 1 o uno 0 che chiede una decisione va nel feedback derivato;
+   *   - un 1 che chiede una decisione va nel feedback derivato;
+   *   - una scelta difficile da disfare (`?!`) ferma a ogni livello, e va al
+   *     manutentore (`destinatario` su ogni `blocking`: destinatarioDelFermo);
    *   - un giro consuma UN giro dal bilancio più alto fra quelli con cui i
    *     rilievi possono pagare (bilancioPagato lo racconta nella nota);
-   *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
-   *   - senza uno dei quattro bilanci LANCIA (`bilanci del verificatore
+   *   - se il lavoro si ferma, non si corregge niente;
+   *   - senza uno dei tre bilanci LANCIA (`bilanci del verificatore
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
-   * Il giro lo decidono i rilievi interni (sede `i`). Un vicino (sede `v`)
-   * entra nella correzione solo se parte comunque per gli interni; altrimenti
-   * va da parte col livello scritto. Non paga e non ferma niente, e un `v?` va
-   * sempre da parte (decisione dell'owner del 2026-10-12, #1202). Gli esterni
-   * non entrano in nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
-   * `priority` del livello (un 2 nasce a 1), in ogni esito (anche a lavoro fermo: sono
-   * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
-   * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
-   * messi da parte (`derived`) portano la `priority` del livello SCRITTO; come
-   * diventano feedback lo dice derivedGroups.
+   * Il giro lo decidono i rilievi interni (sede `i`). Gli esterni non entrano
+   * in nessuna delle regole sopra: tornano a parte in `external`, senza livello
+   * e con `priority: null` (il feedback nuovo lo classifica chi classifica gli
+   * altri, #2339), in ogni esito. Un esterno col `?` non ferma niente: la
+   * domanda viaggia nel suo feedback. I rilievi messi da parte (`derived`)
+   * portano la `priority` del livello SCRITTO; come diventano feedback lo dice
+   * derivedGroups.
    *
-   * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
+   * @param {object} p { findings, caps:{cap3,cap2,cap1}, counts:{count3,count2,count1} }
    * @returns {{
    *   stop: boolean, blocking: object[], sospesi: object[], fix: object[], derived: object[], external: object[],
-   *   consume: 'cap3'|'cap2'|'cap1'|'cap0'|null, counts: object,
-   *   budgets: { cap3:{cap,used,left}, cap2:…, cap1:…, cap0:… }
+   *   consume: 'cap3'|'cap2'|'cap1'|null, counts: object,
+   *   budgets: { cap3:{cap,used,left}, cap2:…, cap1:… }
    * }}
    *   `sospesi` (solo allo stop): gli altri interni della stessa critica, che
-   *   restano davanti a chi riprende dopo la risposta dell'owner.
+   *   restano davanti a chi riprende dopo la risposta.
    */
   function decideRound(p) {
     const tutti = normalizeFindings(p && p.findings);
