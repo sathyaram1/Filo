@@ -723,10 +723,8 @@
   /** «[2i]», «[1i?]», «[2i?!]», «[e]»: livello e sede di un rilievo, senza testo. PURA. */
   function findingTag(f) {
     const segni = f && f.decision ? `?${f.irreversibile === true ? '!' : ''}` : '';
-    const sede = sedeDi(f && f.sede);
-    if (sede === 'e') return `[e${segni}]`;
-    const n = Number(f && f.level);
-    return `[${LEVELS.includes(n) ? n : 1}i${segni}]`;
+    const n = livelloMostrato(f);
+    return n === null ? `[e${segni}]` : `[${n}i${segni}]`;
   }
 
   /**
