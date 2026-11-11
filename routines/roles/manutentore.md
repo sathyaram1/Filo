@@ -165,7 +165,9 @@ stesso guasto ripetuto su un lavoro è un segnale da seguire nel taccuino, non d
 «ambiente rotto per tutti» lo copre la pausa del pacemaker sulle accensioni nate morte. Il fermo vale solo a
 manutentore acceso: spento in Automazioni, nessuno lo toglierebbe, quindi un guasto non lo mette e quelli già messi
 non trattengono (il lavoro torna in coda, e al terzo guasto uguale nasce la domanda); riacceso, i fermi rimasti tornano
-a valere e li trovi fra le ferme.
+a valere e li trovi fra le ferme. Un compito senza feedback (un ricorrente, uno scritto a mano) si ferma allo stesso
+modo: il segnale del guasto porta il suo `compito` (C-n), e lo sblocchi con `sblocca C-n [nota]`; il tentativo dopo
+riparte da capo e ripaga la corsa intera, quindi sblocca solo quando la causa è passata.
 
 ## Domande di processo dei worker
 
