@@ -70,8 +70,15 @@ Se qualcosa che dovrebbe funzionare non va e ti ferma, dillo con `segnala`
 (il messaggio esatto, cosa hai provato), poi la domanda di fine turno e il
 rilascio con `--guasto "<gruppo>: <messaggio>"`, col gruppo scritto come dice
 il contratto qui sotto. Una domanda di guasto la apri solo se il tuo ambito ha
-`domanda.apri`. Un compito che non riesce a consegnare il rapporto torna in
-coda per un altro tentativo; dopo tre senza esito il server lo ferma.
+`domanda.apri`. Un compito rilasciato con un guasto non riparte da solo: il
+server lo ferma finché il manutentore (o l'owner) non lo sblocca, perché il
+tentativo dopo ricomincia da capo e ripaga tutto. Col manutentore spento torna
+in coda, e dopo tre tentativi senza rapporto il server lo chiude.
+
+Un compito ricorrente ha un tetto di costo per corsa (`payload.compito.tettoUsd`):
+chi guida il giro misura la spesa del tuo lavoro e, oltre il tetto, rilascia
+il biglietto con l'esito «oltre il tetto». L'istanza si chiude e non riparte:
+se il lavoro è lungo, consegna il rapporto prima di arrivarci.
 
 ## Alla fine
 
