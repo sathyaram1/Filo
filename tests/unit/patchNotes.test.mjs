@@ -187,6 +187,11 @@ test('nessun blocco del changelog è vuoto (almeno una feature o un fix)', () =>
   }
 });
 
+test('nessun blocco scrive due volte la stessa chiave: vincerebbe l\'ultima e le righe dell\'altra sparirebbero (#2320)', () => {
+  const doppie = chiaviDoppie(readFileSync(join(ROOT, 'src', 'shared', 'patchNotes.js'), 'utf8'));
+  assert.deepEqual(doppie, [], `${testoChiaviDoppie(doppie)}. Succede quando un rebase unisce due elenchi aperti nello stesso blocco da strade diverse.`);
+});
+
 test('le versioni sono ordinate dalla più recente alla più vecchia, senza duplicati', () => {
   for (let i = 1; i < PN.NOTES.length; i++) {
     const prev = PN.NOTES[i - 1].version;
