@@ -1079,7 +1079,7 @@ test('le attese dichiarate dal fornitore sopra 30 s stanno fra le attese, e arri
     result('f1', 'ok', T('00:01')),
     errore(T('00:02'), 5000, 1),
     errore(T('00:08'), 1_200_000, 2),
-    { type: 'system', subtype: 'api_error', timestamp: T('00:09') },
+    JSON.stringify({ type: 'system', subtype: 'api_error', timestamp: T('00:09') }),
   ], { role: 'compito' });
   assert.deepEqual(rep.attese, [{ strumento: 'API', cosa: 'attesa dichiarata dal fornitore, tentativo 2 di 10', s: 1200 }]);
   assert.equal(rep.atteseOltre30, 1);
