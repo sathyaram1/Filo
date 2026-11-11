@@ -1,6 +1,6 @@
 // I bilanci, uno per livello (2026-09-23): finito il suo, un rilievo paga col più alto aperto
-// sotto (D88, #744); un 3 senza più bilanci ferma, un 2 esce nel feedback dei rimasti; i quattro
-// nomi sono gli stessi nella regola, nelle tabelle e in dashboard.
+// sotto (D88, #744); un 3 senza più bilanci ferma, un 2 esce nel feedback dei rimasti; i tre
+// nomi (dal #2339) sono gli stessi nella regola, nelle tabelle e in dashboard.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
