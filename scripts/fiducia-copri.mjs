@@ -31,9 +31,9 @@ export function rigaEsito(r, { dalVero } = {}) {
   if (!n) return `#${r.numero}: nessuna nota del manutentore da coprire.`;
   const note = n === 1 ? 'una nota del manutentore' : `${n} note del manutentore`;
   const altre = Number(r.restano) > 0 ? `; restano ${r.restano} scritture di altri, che lo sporcano ancora` : '';
-  if (!dalVero) return `#${r.numero}: si coprono ${note}${altre}. Rilancia con --dal-vero se le hai lette.`;
+  if (!dalVero) return `#${r.numero}: ${n === 1 ? 'si copre' : 'si coprono'} ${note}${altre}. Rilancia con --dal-vero se le hai lette.`;
   const locale = Array.isArray(r.restaLocale) && r.restaLocale.length ? ` Resta locale: ${r.restaLocale.join('; ')}.` : ' Il lavoro può ripartire.';
-  return `#${r.numero}: coperte ${note}${altre}.${locale}`;
+  return `#${r.numero}: ${n === 1 ? 'coperta' : 'coperte'} ${note}${altre}.${locale}`;
 }
 
 /** deps: { chiama(data) → risultato della callable, scrivi(riga), rete (i deps della chiamata comune) }. → codice d'uscita. */
