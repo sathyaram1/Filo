@@ -31,7 +31,7 @@ test('r1 lanciato dal clone, lo strumento lavora sul clone o dice su quale carte
   git(['init', '-q', '-b', 'main']);
   execFileSync('git', ['-C', clone, 'config', 'commit.gpgsign', 'false']);
   writeFileSync(join(clone, 'package.json'), JSON.stringify({ name: 'x', version: '0.2.269' }));
-  execFileSync('mkdir', ['-p', join(clone, 'src', 'shared')]);
+  mkdirSync(join(clone, 'src', 'shared'), { recursive: true });
   writeFileSync(join(clone, 'src', 'shared', 'patchNotes.js'), registro(['Di main']));
   git(['add', '-A']);
   git(['commit', '-qm', 'base']);
