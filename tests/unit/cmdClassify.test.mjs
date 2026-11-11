@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
@@ -1397,6 +1398,63 @@ test('#1994 — $_ porta l\'opzione del comando prima: si misura col suo valore'
   assert.equal(C.classify('echo --output=x; git log $_', { shell: 'bash', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true }), 3);
   // In PowerShell `$_` fuori da un blocco vale niente.
   assert.equal(C.classify('git log -1 $_', { shell: 'powershell', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true }), 1);
+});
+
+// Il gruppo `( … )` si misura da sé e il comando attorno lo vede come un segno interno: in bash quel segno non è `$_`.
+test('#2392 — una sottoshell di sola lettura in bash e sh resta una lettura; $_ dopo un gruppo si misura ancora', () => {
+  const POSIX = { cwd: '/home/u/proj', home: '/home/u' };
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { ...POSIX, shell };
+    for (const cmd of ['(echo ciao)', '(ls "/home/u/proj" | wc -l)', 'echo (pwd)', '(ls) && (pwd)']) {
+      assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
+    }
+    // La sottoshell non cambia il `$_` di chi la lancia: resta quello del comando prima.
+    for (const cmd of ['(rm x)', 'echo --output=x; (pwd); git log $_', 'echo --output=x; ls (pwd); git log $_']) {
+      assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    }
+    // Ogni segno interno scritto da chi manda il comando, presi dal modulo: non si fa passare per un gruppo già misurato.
+    const segni = [...C.segniInterni()];
+    assert.ok(segni.length >= 3);
+    for (const s of segni) {
+      for (const cmd of [`echo --output=x; git log $_${s}`, `ls ${s}x`]) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${JSON.stringify(cmd)}`);
+    }
+    for (const cmd of ['echo --output=x; git log $_\uE000', 'ls \uE001x\uE002']) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${JSON.stringify(cmd)}`);
+  }
+});
+
+// In sh, bash e zsh `$(…)` in testa a un comando esegue ciò che stampa: `$(echo rm x)` è `rm x`, non una lettura.
+test('#2392 — in una shell posix una sostituzione in testa a un comando chiede «conferma»', () => {
+  const POSIX = { cwd: '/home/u/proj', home: '/home/u' };
+  for (const shell of ['bash', 'sh', 'zsh']) {
+    const ctx = { ...POSIX, shell };
+    for (const cmd of [
+      '$(echo rm x)', '$( echo rm x )', '$(cat x)', '$(ls)', '@(echo rm x)', '($(echo rm x))', '(ls; $(echo rm x))',
+      '$(echo rm x) | wc -l', 'ls; $(echo rm x)', 'ls && $(echo rm x)', '! $(echo rm x)', 'if (Test-Path x) { $(cat x) }',
+    ]) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    // Come argomento il valore di una lettura resta una lettura.
+    for (const cmd of ['echo $(whoami)', '(ls) && (pwd)']) assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
+  }
+  // In PowerShell `$( … )` in testa stampa il suo valore e basta.
+  const WIN = { cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true, shell: 'powershell' };
+  assert.equal(C.classify('$(Get-ChildItem "$env:USERPROFILE\\Downloads").Count', WIN), 1);
+});
+
+// In bash `$_` dopo `echo $(cat f)` vale ciò che il file contiene: `git log $_` può diventare `git log --output=~/.bashrc`.
+test('#2392 — dopo una sostituzione fra gli argomenti `$_` è un valore ignoto', () => {
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { cwd: '/home/u/proj', home: '/home/u', shell };
+    for (const cmd of ['echo $(echo --output=/home/u/.bashrc); git log $_', 'echo $(cat f); git log $_', 'echo $(cat f) && git log -1 $_',
+      'echo $(cat f) {,}; git log $_', 'echo $(cat f)x; git log $_', 'echo "$(cat f)"; git log $_']) {
+      assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    }
+    assert.equal(C.classify('echo $(cat f) x; git log $_', ctx), 1, `${shell}: l'ultimo argomento scritto resta noto`);
+  }
+});
+
+// Una copia del rifiuto col segno scritto a mano resta indietro quando i segni cambiano: il rifiuto si costruisce dalle definizioni.
+test('#2392 — i segni interni non si confrontano scritti a mano', () => {
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'), 'utf8');
+  assert.doesNotMatch(src, /includes\(\s*['"`](?:[-]|\\u[Ee][0-9A-Fa-f]{3})/);
 });
 
 test('#1994 — in cmd le variabili col nome che comincia per = non nascondono un\'opzione', () => {

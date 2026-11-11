@@ -755,7 +755,8 @@
   const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
-  const SEGNAPOSTO = '$_\uE000';
+  const SEGNO_GRUPPO = '\uE000';
+  const SEGNAPOSTO = `$_${SEGNO_GRUPPO}`;
   // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
   const APICE_TESTO = '\u02BC';
   const VIRGOLETTE_TESTO = '\u02BA';
@@ -945,6 +946,8 @@
     }
     return inerti.size ? [segnata()] : null;
   }
+  // Tutti i segni interni, presi dalle loro definizioni: scritti da chi manda il comando fingerebbero un gruppo già misurato.
+  const segniInterni = () => SEGNO_GRUPPO + SEGNI_INERTI;
   // I segni delle graffe inerti mentre si aprono le altre: `graffe` li rimette come erano.
   const SEGNI_INERTI = '';
 
@@ -1824,7 +1827,7 @@
   // Il comando con ogni gruppo ed ogni `if` sostituiti (`testo`) e ciò che quei
   // costrutti eseguono (`pezzi`). null senza gruppi; TRE se la forma non si
   // riconosce. `mosso`: un pezzo cambia cartella, quindi dopo non la si conosce.
-  function smonta(s) {
+  function smonta(s, c) {
     let q = '';
     let gruppi = false;
     for (let k = 0; k < s.length; k++) {
@@ -1865,6 +1868,8 @@
         if (i < 0) return TRE;
         out += `Write-Output ${SEGNAPOSTO}`;
       } else if (/^(?:[@$]?\(|!|-not(?![\w-]))/i.test(resto)) {
+        // In sh, bash e zsh `$(…)` in testa esegue come comando ciò che stampa, e `@(…)` è un nome da espandere (#2392).
+        if (shellPosix(c) && /^(?:(?:!|-not(?![\w-]))\s*)*[@$]\(/i.test(resto)) return TRE;
         const r = espressione(s, i, gruppo);
         if (!r) return TRE;
         lasciato += r.lasciato;
@@ -1941,7 +1946,7 @@
   function classifica(cmd, c, prof) {
     const trimmed = String(cmd).trim();
     if (!trimmed || prof > PROF_MAX) return TRE;
-    const sm = smonta(trimmed);
+    const sm = smonta(trimmed, c);
     if (sm === null) return classificaPiatta(trimmed, c);
     // Il testo lasciato fuori non passa dai controlli dei separatori: non ne deve avere, neanche fra virgolette.
     if (sm === TRE || /[;|&<>]/.test(sm.lasciato)) return TRE;
@@ -2009,9 +2014,8 @@
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    // Il carattere del SEGNAPOSTO scritto da chi manda il comando farebbe passare un `$_` vero per un gruppo.
-    if (cmd.includes('')) return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
+    if ([...segniInterni()].some((s) => cmd.includes(s))) return TRE;
     if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
@@ -2087,7 +2091,7 @@
   // misura con ognuno dei valori che può prendere. In testa alla riga, in un tubo o da un valore ignoto non si sa.
   // Senza contesto resta la lettura di PowerShell, dove `$_` è l'oggetto del tubo.
   // Il SEGNAPOSTO di un gruppo comincia anch'esso con `$_`, ma non è la variabile: `(ls | wc -l)` resta una lettura (#2345).
-  const ULTIMO_ARG_RE = /\$_(?![\w])/g;
+  const ULTIMO_ARG_RE = new RegExp(String.raw`\$_(?![\w${SEGNO_GRUPPO}])`, 'g');
   const ULTIMI_MAX = 16;
   function usaUltimoArg(s, c) {
     return shellPosix(c) && String(s).search(ULTIMO_ARG_RE) >= 0;
@@ -2105,7 +2109,8 @@
       const piene = parole.filter(Boolean);
       if (piene.length) out.push(piene[piene.length - 1]);
     }
-    return out;
+    // Un gruppo fra gli argomenti lascia in `$_` ciò che stampa: si sa solo eseguendolo (#2392).
+    return out.some((v) => v.includes(SEGNO_GRUPPO)) ? null : out;
   }
   const comeParola = (v) => (/^[\w./:=@%+,-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`);
 
@@ -2246,6 +2251,8 @@
     gitConfigLancia,
     // Per la sentinella che prova su ogni nome le forme che scrivono o eseguono: chi aggiunge un nome la deve aggiornare.
     nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ], git: [...GIT_READ] }),
+    // Per la sentinella che prova ogni segno interno scritto a mano.
+    segniInterni,
     cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
