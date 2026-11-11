@@ -686,7 +686,7 @@
     const il = e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : '';
     if (e.nonServiva) return 'Non serviva: il lavoro è già fuso con questa scelta.';
     if (e.accodata) return `Fatto${il}: la prende il prossimo giro di lavoro.`;
-    if (e.rimandata) return `Fatto${il}: il lavoro torna in verifica con la risposta.`;
+    if (e.rimandata) return `Fatto${il}: il lavoro torna in verifica con la ${e.automatica ? '' : 'tua '}risposta.`;
     if (e.lavoroArchiviato) return 'Il lavoro è archiviato: la risposta non lo riapre.';
     return '';
   }
