@@ -1121,3 +1121,72 @@ test('la cache in dollari: ogni richiesta col suo modello, la soglia di Haiku, l
   vicino(opus.cache.rewarmUsd, 2.5);
   assert.deepEqual(rapportoVuoto().cache, { scrittaUsd: 0, rewarmUsd: 0, sovrapprezzoOraUsd: 0, risparmioOraUsd: 0, risparmioSeTuttoUsd: 0 });
 });
+
+// #2188: gli Edit e i Write rifiutati si contano con la causa, e il conto arriva al server nella nota (un campo nuovo
+// il server lo rifiuterebbe, e col rapporto intero).
+const NON_LETTO = '<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>';
+const MODIFICATO = '<tool_use_error>File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.</tool_use_error>';
+const USO = { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 1000, output_tokens: 5 };
+function sessioneConRifiuti(prefisso = '') {
+  let n = 0;
+  const chiama = (name, input, risposta, errore) => {
+    n += 1;
+    const id = `${prefisso}r${n}`;
+    return [assistant(`${prefisso}m${n}`, 'claude-opus-5-5', USO, [{ type: 'tool_use', id, name, input }], T(`${String(n).padStart(2, '0')}:00`)),
+      result(id, risposta, T(`${String(n).padStart(2, '0')}:01`), errore)];
+  };
+  const clone = '/tmp/filo-lavori/1';
+  return [
+    // letto dalla shell, poi modificato
+    ...chiama('Bash', { command: `cd "${clone}" && sed -n 1,40p scripts/a.mjs` }, 'righe'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/a.mjs`, old_string: 'x', new_string: 'y' }, NON_LETTO, true),
+    // letto nella cartella della sessione, modificato nel clone
+    ...chiama('Read', { file_path: '/home/user/Filo/scripts/b.mjs' }, 'righe'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/b.mjs`, old_string: 'x', new_string: 'y' }, NON_LETTO, true),
+    // letto allo stesso percorso, poi dimenticato (una compattazione)
+    ...chiama('Read', { file_path: `${clone}/scripts/c.mjs`, offset: 10, limit: 20 }, 'righe'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/c.mjs`, old_string: 'x', new_string: 'y' }, NON_LETTO, true),
+    // un Write su un file mai visto, che c'era già
+    ...chiama('Write', { file_path: `${clone}/scripts/d.mjs`, content: 'z' }, NON_LETTO, true),
+    // una lettura fallita non vale: il rifiuto dopo è «mai letto»
+    ...chiama('Read', { file_path: `${clone}/scripts/e.mjs` }, 'File content exceeds maximum allowed tokens', true),
+    ...chiama('Edit', { file_path: `${clone}/scripts/e.mjs`, old_string: 'x', new_string: 'y' }, NON_LETTO, true),
+    // letto, poi un comando che lo riscrive, poi modificato
+    ...chiama('Read', { file_path: `${clone}/scripts/f.mjs` }, 'righe'),
+    ...chiama('Bash', { command: 'git rebase origin/main' }, 'fatto'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/f.mjs`, old_string: 'x', new_string: 'y' }, MODIFICATO, true),
+    // letto e modificato con niente in mezzo: l'ha cambiato qualcun altro
+    ...chiama('Read', { file_path: `${clone}/scripts/g.mjs` }, 'righe'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/g.mjs`, old_string: 'x', new_string: 'y' }, 'ok'),
+    ...chiama('Edit', { file_path: `${clone}/scripts/g.mjs`, old_string: 'y', new_string: 'w' }, MODIFICATO, true),
+    // un errore d'altro tipo su un file letto non è un rifiuto
+    ...chiama('Edit', { file_path: `${clone}/scripts/g.mjs`, old_string: 'q', new_string: 'w' }, '<tool_use_error>String to replace not found in file.</tool_use_error>', true),
+  ];
+}
+
+test('rifiuti di scrittura: non letto e modificato dopo la lettura, ognuno con la sua causa, nella nota del rapporto', async () => {
+  const rep = await analizzaRighe(sessioneConRifiuti());
+  assert.equal(rep.tools.errors, 9);
+  assert.deepEqual(rep.rifiutiScrittura, { nonLetto: { prima: 1, altraCartella: 1, shell: 1, mai: 2 }, modificato: { shell: 1, senzaShell: 1 } });
+  const nota = rep.notes.find((n) => n.startsWith(NOTA_RIFIUTI));
+  assert.equal(nota, 'rifiuti di scrittura: non letto 5 (letto prima 1, letto in un\'altra cartella 1, solo dalla shell 1, mai letto 2), modificato dopo la lettura 2 (shell in mezzo 1, senza shell in mezzo 1)');
+  assert.deepEqual(leggiNotaRifiuti(nota), rep.rifiutiScrittura);
+  // Il conto non esce dal processo come campo: il rilascio manda la nota, e il server non trova chiavi che non conosce.
+  const { report } = registrazioniDelRapporto(rep);
+  assert.equal(JSON.stringify(report).includes('rifiutiScrittura'), false);
+  assert.ok(report.notes.includes(nota));
+  // Una sessione senza rifiuti non ha la nota.
+  const pulita = await analizzaRighe(RIGHE);
+  assert.equal(pulita.notes.some((n) => n.startsWith(NOTA_RIFIUTI)), false);
+});
+
+test('rifiuti di scrittura: i sotto-agenti si sommano in una nota sola, anche da un rapporto passato per JSON', async () => {
+  const rep = await analizzaRighe(sessioneConRifiuti('a'));
+  sommaSottoAgente(rep, await analizzaRighe(sessioneConRifiuti('b')));
+  sommaSottoAgente(rep, JSON.parse(JSON.stringify(await analizzaRighe(sessioneConRifiuti('c')))));
+  assert.deepEqual(rep.rifiutiScrittura, { nonLetto: { prima: 3, altraCartella: 3, shell: 3, mai: 6 }, modificato: { shell: 3, senzaShell: 3 } });
+  const note = rep.notes.filter((n) => n.includes(NOTA_RIFIUTI));
+  assert.deepEqual(note, ['rifiuti di scrittura: non letto 15 (letto prima 3, letto in un\'altra cartella 3, solo dalla shell 3, mai letto 6), modificato dopo la lettura 6 (shell in mezzo 3, senza shell in mezzo 3)']);
+  assert.equal(leggiNotaRifiuti('altro: non letto 3'), null);
+  assert.equal(causaNonLetto('', new Set(), []), 'mai');
+});
