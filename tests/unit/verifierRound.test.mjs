@@ -233,7 +233,7 @@ test('formatFindings e roundNote: livelli davanti, il segno ? conservato, esito 
 
 test('#561 giro 2: unparsedLevelLines segnala i livelli fuori posto; «1. [2]» e «- [2]» sono rilievi', () => {
   assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.\n[1i] bordo'), ['Provato. Rilievo [2]: non salva.']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n1. [2i] non salva\n- [1i] bordo\n[0i] raro'), []);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n1. [2i] non salva\n- [1i] bordo\n[e] altrove'), []);
   assert.deepEqual(R.parseFindings('1. [2i] non salva\n2) [1i?] gusto').findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
   assert.deepEqual(R.unparsedLevelLines(''), []);
 });
