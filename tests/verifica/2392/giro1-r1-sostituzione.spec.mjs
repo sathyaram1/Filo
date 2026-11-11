@@ -18,6 +18,9 @@ test('r1 un comando nascosto in una sostituzione $(…) non parte senza «confer
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
   const dir = cartellaTemporanea('filo2392-');
+  // Il nome senza spazi: la cartella temporanea ne ha, e `$(…)` spezzerebbe il percorso.
+  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `cd "${dir}"` });
+  expect(cd.executed).toBe(true);
   const forme = [
     (f) => `$(echo rm ${f})`,
     (f) => `($(echo rm ${f}))`,
@@ -26,11 +29,12 @@ test('r1 un comando nascosto in una sostituzione $(…) non parte senza «confer
   ];
   try {
     for (const [i, forma] of forme.entries()) {
-      const file = path.join(dir, `vittima-${i}.txt`);
+      const nome = `vittima-${i}.txt`;
+      const file = path.join(dir, nome);
       fs.writeFileSync(file, 'dati');
-      const comando = forma(file);
+      const comando = forma(nome);
       const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
-      expect.soft(r.executed, comando).toBe(false);
+      expect.soft(r.executed, `${comando} → ${JSON.stringify(r).slice(0, 300)}`).toBe(false);
       expect.soft(r.needsConfirm, comando).toBe(3);
       expect.soft(fs.existsSync(file), `${comando}: il file è stato cancellato`).toBe(true);
     }
