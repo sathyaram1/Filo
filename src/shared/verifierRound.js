@@ -449,8 +449,7 @@
     for (const f of list) {
       if (!f || typeof f !== 'object') continue;
       const sede = sedeDi(f.sede);
-      const scritto = f.level == null || f.level === '' ? NaN : Number(f.level);
-      const level = sede === 'e' ? null : (scritto === 0 ? 1 : scritto);
+      const level = livelloLetto(f);
       if (sede === 'i' && !LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
