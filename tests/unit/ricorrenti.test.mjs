@@ -45,7 +45,7 @@ test('la cadenza si dice come la direbbe l’owner, con la domenica in fondo', (
 
 test('i campi: nome e testo obbligatori, tetti rifiutati col numero, cadenza ripulita', () => {
   const base = { nome: ' Riordino ', testo: ' fai ', giorni: [1, 1, 0], ora: '01:00' };
-  assert.deepEqual(R.validaCampi(base), { ok: true, campi: { nome: 'Riordino', testo: 'fai', domandaFineTurno: '', attivo: true, giorni: [0, 1], ora: '01:00' } });
+  assert.deepEqual(R.validaCampi(base), { ok: true, campi: { nome: 'Riordino', testo: 'fai', domandaFineTurno: '', attivo: true, giorni: [0, 1], ora: '01:00', tettoUsd: null } });
   assert.equal(R.validaCampi(Object.assign({}, base, { nome: '   ' })).errore, 'nome_mancante');
   assert.equal(R.validaCampi(Object.assign({}, base, { testo: '' })).errore, 'testo_mancante');
   const lungo = R.validaCampi(Object.assign({}, base, { testo: 'x'.repeat(R.TETTI.testo + 1) }));
