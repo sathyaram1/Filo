@@ -158,12 +158,12 @@ export const VERIFIER_ROUND = (() => {
     parseFindings(text) {
       const findings = [];
       for (const line of String(text || '').split('\n')) {
-        const m = /^\s*\[\s*([0-3])\s*([ievIEV])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
-        if (m) findings.push({ level: Number(m[1]), sede: m[2].toLowerCase(), text: m[4].trim(), decision: m[3] === '?' });
+        const m = /^\s*\[\s*(?:([1-3])\s*[iI]|([eE]))\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: m[1] ? Number(m[1]) : null, sede: m[2] ? 'e' : 'i', text: m[4].trim(), decision: m[3] === '?' });
       }
       return { summary: '', findings, rifiutati: [] };
     },
-    formatFinding(f) { return `- [${f.level}${f.sede === 'e' || f.sede === 'v' ? f.sede : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
+    formatFinding(f) { return `- [${f.sede === 'e' ? 'e' : `${f.level}i`}${f.decision ? '?' : ''}] ${f.text}`; },
     formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
     primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
     groupLabel(g) { return g.tipo; },
