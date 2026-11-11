@@ -100,12 +100,16 @@ test('[2i?] a bilanci finiti dal 2 in giù va da parte come un 2: domanda nel su
   assert.equal(conTre.derived[0].inCorrezione, true);
 });
 
-test('decisioneFerma: ferma un 3 o un 2 su una scelta difficile da disfare', () => {
+test('decisioneFerma: ferma un 3 col ?, o una scelta difficile da disfare a ogni livello; destinatarioDelFermo la manda al manutentore', () => {
   assert.equal(R.decisioneFerma({ level: 3, decision: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true, irreversibile: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true }), false);
-  assert.equal(R.decisioneFerma({ level: 1, decision: true, irreversibile: true }), false);
+  assert.equal(R.decisioneFerma({ level: 1, decision: true, irreversibile: true }), true, '#2339: il ! ferma anche su un 1');
+  assert.equal(R.decisioneFerma({ level: 1, decision: true }), false);
   assert.equal(R.decisioneFerma({ level: 3, decision: false }), false, 'senza «?» non è una domanda');
+  assert.equal(R.destinatarioDelFermo({ level: 1, decision: true, irreversibile: true }), 'manutentore');
+  assert.equal(R.destinatarioDelFermo({ level: 3, decision: true }), 'owner');
+  assert.equal(R.destinatarioDelFermo({ level: 3, decision: false }), 'owner', 'un 3 a bilanci finiti va all\'owner');
 });
 
 // ── Gli strumenti: dispatch e verifica locale ───────────────────────────────
