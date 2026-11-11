@@ -10,7 +10,8 @@ import '../src/shared/feedback.js';
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineStateAdmin';
 const GIORNO = 24 * 60 * 60 * 1000;
 const FINESTRA_PREDEFINITA = 30 * GIORNO;
-const LIVELLI = [3, 2, 1, 0];
+const SENZA_LIVELLO = 'e';
+const LIVELLI = [3, 2, 1, 0, SENZA_LIVELLO];
 const ESITI = ['passa', 'corregge', 'corretto', 'fermato'];
 const USO = 'Uso: node scripts/storico-giri.mjs [--da <data>] [--a <data>] [--json]\n'
   + '  <data>: AAAA-MM-GG, GG/MM/AAAA o GG/MM (anno in corso). --a comprende tutto quel giorno.\n'
