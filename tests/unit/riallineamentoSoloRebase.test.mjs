@@ -33,7 +33,7 @@ test('chi verifica il riallineamento fa di ogni unit rosso sulla fusione un rili
   assert.match(testo, /ogni test\s+rosso che su `main` da solo passa è un rilievo \*\*interno\*\*/);
   assert.match(testo, /livello è quello di ogni altro rosso dei controlli automatici/);
   // La regola del livello sta in un posto solo: il testo comune dei controlli automatici.
-  assert.match(testo, /Un rosso \*\*fuori dai rossi noti\*\* è un rilievo di livello 2/);
+  assert.match(testo, /Un rosso \*\*fuori dai rossi noti\*\* che ha rotto il ramo[^.]*?è un rilievo interno di livello 2/);
 });
 
 test('il perimetro del riallineamento chiede a chi verifica di leggere anche gli unit rimasti rossi', () => {
