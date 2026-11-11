@@ -144,9 +144,11 @@ test('riallineamento senza conflitti: nessuno spec, né del lavoro né dei file 
     g('rebase', '-q', 'main');
 
     const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
-    assert.deepEqual(con.changed, ['src/pages/editor/a.js'], 'solo il file del lavoro, nessuno dei 300 arrivati da main');
-    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0\./);
-    assert.match(con.nota, /\(300 file\) l'ha già provato la suite di main/);
+    assert.deepEqual(con.changed, [], 'né il file del lavoro, già verificato, né i 300 arrivati da main');
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0, quindi corro solo gli unit\./);
+    assert.match(con.nota, /\(300 file\) la suite di main/);
+    const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
+    assert.deepEqual(senza.changed, ['src/pages/editor/a.js'], 'fuori da un riallineamento la scelta resta il ramo contro main');
   } finally {
     togliCartella(dir);
   }
