@@ -563,6 +563,7 @@ export async function release(t, fault = '', opts, report = null, spedito = null
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   const processo = String((opts && opts.processo) || '').trim();
   if (processo) payload.domandaProcesso = processo;
+  if (opts && opts.oltreTetto) payload.oltreTetto = opts.oltreTetto;
   if (spedito && typeof spedito.branch === 'string' && spedito.branch && /^[0-9a-f]{40}$/.test(String(spedito.sha || ''))) {
     payload.branch = spedito.branch;
     payload.sha = spedito.sha;
