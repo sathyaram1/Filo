@@ -2005,6 +2005,12 @@ if (isMain) {
       console.error(`--processo vale per chi lavora un feedback: il ruolo ${data.role} non ne ha uno, e la domanda non arriverebbe al manutentore. Scrivila con «segnala». Non ho rilasciato niente.`);
       process.exit(1);
     }
+    // `--oltre-tetto "<spesi>:<tetto>"`: la veglia ferma un compito oltre il tetto di costo della corsa (#2303).
+    const oltreTetto = data['oltre-tetto'] === undefined ? null : leggiOltreTetto(data['oltre-tetto']);
+    if (data['oltre-tetto'] !== undefined && !oltreTetto) {
+      console.error('--oltre-tetto vuole i dollari spesi e il tetto: --oltre-tetto "131.2:120". Non ho rilasciato niente.');
+      process.exit(1);
+    }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
