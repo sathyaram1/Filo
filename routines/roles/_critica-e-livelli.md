@@ -9,7 +9,10 @@ lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
 sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: riparte
 dagli spec non ancora verdi, anche se nel frattempo hai committato le prove del
-giro (un cambio al codice invece li rifà tutti). La suite intera (`npm test`)
+giro (un cambio al codice invece li rifà tutti). Lancialo senza filtri
+(`| tail`, `| head`): un filtro trattiene l'uscita fino alla fine e
+l'avanzamento non si vede; quella intera la leggi dal file del comando in
+sottofondo. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
