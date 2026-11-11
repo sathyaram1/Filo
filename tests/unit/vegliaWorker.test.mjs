@@ -14,7 +14,7 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
 const {
-  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti,
+  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti, oltreIlTetto,
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
   chiusuraDi, SOGLIA_CHIUSO_MS,
 } = await import('../../scripts/lib/veglia-worker.mjs');
