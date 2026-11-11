@@ -2125,7 +2125,7 @@ export function usageText() {
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
+    '                         con livello e sede davanti ([2i] …, [1i] …; [e] … senza livello = esterno; [1i?] = chiede una decisione,',
     '                         [2i?!] = una scelta difficile da disfare; ognuna porta la sua domanda: --domanda con',
     '                         una, o un elenco nell\'ordine dei rilievi col «?»);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
