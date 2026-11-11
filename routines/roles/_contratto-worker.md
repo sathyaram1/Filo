@@ -110,6 +110,22 @@ Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
 Agent (senza, vale il default); la catena arriva a tre livelli sotto
 l'orchestratore, tu compreso.
 
+**Si lanciano in primo piano**, con `run_in_background: false` scritto nella
+chiamata: senza, lo strumento li manda in sottofondo. Quando sono indipendenti
+ne lanci più d'uno nello stesso messaggio: girano insieme, e la tua chiamata
+resta aperta finché finiscono tutti, un'attesa che non costa turni e che la
+veglia riconosce. In sottofondo solo se nel frattempo hai davvero altro da
+fare; un comando lungo da far girare intanto non è un motivo, lo lanci in
+sottofondo nello stesso messaggio dei sotto-agenti in primo piano.
+
+Un sotto-agente in sottofondo, tuo o spostato lì da Claude Code perché durava
+troppo, **si aspetta con `aspetta`** (§ Comandi lunghi), che guarda anche i
+sotto-agenti: mai con controlli ripetuti del suo stato o del suo file, né
+chiudendo il turno per aspettare la notifica. Un controllo è un turno intero sul
+tuo contesto: un audit che aspettava così ha fatto 1.485 turni in 21 minuti e
+75 $ (#2304), e uno che si è fermato ad aspettare è stato dichiarato fermo dopo
+venti minuti e rifatto da capo.
+
 ## Il battito non è affar tuo
 
 Il semaforo sul tuo lavoro cade dopo un'ora di silenzio, e un controllo lungo
