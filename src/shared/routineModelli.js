@@ -103,6 +103,6 @@
 
   global.SN_ROUTINE_MODELLI = Object.freeze({
     CAMPO, RUOLI, SCELTE, CAMPI, NOME_CAMPO, VUOTO,
-    leggiDoc, inElenco, valida, percorso, nomeRuolo,
+    leggiDoc, inElenco, valida, percorso, nomeRuolo, vuotoDi,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);
