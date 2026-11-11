@@ -110,13 +110,10 @@ in più:
 <!-- includi: _criteri-struttura.md -->
 
 Il verificatore dà un livello solo ai difetti che riguardano l'**obiettivo**
-del feedback (la cosa chiesta, coi suoi esempi e i casi ovvi) o che il tuo
-ramo ha **introdotto**, misurandoli sull'obiettivo: 3 se la modifica non
-risolve nella maggior parte dei casi o porta un problema più grave, 2 se
-risolve in meno dell'80% dei casi o porta un problema nuovo meno grave, 1 per
-un caso molto raro, un miglioramento incerto o un problema raro. Tutto il
-resto è **esterno**, anche in un file che il tuo ramo modifica: niente
-livello, diventa un feedback nuovo. Usa lo stesso metro: chiudi l'obiettivo e
+del feedback o che il tuo ramo ha **introdotto**, misurandoli sull'obiettivo;
+tutto il resto è **esterno**, senza livello, e diventa un feedback nuovo. La
+scala sta per intero in `routines/roles/_livelli-e-sede.md`, l'unico posto
+dove si scrive. Usa lo stesso metro: chiudi l'obiettivo e
 le porte della stessa causa, col 20% dello sforzo che dà l'80% del risultato.
 **Niente oltre al chiesto**: un difetto fuori dall'obiettivo, o una funzione
 che nessuno ha chiesto, non si fa — lo scrivi nel report e diventerà un
