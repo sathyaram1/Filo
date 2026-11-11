@@ -67,17 +67,23 @@ test('[2i?] non ferma: va nella correzione E nel derivato con la domanda; paga i
   assert.doesNotMatch(nota, /Bilancio delle correzioni di livello 2|bilancio delle correzioni di livello 2/);
 });
 
-test('[2i?!] e [3i?] fermano; [1i?!] e [0i?] vanno da parte senza fermare', () => {
-  for (const riga of ['[2i?!] sui dati salvati', '[3i?] chiavi SSH', '[3i?!] chiavi SSH']) {
+test('[3i?] ferma per l\'owner; un «?!» ferma a ogni livello, per il manutentore; [1i?] va da parte senza fermare', () => {
+  const casi = [
+    ['[2i?!] sui dati salvati', 'manutentore'], ['[1i?!] formato del registro', 'manutentore'],
+    ['[3i?] chiavi SSH', 'owner'], ['[3i?!] chiavi SSH', 'manutentore'],
+  ];
+  for (const [riga, destinatario] of casi) {
     const d = decide(`Provato.\n${riga}\n[1i] lieve`);
     assert.equal(d.stop, true, riga);
     assert.deepEqual(d.fix, [], `${riga}: a lavoro fermo non si corregge niente`);
     assert.deepEqual(tag(d.sospesi), ['[1i]']);
+    assert.deepEqual(d.blocking.map((f) => f.destinatario), [destinatario], riga);
   }
-  const lieve = decide('Provato.\n[1i?!] formato del registro\n[0i?] gusto');
+  const lieve = decide('Provato.\n[1i?] gusto\n[e?] altrove, da decidere');
   assert.equal(lieve.stop, false);
   assert.deepEqual(lieve.fix, []);
-  assert.deepEqual(tag(lieve.derived), ['[1i?!]', '[0i?]']);
+  assert.deepEqual(tag(lieve.derived), ['[1i?]']);
+  assert.deepEqual(tag(lieve.external), ['[e?]'], 'un esterno col ? non ferma');
   assert.ok(lieve.derived.every((f) => f.inCorrezione !== true), 'niente si applica: la domanda e basta');
 });
 
