@@ -597,6 +597,15 @@ export const PROCESSO_MAX = 4000;
 // I ruoli il cui biglietto non porta un feedback (server: guasti.domandaDiProcesso lo vuole).
 export const RUOLI_SENZA_FEEDBACK = Object.freeze(['compito', 'risposta', 'smistamento', 'manutentore', 'orchestrator']);
 
+/** «131.2:120» (spesi e tetto, in dollari) → { usd, tettoUsd } per il server (#2303), o null se non si legge. PURA. */
+export function leggiOltreTetto(v) {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$/.exec(typeof v === 'string' ? v : '');
+  if (!m) return null;
+  const usd = Number(m[1].replace(',', '.'));
+  const tettoUsd = Number(m[2].replace(',', '.'));
+  return tettoUsd > 0 ? { usd, tettoUsd } : null;
+}
+
 /**
  * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
  * biglietto per il manutentore (`strumentiFalliti` { nome, errore, poi }, `attese` { cosa, secondi }). PURA.
