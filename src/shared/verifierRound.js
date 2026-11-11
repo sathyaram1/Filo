@@ -110,8 +110,9 @@
   // spiegazione giusta, non per leggerla.
   const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   const SPIEGAZIONE_SEGNO = 'il segno «!» (scelta difficile da disfare) va con il «?» della decisione: [2i?!]';
-  // Una sede nuda fra quadre in mezzo a una riga («… [e] …») è un secondo rilievo senza a capo, non testo.
-  const QUADRA_SEDE = /\[{1,2}\s*(?:\?\s*)?[ievIEV]\s*[?!]*\s*\]{1,2}/;
+  // Una sede nuda fra quadre in mezzo a una riga («… [e] …») è un secondo rilievo senza a capo, non testo; attaccata a un
+  // nome o a una chiusa («righe[i]», «f(x)[e]») è l'indice di una citazione di codice.
+  const QUADRA_SEDE = /(?<![\w\])À-ÿ])\[{1,2}\s*(?:\?\s*)?[ievIEV]\s*[?!]*\s*\]{1,2}/;
 
   /** I gruppi di FINDING_LINE come rilievo: livello (null se non c'è), sede minuscola, segni «?» e «!», testo. PURA. */
   function rilievoDa(m) {
