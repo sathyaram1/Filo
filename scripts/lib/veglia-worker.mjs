@@ -203,6 +203,11 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
     const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
     const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
     parti.push(`Ultimo passo per traccia: ${righe.join(', ')}${altre}${elenco.length === 1 ? '; nessun sotto-agente' : ''}.`);
+    const attesa = elenco.map((e) => e.attesa).filter(Boolean).reduce((a, b) => (!a || b.finoMs >= a.finoMs ? b : a), null);
+    if (attesa) {
+      const tentativo = attesa.tentativo ? `, tentativo ${attesa.tentativo}${attesa.di ? ` di ${attesa.di}` : ''}` : '';
+      parti.push(`Ultima attesa dichiarata dal fornitore: dalle ${ora(attesa.inizioMs)} alle ${ora(attesa.finoMs)}${tentativo}.`);
+    }
   }
   const cmd = Array.isArray(comandi) ? comandi : [];
   if (!processiLetti) parti.push('Processi nella cartella: non letti.');
