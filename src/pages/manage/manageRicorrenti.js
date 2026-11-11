@@ -392,10 +392,19 @@
     sforzo.append(new Option('dell’agente', ''));
     for (const s of K.SFORZI) sforzo.append(new Option(s, s));
     sforzo.value = String(v.sforzo || '');
+    const cur = id === NUOVO ? null : trova(id);
+    const auto = cur && cur.tetto && cur.tetto.da !== 'owner' ? Number(cur.tetto.usd) : NaN;
+    const tetto = campo('input', 'tettoUsd', {
+      type: 'text', inputMode: 'decimal', value: v.tettoUsd === null || v.tettoUsd === undefined ? '' : String(v.tettoUsd),
+      placeholder: auto > 0 ? `automatico, ${dollari(auto)}` : 'automatico',
+    });
+    tetto.className = 'mg-auto-number mg-rc-tetto-campo';
+    const stima = nodo('span', 'mg-rc-tetto-stima', cur && cur.tetto && cur.tetto.corse > 0 ? `di solito ${dollari(cur.tetto.mediana)} a corsa` : 'nessuna corsa finita ancora');
     scelte.append(
       scelta('Ambito', ambito, 'Cosa può fare l’agente: l’elenco degli ambiti è in fondo alla scheda'),
       scelta('Urgenza', urgenza, 'Più alta passa prima. I feedback a priorità 3 stanno da 50 in su, «Gestisci la risposta» a 47.'),
       scelta('Modello', modello), scelta('Sforzo', sforzo),
+      scelta('Tetto a corsa ($)', tetto, stimaTesto(cur && cur.tetto, v.giorni)), stima,
     );
     // Uno che c'è già si accende e si spegne dalla sua levetta, subito: una seconda nel modulo varrebbe solo al salvataggio.
     if (id === NUOVO) {
