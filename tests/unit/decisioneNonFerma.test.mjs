@@ -116,7 +116,7 @@ test('decisioneFerma: ferma un 3 col ?, o una scelta difficile da disfare a ogni
 
 test('dispatch: la risposta dice di applicare l\'opzione consigliata, e la pulizia lascia la prova del rilievo in correzione', async () => {
   const { verifierReplyText, messiDaParte, DECISIONE_IN_CORREZIONE_NOTE } = await import('../../scripts/dispatch.mjs');
-  const critica = F('Provato.\n[2i?] A o B? Consiglio A.\n[1e] bordo storto altrove');
+  const critica = F('Provato.\n[2i?] A o B? Consiglio A.\n[e] bordo storto altrove');
   const d = R.decideRound({ findings: critica, caps: CAPS, counts: {} });
   // Come li rimanda il server: col numero del feedback, e col posto nella critica che dispatch ci rimette.
   const posto = (f) => critica.findIndex((c) => c.text === f.text) + 1;
