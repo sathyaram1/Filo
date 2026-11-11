@@ -40,7 +40,7 @@ test('un rilievo «?» senza domanda, o una domanda di troppo, fermano prima del
   const f = V.parseFindings(CRITICA).findings;
   const manca = rilieviConDomanda(f, [domanda('Bordo caldo o freddo?')]);
   assert.equal(manca.ok, false);
-  assert.match(manca.errore, /il rilievo 3 col «\?» non ha la sua domanda \(\[1e\?\] Il menu delle schede è lento: un indice\?\)/);
+  assert.match(manca.errore, /il rilievo 3 col «\?» non ha la sua domanda \(\[e\?\] Il menu delle schede è lento: un indice\?\)/);
   assert.match(manca.errore, /con più rilievi un elenco, uno per rilievo nell'ordine della critica/);
   assert.match(rilieviConDomanda(f, []).errore, /i rilievi 2, 3 col «\?» non hanno la sua domanda/);
   const troppe = rilieviConDomanda(V.parseFindings('Provato.\n[2i] Non salva.').findings, [domanda('Altro?')]);
