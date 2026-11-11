@@ -125,9 +125,8 @@
   /** Perché una riga di FINDING_LINE non si legge come rilievo, '' se si legge. PURA. */
   function motivoDelRifiuto(m) {
     const f = rilievoDa(m);
-    if (f.level === 0) return SPIEGAZIONE_ZERO;
-    if (f.sede === 'v') return SPIEGAZIONE_VICINO;
-    if (f.sede === 'e' && f.level !== null) return SPIEGAZIONE_ESTERNO;
+    const vecchia = motivoScalaVecchia(f);
+    if (vecchia) return vecchia;
     if (f.sede === 'i' && f.level === null) return SPIEGAZIONE_INTERNO;
     if (f.irreversibile === true && !f.decision) return SPIEGAZIONE_SEGNO;
     return '';
