@@ -179,6 +179,7 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await modelloFinto(app, [imposta('segnalazione_automatica', 'no', 'i3'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'spegni la segnalazione automatica');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await impostazioni(app)).security.autoFeedback, { timeout: 5_000 }).toBe(false);
   await sec.bringToFront();
   await expect(sec.locator('#sec-auto-feedback')).not.toBeChecked({ timeout: 3_000 });
