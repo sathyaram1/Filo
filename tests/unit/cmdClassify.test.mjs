@@ -1421,6 +1421,23 @@ test('#2392 — una sottoshell di sola lettura in bash e sh resta una lettura; $
   }
 });
 
+// In sh, bash e zsh `$(…)` in testa a un comando esegue ciò che stampa: `$(echo rm x)` è `rm x`, non una lettura.
+test('#2392 — in una shell posix una sostituzione in testa a un comando chiede «conferma»', () => {
+  const POSIX = { cwd: '/home/u/proj', home: '/home/u' };
+  for (const shell of ['bash', 'sh', 'zsh']) {
+    const ctx = { ...POSIX, shell };
+    for (const cmd of [
+      '$(echo rm x)', '$( echo rm x )', '$(cat x)', '$(ls)', '@(echo rm x)', '($(echo rm x))', '(ls; $(echo rm x))',
+      '$(echo rm x) | wc -l', 'ls; $(echo rm x)', 'ls && $(echo rm x)', '! $(echo rm x)', 'if (Test-Path x) { $(cat x) }',
+    ]) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    // Come argomento il valore di una lettura resta una lettura.
+    for (const cmd of ['echo $(whoami)', '(ls) && (pwd)']) assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
+  }
+  // In PowerShell `$( … )` in testa stampa il suo valore e basta.
+  const WIN = { cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true, shell: 'powershell' };
+  assert.equal(C.classify('$(Get-ChildItem "$env:USERPROFILE\\Downloads").Count', WIN), 1);
+});
+
 test('#1994 — in cmd le variabili col nome che comincia per = non nascondono un\'opzione', () => {
   const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
   for (const cmd of ['git log --out%=ExitCode:~0,0%put=x', 'git log --output%=ExitCodeAscii:~0,0%=x', 'git log --out%=C:~0,0%put=x']) {
