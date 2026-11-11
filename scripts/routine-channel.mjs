@@ -1989,7 +1989,7 @@ if (isMain) {
     const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
     const chiRilascia = typeof data.role === 'string' ? data.role : '';
     if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
-      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER });
+      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
       if (vivo.vivo) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'
