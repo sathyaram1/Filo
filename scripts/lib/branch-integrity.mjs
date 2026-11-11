@@ -1104,6 +1104,7 @@ function ultimoCommit(root) {
  */
 export function lavoroVivo(root, {
   mio = '', cosa = SEGNI_TUTTI, adesso = Date.now(), leggiProcessi = processiDiSistema, alive = pidAlive, pid = process.pid,
+  altre = [],
 } = {}) {
   const radice = percorsoVero(resolve(root));
   const battito = readBeat(radice);
