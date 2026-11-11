@@ -335,7 +335,6 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
         const ultima = cima.props[cima.props.length - 1];
         const v = virgolaDopo(src, ultima, cima.chiudeOggetto);
         if (v) modifiche.push(v);
-        const corpo = daPortare[chiave].map((t) => `${rProp}  ${t},\n`).join('');
         modifiche.push({ da: inizioRiga(src, cima.chiudeOggetto), a: inizioRiga(src, cima.chiudeOggetto), testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
         continue;
       }
