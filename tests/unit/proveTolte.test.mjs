@@ -632,7 +632,7 @@ test('una domanda per l\'owner senza prova sua non lascia uscire la prova rossa 
 test('un rilievo esterno non allarga la pulizia fino alla prova rossa di un rilievo da correggere', () => {
   const { dir, g, cartella, shaCritica, vl } = giroCriticato({
     prove: { 'giro1-r1-a': ['a'], 'giro1-r2-b': ['b'], 'giro1-r3-c': ['c'] },
-    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.\n[1e] un difetto di un altro lavoro.',
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.\n[e] un difetto di un altro lavoro.',
   });
   try {
     g('rm', '-q', `${cartella}/giro1-r2-b.spec.mjs`, `${cartella}/giro1-r3-c.spec.mjs`); g('commit', '-qm', 'pulizia larga');
