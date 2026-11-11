@@ -946,6 +946,8 @@
     }
     return inerti.size ? [segnata()] : null;
   }
+  // Tutti i segni interni, presi dalle loro definizioni: scritti da chi manda il comando fingerebbero un gruppo già misurato.
+  const segniInterni = () => SEGNO_GRUPPO + SEGNI_INERTI;
   // I segni delle graffe inerti mentre si aprono le altre: `graffe` li rimette come erano.
   const SEGNI_INERTI = '';
 
