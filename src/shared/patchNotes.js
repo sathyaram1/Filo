@@ -38,6 +38,7 @@
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
         { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
         { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
+        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
@@ -64,7 +65,6 @@
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
         { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
-        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
