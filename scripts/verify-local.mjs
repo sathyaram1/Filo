@@ -999,7 +999,8 @@ const MAIN = 'main';
 function realignBeforeStart(root = ROOT) {
   const branch = currentBranch(root);
   const workBranch = !!branch && branch !== 'HEAD' && !['main', 'master'].includes(branch.toLowerCase());
-  const fetchOk = tryGit(['fetch', 'origin', MAIN], root).ok;
+  // Refspec esplicito: in un clone a ramo singolo `fetch origin main` non muove origin/main (#2237.3).
+  const fetchOk = tryGit(['fetch', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`], root).ok;
   const behind = fetchOk ? Number(tryGit(['rev-list', '--count', `HEAD..origin/${MAIN}`], root).out) : 0;
   const plan = realignPlan({ fetchOk, dirty: isDirty(root), behind, workBranch });
   if (plan.message) console.log(`${plan.message}\n`);
