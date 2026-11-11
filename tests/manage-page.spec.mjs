@@ -393,7 +393,7 @@ test('a routine spente un bilancio e le istruzioni si modificano e restano salva
   // Il caso dell'owner: apre Gestione con le routine GIÀ spente e vuole cambiare i numeri.
   const page = await apriAutomazioni(openTab);
   await stubAutomation(page, { routinesEnabled: false });
-  await stubCaps(page, { cap3: 2, cap2: 5, cap1: 1, cap0: 0, fixInstructions: 'VECCHIO' });
+  await stubCaps(page, { cap3: 2, cap2: 5, cap1: 1, fixInstructions: 'VECCHIO' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   await page.evaluate(() => window.__mgTest.loadCaps());
