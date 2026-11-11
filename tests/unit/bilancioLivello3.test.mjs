@@ -179,36 +179,37 @@ test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilanci finiti;
   assert.deepEqual(livelli(fermo.sospesi), ['2i']);
 });
 
-test('gli 1 e gli 0: con un 2 corretto entrano; finiti i bilanci dal 2 in giù escono tutti', () => {
-  const insieme = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')]);
-  assert.deepEqual(livelli(insieme.fix), ['2i', '1i', '0i']);
+test('gli 1: con un 2 corretto entrano; finiti i bilanci dal 2 in giù escono tutti', () => {
+  const insieme = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')]);
+  assert.deepEqual(livelli(insieme.fix), ['2i', '1i', '1i']);
   assert.equal(insieme.consume, 'cap2');
-  const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], FINITI[2]);
+  const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')], FINITI[2]);
   assert.deepEqual(tuttoFinito.fix, []);
-  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 0]);
+  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 1]);
   assert.equal(tuttoFinito.consume, null);
-  // Gli esterni come prima: fuori dal conto, con la priorità del livello (un 2 nasce a 1).
-  const conEsterno = decide([f(2, 'e', 'altrove'), f(3, 'e', 'grave altrove')], FINITI[2]);
+  // Gli esterni fuori dal conto, senza livello né priorità (#2339): li classifica chi classifica ogni feedback.
+  const conEsterno = decide([f(null, 'e', 'altrove'), f(null, 'e', 'grave altrove')], FINITI[2]);
   assert.equal(conEsterno.stop, false);
-  assert.deepEqual(conEsterno.external.map((x) => x.priority), [1, 3]);
+  assert.deepEqual(conEsterno.external.map((x) => [x.level, x.priority]), [[null, null], [null, null]]);
 });
 
-test('senza uno dei quattro bilanci si ferma e dice quale manca: nessun default', () => {
-  assert.throws(() => R.decideRound({ findings: [f(2, 'i', 'x')], caps: { cap2: 4, cap1: 1, cap0: 0 } }), /bilanci del verificatore mancanti: cap3/);
-  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
+test('senza uno dei tre bilanci si ferma e dice quale manca: nessun default; un cap0 si ignora', () => {
+  assert.throws(() => R.decideRound({ findings: [f(2, 'i', 'x')], caps: { cap2: 4, cap1: 1, cap0: 0 } }), /bilanci del verificatore mancanti: cap3 —/);
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /mancanti: cap3, cap2, cap1 —/);
   assert.deepEqual(R.missingCaps(CAPS), []);
-  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 4, cap1: 1 }), ['cap0']);
+  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 4, cap1: 1 }), [], 'senza cap0 non manca niente');
   assert.equal(R.capKeyOf(3), 'cap3');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
-  assert.equal(R.capKeyOf(0), 'cap0');
+  assert.equal(R.capKeyOf(0), 'cap1', 'uno 0 dello stato vecchio vale 1');
   assert.equal(R.countKeyOf(3), 'count3');
-  assert.deepEqual(R.normalizeCaps({ cap3: 99, cap2: -1 }, CAPS), { cap3: 10, cap2: 0, cap1: 1, cap0: 0 });
-  assert.deepEqual(R.normalizeCounts({ count3: '2' }), { count3: 2, count2: 0, count1: 0, count0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap3: 99, cap2: -1, cap0: 7 }, CAPS), { cap3: 10, cap2: 0, cap1: 1 });
+  assert.deepEqual(R.normalizeCounts({ count3: '2', count0: 3 }), { count3: 2, count2: 0, count1: 0 });
 });
 
 test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle, nella cache e nella dashboard', () => {
-  assert.deepEqual(R.CAP_KEYS, ['cap3', 'cap2', 'cap1', 'cap0']);
+  assert.deepEqual(R.CAP_KEYS, ['cap3', 'cap2', 'cap1']);
+  assert.equal(C.STORAGE_KEYS.AUTOMATION_CAP0, undefined, 'il bilancio dello 0 non c\'è più (#2339)');
   assert.deepEqual(T.VERIFIER_CAP_KEYS, R.CAP_KEYS, 'feedbackTransitions.js e verifierRound.js: una lista sola');
   for (const k of R.CAP_KEYS) {
     assert.equal(C.STORAGE_KEYS[`AUTOMATION_${k.toUpperCase()}`], `filo_automation_${k}`, `manca la chiave di cache di ${k}`);
