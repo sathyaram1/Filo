@@ -15,6 +15,7 @@ const GIOVEDI_9 = Date.UTC(2026, 9, 29, 8, 30);
 const REVISIONE = {
   id: 'rev-domande', nome: 'Revisione delle domande', testo: 'Leggi le domande <b>aperte</b>.\nRaggruppale.', giorni: [0, 1, 2, 3, 4, 5, 6],
   ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
+  tettoUsd: null, tetto: { usd: 124, da: 'corse', mediana: 61.7, corse: 3 },
   prossimaIl: LUNEDI_6, creatoIl: ORA - 3000 * MIN, modificatoIl: ORA - 600 * MIN, iniziale: true, attesa: 'aspetta l’ambiente dei riservati',
   istanza: { id: 'C-12', stato: 'fatto', esito: '3 domande raggruppate', creatoIl: ORA - 300 * MIN, nonPrimaDi: ORA - 300 * MIN, chiusoIl: ORA - 250 * MIN },
   rapporto: { testo: 'Raggruppate <img src=x onerror="window.__xss=1"> tre domande.\nRiparti da D-40.', fiducia: 'non_fidato', scrittoIl: LUNEDI_6 - 24 * 60 * MIN + 41 * MIN, compitoId: 'C-12' },
