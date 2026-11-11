@@ -136,7 +136,7 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 const ROUTINES_DOC = 'config/routines';
 
 // I bilanci dei giri di correzione, uno per livello (feedback #561: cap3 per
-// i rilievi di livello 3, cap2 per i 2, cap1, cap0) li CONSUMA il SERVER quando
+// i rilievi di livello 3, cap2 per i 2, cap1 per gli 1) li CONSUMA il SERVER quando
 // registra la critica, coi numeri che l'owner scrive in config/routines: qui
 // non esistono, nemmeno come riferimento (fino al 2026-09-16 c'era una copia
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
