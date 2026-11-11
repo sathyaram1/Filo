@@ -411,6 +411,8 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   return out;
 }
 
+export const FERMA_IL_WORKER = 'Il worker però è ancora acceso e spende: fermalo adesso con lo strumento TaskStop (se non lo vedi, caricalo con ToolSearch «select:TaskStop»), passandogli l’id che ti ha dato il suo lancio.';
+
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
 
 /**
