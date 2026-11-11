@@ -972,14 +972,16 @@ test('esterni e messi da parte diventano feedback appena la critica li registra,
 
 test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso solo; gli altri non si riaprono', async () => {
   const p = nuovaPratica({ num: 7, slug: 'sette' });
-  const derived = [{ level: 1, sede: 'e', text: 'altro lavoro Z' }, { level: 0, sede: 'e', text: 'altro lavoro W' }];
+  const derived = [{ level: null, sede: 'e', text: 'altro lavoro Z' }, { level: 1, sede: 'i', text: 'altro lavoro W' }];
   let rete = false;
   const righe = [];
+  const comandi = [];
   const dep = {
     percorsi: { wt: (s) => `/r/.claude/worktrees/${s}` },
     verifica: () => ({ entry: { derived } }),
     esegui: async (cmd, args) => {
       righe.push(args[1]);
+      comandi.push(args.slice(2).join(' '));
       return /Z/.test(args[1]) || rete ? { code: 0, out: 'Aperto #1001' } : { code: 1, out: 'fetch failed' };
     },
   };
