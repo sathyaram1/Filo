@@ -760,6 +760,8 @@ test('la durata prevista cresce con gli spec, e un ramo largo passa l’ora', ()
   assert.ok(pochi.a < largo.da, 'quattro spec durano meno di duecento');
   const niente = stimaDurataControlli(0);
   assert.ok(niente.da > 0, 'gli unit girano anche senza spec');
+  assert.ok(niente.a < pochi.a, 'un riallineamento senza file risolti dura meno di uno con quattro spec');
+  assert.match(niente.testo, /solo unit/, 'chi lo lancia legge prima di partire che corrono i soli unit (#2237)');
   assert.deepEqual(stimaDurataControlli(undefined), niente);
 });
 
