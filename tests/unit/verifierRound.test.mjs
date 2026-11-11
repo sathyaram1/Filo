@@ -242,7 +242,7 @@ test('#561 giro 3: un livello fuori scala o a intervallo a inizio riga non è un
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2-3] grave\n[2/3] grave'), ['[2-3] grave', '[2/3] grave']);
   assert.deepEqual(R.parseFindings('Provato.\n[4] gravissimo').findings, [], 'non è un rilievo: è un errore da segnalare');
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[3i] grave\n[0i?] raro'), []);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[3i] grave\n[1i?] raro'), []);
 });
 
 test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parentesi in mezzo alla frase sono testo; oltre il tetto si dice', () => {
