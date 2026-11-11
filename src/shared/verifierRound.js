@@ -731,13 +731,13 @@
   }
 
   // Le frasi sui bilanci stanno qui sole: le stampano anche dispatch e la verifica locale.
-  const RILIEVI_CHE_FERMANO = 'Rilievi interni che non si possono correggere da soli (un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.';
+  const RILIEVI_CHE_FERMANO = 'Rilievi interni che non si possono correggere da soli (un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3): decide l\'owner. Una scelta difficile da disfare ferma anche lei, e va al manutentore.';
 
-  /** La riga sui 2 interni messi da parte (finiti i bilanci dal 2 in giù), o ''. Un vicino scritto 2 non è il caso. PURA. */
+  /** La riga sui 2 interni messi da parte (finiti i bilanci dal 2 in giù), o ''. PURA. */
   function dueDaParteRiga(list) {
     const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && f.decision !== true).length;
     if (!n) return '';
-    return `I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: ${n === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${n} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`;
+    return `I bilanci delle correzioni dei livelli 2 e 1 sono finiti: ${n === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${n} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`;
   }
 
   /**
