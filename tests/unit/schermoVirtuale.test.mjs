@@ -76,10 +76,10 @@ test('riallineamento: il commit verificato arriva dal marcatore di chi verifica,
   assert.equal(shaDelRiallineamento(null), '');
 });
 
-// #1907: un ramo verificato, poi main che tocca un'altra area e due file del lavoro, poi il ramo riallineato con un
-// conflitto risolto e uno risolto col lato di main. Si scelgono il lavoro e i suoi conflitti, non l'area solo di main:
-// presa intera, su un ramo vecchio, erano centinaia di spec e ore di corsa.
-test('riallineamento: la scelta include i file in conflitto, anche risolti col lato di main, e non il resto del lato di main', () => {
+// #1907, #2237: un ramo verificato, poi main che tocca un'altra area e due file del lavoro, poi il ramo riallineato con
+// un conflitto risolto e uno risolto col lato di main. Si scelgono i soli conflitti: il resto del lavoro l'ha provato la
+// verifica, l'area solo di main la sua suite (presi interi erano centinaia di spec e ore di corsa).
+test('riallineamento: la scelta è dei soli file in conflitto, anche risolti col lato di main', () => {
   const dir = cartellaTemporanea('riallineamento-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
