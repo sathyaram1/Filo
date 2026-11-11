@@ -237,6 +237,19 @@ export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fe
 function defaultSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /**
+ * La lettura del lavoro vivo di un worker, una regola per l'attesa e il rilascio: i suoi processi nella cartella e i
+ * sotto-agenti non chiusi della sessione (#2304), che dopo il rilascio scriverebbero nella cartella del prossimo.
+ */
+async function lavoroVivoDelWorker() {
+  const { sottoAgentiVivi } = await import('./lib/veglia-worker.mjs');
+  return () => {
+    const v = lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER });
+    const figli = sottoAgentiVivi();
+    return figli.length ? { ...v, vivo: true, segni: [...figli, ...v.segni] } : v;
+  };
+}
+
+/**
  * Traduce la risposta del canale nel vocabolario delle routine. PURA.
  *
  * Esiste perché la distinzione fra "non c'è lavoro" e "non riesco a sapere se
