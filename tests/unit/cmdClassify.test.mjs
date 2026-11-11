@@ -1399,6 +1399,22 @@ test('#1994 — $_ porta l\'opzione del comando prima: si misura col suo valore'
   assert.equal(C.classify('git log -1 $_', { shell: 'powershell', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true }), 1);
 });
 
+// Il gruppo `( … )` si misura da sé e il comando attorno lo vede come un segno interno: in bash quel segno non è `$_`.
+test('#2392 — una sottoshell di sola lettura in bash e sh resta una lettura; $_ dopo un gruppo si misura ancora', () => {
+  const POSIX = { cwd: '/home/u/proj', home: '/home/u' };
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { ...POSIX, shell };
+    for (const cmd of ['(echo ciao)', '(ls "/home/u/proj" | wc -l)', 'echo (pwd)', '(ls) && (pwd)']) {
+      assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
+    }
+    for (const cmd of ['(rm x)', '(echo --output=x); git log $_', '(echo ciao); git log $_']) {
+      assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    }
+    // Il segno interno scritto da chi manda il comando non si fa passare per un gruppo già misurato.
+    for (const cmd of ['echo --output=x; git log $_\uE000', 'ls \uE001x\uE002']) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${JSON.stringify(cmd)}`);
+  }
+});
+
 test('#1994 — in cmd le variabili col nome che comincia per = non nascondono un\'opzione', () => {
   const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
   for (const cmd of ['git log --out%=ExitCode:~0,0%put=x', 'git log --output%=ExitCodeAscii:~0,0%=x', 'git log --out%=C:~0,0%put=x']) {
