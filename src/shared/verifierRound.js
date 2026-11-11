@@ -6,9 +6,9 @@
 //   quali si correggono subito (e da quale bilancio si paga il giro), quali
 //   finiscono nel feedback derivato, e quando il lavoro si ferma e passa
 //   all'owner. Più il formato con cui il verificatore scrive la critica
-//   (`[livello+sede] testo`: `[2i]`, `[1v]`, `[1e?]`, `[2i?!]`, una riga per
-//   rilievo) e il suo parser. Decidono gli interni; i vicini seguono un giro che
-//   parte comunque, gli esterni escono a parte.
+//   (`[livello+sede] testo`: `[2i]`, `[1i?]`, `[2i?!]`, e `[e]` senza livello
+//   per un esterno, una riga per rilievo) e il suo parser. Decidono gli
+//   interni, gli esterni escono a parte.
 //   In fondo il motivo del correttore e il giro dopo un riallineamento.
 //
 // PERCHÉ È CONDIVISO
