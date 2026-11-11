@@ -242,6 +242,15 @@ test('#2215: dopo lo sblocco di un guasto la riga non dice «nota scritta»: nel
   assert.equal(M.rigaNotaOSblocco({ numero: '7' }), '#7: nota scritta.');
 });
 
+test('sblocca anche un compito fermo per guasto (#2303), col suo C-n', () => {
+  assert.deepEqual(M.richiestaSblocca(['C-3915', 'il', 'limite', 'è', 'passato']), { ok: true, compito: 'C-3915', testo: 'il limite è passato' });
+  assert.deepEqual(M.richiestaSblocca(['c-12']), { ok: true, compito: 'C-12', testo: '' });
+  assert.deepEqual(M.datiSblocca(M.richiestaSblocca(['C-12']), 'riprendi'), { compito: 'C-12', testo: 'riprendi' });
+  assert.deepEqual(M.datiSblocca(M.richiestaSblocca(['812']), ''), { numero: '812' });
+  assert.equal(M.controlliLocali('sblocca', ['sblocca', 'C-3915']), '');
+  assert.match(M.controlliLocali('sblocca', ['sblocca', 'C-']), /sblocca 812 \[nota\], sblocca C-3915 \[nota\]/);
+});
+
 // ── SPEC-MANUTENTORE: il canale della chiave, il contesto piccolo e intero, le indicazioni, il redattore ──
 
 import { readFileSync } from 'node:fs';
