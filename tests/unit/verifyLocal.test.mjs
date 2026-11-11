@@ -751,7 +751,7 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
   assert.equal(ridata.ok, true);
   assert.equal(ridata.replayed, true);
   assert.equal(ridata.outcome, 'fix');
-  assert.deepEqual(ridata.decision.fix.map((f) => f.level), [2, 0]);
+  assert.deepEqual(ridata.decision.fix.map((f) => f.level), [2, 1]);
   assert.equal(ridata.decision.budgets.cap2.left, 4, 'i bilanci della fase 2 sono quelli del giro');
   assert.equal(JSON.stringify(ridata.state), snap, 'niente scritto');
   // La barra-n letterale è la stessa critica.
