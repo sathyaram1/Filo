@@ -101,7 +101,7 @@ test('D88, il caso di #744: un 2 a bilancio finito e un 1 si correggono insieme,
   assert.deepEqual(livelli(d.fix), ['2i', '1i'], 'nell\'ordine della critica');
   assert.deepEqual(d.derived, [], 'nessun feedback a parte per il 2');
   assert.equal(d.consume, 'cap1');
-  assert.deepEqual([d.counts.count2, d.counts.count1, d.counts.count0], [4, 1, 0]);
+  assert.deepEqual(d.counts, { count3: 0, count2: 4, count1: 1 });
   // Il giro dopo, con cap1 finito anche lui: escono tutti e due, il lavoro passa.
   const dopo = decide([f(2, 'i', 'non salva ancora'), f(1, 'i', 'bordo')], d.counts);
   assert.deepEqual(dopo.fix, []);
