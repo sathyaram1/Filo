@@ -1,6 +1,6 @@
-// La sede `v` (vicino: un altro lavoro, ma in un file che il ramo modifica già)
-// e l'accorpamento dei rimasti di un giro in un feedback solo (decisioni
-// dell'owner del 2026-09-27). Stesse regole sul server, che le incorpora al deploy.
+// La sede `v` (vicino) non c'è più dal #2339: nella critica si respinge col perché, e nello
+// stato già scritto si legge esterno. Più l'accorpamento dei rimasti di un giro in un feedback
+// solo (decisione dell'owner del 2026-09-27). Stesse regole sul server, che le incorpora al deploy.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,135 +13,117 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 require(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2 };
 
 const f = (level, sede, text, decision = false) => ({ level, sede, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
-const tag = (list) => list.map((x) => `${x.level}${x.sede}${x.decision ? '?' : ''}`);
+const tag = (list) => list.map((x) => `${x.level == null ? '' : x.level}${x.sede}${x.decision ? '?' : ''}`);
 
-// ── Il formato ───────────────────────────────────────────────────────────────
+// ── Il formato: il vicino si respinge ────────────────────────────────────────
 
-test('la critica accetta la sede v, col ? prima o dopo la lettera', () => {
-  const p = R.parseFindings('Provato tutto.\n[1v] etichetta tagliata\n- [2v?] scelta sul file vicino\n[3?V] grave nel file vicino');
-  assert.deepEqual(p.rifiutati, []);
-  assert.deepEqual(tag(p.findings), ['1v', '2v?', '3v?']);
-  assert.deepEqual(R.unparsedLevelLines('[1v] bene\n[2v?] bene'), [], 'una riga col v non è scritta male');
-  assert.match(R.SPIEGAZIONE_SEDE, /«v» se è di un altro lavoro ma sta in un file che il ramo modifica già/);
-  assert.ok(R.SEDI.includes('v'));
+test('la critica respinge la sede v, col ? prima o dopo la lettera, e dice che ora è un esterno senza livello', () => {
+  const p = R.parseFindings('Provato tutto.\n[1v] etichetta tagliata\n- [2v?] scelta sul file vicino\n[3?V] grave nel file vicino\n[2i] qui');
+  assert.deepEqual(tag(p.findings), ['2i'], 'solo l\'interno è un rilievo');
+  assert.equal(p.rifiutati.length, 3);
+  for (const r of p.rifiutati) assert.match(r, /la sede «vicino» non c'è più[^)]*: \[e\] testo/);
+  assert.doesNotMatch(p.summary, /etichetta|vicino/, 'e non finisce nel riassunto');
+  assert.equal(R.unparsedLevelLines('[1v] male\n[2v?] male').length, 2, 'una riga col v è scritta male');
+  assert.match(R.testoRilieviNonRiconosciuti('Provato.\n[1v] male'), /\[1v\] male \(la sede «vicino» non c'è più/);
+  assert.doesNotMatch(R.SPIEGAZIONE_SEDE, /«v»/);
+  assert.deepEqual(R.SEDI, ['i', 'e']);
 });
 
-test('i dati strutturati tengono la sede v, e formatFinding la riscrive uguale', () => {
-  assert.deepEqual(R.normalizeFindings([{ level: 2, sede: 'V', text: 'x' }]).map((x) => x.sede), ['v']);
-  assert.equal(R.formatFinding(f(3, 'v', 'vicino', true)), '- [3v?] vicino');
+test('nello stato già scritto un vicino si legge esterno: senza livello, e formatFinding lo riscrive [e]', () => {
+  assert.deepEqual(R.normalizeFindings([{ level: 2, sede: 'V', text: 'x' }]).map((x) => [x.level, x.sede]), [[null, 'e']]);
+  assert.equal(R.sedeDi('v'), 'e');
+  assert.equal(R.formatFinding(f(3, 'v', 'vicino', true)), '- [e?] vicino');
   const giro = R.parseFindings(R.formatFindings([f(3, 'v', 'a'), f(1, 'v', 'b', true)]));
-  assert.deepEqual(giro.findings, [f(3, 'v', 'a'), f(1, 'v', 'b', true)]);
+  assert.deepEqual(giro.rifiutati, []);
+  assert.deepEqual(giro.findings, [f(null, 'e', 'a'), f(null, 'e', 'b', true)]);
 });
 
-// ── La decisione del giro ────────────────────────────────────────────────────
+// ── La decisione del giro con lo stato vecchio ───────────────────────────────
 
-test('con una correzione in corso i vicini entrano, e il giro lo paga il livello degli interni', () => {
+test('un vicino dello stato vecchio è un esterno: non fa partire il giro, non paga, non ferma', () => {
+  const solo = decide([f(3, 'v', 'grave ma non di questo lavoro'), f(2, 'v', 'scelta', true)]);
+  assert.equal(solo.stop, false, 'nemmeno un 3 col ? scritto sul vicino ferma');
+  assert.deepEqual(solo.fix, []);
+  assert.equal(solo.consume, null);
+  assert.deepEqual(solo.counts, { count3: 0, count2: 0, count1: 0 });
+  assert.deepEqual(solo.external.map((x) => [x.level, x.sede, x.priority, x.decision]), [[null, 'e', null, false], [null, 'e', null, true]]);
+  assert.deepEqual(solo.derived, []);
+  // Accanto a un interno da correggere: il giro lo paga l'interno, il vicino esce a parte.
   const r = decide([f(1, 'i', 'qui'), f(3, 'v', 'nel file vicino')]);
-  assert.equal(r.stop, false);
-  assert.deepEqual(tag(r.fix), ['1i', '3v']);
-  assert.equal(r.consume, 'cap1', 'il 3 scritto sul vicino non paga cap3');
-  assert.equal(r.budgets.cap3.left, 5);
+  assert.deepEqual(tag(r.fix), ['1i']);
+  assert.equal(r.consume, 'cap1');
+  assert.deepEqual(tag(r.external), ['e']);
 });
 
-test('un vicino da solo non fa partire il giro, nemmeno con cap0 sopra zero: esce derivato col livello scritto (#1202)', () => {
-  const senza = decide([f(3, 'v', 'grave ma non di questo lavoro')]);
-  assert.equal(senza.stop, false, 'un 3 vicino non ferma il lavoro');
-  assert.deepEqual(senza.fix, []);
-  assert.equal(senza.consume, null);
-  assert.deepEqual(senza.derived.map((x) => [x.level, x.sede, x.priority]), [[3, 'v', 3]], 'priorità = il livello SCRITTO');
-  const con = decide([f(2, 'v', 'a'), f(0, 'v', 'b')], {}, { ...CAPS, cap0: 3 });
-  assert.equal(con.stop, false);
-  assert.deepEqual(con.fix, [], 'cap0 è il bilancio degli 0 interni: i vicini non lo usano');
-  assert.equal(con.consume, null);
-  assert.deepEqual(con.counts, { count3: 0, count2: 0, count1: 0, count0: 0 }, 'nessun bilancio pagato');
-  assert.deepEqual(con.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'v', 1], [0, 'v', 0]], 'livello scritto, e un 2 nasce a 1');
-  assert.deepEqual(R.derivedGroups(con).map((g) => [g.tipo, g.priority]), [['rimasti', 1]]);
-});
-
-test('un vicino insieme a un interno da correggere entra nel giro, e non paga niente (#1202)', () => {
-  const r = decide([f(0, 'i', 'qui'), f(2, 'v', 'nel file vicino')], {}, { ...CAPS, cap0: 1 });
-  assert.deepEqual(tag(r.fix), ['0i', '2v']);
-  assert.equal(r.consume, 'cap0', 'il giro lo paga lo 0 interno, non il 2 scritto sul vicino');
-  assert.equal(r.counts.count2, 0);
-  // Un interno messo da parte dal bilancio non fa partire niente: il vicino esce con lui.
-  const fuori = decide([f(1, 'i', 'qui'), f(2, 'v', 'vicino')], { count1: 2 });
-  assert.deepEqual(fuori.fix, []);
-  assert.deepEqual(tag(fuori.derived), ['1i', '2v']);
-});
-
-test('un 3 vicino a cap3 finito non ferma; un v col ? non ferma e va da parte', () => {
-  const finito = decide([f(3, 'v', 'a')], { count3: 5 }, { ...CAPS, cap0: 1 });
-  assert.equal(finito.stop, false);
-  assert.equal(finito.consume, null);
-  assert.deepEqual(tag(finito.derived), ['3v']);
-  const domanda = decide([f(3, 'v', 'scelta', true), f(2, 'i', 'qui')]);
-  assert.equal(domanda.stop, false);
-  assert.deepEqual(tag(domanda.fix), ['2i']);
-  assert.deepEqual(tag(domanda.derived), ['3v?']);
-  assert.equal(domanda.derived[0].priority, 3);
-});
-
-test('allo stop i vicini restano fra i sospesi, come gli interni', () => {
-  const r = decide([f(3, 'i', 'da decidere', true), f(1, 'v', 'vicino'), f(1, 'e', 'altrove')]);
+test('allo stop i vicini dello stato vecchio escono con gli esterni, non fra i sospesi', () => {
+  const r = decide([f(3, 'i', 'da decidere', true), f(1, 'v', 'vicino'), f(null, 'e', 'altrove'), f(1, 'i', 'lieve')]);
   assert.equal(r.stop, true);
-  assert.deepEqual(tag(r.sospesi), ['1v']);
-  assert.deepEqual(tag(r.external), ['1e']);
+  assert.deepEqual(tag(r.sospesi), ['1i']);
+  assert.deepEqual(tag(r.external), ['e', 'e']);
 });
 
 // ── I gruppi dei derivati ────────────────────────────────────────────────────
 
 test('derivedGroups: esterni e domande da soli, tutti gli altri in un feedback solo a priorità massima', () => {
-  const r = decide([f(3, 'e', 'esterno grave'), f(1, 'i', 'lieve'), f(3, 'v', 'vicino grave'), f(1, 'i', 'domanda', true), f(0, 'v', 'cosmetico')], { count1: 2 });
+  const r = decide([f(null, 'e', 'esterno grave'), f(1, 'i', 'lieve'), f(2, 'i', 'non salva'), f(1, 'i', 'domanda', true), f(3, 'v', 'vicino vecchio')], { count2: 5, count1: 2 });
   assert.equal(r.consume, null);
   const g = R.derivedGroups(r);
   assert.deepEqual(g.map((x) => [x.tipo, x.priority, x.decision, tag(x.findings)]), [
-    ['esterno', 3, false, ['3e']],
+    ['esterno', null, false, ['e']],
+    ['esterno', null, false, ['e']],
     ['decisione', 1, true, ['1i?']],
-    ['rimasti', 3, false, ['1i', '3v', '0v']],
+    ['rimasti', 1, false, ['1i', '2i']],
   ]);
-  assert.deepEqual(g[2].findings.map((x) => x.priority), [1, 3, 0], 'ciascuno tiene il suo livello');
+  assert.deepEqual(g[3].findings.map((x) => x.priority), [1, 1], 'un 2 nasce a 1');
 });
 
-test('derivedGroups accetta un elenco piatto e tiene i campi in più (numero, id)', () => {
+test('derivedGroups accetta un elenco piatto e tiene i campi in più (numero, id); lo stato vecchio si legge con la regola scritta', () => {
   const g = R.derivedGroups([
     { level: 2, sede: 'i', text: 'a', num: '#7.1', id: 'x' },
-    { level: 1, sede: 'e', text: 'b', decision: true },
+    { level: 2, sede: 'e', text: 'b', decision: true },
     { level: 1, text: 'senza sede' },
+    { level: 0, sede: 'i', text: 'zero vecchio' },
     { level: 9, text: 'fuori scala' },
   ]);
   assert.deepEqual(g.map((x) => x.tipo), ['esterno', 'rimasti']);
   assert.equal(g[0].decision, true, 'un esterno col ? resta un esterno, con la domanda dentro');
+  assert.deepEqual([g[0].priority, g[0].findings[0].level, g[0].findings[0].priority], [null, null, null], 'l\'esterno perde il livello scritto');
   assert.equal(g[1].findings[0].num, '#7.1');
   assert.equal(g[1].findings[0].id, 'x');
   assert.equal(g[1].findings[1].sede, 'i');
+  assert.deepEqual(g[1].findings[2].level, 1, 'uno 0 interno vale 1');
   assert.equal(g[1].priority, 1);
   assert.deepEqual(R.derivedGroups([]), []);
   assert.deepEqual(R.derivedGroups(null), []);
 });
 
 test('groupLabel dice cosa contiene il feedback, con livello e sede di ciascun rilievo', () => {
-  const [esterno, domanda, rimasti] = R.derivedGroups([f(2, 'e', 'x', true), f(1, 'v', 'y', true), f(2, 'i', 'z'), f(1, 'v', 'w')]);
+  const [esterno, domanda, rimasti] = R.derivedGroups([f(null, 'e', 'x', true), f(1, 'i', 'y', true), f(2, 'i', 'z'), f(1, 'i', 'w')]);
   assert.equal(R.groupLabel(esterno), 'esterno, da decidere');
-  assert.equal(R.groupLabel(domanda), 'vicino, da decidere');
-  assert.equal(R.groupLabel(rimasti), 'rimasti del giro: 2 rilievi ([2i], [1v])');
+  assert.equal(R.groupLabel(domanda), 'interno, da decidere');
+  assert.equal(R.groupLabel(rimasti), 'rimasti del giro: 2 rilievi ([2i], [1i])');
+  assert.equal(R.findingTag(f(null, 'e', 'x')), '[e]');
+  assert.equal(R.findingTag(f(2, 'v', 'x', true)), '[e?]');
 });
 
-test('roundNote parla per gruppi: il feedback dei rimasti coi suoi rilievi, i vicini corretti insieme', () => {
-  const list = [f(2, 'i', 'Non salva. Passi: …'), f(1, 'v', 'Etichetta tagliata.'), f(0, 'i', 'Bordo storto.'), f(1, 'e', 'Altrove.')];
+test('roundNote parla per gruppi: il feedback dei rimasti coi suoi rilievi, nessuna riga sui vicini', () => {
+  const list = [f(2, 'i', 'Non salva. Passi: …'), f(1, 'i', 'Etichetta tagliata.'), f(1, 'i', 'Bordo storto.'), f(null, 'e', 'Altrove.')];
   const r = decide(list, { count2: 5, count1: 2 });
   const nota = R.roundNote({ summary: 'provato', findings: list, decision: r });
-  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1 \(la più alta fra loro\): \[2i\] Non salva\.; \[1v\] Etichetta tagliata\.; \[0i\] Bordo storto\./);
+  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1 \(la più alta fra loro\): \[2i\] Non salva\.; \[1i\] Etichetta tagliata\.; \[1i\] Bordo storto\./);
   assert.match(nota, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti/);
+  assert.match(nota, /Un rilievo è esterno/);
   assert.doesNotMatch(nota, /escono come feedback a parte/);
-  const fix = decide([f(2, 'i', 'qui'), f(3, 'v', 'vicino')]);
-  assert.match(R.roundNote({ findings: [f(2, 'i', 'qui'), f(3, 'v', 'vicino')], decision: fix }), /Un rilievo è vicino \(di un altro lavoro, ma in un file che il ramo modifica già\): si corregge insieme al resto\./);
-  // Un vicino di livello scritto 2 messo da parte non è «il bilancio dei 2 finito».
-  const vicino2 = decide([f(2, 'v', 'vicino')]);
-  assert.doesNotMatch(R.roundNote({ findings: [f(2, 'v', 'vicino')], decision: vicino2 }), /bilancio delle correzioni di livello 2/i);
+  // Uno stato vecchio col vicino: la nota lo conta fra gli esterni, e non parla di vicini.
+  const vecchio = [f(2, 'i', 'qui'), f(3, 'v', 'vicino')];
+  const notaVecchia = R.roundNote({ findings: vecchio, decision: decide(vecchio) });
+  assert.match(notaVecchia, /Un rilievo è esterno/);
+  assert.doesNotMatch(notaVecchia, /vicino \(|è vicino|bilancio delle correzioni di livello 2/i);
+  assert.match(notaVecchia, /- \[e\] vicino/);
 });
 
 test('roundNote: una domanda che non ferma esce da sola', () => {
