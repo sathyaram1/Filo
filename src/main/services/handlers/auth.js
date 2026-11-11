@@ -11,6 +11,7 @@ const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 const { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
 require('../../../shared/routineCrediti.js');
+require('../../../shared/mergeApprovals.js');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
