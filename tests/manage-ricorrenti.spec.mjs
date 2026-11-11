@@ -173,7 +173,7 @@ test('Modifica e Salva mandano i campi ripuliti, solo i toccati cambiano, e la r
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     id: 'rev-domande', nome: 'Revisione serale', testo: REVISIONE.testo, giorni: [1, 2, 3, 4, 5, 6], ora: '21:15', ambito: 'coda',
-    urgenza: 46, modello: 'sonnet', sforzo: 'xhigh', attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
+    urgenza: 46, modello: 'sonnet', sforzo: 'xhigh', tettoUsd: null, attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
   });
   await expect(r.locator('.mg-cp-nome')).toHaveText('Revisione serale');
   await expect(r).toContainText('lunedì, martedì, mercoledì, giovedì, venerdì e sabato alle 21:15');
