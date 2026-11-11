@@ -665,6 +665,15 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     const ms = e.timestamp ? Date.parse(e.timestamp) : NaN;
     if (Number.isFinite(sinceMs) && Number.isFinite(ms) && ms < sinceMs) continue;
     if (Number.isFinite(ms)) { if (ms < primoMs) primoMs = ms; if (ms > ultimoMs) ultimoMs = ms; }
+    const fornitore = attesaDichiarata(e);
+    if (fornitore) {
+      const s = Math.round((fornitore.finoMs - fornitore.inizioMs) / 1000);
+      if (s > ATTESA_MIN_S) {
+        rep.atteseOltre30 += 1;
+        const tentativo = fornitore.tentativo ? `, tentativo ${fornitore.tentativo}${fornitore.di ? ` di ${fornitore.di}` : ''}` : '';
+        rep.attese.push({ strumento: ATTESA_FORNITORE, cosa: `attesa dichiarata dal fornitore${tentativo}`, s });
+      }
+    }
     const msg = e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg) continue;
     // Le righe col modello «<synthetic>» (una richiesta interrotta, un errore
