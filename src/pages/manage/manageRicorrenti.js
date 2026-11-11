@@ -249,7 +249,7 @@
     const occ = stato.occupato.get(r.id);
     const e = stato.esito.get(r.id);
     // Quando cambia una di queste il contenitore vivo si rifà (dalla bozza, se c'è); altrimenti resta, modulo compreso.
-    li.dataset.state = [r.attivo === false ? 0 : 1, r.modificatoIl || 0, (r.rapporto && r.rapporto.scrittoIl) || 0,
+    li.dataset.state = [r.attivo === false ? 0 : 1, r.modificatoIl || 0, (r.rapporto && r.rapporto.scrittoIl) || 0, tettoTesto(r.tetto),
       occ ? `${occ.azione}${occ.valore}` : '', e ? e.testo : '', stato.msgModulo.has(r.id) ? stato.msgModulo.get(r.id).testo : ''].join('|');
 
     const testa = nodo('div', 'mg-rc-testa');
