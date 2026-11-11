@@ -246,7 +246,7 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
   // Prima del conteggio: con una chiave doppia il blocco eseguito ha meno righe di main, e il conteggio non vede niente.
   let doppie;
   try { doppie = chiaviDoppie(src); } catch (e) { return { ok: false, motivo: `non riesco a leggere il registro: ${e.message}` }; }
-  if (false && doppie.length) return { ok: false, motivo: testoChiaviDoppie(doppie) };
+  if (doppie.length) return { ok: false, motivo: testoChiaviDoppie(doppie) };
   const uscita = String((manifesto && manifesto.version) || '');
   const p = prossimaVersione(manifesto);
   if (p.errore) return { ok: false, motivo: p.errore };
