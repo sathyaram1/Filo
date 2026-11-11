@@ -1430,7 +1430,8 @@ export function controlliLocali(cmd, argv) {
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
     case 'taccuino': {
-      if (a === 'sezione' && !/^[a-z][a-z-]{0,39}$/.test(String(b ?? ''))) return `taccuino sezione vuole il nome della sezione, una parola minuscola come nelle intestazioni del taccuino (stato, problemi…), non «${String(b ?? '').slice(0, 30)}»`;
+      // La forma del nome la giudica solo il server (manutentoreRegole.validaSezione): qui basta che ci sia.
+      if (a === 'sezione' && (!String(b ?? '').trim() || b === '-' || String(b).startsWith('--'))) return 'taccuino sezione vuole il nome della sezione, come nelle intestazioni del taccuino (stato, problemi…), prima del «-»';
       const versione = /^\d+$/.test(String(opzione(argv, '--versione') ?? ''));
       return (a === 'scrivi' || a === 'sezione') && !versione ? `taccuino ${a} vuole --versione <V>, il numero che hai letto col taccuino: senza, un'indicazione dell'owner scritta in mezzo sparirebbe` : '';
     }
