@@ -120,8 +120,8 @@ test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa crit
   const require = createRequire(import.meta.url);
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[1e] Fuori.');
-  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[e] Fuori.');
+  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1 }, counts: {} });
   assert.equal(esito.stop, false);
   assert.deepEqual(esito.fix.map((f) => f.level), [2]);
   const fuori = proveDaToglierePrimaDelVerdetto([
