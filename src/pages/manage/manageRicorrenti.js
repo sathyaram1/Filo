@@ -399,7 +399,8 @@
       placeholder: auto > 0 ? `automatico, ${dollari(auto)}` : 'automatico',
     });
     tetto.className = 'mg-auto-number mg-rc-tetto-campo';
-    const stima = nodo('span', 'mg-rc-tetto-stima', cur && cur.tetto && cur.tetto.corse > 0 ? `di solito ${dollari(cur.tetto.mediana)} a corsa` : 'nessuna corsa finita ancora');
+    const stima = nodo('span', 'mg-rc-tetto-stima', cur && cur.tetto && cur.tetto.corse > 0
+      ? `di solito ${dollari(cur.tetto.mediana)} a corsa, circa ${dollari(Math.round(alMese(cur.tetto, v.giorni)))} al mese` : 'nessuna corsa finita ancora');
     scelte.append(
       scelta('Ambito', ambito, 'Cosa può fare l’agente: l’elenco degli ambiti è in fondo alla scheda'),
       scelta('Urgenza', urgenza, 'Più alta passa prima. I feedback a priorità 3 stanno da 50 in su, «Gestisci la risposta» a 47.'),
