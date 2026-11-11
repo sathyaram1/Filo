@@ -20,7 +20,7 @@ const C = globalThis.SN_CONST;
 
 // I bilanci di QUESTI test (quelli decisi dall'owner il 2026-09-23 stanno
 // solo in config/routines: qui non c'è un default).
-const CAPS = { cap3: 5, cap2: 4, cap1: 1, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 4, cap1: 1 };
 const f = (level, sede, text, decision = false) => ({ level, sede, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
 const livelli = (list) => list.map((x) => `${x.level}${x.sede}`);
