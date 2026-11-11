@@ -26,6 +26,7 @@ for (const tema of ['light', 'dark']) {
     });
     await page.evaluate(() => window.__mgTest.setAdmin(true));
     await page.evaluate(() => window.__mgTest.setData([]));
+    await page.evaluate(() => window.__mgTest.loadCaps());
     await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, tema);
     await apriScheda(page, 'automation');
     await expect(page.locator('#mgCap3')).toBeVisible({ timeout: 5000 });
