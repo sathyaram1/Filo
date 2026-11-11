@@ -1116,7 +1116,7 @@ export function lavoroVivo(root, {
   const { esclusi, sessione } = questoProcesso(processi || [], pid);
   const segni = segniDiLavoroVivo({
     mio, battito: diQui ? battito : null, battitoVivo, biglietto: leggiMarcatoreBiglietto(radice), timbroMs,
-    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice)] : [radice],
+    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice), ...altre.filter(Boolean)] : [radice],
     esclusi, sessione, adesso, cosa,
   });
   return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
