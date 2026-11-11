@@ -2747,6 +2747,11 @@ export function emit(bucket, ctx) {
       main: riallinea ? mainAllaPresa() : '',
     });
   }
+  // Il tetto di costo della corsa (#2303) va dove la veglia di chi guida il giro lo legge: il marcatore del biglietto.
+  if (bucket.role === 'compito') {
+    const mk = leggiMarcatoreBiglietto(ROOT);
+    if (mk && mk.ticket) annotaTetto(ROOT, mk.ticket, ctx && ctx.compito && ctx.compito.tettoUsd);
+  }
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
