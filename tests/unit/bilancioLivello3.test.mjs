@@ -44,7 +44,7 @@ test('un 3 interno paga il bilancio dei 3; finiti il suo e quelli sotto ferma il
   assert.deepEqual(fermo.fix, []);
   assert.deepEqual(fermo.derived, [], 'fermandosi non si mette da parte niente');
   assert.equal(fermo.consume, null, 'fermarsi non paga');
-  assert.equal(decide([f(3, 'i', 'x')], {}, { cap3: 0, cap2: 0, cap1: 0, cap0: 0 }).stop, true, 'tutti a zero: il primo 3 ferma subito');
+  assert.equal(decide([f(3, 'i', 'x')], {}, { cap3: 0, cap2: 0, cap1: 0 }).stop, true, 'tutti a zero: il primo 3 ferma subito');
 });
 
 // D88 (#744): un rilievo di livello X col bilancio di X finito paga col più alto
