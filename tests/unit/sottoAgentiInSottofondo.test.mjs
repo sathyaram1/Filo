@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { claudeConSottoAgenti } from '../helpers/sottoAgenti.mjs';
 import { sottoAgentiAlLavoro, sottoAgentiVivi, vociSottoAgenti, cartellaSottoAgenti, SOGLIA_FERMO_MS } from '../../scripts/lib/veglia-worker.mjs';
-import { USCITA_LAVORO_VIVO, testoLavoroVivo } from '../../scripts/lib/branch-integrity.mjs';
+import { USCITA_LAVORO_VIVO, testoLavoroVivo, processiDiSistema } from '../../scripts/lib/branch-integrity.mjs';
 import { USCITA_LIBERA } from '../../scripts/lib/aspetta-cartella.mjs';
 import { decidi, comando, FIGLIO_IN_SOTTOFONDO } from '../../scripts/lib/orchestratore-cieco.mjs';
 
