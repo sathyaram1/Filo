@@ -69,12 +69,6 @@
     return [righe(v.pending), righe(v.failed), righe(v.recent), bocciature, b.oltre ? 1 : 0, Number(b.illeggibili) || 0].join('|');
   }
 
-  /** Quello che il server ha risposto a un sì o a uno scarto, nella forma che le card sanno leggere. PURA. */
-  function rispostaPerCard(r) {
-    if (r && r.ok === false) return { ok: false, error: String(r.detail || r.reason || 'Non è riuscita.') };
-    return r || { ok: false, error: 'Il server non ha risposto.' };
-  }
-
   function avvia() {
     var doc = global.document;
     var q = function (sel) { return doc.querySelector(sel); };
