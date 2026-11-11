@@ -399,6 +399,13 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
   return schedaServer(n, n % 2);
 });
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
+test('le accensioni del pacemaker prendono il contesto per differenze dal payload, non lo ristampano intero (#2340)', () => {
+  const testa = RUOLO.split('\n').filter((r) => r.startsWith('>')).join(' ');
+  assert.match(testa, /payload\.manutentore/);
+  assert.match(testa, /non rilanciare `sveglia`/);
+  assert.doesNotMatch(testa, /ogni altra accensione: il contesto piccolo/);
+});
+
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
 test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, non le 2 (#2269)', () => {
