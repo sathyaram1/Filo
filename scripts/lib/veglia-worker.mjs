@@ -371,10 +371,24 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   if (Number.isFinite(tracce.fornitoreFinoMs)) tempi.push(tracce.fornitoreFinoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
+  // Il tetto di costo della corsa di un compito (#2303), scritto da dispatch nel marcatore; `dalMs` è da quando contare.
+  const tetto = mio ? Number(m.tettoUsd) : NaN;
   return {
     mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce,
     chiusoMs: tracce.viste ? tracce.chiusoMs : NaN,
+    ...(Number.isFinite(tetto) && tetto > 0 ? { tettoUsd: tetto, dalMs: dopoMs } : {}),
   };
+}
+
+/**
+ * Il tetto superato, dai segni e dai dollari misurati: { usd, tettoUsd } da rilasciare, o null. PURA.
+ * Senza tetto, o senza una misura, non si ferma niente.
+ */
+export function oltreIlTetto(s, misura) {
+  const tetto = Number(s && s.tettoUsd);
+  const usd = Number(misura && misura.usd);
+  if (!(tetto > 0) || !Number.isFinite(usd)) return null;
+  return usd > tetto ? { usd: Math.round(usd * 100) / 100, tettoUsd: tetto } : null;
 }
 
 /**
