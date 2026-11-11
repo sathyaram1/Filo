@@ -21,10 +21,18 @@ async function conFetch(finto, fn) {
 }
 
 test('le fasi e le scelte sono quelle che il server legge', () => {
-  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'fixer', 'secaudit', 'manutentore']);
+  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'verifier-riallineamento', 'fixer', 'secaudit', 'manutentore']);
   assert.deepEqual(RM.SCELTE.model.map((s) => s.id), ['opus', 'sonnet', 'haiku', 'fable']);
   assert.deepEqual(RM.SCELTE.effort.map((s) => s.id), ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.equal(RM.CAMPO, 'roleModels');
+});
+
+test('la voce vuota dice cosa vale davvero: la partenza, l\'altra fase o la definizione dell\'agente (#2344)', () => {
+  assert.equal(RM.vuotoDi('verifier-riallineamento', 'effort'), 'medium (partenza)');
+  assert.equal(RM.vuotoDi('verifier-riallineamento', 'model'), 'Come in Verifica');
+  assert.equal(RM.vuotoDi('verifier', 'model'), RM.VUOTO);
+  assert.deepEqual(RM.valida({ ruolo: 'verifier-riallineamento', campo: 'effort', valore: 'low' }), { ok: true, ruolo: 'verifier-riallineamento', campo: 'effort', valore: 'low' });
+  assert.equal(RM.percorso('verifier-riallineamento', 'effort'), 'roleModels.`verifier-riallineamento`.effort');
 });
 
 test('un documento senza roleModels vale la definizione dell\'agente per tutte le fasi', () => {
