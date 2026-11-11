@@ -591,7 +591,7 @@ function giroCriticato({ prove, critica }) {
   g('add', '-A'); g('commit', '-qm', 'prove del giro');
   const shaCritica = g('rev-parse', 'HEAD');
   const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: avvio }), ramo, {
-    critique: critica, sha: shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
+    critique: critica, sha: shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1 },
   });
   assert.equal(r.outcome, 'fix', r.reason);
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
