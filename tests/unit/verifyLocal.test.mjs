@@ -161,10 +161,16 @@ test('un 3 a bilanci esauriti, o un 2 col segno ?!: esito stop; un 2 a bilanci e
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
-  const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0i] caso raro', sha: SHA });
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  s.r.counts = { count1: 2 };
+  const r = withCritique(s, 'r', { critique: '[1i] caso raro', sha: SHA });
   assert.equal(r.outcome, 'pass');
   assert.equal(r.state.r.derived.length, 1);
-  assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
+  assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'un 1 a cap1 finito non ferma la pubblicazione');
+  // La scala vecchia (#2339): uno 0 non è più un rilievo, la critica si respinge e niente si scrive.
+  const zero = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0i] caso raro', sha: SHA });
+  assert.equal(zero.ok, false);
+  assert.match(zero.reason, /il livello 0 non c'è più/);
 });
 
 test('buildVerifierBrief: niente che non serva a criticare', () => {
