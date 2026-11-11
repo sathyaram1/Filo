@@ -501,7 +501,7 @@ test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il ca
   }, { ramo });
   const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: t.avvio }), ramo, {
     critique: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.',
-    sha: t.critica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
+    sha: t.critica, caps: { cap3: 2, cap2: 2, cap1: 1 },
   });
   assert.equal(r.outcome, 'fix', r.reason);
   mkdirSync(resolve(t.dir, '.claude'), { recursive: true });
