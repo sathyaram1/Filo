@@ -525,8 +525,9 @@ ${riga}`).length, 1, 'una parentesi dimenticata non deve costare una bocciatura'
 test('due livelli sulla stessa riga: il secondo non sparisce dentro al primo', () => {
   const riassunto = 'Provato tutto per bene, il resto regge.';
   for (const riga of [
-    '[0i] con la finestra stretta il menu esce [3i] scrive nelle chiavi SSH',
+    '[e] con la finestra stretta il menu esce [3i] scrive nelle chiavi SSH',
     '[1i] bordo freddo [3i] chiavi SSH',
+    '[2i] non salva [e] e il menu altrove si chiude',
   ]) {
     assert.equal(R.unparsedLevelLines(`${riassunto}
 ${riga}`).length, 1, 'un a capo dimenticato non deve costare una bocciatura');
