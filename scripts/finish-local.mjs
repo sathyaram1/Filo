@@ -209,12 +209,9 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   };
 }
 
-/**
- * Scarica main su origin/main. Il refspec è esplicito: in un clone a ramo singolo `fetch origin main` muove solo
- * FETCH_HEAD, e i controlli fondevano e sceglievano gli spec su un main vecchio senza dirlo (#2237.3).
- */
+/** Scarica main su origin/main: i controlli fondevano e sceglievano gli spec su un main vecchio senza dirlo (#2237.3). */
 export function aggiornaMain(root = ROOT) {
-  const fetchOk = git(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
+  const fetchOk = git(['fetch', '--quiet', 'origin', refspecMain(MAIN)], { cwd: root }).ok;
   const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
   return { fetchOk, remoteRefOk };
 }
