@@ -106,7 +106,7 @@ import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs'
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo, scriviRispostaVerifica } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { dentroLaBusta } from './lib/busta.mjs';
-import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { assicuraStoria, TETTO_STORIA_MS, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
 
