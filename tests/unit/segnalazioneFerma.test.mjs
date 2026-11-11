@@ -58,13 +58,16 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
 
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {
   const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [], scope: 'pieno', perimetro: [] });
-  const esempi = brief.split('\n').filter((l) => /^\s*\[\d/.test(l));
+  const esempi = brief.split('\n').filter((l) => /^\s*\[(\d|e\b)/.test(l));
   assert.ok(esempi.length >= 2, 'il compito porta righe d\'esempio');
   for (const riga of esempi) {
     assert.deepEqual(V.unparsedLevelLines(riga), [], riga);
     assert.equal(V.parseFindings(riga).findings.length, 1, riga);
   }
+  assert.ok(esempi.some((riga) => V.parseFindings(riga).findings[0].sede === 'e'), 'un esempio d\'esterno, senza livello');
   assert.doesNotMatch(brief, /`\[1\?\]`/);
+  // La scala vecchia non s'insegna più (#2339): niente 0, niente vicino, niente esterno col livello.
+  assert.doesNotMatch(brief, /\[0[iev]|\[\d[ev]\]|`v`/);
   assert.match(brief, /sede/);
 });
 
