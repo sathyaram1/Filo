@@ -71,9 +71,9 @@ test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1; f
   assert.deepEqual([d.counts.count2, d.counts.count1], [4, 1], 'il 2 non va oltre il suo tetto: paga l\'1');
   assert.equal(d.budgets.cap1.left, 0);
 
-  const zeroAperto = decide([f(2, 'i', 'non salva')], FINITI[2], { ...CAPS, cap0: 2 });
-  assert.equal(zeroAperto.consume, 'cap0');
-  assert.deepEqual(livelli(zeroAperto.fix), ['2i']);
+  const zeroVecchio = decide([f(2, 'i', 'non salva')], FINITI[2], { ...CAPS, cap0: 2 });
+  assert.equal(zeroVecchio.consume, null, 'un cap0 rimasto dalla scala vecchia si ignora');
+  assert.deepEqual(zeroVecchio.fix, []);
 
   const finito = decide([f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], FINITI[2]);
   assert.equal(finito.stop, false, 'un 2 a bilanci finiti non ferma');
