@@ -1,10 +1,6 @@
-// L'esito di «Approva e fondi» passa dal main (src/main/services/handlers/auth.js)
-// prima di arrivare alla pagina di Gestione. Il server dice più di «esito e
-// sha»: il riallineamento fatto da lui (`realigned`), la richiesta nuova aperta
-// per la sola differenza (`newRequest`, `newBlocks`) e il motivo di un
-// tentativo fallito (`realignReason`). Il main deve lasciarli passare TUTTI:
-// una volta li buttava via, e la pagina diceva «la richiesta decade, rilancia»
-// a un riallineamento riuscito (verifica locale del 2026-09-13, giro 1).
+// L'esito di «Approva e fondi» passa dal main (src/main/services/handlers/auth.js) prima della
+// Gestione: ogni campo che la frase dell'owner legge (esito, realigned, newRequest…) deve arrivare,
+// altrimenti la pagina racconta un esito diverso da quello vero.
 //
 // Stesso harness di decksImportExportHandler.test.mjs: handler vero registrato
 // con `on`/`ctx` finti, sessione da proprietario al posto del modulo di

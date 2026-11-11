@@ -424,10 +424,6 @@
     return out;
   }
 
-  // Il sì che il cancello del server rifiuta perché i verdetti sono stati azzerati: la richiesta resta
-  // aperta e un altro sì risponde uguale, quindi la frase dice come se ne esce (#2199.6).
-  var VERIFICA_ASSENTE_RE = /verifica[^.]*non risulta registrata/i;
-
   // L'esito di un'approvazione, detto all'owner: mai il motivo tecnico lasciato lì da
   // interpretare, sempre cosa è successo e cosa fare adesso. PURA.
   function outcomeMessage(reply, req) {
@@ -435,9 +431,6 @@
     var retry = howToRetry(req);
     if (r.ok === false || r.error) {
       var err = String(r.error || r.detail || r.reason || '');
-      if (VERIFICA_ASSENTE_RE.test(err)) {
-        return { kind: 'err', text: 'Non è riuscita: la verifica di questo lavoro non c’è più, e senza quella il server non lo fonde. Nessuna fusione è avvenuta. Rimandala in lavorazione per un giro nuovo.' };
-      }
       if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta. ' + retry };
       if (/già stata usata|already_used/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era già stata usata.' };
       if (/scartat|discarded/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era stata scartata.' };
