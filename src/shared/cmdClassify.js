@@ -2012,8 +2012,6 @@
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    // Il carattere del SEGNAPOSTO scritto da chi manda il comando farebbe passare un `$_` vero per un gruppo.
-    if (cmd.includes('')) return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     if ([...segniInterni()].some((s) => cmd.includes(s))) return TRE;
     if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
@@ -2091,7 +2089,7 @@
   // misura con ognuno dei valori che può prendere. In testa alla riga, in un tubo o da un valore ignoto non si sa.
   // Senza contesto resta la lettura di PowerShell, dove `$_` è l'oggetto del tubo.
   // Il SEGNAPOSTO di un gruppo comincia anch'esso con `$_`, ma non è la variabile: `(ls | wc -l)` resta una lettura (#2345).
-  const ULTIMO_ARG_RE = /\$_(?![\w])/g;
+  const ULTIMO_ARG_RE = new RegExp(String.raw`\$_(?![\w${SEGNO_GRUPPO}])`, 'g');
   const ULTIMI_MAX = 16;
   function usaUltimoArg(s, c) {
     return shellPosix(c) && String(s).search(ULTIMO_ARG_RE) >= 0;
