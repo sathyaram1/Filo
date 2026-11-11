@@ -401,7 +401,8 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   const tracce = s.tracce || {};
   if (!(s.processi > 0) && !tracce.viste) return {};
   const noti = (s.tempi || []).filter((t) => Number.isFinite(t));
-  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.max(...noti) : NaN);
+  // Un segno nel futuro (un'attesa dichiarata dal fornitore) vale «adesso».
+  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.min(adesso, Math.max(...noti)) : NaN);
   if (!Number.isFinite(attivitaMs)) return {};
   const out = { attivitaMs: Math.round(attivitaMs) };
   const a = tracce.attesa;
