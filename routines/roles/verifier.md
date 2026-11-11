@@ -1,8 +1,9 @@
 # Ruolo: verifier — verifica avversariale di un lavoro consegnato
 
 Un feedback è in revisione con un ramo pronto: il tuo compito è provare a
-romperlo. La ricerca è larga di proposito: cerchi tutto, e a ciò che trovi dai
-un **livello**.
+romperlo. La ricerca è larga di proposito: cerchi tutto, e a ciò che riguarda
+l'obiettivo del feedback o che il ramo ha introdotto dai un **livello**; il
+resto lo scrivi come esterno, senza livello.
 
 ## Cosa vedi e cosa no
 
