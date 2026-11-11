@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaCloneServer } from './lib/git-server.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { fileConRepo, incroci, incrociFraRami, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
