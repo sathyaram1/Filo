@@ -67,7 +67,7 @@ test('la lettura della scala vecchia vive in un posto solo: le altre strade la c
     const src = readFileSync(resolve(ROOT, f), 'utf8');
     assert.ok(!/===\s*0\s*\?\s*1|\[ev\]|\['e',\s*'v'\]/.test(src), `${f} riscrive la regola della scala vecchia invece di chiederla al modulo condiviso`);
   }
-  const { perimetroNote } = await import(resolve(ROOT, 'scripts', 'lib', 'verifier-scope.mjs'));
+  const { perimetroNote } = await import(pathToFileURL(resolve(ROOT, 'scripts', 'lib', 'verifier-scope.mjs')).href);
   assert.match(perimetroNote('chiusura', { rilievi: [{ level: 0, sede: 'i', text: 'a' }, { level: 1, sede: 'v', text: 'b', decision: true, irreversibile: true }] }),
     /- \[1i\] a\n- \[e\?!\] b/);
 });
