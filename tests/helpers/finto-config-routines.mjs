@@ -14,7 +14,7 @@
 
 import { createServer } from 'node:http';
 
-const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap3":5,"cap2":10,"cap1":1,"cap0":0}');
+const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap3":5,"cap2":10,"cap1":1}');
 const status = Number(process.env.FINTO_STATUS || 200);
 const richiediBearer = process.env.FINTO_RICHIEDI_BEARER === '1';
 
