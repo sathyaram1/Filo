@@ -103,9 +103,9 @@ test('critica senza rilievi: verifica superata sul contenuto', () => {
 
 test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo serve un\'altra verifica', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const r = withCritique(s, 'r', { critique: 'funziona Y\n[2i] il pulsante non salva\n[0i] caso raro', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'funziona Y\n[2i] il pulsante non salva\n[1i] caso raro', sha: SHA });
   assert.equal(r.outcome, 'fix');
-  assert.deepEqual(r.decision.fix.map((f) => f.level), [2, 0], 'gli 0 si correggono insieme ad altro');
+  assert.deepEqual(r.decision.fix.map((f) => f.level), [2, 1], 'gli 1 si correggono insieme a un 2');
   assert.equal(r.state.r.verdict, 'fix-pending');
   assert.equal(r.state.r.counts.count2, 1, 'il giro si paga da cap2');
   const bloccato = checkVerdict(r.state.r, SHA);
