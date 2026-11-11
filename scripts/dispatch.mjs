@@ -1634,7 +1634,9 @@ function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
     const gruppo = { tipo: d.tipo, priority: d.priority, decision: d.rilievi.some((f) => f.decision === true), findings: d.rilievi };
-    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}` : ''}`;
+    const etichetta = d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}`
+      : d.esterno ? `, ${VERIFIER_ROUND.groupLabel(gruppo)}, senza livello: lo classifica chi classifica ogni feedback` : '';
+    const dove = `feedback ${d.num || '(numero non comunicato)'}${etichetta}`;
     const conTesto = d.rilievi.filter((f) => f.text);
     return conTesto.length ? `${conTesto.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n')}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
