@@ -85,6 +85,8 @@ server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna quest
 motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
 sua versione, le schede delle 3 e dei lavori nell'ordine (`nellOrdine` è il posto nella sequenza) e le ferme, e il conto
 dei pronti contro i 2×N (`stato.pronti`). È il contesto piccolo, per differenze come sopra: basta per una sveglia.
+`contesto` in testa dice `tutto` (col perché) o `differenze`; per differenze `schedeUscite` sono i numeri
+usciti dalla lista (chiusi, o scesi sotto la 2), `taccuino.sezioni` le sezioni cambiate e `taccuino.invariate` le altre.
 
 - **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
