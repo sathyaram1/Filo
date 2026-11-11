@@ -690,13 +690,13 @@
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, routinesEnabled, lavoriServer } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
     // I bilanci dei giri di correzione, uno per livello (doc config/routines,
-    // campi `cap3`, `cap2`, `cap1`, `cap0` — feedback #561) e il testo della
+    // campi `cap3`, `cap2`, `cap1` — feedback #561, tre dal #2339) e il testo della
     // fase 2 (`fixInstructions`, vuoto = quello del server):
-    //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+    //   cap3/cap2/cap1  giri per i rilievi di livello 3/2/1 (come si
     //         spendono: decideRound in verifierRound.js).
     // Li applica il SERVER quando registra la critica. Owner-only.
-    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions, giroStretto } | { ok:false, error }
-    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, cap0?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
+    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, fixInstructions, giroStretto } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
     // Come partono le sessioni delle routine (doc config/routines):
     //   maxSessions      il freno d'emergenza: il massimo di sessioni insieme
     //                    (intero 1–20; campo assente = 20), sopra la N del manutentore;
