@@ -288,7 +288,7 @@ test('dopo un pass si tolgono solo le prove dei rilievi che il bilancio ha messo
   const testo = verifierReplyText({
     outcome: 'pass',
     derived: [
-      { level: 2, sede: 'e', text: 'esterno.', n: 1, num: '#42.1' },
+      { level: null, sede: 'e', text: 'esterno.', priority: null, n: 1, num: '#42.1' },
       { level: 1, sede: 'i', text: 'domanda.', decision: true, n: 2, num: '#42.2' },
       { tipo: 'rimasti', num: '#42.3', findings: [{ level: 1, sede: 'i', text: 'rimasto.', n: 3 }] },
     ],
