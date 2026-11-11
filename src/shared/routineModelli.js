@@ -12,7 +12,15 @@
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
     // Guarda solo i file di un conflitto risolto (#2344): vuota vale la Verifica, salvo la partenza, che il server
     // applica (functions/src/routine/modello.js di filo-security, una prova lì le tiene uguali).
-    Object.freeze({ id: 'verifier-riallineamento', nome: 'Verifica dopo un riallineamento', come: 'verifier', partenza: Object.freeze({ effort: 'medium' }) }),
+    Object.freeze({
+      id: 'verifier-riallineamento', nome: 'Verifica dopo un riallineamento', come: 'verifier', partenza: Object.freeze({ effort: 'medium' }),
+      // Base misurata (#2344): 748 $ su 253 verifiche dopo un riallineamento, 1-8/11/2026, Opus a sforzo high. Volume:
+      // il traguardo del feedback, sotto 50 a settimana. Gli altri sforzi in proporzione: [costo, minuti], stimati.
+      stima: Object.freeze({
+        dollariAVerifica: 3, aSettimana: 50, base: 'Opus a sforzo high, 748 $ su 253 verifiche dal 1° all\'8 novembre',
+        sforzi: Object.freeze({ low: [0.5, 15], medium: [0.7, 20], high: [1, 25], xhigh: [1.4, 35], max: [2, 45] }),
+      }),
+    }),
     Object.freeze({ id: 'fixer', nome: 'Correzione' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
     // Non è una fase di un cambio: è la regia (SPEC-MANUTENTORE § 1), ultima perché fuori da quell'ordine.
