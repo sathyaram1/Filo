@@ -29,7 +29,7 @@ test('parseFindings: riassunto prima, poi una riga per rilievo col livello; le r
     '[2i] Il pulsante non salva se il titolo è vuoto.',
     '    Passi: apri, lascia vuoto, premi Salva.',
     '- [1i?] Bordo grigio freddo: caldo come il resto? Scelta di gusto.',
-    '**[0i]** Sotto i 300 pixel il menu esce.',
+    '**[e]** Sotto i 300 pixel il menu esce.',
     '[7i] livello inesistente: non è un rilievo',
     '[3i]    ',
   ].join('\n'));
@@ -38,7 +38,7 @@ test('parseFindings: riassunto prima, poi una riga per rilievo col livello; le r
   assert.equal(p.findings.length, 3, 'livello fuori scala e testo vuoto non sono rilievi');
   assert.deepEqual(p.findings[0], { level: 2, sede: 'i', text: 'Il pulsante non salva se il titolo è vuoto.\nPassi: apri, lascia vuoto, premi Salva.', decision: false });
   assert.deepEqual(p.findings[1], { level: 1, sede: 'i', text: 'Bordo grigio freddo: caldo come il resto? Scelta di gusto.', decision: true });
-  assert.equal(p.findings[2].level, 0);
+  assert.deepEqual(p.findings[2], { level: null, sede: 'e', text: 'Sotto i 300 pixel il menu esce.', decision: false });
 });
 
 test('parseFindings: senza righe col livello → zero rilievi (è il pass), qualunque cosa dica il testo', () => {
