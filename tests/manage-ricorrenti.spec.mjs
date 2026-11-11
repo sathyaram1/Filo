@@ -195,7 +195,7 @@ test('il tetto di costo per corsa: automatico dalla mediana, scritto dall\'owner
   const tetto = form.locator('[data-campo="tettoUsd"]');
   await expect(tetto).toHaveValue('');
   await expect(tetto).toHaveAttribute('placeholder', 'automatico, 124 $');
-  await expect(form.locator('.mg-rc-tetto-stima')).toHaveText('di solito 61,7 $ a corsa');
+  await expect(form.locator('.mg-rc-tetto-stima')).toHaveText('di solito 61,7 $ a corsa, circa 1872 $ al mese');
   await tetto.fill('tanti');
   await form.getByRole('button', { name: 'Salva' }).click();
   await expect(form.locator('.mg-rc-form-msg')).toHaveText('Il tetto di costo è un numero di dollari da 0,01 a 10000, o vuoto per quello automatico.');
