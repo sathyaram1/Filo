@@ -53,8 +53,11 @@ export function leggiArgomenti(argv, ora = Date.now()) {
   return { da, a, json };
 }
 
+// Dalla scala a tre (#2339) un esterno non ha livello e il server lo registra `null`: ha la sua riga, mai quella dello 0,
+// che resta per i giri della scala a quattro.
 function livelli(v) {
-  return (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 3);
+  return (Array.isArray(v) ? v : []).filter((x) => x === null || (x !== '' && Number.isInteger(Number(x)) && Number(x) >= 0 && Number(x) <= 3))
+    .map((x) => (x === null ? SENZA_LIVELLO : Number(x)));
 }
 
 /** «#795», «#22.1» o l'id quando il feedback non ha numero. PURA. */
