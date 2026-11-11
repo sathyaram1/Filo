@@ -43,6 +43,7 @@ async function modelloFinto(app, giri) {
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
+      globalThis.__imp_giri = n;
       const ultimo = [...messages].reverse().find((m) => m.role === 'tool');
       if (ultimo) globalThis.__imp_tool.push(String(ultimo.content || ''));
       for (const m of messages) if (m.role === 'tool') globalThis.__imp_esiti[m.tool_call_id] = String(m.content || '');
@@ -62,6 +63,12 @@ async function modelloFinto(app, giri) {
   }, giri);
 }
 const ripristina = (app) => app.evaluate(() => { try { globalThis.__imp_restore?.(); } catch (_) {} });
+// Dopo l'OK il modello riparte da solo (#1373): il modello finto si cambia a ripresa chiusa, o la ripresa legge il giro
+// pensato per il messaggio dopo. Una proposta senza testo chiude il turno sulla conferma: la ripresa è il giro 2.
+async function ripresaChiusa(app, chat, giri = 2) {
+  await expect.poll(() => app.evaluate(() => globalThis.__imp_giri), { timeout: 8_000, message: 'dopo l\'OK il modello non è ripartito' }).toBe(giri);
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+}
 // Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme. Ferma sulla conferma, col testo il modello riparte.
 const impostaDicendo = (testo, ...arg) => ({ ...imposta(...arg), text: testo });
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
@@ -156,6 +163,7 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'blocca facebook.com');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com', { timeout: 3_000 });
@@ -171,6 +179,7 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await modelloFinto(app, [imposta('segnalazione_automatica', 'no', 'i3'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'spegni la segnalazione automatica');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await impostazioni(app)).security.autoFeedback, { timeout: 5_000 }).toBe(false);
   await sec.bringToFront();
   await expect(sec.locator('#sec-auto-feedback')).not.toBeChecked({ timeout: 3_000 });
@@ -292,17 +301,20 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
+  // La frase la dice la ripresa dopo l'OK (#1373): scritta anche col giro della proposta, comparirebbe due volte.
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa(app, chat);
 
-  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
+  await ripresaChiusa(app, chat);
 
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
   await bolla.locator('.dash-cambi-segno').hover();
@@ -376,6 +388,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'accendi il blocco della pubblicità');
   await domanda('Blocco di pubblicità e tracker → attivo');
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).adblock.enabled, { timeout: 5_000 }).toBe(true);
   await sec.bringToFront();
   await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 3_000 });
@@ -384,6 +397,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'blocca example.org');
   await domanda('Siti bloccati → aggiungi example.org');
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com\nexample.org', { timeout: 3_000 });
@@ -410,6 +424,7 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await scrivi(chat, 'non fidarti più dei download da example.org');
   expect((await domanda('Siti fidati per i programmi → togli example.org')).hasInput).toBeFalsy();
   await clickConfirm(chat, 'ok');
+  await ripresaChiusa(app, chat);
   await expect.poll(async () => (await sicurezza()).downloads.trustedSites, { timeout: 5_000 }).toEqual(['github.com']);
   await sec.bringToFront();
   await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.com', { timeout: 3_000 });

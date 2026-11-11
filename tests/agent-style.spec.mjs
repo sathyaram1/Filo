@@ -186,12 +186,14 @@ test('#592 — confermato, lo stile entra imbustato e prima delle regole anti-in
   await configureModel(app);
 
   const stile = 'Rispondi breve e dammi del tu.';
-  // Una proposta ferma sulla conferma, senza testo insieme, chiude il turno (#1130): il giro dopo è del turno dopo.
-  await fakeProvider(app, [proponi(stile), { text: 'Ok, così.' }]);
+  // Dopo l'OK il modello riparte con l'esito e, a lavoro finito, chiude muto (#1373): il giro con la risposta è del turno dopo.
+  await fakeProvider(app, [proponi(stile), { text: '' }, { text: 'Ok, così.' }]);
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(stile);
+  await expect.poll(() => app.evaluate(() => globalThis.__stile_calls.length), { timeout: 8_000 }).toBe(2);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   // Il turno dopo porta lo stile al modello, nella sua busta, nel CONTESTO dell'utente (SPEC-CONTESTO § La richiesta):
   // dopo le regole sul contenuto esterno, che la frase dopo la busta tiene in piedi (#592).
@@ -318,7 +320,7 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   await configureModel(app);
 
   const visibile = 'Rispondi breve e dammi del tu.';
-  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: 'Ok, così.' }]);
+  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: '' }, { text: 'Ok, così.' }]);
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
@@ -327,6 +329,9 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   expect(haInvisibili(popup.text)).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(visibile);
+  // La ripresa muta dopo l'OK (#1373) finisce prima del turno dopo.
+  await expect.poll(() => app.evaluate(() => globalThis.__stile_calls.length), { timeout: 8_000 }).toBe(2);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   await page.locator('#input').fill('ciao');
   await page.locator('#sendBtn').click();
