@@ -955,7 +955,7 @@ test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slu
 });
 
 test('esterni e messi da parte diventano feedback appena la critica li registra, anche se il lavoro si ferma; mai due volte', async () => {
-  const esterno = { level: 1, sede: 'e', text: 'altro lavoro Z' };
+  const esterno = { level: null, sede: 'e', text: 'altro lavoro Z' };
   const fermata = ({ cwd, per }) => {
     per[cwd] = { entry: { ...per[cwd].entry, verdict: 'fail', critique: '- [2i?] scegli A o B', derived: [esterno], at: 'giro-fermo', sha: 1 } };
     return { ok: true, testo: 'fatto', costo: 0 };
