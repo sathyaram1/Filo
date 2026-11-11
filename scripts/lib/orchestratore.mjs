@@ -220,7 +220,9 @@ export function serveDeploy(p, fileApp) {
 }
 export function toccaRegole(fileApp) { return (fileApp || []).some((f) => FILE_REGOLE.includes(f)); }
 
-const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}`;
+const chiaveRilievo = (f) => `${f.sede === 'e' ? '' : f.level}${f.sede}:${String(f.text).slice(0, 80)}`;
+// Le chiavi registrate con la scala a quattro livelli (#2339): «2e:», «1v:» erano esterni, «0i:» un 1.
+const chiaveDiOggi = (k) => String(k).replace(/^\d+[ev]:/, 'e:').replace(/^0i:/, '1i:');
 
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
