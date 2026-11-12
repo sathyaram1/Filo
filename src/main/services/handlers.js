@@ -6706,8 +6706,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // passa dal salvataggio della risposta più in basso.
     await archiviaCongedoAccoglienza(chatId, bye);
     releaseOnboardingResume();
-    // Ciò che l'utente ha raccontato è suo e resta, ma senza guardiano le lezioni da sole vogliono l'intervista pulita (#1312.2).
-    finishOnboarding({ userMessage, filoReply: bye, stateText: '', lessons: !Onboarding.haTestoDiAltri(closed) });
+    // Le lezioni di fine intervista passano dalla stessa regola di quelle di ogni turno, come la chiusura normale (#1312.2).
+    const lessons = !Onboarding.haTestoDiAltri(closed)
+      && await lezioniAutomaticheConsentite({ sender, fontiLette: chatId ? await fontiDellaChat(chatId) : [] });
+    finishOnboarding({ userMessage, filoReply: bye, stateText: '', lessons });
     return { text: bye, actions: [], onboardingClosed: true };
   }
 
