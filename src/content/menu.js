@@ -1786,6 +1786,7 @@
     _test: { cronologia: statoCronologia },
     daTastiera,
     open,
+    fotoDelloScorrimento,
     misuraLeAzioni,
     azioneInCorso: () => azioneInCorso,
     close,
