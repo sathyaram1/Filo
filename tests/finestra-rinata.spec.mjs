@@ -76,6 +76,12 @@ test('a Filo chiuso, l\'invito che lo apre porta Crediti davanti alle schede sal
       .toEqual(expect.arrayContaining([...salvate, expect.stringMatching(/^filo:\/\/credits\//)]));
     await new Promise((r) => setTimeout(r, 800));
     expect((await normale(app)).davanti, 'all\'avvio Crediti è finita dietro le schede riaperte').toMatch(/^filo:\/\/credits\//);
+    // A caricamento finito la porta chiusa dà la pagina d'errore: le schede restano le salvate, non «un errore».
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+      return w ? w._filoTabs.tabs.some((t) => { try { return t.view.webContents.getURL().startsWith('filo://error/'); } catch (_) { return false; } }) : false;
+    }), { message: 'nessuna scheda salvata è arrivata alla pagina d\'errore', timeout: 20000 }).toBe(true);
+    expect((await normale(app)).schede, 'con la pagina d\'errore davanti le schede non sono più le salvate').toEqual(expect.arrayContaining(salvate));
   } finally {
     await chiudiApp(app);
     togliCartella(userData);
