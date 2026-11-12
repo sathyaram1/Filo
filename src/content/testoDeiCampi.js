@@ -132,9 +132,13 @@
     const campi = [];
     for (const [el, s] of seguiti) {
       if (!el.isConnected) { seguiti.delete(el); continue; }
-      const v = String(el.value || '');
+      let v = String(el.value || '');
       if (v === s.ultimo) continue;
-      s.ultimo = v;
+      // Un numero di carta scritto in un campo qualunque lo diventa solo a metà: il campo si riguarda a ogni spedizione.
+      let segreto = true;
+      try { segreto = Segreti.campoSegreto(el); } catch (_) {}
+      if (segreto) v = '';
+      s.ultimo = segreto ? null : v;
       campi.push({ firma: s.firma, valore: v });
     }
     if (!seguiti.size && controllo) { clearInterval(controllo); controllo = null; }
