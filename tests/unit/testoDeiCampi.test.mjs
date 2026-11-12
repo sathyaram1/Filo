@@ -4,9 +4,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
