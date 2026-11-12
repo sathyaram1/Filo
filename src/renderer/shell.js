@@ -2276,7 +2276,7 @@
       clearBtn.textContent = 'Svuota';
       clearBtn.dataset.tip = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
-        api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+        api.downloads.clear().then((r) => { syncFromList(r); }).catch(() => {});
       });
       // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
       const closeBtn = document.createElement('button');
@@ -2566,7 +2566,7 @@
       reserveForPanel();
       // Un file può sparire dal disco a pannello chiuso e nessun evento lo
       // annuncia: la lista si rilegge all'apertura, non dopo un clic a vuoto.
-      api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+      api.downloads.list().then((r) => { syncFromList(r); }).catch(() => {});
     }
     function closePanel() {
       panelOpen = false;
@@ -2705,7 +2705,7 @@
     };
 
     // Cronologia iniziale (sopravvive al riavvio).
-    api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+    api.downloads.list().then((r) => { syncFromList(r); }).catch(() => {});
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
