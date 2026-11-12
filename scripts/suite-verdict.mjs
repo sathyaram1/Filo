@@ -388,7 +388,7 @@ function erroreRientrato(errore, righe, caratteri) {
   if (!tenute.length && tutte.length) tenute.push(`${tutte[0].slice(0, caratteri)} … (riga accorciata)`);
   const tolte = tutte.length - tenute.length;
   if (tolte > 0) tenute.push(`… altre ${tolte} righe: l'errore intero sta nel registro della parte della suite`);
-  return tenute.map((r) => `    ${r}`).join('\n');
+  return tenute.map((r) => (r ? `    ${r}` : '')).join('\n');
 }
 
 /**
