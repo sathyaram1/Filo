@@ -224,6 +224,54 @@ export async function fusioneDalCancello({ cartella, ramo, sha, feedbackId }, { 
 }
 
 /**
+ * Le fonti di Filo che leggono le prove del server (#2199.5): con parti dell'app legate e fuori da main, main di Filo con
+ * quelle parti fuse, in una cartella staccata fuori dal repo; i generati del ramo del server sono fatti da lì, e su main
+ * da solo le prove sarebbero rosse. Senza parti: null, e vale il checkout ../Filo come prima.
+ * → null | { dir, togli() } | { errore }
+ */
+export function filoConLApp(radice, ramiApp, { git = gitEsito } = {}) {
+  const rami = (Array.isArray(ramiApp) ? ramiApp : []).filter((r) => ramoValido(r));
+  if (!rami.length) return null;
+  const firma = ['-c', 'user.name=server:fondi', '-c', 'user.email=server-fondi@filo.invalid'];
+  const base = ['refs/remotes/origin/main', 'refs/heads/main'].find((r) => git(radice, ['rev-parse', '--verify', '--quiet', r]).ok);
+  if (!base) return { errore: 'non trovo main di Filo per le prove del server' };
+  let punta = String(git(radice, ['rev-parse', base]).out || '').trim();
+  for (const ramo of rami) {
+    const albero = git(radice, ['merge-tree', '--write-tree', punta, `refs/heads/${ramo}`]);
+    const tree = albero.ok ? String(albero.out).split('\n')[0].trim() : '';
+    if (!/^[0-9a-f]{40}$/.test(tree)) {
+      return { errore: `${ramo} dell'app non si fonde con main di Filo senza conflitti: riallinealo e rilancia` };
+    }
+    const c = git(radice, [...firma, 'commit-tree', tree, '-p', punta, '-p', `refs/heads/${ramo}`, '-m', `server:fondi: main di Filo con ${ramo}`]);
+    punta = c.ok ? String(c.out).trim() : '';
+    if (!/^[0-9a-f]{40}$/.test(punta)) return { errore: `non riesco a comporre main di Filo con ${ramo}: ${String(c.out || '').slice(0, 200)}` };
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'filo-per-server-'));
+  const w = git(radice, ['worktree', 'add', '--detach', '--quiet', dir, punta]);
+  if (!w.ok) {
+    rmSync(dir, { recursive: true, force: true });
+    return { errore: `non riesco ad aprire main di Filo con l'app per le prove del server: ${String(w.out || '').slice(0, 200)}` };
+  }
+  return { dir, togli: () => { if (!git(radice, ['worktree', 'remove', '--force', dir]).ok) rmSync(dir, { recursive: true, force: true }); } };
+}
+
+/**
+ * Il server è su main senza passare dal cancello (spinto dal PC, o già dentro): una parte dell'app in attesa di lui la
+ * porta solo il cancello (#2199.5), che col server già su main fonde lei sola. → true se non resta niente da fare.
+ */
+export async function appDopoIlServer({ ramo, sha, feedbackId }, { chiedi, log, err }) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha || ''))) return false;
+  const { askServerMergeServer, messageForServerMerge } = await import('./lib/owner-merge.mjs');
+  const risposta = await (chiedi || askServerMergeServer)({ branch: ramo, sha, feedbackId });
+  if (risposta.outcome !== 'merged') {
+    err(`${ramo} è su main del server, ma la parte dell'app in attesa non l'ho portata: ${messageForServerMerge(risposta, ramo)} Rilancia lo stesso comando.`);
+    return false;
+  }
+  if (risposta.app) log(`Parte dell'app in attesa del server portata su main di Filo (${String(risposta.app).slice(0, 9)}).`);
+  return true;
+}
+
+/**
  * Il server registra che main del server su `sha` l'ha portato server:fondi dal PC (#1521): senza la voce, il suo
  * controllo dei riferimenti allarma. Main è già spinto: un no si dice e basta. `prima`: main letto da origin prima di
  * server:fondi; uguale a `sha` vuol dire niente spinto (ramo già dentro), e registrarlo sdoganerebbe chi l'ha portato lì.
