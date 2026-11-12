@@ -525,10 +525,16 @@ test('dopo una compattazione entrano almeno tre turni come quelli di adesso prim
       const grezzo = lista.slice(k).reduce((a, m) => a + m.peso, 0);
       let j = 1;
       while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base, turno })) j++;
-      assert.ok(j > L.TURNI_LIBERI, `soglia ${soglia}, turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
-      assert.ok(L.limiti({ soglia, base, turno }).soglia < L.LISTINO, 'lo spazio che serve si ferma sotto il listino');
+      const l = L.limiti({ soglia, base, turno });
+      // Dove lo spazio che serve passerebbe il posto per un esito grosso sotto il listino, almeno i tre messaggi.
+      const pieno = l.spazio >= (L.TURNI_LIBERI + 1) * T / L.QUOTA_ANTICIPO;
+      assert.ok(pieno ? j > L.TURNI_LIBERI : j >= L.TURNI_LIBERI, `soglia ${soglia}, turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+      assert.ok(l.soglia <= L.LISTINO - L.ESITO_GROSSO, 'resta il posto per un esito grosso sotto il listino');
     }
   }
+  // Il peso dei turni di adesso è quello tipico: un capitolo incollato ore fa non lo alza.
+  const misti = [msg('ab', 'user', 80, 'tesi', ora, { peso: 30000 }), msg('ab', 'user', 60, 'ciao', ora, { peso: 50 }), msg('ab', 'user', 40, 'e poi?', ora, { peso: 80 })];
+  assert.equal(L.pesoTurno(misti, peso), 80);
   assert.equal(Math.round(L.grezzoMassimo({ soglia: 70000, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
   assert.equal(L.pesoTurno([], peso), 0);
 });
