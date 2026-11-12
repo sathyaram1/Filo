@@ -26,19 +26,12 @@ const timerFermo = { normale: null, incognito: null };
 const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
-// Scrive una memoria con gli eventi del filo da cui nasce, come le lezioni: una che ridice una riga tolta dall'utente
-// dallo stesso tratto non entra, e torna falso.
-async function scriviMemoria(testo, { fonti = [] } = {}) {
-  const P = globalThis.SN_PREF;
-  const l = P ? P.lezioneDaAzione({ testo }) : { testo };
-  if (l.rifiuto || !l.testo) return false;
-  const buf = await globalThis.SN_FILO_MEMORY.appendLesson(l.testo, { fonti });
-  const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-  return !!ultima && ultima.text === String(l.testo).trim();
-}
+// Una memoria passa dalla strada delle lezioni con gli eventi del filo da cui nasce: una che ridice una riga tolta
+// dall'utente dallo stesso tratto non entra, e torna falso.
+const scriviMemoria = async (testo, fonti) => (await globalThis.SN_FILO_MEMORY.scriviLezione(testo, fonti)).scritta;
 
-// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti })` → scriviMemoria.
-// Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
+// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti, origine })` →
+// scriviMemoria. Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
 const _dip = {
   chiama: null,
   applicaMemoria: scriviMemoria,
