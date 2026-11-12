@@ -93,7 +93,7 @@
     },
     'contestoFilo.token': {
       nome: 'tetto in token di quello che la chat ricorda',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     },
     'contestoFilo.soglia': {
