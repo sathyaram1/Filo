@@ -506,8 +506,13 @@ function scriviChiavi(opt, chiavi) {
   if (opt.chiavi) writeFileSync(resolve(opt.chiavi), chiavi.length ? `${chiavi.join('\n')}\n` : '', 'utf8');
 }
 
+function scriviErrori(opt, nuovi) {
+  const testo = testoErrori(nuovi);
+  if (opt.errori) writeFileSync(resolve(opt.errori), testo ? `${testo}\n` : '', 'utf8');
+}
+
 async function main() {
-  const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--parti <N> --esiti <cartella>]';
+  const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--errori <file>] [--parti <N> --esiti <cartella>]';
   let opt;
   try {
     opt = leggiArgomenti(process.argv.slice(2));
