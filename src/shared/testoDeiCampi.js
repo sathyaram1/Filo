@@ -7,8 +7,8 @@
 
   const GIORNI = [1, 7, 30];
   const GIORNI_DI_SERIE = 7;
-  // Tetti larghi: un messaggio lunghissimo sta in decine di migliaia di caratteri. Oltre il tetto il campo non si
-  // conserva affatto, e la risposta al content script lo dice (`troppo`): mai un pezzo tagliato.
+  // Tetti larghi: un messaggio lunghissimo sta in decine di migliaia di caratteri. Oltre un tetto il campo non si
+  // conserva affatto e la pagina lo dice a chi scrive (`troppo`): mai un pezzo tagliato, mai il vecchio buttato via.
   const VALORE_MAX = 1000000;
   const CAMPI_PER_PAGINA = 200;
   const TOTALE_MAX = 20000000;
