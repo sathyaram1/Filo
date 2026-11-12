@@ -197,7 +197,7 @@ const conversazioneTolta = (app, { chat, sospetta, oreFa }) => app.evaluate(asyn
   const vero = C._dip.chiama;
   C._dip.chiama = async () => JSON.stringify({ ore: ['10:00 parlato dei gatti'], memorie: [{ testo: 'L\'utente ha due gatti, Miso e Pepe.', righe: [1] }] });
   try { return await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
-}, { chat, sospetta });
+}, { chat, sospetta, oreFa });
 
 test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da una proposta il quaderno dice perché', async ({ app, openTab }) => {
   const r = await conversazioneTolta(app, { chat: 'gatti1', sospetta: false });
