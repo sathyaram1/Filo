@@ -86,6 +86,7 @@
       case A.TRANSCRIBE_IMAGE:
       case A.FILE_NAME:
       case A.EMBED_COOKIE_CHECK:
+      case A.FEEDBACK_L0_IMMAGINI:
         return { output: M.TEXT, inputs: [M.IMAGE] };
       case A.TRANSCRIBE_AUDIO:
         return { output: M.TEXT, inputs: [M.AUDIO] };
