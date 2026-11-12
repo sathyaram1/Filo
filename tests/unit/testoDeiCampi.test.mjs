@@ -207,6 +207,23 @@ test('cancellare li toglie tutti, dal disco; spegnere la voce li toglie già', a
   assert.doesNotMatch(readFileSync(f, 'utf8'), /di nuovo/);
 });
 
+test('un file che non si capisce si mette da parte intatto; lo scaduto lascia il disco alla prima lettura', async () => {
+  impostazioni = {};
+  const f = join(cartella, 'rovinato.json');
+  writeFileSync(f, '{ non è json');
+  Testo._test.usaFile(f);
+  assert.deepEqual((await leggi(mittente('https://esempio.it/'))).campi, []);
+  assert.ok(readdirSync(cartella).some((n) => n.startsWith('rovinato.json.rovinato-')));
+
+  const g = join(cartella, 'scaduto.json');
+  const vecchio = Date.now() - 8 * DAY;
+  writeFileSync(g, JSON.stringify({ v: 1, pagine: { 'https://esempio.it/': { t: vecchio, campi: [{ firma: firma(), valore: 'scaduto da un giorno', t: vecchio }] } } }));
+  Testo._test.usaFile(g);
+  assert.deepEqual((await leggi(mittente('https://esempio.it/'))).campi, []);
+  Testo.scriviSubito();
+  assert.doesNotMatch(readFileSync(g, 'utf8'), /scaduto da un giorno/);
+});
+
 test('una durata accorciata toglie subito il testo che è già oltre', async () => {
   impostazioni = { testoDeiCampi: { giorni: 30 } };
   Testo._test.usaFile(join(cartella, 'durata.json'));
