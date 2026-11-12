@@ -125,7 +125,8 @@
     // La pagina che scorre chiude il menu normale, come nel documento: lo strato non scorre con lei e resterebbe sopra un
     // punto che non è più quello cliccato.
     if (!(opzioni && opzioni.keepOnScroll)) {
-      const scorre = () => { if (corrente === m) chiudi(); };
+      const scorsoDopo = Menu.fotoDelloScorrimento(Number(opzioni && opzioni.x) || 0, Number(opzioni && opzioni.y) || 0);
+      const scorre = (e) => { if (corrente === m && scorsoDopo(e)) chiudi(); };
       window.addEventListener('scroll', scorre, true);
       m.pulizie.push(() => window.removeEventListener('scroll', scorre, true));
     }
