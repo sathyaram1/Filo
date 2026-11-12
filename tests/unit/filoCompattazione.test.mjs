@@ -48,18 +48,19 @@ function azzera({ chiama = null, memorie = [] } = {}) {
   Comp.azzera();
   const scritte = [];
   const fontiScritte = [];
+  const opzioniScritte = [];
   const chiamate = [];
   Comp.imposta({
     cartella: () => join(cartella, 'filo'),
     livello: async () => ({ livello: 'default' }),
-    applicaMemoria: async (t, o) => { scritte.push(t); fontiScritte.push((o && o.fonti) || []); scritte.fonti = [...(scritte.fonti || []), o]; return true; },
+    applicaMemoria: async (t, o) => { scritte.push(t); fontiScritte.push((o && o.fonti) || []); opzioniScritte.push(o); return true; },
     chiama: chiama || (async ({ messages }) => {
       chiamate.push(messages);
       const righe = [...messages[1].content.matchAll(/^\[(\d+)\]/gm)].map((m) => Number(m[1]));
       return JSON.stringify({ ore: [{ testo: '10:00 parlato di gatti e di una ricetta', righe }], memorie });
     }),
   });
-  return { cartella, scritte, fontiScritte, chiamate };
+  return { cartella, scritte, fontiScritte, opzioniScritte, chiamate };
 }
 
 // ── La logica pura ─────────────────────────────────────────────────────────
