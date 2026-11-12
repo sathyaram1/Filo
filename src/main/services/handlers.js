@@ -1182,7 +1182,7 @@ Compattazione.imposta({
   applicaMemoria: async (testo, fonti) => {
     const w = await FiloMem.scriviLezione(testo, fonti);
     if (w.scritta && await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
-    return w.scritta;
+    return w;
   },
 });
 
