@@ -36,6 +36,11 @@ test('la richiesta di fullscreen della pagina porta la view a tutto schermo', as
   await app.evaluate(({ BrowserWindow }, tabId) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const tab = win._filoTabs.tabs.find((t) => t.id === tabId);
+    globalThis.__diag = [];
+    globalThis.__t0 = Date.now();
+    const log = (s) => globalThis.__diag.push(`${Date.now() - globalThis.__t0} ${s}`);
+    ['enter-full-screen', 'leave-full-screen', 'resize'].forEach((e) => win.on(e, () => log(`win ${e} isFS=${win.isFullScreen()} b=${JSON.stringify(win.getBounds())}`)));
+    ['enter-html-full-screen', 'leave-html-full-screen'].forEach((e) => tab.view.webContents.on(e, () => log(`wc ${e} cf=${win._filoTabs.contentFullscreen} pf=${win._filoTabs.pageFullscreen}`)));
     return tab.view.webContents.executeJavaScript(
       'document.getElementById("box").requestFullscreen().catch(()=>{}); true',
       true,
