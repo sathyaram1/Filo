@@ -2846,9 +2846,9 @@ if (isMainModule) {
         process.stderr.write(`[dispatch] risposta non salvata su file (${e.message}): questa stampa è l'unica copia, leggila intera.\n`);
       }
       console.log(risposta);
-      console.log(rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta)));
-      // In fondo, perché sopravviva a un `| tail`, che è il filtro che l'ha persa (#2316).
-      if (salvata) console.log(`\nLa risposta intera sta anche in ${salvata}; se l'hai filtrata o persa la ristampa: node scripts/dispatch.mjs --risposta-critica ${id}`);
+      const suFile = rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta));
+      // Una riga sola in fondo, perché sopravviva a un `| tail`, che è il filtro che l'ha persa (#2316).
+      console.log(salvata ? `\nLa risposta intera sta anche in ${salvata}; se l'hai filtrata o persa la ristampa: node scripts/dispatch.mjs --risposta-critica ${id}` : suFile);
       process.exit(0);
     } else if (flag === '--risposta-critica') {
       // Sola lettura: niente server, niente stato, niente battito. Il biglietto a mano si accetta e non serve.
