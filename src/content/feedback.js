@@ -951,19 +951,11 @@
           files: files.slice(),
           submissionId,
         };
-        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
-        if (!res?.ok) {
-          const err = new Error(res?.error || 'invio fallito');
-          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
-          // la frase intera per chi legge: mostrarla così com'è.
-          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
-          throw err;
-        }
-        statusEl.textContent = '';
-        statusEl.classList.remove('sn-fb-status--attesa');
+        partito = { images: outImages.slice(), files: files.slice(), submissionId };
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
-        // Chiuso con Esc durante l'attesa, il riquadro aperto adesso è un altro, con un altro testo: resta (#1681).
+        // Il riquadro si chiude subito (#1403): il feedback è al sicuro nella coda del main, e se torna indietro
+        // si riapre intatto. Chiuso con Esc durante lo scatto, il riquadro aperto adesso è un altro: resta (#1681).
         if (activeRoot === root) {
           clearTimeout(saveTimer);
           saveTimer = null;
@@ -972,6 +964,20 @@
         } else {
           clearDraft(testoInviato);
         }
+        attesa = Popup?.showToast?.('Sto inviando il feedback', { duration: 0 }) || null;
+        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload, rileggi: rileggi !== false });
+        if (!res?.ok && res?.rilettura) {
+          riapri({ rilettura: res.rilettura });
+          return;
+        }
+        if (!res?.ok) {
+          const err = new Error(res?.error || 'invio fallito');
+          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
+          // la frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
+          throw err;
+        }
+        try { attesa?.close?.(); } catch (_) {}
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
         // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
         // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
