@@ -40,6 +40,38 @@ test('un sito che accende i suoi script tardi riceve il testo rimesso', async ({
   await expect(page.locator('#ricevuto')).toHaveText('testo per il sito', { timeout: 3000 });
 });
 
+test('Filo che si chiude di colpo (processo ucciso): alla ripartenza il testo torna', async ({ testServer }) => {
+  const url = testServer.html(`<!doctype html><body style="padding:24px"><textarea id="m" name="m" style="width:300px;height:60px"></textarea></body>`);
+  const host = new URL(url).hostname;
+  const userData = cartellaTemporanea('filo-testo-crash-');
+  const lancia = () => electron.launch({
+    args: [...argomentiScala, '.'], cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test', FILO_TEST_ACCOLTO: '1' },
+  });
+  const sulPosto = (w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } };
+  let app = null;
+  try {
+    app = await lancia();
+    const shell = await primaFinestra(app);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => Boolean(page = app.windows().find(sulPosto)), { timeout: 15000 }).toBe(true);
+    await pronta(page);
+    await page.locator('#m').click();
+    await page.keyboard.type('prima del crollo');
+    await page.waitForTimeout(3000);
+    app.process().kill('SIGKILL');
+    app = null;
+    app = await lancia();
+    let tornata = null;
+    await expect.poll(() => Boolean(tornata = app.windows().find(sulPosto)), { timeout: 20000 }).toBe(true);
+    await expect.poll(() => tornata.locator('#m').inputValue().catch(() => ''), { timeout: 15000 }).toBe('prima del crollo');
+  } finally {
+    if (app) await chiudiApp(app);
+    togliCartella(userData);
+  }
+});
+
 test('cinquantamila caratteri incollati tornano interi', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><textarea name="m" style="width:300px;height:60px"></textarea></body>`);
   const lungo = 'parola lunga 😀 '.repeat(3200);
