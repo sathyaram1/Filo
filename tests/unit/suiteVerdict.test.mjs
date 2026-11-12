@@ -40,6 +40,12 @@ import {
   rossiDellePartiMancanti,
   rigaRosso,
   FUORI_DAI_CASI,
+  erroreDelTest,
+  testoErrore,
+  testoErrori,
+  RIGHE_PER_ERRORE,
+  CARATTERI_PER_ERRORE,
+  TETTO_ERRORI,
 } from '../../scripts/suite-verdict.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
