@@ -346,7 +346,7 @@ async function bastaCosi(app, shell, { livello = null } = {}) {
   await expect(page.locator('.dash-bubble-filo[data-spontaneo="1"]')).toContainText('Buongiorno Anna', { timeout: 40_000 });
 }
 
-test('nel benvenuto pulito, a fine intervista Filo si scrive le lezioni da solo, chiusa da Filo o con «basta così»', async ({ app, shell }) => {
+test('nel benvenuto pulito, chiuso con «basta così», Filo si scrive le lezioni da solo', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await bastaCosi(app, shell);
   await expect.poll(() => app.evaluate(() => globalThis.__seen.lesson), { timeout: 15_000 }).toBeGreaterThan(0);
