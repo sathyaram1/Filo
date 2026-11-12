@@ -71,6 +71,25 @@ test('feedback: testo negli appunti, Ctrl+V mentre nasce', async ({ app, openTab
   console.log('testo', 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)), 'casella:', JSON.stringify((await statoDi(app, p, '.sn-fb-text')).valore));
 });
 
+const lettera = (c) => [{ type: 'keyDown', keyCode: c.toUpperCase() }, { type: 'char', keyCode: c }, { type: 'keyUp', keyCode: c.toUpperCase() }];
+for (const [nome, ev, atteso] of [
+  ['incolla poi lettere', [...CTRL_V, ...lettera('a'), ...lettera('b')], 'XYZab'],
+  ['lettere poi incolla', [...lettera('a'), ...lettera('b'), ...CTRL_V], 'abXYZ'],
+  ['lettera incolla lettera', [...lettera('a'), ...CTRL_V, ...lettera('b')], 'aXYZb'],
+]) {
+  test(`feedback ordine: ${nome}`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const p = await testServer.openReady(openTab, PAGINA);
+    await app.evaluate(({ clipboard }) => clipboard.writeText('XYZ'));
+    await focoAllaScheda(app, p.url());
+    await apriFeedback(app, p.url());
+    expect(await tasti(app, p.url(), 60, ev)).toBe(false);
+    await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
+    await p.waitForTimeout(1500);
+    console.log(nome, 'casella:', JSON.stringify((await statoDi(app, p, '.sn-fb-text')).valore), 'atteso', atteso, 'sito:', JSON.stringify(await p.evaluate(() => [window.__visti, document.querySelector('#campo').value])));
+  });
+}
+
 test('feedback riaperto (strato caldo): Ctrl+V subito', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const p = await testServer.openReady(openTab, PAGINA);
