@@ -9216,6 +9216,10 @@ ConversazioniApp.collega({
 
 // Pagine entrate, rititolate o tolte dal filo, da qualunque strada: le home aperte rifanno le righe delle pagine (#869).
 globalThis.SN_IL_FILO.suPagine(() => broadcastToFiloPages({ type: MSG.FILO_PAGINE_CAMBIATE }));
+// Una pagina tolta porta via subito anche le righe del diario nate da lei, come una conversazione cancellata.
+globalThis.SN_IL_FILO.suPagine(({ incognito }) => {
+  Compattazione.dimenticaPagine(incognito).catch((e) => console.warn('[Filo] diario della pagina cancellata:', e?.message || e));
+});
 
 // Filo parla per primo (#869): cosa genera il messaggio, quando può farlo, e a chi lo dice.
 FiloParla.collega({
