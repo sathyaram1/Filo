@@ -23,9 +23,7 @@ for (const ms of [0, 80, 150]) {
     await expect(voce).toBeVisible({ timeout: 10_000 });
     const premi = app.evaluate(async ({ webContents }, attesa) => {
       const t0 = Date.now();
-      const nelMenu = () => { const f = webContents.getFocusedWebContents(); return !f || f.getURL().startsWith('filo://menu/'); };
-      while (nelMenu() && Date.now() - t0 < 3000) await new Promise((r) => setTimeout(r, 2));
-      const lascia = Date.now() - t0;
+      const lascia = webContents.getFocusedWebContents()?.getURL();
       if (attesa) await new Promise((r) => setTimeout(r, attesa));
       const wc = webContents.getFocusedWebContents();
       const dove = wc ? wc.getURL() : 'nessuno';
