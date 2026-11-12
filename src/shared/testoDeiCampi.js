@@ -145,7 +145,7 @@
 
   global.SN_TESTO_CAMPI = {
     GIORNI, GIORNI_DI_SERIE, VALORE_MAX, CAMPI_PER_PAGINA, TOTALE_MAX, TIPI,
-    opzioni, chiavePagina, firmaPulita, stessaFirma, abbina, pota, aggiorna,
+    opzioni, chiavePagina, firmaPulita, stessaFirma, abbina, pota, aggiorna, pesoTotale,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_TESTO_CAMPI;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
