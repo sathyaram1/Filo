@@ -963,7 +963,7 @@ async function siRipete(app) {
 
 for (const [come, ripeti] of [
   ['dalla pagina dei risultati di una ricerca', { nome: 'LEGGI_PAGINA', args: { url: `https://it.wikipedia.org/w/index.php?search=${encodeURIComponent(RIPETUTO)}` } }],
-  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }],
+  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }],
 ]) {
   test(`dopo una pagina letta, un indirizzo scritto dal modello e ripetuto ${come} chiede l'OK`, async ({ app, openTab }) => {
     test.setTimeout(60_000);
