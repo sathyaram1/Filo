@@ -51,6 +51,9 @@
     return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
   }
 
+  // Un numero di token che può tornare ai predefiniti: tetti del contesto e lunghezze delle risposte lo dicono uguale.
+  const tokenOPredefiniti = (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`);
+
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
