@@ -1335,6 +1335,7 @@
       // Toglie un freno solo se rimettere com'era lo allenta (`_allentaCambio`, scritto dal main): riaccendere una
       // protezione la stringe, e dopo una lettura non riceve il no (#1840).
       difesa: (a) => !(a && a._livelloCambio === 1) && !(a && a._allentaCambio === false),
+      dove: (a) => (a && typeof a._doveCambio === 'string' ? a._doveCambio : ''),
       describe: (a) => {
         // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
         const f = String((a && a._fraseCambio) || '').trim();
