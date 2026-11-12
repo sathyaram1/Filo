@@ -892,3 +892,30 @@ test('costo 4 dopo una lettura: la strada a mano nomina la pagina che il catalog
   const pref = readFileSync(join(ROOT, 'src', 'shared', 'preferences.js'), 'utf8');
   assert.doesNotMatch(pref, /startsWith\('security\.'\)/, 'la pagina non si indovina dal nome della voce');
 });
+
+// #1840: il no dopo una lettura dice al modello il motivo vero, che per un segreto scritto dall'utente è l'uscita.
+test('il no dopo una lettura per un segreto dice che lo porterebbe fuori, non che toglie un freno', () => {
+  const fonte = { motivo: 'ho fatto una ricerca sul web' };
+  const seg = A.fraseNo({ regola: 'lettura', segreto: 'chiave', fonte }).perModello;
+  assert.match(seg, /^porterebbe fuori una chiave o un token di accesso, e in questo compito ho fatto una ricerca sul web/);
+  assert.doesNotMatch(seg, /toglie un freno/);
+  assert.match(A.fraseNo({ regola: 'lettura', fonte }).perModello, /^toglie un freno o cancella per sempre/);
+});
+
+// #1840: «rimetti com'era» toglie un freno solo se l'annullo lo allenta; riaccendere una protezione la stringe.
+test('l\'annullo di un cambio sensibile è una difesa abbassata solo nel verso che allenta', () => {
+  const L = globalThis.SN_ACTION_LEVELS;
+  const P = globalThis.SN_PREF;
+  assert.equal(L.ingressi({ type: 'ANNULLA_CAMBIO', _livelloCambio: 2 }, {}).difesa, true, 'senza il verso vale abbassata');
+  assert.equal(L.ingressi({ type: 'ANNULLA_CAMBIO', _livelloCambio: 2, _allentaCambio: true }, {}).difesa, true);
+  assert.equal(L.ingressi({ type: 'ANNULLA_CAMBIO', _livelloCambio: 2, _allentaCambio: false }, {}).difesa, false);
+  assert.equal(P.allentaParziale({ monthlyLimitEur: 5 }, { monthlyLimitEur: 800 }), false);
+  assert.equal(P.allentaParziale({ monthlyLimitEur: 800 }, { monthlyLimitEur: 5 }), true);
+  assert.equal(P.allentaParziale({ security: { blockPopups: true } }, { security: { blockPopups: false } }), false);
+  assert.equal(P.allentaParziale({ security: { blockPopups: false } }, { security: { blockPopups: true } }), true);
+  assert.equal(P.allentaParziale({ security: { siteBlock: { blacklist: ['a.com', 'b.com'] } } }, { security: { siteBlock: { blacklist: ['a.com'] } } }), false);
+  assert.equal(P.allentaParziale({ security: { siteBlock: { blacklist: ['a.com'] } } }, { security: { siteBlock: { blacklist: ['a.com', 'b.com'] } } }), true);
+  assert.equal(P.allentaParziale({ themeTokens: { accento: '#c00' } }, {}), false);
+  const reg = readFileSync(join(ROOT, 'src', 'main', 'services', 'registroCambi.js'), 'utf8');
+  assert.match(reg, /allentaParziale\(K\(\)\.annulloImpostazioni\(/, 'il verso lo giudica il pezzo che l\'annullo scriverebbe');
+});
