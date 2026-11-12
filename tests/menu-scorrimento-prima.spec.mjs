@@ -15,6 +15,11 @@ const inCima = (page) => expect.poll(() => page.evaluate(() => new Promise((ok) 
 // Scorre e apre nello stesso compito, come Playwright o un utente svelto che porta la voce sotto il puntatore e preme.
 const SCORRI_E_APRI = `window.scrollTo({ top: 400, behavior: 'instant' });
   SN_MENU.open({ x: 300, y: 300, items: [{ type: 'item', label: ${JSON.stringify(VOCE)}, onClick() {} }] }); true`;
+const SCORRI_AL_PROSSIMO_MENU = `(() => {
+  const apri = SN_MENU.open;
+  SN_MENU.open = (o) => { SN_MENU.open = apri; window.scrollTo({ top: 400, behavior: 'instant' }); return apri(o); };
+  return true;
+})()`;
 
 test('una pagina di Filo appena scorsa: il menu aperto resta, e si chiude allo scorrimento dopo', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
