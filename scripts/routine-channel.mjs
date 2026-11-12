@@ -344,8 +344,9 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
-// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
-export const ID_IMMAGINE_RE = /^(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
+// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K; con `uM.` davanti sono
+// dell'unita M di un pacchetto (#2267). Specchio di ID_RE in routine/immagini.js del server.
+export const ID_IMMAGINE_RE = /^(u\d{1,2}\.)?(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
 
 /**
  * Chi chiede un'immagine: l'id, e il biglietto se passato (davanti all'id o con `--ticket`, uguali se
@@ -359,7 +360,7 @@ export function argomentiImmagine(args, aMano = '') {
   if (lista.length === 2 && haFormaDiBigliettoVero(lista[0])) davanti = lista.shift();
   if (lista.length !== 1) return { errore: 'Uso: immagine <id> [--ticket <codice>], un id solo (s2, r1.3).' };
   const id = lista[0].trim();
-  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), come in «immagini».` };
+  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), con uM. davanti per l'unita M di un pacchetto, come in «immagini».` };
   if (davanti && mano && davanti !== mano) return { errore: 'Due biglietti diversi: passane uno solo.' };
   return { id, ticket: davanti || mano };
 }

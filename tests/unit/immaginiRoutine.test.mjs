@@ -200,7 +200,12 @@ test('id che il ruolo non vede: rifiuto, non guasto; un 200 senza voce (server v
 test('argomenti: un id della forma del contratto, biglietto davanti o con --ticket', () => {
   assert.deepEqual(argomentiImmagine(['r1.3']), { id: 'r1.3', ticket: '' });
   assert.deepEqual(argomentiImmagine(['s2'], 'tkt'), { id: 's2', ticket: 'tkt' });
-  for (const male of [[], ['s'], ['../s1'], ['s1', 's2'], ['r1']]) assert.ok(argomentiImmagine(male).errore, JSON.stringify(male));
+  for (const male of [[], ['s'], ['../s1'], ['s1', 's2'], ['r1'], ['u1'], ['u1.'], ['u.s1'], ['u123.s1'], ['x1.s1']]) assert.ok(argomentiImmagine(male).errore, JSON.stringify(male));
+});
+
+test('argomenti: un\'immagine di un\'unita del pacchetto si chiede col suo id (#2267)', () => {
+  assert.deepEqual(argomentiImmagine(['u2.s1']), { id: 'u2.s1', ticket: '' });
+  assert.deepEqual(argomentiImmagine(['u12.r1.3']), { id: 'u12.r1.3', ticket: '' });
 });
 
 function fintoServer(rispondi) {
