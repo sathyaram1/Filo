@@ -29,7 +29,8 @@ test('r2 testo che scorre: la riga che va a capo nella casella va a capo anche s
     });
   });
   const righe = Array.from({ length: 30 }, (_, i) => `Passo ${i + 1} del racconto.`);
-  const TESTO = `Il login non va.\n${righe.join('\n')}\nQuinta riga.\nLa password è Gatto!2024 e non entra.`;
+  const dopo = Array.from({ length: 12 }, (_, i) => `Nota ${i + 1} in fondo.`);
+  const TESTO = `Il login non va.\n${righe.join('\n')}\nQuinta riga.\nLa password è Gatto!2024 e non entra.\n${dopo.join('\n')}`;
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await page.locator('.sn-fb-text').fill(TESTO);
   await page.locator('.sn-fb-send').click();
