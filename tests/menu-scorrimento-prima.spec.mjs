@@ -40,11 +40,13 @@ test.describe('nello strato', () => {
     const page = await testServer.openReady(openTab, '<!doctype html><body style="margin:0;height:4000px"><p>Una pagina lunga.</p></body>');
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
     await inCima(page);
+    // Lo strato si apre solo dopo un tasto destro vero: la pagina scorre nello stesso compito in cui il menu si apre.
     await app.evaluate(({ BrowserWindow }, { url, code }) => {
       const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
       const tab = tm.tabs.find((t) => t.view && t.view.webContents.getURL() === url);
       return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
-    }, { url: page.url(), code: SCORRI_E_APRI });
+    }, { url: page.url(), code: SCORRI_AL_PROSSIMO_MENU });
+    await page.mouse.click(300, 300, { button: 'right' });
     await expect.poll(async () => (await statoDelloStrato(app))?.aperto).toBe(true);
     await fotogrammi(page);
     expect((await statoDelloStrato(app)).aperto, 'lo scorrimento di prima non chiude il menu nuovo').toBe(true);
