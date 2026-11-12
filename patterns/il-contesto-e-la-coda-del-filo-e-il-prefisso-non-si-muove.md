@@ -42,8 +42,12 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   disco e porte in `src/main/services/compattazioneFilo.js`). Prima di ogni richiesta della chat, anche a metà di un
   giro di strumenti, si stima la richiesta intera: oltre la soglia (70.000 token di serie, `contestoFilo.soglia`) il
   pezzo più vecchio del tratto va a un modello (quello della compattazione, vuoto = quello della chat) che scrive le righe
-  delle ore; le ultime due ore o gli ultimi quattro turni, il più corto, restano grezzi, e non oltre un terzo dello
-  spazio fra la parte fissa e la soglia (turni pesanti: meno turni, l'ultimo sempre). Il tratto riparte dal punto
+  delle ore; le ultime due ore o gli ultimi quattro turni, il più corto, restano grezzi (turni pesanti: meno turni,
+  l'ultimo sempre). **Una regola sola sullo spazio sopra la parte fissa misurata** (strumenti, istruzioni, CONTESTO:
+  ~43.000 token a novembre 2026, cresce a ogni strumento; `limiti` in `filoCompattazione.js`): la soglia meno la parte
+  fissa, mai meno di 30.000 token né di quanto serve a tenere, dopo il grezzo, tre turni del peso di adesso sotto
+  l'anticipo, e quello che serve si ferma sotto il listino. Da lì vengono la soglia vera, l'anticipo, il grezzo e la
+  stima accanto al campo, che dice quando la soglia scritta sale. Il tratto riparte dal punto
   compattato (`finestra({ dopo })`), il diario entra nel CONTESTO come sezione `FILO` (che rifà la fotografia), e i
   turni rimasti tornano byte per byte: verso Claude il loro ragionamento lo toglie l'impronta del prefisso. Le altre
   porte: fermo oltre la durata della cache col tratto grande (timer dopo il turno), una risposta già oltre l'80% dello
