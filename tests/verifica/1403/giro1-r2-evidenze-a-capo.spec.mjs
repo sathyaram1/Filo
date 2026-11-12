@@ -43,7 +43,7 @@ test('r2 testo che scorre: la riga che va a capo nella casella va a capo anche s
     const base = ta.value;
     const at = base.indexOf('Quinta riga.');
     for (let k = 1; k < 400; k++) {
-      const riga = 'parola '.repeat(k).trim();
+      const riga = 'Il codice di errore era ' + 'x'.repeat(k);
       ta.value = base.slice(0, at) + riga + '\n' + base.slice(at);
       ta.dispatchEvent(new Event('input', { bubbles: true }));
       if (ta.scrollHeight !== ev.scrollHeight) {
