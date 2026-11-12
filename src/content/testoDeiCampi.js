@@ -292,5 +292,11 @@
   // Una scheda chiusa o una pagina lasciata entro il riposo: l'ultimo tasto parte adesso.
   window.addEventListener('pagehide', () => { clearTimeout(riposo); manda(); }, true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { clearTimeout(riposo); manda(); } });
+  // La scheda che si chiude esce di vista senza eventi della pagina: lo dice il main, e aspetta la spedizione.
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === (MSG.TAB_IN_VISTA || 'tab_in_vista') && msg.inVista === false) { clearTimeout(riposo); manda(); }
+    });
+  } catch (_) {}
   nascita();
 })(typeof globalThis !== 'undefined' ? globalThis : self);
