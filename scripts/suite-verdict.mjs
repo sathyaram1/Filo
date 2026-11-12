@@ -118,6 +118,7 @@ export function raccogliCasi(json) {
           titoloCompleto: [...corniceQui, titolo].join(' › '),
           stato: statoFinale(t),
           nonGirato: !Array.isArray(t?.results) || t.results.length === 0,
+          errore: erroreDelTest(t),
         });
       }
     }
