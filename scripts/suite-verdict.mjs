@@ -485,7 +485,7 @@ export function leggiArgomenti(argv) {
       out[k] = val;
       i += 1;
     } else if (a.startsWith('--')) {
-      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file> --parti <N> --esiti <cartella>`);
+      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file> --errori <file> --parti <N> --esiti <cartella>`);
     } else if (!out.file) {
       out.file = a;
     } else {
