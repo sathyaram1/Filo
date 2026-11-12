@@ -231,9 +231,8 @@ test('il ripristino da Automatico coi modelli scelti a mano: una riga vera per i
   expect(testo).not.toContain('→ nessuno');
   expect(testo).toMatch(/modelli scelti a mano per \d+ funzioni: tolti, valgono quelli predefiniti di Filo/);
   expect(testo).toContain('Restano le chiavi API, il registro dei modelli e l\'autonomia di Filo');
-  await fillConfirmInput(chat, 'conferma');
   await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'danger');
+  await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
   expect((await impostazioni(app)).autonomia.livello).toBe('automatico');
   await ripristina(app);
