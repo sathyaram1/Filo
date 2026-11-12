@@ -53,6 +53,16 @@ export function fusioniCheCitano(root, num, { ref = 'origin/main', dopo = 0, max
     .sort((a, b) => Date.parse(b.data) - Date.parse(a.data)).slice(0, max);
 }
 
+/**
+ * La fusione `sha` porta un commit che cita #N, lei o un commit del ramo che ha fuso: la citazione di
+ * `fusioniCheCitano`, chiesta per una fusione sola (il doppione dichiarato di `deliver … gia_risolto`, #2046).
+ */
+export function fusioneCita(root, sha, num) {
+  let fuori = [];
+  try { fuori = [`^${git(root, ['rev-parse', '--verify', '--quiet', `${sha}^1`]).trim()}`]; } catch (_) { /* senza genitori: solo lei */ }
+  return git(root, ['rev-list', '-E', `--grep=${regexCitazione(num)}`, sha, ...fuori]).trim() !== '';
+}
+
 /** I commit della linea principale di `ref` (i primi genitori): ci sta la punta di un ramo nato lì e mai scritto. */
 export function lineaPrincipale(root, ref = 'origin/main') {
   return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
