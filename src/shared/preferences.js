@@ -2713,7 +2713,7 @@
   }
 
   global.SN_PREF = {
-    buildPreferencePartial, allentaParziale, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
+    buildPreferencePartial, allentaParziale, doveSeAllenta, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
     SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
