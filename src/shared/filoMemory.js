@@ -109,10 +109,10 @@
     const l = P ? P.lezioneDaAzione({ testo }) : { testo: String(testo || '').trim() };
     if (l.rifiuto) return { scritta: false, rifiuto: l.rifiuto, riga: null };
     if (!l.testo) return { scritta: false, riga: null };
+    const prima = (await getLessonsBuffer()).length;
     const buf = await appendLesson(l.testo, opzioni);
-    const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-    const scritta = !!ultima && ultima.text === String(l.testo).trim();
-    return { scritta, riga: scritta ? ultima : null };
+    const scritta = Array.isArray(buf) && buf.length > prima;
+    return { scritta, riga: scritta ? buf[buf.length - 1] : null };
   }
 
   // ===== Quaderno delle memorie (#872) =====
