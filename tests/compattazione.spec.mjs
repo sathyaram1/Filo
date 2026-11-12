@@ -570,3 +570,27 @@ test('con la soglia scritta sotto la parte fissa la risposta non aspetta una com
     expect(soglia).toBe(base + 30000);
   } finally { await rimettiCompattatore(app); await ripristina(app); }
 });
+
+// Il giro dei giorni lo fa partire l'app, all'avvio: qui il suo passo è accorciato, il resto è quello vero.
+test.describe('il giro dei giorni', () => {
+  test.use({ envInPiu: { FILO_TEST_GIRO_GIORNI_MS: '1000' } });
+  test('le ore di ieri diventano la riga del giorno da sole, senza un messaggio a Filo', async ({ app }) => {
+    await app.evaluate(async () => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      const ieri = new Date();
+      ieri.setDate(ieri.getDate() - 1);
+      ieri.setHours(10, 0, 0, 0);
+      await globalThis.SN_FILO_CHATS.append('ieri1', { role: 'user', text: 'scrivo la mail al relatore', ts: ieri.toISOString() });
+      await globalThis.SN_FILO_CHATS.append('ieri1', { role: 'filo', text: 'Scritta.', ts: new Date(ieri.getTime() + 5000).toISOString() });
+      globalThis.__giorni = [];
+      C._dip.chiama = async ({ motivo }) => {
+        if (motivo === 'giorni') { globalThis.__giorni.push(motivo); return 'ieri: mail al relatore'; }
+        return JSON.stringify({ ore: ['10:00 scritta la mail al relatore'], memorie: [] });
+      };
+      await C.compatta({ incognito: false, motivo: 'prova', forza: true });
+    });
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.righe(false)).giorni.map((g) => g.testo)), { timeout: 15000 })
+      .toEqual(['ieri: mail al relatore']);
+    expect(await app.evaluate(() => globalThis.SN_COMPATTAZIONE.sezione(false))).toMatch(/GIORNI:\n- ieri: mail al relatore/);
+  });
+});
