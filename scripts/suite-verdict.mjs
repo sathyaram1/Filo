@@ -319,6 +319,7 @@ export function verdetto(json, noti) {
     const strascico = casoDelloStrascico(e, casi);
     v.nuovi.push({
       spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: strascico ? '' : fileDellErrore(e),
+      errore: testoErrore({ ...e, message: e?.stack || e?.message }),
       ...(strascico ? { strascicoDi: `tests/${strascico.spec}.spec.mjs:${strascico.riga}` } : {}),
     });
   }
