@@ -66,6 +66,25 @@ test('alla ricarica il testo torna nei campi com\'era, e il sito lo riceve; cart
   expect(await valore(page, '#otp')).toBe('');
 });
 
+test('un modulo d\'accesso e una ricerca non si conservano', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px">
+    <form onsubmit="return false"><input type="text" name="utente" id="utente" style="width:200px;height:28px">
+      <input type="password" name="pw" id="pw" style="width:200px;height:28px"></form>
+    <input type="search" id="cerca" style="width:200px;height:28px">
+    <textarea id="nota" name="nota" style="width:300px;height:60px"></textarea></body>`);
+  await page.locator('#utente').evaluate((el) => el.focus());
+  await page.keyboard.type('mario.rossi');
+  await page.locator('#pw').evaluate((el) => el.focus());
+  await page.keyboard.type('segretissima');
+  await page.locator('#cerca').evaluate((el) => el.focus());
+  await page.keyboard.type('scarpe da corsa');
+  await page.locator('#nota').evaluate((el) => el.focus());
+  await page.keyboard.type('questa sì');
+  await expect.poll(() => quanti(app), { timeout: 8000 }).toBe(1);
+  await page.waitForTimeout(800);
+  expect(await quanti(app)).toBe(1);
+});
+
 test('chiusa la scheda per sbaglio e riaperta, il testo è lì', async ({ app, shell, testServer }) => {
   const url = testServer.html(PAGINA);
   const id = await apriEAspetta(app, url);
