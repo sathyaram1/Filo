@@ -37,16 +37,12 @@ async function scrivi(page, sel, testo) {
 }
 
 const valore = (page, sel) => page.locator(sel).inputValue();
-const conservati = (app) => app.evaluate(() => require('./src/main/services/testoDeiCampi.js').stato()).catch(() => null);
-const statoMain = (app) => app.evaluate(async ({ app: a }) => {
-  const p = require('node:path').join(a.getPath('userData'), '..');
-  return p;
-});
 
-// Il magazzino è un modulo del main: lo si chiede con lo stesso require dell'app.
-async function quanti(app) {
+// I campi conservati, chiesti al modulo del main con lo stesso require dell'app.
+function quanti(app) {
   return app.evaluate(async () => {
-    const T = process.mainModule.require('./services/testoDeiCampi.js');
+    const rq = process.mainModule.require;
+    const T = rq(rq('node:path').join(process.cwd(), 'src/main/services/testoDeiCampi.js'));
     return (await T.stato()).campi;
   });
 }
