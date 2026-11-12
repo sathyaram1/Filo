@@ -28,9 +28,15 @@ for (const ms of [100]) {
       const tw = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
       const lascia = !!win._filoTabs.riquadri?.strati?.get(tw);
       tw.focus();
-      if (attesa) await new Promise((r) => setTimeout(r, attesa));
-      const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
+      const wc = tw;
       const s = win._filoTabs.riquadri?.strati?.get(wc);
+      const traccia = [];
+      const segna = () => {
+        const f = webContents.getFocusedWebContents();
+        const riga = `${f ? f.getURL().slice(0, 14) : '-'}|${s && s.trattenuti ? 'T' + s.trattenuti.length : 'n'}|${s && s.pronta ? 'P' : 'p'}|${s && s.visibile ? 'V' : 'v'}`;
+        if (traccia[traccia.length - 1]?.r !== riga) traccia.push({ t: Date.now() - t0, r: riga });
+      };
+      while (Date.now() - t0 < attesa) { segna(); await new Promise((r) => setTimeout(r, 3)); }
       const stato = s ? { pronta: !!s.pronta, visibile: !!s.visibile, chiavi: Object.keys(s).join(',') } : null;
       const foco = { scheda: wc.isFocused(), strato: s?.vista?.webContents?.isFocused?.() ?? s?.view?.webContents?.isFocused?.() };
       const dove = wc ? wc.getURL() : 'nessuno';
