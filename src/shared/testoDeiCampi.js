@@ -112,8 +112,8 @@
     return out;
   }
 
-  // `dati` { [pagina]: { t, campi: [{ firma, valore, t }] } } → una copia senza lo scaduto, entro il tetto totale
-  // (prima se ne vanno le pagine toccate da più tempo). `tolte` conta le pagine uscite.
+  // `dati` { [pagina]: { t, campi: [{ firma, valore, t }] } } → una copia senza lo scaduto e senza quello che non è un
+  // campo valido. Il tetto totale non toglie niente di vecchio: rifiuta il nuovo (`pesoTotale` a chi scrive).
   function pota(dati, ora, giorni) {
     const limite = ora - (GIORNI.includes(giorni) ? giorni : GIORNI_DI_SERIE) * DAY_MS;
     const pagine = [];
