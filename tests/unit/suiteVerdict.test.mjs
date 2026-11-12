@@ -162,10 +162,11 @@ describe('le funzioni pure', () => {
   });
 
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
-    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt']),
-      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt', parti: 0, esiti: '' });
+    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt', '--errori', 'e.txt']),
+      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt', errori: 'e.txt', parti: 0, esiti: '' });
     assert.deepEqual(leggiArgomenti(['r.json', '--parti', '4', '--esiti', 'blob-report']),
-      { file: 'r.json', out: '', rossi: '', chiavi: '', parti: 4, esiti: 'blob-report' });
+      { file: 'r.json', out: '', rossi: '', chiavi: '', errori: '', parti: 4, esiti: 'blob-report' });
+    assert.throws(() => leggiArgomenti(['r.json', '--errori']), /--errori vuole un percorso/);
     for (const n of ['0', '-1', '2.5', 'tre', undefined]) {
       assert.throws(() => leggiArgomenti(['r.json', '--parti', n, '--esiti', 'b'].filter((x) => x !== undefined)), /--parti/, String(n));
     }
