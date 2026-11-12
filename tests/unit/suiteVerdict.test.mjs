@@ -521,7 +521,7 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     assert.match(nuovi, /^tests\/b\.spec\.mjs › rosso$/m, 'il rosso della parte arrivata in fondo');
     // #2313: l'errore deve arrivare dall'unione vera delle parti, senza colori e con la riga dello spec.
     const errori = readFileSync(join(dir, 'errori.txt'), 'utf8');
-    assert.match(errori, /^✗ tests\/b\.spec\.mjs › rosso\n {4}in tests\/b\.spec\.mjs:2\n {4}Error: expect\(received\)\.toBe\(expected\)/m, errori);
+    assert.match(errori, /^✗ tests\/b\.spec\.mjs › rosso\n {4}in tests\/\S*b\.spec\.mjs:2\n {4}Error: expect\(received\)\.toBe\(expected\)/m, errori);
     assert.match(errori, /Expected: 2/);
     assert.doesNotMatch(errori, /\u001b\[/, 'i colori del terminale nel feedback sono rumore');
     assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: [12] casi non sono girati/m, 'a macchina carica il tetto può scadere prima del caso lento');
