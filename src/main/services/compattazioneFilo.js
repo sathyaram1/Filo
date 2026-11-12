@@ -234,16 +234,19 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
-  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna.
-  if (!incognito) {
-    const fonti = sospetto && letto.memorie.length ? await eventiDeiMessaggi(sospette) : [];
+  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna. Ognuna
+  // porta i messaggi da cui nasce (`origine`), come le lezioni: il punto del filo nel quaderno, e il controllo che non
+  // lascia tornare una riga tolta. Una proposta mostra anche i messaggi che hanno reso sospetto il pezzo.
+  if (!incognito && letto.memorie.length) {
+    const fontiSospette = sospetto ? await eventiDeiMessaggi(sospette) : [];
     for (const m of letto.memorie) {
+      const origine = await eventiDeiMessaggi(m.fonti);
       if (sospetto) {
-        const p = { id: id(), testo: m, ts: new Date(ora).toISOString(), fonti };
+        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: [...new Set([...origine, ...fontiSospette])], origine };
         s.inAttesa.push(p);
         inAttesa.push(p);
       } else {
-        try { if (await _dip.applicaMemoria(m)) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
+        try { if (await _dip.applicaMemoria(m.testo, { fonti: origine })) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
       }
     }
   }
