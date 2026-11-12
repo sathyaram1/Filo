@@ -240,3 +240,14 @@ test('controllaFormaOwner: da 2 a 4 opzioni, contesto e problema corti, pro, con
   assert.equal(pro.campo, 'opzioni[1].pro');
   assert.equal(D.controllaFormaOwner({ ...buona, consiglio: { opzione: 0, perche: 'a\nb' } }).campo, 'consiglio.perche');
 });
+
+test('assorbimento (#1154): l’assorbita porta la madre, la madre le assorbite; un’altra superata non è assorbita', () => {
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-3', assorbita: true } }), 'D-3');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-3' } }), '', 'sostituita da una domanda nuova sul suo lavoro');
+  assert.equal(D.assorbitaIn({ stato: 'aperta', esito: { superataDa: 'D-3', assorbita: true } }), '', 'riaperta: non è più dentro');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-0', assorbita: true } }), '');
+  assert.equal(D.assorbitaIn(null), '');
+  assert.deepEqual(D.assorbiteDi({ assorbite: ['D-5', 'D-7', 'D-5', 'nulla', 3, ' D-9 '] }), ['D-5', 'D-7', 'D-9']);
+  assert.deepEqual(D.assorbiteDi({ assorbite: 'D-5' }), []);
+  assert.equal(D.validaDomanda({ ...domandaValida(), assorbite: ['D-1'] }).ok, true, 'campo del server: nell’ingresso si ignora');
+});
