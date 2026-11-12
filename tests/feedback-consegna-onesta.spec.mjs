@@ -179,17 +179,16 @@ test('la schermata annotata di uno schermo grande scende sotto i 4 MB, coi tratt
   expect(verifica.rossiInBarra, 'col suo tratto').toBeGreaterThan(0);
 });
 
-// #1681 — chi chiude con Esc mentre l'invio aspetta e riapre per scrivere altro: la consegna del primo non chiude il
-// riquadro nuovo, non ne cancella la bozza e non gli ripropone il testo già in viaggio.
+// #1681 — chi riapre il riquadro mentre l'invio aspetta (dal #1403 si chiude da sé all'invio) e scrive altro: la
+// consegna del primo non chiude il riquadro nuovo, non ne cancella la bozza e non gli ripropone il testo in viaggio.
 test('la consegna di un feedback partito non chiude il riquadro riaperto per scriverne un altro', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await reteFinta(app);
   await esito(app, 'lento');
   await scriviEInvia(page, 'Il tasto Salva non risponde');
-  await expect(page.locator('.sn-fb-status')).toContainText('Invio in corso');
-  await page.keyboard.press('Escape');
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
+  await expect.poll(() => app.evaluate(() => typeof globalThis.__rete.sblocca), { timeout: 12_000 }).toBe('function');
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await expect(page.locator('.sn-fb-modal')).toBeVisible();
   await page.waitForTimeout(400);
