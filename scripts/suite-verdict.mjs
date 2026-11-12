@@ -368,6 +368,51 @@ export function rigaRosso(c) {
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
 }
 
+/** I tetti del testo degli errori, che finisce nel feedback: il server ne tiene 10.000 caratteri in tutto. */
+export const RIGHE_PER_ERRORE = 15;
+export const CARATTERI_PER_ERRORE = 1500;
+export const TETTO_ERRORI = 5000;
+
+/** Un errore entro le sue righe e i suoi caratteri, rientrato sotto il suo rosso; un taglio si dice col numero. PURA. */
+function erroreRientrato(errore, righe, caratteri) {
+  const tutte = String(errore || '').split('\n').map((r) => r.trimEnd()).filter((r, i, a) => r || (a[i - 1] && i < a.length - 1));
+  const tenute = [];
+  let lunghezza = 0;
+  for (const r of tutte) {
+    if (tenute.length >= righe || lunghezza + r.length > caratteri) break;
+    tenute.push(r);
+    lunghezza += r.length + 1;
+  }
+  // Una prima riga più lunga di tutto il tetto si accorcia: senza nemmeno quella il rosso resterebbe muto.
+  if (!tenute.length && tutte.length) tenute.push(`${tutte[0].slice(0, caratteri)} … (riga accorciata)`);
+  const tolte = tutte.length - tenute.length;
+  if (tolte > 0) tenute.push(`… altre ${tolte} righe: l'errore intero sta nel registro della parte della suite`);
+  return tenute.map((r) => `    ${r}`).join('\n');
+}
+
+/**
+ * L'errore di ogni rosso nuovo, sotto la sua riga: dalla cloud gli artifact della corsa non si scaricano, e senza
+ * l'errore nel feedback chi lo prende rilancia la suite per vederlo (#2313). I rossi senza un errore (una parte
+ * senza esito, il tetto della corsa) non ci sono: la loro riga dice già tutto. Oltre il tetto si dice quanti mancano.
+ * PURA.
+ */
+export function testoErrori(nuovi, { righe = RIGHE_PER_ERRORE, caratteri = CARATTERI_PER_ERRORE, tetto = TETTO_ERRORI } = {}) {
+  const conErrore = (Array.isArray(nuovi) ? nuovi : []).filter((c) => String(c?.errore || '').trim());
+  const blocchi = [];
+  let lunghezza = 0;
+  for (const c of conErrore) {
+    const blocco = `✗ ${rigaRosso(c)}\n${erroreRientrato(c.errore, righe, caratteri)}`;
+    if (blocchi.length && lunghezza + blocco.length > tetto) break;
+    blocchi.push(blocco);
+    lunghezza += blocco.length + 2;
+  }
+  const mancano = conErrore.length - blocchi.length;
+  if (mancano > 0) {
+    blocchi.push(`… altri ${mancano} rossi senza il loro errore qui (tetto di ${tetto} caratteri): gli errori stanno nei registri delle parti della suite`);
+  }
+  return blocchi.join('\n\n');
+}
+
 /** La chiave dell'allarme quando la suite non è partita o non ha lasciato un esito. */
 export const CHIAVE_NON_PARTITA = 'suite:non-partita';
 /** La chiave della suite fermata dal suo tetto di tempo: non è un'installazione rotta, è la suite troppo lunga o appesa. */
