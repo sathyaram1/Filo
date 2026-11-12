@@ -206,11 +206,11 @@
     }
     if (!presenti.length) return;
     const fatti = R.abbina(rimasti, presenti);
-    for (const { indice, valore } of fatti) {
+    for (const { indice, valore, da } of fatti) {
       const el = campi[indice];
       scriviNelCampo(el, valore);
-      // Il testo rimesso è ancora dell'utente: resta seguito, a nome della firma che ha adesso.
-      segue(el, String(el.value || ''));
+      // Il testo rimesso è ancora dell'utente: resta seguito con la firma con cui è stato tenuto, che così si aggiorna.
+      segue(el, String(el.value || ''), R.firmaPulita(rimasti[da].firma));
     }
     const usati = new Set(fatti.map((f) => f.da));
     rimasti = rimasti.filter((_, i) => !usati.has(i));
