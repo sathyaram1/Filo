@@ -18,6 +18,14 @@ for (const ms of [100]) {
       const png = nativeImage.createFromBitmap(px, { width: 48, height: 32 }).toPNG();
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
     });
+    const fuoco = await app.evaluate(async ({ BrowserWindow, webContents }, u) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      win.show(); win.focus();
+      win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents.focus();
+      await new Promise((r) => setTimeout(r, 300));
+      return { win: win.isFocused(), f: webContents.getFocusedWebContents()?.getURL() };
+    }, p.url());
+    console.log('FUOCO', JSON.stringify(fuoco));
     await p.locator('#t').click({ button: 'right' });
     const voce = menuDi(p).voce('Invia feedback');
     await expect(voce).toBeVisible({ timeout: 10_000 });
