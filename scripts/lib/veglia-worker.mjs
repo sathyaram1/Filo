@@ -13,6 +13,10 @@ import { leggiMeta, rigaSintetica } from '../session-report.mjs';
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
 export const SOGLIA_FERMO_MS = 20 * 60 * 1000;
+// Un worker che ha già reso il suo esito non tornerà a rilasciare: dopo la chiusura basta il tempo del rilascio che stava
+// per fare (spinta e rapporto), non venti minuti di posto occupato (#2324).
+export const SOGLIA_CHIUSO_MS = 2 * 60 * 1000;
+const CHIUSURE = new Set(['SubagentHandback']);
 // Sotto i due minuti del tempo di serie di una chiamata: un timeout dimenticato non la uccide a metà rilascio.
 export const FETTA_MS = 90 * 1000;
 export const PASSO_MS = 10 * 1000;
@@ -25,15 +29,45 @@ const LANCI = new Set(['Agent', 'Task']);
 
 /**
  * Il giudizio su un worker, da segni già letti. PURA.
- * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella.
- * @returns {{ stato: 'finito'|'lavora'|'fermo', fermoMs: number }}
+ * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella; `chiusoMs`: quando
+ * il worker ha chiuso la sua sessione (NaN se lavora ancora).
+ * @returns {{ stato: 'finito'|'lavora'|'chiuso'|'fermo', fermoMs: number }}
  */
-export function giudica({ finito = false, processi = 0, tempi = [], adesso = Date.now(), soglia = SOGLIA_FERMO_MS } = {}) {
+export function giudica({
+  finito = false, processi = 0, tempi = [], chiusoMs = NaN, adesso = Date.now(), soglia = SOGLIA_FERMO_MS, sogliaChiuso = SOGLIA_CHIUSO_MS,
+} = {}) {
   if (finito) return { stato: 'finito', fermoMs: 0 };
   const noti = tempi.filter((t) => Number.isFinite(t));
   if (processi > 0 || !noti.length) return { stato: 'lavora', fermoMs: 0 };
   const fermoMs = Math.max(0, adesso - Math.max(...noti));
+  if (Number.isFinite(chiusoMs) && fermoMs >= sogliaChiuso) return { stato: 'chiuso', fermoMs };
   return { stato: fermoMs >= soglia ? 'fermo' : 'lavora', fermoMs };
+}
+
+/**
+ * Quando un transcript ha chiuso la sua sessione: l'ultimo turno dell'assistente rende l'esito (handback) o finisce
+ * senza strumenti. Un messaggio arrivato dopo (una notifica che lo risveglia) la riapre. NaN se lavora ancora. PURA.
+ */
+export function chiusuraDi(righe) {
+  let chiuso = NaN;
+  let consegna = '';
+  for (const r of righe) {
+    let o;
+    try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
+    if (!o || typeof o !== 'object') continue;
+    const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    if (o.type === 'assistant') {
+      if (rigaSintetica(o.message)) { chiuso = NaN; continue; }
+      const usi = c.filter((x) => x && x.type === 'tool_use');
+      const resa = usi.find((x) => CHIUSURE.has(String(x.name || '')));
+      const ms = Date.parse(String(o.timestamp || ''));
+      if (resa) { chiuso = ms; consegna = String(resa.id || ''); } else if (usi.length) { chiuso = NaN; } else if (o.message && o.message.stop_reason === 'end_turn') { chiuso = ms; consegna = ''; }
+    } else if (o.type === 'user') {
+      const soloEsito = c.length > 0 && c.every((x) => x && x.type === 'tool_result' && consegna && x.tool_use_id === consegna);
+      if (!soloEsito) chiuso = NaN;
+    }
+  }
+  return chiuso;
 }
 
 /** L'ultimo strumento chiesto e rimasto senza risposta, dalle righe di un transcript. PURA. */
@@ -169,10 +203,13 @@ export const NOTA_FERMO = 'fermo dalla veglia:';
 export const notaDelFermo = (quadro) => (String(quadro || '').trim() ? `${NOTA_FERMO} ${pulito(quadro).trim()}` : '');
 
 /** Il guasto da dichiarare per un worker fermo, col gruppo davanti e il quadro prima della coda. PURA. */
-export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '' } = {}) {
+export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '', chiusoMs = NaN } = {}) {
   const minuti = Math.round(fermoMs / 60000);
   const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
   const coda = `${String(quadro || '').trim() ? `${String(quadro).trim()} ` : ''}Rilasciato dalla veglia di chi guida il giro.`;
+  if (Number.isFinite(chiusoMs)) {
+    return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
+  }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
@@ -228,13 +265,16 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [] };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN };
   const ultimoMs = Math.max(...file.map((f) => f.m));
   const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
   const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
   const attesa = attese.length ? attese.reduce((a, b) => ((b.ms || 0) >= (a.ms || 0) ? b : a)) : null;
   const elenco = lette.map(({ f, righe }) => ({ nome: nomeTraccia(f.p), ms: f.m, ...ultimoPasso(righe) })).sort((a, b) => b.ms - a.ms);
-  return { viste: true, ultimoMs, attesa, elenco };
+  // Il worker è la traccia lanciata da chi guida il giro (senza lanciatore nel meta); i suoi figli ne hanno uno.
+  const worker = lette.filter(({ f }) => { const m = leggiMeta(f.p); return !(m && typeof m.parentAgentId === 'string' && m.parentAgentId.trim()); })
+    .reduce((a, b) => (!a || b.f.m >= a.f.m ? b : a), null);
+  return { viste: true, ultimoMs, attesa, elenco, chiusoMs: worker ? chiusuraDi(worker.righe) : NaN };
 }
 
 /** Quando il server ha dato il biglietto, dal registro che il comando ticket scrive per il gancio. NaN se non c'è. */
@@ -274,7 +314,10 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   if (tracce.viste) tempi.push(tracce.ultimoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
-  return { mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce };
+  return {
+    mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce,
+    chiusoMs: tracce.viste ? tracce.chiusoMs : NaN,
+  };
 }
 
 /**
@@ -313,17 +356,21 @@ export async function veglia({
     const g = giudica({ ...s, adesso: adesso(), soglia });
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
     const minuti = Math.round(g.fermoMs / 60000);
-    if (g.stato === 'fermo') {
+    if (g.stato === 'fermo' || g.stato === 'chiuso') {
+      const chiuso = g.stato === 'chiuso';
       const quadro = quadroDelFermo(s);
-      const guasto = testoGuasto({ fermoMs: g.fermoMs, attesa: s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro });
+      const guasto = testoGuasto({
+        fermoMs: g.fermoMs, attesa: chiuso ? null : s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro, chiusoMs: chiuso ? s.chiusoMs : NaN,
+      });
       const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok
         ? 'biglietto rilasciato con un guasto dichiarato'
         : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+      const cosa = chiuso ? 'Worker chiuso senza rilasciare il biglietto' : `Worker fermo da ${minuti} minuti senza segni di vita`;
       return {
         uscita: USCITA_FERMO,
         guasto,
-        testo: `Worker fermo da ${minuti} minuti senza segni di vita: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
+        testo: `${cosa}: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
       };
     }
     if (adesso() + passo >= fine) {

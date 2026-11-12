@@ -779,9 +779,11 @@ transazione che cambia la domanda), nessuna routine lo prende, e in dashboard st
 riparte con la decisione. La ripresa non sposta un `todo`, un `working` né un
 `revision_capability` (la decisione si accoda per il giro dopo); un `revision_security`
 torna `revision_capability` coi verdetti azzerati, perché sicurezza e fusione non leggono
-le decisioni; un `done` torna `todo`. Fanno eccezione gli ultimi due quando la scelta è la
-provvisoria di una domanda non bloccante, senza parole in più: il `revision_security` resta
-dov'è con la decisione accodata, e sul `done` la risposta dice «non serviva». Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
+le decisioni; un `done` torna `todo` quando la domanda l'ha aperta l'owner sul chiuso
+(`nataSuChiuso`). Sulla provvisoria di una domanda non bloccante: la stessa scelta senza
+parole in più lascia il `revision_security` dov'è con la decisione accodata, e sul `done`
+dice «non serviva»; un'altra scelta, o parole in più, sul `done` non lo riapre: la scelta
+continua in un figlio `#N.k` col testo della risposta, e il padre resta fuso (#2324). Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
 server fondono il ramo.
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
