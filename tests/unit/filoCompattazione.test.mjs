@@ -438,8 +438,9 @@ test('la stima accanto alla soglia: più bassa compatta più spesso, oltre i 100
   assert.equal(S.prezzoPer(haiku, 99999).prompt, 0.0000001);
   assert.equal(S.prezzoPer(haiku, 100000).prompt, 0.0000005);
   const stima = (soglia) => L.stimaSoglia({ soglia, base: 38500, prezzoChat: haiku, prezzoCompattazione: haiku, prezzoPer: S.prezzoPer });
-  assert.ok(stima(50000).ogni < stima(70000).ogni && stima(70000).ogni < stima(90000).ogni);
+  assert.ok(stima(75000).ogni < stima(90000).ogni && stima(90000).ogni < stima(110000).ogni);
   assert.match(stima(70000).testo, /^Circa \d+,\d+ \$ al mese con 600 messaggi .* \d+ s/);
+  assert.doesNotMatch(stima(70000).testo, /token fissi/, 'una soglia che lascia spazio vale com\'è');
   assert.ok(stima(200000).oltreListino && stima(200000).usd > 3 * stima(70000).usd);
   assert.match(stima(200000).testo, /cinque volte/);
   assert.equal(L.stimaSoglia({ soglia: 70000, base: 38500, prezzoChat: null, prezzoCompattazione: haiku }), null, 'senza prezzo, niente stima inventata');
