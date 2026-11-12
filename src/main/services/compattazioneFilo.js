@@ -171,7 +171,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const lista = await daCompattare(incognito, { ora, tetti: t });
   const taglio = L().puntoDiTaglio(lista, {
     ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI,
-    maxToken: L().grezzoMassimo({ soglia: t.soglia, base: basi[lato(incognito)], turno: L().pesoTurno(lista, pesoDi) }), peso: pesoDi,
+    maxToken: limitiDi(lista, incognito, t.soglia).grezzo, peso: pesoDi,
   });
   // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima. Con la
   // parte dell'utente davanti, chi compatta resta sotto il listino.
