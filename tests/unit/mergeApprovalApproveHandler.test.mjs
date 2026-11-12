@@ -128,6 +128,22 @@ test('un riallineamento malformato non arriva come oggetto strano', async () => 
   assert.equal('realigned' in r, false);
 });
 
+test('un sì che il server prende (lavoro locale in attesa del server): alla pagina arrivano esito e comando da lanciare', async () => {
+  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
+  const UI = globalThis.SN_MERGE_APPROVALS;
+  const comando = 'L’app resta in attesa ed entra su main insieme al server: lancia npm run server:fondi -- claude/x --feedback 42, che porta prima l’app e poi il server, o nessuno dei due.';
+  risposta = { ok: true, result: 'server', esito: 'al_pc', detail: comando };
+  const r = await approva();
+  assert.deepEqual([r.result, r.esito, r.detail], ['server', 'al_pc', comando]);
+  const msg = UI.outcomeMessage(r, { origin: 'locale' });
+  assert.match(msg.text, /^Approvata\. .*npm run server:fondi -- claude\/x --feedback 42/);
+  // Un lavoro delle routine: il giro delle fusioni dal PC lo prende da sé.
+  risposta = { ok: true, result: 'server', esito: 'al_pc' };
+  assert.match(UI.outcomeMessage(await approva(), { origin: 'routine' }).text, /alla prossima fusione dei lavori del server/);
+  risposta = { ok: true, result: 'server', esito: 'rimandato' };
+  assert.match(UI.outcomeMessage(await approva(), { origin: 'routine' }).text, /torna alle routine/, 'anche gli altri seguiti del sì arrivano alla pagina');
+});
+
 test('la frase che legge l’owner, costruita con quello che il main passa davvero', async () => {
   require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
   const UI = globalThis.SN_MERGE_APPROVALS;

@@ -412,7 +412,7 @@ export function classifyServerMerge(status, body) {
   const errMsg = String((b.error && b.error.message) || '');
   if (status === 200 && r.ok === true && ESITI_SERVER.has(String(r.result))) {
     const out = { outcome: String(r.result) };
-    for (const k of ['sha', 'url', 'detail', 'mainSha']) if (r[k]) out[k] = String(r[k]);
+    for (const k of ['sha', 'url', 'detail', 'mainSha', 'app']) if (r[k]) out[k] = String(r[k]);
     return out;
   }
   if (status === 200 && r.ok === true) return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
@@ -433,7 +433,7 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
   const r = reply || {};
   const sha = String(r.sha || '').slice(0, 9);
   switch (r.outcome) {
-    case 'merged': return `Il cancello ha portato ${ramo} su main di filo-security${sha ? ` (${sha})` : ''}. La pubblicazione la fa GitHub (deploy.yml).`;
+    case 'merged': return `${r.app ? `Il cancello ha portato prima la parte dell’app in attesa su main di Filo (${String(r.app).slice(0, 9)}), poi ` : 'Il cancello ha portato '}${ramo} su main di filo-security${sha ? ` (${sha})` : ''}. La pubblicazione la fa GitHub (deploy.yml).`;
     case 'aspetta_suite': return `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
     case 'suite_rossa': return `La suite di filo-security è rossa su ${sha || 'quel commit'}${r.url ? ` (${r.url})` : ''}: correggi il ramo, spingi e rilancia.`;
     case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
