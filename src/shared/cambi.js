@@ -70,6 +70,8 @@
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
     'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
     'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
+    'testoDeiCampi.attivo': { nome: 'testo dei campi che non si perde', valore: ATTIVO, livello: 1 },
+    'testoDeiCampi.giorni': { nome: 'durata del testo dei campi', valore: (v) => (Number(v) === 1 ? '1 giorno' : `${numero(v)} giorni`), livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
