@@ -147,7 +147,7 @@ describe('quali spec lanciare', () => {
     });
 
     test('la chiamata vera passa l’elenco degli spec tracciati', () => {
-      assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
+      assert.match(SORGENTE, /specsForChangedFiles\(changed[^,]*, \[\.\.\.tracked\]\)/);
     });
   });
 });
