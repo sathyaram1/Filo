@@ -506,6 +506,7 @@
       images.forEach((img, i) => {
         const wrap = document.createElement('div');
         wrap.className = 'sn-fb-thumb';
+        if (immaginiSegnate.has(img)) wrap.classList.add('sn-fb-thumb--l0');
         const imEl = document.createElement('img');
         imEl.src = dataUrlToBlobUrl(img.dataUrl);
         imEl.dataset.snObjurl = '1';
