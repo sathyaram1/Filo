@@ -692,6 +692,21 @@
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
   }
 
+  // Le domande che la revisione ha assorbito in questa (§3.6): restano leggibili, e la risposta qui vale anche per loro.
+  function assorbite(d) {
+    const ids = D.assorbiteDi(d);
+    if (!ids.length) return null;
+    const ul = el('ul', 'mg-dq-assorbite');
+    for (const id of ids) {
+      const li = el('li', '');
+      li.appendChild(legame('domanda', id));
+      const x = trova(id);
+      if (x && !x.illeggibile && x.titolo) li.appendChild(el('span', 'mg-dq-assorbita-titolo', String(x.titolo)));
+      ul.appendChild(li);
+    }
+    return sezione('mg-dq-assorbite-sez', 'Domande assorbite', ul);
+  }
+
   // Chiusa dalla revisione perché un lavoro fuso l'ha attuata (#2006): { id, num }, o null.
   function attuataDa(d) {
     const a = d.esito && d.esito.automatica && d.esito.attuataDa;
