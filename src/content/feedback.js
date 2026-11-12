@@ -842,9 +842,11 @@
       await allega(picked);
     });
 
-    // Invio: solo dal clic dell'utente sul tasto (#1071).
-    sendBtn.addEventListener('click', async (e) => {
-      if (!e.isTrusted) return;
+    // Invio: solo dal clic dell'utente sul tasto (#1071). «Manda così» dall'avviso di L0 salta la rilettura.
+    sendBtn.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: true }); });
+    let inviando = false;
+    async function invia({ rileggi }) {
+      if (inviando || activeRoot !== root) return;
       const text = textEl.value.trim();
       const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && files.length === 0 && !wantShot) {
@@ -857,13 +859,23 @@
         if (activeRoot === root) statusEl.textContent = testo;
         else Popup?.showToast?.(testo, { duration: 6000 });
       };
-      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; };
+      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; inviando = false; };
       const testoInviato = textEl.value;
       inVolo.add(testoInviato);
+      inviando = true;
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
       statusEl.classList.add('sn-fb-status--attesa');
+      // Dopo la chiusura il feedback torna indietro intatto, con quello che L0 ha visto o con l'errore (#1403).
+      let partito = null;
+      let attesa = null;
+      const riapri = (extra) => {
+        try { attesa?.close?.(); } catch (_) {}
+        const d = { ripresa: { testo: testoInviato, images: partito.images, files: partito.files, submissionId: partito.submissionId, ...extra } };
+        if (activeRoot) daRiaprire = d;
+        else apriQui(d);
+      };
       try {
         const clientId = await getClientId();
         // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
