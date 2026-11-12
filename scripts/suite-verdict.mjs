@@ -470,7 +470,7 @@ export function testoRiassunto(v) {
 
 /** Le opzioni della riga di comando. PURA. */
 export function leggiArgomenti(argv) {
-  const out = { file: '', out: '', rossi: '', chiavi: '', parti: 0, esiti: '' };
+  const out = { file: '', out: '', rossi: '', chiavi: '', errori: '', parti: 0, esiti: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--parti') {
