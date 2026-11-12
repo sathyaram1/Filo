@@ -137,7 +137,9 @@
       corrente += Number(peso(m)) || 0;
       if (m.role === 'user' && !m.riga && !m.seguito) { pesi.push(corrente); corrente = 0; }
     }
-    return pesi.length ? pesi.reduce((a, b) => a + b, 0) / pesi.length : 0;
+    if (!pesi.length) return 0;
+    pesi.sort((a, b) => a - b);
+    return pesi[Math.floor((pesi.length - 1) / 2)];
   }
 
   const sogliaAnticipo = (o) => limiti(o).anticipo;
