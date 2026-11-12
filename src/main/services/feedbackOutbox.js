@@ -205,8 +205,8 @@
 
   async function ritira(id) {
     await load();
-    const c'era = queue.some((it) => it.id === String(id) && it.trattenuta);
-    if (!c'era) return false;
+    const trovata = queue.some((it) => it.id === String(id) && it.trattenuta);
+    if (!trovata) return false;
     remove(String(id));
     await persist();
     return true;
