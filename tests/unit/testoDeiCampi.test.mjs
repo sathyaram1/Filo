@@ -137,8 +137,32 @@ test('svuotato (anche solo spazi) il campo se ne va; oltre il tetto non si tiene
   await scrivi(s, [campo('   \n ')]);
   assert.deepEqual((await leggi(s)).campi.map((c) => c.valore), ['altro']);
   const r = await scrivi(s, [campo('z'.repeat(R.VALORE_MAX + 1), { nome: 'oggetto' })]);
-  assert.equal(r.troppo, 1);
+  assert.deepEqual([r.troppo, r.motivo], [1, 'campo']);
   assert.deepEqual((await leggi(s)).campi, []);
+});
+
+test('pieno il magazzino, il testo nuovo si rifiuta col motivo e quello vecchio resta; così una pagina piena di campi', async () => {
+  impostazioni = {};
+  Testo._test.usaFile(join(cartella, 'pieno.json'));
+  const grosso = 'y'.repeat(R.VALORE_MAX);
+  const quante = Math.floor(R.TOTALE_MAX / R.VALORE_MAX);
+  for (let i = 0; i < quante; i++) assert.equal((await scrivi(mittente(`https://p${i}.it/`), [campo(grosso)])).troppo, 0);
+  const r = await scrivi(mittente('https://nuova.it/'), [campo('anche poco')]);
+  assert.deepEqual([r.troppo, r.motivo], [1, 'totale']);
+  assert.deepEqual(await Testo.stato(), { ok: true, pagine: quante, campi: quante });
+  // Lo stesso campo che si accorcia ci sta: conta il suo peso nuovo, non la somma col vecchio.
+  assert.equal((await scrivi(mittente('https://p0.it/'), [campo('corto')])).troppo, 0);
+  assert.equal((await scrivi(mittente('https://nuova.it/'), [campo('anche poco')])).troppo, 0);
+
+  await Testo.cancellaTutto();
+  const s = mittente('https://modulo-lungo.it/');
+  const tanti = Array.from({ length: R.CAMPI_PER_PAGINA }, (_, i) => campo(`v${i}`, { nome: `c${i}` }));
+  assert.equal((await scrivi(s, tanti)).troppo, 0);
+  const oltre = await scrivi(s, [campo('uno di troppo', { nome: 'nuovo' }), campo('cambiato', { nome: 'c0' })]);
+  assert.deepEqual([oltre.troppo, oltre.motivo], [1, 'pagina']);
+  const tornati = (await leggi(s)).campi;
+  assert.equal(tornati.length, R.CAMPI_PER_PAGINA);
+  assert.ok(tornati.some((c) => c.valore === 'cambiato') && !tornati.some((c) => c.valore === 'uno di troppo'));
 });
 
 test('niente da incognito, sessioni che non restano, pagine delicate, siti dove Filo è spento, Filo stesso, o spento', async () => {
