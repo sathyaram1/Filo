@@ -1651,7 +1651,7 @@ export const CAMPI_DELLA_RIGA = Object.freeze([
   'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
   'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-  'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
+  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto',
   ...CAMPI_PERIZIA,
 ]);
 
