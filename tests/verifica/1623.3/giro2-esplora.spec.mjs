@@ -103,7 +103,7 @@ test('controllo caldo: Aiuto e feedback già a schermo, Ctrl+V e Ctrl+Maiusc+V n
   await strato.click('.sn-sidebar-input textarea');
   await strato.keyboard.press('Control+V');
   await p.waitForTimeout(1200);
-  console.log('aiuto caldo Ctrl+V allegati:', await strato.evaluate(() => document.querySelectorAll('.sn-sidebar-allegati img').length), 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)));
+  console.log('aiuto caldo Ctrl+V allegati:', await allegatiAiuto(app, p), 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)));
   await apriFeedback(app, p.url());
   await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
   await p.waitForTimeout(800);
