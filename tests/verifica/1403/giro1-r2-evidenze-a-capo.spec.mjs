@@ -28,7 +28,8 @@ test('r2 testo che scorre: la riga che va a capo nella casella va a capo anche s
       provider: attempts[0].provider, model: attempts[0].model, servedBy: 'DeepInfra', usage: {},
     });
   });
-  const TESTO = 'Il login non va.\nPrima riga.\nSeconda riga.\nTerza riga.\nQuarta riga.\nQuinta riga.\nLa password è Gatto!2024 e non entra.';
+  const righe = Array.from({ length: 30 }, (_, i) => `Passo ${i + 1} del racconto.`);
+  const TESTO = `Il login non va.\n${righe.join('\n')}\nQuinta riga.\nLa password è Gatto!2024 e non entra.`;
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await page.locator('.sn-fb-text').fill(TESTO);
   await page.locator('.sn-fb-send').click();
