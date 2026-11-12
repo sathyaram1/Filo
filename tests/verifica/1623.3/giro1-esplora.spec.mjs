@@ -94,9 +94,15 @@ test('Incolla dal tasto destro nella casella del feedback: entra fra gli allegat
   const strato = await paginaDelloStrato(app, p);
   await strato.mouse.click(s.x + 30, s.y + 15);
   await strato.mouse.click(s.x + 30, s.y + 15, { button: 'right' });
-  const voce = strato.locator('.sn-menu-item', { hasText: 'Incolla' }).first();
-  await expect(voce).toBeVisible({ timeout: 10_000 });
-  await voce.click();
+  let r = null;
+  await expect.poll(async () => (r = await nelloStrato(app, p, () => {
+    const T = globalThis.SN_FILO_UI._test;
+    const el = Array.from(T.trovaTutti('.sn-menu-item')).find((x) => /^\s*Incolla/.test(x.textContent || ''));
+    if (!el) return Array.from(T.trovaTutti('.sn-menu-item')).map((x) => x.textContent).join('|') || null;
+    const b = el.getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  })), { timeout: 10_000 }).toHaveProperty('x');
+  await strato.mouse.click(r.x, r.y);
   await expect.poll(() => conta(app, p, '.sn-fb-thumbs > *'), { timeout: 10_000 }).toBeGreaterThan(0);
   expect(await visti(p)).toEqual([]);
 });
