@@ -20,6 +20,7 @@
       version: '0.2.277', date: '2026-11-12',
       fixes: [
         { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
+        { testo: 'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.' },
       ],
     },
     {
