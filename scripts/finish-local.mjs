@@ -445,6 +445,15 @@ export function motivoDellaScelta({ changed = [], soloCommenti = [], specs = 0 }
   return `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.`;
 }
 
+/** Gli spec da lanciare per `changed`, fra quelli tracciati in `root`, e i file che non scelgono perché cambiano solo nei commenti. */
+export function specDellaScelta({ changed, base, root = ROOT }) {
+  // `ls-files` e filtro in memoria: `--error-unmatch` stampava un errore per ogni spec inesistente, e sembrava un guasto.
+  const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: root }).out.split('\n').filter(Boolean));
+  const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
+  const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+  return { specs, soloCommenti };
+}
+
 /**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
