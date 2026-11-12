@@ -406,6 +406,8 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
+    [ACTIONS.FEEDBACK_L0]: 'Rilettura del feedback — testo',
+    [ACTIONS.FEEDBACK_L0_IMMAGINI]: 'Rilettura del feedback — immagini',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
