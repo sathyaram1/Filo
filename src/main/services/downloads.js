@@ -112,6 +112,10 @@ const liveItems = new Map();
 const liveManual = new Map();
 // Sessioni già agganciate (evita doppioni se una session torna più volte).
 const attached = new WeakSet();
+// Cresce a ogni cambio che le superfici vedono: una lista di risposta più vecchia di un evento già arrivato non lo
+// riscrive (#2307, src/shared/elencoScaricamenti.js).
+let revisione = 0;
+function elenco(scope = '') { return { items: listRecords(scope), rev: revisione }; }
 
 // Ambito di chi guarda: '' per le finestre normali, la partizione per una
 // finestra incognito. Una voce si vede e si comanda solo dal suo ambito.
