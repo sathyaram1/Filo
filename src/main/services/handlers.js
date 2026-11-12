@@ -1132,6 +1132,14 @@ function compattaDaFermo(incognito, tetti) {
   }, cacheMs + 60 * 1000, incognito);
 }
 
+// La parte fissa della richiesta della chat, in token: strumenti, istruzioni e CONTESTO (la parte dell'utente). La chat
+// e la stima accanto alla soglia la contano allo stesso modo.
+function parteFissaChat(tools, parteUtente) {
+  let strumenti = 0;
+  try { strumenti = tools ? JSON.stringify(tools).length : 0; } catch (_) {}
+  return Math.ceil((PROMPTS.filoChatStatic().length + String(parteUtente || '').length + strumenti) / globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN);
+}
+
 // La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
 async function stimaSogliaCompattazione(valore) {
   const FC = globalThis.SN_FILO_CONTESTO;
