@@ -951,7 +951,7 @@
     // Su una chiusa da fidare le note stanno aperte sopra i tasti: si leggono prima di «Segna fidata» (#2078).
     const primaDeiTasti = !!note && fidabile(d);
     if (primaDeiTasti) note.open = true;
-    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d),
+    for (const parte of [opzioni(d), consiglio(d), esito(d), assorbite(d), daChiave(d), automatica(d), principio, conversazione(d),
       primaDeiTasti ? note : null, risposta(d), primaDeiTasti ? null : note]) if (parte) art.appendChild(parte);
     return art;
   }
