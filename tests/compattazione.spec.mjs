@@ -1,5 +1,6 @@
 // La compattazione del filo (SPEC-CONTESTO fase 4, #1563): una chat che passerebbe la soglia compatta prima di
 // rispondere, la richiesta dopo sta sotto i 100.000 token, il diario entra nel CONTESTO e la conversazione resta intera.
+import { readFileSync } from 'node:fs';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
