@@ -708,4 +708,4 @@ function aiutoAllaPagina(stratoWc, op, args) {
   return r.strato._allaPagina(r.s, String(op || ''), args);
 }
 
-module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, scrive, INDIRIZZO, TIPI, OP_PAGINA };
+module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, scrive, incolla, INDIRIZZO, TIPI, OP_PAGINA };
