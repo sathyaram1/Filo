@@ -125,6 +125,8 @@
   // anche dal disco.
   function manda() {
     if (!segui) return;
+    const eraSospeso = sospeso;
+    sospeso = false;
     const campi = [];
     for (const [el, s] of seguiti) {
       if (!el.isConnected) { seguiti.delete(el); continue; }
