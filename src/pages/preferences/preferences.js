@@ -1941,6 +1941,15 @@
       persist();
     });
     $('propostaEmailIncognito').addEventListener('change', persist);
+    // Spento, quello già tenuto se ne va (lo cancella il main): il conto accanto al tasto lo deve dire.
+    for (const id of ['testoCampiAttivo', 'testoCampiGiorni']) {
+      $(id).addEventListener('change', async () => {
+        $('testoCampiGiorni').disabled = !$('testoCampiAttivo').checked;
+        await persist();
+        setTimeout(caricaStatoTestoCampi, 300);
+      });
+    }
+    $('testoCampiCancella').addEventListener('click', cancellaTestoCampi);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
