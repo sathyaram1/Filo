@@ -518,7 +518,7 @@
         xBtn.className = 'sn-fb-thumb-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { images.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
+        xBtn.addEventListener('click', () => { images.splice(i, 1); immaginiSegnate.delete(img); bumpSubmissionId(); renderThumbs(); });
         wrap.appendChild(imEl);
         wrap.appendChild(xBtn);
         thumbsEl.appendChild(wrap);
