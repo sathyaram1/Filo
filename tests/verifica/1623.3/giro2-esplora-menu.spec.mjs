@@ -34,7 +34,7 @@ for (const ms of [0, 80, 150]) {
         wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
         wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
       }
-      return { dove, dt: Date.now() - t0 };
+      return { dove, lascia, dt: Date.now() - t0 };
     }, ms);
     await voce.click();
     const r = await premi;
