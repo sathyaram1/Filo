@@ -2175,12 +2175,7 @@
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
       costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
-      build(v) {
-        if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
-        const token = tettoAParole('token', v);
-        if (token == null) return null;
-        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
-      },
+      build: cambioDelTetto('token', 'Tetto in token della chat'),
     },
     {
       scrive: ['contestoFilo.soglia'],
