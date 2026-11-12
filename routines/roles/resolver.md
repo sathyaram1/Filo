@@ -44,7 +44,8 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
 - un **doppione** (la stessa cosa chiesta e già risolta sotto un altro numero)
   non ha fusioni che lo citino: si chiude allo stesso modo con la fusione che
   ha chiuso l'originale, aggiungendo `--doppione-di <numero dell'originale>`.
-  Il server vuole che la fusione citi l'originale e che l'originale sia chiuso.
+  Il server vuole che la fusione sia dell'originale (lo cita, o è quella del
+  suo ramo) e che l'originale sia chiuso.
 
 `payload.commitProvato`, se c'è, dice che il feedback è un allarme della
 suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
