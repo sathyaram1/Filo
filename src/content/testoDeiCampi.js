@@ -23,6 +23,8 @@
   try { Segreti = S.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t), { ricorda: true }); } catch (_) { return; }
 
   let segui = true;
+  // Scritto e non ancora spedito: il main lo sa, e la chiusura della scheda aspetta.
+  let sospeso = false;
   // Campo → { firma, ultimo }: l'ultimo valore che il main conosce.
   const seguiti = new Map();
   let riposo = null;
