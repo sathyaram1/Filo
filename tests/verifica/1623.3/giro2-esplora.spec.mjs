@@ -88,6 +88,29 @@ test('feedback riaperto (strato caldo): Ctrl+V subito', async ({ app, openTab, t
   console.log('caldo', gia, 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)), 'allegati:', await conta(app, p, '.sn-fb-thumb'));
 });
 
+test('controllo caldo: Aiuto e feedback già a schermo, Ctrl+V e Ctrl+Maiusc+V nella casella', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, PAGINA);
+  await immagine(app);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await focoAllaScheda(app, p.url());
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const strato = await paginaDelloStrato(app, p);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+  await p.waitForTimeout(800);
+  await strato.click('.sn-sidebar-input textarea');
+  await strato.keyboard.press('Control+V');
+  await p.waitForTimeout(1200);
+  console.log('aiuto caldo Ctrl+V allegati:', await strato.evaluate(() => document.querySelectorAll('.sn-sidebar-allegati img').length), 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)));
+  await apriFeedback(app, p.url());
+  await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
+  await p.waitForTimeout(800);
+  await strato.click('.sn-fb-text');
+  await strato.keyboard.press('Control+Shift+V');
+  await p.waitForTimeout(1200);
+  console.log('feedback caldo Ctrl+Maiusc+V allegati:', await conta(app, p, '.sn-fb-thumb'));
+});
+
 test('Aiuto: Ctrl+V mentre nasce, l\'immagine va fra gli allegati dell\'Aiuto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const p = await testServer.openReady(openTab, PAGINA);
