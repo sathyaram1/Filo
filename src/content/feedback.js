@@ -1000,11 +1000,13 @@
       } catch (e) {
         console.error('[SN feedback] submit', e);
         root.style.visibility = '';
-        riprova(e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e)));
+        const frase = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
+        if (partito) riapri({ messaggio: frase });
+        else riprova(frase);
       } finally {
         inVolo.delete(testoInviato);
       }
-    });
+    }
 
     // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un
     // pixel frazionario e sfocherebbe il testo.
