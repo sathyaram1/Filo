@@ -418,9 +418,12 @@
     // Ingresso letto a ~15.000 token al secondo, uscita a ~120: le misure di Haiku attraverso OpenRouter del 4/11/2026.
     const secondi = Math.max(2, Math.round(1.5 + ingresso / 15000 + u.uscitaCompattazione / 120));
     const cifra = usd.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: usd < 0.1 ? 3 : 2 });
+    const alzata = l.soglia > Number(soglia) + 500
+      ? ` Ogni richiesta porta già circa ${migliaia(base)} token fissi (istruzioni, strumenti e memoria), e sopra servono almeno ${migliaia(l.spazio)} token per la conversazione: la chat compatta da circa ${migliaia(l.soglia)}.`
+      : '';
     return {
-      usd, ogni, secondi, oltreListino: medio > LISTINO,
-      testo: `Circa ${cifra} $ al mese con ${u.messaggiAlMese} messaggi (chat e compattazioni): ${ogni === 1 ? 'una compattazione a ogni messaggio' : `una compattazione ogni ${ogni} messaggi circa`}, ${secondi} s, di solito mentre leggi la risposta.${medio > LISTINO ? ' Le richieste passano i 100.000 token: con Haiku costano cinque volte tanto.' : ''}`,
+      usd, ogni, secondi, oltreListino: medio > LISTINO, soglia: l.soglia,
+      testo: `Circa ${cifra} $ al mese con ${u.messaggiAlMese} messaggi (chat e compattazioni): ${ogni === 1 ? 'una compattazione a ogni messaggio' : `una compattazione ogni ${ogni} messaggi circa`}, ${secondi} s, di solito mentre leggi la risposta.${medio > LISTINO ? ' Le richieste passano i 100.000 token: con Haiku costano cinque volte tanto.' : ''}${alzata}`,
     };
   }
 
