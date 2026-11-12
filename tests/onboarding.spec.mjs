@@ -215,6 +215,8 @@ test('«basta così»: chiude, fissa in memoria quello che ha imparato e apre la
 
   // Il segno "già accolto" si scrive ADESSO, non prima.
   expect((await onbState(app)).done).toBe(true);
+  // Intervista pulita chiusa da Filo: le lezioni se le scrive da solo (#1312.2, verso positivo).
+  expect(await app.evaluate(() => globalThis.__seen.lesson)).toBeGreaterThan(0);
 
   // Le lezioni raccolte sono già dentro il profilo: compattazione FORZATA,
   // senza aspettare la soglia dei 3000 caratteri (prima non c'era modo di
