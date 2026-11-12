@@ -29,7 +29,7 @@ function servizio({ risposte = {}, ritardo = 0, acceso = true, segreti = [], red
   };
   const L0 = crea({
     gate, azioni: AZ, log: muto,
-    impostazioni: async () => ({ feedbackL0: { enabled: acceso } }),
+    impostazioni: async () => ({ feedbackRilettura: { enabled: acceso } }),
     segreti: async () => segreti,
     redTeam: () => redTeam,
   });
