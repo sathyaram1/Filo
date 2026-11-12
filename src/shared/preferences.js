@@ -2690,7 +2690,8 @@
 
   // Un pezzo di impostazioni scritto per intero, come l'annullo di un cambio (#1840): abbassa una difesa se uno dei freni
   // che tocca, giudicato dal suo setter come una richiesta in chat, la allenta. Un freno che non si sa giudicare la abbassa.
-  function allentaParziale(partial, attuali) {
+  // La prima voce che `partial` allenterebbe: { setter }, { setter: null } se non si sa giudicare (vale allentata), o null.
+  function freniAllentati(partial, attuali) {
     for (const s of PREF_SETTERS) {
       if (typeof s.allenta !== 'function' || !Array.isArray(s.scrive)) continue;
       for (const p of s.scrive) {
@@ -2698,10 +2699,17 @@
         const v = dentro(partial, percorso);
         if (v === undefined) continue;
         const r = Array.isArray(v) ? { partial, elenco: { percorso, op: 'sostituisci', voci: v } } : { partial };
-        try { if (s.allenta(r, attuali)) return true; } catch (_) { return true; }
+        try { if (s.allenta(r, attuali)) return { setter: s }; } catch (_) { return { setter: null }; }
       }
     }
-    return false;
+    return null;
+  }
+  function allentaParziale(partial, attuali) { return !!freniAllentati(partial, attuali); }
+  // La strada a mano per un cambio di più voci che toglie un freno («rimetti com'era», il ripristino di serie): '' se non ne toglie.
+  function doveSeAllenta(partial, attuali) {
+    const f = freniAllentati(partial, attuali);
+    if (!f) return '';
+    return (f.setter && f.setter.dove) || doveAMano(f.setter);
   }
 
   global.SN_PREF = {
