@@ -308,20 +308,25 @@
     return null;
   }
 
-  // La risposta di chi compatta → righe delle ore con le fonti e l'intervallo, memorie. null se non si legge: il tratto
-  // resta com'è, mai un pezzo perso perché il riassunto non è arrivato.
+  // La risposta di chi compatta → righe delle ore con le fonti e l'intervallo, memorie con le fonti (le chiavi dei
+  // messaggi citati: il quaderno ne fa il punto del filo, e una riga tolta dall'utente non torna da lì). null se non si
+  // legge: il tratto resta com'è, mai un pezzo perso perché il riassunto non è arrivato.
   function leggiRisposta(testo, righe, { id = () => `o${Math.random().toString(36).slice(2, 10)}` } = {}) {
     const j = jsonDi(testo);
     if (!j || typeof j !== 'object' || !Array.isArray(j.ore)) return null;
     const perN = new Map((Array.isArray(righe) ? righe : []).map((r) => [r.n, r]));
     const tutte = [...perN.values()];
     if (!tutte.length) return null;
+    // Senza righe citate (o citate a vuoto) vale tutto il pezzo.
+    const daDove = (o) => {
+      const citate = (o && Array.isArray(o.righe) ? o.righe : []).map(Number).map((n) => perN.get(n)).filter(Boolean);
+      return citate.length ? citate : tutte;
+    };
     const ore = [];
     for (const o of j.ore) {
       const t = typeof o === 'string' ? o : (o && o.testo);
       if (!stringa(t)) continue;
-      const citate = (o && Array.isArray(o.righe) ? o.righe : []).map(Number).map((n) => perN.get(n)).filter(Boolean);
-      const da = citate.length ? citate : tutte;
+      const da = daDove(o);
       const tss = da.map((r) => ms(r.ts)).filter(Number.isFinite);
       ore.push({
         id: id(), testo: unaRiga(t, 2000),
