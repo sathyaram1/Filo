@@ -320,11 +320,13 @@ test('un file lasciato nella chat pulita non toglie la strada della parola', asy
   writeFileSync(file, 'I miei appunti.');
   try {
     await modelloFinto(app, [chiamata('f1', ...TETTO), { text: 'Serve la parola.' }]);
-    await page.evaluate((p) => {
+    // Come il trascinamento vero da dentro Filo: il gettone nel tipo, il percorso al main (un percorso nudo è testo di altri).
+    await page.evaluate(async (p) => {
       const dt = new DataTransfer();
-      dt.setData('application/x-filo-file', p);
+      await window.SN_TRASCINO_INTERNO.parte(dt, 'file', p);
       document.getElementById('inputForm').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
     }, file);
+    await expect(page.locator('.dash-file-chip')).toHaveCount(1);
     await page.locator('#input').fill('alza il tetto di spesa a 800 euro');
     await page.locator('#sendBtn').click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
