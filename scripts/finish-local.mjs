@@ -980,8 +980,7 @@ async function main() {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
   }
-  const dopo = giro;
-  const reply = dopo.reply;
+  const { reply } = giro;
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
