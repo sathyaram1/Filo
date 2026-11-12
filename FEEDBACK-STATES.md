@@ -363,6 +363,15 @@ la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il r
 preceduto dalla riga della fusione e la versione di `package.json` sulla fusione. Un
 rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
 
+Un allarme della suite (`agent:costruzione`, scritto dal server) nasce col commit su cui
+la suite ha dato il rosso (`commitProvato`, dal `--commit` di `scripts/build-alarm.mjs`),
+e il primo lavoro lo riceve in `payload.commitProvato`. Per lui la prova cambia (#2148.1):
+il rosso può averlo corretto la fusione di un altro feedback arrivata mentre la suite
+girava, che non cita l'allarme ed è più vecchia della sua nascita. Il server accetta
+allora una fusione sulla linea principale (o arrivata su main, oltre la finestra) che il
+commit provato NON contiene, più recente dell'ultima riapertura (non della nascita),
+senza chiedere la citazione, e mai la propria.
+
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
 `npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
