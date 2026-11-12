@@ -22,6 +22,7 @@ const PAGINA = `<!doctype html><html><head><title>Scrivi</title></head>
     <textarea name="messaggio" id="messaggio" style="width:420px;height:120px"></textarea>
     <input type="text" name="cardnumber" id="carta" placeholder="Numero della carta" style="width:220px;height:28px">
     <input type="text" id="otp" autocomplete="one-time-code" style="width:120px;height:28px">
+    <input type="text" name="riferimento" id="riferimento" style="width:220px;height:28px">
     <button id="invia">Invia</button>
   </form>
   <p id="ricevuto"></p>
