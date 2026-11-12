@@ -440,7 +440,7 @@
 
   global.SN_FILO_COMPATTAZIONE = {
     LISTINO, ORE_GREZZE, TURNI_GREZZI, QUOTA_GRANDE, TETTO_COMPATTATO, PAUSA_DOPO_GUASTO_MS, MAX_MEMORIE, MAX_INGRESSO, ISTRUZIONI,
-    MAX_MESSAGGIO, MARGINE, testoPerChiCompatta, grezzoMassimo, pesoTurno, TURNI_LIBERI, sogliaAnticipo, usoTipico, SPAZIO_MINIMO, spazio, limiti,
+    MAX_MESSAGGIO, MARGINE, testoPerChiCompatta, grezzoMassimo, pesoTurno, TURNI_LIBERI, sogliaAnticipo, usoTipico, SPAZIO_MINIMO, ESITO_GROSSO, spazio, limiti,
     motivo, ultimaAttivita, giornoDi, giorniDaRiassumere, puntoDiTaglio, rigaLettura, righePerChiCompatta, richiesta, richiestaGiorno,
     leggiRisposta, leggiGiorno, rendiFiloCompattato, senzaCancellate, USO, stimaSoglia, QUOTA_ANTICIPO,
   };
