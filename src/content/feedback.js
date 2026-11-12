@@ -39,6 +39,9 @@
   let clientIdCache = null;
   // I testi in viaggio verso il server: un riquadro riaperto mentre aspettano non li ripropone come bozza (#1681).
   const inVolo = new Set();
+  let daRiaprire = null;
+  // L0 (#1403): la rilettura del testo parte dopo questa pausa nello scrivere, così all'invio è già pronta.
+  const ANTICIPO_MS = 1500;
 
   // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
   // pagina.
