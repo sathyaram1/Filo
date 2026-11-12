@@ -87,7 +87,7 @@
       for (const [k, gs] of gruppi(restoS, passo)) {
         const qui = gp.get(k) || [];
         for (let i = 0; i < gs.length && i < qui.length; i++) {
-          out.push({ indice: qui[i].indice, valore: gs[i].valore });
+          out.push({ indice: qui[i].indice, valore: gs[i].valore, da: gs[i].da });
           usatiS.add(gs[i]);
           usatiP.add(qui[i]);
         }
