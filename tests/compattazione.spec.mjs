@@ -200,7 +200,7 @@ const conversazioneTolta = (app, { chat, sospetta, oreFa }) => app.evaluate(asyn
 }, { chat, sospetta, oreFa });
 
 test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da una proposta il quaderno dice perché', async ({ app, openTab }) => {
-  const r = await conversazioneTolta(app, { chat: 'gatti1', sospetta: false });
+  const r = await conversazioneTolta(app, { chat: 'gatti1', sospetta: false, oreFa: 5 });
   expect(r.fatto).toBe(true);
   expect(r.scritte, 'la compattazione non la riscrive').toBe(0);
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
