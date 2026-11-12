@@ -229,19 +229,23 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
-  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna. Ognuna
-  // porta i messaggi da cui nasce (`origine`), come le lezioni: il punto del filo nel quaderno, e il controllo che non
-  // lascia tornare una riga tolta. Una proposta mostra anche i messaggi che hanno reso sospetto il pezzo.
-  if (!incognito && letto.memorie.length) {
-    const fontiSospette = sospetto ? await eventiDeiMessaggi(sospette) : [];
+  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna.
+  // Ogni memoria porta i messaggi che la dicono (`origine`, il controllo delle righe tolte) e, se proposta, la lettura
+  // che l'ha resa sospetta; senza messaggi citati, tutto il pezzo per il salto al filo.
+  if (!incognito) {
+    const unisci = (...l) => globalThis.SN_QUADERNO.unisci(...l);
+    const lette = sospetto && letto.memorie.length ? await eventiDeiMessaggi(sospette) : [];
+    let tuttoIlPezzo = null;
     for (const m of letto.memorie) {
-      const origine = await eventiDeiMessaggi(m.fonti);
+      const origine = m.fonti.length ? await eventiDeiMessaggi(m.fonti) : [];
+      if (!origine.length && !tuttoIlPezzo) tuttoIlPezzo = await eventiDeiMessaggi(pezzo.map((x) => FC().chiave(x)));
+      const fonti = unisci(origine.length ? origine : tuttoIlPezzo, lette);
       if (sospetto) {
-        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: [...new Set([...origine, ...fontiSospette])], origine };
+        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: unisci(lette, origine.length ? origine : []), origine };
         s.inAttesa.push(p);
         inAttesa.push(p);
       } else {
-        try { if (await _dip.applicaMemoria(m.testo, { fonti: origine })) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
+        try { if (await _dip.applicaMemoria(m.testo, { fonti, origine })) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
       }
     }
   }
