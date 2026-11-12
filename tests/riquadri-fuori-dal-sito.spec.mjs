@@ -378,6 +378,13 @@ test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, 
   await dove.keyboard.press('ControlOrMeta+V');
   await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(2);
 
+  // «Incolla» dal tasto destro di Filo sulla casella.
+  await clicca(app, p, '.sn-fb-text', { button: 'right' });
+  let menu = null;
+  await expect.poll(async () => Boolean(menu = await menuDelloStratoAperto(app)), { timeout: 10_000 }).toBe(true);
+  await menu.locator('.sn-menu-paste-main').click();
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(3);
+
   await p.waitForTimeout(400);
   expect(await p.evaluate(() => window.__file)).toEqual([]);
 });
