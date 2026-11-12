@@ -74,16 +74,16 @@ test('foto lasciata fuori dalla scatola, sul resto del riquadro: il sito non la 
 test('immagine incollata nella casella: entra negli allegati, il sito non riceve niente', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   const strato = await apriSegnalazione(app, page);
-  const chiavi = await app.evaluate((electron, b64) => {
-    const cb = electron.clipboard;
-    const k = Object.keys(cb || {}).concat(Object.getOwnPropertyNames(Object.getPrototypeOf(cb || {}) || {}));
-    const img = electron.nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
-    if (typeof cb.writeImage === 'function') cb.writeImage(img);
-    else if (typeof cb.write === 'function') cb.write({ image: img });
-    return k;
-  }, PNG.toString('base64'));
-  console.log('appunti:', chiavi.join(','));
   await strato.locator('.sn-fb-text').click();
+  // Le prove hanno appunti finti nel main: l'immagine va negli appunti veri del sistema dal renderer dello strato.
+  const scritto = await strato.evaluate(async (b64) => {
+    try {
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([bin], { type: 'image/png' }) })]);
+      return 'ok';
+    } catch (e) { return String(e); }
+  }, PNG.toString('base64'));
+  console.log('scrittura appunti:', scritto);
   await strato.keyboard.press('Control+V');
   await expect.poll(() => conta(app, page, '.sn-fb-thumb'), { timeout: 10_000 }).toBe(1);
   await strato.waitForTimeout(500);
