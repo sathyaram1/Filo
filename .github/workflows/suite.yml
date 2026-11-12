@@ -389,10 +389,10 @@ jobs:
           TESTO="${PREMESSA}
 
           Rossi nuovi (${N_TUTTE:-0}):
-          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}${ERRORI}
+          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
 
 
-          ${DOPO_VERDE}
+          ${DOPO_VERDE}${ERRORI}
 
 
           Verdetto:
