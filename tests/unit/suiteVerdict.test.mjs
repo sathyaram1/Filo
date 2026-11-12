@@ -434,7 +434,7 @@ describe('lo script da riga di comando', () => {
     writeFileSync(vuoto, JSON.stringify({ suites: [], errors: [{ message: 'SyntaxError: Unexpected token\n    at tests/zeta.spec.mjs:9' }] }), 'utf8');
     const e2 = join(dir, 'errori-3.txt');
     assert.equal(spawnSync(process.execPath, [CLI, vuoto, '--rossi', fileNoti, '--errori', e2]).status, 2);
-    assert.match(readFileSync(e2, 'utf8'), /^✗ errore fuori dai casi: SyntaxError: Unexpected token\n {4}SyntaxError: Unexpected token\n {4}at tests\/zeta\.spec\.mjs:9$/m);
+    assert.match(readFileSync(e2, 'utf8'), /^✗ errore fuori dai casi: SyntaxError: Unexpected token\n {4}SyntaxError: Unexpected token\n {8}at tests\/zeta\.spec\.mjs:9$/m);
   });
 
   test.after(() => { try { togliCartella(dir); } catch (_) { /* best effort */ } });
