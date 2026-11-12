@@ -170,11 +170,11 @@ test('«rimetti tutte le impostazioni di serie»: OK con l\'elenco, poi tutte di
   expect((await confirmState(chat)).text).toContain('durata delle notifiche: 30 s');
   expect((await impostazioni(app)).theme).toBe('dark');
   await chat.screenshot({ path: 'tests/.shots/pulsanti-preferenze-ripristino-conferma.png' });
-  // Tocca anche i modelli scelti: vuole la parola «conferma».
+  // Tocca anche i modelli scelti, ma tornare a quelli di Filo non toglie un freno (#1840): un OK, senza la parola.
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible();
-  await fillConfirmInput(chat, 'conferma');
+  expect((await confirmState(chat)).hasInput).toBe(false);
   await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'danger');
+  await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
   const dopo = await impostazioni(app);
   expect(dopo.notifications.durationSec).toBe(5);
