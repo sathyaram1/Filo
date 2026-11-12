@@ -95,16 +95,18 @@
   // Una regola sola sullo spazio per la conversazione sopra la parte fissa misurata (`base`: strumenti, istruzioni,
   // CONTESTO), che cresce a ogni strumento nuovo: la soglia meno la parte fissa, ma mai meno di SPAZIO_MINIMO né di
   // quanto serve perché dopo il grezzo (almeno l'ultimo turno) stiano `TURNI_LIBERI` turni del peso di adesso (`turno`)
-  // sotto l'anticipo. Quello che serve si ferma sotto il listino. Senza `base` nota vale la soglia com'è.
+  // sotto l'anticipo. Quello che serve lascia sotto il listino il posto per un esito grosso, come la soglia di serie.
+  // Senza `base` nota vale la soglia com'è.
   const QUOTA_GREZZO = 1 / 3;
   const TURNI_LIBERI = 3;
   const SPAZIO_MINIMO = 30000;
+  const ESITO_GROSSO = 20000;
   function spazio({ soglia, base, turno = 0 } = {}) {
     const b = Number(base);
     if (!(Number.isFinite(b) && b > 0)) return null;
     const t = Number(turno) > 0 ? Number(turno) : 0;
     const serve = Math.max(SPAZIO_MINIMO, ((TURNI_LIBERI + 1) * t) / QUOTA_ANTICIPO);
-    const finoAlListino = Math.max(SPAZIO_MINIMO, LISTINO - MARGINE - b);
+    const finoAlListino = Math.max(SPAZIO_MINIMO, LISTINO - ESITO_GROSSO - b);
     return Math.max(Number(soglia) - b, Math.min(serve, finoAlListino));
   }
 
