@@ -530,11 +530,12 @@ async function main() {
     ? rossiDellePartiMancanti(partiSenzaEsito(opt.parti, existsSync(cartellaEsiti) ? readdirSync(cartellaEsiti) : []), opt.parti)
     : [];
   // Senza un verdetto sui casi, le parti mancanti sono l'unica cosa che si sa: si dicono, e finiscono nel file dei nuovi.
-  const fermo = (messaggio, chiavi) => {
+  const fermo = (messaggio, chiavi, nuovi = []) => {
     console.error(messaggio);
     for (const c of parti) console.error(`  ✗ ${rigaRosso(c)}`);
     if (opt.out && parti.length) writeFileSync(resolve(opt.out), `${parti.map(rigaRosso).join('\n')}\n`, 'utf8');
     scriviChiavi(opt, parti.length && !chiavi.includes(CHIAVE_NON_PARTITA) ? [...chiavi, CHIAVE_NON_PARTITA] : chiavi);
+    scriviErrori(opt, nuovi);
     process.exit(2);
   };
   const fileJson = resolve(opt.file);
