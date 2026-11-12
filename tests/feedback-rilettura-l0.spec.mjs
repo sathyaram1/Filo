@@ -169,6 +169,29 @@ test('la rilettura parte mentre si scrive: all\'invio, testo uguale, non si rile
   expect(await invii(app)).toEqual(['Il tasto Salva non risponde']);
 });
 
+test('spenta in Preferenze avanzate (con la stima accanto) o chiedendolo a Filo, il feedback parte senza rilettura', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await finti(app);
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
+  const pref = await openTab('filo://preferences/preferences.html#sec-feedback');
+  const casella = pref.locator('#feedbackRilettura');
+  await expect(casella).toBeChecked();
+  await expect(pref.locator('#sec-feedback')).toContainText('al mese');
+  await casella.uncheck();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).feedbackRilettura?.enabled)).toBe(false);
+  await pref.locator('#sec-feedback').screenshot({ path: `${SHOTS}/1403-preferenze.png` });
+
+  const page = await newtab(app);
+  await scriviEInvia(page, TESTO);
+  await expect(toast(page, 'Grazie! Feedback inviato.')).toHaveCount(1, { timeout: 15_000 });
+  expect(await invii(app)).toEqual([TESTO]);
+  expect(await chiamateTesto(app), 'nessuna rilettura').toBe(0);
+
+  // La stessa scelta dalla chat la scrive nello stesso posto.
+  const P = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('rilettura_feedback', 'sì').partial);
+  expect(P).toEqual({ feedbackRilettura: { enabled: true } });
+});
+
 test('il modello non risponde: dopo 8 secondi il feedback parte lo stesso', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
