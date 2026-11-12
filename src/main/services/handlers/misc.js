@@ -256,6 +256,13 @@ module.exports = function register(on, ctx) {
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
+  const L0 = require('../feedbackL0').crea({
+    gate: modelGate,
+    azioni: ACTIONS,
+    impostazioni: () => ctx.getEffectiveSettings(),
+    segreti: async () => (typeof ctx.segretiCustoditi === 'function' ? ctx.segretiCustoditi() : []),
+    redTeam: () => require('../redteamGate').visibile(),
+  });
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
   // — l'invio non deve MAI fallire per colpa del titolo.
