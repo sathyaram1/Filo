@@ -991,6 +991,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'feedbackL0.enabled': return !(s.feedbackL0 && s.feedbackL0.enabled === false);
       case 'traduzionePagina.nascoste': return nascosteDellaTraduzione(s);
       case 'filoParla.downloadOgniMin': return minutiFraDownload(s.filoParla);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
