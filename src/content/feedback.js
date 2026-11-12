@@ -235,7 +235,11 @@
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
         <div class="sn-fb-drag" title="Trascina per spostare il box"><span class="sn-fb-grip"></span></div>
         <div class="sn-fb-body">
-          <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          <div class="sn-fb-l0" role="alert" hidden></div>
+          <div class="sn-fb-campo">
+            <div class="sn-fb-evidenze" aria-hidden="true"></div>
+            <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          </div>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
