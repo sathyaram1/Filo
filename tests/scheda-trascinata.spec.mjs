@@ -422,7 +422,8 @@ test('#2084 a metà trascinamento sopra una vicina la linguetta la copre del tut
   expect(copre.visibile).toBeGreaterThanOrEqual(0.99);
 });
 
-// Il modello finto dell'Aiuto: risponde sempre uguale e tiene i messaggi che riceve.
+// Il modello finto dell'Aiuto: risponde sempre uguale e tiene i messaggi della sola chat dell'Aiuto.
+// Il correttore che rilegge la casella mentre si scrive passa dallo stesso provider (#2091.4).
 async function aiutoFinto(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
@@ -432,8 +433,11 @@ async function aiutoFinto(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__visti = [];
+    const fisso = C.PROMPTS.helpStatic().slice(0, 300);
+    const testo = (c) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (p && p.text) || '').join('') : '');
+    const dellAiuto = (messages) => (messages || []).some((m) => m && m.role === 'system' && testo(m.content).includes(fisso));
     const risposta = ({ attempts, messages }) => {
-      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      if (dellAiuto(messages)) globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
       return { text: '{"message":"Con un razzo.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
     P.completeWithFallback = async (o) => risposta(o);
