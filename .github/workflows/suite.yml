@@ -160,6 +160,7 @@ jobs:
           path: |
             suite-risultati.json
             rossi-nuovi.txt
+            rossi-errori.txt
             verdetto.log
             chiavi-allarme.txt
           if-no-files-found: warn
