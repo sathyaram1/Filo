@@ -1219,6 +1219,7 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('feedbackL0.enabled')) $('feedbackL0').checked = !(settings.feedbackL0 && settings.feedbackL0.enabled === false);
     if (vuole('traduzionePagina.nascoste')) $('traduzioneNascoste').value = nascosteDellaTraduzione(settings);
     if (vuole('filoParla.downloadOgniMin')) $('filoParlaDownload').value = String(minutiFraDownload(settings.filoParla));
     if (vuole('descriviImmagini.enabled')) $('descriviImmagini').checked = !(settings.descriviImmagini && settings.descriviImmagini.enabled === false);
