@@ -75,6 +75,12 @@
     else activeRoot.remove();
     activeRoot = null;
     setShellDim(false);
+    // Un feedback che L0 rimanda indietro mentre è aperto un altro riquadro si riapre quando quello si chiude.
+    if (daRiaprire) {
+      const d = daRiaprire;
+      daRiaprire = null;
+      setTimeout(() => { if (!activeRoot) apriQui(d); else daRiaprire = d; }, 0);
+    }
   }
 
   function blobToDataUrl(blob) {
