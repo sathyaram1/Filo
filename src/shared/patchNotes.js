@@ -13,6 +13,7 @@
       features: [
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
         { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
@@ -95,6 +96,7 @@
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
+      features: [],
     },
     {
       version: '0.2.266', date: '2026-11-05',

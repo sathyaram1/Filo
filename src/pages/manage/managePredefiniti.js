@@ -109,6 +109,7 @@
     $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
     $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
     $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('l-contesto-soglia').textContent = I18n.t('admin_defaults_contesto_soglia');
     $('l-contesto-cache').textContent = I18n.t('admin_defaults_contesto_cache');
     $('contestoCache5m').textContent = I18n.t('admin_defaults_contesto_cache_5m');
     $('contestoCache1h').textContent = I18n.t('admin_defaults_contesto_cache_1h');
@@ -847,19 +848,28 @@
   let contestoCaricato = {};
   function renderContesto(salvato, diSerie) {
     contestoCaricato = salvato || {};
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+    for (const k of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI) {
+      const id = window.SN_FILO_CONTESTO.campoDelTetto(k);
       $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
       $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
     }
     $('contestoCache').value = contestoCaricato.cache === '5m' || contestoCaricato.cache === '1h' ? contestoCaricato.cache : '';
+    $('contestoSoglia').oninput = stimaSoglia;
+    stimaSoglia();
     const serie = diSerie && diSerie.cache === '5m' ? 'admin_defaults_contesto_cache_5m' : 'admin_defaults_contesto_cache_1h';
     $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_serie', I18n.t(serie));
   }
+  // Accanto alla soglia di compattazione, la sua stima: costo al mese e attesa, coi prezzi di adesso (filo_design.txt).
+  const stimaSoglia = window.SN_FILO_CONTESTO.stimatoreSoglia({
+    campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
+    chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
+  });
+  window.SN_FILO_CONTESTO.limitiAiCampi($);
   // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
   function collectContesto() {
     const ora = {};
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
-      const v = $(id).value.trim();
+    for (const k of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI) {
+      const v = $(window.SN_FILO_CONTESTO.campoDelTetto(k)).value.trim();
       if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
     }
     if ($('contestoCache').value) ora.cache = $('contestoCache').value;

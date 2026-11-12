@@ -7,8 +7,11 @@
 
   const ORA_MS = 60 * 60 * 1000;
   const GIORNO_MS = 24 * ORA_MS;
-  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000, cache: '1h' });
-  const LIMITI = Object.freeze({ giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]) });
+  // `soglia`: oltre questa stima una richiesta della chat parte solo dopo la compattazione (SPEC-CONTESTO § La compattazione).
+  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000, soglia: 70000, cache: '1h' });
+  const LIMITI = Object.freeze({
+    giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]), soglia: Object.freeze([5000, 2000000]),
+  });
   // Quanto vive la cache della parte fissa della chat (SPEC-CONTESTO § Le costanti): le sole due durate di Anthropic.
   const DURATE_CACHE = Object.freeze(['5m', '1h']);
   function durataIn(v) {
@@ -41,18 +44,51 @@
     return Math.min(max, Math.max(min, n));
   }
 
+  // I numeri dei tetti, uno per campo in Preferenze e nei Modelli predefiniti (`contestoGiorni`…): chi ne aggiunge uno
+  // lo aggiunge qui, e calcolo, salvataggio e pagine lo seguono.
+  const NUMERI_DEI_TETTI = Object.freeze(['giorni', 'token', 'soglia']);
+  const campoDelTetto = (k) => `contesto${k[0].toUpperCase()}${k.slice(1)}`;
+  // Dentro i limiti, intero tranne i giorni (mezza giornata ha senso, mezzo token no). null se non è un numero.
+  function numeroDelTetto(k, v) {
+    const n = numeroIn(v, LIMITI[k]);
+    return n != null && k !== 'giorni' ? Math.round(n) : n;
+  }
+  // I limiti dei campi nelle due pagine vengono da LIMITI, non dall'HTML. `trova(id)`: il campo.
+  function limitiAiCampi(trova) {
+    for (const k of NUMERI_DEI_TETTI) {
+      const c = trova(campoDelTetto(k));
+      if (c) { c.min = String(LIMITI[k][0]); c.max = String(LIMITI[k][1]); }
+    }
+  }
+  // La stima accanto alla soglia, uguale nelle due pagine: il campo (vuoto, il segnaposto), un'attesa breve mentre si
+  // scrive, e una risposta arrivata tardi non copre quella dopo.
+  function stimatoreSoglia({ campo, uscita, chiedi, attesaMs = 250 }) {
+    let giro = 0;
+    let attesa = null;
+    return () => {
+      clearTimeout(attesa);
+      attesa = setTimeout(async () => {
+        const mio = ++giro;
+        const c = campo();
+        const v = c.value.trim() || c.placeholder;
+        let r = null;
+        try { r = await chiedi(v); } catch (_) { r = null; }
+        if (mio !== giro) return;
+        uscita().textContent = r && r.ok ? r.testo : '';
+      }, attesaMs);
+    };
+  }
   // L'utente vince sull'owner, l'owner sul codice. Un valore vuoto vuol dire «come i predefiniti».
   function tetti(utente, owner) {
     const u = utente && typeof utente === 'object' ? utente : {};
     const o = owner && typeof owner === 'object' ? owner : {};
     const out = { da: {} };
-    for (const k of ['giorni', 'token']) {
-      const vu = numeroIn(u[k], LIMITI[k]);
-      const vo = numeroIn(o[k], LIMITI[k]);
+    for (const k of NUMERI_DEI_TETTI) {
+      const vu = numeroDelTetto(k, u[k]);
+      const vo = numeroDelTetto(k, o[k]);
       out[k] = vu ?? vo ?? TETTI_DI_SERIE[k];
       out.da[k] = vu != null ? 'utente' : (vo != null ? 'predefiniti' : 'codice');
     }
-    if (out.token % 1) out.token = Math.round(out.token);
     const cu = durataIn(u.cache);
     const co = durataIn(o.cache);
     out.cache = cu ?? co ?? TETTI_DI_SERIE.cache;
@@ -245,7 +281,7 @@
   // `foto`: le immagini del messaggio che tornano davanti al modello in questo turno (la finestra decide quali).
   // `preambolo`: quello che Filo scrive in testa al messaggio dell'utente (src/shared/filoTrattoVivo.js); `dopo`: le note
   // del suo turno (l'origine delle immagini) che tornano con lui; `intero`: la domanda di adesso non si accorcia.
-  function rendi(m, prima, { tetto, esito, osserva, foto = null, preambolo = '', dopo = null, intero = false }) {
+  function rendi(m, prima, { tetto, esito, osserva, foto = null, preambolo = '', dopo = null, intero = false, esitiTolti = false }) {
     const cambia = !prima || prima.chat !== m.chat;
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : (intero ? String(m.text == null ? '' : m.text) : tienilo(m.text, tetto, m.chat));
@@ -286,6 +322,7 @@
     const storia = ES && !m.confermaDopo && voci.length ? ES.perModello(voci) : '';
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
+    else if (tipi.length && esitiTolti) parti.push(`(azioni di questo turno: ${tipi.join(', ')}; i loro esiti sono stati tolti per stare nel contesto: se ti servono, rifai l'azione o rileggi la conversazione con CERCA_CHAT e l'id "${m.chat}")`);
     else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
     if (storia) parti.push(storia);
     // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
@@ -322,17 +359,22 @@
   // `immagini(m)`: i data URL ancora in memoria del messaggio, o null. `preambolo(m)`: quello che Filo scrive in testa a
   // un messaggio dell'utente; `note(m)`: le note del suo turno. `giro(m)`: il turno di una risposta come è andato, e
   // `salta(m)`: i seguiti che quel turno porta già dentro. `intero(m)`: un messaggio dell'utente già mandato intero, che
-  // torna com'era invece di accorciarsi.
+  // torna com'era invece di accorciarsi. `dopo` ({ da, a }): il pezzo di filo compattato (SPEC-CONTESTO § La
+  // compattazione): il tratto non comincia prima di `a`, e i messaggi fra `da` e `a` non tornano nemmeno come conversazione
+  // ripresa, li dicono le righe delle ore. `senzaEsiti`: oltre il listino di Haiku gli esiti dei turni passati escono per primi, e la risposta lo dice.
   function finestra(messaggi, {
     ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
-    preambolo = null, note = null, giro = null, salta = null, intero = null,
+    preambolo = null, note = null, giro = null, salta = null, intero = null, dopo = null, senzaEsiti = false,
   } = {}) {
     const lista0 = Array.isArray(messaggi) ? messaggi : [];
     const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
     const n = lista.length;
     const t0 = taglio(ora, giorni);
     const stessaAncora = ancora && ancora.giorni === giorni && ancora.token === token && Number.isFinite(Date.parse(ancora.ts));
-    const da = Math.max(t0, stessaAncora ? Date.parse(ancora.ts) : -Infinity);
+    const compattatoFino = dopo && Number.isFinite(Date.parse(dopo.a)) ? Date.parse(dopo.a) : -Infinity;
+    const compattatoDa = dopo && Number.isFinite(Date.parse(dopo.da)) ? Date.parse(dopo.da) : -Infinity;
+    const compattato = (m) => { const t = Date.parse(m.ts); return t >= compattatoDa && t < compattatoFino; };
+    const da = Math.max(t0, stessaAncora ? Date.parse(ancora.ts) : -Infinity, compattatoFino);
     let inizio = 0;
     while (inizio < n && Date.parse(lista[inizio].ts) < da) inizio++;
     // Il comando di un esito scritto in chat è l'ultima riga «/…» dell'utente nella sua conversazione.
@@ -344,7 +386,7 @@
       else if (m.role !== 'user') comandi[i] = ultimoComando.get(m.chat) || '';
     }
     const esitoDi = (i) => {
-      const e = esiti ? esiti(lista[i]) : null;
+      const e = esiti && !senzaEsiti ? esiti(lista[i]) : null;
       const fuori = letturaDaFuori(lista[i], comandi[i]);
       return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
     };
@@ -405,12 +447,12 @@
           preambolo: typeof preambolo === 'function' ? preambolo(m) : '', dopo: typeof note === 'function' ? note(m) : null,
         };
       }
-      return { tetto: token, esito: esitoDi(i), osserva };
+      return { tetto: token, esito: esitoDi(i), osserva, esitiTolti: senzaEsiti };
     };
     // Un messaggio diventa uno o più messaggi per il modello (una risposta col suo giro).
     const rendiIl = (i, prima) => {
       const m = lista[i];
-      const g = m.role !== 'user' && typeof giro === 'function' ? conGiro(m, prima, giro(m)) : null;
+      const g = m.role !== 'user' && !senzaEsiti && typeof giro === 'function' ? conGiro(m, prima, giro(m)) : null;
       if (g) return g;
       const r = rendi(m, prima, opzioni(i));
       return r ? [r] : [];
@@ -427,7 +469,7 @@
     const riprese = new Set(tieni ? ancora.riprese : []);
     if (chatCorrente) riprese.add(chatCorrente);
     const mie = [];
-    for (let i = 0; i < n; i++) if (riprese.has(lista[i].chat)) mie.push(i);
+    for (let i = 0; i < n; i++) if (riprese.has(lista[i].chat) && !compattato(lista[i])) mie.push(i);
     let mieDavanti = 0;
     while (mieDavanti < mie.length && mie[mieDavanti] < inizio) mieDavanti++;
     const riprendi = () => {
@@ -885,7 +927,7 @@
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
-    tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
+    tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, limitiAiCampi, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
     provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
     troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,

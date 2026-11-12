@@ -12,6 +12,8 @@
   const TIPI = Object.freeze({
     conversazione: { prompt: 16000, completion: 900 },
     documento: { prompt: 8000, completion: 800 },
+    // I token li calcola la compattazione stessa (SN_FILO_COMPATTAZIONE.usoTipico), dalla soglia di serie.
+    compattazione: null,
     traduzione: { prompt: 5000, completion: 5000 },
     testo: { prompt: 3000, completion: 500 },
     breve: { prompt: 1500, completion: 150 },
@@ -28,6 +30,7 @@
     [A.FILO_DASHBOARD]: ['documento', U('aggiornamento', 'aggiornamenti')],
     [A.FILO_LESSON]: ['documento', U('conversazione', 'conversazioni')],
     [A.FILO_COMPACT]: ['documento', U('riordino', 'riordini')],
+    [A.FILO_COMPATTAZIONE]: ['compattazione', U('compattazione', 'compattazioni')],
     [A.FILO_TAB_TRIAGE]: ['documento', U('riordino', 'riordini')],
     [A.FILO_TAB_SUMMARY]: ['documento', U('scheda', 'schede')],
     [A.EDITOR_SUMMARY]: ['documento', U('riassunto', 'riassunti')],
@@ -97,7 +100,19 @@
     if (req) out.request = req;
     const cache = numeroListino(pricing.input_cache_read);
     if (cache != null) out.cacheRead = cache;
+    // Il listino a scaglioni (Haiku 5.5 sopra 100.000 token di prompt costa cinque volte tanto, su tutta la richiesta).
+    const sopra = (Array.isArray(pricing.overrides) ? pricing.overrides : [])
+      .map((o) => ({ da: numeroListino(o && o.min_prompt_tokens), p: prezzoDaCatalogo({ ...o, overrides: null }) }))
+      .filter((o) => o.da && o.p).sort((a, b) => a.da - b.da);
+    if (sopra.length) out.oltre = sopra.map((o) => ({ da: o.da, ...o.p }));
     return out;
+  }
+  // Il prezzo che vale per una richiesta di `token` token di prompt.
+  function prezzoPer(prezzo, token) {
+    if (!prezzo || !Array.isArray(prezzo.oltre)) return prezzo;
+    let p = prezzo;
+    for (const o of prezzo.oltre) if (token >= o.da) p = o;
+    return p;
   }
   // Il catalogo intero (le voci di `/api/v1/models`) → { id: prezzo }. Le voci senza prezzo leggibile restano fuori.
   function listinoDaCatalogo(voci) {
@@ -157,7 +172,9 @@
     if (r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
       return { prompt: Number(r.prompt) || 0, completion: Number(r.completion) || 0, cached: Number(r.cached) || 0, fonte: 'registro' };
     }
-    const t = TIPI[funzione(action).tipo];
+    const tipo = funzione(action).tipo;
+    const LC = global.SN_FILO_COMPATTAZIONE;
+    const t = tipo === 'compattazione' ? (LC && global.SN_FILO_CONTESTO ? LC.usoTipico() : null) : TIPI[tipo];
     return t ? { prompt: t.prompt, completion: t.completion, cached: 0, fonte: 'prudente' } : null;
   }
 
@@ -288,7 +305,7 @@
 
   global.SN_STIMA_COSTO = {
     TIPI, CAMPIONI_MINIMI, FINESTRA, SOGLIA_PREDEFINITA, SOGLIA_MAX,
-    funzione, aConsumo, listinoDaCatalogo, prezzoDaCatalogo, prezzoDi, aggiungiCampione, tokenTipici, costoUsd,
+    funzione, aConsumo, listinoDaCatalogo, prezzoDaCatalogo, prezzoDi, prezzoPer, aggiungiCampione, tokenTipici, costoUsd,
     stima, soglia, avviso, voceDi, valuta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -126,6 +126,18 @@
     return global.SN_FILO_CONTESTO;
   }
 
+  // Un tetto del contesto chiesto a parole («50 mila», «2 milioni»): i limiti e l'arrotondamento sono quelli dei campi
+  // di Preferenze e Modelli predefiniti (numeroDelTetto). null se non è un numero.
+  function tettoAParole(k, v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s);
+    if (!Number.isFinite(n)) return null;
+    if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
+    else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
+    return contestoFilo().numeroDelTetto(k, n);
+  }
+  const limitiDelTetto = (k) => contestoFilo().LIMITI[k].map((n) => n.toLocaleString('it-IT', { useGrouping: true })).join('-');
+
   function lunghezzaRisposte() {
     if (!global.SN_LUNGHEZZA_RISPOSTE && typeof require === 'function') require('./lunghezzaRisposte.js');
     return global.SN_LUNGHEZZA_RISPOSTE;
@@ -2152,19 +2164,28 @@
     },
     {
       scrive: ['contestoFilo.token'],
-      aiuto: 'token 2.000-2.000.000, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)',
+      aiuto: () => `token ${limitiDelTetto('token')}, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)`,
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
       costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
       build(v) {
         if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        let n = parseItalianNumber(s);
-        if (!Number.isFinite(n)) return null;
-        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
-        else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
-        const token = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.token));
+        const token = tettoAParole('token', v);
+        if (token == null) return null;
         return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
+      },
+    },
+    {
+      scrive: ['contestoFilo.soglia'],
+      aiuto: () => `token ${limitiDelTetto('soglia')}, o "predefinito" (oltre questa misura la chat riassume la parte più vecchia della conversazione prima di rispondere)`,
+      keys: ['soglia_compattazione', 'soglia di compattazione', 'soglia della compattazione', 'compattazione della chat', 'contestofilo.soglia'],
+      costo: 2,
+      risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
+      build(v) {
+        if (predefinito(v)) return { partial: { contestoFilo: { soglia: null } }, label: 'Soglia di compattazione della chat → come i predefiniti' };
+        const soglia = tettoAParole('soglia', v);
+        if (soglia == null) return null;
+        return { partial: { contestoFilo: { soglia } }, label: `Soglia di compattazione della chat → ${soglia.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
     {

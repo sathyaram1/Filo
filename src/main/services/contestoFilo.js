@@ -49,6 +49,8 @@ function dimenticaIncognito() {
   for (const c of chatIncognito) dimentica(c);
   chatIncognito.clear();
   fotografie.incognito = null;
+  ancore.incognito = null;
+  try { globalThis.SN_COMPATTAZIONE?.dimenticaIncognito(); } catch (_) {}
 }
 
 function ricordaImmagini(chat, ts, immagini) {
@@ -116,6 +118,8 @@ function ricordaGiro(chat, ts, { messaggi, testo, reasoningDetails, azioni, segu
 // è comunque fredda (fermo da più della sua durata), o quando un cambio non si può dire con un'aggiunta.
 const fotografie = { normale: null, incognito: null };
 const DURATE_MS = { '5m': 5 * 60 * 1000, '1h': 60 * 60 * 1000 };
+// Quanto vive la cache: la fotografia fresca e la compattazione da fermo la leggono qui.
+const durataMs = (durata) => DURATE_MS[durata] || DURATE_MS['1h'];
 const epocaDi = (lato) => (fotografie[lato] ? fotografie[lato].epoca : 0);
 // Il tratto riparte quando il suo inizio si sposta, anche per una conversazione ripresa che entra davanti: il primo
 // messaggio di un tratto vuoto non sposta niente.
@@ -128,7 +132,7 @@ const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && 
 function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now(), segna = true } = {}) {
   const lato = incognito ? 'incognito' : 'normale';
   const f = fotografie[lato];
-  const fresca = f && ora - f.usata <= (DURATE_MS[durata] || DURATE_MS['1h']) && stessaAncora(f.ancora, ancora);
+  const fresca = f && ora - f.usata <= durataMs(durata) && stessaAncora(f.ancora, ancora);
   if (fresca) {
     const d = TV().confronta(f.viste, sezioni);
     if (!d.rifai) {
@@ -363,7 +367,8 @@ function domandaNelFilo(lista, chatId, userMessage) {
 // uscite: le azioni il cui esito arriva al modello, i messaggi che porta (letti, voce dell'utente), i più vecchi.
 // `immagini: false`: il modello ha rifiutato le immagini dei turni passati, al loro posto resta la nota.
 // `domanda(...)`: la domanda di adesso resa come la renderà il tratto dei turni dopo, con le note di questo turno.
-async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true } = {}) {
+// `senzaEsiti`: oltre il listino, anche dopo la compattazione, gli esiti dei turni passati escono (SPEC-CONTESTO).
+async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true, senzaEsiti = false } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
   const lato = incognito ? 'incognito' : 'normale';
@@ -448,8 +453,12 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     if (!memo.riga || memo.riga.epoca !== epoca) memo.riga = { epoca, testo: m.text };
     return memo.riga.testo === m.text ? m : { ...m, text: memo.riga.testo };
   });
+  const Comp = globalThis.SN_COMPATTAZIONE;
+  if (Comp) { try { await Comp.carica(); } catch (_) {} }
   const f = FC().finestra(nelTratto, {
     ora,
+    dopo: Comp ? Comp.compattato(incognito) : null,
+    senzaEsiti,
     giorni: tetti.giorni,
     token: tetti.token,
     ancora: ancore[lato],
@@ -519,5 +528,47 @@ function azzeraAncore() {
   fotografie.incognito = null;
 }
 
-module.exports = { ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
+// ── Per la compattazione (src/main/services/compattazioneFilo.js) ──────────
+// Le azioni di una risposta come le ha il tratto: il giro del turno, o gli esiti ricordati.
+function esitiPerCompattare(m) {
+  const k = FC().chiave(m);
+  const g = giri.get(k);
+  const e = esiti.get(k);
+  const azioni = [...((e && e.azioni) || []), ...((g && g.azioni) || [])];
+  const viste = new Set();
+  return { azioni: azioni.filter((a) => { if (!a || viste.has(a)) return false; viste.add(a); return true; }) };
+}
+// Le cose successe scritte in testa a un messaggio dell'utente, se il tratto le ha già scritte.
+function preamboloPerCompattare(m) {
+  const memo = preamboli.get(FC().chiave(m));
+  return memo && memo.eventi ? memo.eventi.testo || '' : '';
+}
+// Quanto pesa, in caratteri, tutto quello che il tratto scrive in testa al messaggio: i ricordi ripescati compresi, che
+// da soli valgono più di metà di un turno pesante e il peso del turno deve contarli.
+function caratteriPreambolo(m) {
+  if (!m || m.riga || m.seguito) return 0;
+  const memo = preamboli.get(FC().chiave(m));
+  if (!memo) return 0;
+  return TV().preambolo({
+    eventi: memo.eventi ? memo.eventi.testo : '',
+    stato: memo.stato ? memo.stato.testo : '',
+    turno: Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi) : '',
+  }).length;
+}
+const diIncognito = (chatId) => chatIncognito.has(chatId);
+function ultimaFotografia(incognito = false) {
+  const f = fotografie[incognito ? 'incognito' : 'normale'];
+  return f ? { testo: f.testo, usata: f.usata, epoca: f.epoca } : null;
+}
+// Dopo una compattazione il tratto riparte dal punto compattato e la parte dell'utente si rifotografa.
+function riparti(incognito = false) {
+  const lato = incognito ? 'incognito' : 'normale';
+  ancore[lato] = null;
+  fotografie[lato] = null;
+}
+
+module.exports = {
+  ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
+  senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, caratteriPreambolo, ultimaFotografia, riparti, eventiDa, diIncognito, durataMs,
+};
 globalThis.SN_CONTESTO_FILO = module.exports;

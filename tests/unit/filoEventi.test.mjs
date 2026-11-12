@@ -489,7 +489,10 @@ test('ciò che una chat ha letto (#530) resta suo riaprendo il filo, senza doppi
   await Chats.segnaFonti('letta', [ricerca]);
   assert.equal(righe(file).filter((r) => r.includes('"tipo":"chat.fonti"')).length, 1, 'la stessa fonte due volte è un evento solo');
   nuovo(cartella);
-  assert.deepEqual((await Chats.get('letta')).fonti, [ricerca], 'riaperta, la chat non riparte pulita');
+  const fonti = (await Chats.get('letta')).fonti;
+  assert.deepEqual(fonti.map(({ ts, ...f }) => f), [ricerca], 'riaperta, la chat non riparte pulita');
+  // L'ora della lettura: la compattazione fa scadere le fonti uscite dal tratto (SPEC-CONTESTO, #1563).
+  assert.ok(Number.isFinite(Date.parse(fonti[0].ts)));
   assert.equal(await Chats.segnaFonti('mai-vista', [ricerca]), null);
   await Chats.remove('letta');
   assert.ok(!leggi(file).includes('web:ricerca'), 'le fonti di una chat cancellata restano su disco');
