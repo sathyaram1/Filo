@@ -391,6 +391,7 @@
       const righe = ['TAB APERTE'];
       // Le pagine col titolo e quelle delicate: una che passa dalle prime alle seconde rifà la fotografia (filoTrattoVivo.js).
       const riservate = { visibili: [], nascosti: [] };
+      const daSiti = [];
       const pagina = (u) => String(u || '').split('#')[0];
       if (!state.tabs.length) righe.push('(nessuna)');
       else {
@@ -413,6 +414,8 @@
           if (t.url) riservate.visibili.push(pagina(t.url));
           const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';
           const title = E.neutralizza(grezzo, { unaRiga: true });
+          // Il titolo di una pagina di Filo lo scrive Filo; ogni altro (anche about:blank, blob:, data:) lo sceglie un sito.
+          if (t.title && !/^filo:/i.test(String(t.url || '').trim())) daSiti.push(title);
           elenco.push(`${i + 1}. ${focus}${title}${rel}`);
         });
         if (state.tabs.length > quante) elenco.push(`...altre ${state.tabs.length - quante} tab`);
@@ -423,7 +426,8 @@
         if (top.some((t) => t.suona || t.audioAt)) righe.push('[SUONA]: sta riproducendo audio adesso. [AUDIO FERMO]: ha suonato ed è ferma, «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.');
         righe.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: elenco.join('\n') }));
       }
-      aggiungi('TAB APERTE', righe, null, { riservate });
+      // `daSiti`: i titoli che il modello legge qui, testo di sconosciuti per le uscite (#2293).
+      aggiungi('TAB APERTE', righe, null, { riservate, ...(daSiti.length ? { daSiti } : {}) });
     }
     if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       aggiungi('SITI SEMPRE APERTI', [
@@ -494,14 +498,18 @@
     }
     if (state.conversazioni && !perChat) aggiungi('CONVERSAZIONI RECENTI', [testoConversazioni(state.conversazioni, salvati)]);
     // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
+    // Li scrive un modello che ha letto i titoli delle schede e delle pagine salvate: testo dei siti per le uscite (#2293).
     {
       const righe = ['SUGGERIMENTI DELLA HOME'];
+      const daSiti = [];
       if (state.dashboard && state.dashboard.suggestions?.length) {
-        righe.push(salvati(state.dashboard.suggestions.slice(0, 8).map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`)));
+        const voci = state.dashboard.suggestions.slice(0, 8);
+        righe.push(salvati(voci.map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`)));
+        for (const s of voci) if (typeof s.text === 'string' && s.text.trim()) daSiti.push(s.text);
       } else {
         righe.push('(nessuno)');
       }
-      aggiungi('SUGGERIMENTI DELLA HOME', righe);
+      aggiungi('SUGGERIMENTI DELLA HOME', righe, null, daSiti.length ? { daSiti } : null);
     }
     return out;
   }

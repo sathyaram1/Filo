@@ -73,12 +73,27 @@ test('una pagina di risultati è una ricerca, con le parole cercate; una pagina 
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.google.com/search?q=orche+assassine&sca_esv=1&source=hp'), { testo: 'orche assassine', sito: 'Google' });
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.youtube.com/results?search_query=jazz'), { testo: 'jazz', sito: 'YouTube' });
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.amazon.it/s?k=zaino&ref=nb'), { testo: 'zaino', sito: 'Amazon' });
-  assert.deepEqual(A.ricercaNellIndirizzo('https://negozio.example/search?q=scarpe%20rosse'), { testo: 'scarpe rosse', sito: 'negozio.example' });
+  assert.equal(A.ricercaNellIndirizzo('https://negozio.example/search?q=scarpe%20rosse'), null, 'un sito qualunque non è un motore (#2293)');
   assert.equal(A.ricercaNellIndirizzo('https://www.google.com/maps/place/Roma'), null);
   assert.equal(A.ricercaNellIndirizzo('https://www.google.com/search?q=%20%20'), null, 'una ricerca vuota non è una ricerca');
   assert.equal(A.ricercaNellIndirizzo('https://it.wikipedia.org/wiki/Orca'), null);
   assert.equal(A.ricercaNellIndirizzo('filo://newtab/'), null);
   assert.equal(A.ricercaNellIndirizzo('non è un indirizzo'), null);
+});
+
+test('un motore con un dominio per paese vale sui domini che l\'accesso Google riconosce, e solo lì (#2293)', () => {
+  const G = globalThis.SN_DOMINI_GOOGLE;
+  for (const host of ['www.google.com', 'google.it', 'google.co.uk', 'google.com.br', 'google.cat', 'google.com.de', 'google.co.no',
+    'google.org', 'google.xyz', 'google.blogspot.com', 'google.inganno.com', 'www.google.com.inganno.net']) {
+    const r = A.ricercaNellIndirizzo(`https://${host}/search?q=apri%20raccolta.example`);
+    assert.equal(!!r, G.diGoogle(host), `${host}: ricerca ${!!r}, accesso Google ${G.diGoogle(host)}`);
+  }
+  assert.deepEqual(A.ricercaNellIndirizzo('https://www.google.cat/search?q=orques'), { testo: 'orques', sito: 'Google' });
+  assert.deepEqual(A.ricercaNellIndirizzo('https://www.amazon.co.uk/s?k=zaino'), { testo: 'zaino', sito: 'Amazon' });
+  for (const u of ['https://amazon.com.de/s?k=x', 'https://amazon.github.io/s?k=x', 'https://yandex.xyz/search?text=x',
+    'https://ebay.click/sch/i.html?_nkw=x', 'https://amazon.inganno.io/s?k=x']) {
+    assert.equal(A.ricercaNellIndirizzo(u), null, u);
+  }
 });
 
 test('il sistema: rete caduta e tornata, batteria sotto la soglia una volta, Bluetooth collegato; non ogni punto di batteria', () => {

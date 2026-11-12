@@ -47,7 +47,10 @@
     const sezStato = Array.isArray(statoSezioni) ? statoSezioni : (stato ? [{ chiave: 'STATO', testo: stato }] : []);
     for (const x of sezStato) {
       if (x && stringa(x.chiave)) {
-        metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}) });
+        metti(`STATO:${x.chiave}`, x.testo, {
+          stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}),
+          ...(Array.isArray(x.daSiti) && x.daSiti.length ? { daSiti: x.daSiti } : {}),
+        });
       }
     }
     metti('CAMBI', P().filoChatCambiValute(cambi));
@@ -90,7 +93,12 @@
       const ris = s.riservate || null;
       const giaVisti = v && v.riservate ? v.riservate.visibili : [];
       const visibili = ris ? [...new Set([...giaVisti, ...(ris.visibili || [])])] : null;
-      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}) });
+      // Il testo dei siti che la fotografia ha mostrato resta davanti al modello finché lei vive (#2293).
+      const daSiti = [...new Set([...((v && v.daSiti) || []), ...(Array.isArray(s.daSiti) ? s.daSiti : [])])];
+      nuove.set(s.chiave, {
+        confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}),
+        ...(daSiti.length ? { daSiti } : {}),
+      });
       if (ris && (ris.nascosti || []).some((u) => giaVisti.includes(u))) { rifai = true; continue; }
       if (v && v.confronto === conf) continue;
       if (s.rifai) { rifai = true; continue; }
@@ -281,7 +289,11 @@
   const FILE = '\u0000file';
   const ALTRO = '\u0000altro';
   const NOMI = { [FILE]: 'file del computer', [ALTRO]: 'pagine senza sito' };
-  function rendiPagine(pagine, { rif = null } = {}) {
+  function rendiPagine(pagine, opts) {
+    return pagineResa(pagine, opts).testo;
+  }
+  // `daSiti`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
+  function pagineResa(pagine, { rif = null } = {}) {
     const gruppi = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
       const t = Date.parse(p && p.ts);
@@ -296,7 +308,8 @@
       if (stringa(p.cercato)) g.cercati.push(p.cercato);
       else if (stringa(p.titolo)) g.titoli.push(p.titolo);
     }
-    if (!gruppi.size) return '';
+    if (!gruppi.size) return { testo: '', daSiti: [] };
+    const daSiti = [];
     const ultimiDistinti = (lista) => {
       const visti = new Set();
       const out = [];
@@ -321,6 +334,7 @@
       const cercati = ultimiDistinti(g.cercati);
       if (cercati.length) pezzi.push(`cercato ${cercati.map((c) => `«${c}»`).join(', ')}`);
       const titoli = ultimiDistinti(g.titoli);
+      daSiti.push(...cercati, ...titoli);
       // «fra cui» solo se resta fuori qualcosa: un titolo oltre i tre, o una pagina senza titolo.
       const diversi = new Set(g.titoli.map((t) => campo(t, 120).toLowerCase())).size;
       const senzaTitolo = g.n - g.delicate - g.cercati.length - g.titoli.length;
@@ -332,7 +346,7 @@
       righe.unshift(`- (prima di queste, altre ${pagineN(n)} su ${fuori.length} sit${fuori.length === 1 ? 'o' : 'i'}: qui non ci sono)`);
     }
     const busta = E().imbusta({ tipo: 'DATI_PAGINA', conIntestazione: true, testo: righe.join('\n'), max: Infinity });
-    return `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`;
+    return { testo: `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`, daSiti };
   }
 
   // Le righe degli eventi di un messaggio, dentro una busta: con l'ora (e il giorno se non è quello del messaggio) e,
@@ -356,19 +370,25 @@
         return;
       }
       const r = rigaDi(ev);
-      if (r) righe.push(`- ${oraDi(ev.ts, rif)} ${r}`);
+      // Il nome di un file scaricato lo sceglie il sito.
+      const sito = ev.tipo === 'download' && stringa(ev.file || ev.scaricamento) ? [campo(ev.file || ev.scaricamento)] : [];
+      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, sito });
     });
     if (schede.aperte || schede.chiuse) {
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
-      righe.push(`- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`);
+      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, sito: [] });
     }
-    const visite = rendiPagine(pagine, { rif });
-    if (!righe.length) return { testo: visite, ids };
+    const visite = pagineResa(pagine, { rif });
+    if (!righe.length) return { testo: visite.testo, ids, daSiti: visite.daSiti };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
-    const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute].join('\n') });
-    return { testo: [`Successo dal messaggio prima:\n${busta}`, visite].filter(Boolean).join('\n\n'), ids };
+    const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute.map((x) => x.riga)].join('\n') });
+    return {
+      testo: [`Successo dal messaggio prima:\n${busta}`, visite.testo].filter(Boolean).join('\n\n'),
+      ids,
+      daSiti: [...tenute.flatMap((x) => x.sito), ...visite.daSiti],
+    };
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.

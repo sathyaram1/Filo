@@ -42,6 +42,19 @@
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
+  // Pagine viste o schede chiuse (#884, #2293): i titoli li scrivono i siti, classe 3; un riassunto l'ha scritto un
+  // modello col testo della pagina, classe 5. Una regola sola per CERCA_CHAT, SCHEDE_CHIUSE e RIAPRI_SCHEDA.
+  function fonteDiPagine(pagine, nome, motivi) {
+    const tenute = pagine.filter(Boolean);
+    if (!tenute.length) return null;
+    return tenute.some((s) => String(s.riassunto || '').trim())
+      ? { classe: 5, campo: 'web', chiave: `${nome}:riassunti`, motivo: motivi.riassunti }
+      : { classe: 3, campo: 'web', chiave: `${nome}:titoli`, motivo: motivi.titoli };
+  }
+  const MOTIVI_VISITATE = { riassunti: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito', titoli: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
+  const MOTIVI_CHIUSE = { riassunti: 'ho letto il riassunto di una scheda chiusa, fatto col testo del sito', titoli: 'ho letto i titoli delle schede chiuse, scritti dai siti' };
+  const fonteSchedeChiuse = (schede) => fonteDiPagine(schede, 'schedeChiuse', MOTIVI_CHIUSE);
+
   // Le voci del menu dell'account (#1615), coi nomi che un modello usa anche fuori dall'enum: '' se non è nessuna.
   const ALIAS_ACCOUNT = { accedi: 'accedi', entra: 'accedi', login: 'accedi', collega_google: 'collega_google', collega: 'collega_google', esci: 'esci', logout: 'esci' };
   function cosaAccount(a) {
@@ -52,8 +65,16 @@
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
-  // Un comando che scarica dal web porta nel compito testo di autore ignoto, non un file del computer.
-  const SCARICA = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m)\b|https?:\/\//i;
+  // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
+  // Decide urlExfil, la stessa regola del controllo delle uscite (#2293); caricato senza, un indirizzo o l'elenco dei
+  // programmi di cmdClassify, e senza neanche quello ogni comando conta come uno di rete.
+  function scaricaDallaRete(cmd) {
+    const X = global.SN_URL_EXFIL;
+    if (X && typeof X.comandoInRete === 'function') return X.comandoInRete({ comando: cmd });
+    const re = global.SN_CMD_CLASSIFY && global.SN_CMD_CLASSIFY.PROGRAMMI_RETE;
+    const c = String(cmd || '').replace(/[\^"'`]/g, '');
+    return /\b[a-z][a-z0-9+-]+:\/\//i.test(c) || !re || re.test(c);
+  }
 
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati.
@@ -559,10 +580,7 @@
       costo: 0,
       campo: null,
       fonte: (a, out) => {
-        const pagine = Array.isArray(out.pagine) ? out.pagine.filter(Boolean) : [];
-        const viste = !pagine.length ? null : pagine.some((p) => String(p.riassunto || '').trim())
-          ? { classe: 5, campo: 'web', chiave: 'visitate:riassunti', motivo: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito' }
-          : { classe: 3, campo: 'web', chiave: 'visitate:titoli', motivo: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
+        const viste = fonteDiPagine(Array.isArray(out.pagine) ? out.pagine : [], 'visitate', MOTIVI_VISITATE);
         const c = Number(out.classeLetta);
         // Quelle del tratto le ha davanti anche una conversazione nuova: `ereditata` toglie quella strada dal «no».
         const risposte = Number.isInteger(c) && c > 1 && c <= 5
@@ -614,9 +632,7 @@
     SCHEDE_CHIUSE: {
       costo: 0,
       campo: null,
-      fonte: (a, out) => (Array.isArray(out.schede) && out.schede.length
-        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto titoli e riassunti delle schede chiuse, scritti dai siti' }
-        : null),
+      fonte: (a, out) => fonteSchedeChiuse(Array.isArray(out.schede) ? out.schede.filter(Boolean) : []),
       describe: (a) => {
         const q = String((a && (a.cerca ?? a.query)) || '').replace(/\s+/g, ' ').trim();
         return q ? ['Cercare fra le schede chiuse ', cit(q.slice(0, 60))] : 'Guardare le schede chiuse';
@@ -626,9 +642,7 @@
     RIAPRI_SCHEDA: {
       costo: 1,
       campo: 'web',
-      fonte: (a, out) => (out.titolo
-        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto il titolo di una scheda chiusa, scritto dal sito' }
-        : null),
+      fonte: (a, out) => fonteSchedeChiuse(out.titolo || out.riassunto ? [out] : []),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         return ['Riaprire ', t ? cit(t) : 'una scheda chiusa'];
@@ -1041,7 +1055,8 @@
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
         const lvl = C.classify(cmd, a._perimetro);
-        return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
+        // Un indirizzo che il comando contatta segue la regola di NAVIGA (#2293): `_nonCompare`/`_exfil` li scrive il main.
+        return costoIndirizzo(a, lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3);
       },
       campo: 'terminale',
       // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
@@ -1051,8 +1066,7 @@
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
         if (!t.trim()) return null;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
-        // Le shell tolgono `^` (cmd), virgolette e backtick prima di eseguire: `c^url` è curl (#1072.1).
-        return SCARICA.test(cmd) || SCARICA.test(cmd.replace(/[\^"'`]/g, ''))
+        return scaricaDallaRete(cmd)
           ? { classe: 5, campo: 'terminale', chiave: 'web:comando', motivo: 'ho scaricato una pagina dal web con un comando' }
           : { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' };
       },
@@ -1068,6 +1082,11 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
+        if (a && a._nonCompare) {
+          perche = `si collega a un indirizzo scritto a memoria da Filo, che non compare da nessuna parte${a._exfilReason ? ` e ${a._exfilReason}` : ''}. Può portare fuori tuoi dati: conferma solo se l'hai chiesto tu.`;
+        } else if (a && a._exfil) {
+          perche = `si collega a un indirizzo che ${a._exfilReason || 'porta dei dati'}. Può inviare tuoi dati a un sito esterno: conferma solo se l'hai chiesto tu.`;
+        }
         if (cancellaColComando(a)) perche = PERCHE_SENZA_CESTINO;
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);

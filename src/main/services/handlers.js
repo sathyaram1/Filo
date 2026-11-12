@@ -1762,9 +1762,11 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const origine = sender?.tab?.url || sender?.url || '';
   const daPagina = /^https?:/i.test(origine);
   const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
+  const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
-  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA') {
-    memoria = [await navExfilCorpus(), indirizzo ? PageRead.materialeRiservato(indirizzo) : ''].filter(Boolean).join('\n');
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA' || delComando.length) {
+    const riservato = [indirizzo, ...delComando].filter(Boolean).map((u) => PageRead.materialeRiservato(u));
+    memoria = [await navExfilCorpus(), ...riservato].filter(Boolean).join('\n');
   }
   const azioni = Array.isArray(contesto) ? contesto : [];
   const testoParole = typeof parole === 'string' ? parole : '';
@@ -1778,14 +1780,31 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
     memoria,
     daPagina,
   });
-  if (v.blocca || !indirizzo || !provenienza) return v;
+  if (v.blocca || !provenienza) return v;
+  // Un comando che va in rete: la stessa regola per ogni indirizzo che contatta (#2293). Il peggiore decide.
+  if (tipo === 'ESEGUI_COMANDO') {
+    const lista = Array.isArray(v.indirizzi) ? v.indirizzi : [];
+    if (!lista.length || !testoDiSconosciuti(azioni)) return v;
+    const esiti = [];
+    for (const x of lista) esiti.push(await indirizzoScritto(tipo, x.url, { ...v, exfil: x.exfil, reason: x.reason }, { sender, azioni, provenienza, testoParole, memoria }));
+    const mai = esiti.find((e) => e.nonCompare);
+    const dati = esiti.find((e) => e.exfil || (e.nonCompare && e.datiReason));
+    if (mai) return { ...v, exfil: false, reason: '', nonCompare: true, insiste: esiti.some((e) => e.insiste), datiReason: dati ? (dati.datiReason || dati.reason) : '' };
+    return { ...v, exfil: !!dati, reason: dati ? dati.reason : '' };
+  }
+  if (!indirizzo) return v;
   // Si giudica l'indirizzo che partirà: senza «https://», fra virgolette o con due barre, lettura e apertura lo completano.
   const web = indirizzoCaricato(tipo, indirizzo);
   if (!/^https?:/i.test(web)) return v;
   // La regola dell'indirizzo scritto (#553, decisione su D-20) vale solo dopo che nella chat è entrato testo di
-  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati. Compare → costo 1; dall'elenco dei siti
-  // o dal modulo di ricerca di un sito → le parole come una ricerca sul web; scritto dal modello → costo 3, con un OK.
+  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati.
   if (!testoDiSconosciuti(azioni)) return v;
+  return indirizzoScritto(tipo, web, v, { sender, azioni, provenienza, testoParole, memoria });
+}
+
+// Compare → costo 1; dall'elenco dei siti o dal modulo di ricerca di un sito → le parole come una ricerca sul web;
+// scritto dal modello → costo 3, con un OK (#553).
+async function indirizzoScritto(tipo, web, v, { sender, azioni, provenienza, testoParole, memoria }) {
   const schede = schedeLeggibili(sender);
   // Una pagina che la lettura trova aperta in una scheda si legge da lì: niente esce.
   if (tipo === 'LEGGI_PAGINA' && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
@@ -1796,7 +1815,7 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   });
   if (ver.compare) return { ...v, exfil: false, reason: '' };
   if (ver.sito) {
-    const r = Exfil.valutaRicerca(ver.sito.parole, { memoria, azioni });
+    const r = globalThis.SN_URL_EXFIL.valutaRicerca(ver.sito.parole, { memoria, azioni });
     return { ...v, exfil: r.exfil, reason: r.reason };
   }
   // Se il controllo di prima ci vede dei dati, il pannello lo dice.
@@ -2821,8 +2840,9 @@ async function eseguiAzioneFilo(action, {
     action._nonCompare = true;
     if (u.datiReason) action._exfilReason = u.datiReason;
     // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
-    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
-    if (!confirmed && !u.insiste && !soloConferma) {
+    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste. Un comando va dritto al pannello:
+    // l'utente ce l'ha davanti intero, indirizzo compreso (#2293).
+    if (!confirmed && !u.insiste && !soloConferma && type !== 'ESEGUI_COMANDO') {
       return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
     }
   }
@@ -3117,8 +3137,11 @@ async function eseguiAzioneFilo(action, {
   }
   let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
-  // e il riquadro da digitare direbbe il contrario.
-  if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
+  // e il riquadro da digitare direbbe il contrario. Così un comando che costerebbe meno di 3 senza l'indirizzo (#2293).
+  if (action._nonCompare && decisione.digita
+    && (type !== 'ESEGUI_COMANDO' || Levels.costoFor({ ...action, _nonCompare: false, _exfil: false }) < 3)) {
+    decisione = { ...decisione, digita: false };
+  }
   const perimetroDentro = dentroPerimetro && ing.dentroPerimetro;
   const contati = ingressiContati(ing, decisione, { origine, dentroPerimetro: perimetroDentro });
   if (decisione.risposta === 'no') {
@@ -6715,6 +6738,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
   const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
   if (dalTratto) azioniViste.push(dalTratto);
+  // Titoli e ricerche delle pagine visitate nei blocchi davanti ai messaggi: testo dei siti senza un'azione (#2293).
+  const dalPreambolo = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{ testi: (filo && filo.daSiti) || [], fonte: 'dalle pagine visitate' }]);
+  if (dalPreambolo) azioniViste.push(dalPreambolo);
   // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
   const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
   LETTURE_DI_UNA_NUOVA.set(azioniViste, [...(filo ? filo.perUnaNuova || [] : []), ...(tuttoIlTratto ? [tuttoIlTratto] : [])]);
@@ -6875,6 +6901,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         nascostiDellaChat = nascostiDi(filo);
       } catch (e) { console.warn('[Filo] tratto non ricomposto dopo la fotografia:', e?.message || e); }
     }
+  }
+  // Il testo dei siti che il CONTESTO mostra (titoli delle schede, suggerimenti della home), anche di una fotografia di prima (#2293).
+  const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{
+    testi: fotografia ? fotografia.daSiti : sezioniUtente.flatMap((s) => (s && Array.isArray(s.daSiti) ? s.daSiti : [])),
+    fonte: 'dalle schede aperte e dai suggerimenti della home',
+  }]);
+  if (dalleSchede) {
+    azioniViste.push(dalleSchede);
+    ricordaLettoInChat([dalleSchede]);
   }
   const payloadBase = {
     // Non entra nel prompt (la domanda sta in threadMessages): è la domanda come l'ha scritta l'utente, per la Cronologia AI.
