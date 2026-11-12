@@ -386,7 +386,10 @@ class StratoDeiRiquadri {
     const tasti = s.trattenuti;
     s.trattenuti = null;
     if (!tasti || !tasti.length || !vivo(dove)) return;
-    for (const t of tasti) for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
+    for (const t of tasti) {
+      if (t.comando) { try { dove[t.comando](); } catch (_) {} continue; }
+      for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
+    }
   }
 
   // La vista è grande quanto la scheda, così i riquadri si posano come nella pagina; la cornice la ritaglia alla zona
