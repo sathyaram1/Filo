@@ -189,10 +189,9 @@ test('la risposta a «Scarica» che arriva dopo la fine non riporta la riga a «
     await expect(avviso).toBeVisible({ timeout: 20000 });
     await risposta(avviso, /^Scarica$/).click();
 
-    await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
-    await page.waitForTimeout(800);
-    console.log('DEBUG', await app.evaluate(() => [globalThis.__trattenute, globalThis.__statoInRisposta]),
-      await shell.locator('#dl-panel .dl-row').evaluateAll((rs) => rs.map((r) => `${r.dataset.state}:${r.textContent}`)));
+    await expect.poll(() => app.evaluate(() => globalThis.__rispostePartite), { timeout: 20000 }).toBe(1);
+    // Un giro sullo stesso canale dopo la risposta trattenuta: quando torna, la shell l'ha già applicata.
+    expect(await statoDi(shell, 'setup.exe')).toBe('completed');
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'setup.exe' });
     await expect(riga).toHaveAttribute('data-state', 'completed', { timeout: 10000 });
     await expect(riga.locator('.dl-row-meta')).toContainText('Completato');
