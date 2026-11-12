@@ -2,7 +2,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { nelMondoDiFilo, statoDi, clicca, paginaDelloStrato, conta } from '../../helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, statoDi, clicca, paginaDelloStrato, conta } from '../../helpers/riquadri.mjs';
 import * as Gesti from '../../helpers/gestiVeri.mjs';
 
 // PNG 1x1 rosso.
