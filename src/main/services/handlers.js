@@ -3104,6 +3104,7 @@ async function eseguiAzioneFilo(action, {
     action._livelloCambio = bersaglio ? bersaglio.livello : 1;
     action._fraseCambio = bersaglio ? bersaglio.frase : '';
     action._allentaCambio = !bersaglio || bersaglio.allenta !== false;
+    action._doveCambio = bersaglio && action._allentaCambio ? String(bersaglio.dove || '') : '';
   }
 
   // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
