@@ -1276,6 +1276,8 @@
     if (d.consiglio && d.consiglio.perche) righe.push('', `Consiglio: opzione ${d.consiglio.opzione + 1}, ${d.consiglio.perche}`);
     const e = esito(d);
     if (e) righe.push('', `Esito: ${e.textContent}`);
+    const dentro = D.assorbiteDi(d);
+    if (dentro.length) righe.push('', `Domande assorbite: ${dentro.map((x) => `${x}${trova(x) && trova(x).titolo ? ` ${trova(x).titolo}` : ''}`).join('; ')}`);
     const da = principioUsato(d);
     if (da) righe.push('', `Risposta automatica col principio di ${da}${trova(da) && trova(da).principio ? `: ${trova(da).principio}` : ''}`);
     if (d.principio) righe.push('', `Principio: ${d.principio}`);
