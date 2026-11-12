@@ -62,7 +62,7 @@ test('un campo senza id, nome ed etichetta torna solo se di quel tipo ce n\'è u
   assert.deepEqual(R.abbina(null, null), []);
 });
 
-test('scaduto, vuoto o oltre il tetto non resta; oltre il totale se ne vanno le pagine toccate da più tempo', () => {
+test('scaduto, vuoto o oltre il tetto non resta; il resto sì, per quanto sia', () => {
   const ora = 1_800_000_000_000;
   const pagina = (t, valore) => ({ t, campi: [{ firma: firma(), valore, t }] });
   const dati = {
