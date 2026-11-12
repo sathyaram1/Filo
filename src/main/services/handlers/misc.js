@@ -697,6 +697,21 @@ module.exports = function register(on, ctx) {
   // Il primo tentativo di solito chiude in pochi secondi (titolo, allegati, scrittura): oltre, il riquadro si chiude
   // dicendo «in partenza» e la coda finisce da sola.
   const ATTESA_CONSEGNA_MS = 12000;
+  // Un tetto alle riletture anticipate: oltre, si rilegge solo all'invio. Chi scrive davvero fa una pausa ogni tanto.
+  const ANTICIPI_ORA = 120;
+  let anticipi = [];
+  on(MSG.FEEDBACK_L0_ANTICIPA, async (msg) => {
+    const ora = Date.now();
+    anticipi = anticipi.filter((t) => ora - t < 3600000);
+    if (anticipi.length >= ANTICIPI_ORA) {
+      console.warn('[Filo L0] riletture anticipate oltre', ANTICIPI_ORA, 'in un\'ora: si rilegge all\'invio');
+      return { ok: true, partita: false };
+    }
+    const testo = String((msg && msg.testo) || '').trim();
+    const partita = await L0.anticipa(testo);
+    if (partita) anticipi.push(ora);
+    return { ok: true, partita };
+  });
   on(MSG.SUBMIT_FEEDBACK, async (msg, sender) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
