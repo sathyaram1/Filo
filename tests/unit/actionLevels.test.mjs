@@ -442,3 +442,19 @@ test('zoom e volume da confermare dicono «all\'80%» e «allo 0%», non «al 80
   assert.equal(AL.describe({ type: 'ZOOM_PAGINA', percentuale: 150 }), 'Portare lo zoom della pagina al 150%');
   assert.equal(AL.describe({ type: 'VOLUME', _richiestaSistema: { livello: 0 } }), 'Portare il volume del computer allo 0%');
 });
+
+// #1840: dopo una lettura un cancellare per sempre è un no, e il no deve dire all'utente dove farlo a mano.
+test('ogni cancellare per sempre dice la strada a mano che resta all\'utente', () => {
+  const senza = [];
+  let visti = 0;
+  for (const type of Object.keys(AL.REGISTRY)) {
+    for (const a of [{ type }, { type, per_sempre: true }]) {
+      const i = AL.ingressi(a, {});
+      if (!i || i.costo !== 4 || i.segreto) continue;
+      visti++;
+      if (!String(i.dove || '').trim()) senza.push(JSON.stringify(a));
+    }
+  }
+  assert.ok(visti >= 5, `trovati solo ${visti} cancellare per sempre`);
+  assert.deepEqual(senza, []);
+});
