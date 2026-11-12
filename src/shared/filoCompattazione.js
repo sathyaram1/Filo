@@ -33,11 +33,13 @@
   const ms = (ts) => Date.parse(ts);
 
   // Il motivo per cui una richiesta della chat deve aspettare la compattazione, o null. `token`: la stima della richiesta
-  // intera; `tokenTratto`: il solo tratto vivo; `ultimoUso`: quando la parte dell'utente è stata mandata l'ultima volta.
-  function motivo({ token = 0, soglia, tokenTratto = 0, ora = Date.now(), ultimoUso = null, cacheMs = ORA_MS } = {}) {
-    if (Number(token) > Number(soglia)) return 'soglia';
+  // intera; `tokenTratto`: il solo tratto vivo; `ultimoUso`: quando la parte dell'utente è stata mandata l'ultima volta;
+  // `base` e `turno`: parte fissa e peso dei turni, per la soglia vera (`limiti`).
+  function motivo({ token = 0, soglia, base = null, turno = 0, tokenTratto = 0, ora = Date.now(), ultimoUso = null, cacheMs = ORA_MS } = {}) {
+    const s = limiti({ soglia, base, turno }).soglia;
+    if (Number(token) > s) return 'soglia';
     const fermo = Number.isFinite(Number(ultimoUso)) && ultimoUso != null && Number(ora) - Number(ultimoUso) > Number(cacheMs);
-    if (fermo && Number(tokenTratto) > Number(soglia) * QUOTA_GRANDE) return 'fermo';
+    if (fermo && Number(tokenTratto) > s * QUOTA_GRANDE) return 'fermo';
     return null;
   }
 
