@@ -1151,6 +1151,19 @@ function vediCampiDelicati() {
   } catch (_) {}
 }
 
+// #2378 — un riquadro monta Filo solo quando lo si usa: col testo dei campi conservato per lui lo monta subito, o il
+// testo tornerebbe solo dopo un clic lì dentro. Chiede solo un riquadro che ha dei campi.
+function testoDaRimettere() {
+  try {
+    window.addEventListener('load', () => {
+      if (contentScriptsStarted || !document.querySelector('textarea, input')) return;
+      require(path.join(SHARED_DIR, 'messages.js'));
+      filoMessage({ type: globalThis.SN_MSG.MSG.TESTO_CAMPI, fase: 'ce' })
+        .then((r) => { if (r && r.ce) ensureContentScripts(); }, () => {});
+    }, { once: true });
+  } catch (_) {}
+}
+
 // L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
 // non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
 function startSafebrowse() {
