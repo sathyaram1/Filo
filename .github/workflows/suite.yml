@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report 2>&1 | tee verdetto.log
+          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report --errori rossi-errori.txt 2>&1 | tee verdetto.log
 
       # Dalla cloud registro e allegati non si scaricano: l'elenco si legge dalle annotazioni, con l'API.
       - name: Rossi nuovi come annotazioni
@@ -140,6 +140,14 @@ jobs:
         run: |
           if [ -s rossi-nuovi.txt ]; then node scripts/annotazioni-github.mjs rossi-nuovi.txt "Rossi nuovi della suite"
           else node scripts/annotazioni-github.mjs verdetto.log "Suite senza esito"; fi
+
+      # Un passo suo: GitHub tiene dieci annotazioni per passo, e l'elenco dei rossi le sue non le cede.
+      - name: Errori dei rossi nuovi come annotazioni
+        if: always() && steps.verdetto.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ -s rossi-errori.txt ]; then node scripts/annotazioni-github.mjs rossi-errori.txt "Errori dei rossi nuovi"; fi
 
       # Un allegato che non si carica non dice niente del commit: rosso, farebbe di una suite verde una «non partita».
       # Su main lo legge `avviso`, che apre il feedback su un'altra macchina: anche le chiavi dell'allarme viaggiano qui.
