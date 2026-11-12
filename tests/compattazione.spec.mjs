@@ -167,6 +167,11 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   await tieni.getByRole('button', { name: 'Tienila in memoria' }).click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).map((l) => l.text)), { timeout: 10000 })
     .toContain('Le piace cucinare.');
+  // Tenuta, la riga porta con sé il punto del filo da cui è nata, come la proposta.
+  const tenuta = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).find((l) => l.text === 'Le piace cucinare.'));
+  const eventi = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chat('sosp1', { ids: true })).eids);
+  expect(tenuta.fonti && tenuta.fonti.length, 'la riga tenuta ha il salto al punto del filo').toBeGreaterThan(0);
+  expect(eventi).toEqual(expect.arrayContaining(tenuta.fonti));
   // Dal tasto destro le stesse scelte, più il salto al punto del filo.
   const via = gruppo.locator('.qd-riga').filter({ hasText: 'x@y.z' });
   await via.locator('.qd-testo').click({ button: 'right' });
