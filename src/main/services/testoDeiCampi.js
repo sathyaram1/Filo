@@ -104,9 +104,11 @@ function paginaAmmessa(sender, settings) {
   if (!pagina) return '';
   const host = PD.host(pagina);
   const motivo = PD.classifica(pagina, {
-    attivo: PD.attivo(settings), sitiUtente: PD.sitiUtente(settings), elenco: PD.elenco(elencoRemoto()), campi: null,
+    sitiUtente: PD.sitiUtente(settings), elenco: PD.elenco(elencoRemoto()), campi: null,
   });
-  if (motivo) return '';
+  // Una delicata dove l'utente manda tutto in anticipo ai modelli (#1589) può tenere il testo sul computer: è uscire meno.
+  const anticipo = motivo && motivo !== 'utente' && LP.regola(settings).sitiAnticipo.some((d) => host === d || host.endsWith(`.${d}`));
+  if (motivo && !anticipo) return '';
   const spenti = Array.isArray(settings && settings.blocklist) ? settings.blocklist.filter((x) => typeof x === 'string') : [];
   if (host && spenti.some((v) => { try { return N.copre(v, host); } catch (_) { return false; } })) return '';
   try { if (!require('./cookies').keepsSiteData(host)) return ''; } catch (_) {}
