@@ -84,6 +84,23 @@ test('Ctrl+V appena aperto il feedback (strato ancora freddo): l\'immagine non v
   expect(sito, 'il sito ha ricevuto l\'incolla').toEqual([]);
 });
 
+test('Incolla dal tasto destro nella casella del feedback: entra fra gli allegati e il sito non riceve niente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const p = await testServer.openReady(openTab, pagina());
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, p, '.sn-fb-text')).not.toBeNull();
+  await immagineNegliAppunti(app);
+  const s = await statoDi(app, p, '.sn-fb-text');
+  const strato = await paginaDelloStrato(app, p);
+  await strato.mouse.click(s.x + 30, s.y + 15);
+  await strato.mouse.click(s.x + 30, s.y + 15, { button: 'right' });
+  const voce = strato.locator('.sn-menu-item', { hasText: 'Incolla' }).first();
+  await expect(voce).toBeVisible({ timeout: 10_000 });
+  await voce.click();
+  await expect.poll(() => conta(app, p, '.sn-fb-thumbs > *'), { timeout: 10_000 }).toBeGreaterThan(0);
+  expect(await visti(p)).toEqual([]);
+});
+
 test('una foto scaricata trascinata dall\'avviso sul feedback: entra fra gli allegati e il sito non la riceve', async ({ app, openTab, testServer, avvisi }) => {
   test.skip(!Gesti.disponibili(), 'servono i gesti veri del sistema (Linux con X)');
   test.setTimeout(120_000);
