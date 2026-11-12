@@ -887,7 +887,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
-      case 'feedbackL0.enabled': return $('feedbackL0').checked;
+      case 'feedbackRilettura.enabled': return $('feedbackRilettura').checked;
       case 'traduzionePagina.nascoste': return modoNascoste($('traduzioneNascoste').value);
       case 'filoParla.downloadOgniMin': return minutiFraDownload({ downloadOgniMin: $('filoParlaDownload').value });
       case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
@@ -991,7 +991,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
-      case 'feedbackL0.enabled': return !(s.feedbackL0 && s.feedbackL0.enabled === false);
+      case 'feedbackRilettura.enabled': return !(s.feedbackRilettura && s.feedbackRilettura.enabled === false);
       case 'traduzionePagina.nascoste': return nascosteDellaTraduzione(s);
       case 'filoParla.downloadOgniMin': return minutiFraDownload(s.filoParla);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
@@ -1219,7 +1219,7 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
-    if (vuole('feedbackL0.enabled')) $('feedbackL0').checked = !(settings.feedbackL0 && settings.feedbackL0.enabled === false);
+    if (vuole('feedbackRilettura.enabled')) $('feedbackRilettura').checked = !(settings.feedbackRilettura && settings.feedbackRilettura.enabled === false);
     if (vuole('traduzionePagina.nascoste')) $('traduzioneNascoste').value = nascosteDellaTraduzione(settings);
     if (vuole('filoParla.downloadOgniMin')) $('filoParlaDownload').value = String(minutiFraDownload(settings.filoParla));
     if (vuole('descriviImmagini.enabled')) $('descriviImmagini').checked = !(settings.descriviImmagini && settings.descriviImmagini.enabled === false);
@@ -2005,7 +2005,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
-    $('feedbackL0').addEventListener('change', persist);
+    $('feedbackRilettura').addEventListener('change', persist);
     $('traduzioneNascoste').addEventListener('change', persist);
     $('filoParlaDownload').addEventListener('change', persist);
     $('descriviImmagini').addEventListener('change', persist);
