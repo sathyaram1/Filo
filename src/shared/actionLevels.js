@@ -75,10 +75,12 @@
     const c = String(cmd || '').replace(/[\^"'`]/g, '');
     return /\b[a-z][a-z0-9+-]+:\/\//i.test(c) || !re || re.test(c);
   }
+  // Chi scarica è anche un programma di rete: l'elenco sta qui una volta sola, e RETE lo allarga.
+  const PROGRAMMI_SCARICA = 'curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m';
 
   // Un comando esce dal computer se nomina un indirizzo che non è il computer stesso, o se usa un programma di rete
   // verso un posto che non sa dire. I nomi risolti dal DNS escono sempre, anche chiesti a un resolver locale.
-  const RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m|git|ssh|scp|sftp|rsync|ftp|tftp|telnet|nc|ncat|netcat|socat|start-bitstransfer)\b/i;
+  const RETE = new RegExp(`\\b(?:${PROGRAMMI_SCARICA}|git|ssh|scp|sftp|rsync|ftp|tftp|telnet|nc|ncat|netcat|socat|start-bitstransfer)\\b`, 'i');
   const DNS = /\b(?:ping|nslookup|dig|whois|traceroute|tracert|resolve-dnsname|test-netconnection)\b/i;
   const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@"'`^]*@)?(\[[^\]\s]*\]|[^\s\/:?#@"'`^]*)/gi;
   const HOST_UTENTE = /[\w.+-]+@((?:[\w-]+\.)*[\w-]+)(?=[:\s\/]|$)/g;
