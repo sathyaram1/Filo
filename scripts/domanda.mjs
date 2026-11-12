@@ -357,6 +357,11 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
       + `${e.compito ? ` · compito ${visibile(e.compito.stato || '')}` : ''}`
       + `${e.automatica ? ' · risposta automatica' : ''}${e.smistata ? ` · smistata: ${visibile(e.smistata)}` : ''}`);
   }
+  const madre = D.assorbitaIn(x);
+  if (madre) righe.push(`Assorbita in ${madre}: la risposta lì vale anche per questa (l'owner la riapre se non è lo stesso caso).`);
+  else if (x.stato === 'superata' && x.esito && D.numeroDi(x.esito.superataDa) !== null) righe.push(`Superata da ${x.esito.superataDa.trim()}.`);
+  const dentro = D.assorbiteDi(x);
+  if (dentro.length) righe.push('', `Domande assorbite: ${dentro.join(', ')}`);
   if (x.principio) righe.push('', 'Principio', rientro(x.principio));
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
   if (x.stato === 'aperta') {
