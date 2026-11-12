@@ -868,11 +868,14 @@
   }
 
   // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6), una data dalla chiave
-  // owner-non-fidato (#2011) e una registrata da una sessione locale (#1924).
+  // owner-non-fidato (#2011), una registrata da una sessione locale (#1924) e una assorbita dalla revisione (#1154).
   function riapribile(d) {
-    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)))
+      || !!D.assorbitaIn(d);
   }
   function titoloRiapri(d) {
+    const madre = D.assorbitaIn(d);
+    if (madre) return `Non è un caso di ${madre}: rimettila fra quelle da rispondere, fuori da ${madre}`;
     if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: quello che ha applicato si disfa dove si può, e un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
