@@ -506,6 +506,10 @@ export async function esegui(argv, deps = {}) {
     }
     // La fusione chiesta al cancello la registra il server; la spinta dal PC la dice questo passo.
     if (dalPc) await registraMainDalPc({ ramo: a.ramo, sha, prima: mainPrima, feedbackId: r.id }, { registra: deps.registraMain, err });
+    if (dalPc && ramiApp.length) {
+      const shaServer = verificato || (deps.puntaRamo || puntaRamoServer)(cartella, a.ramo) || '';
+      await appDopoIlServer({ ramo: a.ramo, sha: shaServer, feedbackId: r.id }, { chiedi: deps.chiediAlCancello, log, err });
+    }
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     const daGitHub = (deps.deployDaGitHub || deployDaGitHub)(cartella);
