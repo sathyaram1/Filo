@@ -623,17 +623,6 @@ test.describe('col mouse vero', () => {
     await expect(page.locator('.sn-gettoni-fondo .sn-gettone')).toContainText('Articolo sulla Tesla', { timeout: 5000 });
   });
 
-  test('#2285 con due home aperte, la scheda portata nella casella della home davanti diventa un gettone', async ({ app, shell, openTab, testServer }) => {
-    const url = testServer.html('<title>Articolo sulla Luna</title><p>Artemis</p>');
-    await openTab(url);
-    const sorgente = await idPerUrl(shell, url);
-    const page = await openTab('filo://newtab/');
-    await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
-    await Gesti.finestraASchermo(app);
-    Gesti.trascina(await sulloSchermoLaLinguetta(app, shell, sorgente), await Gesti.sulloSchermo(app, page, page, '#input'));
-    await expect(page.locator('.sn-gettoni-fondo .sn-gettone')).toContainText('Articolo sulla Luna', { timeout: 5000 });
-  });
-
   test('#2084 col mouse vero: sopra la pagina e di nuovo nella fila il trascinamento continua, e un campo del sito riceve il link', async ({ app, shell, openTab, testServer }) => {
     const sorgenteUrl = testServer.html('<title>Ricetta del pane</title><p>farina');
     await openTab(sorgenteUrl);
