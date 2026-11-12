@@ -87,7 +87,7 @@ test('ripartenza di un lavoro server: la ricetta del testo dà un ramo da main c
     const identita = (cwd, nome) => { git(cwd, 'config', 'user.email', `${nome}@t`); git(cwd, 'config', 'user.name', nome); git(cwd, 'config', 'commit.gpgsign', 'false'); };
     const scrivi = (cwd, f, s) => { writeFileSync(join(cwd, f), s); git(cwd, 'add', f); git(cwd, 'commit', '-m', f); };
     execFileSync('git', ['init', '--bare', '-b', 'main', remoto]);
-    execFileSync('git', ['clone', '-q', remoto, vecchio]);
+    execFileSync('git', ['clone', '-q', '-c', 'core.autocrlf=false', remoto, vecchio]);
     identita(vecchio, 'worker');
     git(vecchio, 'checkout', '-q', '-b', 'main');
     scrivi(vecchio, 'a.txt', 'a\n');
