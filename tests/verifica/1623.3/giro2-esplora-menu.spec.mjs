@@ -22,11 +22,12 @@ for (const ms of [0, 80, 150]) {
     const voce = menuDi(p).voce('Invia feedback');
     await expect(voce).toBeVisible({ timeout: 10_000 });
     await voce.click();
-    const premi = app.evaluate(async ({ webContents }, attesa) => {
+    const premi = app.evaluate(async ({ BrowserWindow }, { attesa, u }) => {
       const t0 = Date.now();
-      const lascia = webContents.getFocusedWebContents()?.getURL();
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      const lascia = !!win._filoTabs.riquadri?.strati?.get(win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents);
       if (attesa) await new Promise((r) => setTimeout(r, attesa));
-      const wc = webContents.getFocusedWebContents();
+      const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
       const dove = wc ? wc.getURL() : 'nessuno';
       if (wc) {
         wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
