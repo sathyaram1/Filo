@@ -6,6 +6,7 @@ const path = require('node:path');
 const Disco = require('./scritturaAtomica');
 const R = require('../../shared/testoDeiCampi.js');
 const PD = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+const LP = globalThis.SN_LIVELLI_PRIVACY || require('../../shared/livelliPrivacy.js');
 const N = require('../../shared/nomiSito.js');
 
 const NOME_FILE = 'testo-dei-campi.json';
