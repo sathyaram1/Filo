@@ -302,7 +302,11 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
   await chiedi(page, 'ciao');
   await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(1);
   const parteFissa = await app.evaluate(() => globalThis.SN_COMPATTAZIONE.base(false));
-  await conSoglia(app, Math.round(parteFissa + 34000));
+  // Lo spazio sopra la parte fissa poco più grande di quello che la richiesta già occupa: il messaggio dopo sta sotto
+  // la soglia e sopra l'anticipo.
+  const occupato = (await tokenDi(app, (await chiamateAlModello(app))[0])) - parteFissa;
+  expect(occupato + 3000, 'la soglia scritta vale: supera lo spazio minimo').toBeGreaterThan(30000);
+  await conSoglia(app, Math.round(parteFissa + occupato + 3000));
   // Il timer della pausa: si prende la funzione che il turno lascia, per farla partire senza aspettare un'ora.
   await app.evaluate(() => {
     const C = globalThis.SN_COMPATTAZIONE;
