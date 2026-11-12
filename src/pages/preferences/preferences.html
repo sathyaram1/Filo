@@ -247,6 +247,23 @@
       </div>
     </section>
 
+    <section id="sec-testo-campi">
+      <h2>Il testo che scrivi nei siti</h2>
+      <p class="sn-muted">Se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, il testo che stavi scrivendo in un campo ricompare com'era. Resta solo su questo computer, e se ne va quando invii il modulo o svuoti il campo. Mai password, carte di pagamento e codici, né posta, banche, sanità, pubblica amministrazione o finestre in incognito.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="testoCampiAttivo" />
+          <span>Conserva il testo scritto nei campi dei siti</span>
+        </label>
+      </div>
+      <label for="testoCampiGiorni" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Per quanto tempo</label>
+      <select id="testoCampiGiorni"></select>
+      <div class="doc-piede">
+        <button type="button" class="sn-btn sn-btn-secondary" id="testoCampiCancella">Cancella i testi conservati</button>
+        <span id="testoCampiStato" class="sn-muted" aria-live="polite"></span>
+      </div>
+    </section>
+
     <section>
       <h2>Stile dell'agente</h2>
       <p class="sn-muted">Come deve scrivere Filo quando ti risponde (chat, Aiuto, spiegazioni, chat dell'editor). Scegli uno stile già pronto oppure scrivine uno tuo.</p>
