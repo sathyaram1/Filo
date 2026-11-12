@@ -917,5 +917,41 @@ test('l\'annullo di un cambio sensibile è una difesa abbassata solo nel verso c
   assert.equal(P.allentaParziale({ security: { siteBlock: { blacklist: ['a.com'] } } }, { security: { siteBlock: { blacklist: ['a.com', 'b.com'] } } }), true);
   assert.equal(P.allentaParziale({ themeTokens: { accento: '#c00' } }, {}), false);
   const reg = readFileSync(join(ROOT, 'src', 'main', 'services', 'registroCambi.js'), 'utf8');
-  assert.match(reg, /allentaParziale\(K\(\)\.annulloImpostazioni\(/, 'il verso lo giudica il pezzo che l\'annullo scriverebbe');
+  assert.match(reg, /doveSeAllenta\(K\(\)\.annulloImpostazioni\(/, 'il verso lo giudica il pezzo che l\'annullo scriverebbe');
+});
+
+// #1840 giro 7: il no dopo una lettura dice dove farlo a mano anche per «rimetti com'era» e per il ripristino di serie,
+// e il ripristino toglie un freno solo se le impostazioni di serie ne allentano uno.
+test('«rimetti com\'era» e il ripristino di serie: il verso del freno e la strada a mano', () => {
+  const L = globalThis.SN_ACTION_LEVELS;
+  const P = globalThis.SN_PREF;
+  assert.match(P.doveSeAllenta({ security: { blockPopups: false } }, { security: { blockPopups: true } }), /Sicurezza/);
+  assert.match(P.doveSeAllenta({ monthlyLimitEur: 800 }, { monthlyLimitEur: 5 }), /Modelli/);
+  assert.equal(P.doveSeAllenta({ security: { blockPopups: true } }, { security: { blockPopups: false } }), '');
+  const ann = L.ingressi({ type: 'ANNULLA_CAMBIO', _livelloCambio: 2, _allentaCambio: true, _doveCambio: 'Si cambia a mano nella pagina Sicurezza.' }, {});
+  assert.match(ann.dove, /Sicurezza/);
+  const rip = (allenta) => L.ingressi({ type: 'PULSANTE_PREFERENZE', pulsante: 'ripristina_tutto', _ripristino: { frasi: ['blocco dei popup: spento → acceso'], livello: 2, allenta } }, {});
+  assert.equal(rip(true).difesa, true);
+  assert.equal(rip(false).difesa, false, 'rimettere di serie che riaccende soltanto una protezione la stringe');
+  assert.match(rip(true).dove, /Preferenze/);
+  assert.match(A.fraseNo({ regola: 'lettura', dove: rip(true).dove, fonte: { motivo: 'ho fatto una ricerca sul web' } }).perModello, /Ripristina tutto/);
+});
+
+// #1840.4 (consigliata): il racconto che Filo scrive da sé nel filo non toglie la parola al costo 4; resta lettura sotto.
+test('il messaggio che Filo scrive da sé conta come lettura, ma non per il costo 4', () => {
+  require(join(ROOT, 'src', 'shared', 'filoContesto.js'));
+  const FC = globalThis.SN_FILO_CONTESTO;
+  const racconto = AL.fonteDi({ type: 'TESTO_DI_FUORI', _executed: true, _output: { daFuori: [{ testo: 'Buongiorno.', fonte: FC.ESTERNO_RACCONTO }] } });
+  assert.equal(racconto.chiave, 'filo:racconto');
+  assert.equal(racconto.classe, 5);
+  const misto = AL.fonteDi({ type: 'TESTO_DI_FUORI', _executed: true, _output: { daFuori: [{ testo: 'Buongiorno.', fonte: FC.ESTERNO_RACCONTO }, { testo: 'x', fonte: 'da un sito' }] } });
+  assert.equal(misto.chiave, 'filo:da-fuori', 'con dentro altro testo da fuori resta una lettura piena');
+  const stato = (costo, fonti) => A.stato({ fonti: A.fontiPerCosto(fonti, costo), livello: 'default' }).stato;
+  assert.equal(stato(4, [racconto]), 'pulito');
+  assert.equal(stato(2, [racconto]), 'contaminato', 'le lezioni e i costi sotto il 4 lo contano ancora');
+  assert.equal(stato(4, [racconto, misto]), 'contaminato');
+  const filoParla = readFileSync(join(ROOT, 'src', 'main', 'services', 'filoParla.js'), 'utf8');
+  assert.match(filoParla, /const ESTERNO = globalThis\.SN_FILO_CONTESTO\.ESTERNO_RACCONTO/, 'un segno solo, scritto in filoContesto');
+  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.match(h, /A\.fontiPerCosto\(fonti, c\)/, 'decisioneAutonomia filtra le fonti col costo dell\'azione');
 });
