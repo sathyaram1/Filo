@@ -394,6 +394,7 @@ function publicRecord(r) {
     site: r.site || '',
     siteUncertain: !!r.siteUncertain,
     servedBy: r.servedBy || '',
+    rev: r._rev || 0,
     // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
     nomeOriginale: r.nomeOriginale || '',
     // #1488 — `via` dice chi rifà lo scaricamento, `nota` cosa sta facendo o perché non è riuscito.
