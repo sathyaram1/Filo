@@ -170,6 +170,10 @@
     if (!e.isTrusted && attivo() !== el) return;
     if (!seguiti.has(el) && !idoneo(el)) return;
     if (!segue(el, null)) return;
+    if (!sospeso) {
+      sospeso = true;
+      send({ fase: 'sospeso' }).then((r) => { if (r && r.segui === false) smetti(); });
+    }
     aRiposo();
   }
 
