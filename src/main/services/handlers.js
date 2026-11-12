@@ -1124,8 +1124,10 @@ function compattaDaFermo(incognito, tetti) {
   if (!tetti) return;
   const cacheMs = ContestoFilo.durataMs(tetti.cache);
   Compattazione.programmaFermo(async () => {
-    const tokenTratto = await Compattazione.tokenDelTratto(incognito, { tetti });
-    const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({ soglia: tetti.soglia, tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs });
+    const l = await Compattazione.limiti(incognito, { tetti });
+    const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({
+      soglia: tetti.soglia, base: l.base, turno: l.turno, tokenTratto: l.tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs,
+    });
     if (motivo === 'fermo') await Compattazione.compatta({ incognito, motivo, tetti });
   }, cacheMs + 60 * 1000, incognito);
 }
