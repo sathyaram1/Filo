@@ -21,6 +21,7 @@
       version: '0.2.277', date: '2026-11-12',
       fixes: [
         { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
+        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {
@@ -32,7 +33,6 @@
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
-        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {
