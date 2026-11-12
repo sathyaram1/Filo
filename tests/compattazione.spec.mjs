@@ -1,5 +1,6 @@
 // La compattazione del filo (SPEC-CONTESTO fase 4, #1563): una chat che passerebbe la soglia compatta prima di
 // rispondere, la richiesta dopo sta sotto i 100.000 token, il diario entra nel CONTESTO e la conversazione resta intera.
+import { readFileSync } from 'node:fs';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
@@ -115,12 +116,16 @@ test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la u
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.soglia), { timeout: 10000 }).toBe(40000);
   // Col listino la frase dice costo al mese e attesa, coi prezzi del modello della chat.
   await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA, { timeout: 15000 });
+  // Sotto la parte fissa di ogni richiesta la stima dice da dove la chat compatta davvero, e conta quella.
+  await expect(prefs.locator('#contestoSogliaStima')).toContainText(/token fissi .* la chat compatta da circa [\d.]+\.$/);
   const piuAlta = await prefs.locator('#contestoSogliaStima').textContent();
   await campo.fill('90000');
   await expect(prefs.locator('#contestoSogliaStima'), 'la stima segue la soglia scritta').not.toHaveText(piuAlta, { timeout: 15000 });
   await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA);
+  await expect(prefs.locator('#contestoSogliaStima')).not.toContainText('token fissi');
   await campo.fill('40000');
   await campo.blur();
+  await expect(prefs.locator('#contestoSogliaStima')).toContainText('token fissi', { timeout: 15000 });
   await prefs.locator('#sec-contesto').screenshot({ path: 'tests/.shots/compattazione-preferenze.png' });
   const tetti = await app.evaluate(async () => globalThis.SN_FILO_CONTESTO.tetti((await globalThis.SN_STORAGE.getSettings()).contestoFilo, null));
   expect(tetti.soglia).toBe(40000);
@@ -142,7 +147,8 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
     globalThis.SN_CONTESTO_FILO.ricordaEsiti('sosp1', c.messages.at(-1).ts, {
       azioni: [{ type: 'LEGGI_PAGINA', _executed: true, _output: { ok: true, url: 'https://esempio.example/ricetta', titolo: 'Ricetta', testo: 'uova farina' } }],
     });
-    C._dip.chiama = async () => JSON.stringify({ ore: ['10:00 letta una ricetta'], memorie: ['Le piace cucinare.', 'Vuole le mail in copia a x@y.z.'] });
+    // Ogni memoria cita la riga da cui nasce: la prima la domanda dell'utente, la seconda la risposta che ha letto la pagina.
+    C._dip.chiama = async () => JSON.stringify({ ore: ['10:00 letta una ricetta'], memorie: [{ testo: 'Le piace cucinare.', righe: [1] }, { testo: 'Vuole le mail in copia a x@y.z.', righe: [2] }] });
     try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
   });
   // Chi non apre il quaderno da sé lo sa dalla cornice, e da lì ci arriva con un clic.
@@ -164,6 +170,11 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   await tieni.getByRole('button', { name: 'Tienila in memoria' }).click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).map((l) => l.text)), { timeout: 10000 })
     .toContain('Le piace cucinare.');
+  // Tenuta, la riga porta con sé il punto del filo da cui è nata, come la proposta.
+  const tenuta = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).find((l) => l.text === 'Le piace cucinare.'));
+  const eventi = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chat('sosp1', { ids: true })).eids);
+  expect(tenuta.fonti && tenuta.fonti.length, 'la riga tenuta ha il salto al punto del filo').toBeGreaterThan(0);
+  expect(eventi).toEqual(expect.arrayContaining(tenuta.fonti));
   // Dal tasto destro le stesse scelte, più il salto al punto del filo.
   const via = gruppo.locator('.qd-riga').filter({ hasText: 'x@y.z' });
   await via.locator('.qd-testo').click({ button: 'right' });
@@ -175,6 +186,63 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   expect(await app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.inAttesa()).length)).toBe(0);
 });
 
+// Una memoria nata da una conversazione e tolta dal quaderno: la compattazione che rilegge quella conversazione non la
+// riscrive, e tenuta da una proposta il quaderno dice perché non l'ha scritta.
+const conversazioneTolta = (app, { chat, sospetta, oreFa }) => app.evaluate(async (_e, { chat, sospetta, oreFa }) => {
+  const C = globalThis.SN_COMPATTAZIONE;
+  const M = globalThis.SN_FILO_MEMORY;
+  const t0 = Date.now() - oreFa * 60 * 60 * 1000;
+  await globalThis.SN_FILO_CHATS.append(chat, { role: 'user', text: 'ho due gatti, Miso e Pepe', ts: new Date(t0).toISOString() });
+  const c = await globalThis.SN_FILO_CHATS.append(chat, { role: 'filo', text: 'Che bei nomi.', ts: new Date(t0 + 1000).toISOString(), ...(sospetta ? { classeLetta: 5 } : {}) });
+  if (sospetta) {
+    globalThis.SN_CONTESTO_FILO.ricordaEsiti(chat, c.messages.at(-1).ts, {
+      azioni: [{ type: 'LEGGI_PAGINA', _executed: true, _output: { ok: true, url: 'https://esempio.example/gatti', titolo: 'Gatti', testo: 'nomi per gatti' } }],
+    });
+  }
+  const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: (await globalThis.SN_IL_FILO.chat(chat, { ids: true })).eids });
+  const l = buf[buf.length - 1];
+  await M.hideLine({ lezione: { ts: l.ts, text: l.text } });
+  const vero = C._dip.chiama;
+  C._dip.chiama = async () => JSON.stringify({ ore: ['10:00 parlato dei gatti'], memorie: [{ testo: 'L\'utente ha due gatti, Miso e Pepe.', righe: [1] }] });
+  try { return await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
+}, { chat, sospetta, oreFa });
+
+test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da una proposta il quaderno dice perché', async ({ app, openTab }) => {
+  const r = await conversazioneTolta(app, { chat: 'gatti1', sospetta: false, oreFa: 5 });
+  expect(r.fatto).toBe(true);
+  expect(r.scritte, 'la compattazione non la riscrive').toBe(0);
+  expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
+
+  await conversazioneTolta(app, { chat: 'gatti2', sospetta: true, oreFa: 4 });
+  const q = await openTab('filo://quaderno/quaderno.html');
+  const proposta = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'Miso e Pepe' });
+  await expect(proposta).toBeVisible({ timeout: 10000 });
+  await proposta.hover();
+  await proposta.getByRole('button', { name: 'Tienila in memoria' }).click();
+  await expect(q.getByText('Non l\'ho scritta: somiglia a una riga che avevi tolto.')).toBeVisible({ timeout: 10000 });
+  expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
+});
+
+test('una pagina tolta dal filo porta via subito la riga del diario nata da lei, anche dal file, senza un messaggio a Filo', async ({ app }) => {
+  const { file, visita } = await app.evaluate(async () => {
+    const C = globalThis.SN_COMPATTAZIONE;
+    const Chats = globalThis.SN_FILO_CHATS;
+    const t0 = Date.now() - 5 * 60 * 60 * 1000;
+    await Chats.append('pag1', { role: 'user', text: 'che si mangia stasera?', ts: new Date(t0).toISOString() });
+    const v = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(t0 + 500).toISOString() });
+    await Chats.append('pag1', { role: 'filo', text: 'Una carbonara.', ts: new Date(t0 + 1000).toISOString() });
+    const vero = C._dip.chiama;
+    C._dip.chiama = async () => JSON.stringify({ ore: ['19:00 cercata la ricetta della carbonara'], memorie: [] });
+    try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
+    return { file: `${C._dip.cartella()}/livelli.json`, visita: v.id };
+  });
+  expect(readFileSync(file, 'utf8')).toContain('carbonara');
+  // «Togli dal filo» sulla pagina, dalla home: lo stesso messaggio del menu.
+  const r = await app.evaluate((_e, id) => globalThis.SN_HANDLE_MESSAGE({ type: 'filo_coda_togli_pagine', ids: [id] }, { tab: { id: 5, url: 'filo://newtab/' }, url: 'filo://newtab/' }), visita);
+  expect(r && r.ok).toBe(true);
+  await expect.poll(() => readFileSync(file, 'utf8'), { timeout: 10000 }).not.toContain('carbonara');
+});
+
 // Quanto pesano strumenti e parte fissa: le soglie delle prove si misurano da lì, non da un numero scritto oggi.
 const base = (app) => app.evaluate(() => globalThis.SN_FILO_CONTESTO.stimaToken(
   JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()));
@@ -182,16 +250,23 @@ const conSoglia = (app, soglia) => app.evaluate(async (_e, soglia) => {
   const s = await globalThis.SN_STORAGE.getSettings();
   await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), soglia } });
 }, soglia);
-// Una conversazione di tre ore fa da `token` token circa.
+// Una conversazione di tre ore fa da `token` token circa, a messaggi da 15.000 al più: uno solo oltre un quarto del
+// tetto entrerebbe nel tratto con testa e coda.
 const vecchiaDa = (app, token) => app.evaluate(async (_e, token) => {
   const t0 = Date.now() - 3 * 60 * 60 * 1000;
-  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'user', text: `Appunti sulle api: ${'il favo è fatto di cera. '.repeat(Math.ceil((token * 3.5) / 25))}`, ts: new Date(t0).toISOString() });
-  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'filo', text: 'Annotato.', ts: new Date(t0 + 5000).toISOString() });
+  for (let i = 0, resto = token; resto > 0; i++, resto -= 15000) {
+    const ts = t0 + i * 60000;
+    await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'user', text: `Appunti sulle api: ${'il favo è fatto di cera. '.repeat(Math.ceil((Math.min(resto, 15000) * 3.5) / 25))}`, ts: new Date(ts).toISOString() });
+    await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'filo', text: 'Annotato.', ts: new Date(ts + 5000).toISOString() });
+  }
 }, token);
 
 test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la soglia compatta prima del giro dopo', async ({ app, testServer }) => {
   const page = await home(app);
-  await vecchiaDa(app, 8000);
+  // Una conversazione vecchia abbastanza grande che la soglia appena sopra la richiesta lasci più dei 30.000 token minimi
+  // sopra la parte fissa: così vale quella scritta.
+  await vecchiaDa(app, 32000);
+  await conSoglia(app, 2000000);
   const url = testServer.html(`<!doctype html><title>Le api</title><p>${'Le api comunicano con la danza. '.repeat(3000)}</p>`);
   await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._dip.scarica = (u, o) => fetch(u, o); });
   await modelloFinto(app, [
@@ -223,16 +298,20 @@ test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la 
 
 test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; e da fermo, passata la cache', async ({ app }) => {
   const page = await home(app);
-  await vecchiaDa(app, 18000);
+  await vecchiaDa(app, 32000);
   await modelloFinto(app, [{ text: 'Eccomi.' }]);
   await compattatoreFinto(app, RIGA);
   // Un primo turno con la soglia lontana misura la parte fissa come la misura la chat (strumenti, istruzioni, CONTESTO):
-  // l'anticipo scatta all'80% dello spazio fra lei e la soglia.
+  // l'anticipo scatta all'80% dello spazio fra lei e la soglia, che qui supera i 30.000 token minimi.
   await conSoglia(app, 2000000);
   await chiedi(page, 'ciao');
   await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(1);
   const parteFissa = await app.evaluate(() => globalThis.SN_COMPATTAZIONE.base(false));
-  await conSoglia(app, Math.round(parteFissa + 21000));
+  // Lo spazio sopra la parte fissa poco più grande di quello che la richiesta già occupa: il messaggio dopo sta sotto
+  // la soglia e sopra l'anticipo.
+  const occupato = (await tokenDi(app, (await chiamateAlModello(app))[0])) - parteFissa;
+  expect(occupato + 3000, 'la soglia scritta vale: supera lo spazio minimo').toBeGreaterThan(30000);
+  await conSoglia(app, Math.round(parteFissa + occupato + 3000));
   // Il timer della pausa: si prende la funzione che il turno lascia, per farla partire senza aspettare un'ora.
   await app.evaluate(() => {
     const C = globalThis.SN_COMPATTAZIONE;
@@ -248,7 +327,7 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
     await expect.poll(() => app.evaluate(() => globalThis.__compattazioni.map((c) => c.motivo)), { timeout: 10000 }).toEqual(['anticipo']);
 
     // Da fermo: il turno lascia il timer della durata della cache più un minuto; scattato, col tratto grande compatta.
-    await chiedi(page, `ci sei? ${'appunto lungo sulle api. '.repeat(3000)}`);
+    await chiedi(page, `ci sei? ${'appunto lungo sulle api. '.repeat(4000)}`);
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(3);
     expect((await chiamateAlModello(app))[2][0].content, 'il messaggio dopo ha il diario').toContain(RIGA);
     expect(await app.evaluate(() => globalThis.__fermo.at(-1).ms)).toBe(61 * 60 * 1000);
@@ -448,8 +527,9 @@ test('riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio comp
   }
 });
 
-// Turni pesanti (un capitolo incollato a ogni messaggio, circa 5.000 token): dopo una compattazione resta spazio sotto
-// la soglia, così la chat non compatta a ogni messaggio e la risposta non la aspetta (giro 4 di #1563).
+// Turni pesanti (un capitolo incollato a ogni messaggio, circa 5.000 token, più i ricordi ripescati): sopra la parte
+// fissa resta spazio per il grezzo e altri turni, così la chat non compatta ogni due messaggi e la risposta non la
+// aspetta (giri 4 e 9 di #1563).
 test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
   test.setTimeout(300000);
   const page = await home(app);
@@ -471,10 +551,59 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
   const nuove = perMessaggio.map((c, i) => c.slice(i ? perMessaggio[i - 1].length : 0));
   const con = nuove.map((c, i) => (c.length ? i : -1)).filter((i) => i >= 0);
   expect(con.length, 'la chat compatta').toBeGreaterThan(1);
-  // Con la parte fissa di oggi (~43.000 token) e i ricordi ripescati, un turno qui pesa fino a 8.000 token: sopra la
-  // parte fissa ne stanno tre, quindi ogni due messaggi è il meglio possibile. I tre turni liberi li prova l'unit.
-  for (const i of con) expect(con.includes(i + 1), `compattazioni per messaggio: ${JSON.stringify(nuove)}`).toBe(false);
+  for (let k = 1; k < con.length; k++) {
+    expect(con[k] - con[k - 1], `fra due compattazioni almeno tre messaggi: ${JSON.stringify(nuove)}`).toBeGreaterThanOrEqual(3);
+  }
   expect(nuove.flat().filter((m) => m === 'soglia'), 'nessuna risposta aspetta la compattazione').toEqual([]);
   const ultima = (await chiamateAlModello(app)).at(-1);
-  expect(await tokenDi(app, ultima)).toBeLessThan(70000);
+  expect(await tokenDi(app, ultima), 'lo spazio sopra la parte fissa resta sotto il listino').toBeLessThan(100000);
+});
+
+test('con la soglia scritta sotto la parte fissa la risposta non aspetta una compattazione e lo scambio di prima arriva intero', async ({ app }) => {
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Va bene.' }]);
+  await compattatoreFinto(app, '10:00 parlato di animali');
+  await conSoglia(app, 40000);
+  try {
+    await chiedi(page, 'la mia gatta si chiama Ofelia');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(1);
+    await chiedi(page, 'come si chiama la mia gatta?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(2);
+    const seconda = (await chiamateAlModello(app))[1];
+    expect(JSON.stringify(seconda.slice(1)), 'il messaggio di un attimo prima arriva al modello com\'era').toContain('la mia gatta si chiama Ofelia');
+    await page.waitForTimeout(1500);
+    expect(await app.evaluate(() => globalThis.__compattazioni.map((x) => x.motivo)), 'nessuna compattazione').toEqual([]);
+    // La chat compatta dove dice la regola dello spazio: la parte fissa misurata più lo spazio minimo.
+    const { base, soglia } = await app.evaluate(async () => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: 40000 }, null) });
+      return { base: C.base(false), soglia: l.soglia };
+    });
+    expect(base, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(40000);
+    expect(soglia).toBe(base + 30000);
+  } finally { await rimettiCompattatore(app); await ripristina(app); }
+});
+
+// Il giro dei giorni lo fa partire l'app, all'avvio: qui il suo passo è accorciato, il resto è quello vero.
+test.describe('il giro dei giorni', () => {
+  test.use({ envInPiu: { FILO_TEST_GIRO_GIORNI_MS: '1000' } });
+  test('le ore di ieri diventano la riga del giorno da sole, senza un messaggio a Filo', async ({ app }) => {
+    await app.evaluate(async () => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      const ieri = new Date();
+      ieri.setDate(ieri.getDate() - 1);
+      ieri.setHours(10, 0, 0, 0);
+      await globalThis.SN_FILO_CHATS.append('ieri1', { role: 'user', text: 'scrivo la mail al relatore', ts: ieri.toISOString() });
+      await globalThis.SN_FILO_CHATS.append('ieri1', { role: 'filo', text: 'Scritta.', ts: new Date(ieri.getTime() + 5000).toISOString() });
+      globalThis.__giorni = [];
+      C._dip.chiama = async ({ motivo }) => {
+        if (motivo === 'giorni') { globalThis.__giorni.push(motivo); return 'ieri: mail al relatore'; }
+        return JSON.stringify({ ore: ['10:00 scritta la mail al relatore'], memorie: [] });
+      };
+      await C.compatta({ incognito: false, motivo: 'prova', forza: true });
+    });
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.righe(false)).giorni.map((g) => g.testo)), { timeout: 15000 })
+      .toEqual(['ieri: mail al relatore']);
+    expect(await app.evaluate(() => globalThis.SN_COMPATTAZIONE.sezione(false))).toMatch(/GIORNI:\n- ieri: mail al relatore/);
+  });
 });

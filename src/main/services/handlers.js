@@ -1124,10 +1124,20 @@ function compattaDaFermo(incognito, tetti) {
   if (!tetti) return;
   const cacheMs = ContestoFilo.durataMs(tetti.cache);
   Compattazione.programmaFermo(async () => {
-    const tokenTratto = await Compattazione.tokenDelTratto(incognito, { tetti });
-    const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({ soglia: tetti.soglia, tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs });
+    const l = await Compattazione.limiti(incognito, { tetti });
+    const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({
+      soglia: tetti.soglia, base: l.base, turno: l.turno, tokenTratto: l.tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs,
+    });
     if (motivo === 'fermo') await Compattazione.compatta({ incognito, motivo, tetti });
   }, cacheMs + 60 * 1000, incognito);
+}
+
+// La parte fissa della richiesta della chat, in token: strumenti, istruzioni e CONTESTO (la parte dell'utente). La chat
+// e la stima accanto alla soglia la contano allo stesso modo.
+function parteFissaChat(tools, parteUtente) {
+  let strumenti = 0;
+  try { strumenti = tools ? JSON.stringify(tools).length : 0; } catch (_) {}
+  return Math.ceil((PROMPTS.filoChatStatic().length + String(parteUtente || '').length + strumenti) / globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN);
 }
 
 // La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
@@ -1143,8 +1153,13 @@ async function stimaSogliaCompattazione(valore) {
   };
   const chat = primo(ACTIONS.FILO_CHAT);
   const comp = primo(modelloCheCompatta(settings));
+  // La parte fissa che la chat ha misurato all'ultimo turno; prima del primo, gli stessi pezzi con la parte dell'utente di
+  // adesso (o quella tipica, se non c'è ancora).
   const Tools = globalThis.SN_ACTION_TOOLS;
-  const base = FC.stimaToken(JSON.stringify(Tools ? Tools.definitions() : []) + PROMPTS.filoChatStatic()) + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente;
+  const foto = ContestoFilo.ultimaFotografia(false);
+  const base = Compattazione.base(false) || (foto
+    ? parteFissaChat(Tools ? Tools.definitions() : [], foto.testo)
+    : parteFissaChat(Tools ? Tools.definitions() : [], '') + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente);
   const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
     soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
   });
@@ -1166,13 +1181,10 @@ Compattazione.imposta({
     });
     return r && r.text;
   },
-  applicaMemoria: async (testo) => {
-    const l = global.SN_PREF.lezioneDaAzione({ testo });
-    if (l.rifiuto || !l.testo) return false;
-    const buf = await FiloMem.appendLesson(l.testo);
-    const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+  applicaMemoria: async (testo, opts) => {
+    const scritta = await Compattazione.scriviMemoria(testo, opts);
     if (await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
-    return !!ultima && ultima.text === l.testo;
+    return scritta;
   },
 });
 
@@ -6881,6 +6893,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const LC = globalThis.SN_FILO_COMPATTAZIONE;
   let compattazioniNelTurno = 0;
   let ultimaStima = 0;
+  let limitiDelTurno = null;
   const ricomponi = async () => {
     filo = await componiFilo(tettiChat);
     sezioniUtente = await sezioniCon();
@@ -6902,19 +6915,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     let token = await stimaRichiesta();
     // Dopo un riavvio non c'è una richiesta precedente in memoria: la pausa si misura dall'ultimo messaggio del filo.
     const ultimoUso = round !== 1 ? null : (fotoPrima ? fotoPrima.usata : LC.ultimaAttivita(filo.tutti, { chat: chatId }));
+    // La parte della richiesta che non è tratto né domanda (strumenti, parte fissa, CONTESTO), misurata al primo giro, e
+    // il peso dei turni: la soglia vera, il grezzo che resta e l'anticipo vengono da lì (SN_FILO_COMPATTAZIONE.limiti).
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
-    let tokenTratto = 0;
-    if (ultimoUso != null) { try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {} }
-    // La parte della richiesta che non è tratto né domanda (strumenti, parte fissa, CONTESTO): dice quanto grezzo può
-    // restare e quando compattare in anticipo. Gli stessi pezzi della stima accanto alla soglia.
     if (round === 1) {
-      const FC = globalThis.SN_FILO_CONTESTO;
-      try {
-        Compattazione.segnaBase(incognitoTurno, Math.ceil((PROMPTS.filoChatStatic().length + String(payloadBase.parteUtente || '').length + caratteriStrumenti()) / FC.CARATTERI_PER_TOKEN));
-      } catch (_) {}
+      try { Compattazione.segnaBase(incognitoTurno, parteFissaChat(tools, payloadBase.parteUtente)); } catch (_) {}
+      try { limitiDelTurno = await Compattazione.limiti(incognitoTurno, { tetti: tettiChat }); } catch (_) { limitiDelTurno = null; }
     }
+    const l = limitiDelTurno || {};
     const motivo = LC.motivo({
-      token, soglia: tettiChat.soglia, tokenTratto, ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
+      token, soglia: tettiChat.soglia, base: l.base, turno: l.turno, tokenTratto: ultimoUso != null ? l.tokenTratto || 0 : 0,
+      ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
     });
     if (motivo && compattazioniNelTurno < 2) {
       compattazioniNelTurno++;
@@ -7611,8 +7622,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (!internal && filo) {
       compattaDaFermo(incognitoTurno, tettiChat);
-      if (tettiChat && ultimaStima > LC.sogliaAnticipo({ soglia: tettiChat.soglia, base: Compattazione.base(incognitoTurno) })) {
-        Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }).catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
+      // L'anticipo si misura col turno appena finito dentro il tratto: la stessa regola della soglia e del taglio.
+      if (tettiChat) {
+        const stima = ultimaStima;
+        Compattazione.limiti(incognitoTurno, { tetti: tettiChat })
+          .then((l) => (stima > l.anticipo ? Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }) : null))
+          .catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
       }
     }
     const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
@@ -9201,6 +9216,10 @@ ConversazioniApp.collega({
 
 // Pagine entrate, rititolate o tolte dal filo, da qualunque strada: le home aperte rifanno le righe delle pagine (#869).
 globalThis.SN_IL_FILO.suPagine(() => broadcastToFiloPages({ type: MSG.FILO_PAGINE_CAMBIATE }));
+// Una pagina tolta porta via subito anche le righe del diario nate da lei, come una conversazione cancellata.
+globalThis.SN_IL_FILO.suPagine(({ incognito }) => {
+  Compattazione.dimenticaPagine(incognito).catch((e) => console.warn('[Filo] diario della pagina cancellata:', e?.message || e));
+});
 
 // Filo parla per primo (#869): cosa genera il messaggio, quando può farlo, e a chi lo dice.
 FiloParla.collega({

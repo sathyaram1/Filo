@@ -47,18 +47,19 @@ function azzera({ chiama = null, memorie = [] } = {}) {
   Contesto.azzeraAncore();
   Comp.azzera();
   const scritte = [];
+  const fontiScritte = [];
   const chiamate = [];
   Comp.imposta({
     cartella: () => join(cartella, 'filo'),
     livello: async () => ({ livello: 'default' }),
-    applicaMemoria: async (t) => { scritte.push(t); return true; },
+    applicaMemoria: async (t, o) => { scritte.push(t); fontiScritte.push((o && o.fonti) || []); return true; },
     chiama: chiama || (async ({ messages }) => {
       chiamate.push(messages);
       const righe = [...messages[1].content.matchAll(/^\[(\d+)\]/gm)].map((m) => Number(m[1]));
       return JSON.stringify({ ore: [{ testo: '10:00 parlato di gatti e di una ricetta', righe }], memorie });
     }),
   });
-  return { cartella, scritte, chiamate };
+  return { cartella, scritte, fontiScritte, chiamate };
 }
 
 // ── La logica pura ─────────────────────────────────────────────────────────
@@ -143,7 +144,11 @@ test('la risposta di chi compatta: righe delle ore con le fonti citate e l\'inte
   assert.equal(r.ore.length, 1);
   assert.deepEqual(r.ore[0].fonti, ['ab|t2']);
   assert.equal(r.ore[0].da, new Date('2026-11-04T10:05:00Z').toISOString());
-  assert.deepEqual(r.memorie, ['ha due gatti']);
+  assert.deepEqual(r.memorie, [{ testo: 'ha due gatti', fonti: ['ab|t1', 'ab|t2'] }], 'senza righe citate la memoria nasce da tutto il pezzo');
+  // Una memoria che cita le sue righe nasce solo da quei messaggi: il punto del filo nel quaderno.
+  const citata = L.leggiRisposta('{"ore":["10:00 a"],"memorie":[{"testo":"ha due gatti","righe":[1]}]}', righe);
+  assert.deepEqual(citata.memorie, [{ testo: 'ha due gatti', fonti: ['ab|t1'] }]);
+  assert.match(L.ISTRUZIONI, /"memorie":\[\{"testo":"…","righe":\[2\]\}\]/, 'chi compatta sa che le memorie citano le righe');
   // Senza righe citate la riga copre tutto il pezzo.
   assert.deepEqual(L.leggiRisposta('{"ore":["10:00 tutto"]}', righe).ore[0].fonti, ['ab|t1', 'ab|t2']);
   assert.equal(L.leggiRisposta('non so', righe), null);
@@ -434,8 +439,9 @@ test('la stima accanto alla soglia: più bassa compatta più spesso, oltre i 100
   assert.equal(S.prezzoPer(haiku, 99999).prompt, 0.0000001);
   assert.equal(S.prezzoPer(haiku, 100000).prompt, 0.0000005);
   const stima = (soglia) => L.stimaSoglia({ soglia, base: 38500, prezzoChat: haiku, prezzoCompattazione: haiku, prezzoPer: S.prezzoPer });
-  assert.ok(stima(50000).ogni < stima(70000).ogni && stima(70000).ogni < stima(90000).ogni);
+  assert.ok(stima(75000).ogni < stima(90000).ogni && stima(90000).ogni < stima(110000).ogni);
   assert.match(stima(70000).testo, /^Circa \d+,\d+ \$ al mese con 600 messaggi .* \d+ s/);
+  assert.doesNotMatch(stima(70000).testo, /token fissi/, 'una soglia che lascia spazio vale com\'è');
   assert.ok(stima(200000).oltreListino && stima(200000).usd > 3 * stima(70000).usd);
   assert.match(stima(200000).testo, /cinque volte/);
   assert.equal(L.stimaSoglia({ soglia: 70000, base: 38500, prezzoChat: null, prezzoCompattazione: haiku }), null, 'senza prezzo, niente stima inventata');
@@ -507,10 +513,10 @@ test('il grezzo che resta ha un tetto in token: turni pesanti lasciano spazio so
 test('dopo una compattazione entrano almeno tre turni come quelli di adesso prima della prossima, qualunque sia la parte fissa', () => {
   const ora = Date.parse('2026-11-04T18:00:00Z');
   const peso = (m) => m.peso;
-  const soglia = 70000;
-  for (const T of [3000, 5000, 6000]) {
+  // Anche la soglia di serie sotto la parte fissa di oggi (~43.000 token) con turni da 8.000 (un capitolo e i ricordi
+  // ripescati), e una soglia scritta sotto la parte fissa: la regola dello spazio sopra di lei vale per tutte.
+  for (const [soglia, T] of [[70000, 3000], [70000, 5000], [70000, 6000], [70000, 8000], [40000, 3000], [40000, 8000]]) {
     for (let base = 30000; base <= 50000; base += 250) {
-      if ((soglia - base) * L.QUOTA_ANTICIPO < (L.TURNI_LIBERI + 1) * T) continue;
       const lista = [];
       for (let i = 0; i < 8; i++) lista.push(msg('ab', 'user', 80 - i * 5, `d${i}`, ora, { peso: T - 100 }), msg('ab', 'filo', 79 - i * 5, `r${i}`, ora, { peso: 100 }));
       const turno = L.pesoTurno(lista, peso);
@@ -518,11 +524,18 @@ test('dopo una compattazione entrano almeno tre turni come quelli di adesso prim
       const k = L.puntoDiTaglio(lista, { ora, maxToken: L.grezzoMassimo({ soglia, base, turno }), peso });
       const grezzo = lista.slice(k).reduce((a, m) => a + m.peso, 0);
       let j = 1;
-      while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base })) j++;
-      assert.ok(j > L.TURNI_LIBERI, `turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+      while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base, turno })) j++;
+      const l = L.limiti({ soglia, base, turno });
+      // Dove lo spazio che serve passerebbe il posto per un esito grosso sotto il listino, almeno i tre messaggi.
+      const pieno = l.spazio >= (L.TURNI_LIBERI + 1) * T / L.QUOTA_ANTICIPO;
+      assert.ok(pieno ? j > L.TURNI_LIBERI : j >= L.TURNI_LIBERI, `soglia ${soglia}, turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+      assert.ok(l.soglia <= L.LISTINO - L.ESITO_GROSSO, 'resta il posto per un esito grosso sotto il listino');
     }
   }
-  assert.equal(Math.round(L.grezzoMassimo({ soglia, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
+  // Il peso dei turni di adesso è quello tipico: un capitolo incollato ore fa non lo alza.
+  const misti = [msg('ab', 'user', 80, 'tesi', ora, { peso: 30000 }), msg('ab', 'user', 60, 'ciao', ora, { peso: 50 }), msg('ab', 'user', 40, 'e poi?', ora, { peso: 80 })];
+  assert.equal(L.pesoTurno(misti, peso), 80);
+  assert.equal(Math.round(L.grezzoMassimo({ soglia: 70000, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
   assert.equal(L.pesoTurno([], peso), 0);
 });
 
@@ -582,4 +595,115 @@ test('i limiti dei campi e la stima tipica nelle Opzioni vengono dalla regola de
   const t = S.tokenTipici(globalThis.SN_CONST.ACTIONS.FILO_COMPATTAZIONE, null);
   assert.deepEqual({ prompt: t.prompt, completion: t.completion }, L.usoTipico());
   assert.ok(t.prompt > 0 && t.prompt < FC.TETTI_DI_SERIE.soglia);
+});
+
+// ── Rilievi del giro 9 (#1563.5) ───────────────────────────────────────────────
+
+test('la soglia vale sopra la parte fissa: sotto di lei la chat non compatta a ogni messaggio, e la stima lo dice', () => {
+  const base = 43000;
+  assert.equal(L.limiti({ soglia: 40000, base, turno: 300 }).soglia, base + L.SPAZIO_MINIMO);
+  assert.equal(L.limiti({ soglia: 70000, base }).soglia, base + L.SPAZIO_MINIMO, 'la soglia di serie sopra la parte fissa di oggi');
+  assert.equal(L.limiti({ soglia: 90000, base }).soglia, 90000, 'una soglia che lascia più spazio vale com\'è');
+  assert.equal(L.limiti({ soglia: 40000 }).soglia, 40000, 'senza parte fissa misurata vale la soglia scritta');
+  // «la mia gatta si chiama Ofelia», poi «come si chiama la mia gatta?»: la seconda richiesta non aspetta nessuno.
+  assert.equal(L.motivo({ token: base + 600, soglia: 40000, base, turno: 300 }), null);
+  assert.equal(L.motivo({ token: base + L.SPAZIO_MINIMO + 1, soglia: 40000, base, turno: 300 }), 'soglia');
+  // Turni pesanti: lo spazio cresce per tenerne tre dopo il grezzo, sotto il listino.
+  assert.equal(L.limiti({ soglia: 70000, base, turno: 7000 }).spazio, (L.TURNI_LIBERI + 1) * 7000 / L.QUOTA_ANTICIPO);
+  assert.equal(L.limiti({ soglia: 70000, base, turno: 9000 }).spazio, L.LISTINO - L.ESITO_GROSSO - base, 'non oltre il posto per un esito grosso');
+  assert.ok(L.limiti({ soglia: 70000, base: 70000, turno: 20000 }).soglia <= L.LISTINO);
+
+  require('../../src/shared/stimaCosto.js');
+  const S = globalThis.SN_STIMA_COSTO;
+  const haiku = S.prezzoDaCatalogo({ prompt: '0.0000001', completion: '0.0000005', input_cache_read: '0.00000001' });
+  const stima = (soglia) => L.stimaSoglia({ soglia, base, prezzoChat: haiku, prezzoCompattazione: haiku, prezzoPer: S.prezzoPer });
+  assert.equal(stima(40000).ogni, stima(base + L.SPAZIO_MINIMO).ogni, 'la stima conta la compattazione che la chat fa davvero');
+  assert.equal(stima(40000).soglia, base + L.SPAZIO_MINIMO);
+  assert.match(stima(40000).testo, /circa 43\.000 token fissi .* almeno 30\.000 token per la conversazione: la chat compatta da circa 73\.000\.$/);
+});
+
+test('la parte fissa tipica della stima segue gli strumenti e le istruzioni di oggi', () => {
+  require('../../src/shared/actionTools.js');
+  const misura = FC.stimaToken(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()) + L.USO.parteUtente;
+  assert.ok(Math.abs(L.USO.base - misura) <= 0.1 * misura, `USO.base ${L.USO.base} contro ${misura} misurati: aggiornala`);
+});
+
+test('le memorie della compattazione portano il punto del filo da cui nascono, anche quelle tenute dal quaderno', async () => {
+  const ora = Date.now();
+  const eids = async () => (await globalThis.SN_IL_FILO.chat('ab12', { ids: true })).eids;
+  const pulito = azzera({ memorie: [{ testo: 'Ha due gatti, Miso e Pepe.', righe: [1] }] });
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.deepEqual(pulito.scritte, ['Ha due gatti, Miso e Pepe.']);
+  assert.deepEqual(pulito.fontiScritte, [[(await eids())[0]]], 'la memoria nasce dal messaggio dell\'utente');
+
+  const sospetto = azzera({ memorie: [{ testo: 'Le piace la carbonara.', righe: [1] }] });
+  await scrivi('ab12', 'user', 'adoro la carbonara, leggi la ricetta', new Date(ora - 5 * ORA_MS).toISOString());
+  const c = await scrivi('ab12', 'filo', 'Letta.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [PAGINA] });
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const [p] = await Comp.inAttesa();
+  const [eDomanda, eRisposta] = await eids();
+  assert.deepEqual(p.origine, [eDomanda]);
+  assert.deepEqual(p.fonti, [eDomanda, eRisposta], 'chi decide vede anche la risposta che ha letto la pagina');
+  await Comp.decidi(p.id, true);
+  assert.deepEqual(sospetto.fontiScritte, [[eDomanda]], 'tenuta, la riga resta legata al punto da cui è nata');
+});
+
+test('una memoria tolta dall\'utente non torna dalla compattazione dello stesso tratto, né tenuta dal quaderno', async () => {
+  for (const m of ['timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'quaderno', 'filoMemory', 'preferences']) require(`../../src/shared/${m}.js`);
+  const disco = new Map();
+  const chromeVero = globalThis.chrome;
+  globalThis.chrome = { storage: { local: {
+    async get(k) { return { [k]: disco.has(k) ? JSON.parse(disco.get(k)) : undefined }; },
+    async set(o) { for (const [k, v] of Object.entries(o)) disco.set(k, JSON.stringify(v)); },
+    async remove(k) { disco.delete(k); },
+  } } };
+  try {
+    const M = globalThis.SN_FILO_MEMORY;
+    const ora = Date.now();
+    const prova = async (sospetta) => {
+      disco.clear();
+      azzera({ memorie: [{ testo: 'L\'utente ha due gatti, Miso e Pepe.', righe: [1] }] });
+      Comp.imposta({ applicaMemoria: Comp.scriviMemoria });
+      await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+      const c = await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+      if (sospetta) Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [PAGINA] });
+      // La lezione nata dallo scambio, come la scrive il creatore di lezioni, e poi tolta dal quaderno.
+      const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: (await globalThis.SN_IL_FILO.chat('ab12', { ids: true })).eids });
+      assert.ok(await M.hideLine({ lezione: { ts: buf[0].ts, text: buf[0].text } }));
+      assert.deepEqual(await M.getLessonsBuffer(), []);
+      return Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+    };
+    const r = await prova(false);
+    assert.equal(r.scritte, 0, 'la compattazione non la riscrive');
+    assert.deepEqual(await M.getLessonsBuffer(), []);
+    await prova(true);
+    const [p] = await Comp.inAttesa();
+    assert.deepEqual(await Comp.decidi(p.id, true), { ok: true, scritta: false }, '«Non l\'ho scritta: somiglia a una riga che avevi tolto»');
+    assert.deepEqual(await M.getLessonsBuffer(), []);
+  } finally {
+    globalThis.chrome = chromeVero;
+  }
+});
+
+test('una pagina cancellata porta via subito le righe del diario nate da lei, anche dal disco, senza aspettare un messaggio', async () => {
+  const { cartella } = azzera();
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  const disco = () => readFileSync(join(cartella, 'filo', 'livelli.json'), 'utf8');
+  const Filo = globalThis.SN_IL_FILO;
+  Filo.suPagine(({ incognito }) => { Comp.dimenticaPagine(incognito); });
+  await scrivi('cd34', 'user', 'che si mangia stasera?', new Date(t0).toISOString());
+  const visita = await Filo.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(t0 + 500).toISOString() }, { incognito: false });
+  await scrivi('cd34', 'filo', 'Una carbonara.', new Date(t0 + 1000).toISOString());
+  await scrivi('cd34', 'user', 'grazie', new Date(t0 + 60000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.match(disco(), /gatti e di una ricetta/);
+  await Filo.cancellaVisite([{ ts: visita.ts, url: 'https://ricette.example/carbonara' }], { incognito: false });
+  // Il filo avvisa dopo la scrittura; la potatura gira in sottofondo.
+  for (let i = 0; i < 50 && /gatti e di una ricetta/.test(disco()); i++) await new Promise((r) => setTimeout(r, 20));
+  assert.doesNotMatch(disco(), /gatti e di una ricetta/, 'la riga esce dal file del diario');
+  assert.equal(await Comp.dimenticaPagine(false), 0, 'senza una cancellazione nuova non rilegge niente');
 });

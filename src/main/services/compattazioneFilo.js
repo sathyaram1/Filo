@@ -12,7 +12,8 @@ const FC = () => globalThis.SN_FILO_CONTESTO;
 const F = () => globalThis.SN_IL_FILO;
 const CF = () => require('./contestoFilo');
 const FILE = 'livelli.json';
-const GIRO_GIORNI_MS = 60 * 60 * 1000;
+// Le prove lo accorciano per vedere che l'app fa partire davvero il giro dei giorni (tests/compattazione.spec.mjs).
+const GIRO_GIORNI_MS = Number(process.env.FILO_TEST_GIRO_GIORNI_MS) > 0 ? Number(process.env.FILO_TEST_GIRO_GIORNI_MS) : 60 * 60 * 1000;
 
 const vuoto = () => ({ da: null, a: null, ore: [], giorni: [], inAttesa: [], guasto: 0 });
 const stati = { normale: null, incognito: vuoto() };
@@ -25,17 +26,22 @@ const timerFermo = { normale: null, incognito: null };
 const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
-// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo)` → scrive una memoria. Li dà
-// il main all'avvio (handlers.js), le prove li sostituiscono.
+// Scrive una memoria con gli eventi del filo da cui nasce, come le lezioni: una che ridice una riga tolta dall'utente
+// dallo stesso tratto non entra, e torna falso.
+async function scriviMemoria(testo, { fonti = [] } = {}) {
+  const P = globalThis.SN_PREF;
+  const l = P ? P.lezioneDaAzione({ testo }) : { testo };
+  if (l.rifiuto || !l.testo) return false;
+  const buf = await globalThis.SN_FILO_MEMORY.appendLesson(l.testo, { fonti });
+  const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+  return !!ultima && ultima.text === String(l.testo).trim();
+}
+
+// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti })` → scriviMemoria.
+// Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
 const _dip = {
   chiama: null,
-  applicaMemoria: async (testo) => {
-    const P = globalThis.SN_PREF;
-    const l = P ? P.lezioneDaAzione({ testo }) : { testo };
-    if (l.rifiuto || !l.testo) return false;
-    await globalThis.SN_FILO_MEMORY.appendLesson(l.testo);
-    return true;
-  },
+  applicaMemoria: scriviMemoria,
   livello: async () => {
     let aut = {};
     try { aut = (await globalThis.SN_STORAGE.getSettings()).autonomia || {}; } catch (_) {}
@@ -165,7 +171,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const lista = await daCompattare(incognito, { ora, tetti: t });
   const taglio = L().puntoDiTaglio(lista, {
     ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI,
-    maxToken: L().grezzoMassimo({ soglia: t.soglia, base: basi[lato(incognito)], turno: L().pesoTurno(lista, pesoDi) }), peso: pesoDi,
+    maxToken: limitiDi(lista, incognito, t.soglia).grezzo, peso: pesoDi,
   });
   // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima. Con la
   // parte dell'utente davanti, chi compatta resta sotto il listino.
@@ -228,16 +234,19 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
-  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna.
-  if (!incognito) {
-    const fonti = sospetto && letto.memorie.length ? await eventiDeiMessaggi(sospette) : [];
+  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna. Ognuna
+  // porta i messaggi da cui nasce (`origine`), come le lezioni: il punto del filo nel quaderno, e il controllo che non
+  // lascia tornare una riga tolta. Una proposta mostra anche i messaggi che hanno reso sospetto il pezzo.
+  if (!incognito && letto.memorie.length) {
+    const fontiSospette = sospetto ? await eventiDeiMessaggi(sospette) : [];
     for (const m of letto.memorie) {
+      const origine = await eventiDeiMessaggi(m.fonti);
       if (sospetto) {
-        const p = { id: id(), testo: m, ts: new Date(ora).toISOString(), fonti };
+        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: [...new Set([...origine, ...fontiSospette])], origine };
         s.inAttesa.push(p);
         inAttesa.push(p);
       } else {
-        try { if (await _dip.applicaMemoria(m)) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
+        try { if (await _dip.applicaMemoria(m.testo, { fonti: origine })) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
       }
     }
   }
@@ -260,7 +269,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     } catch (_) {}
   }
   return {
-    fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie, inAttesa, scritte,
+    fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie.map((m) => m.testo), inAttesa, scritte,
     fino: s.a, sospetto,
   };
 }
@@ -301,27 +310,47 @@ async function sezione(incognito) {
   const tutte = await F().chats({ incognito, nascoste: true });
   const chats = new Set(tutte.map((c) => c && c.id));
   const nascoste = new Set(tutte.filter((c) => c && c.nascosta).map((c) => c.id));
-  // Le pagine e gli accaduti si rileggono solo dopo una cancellazione nuova; se non si leggono, non si toglie niente.
-  let eventi = null;
+  const eventi = await eventiDopoCancellazione(s, incognito);
+  await togli(s, incognito, (f) => (chatDellaFonte(f) != null ? chats.has(chatDellaFonte(f)) : (!eventi || eventi.has(f))));
+  const visibile = (f) => !nascoste.has(chatDellaFonte(f));
+  return L().rendiFiloCompattato({ ore: L().senzaCancellate(s.ore, visibile), giorni: L().senzaCancellate(s.giorni, visibile) });
+}
+
+// Le pagine e gli accaduti che il filo ha ancora, riletti solo dopo una cancellazione nuova: null se non ce n'è una o
+// se non si leggono (allora non si toglie niente).
+async function eventiDopoCancellazione(s, incognito) {
   let tolte = null;
-  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { tolte = null; }
-  if (tolte != null && tolte !== s.tolte && s.da) {
-    try {
-      const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
-      eventi = new Set([...acc, ...pag].map((ev) => ev && ev.id));
-      s.tolte = tolte;
-    } catch (_) { eventi = null; }
-  }
-  const vivo = (f) => (chatDellaFonte(f) != null ? chats.has(chatDellaFonte(f)) : (!eventi || eventi.has(f)));
+  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { return null; }
+  if (tolte == null || tolte === s.tolte || !s.da) return null;
+  try {
+    const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
+    s.tolte = tolte;
+    return new Set([...acc, ...pag].map((ev) => ev && ev.id));
+  } catch (_) { return null; }
+}
+
+// Toglie dal diario, anche dal disco, le righe con una fonte che `vivo` non riconosce più.
+async function togli(s, incognito, vivo) {
   const ore = L().senzaCancellate(s.ore, vivo);
   const giorni = L().senzaCancellate(s.giorni, vivo);
-  if (ore.length !== s.ore.length || giorni.length !== s.giorni.length) {
-    s.ore = ore;
-    s.giorni = giorni;
-    try { await salva(incognito); } catch (_) {}
-  }
-  const visibile = (f) => !nascoste.has(chatDellaFonte(f));
-  return L().rendiFiloCompattato({ ore: L().senzaCancellate(ore, visibile), giorni: L().senzaCancellate(giorni, visibile) });
+  const tolte = s.ore.length - ore.length + s.giorni.length - giorni.length;
+  if (!tolte) return 0;
+  s.ore = ore;
+  s.giorni = giorni;
+  try { await salva(incognito); } catch (e) { console.warn('[Filo] diario non salvato dopo una cancellazione:', e?.message || e); }
+  return tolte;
+}
+
+// Una pagina tolta dal filo (Cronologia, chat, «svuota») porta via subito le righe del diario nate da lei, anche dal
+// disco, come una conversazione cancellata: non aspetta il prossimo messaggio a Filo. Il filo lo chiama a ogni pagina
+// entrata o tolta; senza una cancellazione nuova non legge niente.
+async function dimenticaPagine(incognito) {
+  incognito = inIncognito(incognito);
+  const s = await stato(incognito);
+  if (!s.ore.length && !s.giorni.length) return 0;
+  const eventi = await eventiDopoCancellazione(s, incognito);
+  if (!eventi) return 0;
+  return togli(s, incognito, (f) => chatDellaFonte(f) != null || eventi.has(f));
 }
 
 // Una conversazione cancellata (null: tutte) porta via subito le righe del diario nate da lei, anche dal disco, come le
@@ -330,15 +359,7 @@ async function dimenticaChat(chatId) {
   const incognito = inIncognito(null);
   const s = await stato(incognito);
   const tocca = (f) => chatDellaFonte(f) != null && (chatId == null || chatDellaFonte(f) === String(chatId));
-  const tieni = (r) => !(r && Array.isArray(r.fonti) && r.fonti.some(tocca));
-  const ore = s.ore.filter(tieni);
-  const giorni = s.giorni.filter(tieni);
-  const tolte = s.ore.length - ore.length + s.giorni.length - giorni.length;
-  if (!tolte) return 0;
-  s.ore = ore;
-  s.giorni = giorni;
-  await salva(incognito);
-  return tolte;
+  return togli(s, incognito, (f) => !tocca(f));
 }
 
 // Quanto pesa un messaggio del tratto, in token, come parte: testo, quello che Filo gli scrive in testa, esiti.
@@ -353,15 +374,27 @@ function pesoDi(m) {
 
 // Quanto pesa il tratto vivo, senza comporlo: i messaggi dopo il punto compattato.
 async function tokenDelTratto(incognito, { ora = Date.now(), tetti = null } = {}) {
-  const lista = await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) });
-  return Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0));
+  return pesoDelTratto(await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) }));
 }
+const pesoDelTratto = (lista) => Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0));
 
 function segnaBase(incognito, base) {
   const b = Number(base);
   basi[lato(inIncognito(incognito))] = Number.isFinite(b) && b > 0 ? b : null;
 }
 function base(incognito) { return basi[lato(inIncognito(incognito))]; }
+
+// Soglia vera, anticipo e grezzo (SN_FILO_COMPATTAZIONE.limiti) dalla parte fissa misurata all'ultimo turno e dal peso
+// dei turni del tratto: la stessa misura per la richiesta, la risposta, il timer da fermo e il taglio.
+function limitiDi(lista, incognito, soglia) {
+  return L().limiti({ soglia, base: basi[lato(incognito)], turno: L().pesoTurno(lista, pesoDi) });
+}
+async function limiti(incognito, { ora = Date.now(), tetti = null } = {}) {
+  const inc = inIncognito(incognito);
+  const t = tetti || FC().tetti(null, null);
+  const lista = await daCompattare(inc, { ora, tetti: t });
+  return { ...limitiDi(lista, inc, t.soglia), tokenTratto: pesoDelTratto(lista) };
+}
 
 async function righe(incognito) {
   const s = await stato(inIncognito(incognito));
@@ -379,7 +412,9 @@ async function decidi(idProposta, tieni) {
   const [p] = s.inAttesa.splice(i, 1);
   let scritta = false;
   if (tieni) {
-    try { scritta = await _dip.applicaMemoria(p.testo); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
+    // Tenuta, la riga resta legata al punto del filo da cui è nata (le proposte di prima ne hanno solo le fonti).
+    const fonti = Array.isArray(p.origine) ? p.origine : (Array.isArray(p.fonti) ? p.fonti : []);
+    try { scritta = await _dip.applicaMemoria(p.testo, { fonti }); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
   }
   await salva(false);
   return { ok: true, scritta };
@@ -401,7 +436,7 @@ function avvia() {
   const giro = () => riassumiGiorni().catch((e) => console.warn('[Filo] giro dei giorni:', e?.message || e));
   timerGiorni = setInterval(giro, GIRO_GIORNI_MS);
   if (timerGiorni.unref) timerGiorni.unref();
-  const primo = setTimeout(giro, 2 * 60 * 1000);
+  const primo = setTimeout(giro, Math.min(2 * 60 * 1000, GIRO_GIORNI_MS));
   if (primo.unref) primo.unref();
 }
 
@@ -411,7 +446,7 @@ function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando =
 function imposta(dip) { Object.assign(_dip, dip || {}); }
 
 module.exports = {
-  _dip, imposta, carica, compattato, fonteScaduta, compatta, riassumiGiorni, sezione, dimenticaChat, righe, tokenDelTratto, segnaBase, base,
-  inAttesa, decidi, suCompattazione, programmaFermo, avvia, dimenticaIncognito, azzera,
+  _dip, imposta, carica, compattato, fonteScaduta, compatta, riassumiGiorni, sezione, dimenticaChat, dimenticaPagine, righe, tokenDelTratto,
+  segnaBase, base, limiti, scriviMemoria, inAttesa, decidi, suCompattazione, programmaFermo, avvia, dimenticaIncognito, azzera,
 };
 globalThis.SN_COMPATTAZIONE = module.exports;
