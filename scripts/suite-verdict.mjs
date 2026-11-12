@@ -478,7 +478,7 @@ export function leggiArgomenti(argv) {
       if (!Number.isInteger(n) || n < 1) throw new Error('--parti vuole il numero delle parti della suite');
       out.parti = n;
       i += 1;
-    } else if (a === '--out' || a === '--rossi' || a === '--chiavi' || a === '--esiti') {
+    } else if (a === '--out' || a === '--rossi' || a === '--chiavi' || a === '--errori' || a === '--esiti') {
       const k = a.slice(2);
       const val = argv[i + 1];
       if (!val || val.startsWith('--')) throw new Error(`${a} vuole un percorso`);
