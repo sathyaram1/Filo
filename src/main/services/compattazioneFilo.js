@@ -374,9 +374,9 @@ function pesoDi(m) {
 
 // Quanto pesa il tratto vivo, senza comporlo: i messaggi dopo il punto compattato.
 async function tokenDelTratto(incognito, { ora = Date.now(), tetti = null } = {}) {
-  const lista = await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) });
-  return Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0));
+  return pesoDelTratto(await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) }));
 }
+const pesoDelTratto = (lista) => Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0));
 
 function segnaBase(incognito, base) {
   const b = Number(base);
