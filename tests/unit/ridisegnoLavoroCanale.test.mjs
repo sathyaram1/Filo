@@ -150,18 +150,19 @@ test('già risolto su main: parte solo con una fusione della linea principale, i
   assert.equal(ricevuti.length, prima, 'nessuna chiusura storta è arrivata al server');
 });
 
-test('un doppione si chiude con la fusione che cita l\'originale, e il numero arriva al server (#2046)', async (t) => {
+test('un doppione arriva al server col numero dell\'originale, che la fusione lo citi o no (#2046)', async (t) => {
   const { srv, ricevuti, port } = await fintoServer();
   const { casa, fusione } = deposito();
   t.after(() => { srv.close(); togliCartella(casa); });
   const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa };
   const base = ['deliver', 'b'.repeat(43), 'status', '--status', 'done', '--reason', 'gia_risolto'];
   const testi = ['--notes', 'Stessa richiesta di #77, che la fusione ha chiuso.', '--frase', 'Il menu si apre di nuovo.'];
-  for (const [originale, atteso] of [['#77', '77'], ['75', '75']]) {
+  // #76 non è citato: un originale fuso con l'approvazione dell'owner nomina solo il ramo, e decide il server.
+  for (const [originale, atteso] of [['#77', '77'], ['75', '75'], ['76', '76']]) {
     const r = await esegui('routine-channel.mjs', [...base, '--fusione', fusione.slice(0, 10), '--doppione-di', originale, ...testi], env);
     assert.equal(r.code, 0, r.se);
     const d = ricevuti.filter((x) => x.url.includes('routineDeliver')).pop().body.data;
-    assert.equal(d.doppioneDi, atteso, 'citato nel ramo fuso (#77) o nel messaggio della fusione (#75)');
+    assert.equal(d.doppioneDi, atteso);
     assert.equal(d.fusione, fusione);
     assert.equal(d['doppione-di'], undefined, 'un nome solo per il campo');
   }
