@@ -249,11 +249,15 @@ const conSoglia = (app, soglia) => app.evaluate(async (_e, soglia) => {
   const s = await globalThis.SN_STORAGE.getSettings();
   await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), soglia } });
 }, soglia);
-// Una conversazione di tre ore fa da `token` token circa.
+// Una conversazione di tre ore fa da `token` token circa, a messaggi da 15.000 al più: uno solo oltre un quarto del
+// tetto entrerebbe nel tratto con testa e coda.
 const vecchiaDa = (app, token) => app.evaluate(async (_e, token) => {
   const t0 = Date.now() - 3 * 60 * 60 * 1000;
-  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'user', text: `Appunti sulle api: ${'il favo è fatto di cera. '.repeat(Math.ceil((token * 3.5) / 25))}`, ts: new Date(t0).toISOString() });
-  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'filo', text: 'Annotato.', ts: new Date(t0 + 5000).toISOString() });
+  for (let i = 0, resto = token; resto > 0; i++, resto -= 15000) {
+    const ts = t0 + i * 60000;
+    await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'user', text: `Appunti sulle api: ${'il favo è fatto di cera. '.repeat(Math.ceil((Math.min(resto, 15000) * 3.5) / 25))}`, ts: new Date(ts).toISOString() });
+    await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'filo', text: 'Annotato.', ts: new Date(ts + 5000).toISOString() });
+  }
 }, token);
 
 test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la soglia compatta prima del giro dopo', async ({ app, testServer }) => {
