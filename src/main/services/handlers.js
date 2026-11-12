@@ -3103,6 +3103,7 @@ async function eseguiAzioneFilo(action, {
     const bersaglio = await Registro.livelloDi(idDelCambio(action));
     action._livelloCambio = bersaglio ? bersaglio.livello : 1;
     action._fraseCambio = bersaglio ? bersaglio.frase : '';
+    action._allentaCambio = !bersaglio || bersaglio.allenta !== false;
   }
 
   // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
