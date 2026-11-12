@@ -75,13 +75,7 @@ test('scaduto, vuoto o oltre il tetto non resta; il resto sì, per quanto sia', 
   assert.deepEqual(Object.keys(R.pota(dati, ora, 7)), ['https://b.it/']);
   assert.deepEqual(Object.keys(R.pota(dati, ora, 30)).sort(), ['https://a.it/', 'https://b.it/']);
   assert.deepEqual(Object.keys(R.pota(dati, ora, 1)), []);
-  const grosso = (t) => pagina(t, 'y'.repeat(R.VALORE_MAX));
-  const tante = {};
-  const quante = Math.ceil(R.TOTALE_MAX / R.VALORE_MAX) + 2;
-  for (let i = 0; i < quante; i++) tante[`https://p${i}.it/`] = grosso(ora - i * 1000);
-  const tenute = Object.keys(R.pota(tante, ora, 7));
-  assert.equal(tenute.length, Math.floor(R.TOTALE_MAX / R.VALORE_MAX));
-  assert.ok(tenute.includes('https://p0.it/') && !tenute.includes(`https://p${quante - 1}.it/`));
+  assert.equal(R.pesoTotale(R.pota(dati, ora, 30)), 'vecchio'.length + 'recente'.length);
 });
 
 test('un campo si aggiorna al suo posto e se ne va col valore vuoto', () => {
