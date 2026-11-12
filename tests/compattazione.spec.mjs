@@ -231,7 +231,7 @@ test('una pagina tolta dal filo porta via subito la riga del diario nata da lei,
     const vero = C._dip.chiama;
     C._dip.chiama = async () => JSON.stringify({ ore: ['19:00 cercata la ricetta della carbonara'], memorie: [] });
     try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
-    return { file: require('node:path').join(C._dip.cartella(), 'livelli.json'), visita: v.id };
+    return { file: `${C._dip.cartella()}/livelli.json`, visita: v.id };
   });
   expect(readFileSync(file, 'utf8')).toContain('carbonara');
   // «Togli dal filo» sulla pagina, dalla home: lo stesso messaggio del menu.
