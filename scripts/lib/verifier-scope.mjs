@@ -119,7 +119,22 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, 
         : conDiff
           ? '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)'
           : '  (nessun report e nessun confronto: cerca le zone fra i file del lavoro, `git diff --stat origin/main...HEAD`, e nella critica dichiara che il confronto mancava)',
+      ...righeFileDelServer(p),
     ].join('\n');
   }
   return '';
+}
+
+// I file che il server ha confrontato da sé (#2344): la verifica si ferma lì, il resto del lavoro è identico a quello passato.
+function righeFileDelServer(p) {
+  const nomi = (v) => (Array.isArray(v) ? v.map(unaRiga).filter(Boolean) : []);
+  const conflitto = nomi(p.fileInConflitto);
+  const codice = nomi(p.codice).filter((f) => !conflitto.includes(f));
+  if (!conflitto.length && !codice.length) return [];
+  return [
+    '',
+    'Il server ha confrontato le modifiche del lavoro prima e dopo il riallineamento. Guarda solo questi file: negli altri il lavoro è identico a quello che aveva passato la verifica.',
+    ...(conflitto.length ? [`- in conflitto con \`main\`: ${conflitto.map((f) => `\`${f}\``).join(', ')}`] : []),
+    ...(codice.length ? [`- con le modifiche del lavoro cambiate dal riallineamento: ${codice.map((f) => `\`${f}\``).join(', ')}`] : []),
+  ];
 }

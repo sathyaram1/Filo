@@ -1,6 +1,6 @@
 // Modello e sforzo del worker per ogni fase di un cambio di codice (doc config/routines, campo `roleModels`).
 // Logica pura: pagina di gestione e main rifiutano gli stessi valori. Una scelta assente vale la definizione
-// dell'agente: qui non c'è nessun default.
+// dell'agente; l'unica fase con una partenza sua è la verifica dopo un riallineamento, che la prende dal server.
 
 (function (global) {
   'use strict';
@@ -10,6 +10,17 @@
   const RUOLI = Object.freeze([
     Object.freeze({ id: 'new-work', nome: 'Primo lavoro' }),
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
+    // Guarda solo i file di un conflitto risolto (#2344): vuota vale la Verifica, salvo la partenza, che il server
+    // applica (functions/src/routine/modello.js di filo-security, una prova lì le tiene uguali).
+    Object.freeze({
+      id: 'verifier-riallineamento', nome: 'Verifica dopo un riallineamento', come: 'verifier', partenza: Object.freeze({ effort: 'medium' }),
+      // Base misurata (#2344): 748 $ su 253 verifiche dopo un riallineamento, 1-8/11/2026, Opus a sforzo high. Volume:
+      // il traguardo del feedback, sotto 50 a settimana. Gli altri sforzi in proporzione: [costo, minuti], stimati.
+      stima: Object.freeze({
+        dollariAVerifica: 3, aSettimana: 50, base: 'Opus a sforzo high, 748 $ su 253 verifiche dal 1° all\'8 novembre',
+        sforzi: Object.freeze({ low: [0.5, 15], medium: [0.7, 20], high: [1, 25], xhigh: [1.4, 35], max: [2, 45] }),
+      }),
+    }),
     Object.freeze({ id: 'fixer', nome: 'Correzione' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
     // Non è una fase di un cambio: è la regia (SPEC-MANUTENTORE § 1), ultima perché fuori da quell'ordine.
@@ -33,6 +44,31 @@
   const idRuoli = () => RUOLI.map((r) => r.id);
   const idScelte = (campo) => (SCELTE[campo] || []).map((s) => s.id);
   const nomeRuolo = (id) => (RUOLI.find((r) => r.id === id) || {}).nome || id;
+
+  /** Cosa vale la voce vuota di una fase, detto all'owner: la definizione dell'agente, la partenza o l'altra fase. */
+  function vuotoDi(ruolo, campo) {
+    const r = RUOLI.find((x) => x.id === ruolo) || {};
+    if (r.partenza && r.partenza[campo]) return `${r.partenza[campo]} (partenza)`;
+    if (r.come) return `Come in ${nomeRuolo(r.come)}`;
+    return VUOTO;
+  }
+
+  /**
+   * Costo al mese e durata di una fase con lo sforzo scelto ('' = la partenza): { testo, perche }, o null per una fase
+   * senza stima. Si legge dove si decide (filo_design.txt § GESTIONE DEI MODELLI).
+   */
+  function stimaDi(ruolo, effort) {
+    const r = RUOLI.find((x) => x.id === ruolo) || {};
+    const s = r.stima;
+    const sforzo = effort || (r.partenza && r.partenza.effort) || '';
+    if (!s || !s.sforzi[sforzo]) return null;
+    const mese = (k) => Math.round((s.dollariAVerifica * s.sforzi[k][0] * s.aSettimana * 52 / 12) / 10) * 10;
+    return {
+      testo: `Sforzo ${sforzo}: circa ${mese(sforzo)} $ al mese, una verifica in circa ${s.sforzi[sforzo][1]} minuti.`,
+      perche: `Stima con ${s.aSettimana} verifiche a settimana. Base: ${s.base}; gli altri sforzi in proporzione. `
+        + `Al mese: ${Object.keys(s.sforzi).map((k) => `${k} circa ${mese(k)} $`).join(', ')}.`,
+    };
+  }
 
   /**
    * Tutte le fasi, con '' dove vale la definizione dell'agente. Un valore fuori elenco scritto a mano resta
@@ -92,6 +128,6 @@
 
   global.SN_ROUTINE_MODELLI = Object.freeze({
     CAMPO, RUOLI, SCELTE, CAMPI, NOME_CAMPO, VUOTO,
-    leggiDoc, inElenco, valida, percorso, nomeRuolo,
+    leggiDoc, inElenco, valida, percorso, nomeRuolo, vuotoDi, stimaDi,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

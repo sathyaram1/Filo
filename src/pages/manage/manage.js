@@ -79,6 +79,7 @@
   const mgRoleModels      = document.getElementById('mgRoleModels');
   const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
   const roleSelects       = new Map();
+  const roleStime         = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -1245,7 +1246,7 @@
         sel.dataset.ruolo = r.id;
         sel.dataset.campo = campo;
         sel.setAttribute('aria-label', `${RM.NOME_CAMPO[campo]}: ${r.nome}`);
-        sel.append(new Option(RM.VUOTO, ''));
+        sel.append(new Option(RM.vuotoDi(r.id, campo), ''));
         for (const s of RM.SCELTE[campo]) sel.append(new Option(s.nome, s.id));
         sel.disabled = !isAdmin;
         sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
@@ -1254,6 +1255,24 @@
         sel.selectedIndex = -1;
         roleSelects.set(`${r.id}.${campo}`, sel);
       }
+      // Una fase con un costo da scegliere porta la stima accanto alla scelta (#2344).
+      if (RM.stimaDi(r.id, '')) {
+        const s = cella('mg-role-stima', '');
+        s.dataset.ruolo = r.id;
+        mgRoleModels.append(s);
+        roleStime.set(r.id, s);
+      }
+    }
+    aggiornaStime();
+  }
+
+  function aggiornaStime() {
+    for (const [id, s] of roleStime) {
+      // Non letta, la scelta non ha ancora un costo da mostrare: sarebbe già una risposta.
+      const v = roleScelta(`${id}.effort`);
+      const stima = v === null ? null : RM.stimaDi(id, v);
+      s.textContent = stima ? stima.testo : '';
+      s.title = stima ? stima.perche : '';
     }
   }
 
@@ -1291,6 +1310,7 @@
       }
       sel.value = v;
     }
+    aggiornaStime();
     mostraRoleMsg();
   }
 
@@ -1339,6 +1359,7 @@
     const chiave = `${ruolo}.${campo}`;
     const scelta = { chiave, valore };
     roleInAttesa.push(scelta);
+    aggiornaStime();
     setRoleMsg('Salvo…', null);
     const nome = RM.nomeRuolo(ruolo);
     // Una fila sola per tutte le tendine: le risposte arrivano nell'ordine delle scelte.

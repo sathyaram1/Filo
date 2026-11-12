@@ -121,3 +121,11 @@ test('senza report e senza confronto, il compito dice dove cercare le zone', () 
   const conDiff = perimetroNote('riallineamento', { shaVerificato: VERIFICATO });
   assert.match(conDiff, /nessun report: le zone in conflitto le ricavi dal diff/);
 });
+
+test('i file che il server ha trovato in conflitto o riscritti stanno nel perimetro: la verifica si ferma lì (#2344)', () => {
+  const n = perimetroNote('riallineamento', { shaVerificato: VERIFICATO, fileInConflitto: ['src/menu.js'], codice: ['src/menu.js', 'src/a.js'] });
+  assert.match(n, /Guarda solo questi file/);
+  assert.match(n, /in conflitto con `main`: `src\/menu\.js`/);
+  assert.match(n, /cambiate dal riallineamento: `src\/a\.js`$/m);
+  assert.doesNotMatch(perimetroNote('riallineamento', { shaVerificato: VERIFICATO }), /Guarda solo questi file/);
+});

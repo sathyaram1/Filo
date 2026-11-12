@@ -133,22 +133,34 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   let page = await apri(openTab);
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
-  await expect(page.locator('#mgRoleModels select')).toHaveCount(10);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco', 'Manutentore']);
+  await expect(page.locator('#mgRoleModels select')).toHaveCount(12);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Verifica dopo un riallineamento', 'Correzione', 'Controllo cieco', 'Manutentore']);
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
+  // La verifica dopo un riallineamento dice cosa vale senza una scelta: la sua partenza, o quella della Verifica (#2344).
+  await expect(tendina(page, 'verifier-riallineamento', 'effort').locator('.sn-select-value')).toHaveText('medium (partenza)');
+  await expect(tendina(page, 'verifier-riallineamento', 'model').locator('.sn-select-value')).toHaveText('Come in Verifica');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
+  // Il costo si legge dove si sceglie, e segue la scelta (#2344).
+  const stima = page.locator('.mg-role-stima[data-ruolo="verifier-riallineamento"]');
+  await expect(stima).toHaveText(/^Sforzo medium: circa \d+ \$ al mese, una verifica in circa \d+ minuti\.$/);
+  await expect(stima).toHaveAttribute('title', /748 \$ su 253 verifiche/);
+  await expect(page.locator('.mg-role-stima')).toHaveCount(1);
+  await scegli(page, 'verifier-riallineamento', 'effort', 'low');
+  await expect(stima).toHaveText(/^Sforzo low: circa \d+ \$ al mese/);
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica dopo un riallineamento: salvato.');
+  expect((await sulServer(app)).roleModels['verifier-riallineamento']).toEqual({ effort: 'low' });
 
   await scegli(page, 'verifier', 'model', 'Sonnet');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica: salvato.');
   // Sul server la sola foglia scelta: il resto del documento e le altre fasi non si toccano.
-  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, verifier: { model: 'sonnet' } } });
+  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, 'verifier-riallineamento': { effort: 'low' }, verifier: { model: 'sonnet' } } });
 
   // Il trattino del primo lavoro arriva al server come nome, non come espressione.
   await scegli(page, 'new-work', 'effort', 'max');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Primo lavoro: salvato.');
   expect((await sulServer(app)).roleModels['new-work']).toEqual({ effort: 'max' });
-  expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([['roleModels.verifier.model'], ['roleModels.`new-work`.effort']]);
+  expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([['roleModels.`verifier-riallineamento`.effort'], ['roleModels.verifier.model'], ['roleModels.`new-work`.effort']]);
 
   page = await riapri(page);
   await expect(page.locator('select[data-ruolo="verifier"][data-campo="model"]')).toHaveValue('sonnet');
