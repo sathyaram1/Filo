@@ -11,11 +11,14 @@ import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // La finestra normale viva: le sue schede (l'indirizzo che aspetta vale per una riaperta non ancora caricata) e quella davanti.
+// Una scheda finita sulla pagina d'errore conta per l'indirizzo che porta, come la vede l'utente: le salvate su una porta
+// chiusa ci arrivano appena caricate, e il confronto non deve dipendere da quando lo si legge (#2241).
 const normale = (app) => app.evaluate(({ BrowserWindow }) => {
   const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
   if (!w) return null;
   const tm = w._filoTabs;
-  const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const grezzo = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const url = (t) => tm._urlUtente(grezzo(t));
   const davanti = tm.tabs.find((t) => t.id === tm.activeId);
   return { schede: tm.tabs.map(url), davanti: davanti ? url(davanti) : null };
 });
@@ -73,6 +76,12 @@ test('a Filo chiuso, l\'invito che lo apre porta Crediti davanti alle schede sal
       .toEqual(expect.arrayContaining([...salvate, expect.stringMatching(/^filo:\/\/credits\//)]));
     await new Promise((r) => setTimeout(r, 800));
     expect((await normale(app)).davanti, 'all\'avvio Crediti è finita dietro le schede riaperte').toMatch(/^filo:\/\/credits\//);
+    // A caricamento finito la porta chiusa dà la pagina d'errore: le schede restano le salvate, non «un errore».
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+      return w ? w._filoTabs.tabs.some((t) => { try { return t.view.webContents.getURL().startsWith('filo://error/'); } catch (_) { return false; } }) : false;
+    }), { message: 'nessuna scheda salvata è arrivata alla pagina d\'errore', timeout: 20000 }).toBe(true);
+    expect((await normale(app)).schede, 'con la pagina d\'errore davanti le schede non sono più le salvate').toEqual(expect.arrayContaining(salvate));
   } finally {
     await chiudiApp(app);
     togliCartella(userData);
