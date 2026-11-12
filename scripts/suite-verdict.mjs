@@ -573,6 +573,7 @@ async function main() {
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
   scriviChiavi(opt, chiaviDelVerdetto(v));
+  scriviErrori(opt, v.nuovi);
   process.exit(parti.length ? 2 : v.nuovi.length ? 1 : 0);
 }
 
