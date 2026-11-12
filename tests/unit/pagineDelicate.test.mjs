@@ -250,6 +250,9 @@ test('a parole: «questo sito» e «scheda: <titolo>» diventano il sito della s
   assert.match(r('aggiungi scheda: Commercialista Bianchi').rifiuto, /nessuna scheda aperta/);
   assert.match(PD.risolviSchede('aggiungi scheda: a', { schede: [schede[0], schede[1]] }).rifiuto, /più schede/);
   assert.deepEqual(r('aggiungi studiorossi.it'), { valore: 'aggiungi studiorossi.it' });
+  // Nel benvenuto Filo vede solo il sito della scheda, non il titolo: la trova anche da lì (#1840).
+  const senzaTitolo = [{ url: 'https://www.studiorossi.it/area-clienti', title: 'Titolo che non dice il sito' }];
+  assert.deepEqual(PD.risolviSchede('aggiungi scheda: studiorossi.it', { schede: senzaTitolo }), { valore: 'aggiungi studiorossi.it' });
 });
 
 test('un sito tolto dai segnati per il campo password non è più delicato per quel motivo, e solo per quello', () => {
