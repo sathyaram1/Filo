@@ -386,3 +386,52 @@ test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, 
   await p.waitForTimeout(400);
   expect(await p.evaluate(() => window.__file)).toEqual([]);
 });
+
+// #1623.3: Ctrl+V premuto mentre il riquadro sta ancora nascendo (la prima apertura su una pagina tarda qualche decimo)
+// è per il riquadro: la pagina non riceve l'immagine negli appunti. Il tasto passa dal main, come quello dell'utente.
+async function ctrlVMentreNasce(app, p, apri) {
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const px = Buffer.alloc(48 * 32 * 4);
+    for (let i = 0; i < 48 * 32; i++) px.set([0, 0, 255, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: 48, height: 32 }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
+  await p.evaluate(() => { window.__incollati = []; window.addEventListener('paste', (e) => window.__incollati.push(e.clipboardData.files.length), true); });
+  const wcDi = `BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents`;
+  await app.evaluate(({ BrowserWindow }, { u, c }) => new Function('BrowserWindow', 'u', `return ${c}`)(BrowserWindow, u).focus(), { u: p.url(), c: wcDi });
+  await apri();
+  const giaAschermo = await app.evaluate(async ({ BrowserWindow }, { u, c }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const wc = new Function('BrowserWindow', 'u', `return ${c}`)(BrowserWindow, u);
+    await new Promise((r) => setTimeout(r, 60));
+    const s = win._filoTabs.riquadri?.strati?.get(wc);
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+    return !!(s && s.pronta && s.visibile);
+  }, { u: p.url(), c: wcDi });
+  expect(giaAschermo, 'il riquadro era già a schermo: la prova non prova la nascita').toBe(false);
+}
+
+test('feedback su un sito: Ctrl+V subito dopo averlo aperto mette la foto fra gli allegati, e il sito non la riceve', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, pagina());
+  await ctrlVMentreNasce(app, p, () => app.evaluate(({ BrowserWindow }, u) => {
+    const tab = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u);
+    tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: 'globalThis.SN_FEEDBACK_UI.open()' }]);
+  }, p.url()));
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(1);
+  await p.waitForTimeout(400);
+  expect(await p.evaluate(() => window.__incollati)).toEqual([]);
+});
+
+test('Aiuto su un sito: Ctrl+V subito dopo averlo aperto non porta l\'immagine al sito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, pagina());
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await ctrlVMentreNasce(app, p, async () => { shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id); });
+  const strato = await paginaDelloStrato(app, p);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+  await p.waitForTimeout(1000);
+  expect(await p.evaluate(() => window.__incollati)).toEqual([]);
+});
