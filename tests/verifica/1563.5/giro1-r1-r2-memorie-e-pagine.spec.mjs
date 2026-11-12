@@ -61,6 +61,7 @@ test('r2 cancellare una pagina qualunque non toglie dal diario la riga nata da u
     const v = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://meteo.example/oggi', titolo: 'Meteo', ts: new Date(ieri).toISOString() });
     return v.ts;
   });
+  console.log('DEBUG dopo la visita', readFileSync(file, 'utf8'));
   await app.evaluate((_e, ts) => globalThis.SN_IL_FILO.cancellaVisite([{ ts, sito: 'meteo.example', url: 'https://meteo.example/oggi' }]), altra);
   // Il diario si rilegge al primo messaggio: lì la riga della carbonara deve esserci ancora.
   await app.evaluate(() => globalThis.SN_COMPATTAZIONE.sezione(false));
