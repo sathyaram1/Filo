@@ -219,6 +219,17 @@ test('mostra: i testi degli agenti escono coi caratteri di controllo resi visibi
   assert.match(testo, /non fidata/);
 });
 
+test('mostra (#1154): l’assorbita dice in quale domanda è finita, la madre quali ha dentro', () => {
+  const q = { quando: () => 'ora' };
+  const assorbita = formattaDomanda({ id: 'D-5', stato: 'superata', titolo: 'Barra larga', esito: { ok: true, superataDa: 'D-3', assorbita: true } }, {}, q);
+  assert.match(assorbita, /Assorbita in D-3: la risposta lì vale anche per questa/);
+  const sostituita = formattaDomanda({ id: 'D-6', stato: 'superata', titolo: 'Vecchia', esito: { ok: true, superataDa: 'D-8' } }, {}, q);
+  assert.match(sostituita, /Superata da D-8\./);
+  assert.doesNotMatch(sostituita, /Assorbita/);
+  const madre = formattaDomanda({ id: 'D-3', stato: 'aperta', titolo: 'Ripensare le barre', assorbite: ['D-5', 'D-7', 'D-5', 'x'] }, {}, q);
+  assert.match(madre, /Domande assorbite: D-5, D-7\n/);
+});
+
 test('elenco a blocchi e frasi d’errore della callable', () => {
   const e = formattaElenco([{ id: 'D-2', titolo: 'b', priorita: 'quando_puoi', stato: 'aperta' }, { id: 'D-1', titolo: 'a\u001b', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }]);
   assert.ok(e.indexOf('D-1') < e.indexOf('D-2'));
