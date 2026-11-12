@@ -2196,12 +2196,9 @@
   if (api.downloads) {
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
-    const ELENCO = window.SN_ELENCO_SCARICAMENTI || null;
-    const statoElenco = ELENCO ? ELENCO.crea(dls) : null;
-    function applicaEvento(kind, item) {
-      if (ELENCO) { ELENCO.evento(statoElenco, kind, item); return; }
-      if (kind === 'removed') dls.delete(item.id); else dls.set(item.id, item);
-    }
+    const ELENCO = window.SN_ELENCO_SCARICAMENTI;
+    const statoElenco = ELENCO.crea(dls);
+    const applicaEvento = (kind, item) => ELENCO.evento(statoElenco, kind, item);
     let panelOpen = false;
     let panel = null;
     // #588 — le domande sui programmi sono righe del pannello, che si apre sopra
