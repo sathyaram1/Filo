@@ -64,6 +64,8 @@
         aggiornamentiInstalla: 'aggiornamenti.installa',
         propostaEmailAttiva: 'propostaEmail.attiva',
         propostaEmailIncognito: 'propostaEmail.incognito',
+        testoCampiAttivo: 'testoDeiCampi.attivo',
+        testoCampiGiorni: 'testoDeiCampi.giorni',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         contestoCache: 'contestoFilo.cache',
@@ -116,6 +118,8 @@
         SISTEMA_COMANDA: 'legge i dispositivi Bluetooth abbinati per scrivere il nome accanto all’indirizzo dei preferiti: non cambia niente',
         REGISTRA_TASTI: 'lascia arrivare alla pagina i tasti premuti mentre si registra una scorciatoia: dalla chat la combinazione si scrive (scorciatoia)',
         CONTATORI_EVENTO: 'conta per i contatori anonimi cosa si rimette di serie (#1471): non salva niente e non legge impostazioni',
+        TESTO_CAMPI_STATO: 'conta i testi dei campi conservati per scriverlo sul tasto che li cancella: non salva niente',
+        TESTO_CAMPI_CANCELLA: 'cancella per sempre i testi dei campi conservati, e cancellare per sempre lo fa solo l’utente: la chat gli apre la pagina lì (spegnere la voce li toglie già)',
       },
     },
     security: {

@@ -2719,6 +2719,9 @@
     aggiornamenti: { automatici: true, installa: 'avvio' },
     // #1124 — l'email dell'account Filo proposta nei campi di accesso dei siti; in incognito solo se l'utente lo chiede.
     propostaEmail: { attiva: true, incognito: false },
+    // #2378 — il testo scritto nei campi dei siti torna dopo una ricarica, una scheda riaperta o un riavvio; `giorni` fra
+    // quelli di src/shared/testoDeiCampi.js.
+    testoDeiCampi: { attivo: true, giorni: 7 },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

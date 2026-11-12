@@ -846,6 +846,8 @@
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'propostaEmail.attiva': return $('propostaEmailAttiva').checked;
       case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
+      case 'testoDeiCampi.attivo': return $('testoCampiAttivo').checked;
+      case 'testoDeiCampi.giorni': return window.SN_TESTO_CAMPI.opzioni({ testoDeiCampi: { giorni: Number($('testoCampiGiorni').value) } }).giorni;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
@@ -947,6 +949,8 @@
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
       case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
+      case 'testoDeiCampi.attivo': return window.SN_TESTO_CAMPI.opzioni(s).attivo;
+      case 'testoDeiCampi.giorni': return window.SN_TESTO_CAMPI.opzioni(s).giorni;
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
@@ -1161,6 +1165,11 @@
     if (vuole('propostaEmail.attiva')) $('propostaEmailAttiva').checked = !(settings.propostaEmail && settings.propostaEmail.attiva === false);
     if (vuole('propostaEmail.incognito')) $('propostaEmailIncognito').checked = !!(settings.propostaEmail && settings.propostaEmail.incognito === true);
     $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+    const testoCampi = window.SN_TESTO_CAMPI.opzioni(settings);
+    if (vuole('testoDeiCampi.attivo')) $('testoCampiAttivo').checked = testoCampi.attivo;
+    if (vuole('testoDeiCampi.giorni')) $('testoCampiGiorni').value = String(testoCampi.giorni);
+    $('testoCampiGiorni').disabled = !$('testoCampiAttivo').checked;
+    caricaStatoTestoCampi();
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
     }
@@ -1411,6 +1420,44 @@
     // Mentre legge, il conto si muove: la pagina lo chiede finché il giro non finisce.
     clearTimeout(giroStato);
     if (r.inCorso && !document.hidden) giroStato = setTimeout(caricaStatoDocumenti, 1500);
+  }
+
+  // ── Il testo dei campi dei siti (#2378) ────────────────────────────────────
+  function opzioniTestoCampi() {
+    const sel = $('testoCampiGiorni');
+    sel.textContent = '';
+    for (const g of window.SN_TESTO_CAMPI.GIORNI) {
+      const o = document.createElement('option');
+      o.value = String(g);
+      o.textContent = g === 1 ? '1 giorno' : `${g} giorni`;
+      sel.appendChild(o);
+    }
+  }
+
+  function scriviStatoTestoCampi(r) {
+    const n = Number(r && r.campi) || 0;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
+    $('testoCampiStato').textContent = !n ? 'Nessun testo conservato'
+      : `${n === 1 ? 'Un campo' : `${cifre(n)} campi`} in ${r.pagine === 1 ? 'una pagina' : `${cifre(r.pagine)} pagine`}`;
+    $('testoCampiCancella').disabled = !n;
+  }
+
+  async function caricaStatoTestoCampi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.TESTO_CAMPI_STATO }); } catch (_) { r = null; }
+    if (r && r.ok) scriviStatoTestoCampi(r);
+  }
+
+  async function cancellaTestoCampi() {
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Il testo scritto nei campi dei siti e non ancora inviato non ricomparirà più. Quello che hai nelle schede aperte resta dov\'è.';
+    const ok = Ui
+      ? await Ui.confirm({ title: 'Cancella i testi conservati', text, okLabel: 'Cancella' })
+      : window.confirm(text);
+    if (!ok) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.TESTO_CAMPI_CANCELLA }); } catch (_) { r = null; }
+    if (r && r.ok) scriviStatoTestoCampi(r);
   }
 
   async function salvaCartelle(nuovo) {
@@ -1808,6 +1855,7 @@
     disegnaAutonomia();
     mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
+    opzioniTestoCampi();
     preparaShell();
     $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
@@ -1932,6 +1980,15 @@
       persist();
     });
     $('propostaEmailIncognito').addEventListener('change', persist);
+    // Spento, quello già tenuto se ne va (lo cancella il main): il conto accanto al tasto lo deve dire.
+    for (const id of ['testoCampiAttivo', 'testoCampiGiorni']) {
+      $(id).addEventListener('change', async () => {
+        $('testoCampiGiorni').disabled = !$('testoCampiAttivo').checked;
+        await persist();
+        setTimeout(caricaStatoTestoCampi, 300);
+      });
+    }
+    $('testoCampiCancella').addEventListener('click', cancellaTestoCampi);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

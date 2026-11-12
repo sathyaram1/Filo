@@ -227,6 +227,12 @@
       doesNot: 'Non salva e non propone password né altre email: solo quella dell’account Filo. Senza account collegato non compare niente. Non compare nelle pagine di Filo, né in incognito se non l’hai chiesto. Compare anche nei moduli di accesso incorporati da un altro sito.',
     },
     {
+      id: 'testo-dei-campi', title: 'Il testo scritto nei siti non si perde', category: 'writing',
+      desc: 'Il testo che scrivi in un campo di un sito (un messaggio, un commento, un modulo) ricompare com’era se la pagina si ricarica, se chiudi la scheda e la riapri o se Filo si chiude e riparte. Va nei campi rimasti vuoti, anche dentro i riquadri incorporati. Il testo conservato è salvato sul computer, non va al server di Filo né a un modello, e se ne va quando invii il modulo, svuoti il campo o passa il tempo scelto (di serie una settimana).',
+      invoke: 'Automatico. In Preferenze → Il testo che scrivi nei siti si spegne, si sceglie per quanto tempo resta (un giorno, una settimana, un mese) e si cancella quello conservato; spegnerlo cancella anche quello già tenuto. Si accende e si spegne anche chiedendolo a Filo.',
+      doesNot: 'Non conserva password, carte di pagamento, codici, ricerche, i moduli di accesso o d’iscrizione, né niente nelle pagine di posta, banche, sanità e pubblica amministrazione, nelle finestre in incognito, nei siti che in Privacy non restano e dove hai spento Filo. Non tocca gli editor dei siti (documenti, codice, testo formattato), che hanno il loro salvataggio. Finché il testo è in una scheda aperta, una seconda scheda sulla stessa pagina non lo riceve. Un testo più lungo di un milione di caratteri non si conserva, né il testo nuovo quando quelli conservati arrivano a venti milioni di caratteri o una pagina ha già duecento campi conservati: Filo lo dice in un avviso.',
+    },
+    {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
       desc: 'Gestisci le tue correzioni automatiche (da → a, anche su più parole come "x es" → "per esempio", che si espandono mentre scrivi; ci arrivano anche quelle che scegli più volte per la stessa parola), le parole imparate che il correttore non segna (aggiunte da te, ignorate o scritte più volte uguali; si cambiano scrivendoci e si tolgono) e le parole da non correggere più da sé (quelle di cui hai annullato la correzione automatica; si aggiungono, si cambiano e si tolgono). Tolta una parola, Filo ricomincia a imparare da zero. Tutto resta sul computer.',
       invoke: 'Pagina filo://spellcheck/spellcheck.html.',

@@ -102,6 +102,7 @@ require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i feedback: il classificatore gira nel main
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // dopo manageReview: lo usa
+require(path.join(SHARED, 'testoDeiCampi.js')); // #2378 — le durate del testo dei campi: PRIMA di preferences, che le offre alla chat
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
 require(path.join(SHARED, 'cmdClassify.js'));

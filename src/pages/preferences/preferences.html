@@ -24,6 +24,7 @@
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/pannelliApp.js"></script>
+  <script src="filo://shared/testoDeiCampi.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/cambi.js"></script>
   <script src="filo://shared/menuImpostazioni.js"></script>
@@ -244,6 +245,23 @@
           <input type="checkbox" id="riassuntoSchede" />
           <span>Riassumi le schede chiuse, per ritrovarle nel filo della home anche per significato</span>
         </label>
+      </div>
+    </section>
+
+    <section id="sec-testo-campi">
+      <h2>Il testo che scrivi nei siti</h2>
+      <p class="sn-muted">Se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, il testo che stavi scrivendo in un campo ricompare com'era. Lo tiene questo computer, non il server di Filo, e se ne va quando invii il modulo o svuoti il campo. Mai password, carte di pagamento e codici, né posta, banche, sanità, pubblica amministrazione o finestre in incognito.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="testoCampiAttivo" />
+          <span>Conserva il testo scritto nei campi dei siti</span>
+        </label>
+      </div>
+      <label for="testoCampiGiorni" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Per quanto tempo</label>
+      <select id="testoCampiGiorni"></select>
+      <div class="doc-piede">
+        <button type="button" class="sn-btn sn-btn-secondary" id="testoCampiCancella">Cancella i testi conservati</button>
+        <span id="testoCampiStato" class="sn-muted" aria-live="polite"></span>
       </div>
     </section>
 

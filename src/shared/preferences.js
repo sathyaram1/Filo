@@ -304,6 +304,9 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || (typeof require === 'function' ? require('./nomiSito.js') : null);
   }
+  function testoCampi() {
+    return global.SN_TESTO_CAMPI || (typeof require === 'function' ? require('./testoDeiCampi.js') : null);
+  }
   // La riduzione delle pagine (Sicurezza, Altro): «https://www.Sito.it/x» → «sito.it» (#843).
   function dominioDa(raw) {
     const N = nomiSito();
@@ -1120,6 +1123,33 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { propostaEmail: { incognito: b } }, label: `La tua email proposta anche in incognito → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    // #2378 — il testo resta sul computer: accendere non cede niente. Spegnere cancella quello già tenuto.
+    {
+      scrive: ['testoDeiCampi.attivo'],
+      aiuto: 'true | false (il testo scritto nei campi dei siti torna dopo una ricarica, una scheda chiusa e riaperta o un riavvio di Filo; lo tiene il computer, non il server di Filo; mai password, carte, posta, banche, sanità, pubblica amministrazione né incognito; spento, quello già tenuto si cancella)',
+      keys: ['testo_dei_campi', 'testo dei campi', 'testo nei campi', 'conserva il testo', 'conserva testo dei campi',
+        'ripristina testo dei campi', 'testo dei moduli', 'bozze dei moduli', 'bozze nei siti', 'non perdere il testo',
+        'testo scritto nei siti', 'salva il testo dei campi'],
+      costo: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { testoDeiCampi: { attivo: b } }, label: `Il testo dei campi che non si perde → ${b ? 'attivo' : 'spento, e quello tenuto cancellato'}` };
+      },
+    },
+    {
+      scrive: ['testoDeiCampi.giorni'],
+      aiuto: () => `${testoCampi().GIORNI.join(' | ')} (per quanti giorni resta il testo scritto nei campi dei siti e non inviato; di serie ${testoCampi().GIORNI_DI_SERIE})`,
+      keys: ['testo_dei_campi_giorni', 'giorni testo dei campi', 'durata testo dei campi', 'quanto resta il testo dei campi',
+        'per quanto conservare il testo', 'scadenza testo dei campi'],
+      costo: 1,
+      build(v) {
+        const R = testoCampi();
+        const g = parseInt(String(v).replace(/[^\d]/g, ''), 10);
+        if (!R.GIORNI.includes(g)) return { rifiuto: `Il testo dei campi può restare ${R.GIORNI.join(', ')} giorni: scegline uno.` };
+        return { partial: { testoDeiCampi: { giorni: g } }, label: `Il testo dei campi resta → ${g === 1 ? '1 giorno' : `${g} giorni`}` };
       },
     },
     {
