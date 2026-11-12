@@ -2303,13 +2303,7 @@ if (isMain) {
       if (!f.ok) { console.error(`${f.errore} Non ho consegnato niente.`); process.exit(1); }
       data.fusione = f.sha;
       delete data['doppione-di'];
-      if (originale) {
-        if (!fusioneCita(ROOT, f.sha, originale)) {
-          console.error(`La fusione ${f.sha.slice(0, 12)} non porta nessun commit che citi #${originale}, né nel suo messaggio né nel ramo fuso: scegli la fusione che ha chiuso l'originale. Non ho consegnato niente.`);
-          process.exit(1);
-        }
-        data.doppioneDi = originale;
-      }
+      if (originale) data.doppioneDi = originale;
     }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
