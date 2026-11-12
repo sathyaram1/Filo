@@ -125,7 +125,8 @@
   }
   const grezzoMassimo = (o) => limiti(o).grezzo;
 
-  // Il peso medio degli ultimi `n` turni interi della lista (una domanda dell'utente con quello che la segue), o 0.
+  // Il peso tipico degli ultimi `n` turni interi della lista (una domanda dell'utente con quello che la segue), o 0: la
+  // mediana bassa, così una tesi incollata ore fa non fa credere pesanti i turni di adesso.
   function pesoTurno(messaggi, peso, n = TURNI_GREZZI) {
     const lista = Array.isArray(messaggi) ? messaggi : [];
     if (typeof peso !== 'function') return 0;
