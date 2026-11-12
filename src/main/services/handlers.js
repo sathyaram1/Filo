@@ -4595,10 +4595,13 @@ async function ripristinaImpostazioni() {
 async function anteprimaRipristino() {
   const K = globalThis.SN_CAMBI;
   const correnti = await Storage.getSettings();
-  const cambi = K.cambiImpostazioni(correnti, globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti),
-    globalThis.SN_STORAGE.normalizza);
+  const serie = globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti);
+  const cambi = K.cambiImpostazioni(correnti, serie, globalThis.SN_STORAGE.normalizza);
   const evento = { tipo: 'impostazioni', cambi };
-  return { frasi: K.frasi(evento), livello: K.livello(evento) };
+  // Toglie un freno solo se le impostazioni di serie ne allentano uno, con la regola delle preferenze (#1840).
+  let allenta = true;
+  try { allenta = globalThis.SN_PREF.allentaParziale(serie, correnti); } catch (_) { allenta = true; }
+  return { frasi: K.frasi(evento), livello: K.livello(evento), allenta };
 }
 // La home che ospita l'intervista rifatta: col segno, così le altre home restano il filo (#1297).
 function apriIntervistaRifatta(sender) {
