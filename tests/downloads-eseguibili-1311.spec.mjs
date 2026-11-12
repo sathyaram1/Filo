@@ -168,8 +168,11 @@ test('la risposta a «Scarica» che arriva dopo la fine non riporta la riga a «
       const DL = rq(rq('node:path').join(process.cwd(), 'src/main/services/downloads.js'));
       const vero = DL.confirmDownload;
       globalThis.__confermaVera = vero;
+      globalThis.__trattenute = 0;
       DL.confirmDownload = (id, ...resto) => {
         const res = vero(id, ...resto);
+        globalThis.__trattenute++;
+        globalThis.__statoInRisposta = (res.items || []).map((x) => x.state).join(',');
         const t0 = Date.now();
         return new Promise((fine) => {
           const giro = () => {
