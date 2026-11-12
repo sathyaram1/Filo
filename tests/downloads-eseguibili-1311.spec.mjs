@@ -156,6 +156,56 @@ test('«Scarica» porta l’immagine-programma in cartella con la marca «Progra
   }
 });
 
+// #2307 — la risposta a «Scarica» porta l'elenco di quel momento: se arriva dopo l'evento di fine, la riga non torna
+// «In corso» e «Apri file» c'è. Qui la risposta si trattiene finché la voce è finita, l'ordine che il caso produceva.
+test('la risposta a «Scarica» che arriva dopo la fine non riporta la riga a «In corso» (#2307)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const aperti = await spiaApertura(app);
+    await app.evaluate(() => {
+      const rq = process.mainModule.require;
+      const DL = rq(rq('node:path').join(process.cwd(), 'src/main/services/downloads.js'));
+      const vero = DL.confirmDownload;
+      globalThis.__confermaVera = vero;
+      globalThis.__rispostePartite = 0;
+      DL.confirmDownload = (id, ...resto) => {
+        const res = vero(id, ...resto);
+        const t0 = Date.now();
+        return new Promise((fine) => {
+          const giro = () => {
+            if (DL._records.get(id)?.state !== 'completed' && Date.now() - t0 < 15000) { setTimeout(giro, 20); return; }
+            fine(res);
+            globalThis.__rispostePartite++;
+          };
+          giro();
+        });
+      };
+    });
+    const page = await apriPagina(srv.base, { openTab, testServer });
+    await salvaImmagine(page);
+
+    const avviso = domanda(shell, 'setup.exe');
+    await expect(avviso).toBeVisible({ timeout: 20000 });
+    await risposta(avviso, /^Scarica$/).click();
+
+    await expect.poll(() => app.evaluate(() => globalThis.__rispostePartite), { timeout: 20000 }).toBe(1);
+    // Un giro sullo stesso canale dopo la risposta trattenuta: quando torna, la shell l'ha già applicata.
+    expect(await statoDi(shell, 'setup.exe')).toBe('completed');
+    const riga = shell.locator('#dl-panel .dl-row', { hasText: 'setup.exe' });
+    await expect(riga).toHaveAttribute('data-state', 'completed', { timeout: 10000 });
+    await expect(riga.locator('.dl-row-meta')).toContainText('Completato');
+    await apriChiede(shell, aperti, 'setup.exe');
+  } finally {
+    await app.evaluate(() => {
+      const rq = process.mainModule.require;
+      const DL = rq(rq('node:path').join(process.cwd(), 'src/main/services/downloads.js'));
+      if (globalThis.__confermaVera) DL.confirmDownload = globalThis.__confermaVera;
+    }).catch(() => {});
+    await srv.close();
+  }
+});
+
 test('connessione.rdp da un sito si ferma alla domanda, porta la marca «Programma» e «Apri file» chiede (#588.6)', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();

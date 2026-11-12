@@ -2196,6 +2196,9 @@
   if (api.downloads) {
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
+    const ELENCO = window.SN_ELENCO_SCARICAMENTI;
+    const statoElenco = ELENCO.crea(dls);
+    const applicaEvento = (kind, item) => ELENCO.evento(statoElenco, kind, item);
     let panelOpen = false;
     let panel = null;
     // #588 — le domande sui programmi sono righe del pannello, che si apre sopra
@@ -2276,7 +2279,7 @@
       clearBtn.textContent = 'Svuota';
       clearBtn.dataset.tip = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
-        api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+        api.downloads.clear().then((r) => { syncFromList(r); }).catch(() => {});
       });
       // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
       const closeBtn = document.createElement('button');
@@ -2433,7 +2436,7 @@
         // possibilità di rispondere (#588).
         const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
           if (res && res.ok === false) avvisiRiga.set(r.id, res.error || 'Risposta non registrata');
-          if (res && res.items) syncFromList(res.items);
+          if (res && res.items) syncFromList(res);
           else if (panelOpen) renderPanel();
         }).catch(() => {});
         addBtn('Scarica', () => rispondi(true), 'si');
@@ -2454,10 +2457,10 @@
       } else if (r.state === 'completed') {
         if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
-        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {}));
       } else {
         if (r.state === 'interrupted' && /^https?:/i.test(String(r.url || ''))) addBtn('Riprova', () => riprovaDownload(r.id));
-        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {}));
       }
       row.appendChild(actions);
       // #588.8 — un file arrivato si trascina dalla sua riga: sul campo per caricare file di un sito, nella chat.
@@ -2516,7 +2519,7 @@
           if (panelOpen) renderPanel();
         }).catch(() => {})]);
       }
-      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {})]);
+      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {})]);
       menuRiga.id = r.id;
       menuRiga.voci = voci;
       if (panelOpen) renderPanel();
@@ -2566,7 +2569,7 @@
       reserveForPanel();
       // Un file può sparire dal disco a pannello chiuso e nessun evento lo
       // annuncia: la lista si rilegge all'apertura, non dopo un clic a vuoto.
-      api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+      api.downloads.list().then((r) => { syncFromList(r); }).catch(() => {});
     }
     function closePanel() {
       panelOpen = false;
@@ -2584,9 +2587,9 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
-    function syncFromList(items) {
-      dls.clear();
-      if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+    // `res`: una risposta { items, rev }. Può essere più vecchia di eventi già arrivati: quelli restano (#2307).
+    function syncFromList(res) {
+      ELENCO.lista(statoElenco, res);
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
@@ -2638,7 +2641,7 @@
     function chiediChiusura(items) {
       const vive = (Array.isArray(items) ? items : []).filter((r) => r && r.id);
       if (!vive.length) return;
-      for (const r of vive) dls.set(r.id, r);
+      for (const r of vive) applicaEvento('progress', r);
       chiusura = { n: vive.length, nome: vive[0].filename || 'download' };
       if (panelOpen) renderPanel(); else openPanel();
     }
@@ -2647,8 +2650,7 @@
     api.downloads.onEvent((info) => {
       if (info && info.kind === 'chiusura') { chiediChiusura(info.items); return; }
       if (!info || !info.item) return;
-      if (info.kind === 'removed') dls.delete(info.item.id);
-      else dls.set(info.item.id, info.item);
+      applicaEvento(info.kind, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
       aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
@@ -2705,7 +2707,7 @@
     };
 
     // Cronologia iniziale (sopravvive al riavvio).
-    api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+    api.downloads.list().then((r) => { syncFromList(r); }).catch(() => {});
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
