@@ -157,14 +157,22 @@ test('in Preferenze si spegne (e quello tenuto se ne va), si sceglie la durata e
   expect(await quanti(app)).toBe(0);
 });
 
-test('in incognito non si tiene niente', async ({ app, testServer }) => {
+test('in incognito non si tiene niente, e alla ricarica il campo resta vuoto', async ({ app, shell, testServer }) => {
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return w && w._filoTabs ? w._filoTabs.tabs.length : 0;
+  }), { timeout: 15_000 }).toBe(1);
   const url = testServer.html(PAGINA);
-  const page = await app.evaluate(async ({ BrowserWindow }, u) => {
-    const { openIncognitoWindow } = process.mainModule.require('./window.js');
-    const w = openIncognitoWindow ? openIncognitoWindow() : null;
-    return Boolean(w) && u;
-  }, url).catch(() => null);
-  test.skip(!page, 'apertura della finestra in incognito non raggiungibile da qui');
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u), url);
+  let page = null;
+  await expect.poll(async () => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    return page ? page.evaluate(() => document.documentElement.dataset.filoReady === '1').catch(() => false) : false;
+  }, { timeout: 10_000 }).toBe(true);
+  await scrivi(page, '#messaggio', 'in incognito');
+  await page.waitForTimeout(1500);
+  expect(await quanti(app)).toBe(0);
 });
 
 test('riavviato Filo, la scheda torna col testo che c\'era', async ({ testServer }) => {
