@@ -1137,7 +1137,7 @@
   global.SN_FILO_MEMORY = {
     // raw log
     // lessons
-    getLessonsBuffer, appendLesson: inFila(appendLesson), lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
+    getLessonsBuffer, appendLesson: inFila(appendLesson), scriviLezione: inFila(scriviLezione), lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
