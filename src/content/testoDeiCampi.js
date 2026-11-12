@@ -206,19 +206,14 @@
     }
     if (!presenti.length) return;
     const fatti = R.abbina(rimasti, presenti);
-    const usati = new Set();
     for (const { indice, valore } of fatti) {
       const el = campi[indice];
       scriviNelCampo(el, valore);
+      // Il testo rimesso è ancora dell'utente: resta seguito, a nome della firma che ha adesso.
       segue(el, String(el.value || ''));
-      usati.add(valore);
     }
-    if (fatti.length) {
-      const presi = new Set(fatti.map((f) => presenti[f.indice].firma));
-      rimasti = rimasti.filter((r) => !fatti.some((f) => f.valore === r.valore && presi.size)
-        || ![...presi].length);
-      rimasti = rimasti.filter((r) => !usati.has(r.valore));
-    }
+    const usati = new Set(fatti.map((f) => f.da));
+    rimasti = rimasti.filter((_, i) => !usati.has(i));
     if (!rimasti.length) fermaAttesa();
   }
 
