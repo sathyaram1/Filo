@@ -35,7 +35,6 @@ for (const ms of [100]) {
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
       const tw = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
       const lascia = !!win._filoTabs.riquadri?.strati?.get(tw);
-      tw.focus();
       const wc = tw;
       const s = win._filoTabs.riquadri?.strati?.get(wc);
       const traccia = [];
