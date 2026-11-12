@@ -231,7 +231,8 @@
     qui();
   }
 
-  function apriQui({ testo: proposta = '' } = {}) {
+  // `ripresa`: il feedback che torna indietro dall'invio (L0 o un errore), con testo, allegati e avviso intatti.
+  function apriQui({ testo: proposta = '', ripresa = null } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
