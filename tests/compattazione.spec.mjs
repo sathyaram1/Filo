@@ -220,6 +220,26 @@ test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da 
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
 });
 
+test('una pagina tolta dal filo porta via subito la riga del diario nata da lei, anche dal file, senza un messaggio a Filo', async ({ app }) => {
+  const { file, visita } = await app.evaluate(async () => {
+    const C = globalThis.SN_COMPATTAZIONE;
+    const Chats = globalThis.SN_FILO_CHATS;
+    const t0 = Date.now() - 5 * 60 * 60 * 1000;
+    await Chats.append('pag1', { role: 'user', text: 'che si mangia stasera?', ts: new Date(t0).toISOString() });
+    const v = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(t0 + 500).toISOString() });
+    await Chats.append('pag1', { role: 'filo', text: 'Una carbonara.', ts: new Date(t0 + 1000).toISOString() });
+    const vero = C._dip.chiama;
+    C._dip.chiama = async () => JSON.stringify({ ore: ['19:00 cercata la ricetta della carbonara'], memorie: [] });
+    try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
+    return { file: require('node:path').join(C._dip.cartella(), 'livelli.json'), visita: v.id };
+  });
+  expect(readFileSync(file, 'utf8')).toContain('carbonara');
+  // «Togli dal filo» sulla pagina, dalla home: lo stesso messaggio del menu.
+  const r = await app.evaluate((_e, id) => globalThis.SN_HANDLE_MESSAGE({ type: 'filo_coda_togli_pagine', ids: [id] }, { tab: { id: 5, url: 'filo://newtab/' }, url: 'filo://newtab/' }), visita);
+  expect(r && r.ok).toBe(true);
+  await expect.poll(() => readFileSync(file, 'utf8'), { timeout: 10000 }).not.toContain('carbonara');
+});
+
 // Quanto pesano strumenti e parte fissa: le soglie delle prove si misurano da lì, non da un numero scritto oggi.
 const base = (app) => app.evaluate(() => globalThis.SN_FILO_CONTESTO.stimaToken(
   JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()));
