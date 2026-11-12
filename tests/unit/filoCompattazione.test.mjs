@@ -335,7 +335,7 @@ test('la sera di ieri compattata dopo il riassunto del giorno resta nel diario, 
   assert.match(sez, /GIORNI:\n- ieri: mail al relatore, volo per Lisbona/);
   assert.doesNotMatch(sez, /ORE:/, 'le ore riassunte non si ripetono');
   assert.equal((await Comp.righe(false)).giorni.length, 1, 'una riga per giorno');
-  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 0);
+  assert.equal(await Comp.riassumiGiorni({ ora: stamattina }), 0);
 });
 
 test('una fonte della chat scaduta alla compattazione e riletta dopo torna a contare, anche riaprendo il filo', async () => {
