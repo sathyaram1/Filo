@@ -70,6 +70,25 @@ test('mentre lo strato nasce si trattengono i tasti che scrivono, mai le scorcia
   assert.equal(scrive(k('h', { alt: true }), 'win32'), false);
 });
 
+// L'incolla è l'unica scorciatoia trattenuta per lo strato che nasce (#1623.3): lasciata alla pagina le darebbe gli appunti.
+test('mentre lo strato nasce l\'incolla si trattiene, col tasto di ogni sistema, e torna come comando', () => {
+  const { incolla } = require(join(ROOT, 'src', 'main', 'stratoDeiRiquadri.js'));
+  const k = (key, m = {}) => ({ type: 'keyDown', key, ...m });
+  for (const p of ['win32', 'linux']) {
+    assert.equal(incolla(k('v', { control: true }), p), 'paste');
+    assert.equal(incolla(k('V', { control: true, shift: true }), p), 'pasteAndMatchStyle');
+    assert.equal(incolla(k('v', { meta: true }), p), null);
+  }
+  assert.equal(incolla(k('v', { meta: true }), 'darwin'), 'paste');
+  assert.equal(incolla(k('v', { control: true }), 'darwin'), null);
+  for (const p of ['win32', 'linux', 'darwin']) {
+    assert.equal(incolla(k('Insert', { shift: true }), p), 'paste');
+    for (const t of [k('v'), k('c', { control: true }), k('v', { control: true, alt: true }), { type: 'keyUp', key: 'v', control: true, meta: true }, k('v', { control: true, meta: true, isComposing: true })]) {
+      assert.equal(incolla(t, p), null, `${p}: ${JSON.stringify(t)}`);
+    }
+  }
+});
+
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): chiede solo quello che il main lascia passare, e la pagina
 // sa rispondere a tutto quello che passa.
 test('l\'Aiuto nello strato chiede alla pagina solo operazioni che il main conosce e la pagina serve', () => {
