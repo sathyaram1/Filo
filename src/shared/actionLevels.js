@@ -922,7 +922,7 @@
     CANCELLA_PAGINE: {
       costo: 4,
       campo: null,
-      dove: 'Le pagine visitate l\'utente le cancella a mano nella pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: l\'ultima ora, oggi o tutte.',
+      dove: 'Le pagine visitate l\'utente le cancella a mano nella pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: l\'ultima ora, oggi o tutte; una o un gruppo alla volta dalla home, col tasto destro su una pagina nel filo, «Togli dal filo».',
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
