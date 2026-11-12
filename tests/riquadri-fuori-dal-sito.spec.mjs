@@ -371,8 +371,8 @@ test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, 
   await s.detach().catch(() => {});
   await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(1);
 
-  await app.evaluate(async ({ clipboard, nativeImage }, b64) => {
-    clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(b64, 'base64')));
+  await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
   }, PNG.toString('base64'));
   const dove = await clicca(app, p, '.sn-fb-text');
   await dove.keyboard.press('ControlOrMeta+V');
