@@ -83,6 +83,19 @@ test('chiusa la scheda per sbaglio e riaperta, il testo è lì', async ({ app, s
   await expect.poll(() => valore(riaperta, '#messaggio'), { timeout: 10000 }).toBe('Una risposta lunga che non voglio riscrivere');
 });
 
+test('dentro un riquadro di un altro sito il testo torna alla ricarica, senza toccare il riquadro', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html('<!doctype html><body style="margin:0"><textarea name="commento" style="width:300px;height:80px"></textarea></body>', { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><body><iframe src="${dentro}" style="width:400px;height:200px"></iframe></body>`);
+  const riquadro = () => page.frames().find((f) => f.url() === dentro);
+  await expect.poll(() => Boolean(riquadro())).toBe(true);
+  await riquadro().locator('textarea').click();
+  await page.keyboard.type('commento scritto nel riquadro');
+  await expect.poll(() => quanti(app), { timeout: 8000 }).toBe(1);
+  await page.reload();
+  await expect.poll(() => (riquadro() ? riquadro().locator('textarea').inputValue().catch(() => '') : ''), { timeout: 10000 })
+    .toBe('commento scritto nel riquadro');
+});
+
 test('inviato il modulo il testo se ne va: tornando sulla pagina il campo è vuoto', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await scrivi(page, '#messaggio', 'Messaggio già partito');
