@@ -18,8 +18,9 @@
   // Solo i campi dove si scrive testo libero: una data, un colore o una casella hanno il loro modo di tornare.
   const TIPI = /^(text|email|url|tel|number)$/;
 
-  function opzioni(settings) {
-    const t = (settings && settings.testoDeiCampi) || {};
+  // Le leggono il main e le Preferenze; sui siti nessuno: lì decide il main per ogni frame.
+  function opzioni(impostazioni) {
+    const t = (impostazioni && impostazioni.testoDeiCampi) || {};
     const g = Number(t.giorni);
     return { attivo: t.attivo !== false, giorni: GIORNI.includes(g) ? g : GIORNI_DI_SERIE };
   }
