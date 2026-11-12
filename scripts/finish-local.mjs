@@ -425,6 +425,26 @@ export function specsForChangedFiles(changed, tracked) {
   return [...specs];
 }
 
+function elencoCorto(file, mostrati = 8) {
+  return file.slice(0, mostrati).join(', ') + (file.length > mostrati ? ` e altri ${file.length - mostrati}` : '');
+}
+
+/**
+ * Perché la scelta degli spec è quella, quando non è ovvio: nessuno spec, o file tolti perché cambiano solo nei
+ * commenti. Un lavoro sul server fa girare qui solo gli unit, e chi legge deve sapere perché (#2425). PURA.
+ */
+export function motivoDellaScelta({ changed = [], soloCommenti = [], specs = 0 }) {
+  const tolti = soloCommenti.filter((f) => changed.includes(f));
+  if (specs > 0) return tolti.length ? `▸ Cambiano solo nei commenti, e non scelgono spec: ${elencoCorto(tolti)}.` : '';
+  if (!changed.length) return '▸ Nessuno spec da lanciare: il ramo non cambia file rispetto alla linea principale. Corro solo gli unit.';
+  const altri = changed.filter((f) => !tolti.includes(f));
+  const parti = [
+    ...(tolti.length ? [`${tolti.length} cambiano solo nei commenti (${elencoCorto(tolti)})`] : []),
+    ...(altri.length ? [`${tolti.length ? 'gli altri' : `tutti (${changed.length})`} non li prova nessuno spec (${elencoCorto(altri)})`] : []),
+  ];
+  return `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.`;
+}
+
 /**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
