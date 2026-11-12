@@ -725,7 +725,7 @@
         }
         if (nelSub(t)) return;
       }
-      if (keepOnScroll) return;
+      if (keepOnScroll || !scorsoDopo(e)) return;
       close();
     };
     // La finestra che si accorcia è lo stesso difetto dall'altro verso: il fondo del menu
