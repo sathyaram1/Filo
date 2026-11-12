@@ -136,10 +136,7 @@
   // Scrive nella pagina `p` (o la crea) un campo: valore vuoto = via. Torna la pagina, null se resta vuota.
   function aggiorna(p, firma, valore, ora) {
     const campi = (p && Array.isArray(p.campi) ? p.campi : []).filter((c) => !stessaFirma(c.firma, firma));
-    if (valore) {
-      campi.push({ firma, valore, t: ora });
-      if (campi.length > CAMPI_PER_PAGINA) campi.shift();
-    }
+    if (valore) campi.push({ firma, valore, t: ora });
     return campi.length ? { t: ora, campi } : null;
   }
 
