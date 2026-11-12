@@ -185,10 +185,10 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
 
 // Una memoria nata da una conversazione e tolta dal quaderno: la compattazione che rilegge quella conversazione non la
 // riscrive, e tenuta da una proposta il quaderno dice perché non l'ha scritta.
-const conversazioneTolta = (app, { chat, sospetta }) => app.evaluate(async (_e, { chat, sospetta }) => {
+const conversazioneTolta = (app, { chat, sospetta, oreFa }) => app.evaluate(async (_e, { chat, sospetta, oreFa }) => {
   const C = globalThis.SN_COMPATTAZIONE;
   const M = globalThis.SN_FILO_MEMORY;
-  const t0 = Date.now() - 5 * 60 * 60 * 1000;
+  const t0 = Date.now() - oreFa * 60 * 60 * 1000;
   await globalThis.SN_FILO_CHATS.append(chat, { role: 'user', text: 'ho due gatti, Miso e Pepe', ts: new Date(t0).toISOString() });
   const c = await globalThis.SN_FILO_CHATS.append(chat, { role: 'filo', text: 'Che bei nomi.', ts: new Date(t0 + 1000).toISOString(), ...(sospetta ? { classeLetta: 5 } : {}) });
   const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: c.eids || (await globalThis.SN_IL_FILO.chat(chat, { ids: true })).eids });
