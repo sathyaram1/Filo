@@ -2558,6 +2558,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // riallinea lo sha che aveva passato la verifica (la base del confronto alla consegna).
       ...(role !== 'verifier' && typeof (payload && payload.piano) === 'string' ? { piano: payload.piano } : {}),
       ...(role === 'new-work' && Array.isArray(payload && payload.suMain) ? { suMain: payload.suMain } : {}),
+      ...(role === 'new-work' ? conCommitProvato(payload) : {}),
       ...(role === 'fixer' && /^[0-9a-f]{40}$/i.test(String((payload && payload.shaVerificato) || '')) ? { shaVerificato: payload.shaVerificato } : {}),
       // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
       ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
