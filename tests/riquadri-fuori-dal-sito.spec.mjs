@@ -3,6 +3,9 @@
 // nello strato sopra la scheda. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
