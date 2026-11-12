@@ -99,6 +99,40 @@ test('trovata una password: il riquadro si chiude, si riapre con l\'avviso e la 
   expect(await chiamateTesto(app)).toBe(prima);
 });
 
+test('su un sito il riquadro sta sopra la scheda: chiuso all\'invio, si riapre lì con l\'avviso e l\'immagine segnata', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const p = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><body style="padding:40px"><h1>Un sito</h1></body>');
+  await finti(app);
+  await imposta(app, {
+    testo: JSON.stringify({ trovati: [{ tipo: 'persone', pezzo: 'Mario Bianchi, 333 1234567' }] }),
+    immagini: JSON.stringify({ trovati: [{ tipo: 'schede', immagine: 1 }] }),
+  });
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, p, '.sn-fb-text')).not.toBeNull();
+  expect((await statoDi(app, p, '.sn-fb-text')).nelloStrato).toBe(true);
+  const strato = await paginaDelloStrato(app, p);
+  const TESTO_SITO = 'Il modulo non salva. Il mio vicino Mario Bianchi, 333 1234567, ha lo stesso problema.';
+  await strato.locator('.sn-fb-text').fill(TESTO_SITO);
+  await strato.locator('.sn-fb-file').setInputFiles([{ name: 'schermo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') }]);
+  await expect(strato.locator('.sn-fb-thumb')).toHaveCount(1);
+  await clicca(app, p, '.sn-fb-send');
+  await expect.poll(() => statoDi(app, p, '.sn-fb-l0'), { timeout: 10_000 }).not.toBeNull();
+  await expect(strato.locator('.sn-fb-l0')).toBeVisible();
+  await expect(strato.locator('.sn-fb-l0')).toContainText('un’altra persona');
+  await expect(strato.locator('.sn-fb-l0')).toContainText('altre schede');
+  await expect(strato.locator('.sn-fb-text')).toHaveValue(TESTO_SITO);
+  await expect(strato.locator('.sn-fb-evidenze mark')).toHaveText(['Mario Bianchi, 333 1234567']);
+  await expect(strato.locator('.sn-fb-thumb.sn-fb-thumb--l0')).toHaveCount(1);
+  expect(await invii(app)).toEqual([]);
+  // L'immagine segnata si toglie, e il feedback riletto parte senza.
+  await strato.locator('.sn-fb-thumb-x').click();
+  await imposta(app, { testo: '{"trovati":[]}', immagini: '{"trovati":[]}' });
+  await strato.locator('.sn-fb-text').fill('Il modulo non salva.');
+  await clicca(app, p, '.sn-fb-send');
+  await expect.poll(() => invii(app), { timeout: 15_000 }).toEqual(['Il modulo non salva.']);
+  expect(await app.evaluate(() => globalThis.__invii[0].images.length)).toBe(0);
+});
+
 test('«Correggi» porta sulla parte segnata; corretta, l\'evidenza sparisce e il feedback parte riletto', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
