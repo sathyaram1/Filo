@@ -1179,10 +1179,10 @@ Compattazione.imposta({
     });
     return r && r.text;
   },
-  applicaMemoria: async (testo, opts) => {
-    const scritta = await Compattazione.scriviMemoria(testo, opts);
-    if (await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
-    return scritta;
+  applicaMemoria: async (testo, fonti) => {
+    const w = await FiloMem.scriviLezione(testo, fonti);
+    if (w.scritta && await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
+    return w.scritta;
   },
 });
 
