@@ -2651,8 +2651,7 @@
     api.downloads.onEvent((info) => {
       if (info && info.kind === 'chiusura') { chiediChiusura(info.items); return; }
       if (!info || !info.item) return;
-      if (info.kind === 'removed') dls.delete(info.item.id);
-      else dls.set(info.item.id, info.item);
+      applicaEvento(info.kind, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
       aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
