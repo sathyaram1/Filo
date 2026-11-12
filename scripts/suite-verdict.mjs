@@ -562,7 +562,7 @@ async function main() {
   if (v.totale === 0) {
     const errori = Array.isArray(json.errors) ? json.errors : [];
     fermo(['La suite NON ha eseguito nessun caso: non è un verde.', ...errori.map((e) => `  errore: ${primaRiga(e)}`)].join('\n'),
-      chiaviSenzaCasi(json.errors));
+      chiaviSenzaCasi(json.errors), v.nuovi);
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
   // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
