@@ -168,16 +168,15 @@ test('la risposta a «Scarica» che arriva dopo la fine non riporta la riga a «
       const DL = rq(rq('node:path').join(process.cwd(), 'src/main/services/downloads.js'));
       const vero = DL.confirmDownload;
       globalThis.__confermaVera = vero;
-      globalThis.__trattenute = 0;
+      globalThis.__rispostePartite = 0;
       DL.confirmDownload = (id, ...resto) => {
         const res = vero(id, ...resto);
-        globalThis.__trattenute++;
-        globalThis.__statoInRisposta = (res.items || []).map((x) => x.state).join(',');
         const t0 = Date.now();
         return new Promise((fine) => {
           const giro = () => {
-            if (DL._records.get(id)?.state === 'completed' || Date.now() - t0 > 15000) setTimeout(() => fine(res), 100);
-            else setTimeout(giro, 20);
+            if (DL._records.get(id)?.state !== 'completed' && Date.now() - t0 < 15000) { setTimeout(giro, 20); return; }
+            fine(res);
+            globalThis.__rispostePartite++;
           };
           giro();
         });
