@@ -52,12 +52,22 @@
     return el.tagName === 'TEXTAREA' ? '' : String(el.getAttribute('type') || 'text').toLowerCase();
   }
 
+  // Gli editor dei siti (codice, documenti) ricevono i tasti in una casella minuscola o trasparente e tengono il testo
+  // altrove: rimettere lì dentro scriverebbe nell'editor, sopra il salvataggio suo.
+  function sembraUnaCasella(el) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 20 || r.height < 10) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && Number(cs.opacity) >= 0.1;
+  }
+
   function idoneo(el) {
     if (!el || el.nodeType !== 1) return false;
     if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return false;
     if (el.tagName === 'INPUT' && !R.TIPI.test(tipoDi(el))) return false;
     if (el.disabled || el.readOnly) return false;
     try {
+      if (!sembraUnaCasella(el)) return false;
       // Un modulo con la password è un accesso o un'iscrizione: niente di quello che c'è dentro.
       if (el.form && el.form.querySelector('input[type=password]')) return false;
       if (Segreti.campoSegreto(el)) return false;
