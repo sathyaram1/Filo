@@ -17,7 +17,7 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   async function acceso() {
     try {
       const s = await impostazioni();
-      return !(s && s.feedbackL0 && s.feedbackL0.enabled === false);
+      return !(s && s.feedbackRilettura && s.feedbackRilettura.enabled === false);
     } catch (_) { return true; }
   }
 
