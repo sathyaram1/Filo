@@ -223,7 +223,6 @@ export function ultimoTestDelWorker(e) {
  * posizione di Playwright, poi chi importava il modulo che manca, poi il primo percorso sotto tests/. PURA.
  */
 function fileNelTesto(e, radice) {
-  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').replace(new RegExp(ELENCO_DEL_WORKER, 'g'), '');
   // Un percorso può avere spazi (una cartella utente): «imported from» si prende fino a fine riga.
   const percorsi = [...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0]);
