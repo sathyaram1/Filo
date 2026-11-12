@@ -35,7 +35,6 @@ for (const ms of [0, 80, 150]) {
       }
       return { dove, lascia, dt: Date.now() - t0 };
     }, ms);
-    await voce.click();
     const r = await premi;
     await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
     await p.waitForTimeout(1500);
