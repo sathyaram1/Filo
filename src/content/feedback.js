@@ -333,18 +333,47 @@
         }).catch(() => {});
       } catch (_) {}
     }
-    textEl.addEventListener('input', () => {
+    // L0: una rilettura per pausa, pagata da un gesto vero nella casella (patterns/una-chiamata-che-spende-parte-da-un-gesto-vero.md).
+    let anticipoTimer = null;
+    let gestoPerAnticipo = false;
+    let anticipato = '';
+    stacchi.push(() => { clearTimeout(anticipoTimer); anticipoTimer = null; });
+    function preparaAnticipo(e) {
+      const G = global.SN_GESTO;
+      const vero = G && typeof G.prendi === 'function'
+        ? G.prendi('feedback-l0', undefined, (l) => !!(l && l.el && (l.el === textEl || textEl.contains(l.el))))
+        : !!(e && e.isTrusted);
+      if (vero) gestoPerAnticipo = true;
+      clearTimeout(anticipoTimer);
+      anticipoTimer = setTimeout(() => {
+        anticipoTimer = null;
+        const t = textEl.value.trim();
+        if (!gestoPerAnticipo || !t || t === anticipato) return;
+        gestoPerAnticipo = false;
+        anticipato = t;
+        try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_L0_ANTICIPA, testo: t })?.catch?.(() => {}); } catch (_) {}
+      }, ANTICIPO_MS);
+    }
+    textEl.addEventListener('input', (e) => {
       // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
+      aggiornaEvidenze();
+      preparaAnticipo(e);
     });
     // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
     const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
-    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
+    if (ripresa) {
+      textEl.value = String(ripresa.testo || '');
+      for (const im of ripresa.images || []) images.push(im);
+      for (const f of ripresa.files || []) files.push(f);
+      if (ripresa.submissionId) submissionId = ripresa.submissionId;
+      saveDraft();
+    } else if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
-      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+      if (DRAFT_KEY && !ripresa) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
