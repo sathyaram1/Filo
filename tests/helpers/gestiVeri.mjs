@@ -42,12 +42,13 @@ export async function sulloSchermo(app, scheda, doc, sel) {
       if (!t) continue;
       const cb = w.getContentBounds();
       const vb = t.view.getBounds();
-      return { x: cb.x + vb.x, y: cb.y + vb.y, larga: vb.width, alta: vb.height };
+      const visibile = typeof t.view.getVisible === 'function' ? t.view.getVisible() : true;
+      return { x: cb.x + vb.x, y: cb.y + vb.y, aSchermo: visibile && vb.width > 0 && vb.height > 0 };
     }
     return null;
   }, await bersaglioDi(scheda));
   if (!o) throw new Error(`sulloSchermo: ${scheda.url()} non è la Page di una scheda di Filo`);
-  if (!o.larga || !o.alta) throw new Error(`sulloSchermo: la scheda di ${scheda.url()} non è a schermo (ce n'è un'altra davanti)`);
+  if (!o.aSchermo) throw new Error(`sulloSchermo: la scheda di ${scheda.url()} non è a schermo (ce n'è un'altra davanti)`);
   return { x: Math.round(o.x + r.x + r.width / 2), y: Math.round(o.y + r.y + r.height / 2) };
 }
 
