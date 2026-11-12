@@ -368,6 +368,8 @@
   global.SN_FEEDBACK_OUTBOX = {
     init,
     enqueue,
+    rilascia,
+    ritira,
     flush,
     accessoCambiato,
     size: () => queue.length,
