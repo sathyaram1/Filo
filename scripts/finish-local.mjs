@@ -900,12 +900,7 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
-    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
-    // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
-    const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root: albero.dir });
-    const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const { specs, soloCommenti } = specDellaScelta({ changed, base, root: albero.dir });
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
     const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
