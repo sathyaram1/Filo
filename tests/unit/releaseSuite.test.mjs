@@ -371,7 +371,10 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
           },
         });
         assert.equal(r.stato, 0, r.registro);
-        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso\n\nErrori dei rossi nuovi:\n✗ tests\/a\.spec\.mjs › il caso rosso\n {4}in tests\/a\.spec\.mjs:12\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed/);
+        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso\n/);
+        assert.match(r.testo, /\n\n\nErrori dei rossi nuovi:\n✗ tests\/a\.spec\.mjs › il caso rosso\n {4}in tests\/a\.spec\.mjs:12\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed\n\n\nVerdetto:/);
+        assert.ok(r.testo.indexOf('Nessuna suite verde su main') < r.testo.indexOf('Errori dei rossi nuovi'),
+          'i commit sospetti prima degli errori: oltre il tetto del server il taglio mangia la coda');
         assert.ok(r.testo.includes('gh api repos/o/r/actions/runs/1/jobs'), r.testo);
         assert.ok(r.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), r.testo);
         assert.doesNotMatch(r.testo, /stanno negli artifact di questa esecuzione/, 'gli artifact dalla cloud non si scaricano: non sono la strada');
