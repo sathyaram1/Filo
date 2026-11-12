@@ -1043,6 +1043,12 @@ function conPiano(ctx) {
   return typeof ctx.piano === 'string' && ctx.piano.trim() ? { piano: ctx.piano } : {};
 }
 
+// Un allarme della suite: il commit su cui ha dato il rosso, scritto dal server (FEEDBACK-STATES.md, Già risolto su main).
+function conCommitProvato(ctx) {
+  const c = String((ctx && ctx.commitProvato) || '').toLowerCase();
+  return /^[0-9a-f]{40}$/.test(c) ? { commitProvato: c } : {};
+}
+
 /**
  * Le fusioni su main che citano il feedback, dopo la sua nascita (regola 5): quelle che il server ha già trovato, o
  * quelle che dice git qui. `propria`: la fusione del suo stesso lavoro, cioè un feedback riaperto dall'owner.
