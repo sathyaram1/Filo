@@ -537,6 +537,7 @@ function broadcast(kind, rec) {
   // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
   // suo annullamento.
   if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); aggiornaBarra(scopeOf(rec)); return; }
+  if (rec) rec._rev = ++revisione;
   const scope = scopeOf(rec);
   aggiornaBarra(scope);
   nelFilo(kind, rec, scope);
