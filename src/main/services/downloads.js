@@ -480,7 +480,7 @@ function importa(lista) {
   }
   const oltre = listRecords('').filter((r) => !NON_TERMINAL.has(r.state) && r.state !== 'pending').slice(HISTORY_LIMIT);
   for (const r of oltre) records.delete(r.id);
-  if (nuove || oltre.length) { persist(); notifyTabs(); }
+  if (nuove || oltre.length) { revisione++; persist(); notifyTabs(); }
   return nuove;
 }
 
