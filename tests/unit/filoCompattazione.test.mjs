@@ -23,6 +23,7 @@ require('../../src/shared/filoCompattazione.js');
 require('../../src/shared/cambi.js');
 require('../../src/shared/actionLevels.js');
 require('../../src/shared/autonomia.js');
+require('../../src/shared/quaderno.js');
 globalThis.SN_CONST = { ...globalThis.SN_CONST, STORAGE_KEYS: { ...globalThis.SN_CONST.STORAGE_KEYS, FILO_CHATS: 'filo_chats' } };
 globalThis.chrome = { storage: { local: { async get(k) { return { [k]: undefined }; }, async set() {}, async remove() {} } } };
 
