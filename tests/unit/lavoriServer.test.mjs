@@ -74,6 +74,70 @@ test('#2190: le prove del giro sul server hanno un nome che il cancello riconosc
   assert.match(t, /toglie soltanto prove del giro, file interi o casi, e niente aggiunge o cambia/);
 });
 
+// #2433: il registro conta solo i commit dichiarati sotto il nome del ramo nuovo; partire dalla vecchia punta (col
+// riallineamento scritto dal cancello) lasciava il ramo del server non fidato per sempre.
+test('ripartenza di un lavoro server: la ricetta del testo dà un ramo da main con un solo commit nuovo, il lavoro di prima dentro', () => {
+  const dir = cartellaTemporanea('filo-ripartenza-server-');
+  try {
+    const remoto = join(dir, 'remoto.git');
+    const vecchio = join(dir, 'vecchio');
+    const clone = join(dir, 'clone');
+    const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const identita = (cwd, nome) => { git(cwd, 'config', 'user.email', `${nome}@t`); git(cwd, 'config', 'user.name', nome); git(cwd, 'config', 'commit.gpgsign', 'false'); };
+    const scrivi = (cwd, f, s) => { writeFileSync(join(cwd, f), s); git(cwd, 'add', f); git(cwd, 'commit', '-m', f); };
+    execFileSync('git', ['init', '--bare', '-b', 'main', remoto]);
+    execFileSync('git', ['clone', '-q', remoto, vecchio]);
+    identita(vecchio, 'worker');
+    git(vecchio, 'checkout', '-q', '-b', 'main');
+    scrivi(vecchio, 'a.txt', 'a\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+    git(vecchio, 'checkout', '-q', '-b', 'worker/X-1');
+    scrivi(vecchio, 'lavoro.txt', 'il lavoro di prima\n');
+    const lavoroVecchio = git(vecchio, 'rev-parse', 'HEAD');
+    git(vecchio, 'checkout', '-q', 'main');
+    scrivi(vecchio, 'b.txt', 'b\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+    git(vecchio, 'checkout', '-q', 'worker/X-1');
+    identita(vecchio, 'cancello');
+    git(vecchio, 'merge', '-q', '--no-ff', '-m', 'riallineamento: main (dal cancello)', 'main');
+    const riallineamento = git(vecchio, 'rev-parse', 'HEAD');
+    git(vecchio, 'push', '-q', 'origin', 'worker/X-1');
+    identita(vecchio, 'worker');
+    git(vecchio, 'checkout', '-q', 'main');
+    scrivi(vecchio, 'c.txt', 'c\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+
+    execFileSync('git', ['clone', '-q', remoto, clone]);
+    identita(clone, 'nuovo');
+    const t = testoLavoroServer({ clone, canale: '/x/routine-channel.mjs' });
+    const sezione = t.slice(t.indexOf('payload.ripartenza'));
+    const ricetta = sezione.slice(0, sezione.indexOf('```', sezione.indexOf('```') + 3));
+    const avanti = clone.split('\\').join('/');
+    assert.ok(t.includes(`git -C "${avanti}" checkout -b <ramo> origin/main`), 'il ramo nuovo nasce da main');
+    assert.match(ricetta, /git-server fetch "[^"]+" <ripartenza\.ramo>/, 'il tentativo di prima si prende da git-server');
+    const passi = ricetta.split('\n').filter((l) => l.startsWith(`git -C "${avanti}" `));
+    assert.ok(passi.length >= 2, `i passi di git nella ricetta: ${passi.join(' | ')}`);
+    git(clone, 'checkout', '-q', '-b', 'worker/X-2', 'origin/main');
+    git(clone, 'fetch', '-q', 'origin', 'worker/X-1');
+    for (const passo of passi) {
+      const args = [...passo.slice(`git -C "${avanti}" `.length).replace(/<ripartenza\.ramo>/g, 'worker/X-1')
+        .matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
+      git(clone, ...args);
+    }
+
+    const propri = git(clone, 'rev-list', 'origin/main..HEAD').split('\n').filter(Boolean);
+    assert.equal(propri.length, 1, 'un solo commit da dichiarare, scritto da chi riparte');
+    assert.equal(git(clone, 'log', '-1', '--format=%an'), 'nuovo');
+    for (const sha of [lavoroVecchio, riallineamento]) {
+      assert.throws(() => git(clone, 'merge-base', '--is-ancestor', sha, 'HEAD'), `${sha.slice(0, 8)} non entra nel ramo nuovo`);
+    }
+    assert.equal(readFileSync(join(clone, 'lavoro.txt'), 'utf8'), 'il lavoro di prima\n');
+    for (const f of ['a.txt', 'b.txt', 'c.txt']) assert.ok(readFileSync(join(clone, f), 'utf8'), `${f} di main resta`);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
   const server = testoLavoroServer({ clone: '/home/user/filo-security' });
   // Chi verifica consegna uno stato solo per attacco o spam (#1358): ogni altro gli sarebbe rifiutato.
