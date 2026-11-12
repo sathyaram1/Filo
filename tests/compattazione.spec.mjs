@@ -258,7 +258,10 @@ const vecchiaDa = (app, token) => app.evaluate(async (_e, token) => {
 
 test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la soglia compatta prima del giro dopo', async ({ app, testServer }) => {
   const page = await home(app);
-  await vecchiaDa(app, 8000);
+  // Una conversazione vecchia abbastanza grande che la soglia appena sopra la richiesta lasci più dei 30.000 token minimi
+  // sopra la parte fissa: così vale quella scritta.
+  await vecchiaDa(app, 32000);
+  await conSoglia(app, 2000000);
   const url = testServer.html(`<!doctype html><title>Le api</title><p>${'Le api comunicano con la danza. '.repeat(3000)}</p>`);
   await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._dip.scarica = (u, o) => fetch(u, o); });
   await modelloFinto(app, [
