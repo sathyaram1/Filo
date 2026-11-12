@@ -394,6 +394,21 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
+  // L'evento «scroll» arriva al fotogramma dopo lo scorrimento: quello di uno scorrimento finito prima dell'apertura (la
+  // pagina portata sotto il puntatore appena prima del tasto destro) non sposta niente sotto il menu, e non lo chiude (#2452).
+  function fotoDelloScorrimento(x, y) {
+    const posa = (n) => (n && n.nodeType === 1 ? `${n.scrollLeft},${n.scrollTop}` : `${global.scrollX},${global.scrollY}`);
+    const foto = new Map([[document, posa(document)]]);
+    try {
+      for (let n = document.elementFromPoint(x, y); n; n = n.parentElement) foto.set(n, posa(n));
+    } catch (_) {}
+    return function scorsoDopo(e) {
+      const t = e && e.target;
+      const chi = t && t.nodeType === 1 && t !== document.documentElement && t !== document.scrollingElement ? t : document;
+      return !foto.has(chi) || foto.get(chi) !== posa(chi);
+    };
+  }
+
   // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
   // onClick, items? }. 'row' è la fila di icone in cima (#1434), 'inline' mostra contenuto dinamico, 'paste' apre la
   // cronologia.
