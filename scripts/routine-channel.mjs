@@ -2286,15 +2286,27 @@ if (isMain) {
       data.piano = p.testo;
     }
     // Già risolto su main: chiude senza ramo, con la fusione che lo prova, il report e la frase.
-    if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined)) {
+    // Un doppione (#2046) porta il numero dell'originale: la fusione cita quello, e il server controlla che sia chiuso.
+    if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined || data['doppione-di'] !== undefined)) {
+      const { numeroFeedback, fusioneCita } = await import('./lib/su-main.mjs');
+      const originale = data['doppione-di'] === undefined ? '' : numeroFeedback(data['doppione-di']);
       const manca = data.status !== 'done' || data.reason !== 'gia_risolto' ? 'va con --status done --reason gia_risolto'
         : typeof data.fusione !== 'string' ? 'vuole --fusione <sha della fusione su main>'
-          : !String(data.notes || '').trim() ? 'vuole --notes "<cosa hai controllato>"'
-            : !String(data.userNote || '').trim() ? 'vuole --frase "<cosa trova adesso chi ha segnalato>"' : '';
+          : data['doppione-di'] !== undefined && !originale ? `vuole in --doppione-di il numero dell'originale (#1776 o 1776), non "${String(data['doppione-di']).slice(0, 40)}"`
+            : !String(data.notes || '').trim() ? 'vuole --notes "<cosa hai controllato>"'
+              : !String(data.userNote || '').trim() ? 'vuole --frase "<cosa trova adesso chi ha segnalato>"' : '';
       if (manca) { console.error(`La chiusura «già risolto su main» ${manca}: non ho consegnato niente.`); process.exit(1); }
       const f = controllaFusione(ROOT, data.fusione);
       if (!f.ok) { console.error(`${f.errore} Non ho consegnato niente.`); process.exit(1); }
       data.fusione = f.sha;
+      delete data['doppione-di'];
+      if (originale) {
+        if (!fusioneCita(ROOT, f.sha, originale)) {
+          console.error(`La fusione ${f.sha.slice(0, 12)} non porta nessun commit che citi #${originale}, né nel suo messaggio né nel ramo fuso: scegli la fusione che ha chiuso l'originale. Non ho consegnato niente.`);
+          process.exit(1);
+        }
+        data.doppioneDi = originale;
+      }
     }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
