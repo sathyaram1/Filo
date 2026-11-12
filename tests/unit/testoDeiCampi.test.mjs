@@ -109,9 +109,9 @@ test('dalla chat si accende, si spegne e si sceglie la durata; una durata che no
 let impostazioni = {};
 globalThis.SN_STORAGE = { getSettings: async () => impostazioni };
 const Testo = require('../../src/main/services/testoDeiCampi.js');
-const cartella = mkdtempSync(join(tmpdir(), 'filo-testo-campi-'));
+const cartella = cartellaTemporanea('filo-testo-campi-');
 const FILE = join(cartella, 'testo-dei-campi.json');
-process.on('exit', () => { try { rmSync(cartella, { recursive: true, force: true }); } catch (_) {} });
+test.after(() => togliCartella(cartella));
 
 let ultimoWc = 0;
 const mittente = (url, { persistente = true, incognito = false, wc = null } = {}) => ({
