@@ -34,8 +34,10 @@ credenziali di un servizio, il cancellare per sempre (cancellare dentro Filo è
 nascondere, costo normale) e un segreto in un'uscita: se l'ha scritto l'utente
 vuole «conferma», se no non esce. `parola` resta per un'azione che vuole
 «conferma» a ogni livello senza essere un costo 4 (il comando che cancella senza
-cestino, la cui mappa dei costi è di #538). Lo stesso testo a più di 5
-destinatari nello stesso giorno chiede a ogni livello (`molti`). Un lavoro che
+cestino, la cui mappa dei costi è di #538). La tabella sa anche che lo stesso
+testo a più di 5 destinatari nello stesso giorno chiede a ogni livello
+(`molti`), ma oggi nessuna azione lo dichiara: Filo non spedisce a più persone,
+e la prima azione che lo farà deve contarli e passarlo. Un lavoro che
 non ha nessuno a cui chiedere (le lezioni automatiche) parte solo col «sì»
 della tabella o, finché manca il guardiano, a compito pulito
 (`parteSenzaChiedere`, scelta dell'owner su #1312.2). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
