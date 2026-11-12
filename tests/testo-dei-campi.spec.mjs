@@ -85,7 +85,8 @@ test('chiusa la scheda per sbaglio e riaperta, il testo è lì', async ({ app, s
 });
 
 test('dentro un riquadro di un altro sito il testo torna alla ricarica, senza toccare il riquadro', async ({ app, openTab, testServer }) => {
-  const dentro = testServer.html('<!doctype html><body style="margin:0"><textarea name="commento" style="width:300px;height:80px"></textarea></body>', { pubblico: true });
+  const dentro = testServer.html(`<!doctype html><body style="margin:0"><textarea name="commento" style="width:300px;height:80px"></textarea><p id="ricevuto"></p>
+    <script>const t = document.querySelector('textarea'); t.addEventListener('input', () => { document.getElementById('ricevuto').textContent = t.value; });</script></body>`, { pubblico: true });
   const page = await testServer.openReady(openTab, `<!doctype html><body><iframe src="${dentro}" style="width:400px;height:200px"></iframe></body>`);
   const riquadro = () => page.frames().find((f) => f.url() === dentro);
   await expect.poll(() => Boolean(riquadro())).toBe(true);
