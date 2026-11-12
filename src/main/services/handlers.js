@@ -2471,7 +2471,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   let nuovaUguale = false;
   const diUnaNuova = d.risposta === 'no' && Array.isArray(contesto) ? LETTURE_DI_UNA_NUOVA.get(contesto) : null;
   if (diUnaNuova) {
-    const stNuova = A.stato({ fonti: fontiDelCompito(null, diUnaNuova), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+    const stNuova = A.stato({ fonti: A.fontiPerCosto(fontiDelCompito(null, diUnaNuova), costo), livello, spostamenti: aut.fonti, manopole: aut.manopole });
     nuovaUguale = A.decide({ ...ingressi, stato: stNuova.stato }) === 'no';
   }
   let perche = '';
