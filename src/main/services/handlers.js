@@ -2462,7 +2462,9 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   const aut = (impostazioni && impostazioni.autonomia) || {};
   const livello = A.livelloAttivo(aut.livello);
   const costo = ing.difesa ? A.COSTO_MAX : (A.costoValido(ing.costo) ? A.costoEffettivo(ing.costo, ing.campo, aut.manopole) : 0);
-  const st = A.stato({ fonti: A.fontiPerCosto(fontiDelCompito(sender, contesto, fontiLette, assistente), costo), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
+  const statoPer = (c) => A.stato({ fonti: A.fontiPerCosto(fonti, c), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const st = statoPer(costo);
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
     difesa: ing.difesa, chiesta: chiesta && ing.chiesta !== false, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
