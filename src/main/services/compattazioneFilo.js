@@ -359,15 +359,7 @@ async function dimenticaChat(chatId) {
   const incognito = inIncognito(null);
   const s = await stato(incognito);
   const tocca = (f) => chatDellaFonte(f) != null && (chatId == null || chatDellaFonte(f) === String(chatId));
-  const tieni = (r) => !(r && Array.isArray(r.fonti) && r.fonti.some(tocca));
-  const ore = s.ore.filter(tieni);
-  const giorni = s.giorni.filter(tieni);
-  const tolte = s.ore.length - ore.length + s.giorni.length - giorni.length;
-  if (!tolte) return 0;
-  s.ore = ore;
-  s.giorni = giorni;
-  await salva(incognito);
-  return tolte;
+  return togli(s, incognito, (f) => !tocca(f));
 }
 
 // Quanto pesa un messaggio del tratto, in token, come parte: testo, quello che Filo gli scrive in testa, esiti.
