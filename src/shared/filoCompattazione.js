@@ -92,19 +92,36 @@
     return [...out].sort();
   }
 
-  // Quanto grezzo può restare dopo una compattazione: un terzo dello spazio fra la parte fissa (`base`, quello che non è
-  // tratto né domanda) e la soglia, e comunque tanto poco che `TURNI_LIBERI` turni del peso di quelli di adesso (`turno`)
-  // stiano sotto l'anticipo. La sola quota reggeva su una parte fissa e cadeva con 1.500 token di strumenti in più: la
-  // chat compattava ogni due messaggi. Senza `base` nota, nessun tetto: restano ore e turni.
+  // Una regola sola sullo spazio per la conversazione sopra la parte fissa misurata (`base`: strumenti, istruzioni,
+  // CONTESTO), che cresce a ogni strumento nuovo: la soglia meno la parte fissa, ma mai meno di SPAZIO_MINIMO né di
+  // quanto serve perché dopo il grezzo (almeno l'ultimo turno) stiano `TURNI_LIBERI` turni del peso di adesso (`turno`)
+  // sotto l'anticipo. Quello che serve si ferma sotto il listino. Senza `base` nota vale la soglia com'è.
   const QUOTA_GREZZO = 1 / 3;
   const TURNI_LIBERI = 3;
-  function grezzoMassimo({ soglia, base, turno = 0 } = {}) {
+  const SPAZIO_MINIMO = 30000;
+  function spazio({ soglia, base, turno = 0 } = {}) {
     const b = Number(base);
-    if (!(Number.isFinite(b) && b > 0)) return Infinity;
-    const spazio = Number(soglia) - b;
+    if (!(Number.isFinite(b) && b > 0)) return null;
     const t = Number(turno) > 0 ? Number(turno) : 0;
-    return Math.max(0, Math.min(spazio * QUOTA_GREZZO, spazio * QUOTA_ANTICIPO - TURNI_LIBERI * t));
+    const serve = Math.max(SPAZIO_MINIMO, ((TURNI_LIBERI + 1) * t) / QUOTA_ANTICIPO);
+    const finoAlListino = Math.max(SPAZIO_MINIMO, LISTINO - MARGINE - b);
+    return Math.max(Number(soglia) - b, Math.min(serve, finoAlListino));
   }
+
+  // Dalla regola dello spazio: la soglia vera, l'anticipo (la compattazione in sottofondo dopo una risposta) e quanto
+  // grezzo può restare (un terzo dello spazio, e tanto poco che i turni liberi stiano sotto l'anticipo).
+  function limiti({ soglia, base = null, turno = 0 } = {}) {
+    const s = Number(soglia);
+    const t = Number(turno) > 0 ? Number(turno) : 0;
+    const sp = spazio({ soglia, base, turno: t });
+    if (sp == null) return { soglia: s, anticipo: s * QUOTA_ANTICIPO, grezzo: Infinity, spazio: null, base: null, turno: t };
+    const b = Number(base);
+    return {
+      soglia: b + sp, anticipo: b + QUOTA_ANTICIPO * sp, spazio: sp, base: b, turno: t,
+      grezzo: Math.max(0, Math.min(sp * QUOTA_GREZZO, sp * QUOTA_ANTICIPO - TURNI_LIBERI * t)),
+    };
+  }
+  const grezzoMassimo = (o) => limiti(o).grezzo;
 
   // Il peso medio degli ultimi `n` turni interi della lista (una domanda dell'utente con quello che la segue), o 0.
   function pesoTurno(messaggi, peso, n = TURNI_GREZZI) {
