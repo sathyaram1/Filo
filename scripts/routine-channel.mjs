@@ -1693,7 +1693,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
+    'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
