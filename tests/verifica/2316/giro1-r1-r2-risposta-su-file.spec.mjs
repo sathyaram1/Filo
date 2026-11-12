@@ -85,6 +85,7 @@ test('r2 il comando di ristampa scritto nell\'ultima riga funziona dal clone del
     const ultima = r.so.trim().split('\n').at(-1);
     const comando = (/(node \S.*--risposta-critica\s+\S+)/.exec(ultima) || [])[1];
     expect(comando, ultima).toBeTruthy();
+    console.log('COMANDO', comando);
     const ristampa = spawnSync(comando, { cwd: casa, env: ENV(casa, port), shell: true, encoding: 'utf8' });
     expect(ristampa.status, `${comando}\n${ristampa.stderr}`).toBe(0);
     expect(ristampa.stdout).toContain(RILIEVO);
