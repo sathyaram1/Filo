@@ -142,6 +142,7 @@ test('Modelli: sulla chiave OpenRouter la voce è «Togli la chiave», chiede co
   const campo = page.locator('#apiKey');
   await expect(campo).toBeVisible({ timeout: 10_000 });
   const chiave = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter);
+  await pronta(page);
   await campo.click({ button: 'right' });
   const voci = await etichette(page);
   expect(voci).toContain('Togli la chiave');
