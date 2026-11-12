@@ -378,16 +378,18 @@ class StratoDeiRiquadri {
     if (s.trattenuti || col !== s.wc) return;
     s.trattenuti = [];
     clearTimeout(s.timerTrattenuti);
-    s.timerTrattenuti = setTimeout(() => this._rilascia(s, s.wc), TRATTIENI_MS);
+    s.timerTrattenuti = setTimeout(() => this._rilascia(s, s.wc, false), TRATTIENI_MS);
   }
 
-  _rilascia(s, dove) {
+  // `scelta`: la pagina l'ha scelta l'utente (un clic, la tastiera rimasta a lei). Senza, l'incolla trattenuto si perde:
+  // arriverebbe al sito secondi dopo, senza che nessuno l'abbia voluto lì.
+  _rilascia(s, dove, scelta = true) {
     clearTimeout(s.timerTrattenuti);
     const tasti = s.trattenuti;
     s.trattenuti = null;
     if (!tasti || !tasti.length || !vivo(dove)) return;
     for (const t of tasti) {
-      if (t.comando) { try { dove[t.comando](); } catch (_) {} continue; }
+      if (t.comando) { if (scelta) { try { dove[t.comando](); } catch (_) {} } continue; }
       for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
     }
   }
