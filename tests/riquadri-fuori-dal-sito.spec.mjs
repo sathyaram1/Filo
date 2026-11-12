@@ -344,8 +344,8 @@ test('feedback su un sito: se l\'invio con lo screenshot non riesce, la tastiera
     .toMatch(/^filo:\/\/riquadri\//);
 });
 
-// #1623.3: una foto lasciata sul feedback o incollata nella sua casella entra fra gli allegati, e il sito che ascolta
-// rilasci e incolla non la riceve. Il rilascio parte dove lo manda il sistema, sullo strato che copre la pagina.
+// #1623.3: una foto lasciata sul feedback o incollata nella sua casella (Ctrl+V o «Incolla» di Filo) entra fra gli
+// allegati, e il sito che ascolta rilasci e incolla non la riceve. Il rilascio parte dove lo manda il sistema, sullo strato che copre la pagina.
 test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, e il sito non la riceve', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
