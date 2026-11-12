@@ -134,7 +134,19 @@
       campi.push({ firma: s.firma, valore: v });
     }
     if (!seguiti.size && controllo) { clearInterval(controllo); controllo = null; }
-    if (campi.length) send({ fase: 'scrivi', campi }).then((r) => { if (r && r.segui === false) smetti(); });
+    if (campi.length) send({ fase: 'scrivi', campi }).then(dopoScrittura);
+  }
+
+  let avvisato = false;
+  function dopoScrittura(r) {
+    if (r && r.segui === false) { smetti(); return; }
+    // Un testo oltre il tetto non si conserva affatto: chi scrive deve saperlo, una volta per pagina.
+    if (r && r.troppo > 0 && !avvisato) {
+      avvisato = true;
+      try {
+        global.SN_POPUP?.showToast?.(`Questo testo supera ${R.VALORE_MAX.toLocaleString('it-IT')} caratteri: se la pagina si chiude non lo ritrovi.`, { duration: 6000 });
+      } catch (_) {}
+    }
   }
 
   function smetti() {
