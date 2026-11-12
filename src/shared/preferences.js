@@ -136,6 +136,13 @@
     else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
     return contestoFilo().numeroDelTetto(k, n);
   }
+  // Il cambio a parole di un tetto in token e la sua riga nella cronologia: uno per tutti i tetti, come i campi.
+  const cambioDelTetto = (k, nome) => (v) => {
+    if (predefinito(v)) return { partial: { contestoFilo: { [k]: null } }, label: `${nome} → come i predefiniti` };
+    const n = tettoAParole(k, v);
+    if (n == null) return null;
+    return { partial: { contestoFilo: { [k]: n } }, label: `${nome} → ${n.toLocaleString('it-IT', { useGrouping: true })}` };
+  };
   const limitiDelTetto = (k) => contestoFilo().LIMITI[k].map((n) => n.toLocaleString('it-IT', { useGrouping: true })).join('-');
 
   function lunghezzaRisposte() {
