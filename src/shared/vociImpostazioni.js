@@ -76,7 +76,7 @@
         avvisoCreditiGiorni: 'avvisoCrediti.giorni',
         avvisoCreditiPercento: 'avvisoCrediti.percento',
         spiegaAnticipata: 'spiegaAnticipata.enabled',
-        feedbackL0: 'feedbackL0.enabled',
+        feedbackRilettura: 'feedbackRilettura.enabled',
         traduzioneNascoste: 'traduzionePagina.nascoste',
         filoParlaDownload: 'filoParla.downloadOgniMin',
         descriviImmagini: 'descriviImmagini.enabled',
