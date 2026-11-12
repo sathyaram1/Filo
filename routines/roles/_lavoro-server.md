@@ -41,6 +41,17 @@ registrare la critica, e il lavoro torna a un'altra verifica quando esce dal fer
 Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --abbrev-ref HEAD` nel checkout di Filo).
 
 - Lavoro nuovo: `git -C "<CLONE>" checkout -b <ramo> origin/main`.
+- Lavoro nuovo con `payload.ripartenza`: il ramo del server nasce lo stesso da `origin/main`, mai dalla punta del
+  tentativo di prima. Il registro conta solo i commit dichiarati sotto il nome del tuo ramo: quelli del vecchio, e i
+  riallineamenti che il cancello ci ha scritto, lo renderebbero non fidato, e il ramo del server non si riscrive. Il
+  lavoro di prima lo porti come un commit tuo, per `ripartenza.ramo` e per ogni ramo di `ripartenza.altri` che ti
+  serve (se il fetch risponde «couldn't find remote ref», quel tentativo non aveva una parte server):
+
+```bash
+node "<CANALE>" git-server fetch "<CLONE>" <ripartenza.ramo>
+git -C "<CLONE>" merge --squash origin/<ripartenza.ramo>
+git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
+```
 - Verifica o correzione: `node "<CANALE>" git-server fetch "<CLONE>" <ramo>` e
   `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`. Se sul server il ramo non c'è (git: «couldn't find remote
   ref»), il lavoro sta tutto nell'app.
