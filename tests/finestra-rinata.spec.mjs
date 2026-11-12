@@ -11,11 +11,14 @@ import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // La finestra normale viva: le sue schede (l'indirizzo che aspetta vale per una riaperta non ancora caricata) e quella davanti.
+// Una scheda finita sulla pagina d'errore conta per l'indirizzo che porta, come la vede l'utente: le salvate su una porta
+// chiusa ci arrivano appena caricate, e il confronto non deve dipendere da quando lo si legge (#2241).
 const normale = (app) => app.evaluate(({ BrowserWindow }) => {
   const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
   if (!w) return null;
   const tm = w._filoTabs;
-  const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const grezzo = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const url = (t) => tm._urlUtente(grezzo(t));
   const davanti = tm.tabs.find((t) => t.id === tm.activeId);
   return { schede: tm.tabs.map(url), davanti: davanti ? url(davanti) : null };
 });
