@@ -78,7 +78,7 @@ lì non c'è codice di altri.
   quando sta nel suo angolo, perché gli avvisi di lei gli si mettano a sinistra. Anche la finestrella di accesso ha il
   suo, grande quanto la finestra.
 - **Test:** `tests/riquadri-fuori-dal-sito.spec.mjs` e `tests/aiuto-fuori-dal-sito.spec.mjs` (la lamentela: il sito non
-  legge niente, nemmeno cercando; l'Aiuto lavora sulla pagina; con lui aperto un trascinamento vero arriva alla pagina,
+  legge niente, nemmeno cercando, né riceve la foto lasciata o incollata nel feedback (#1623.3); l'Aiuto lavora sulla pagina; con lui aperto un trascinamento vero arriva alla pagina,
   coi gesti del sistema di `tests/helpers/gestiVeri.mjs`, solo su Linux con X), e gli
   spec che guardano i riquadri con `tests/helpers/riquadri.mjs`, che li trova nella scheda o nello strato
   (`nelloStrato`, `paginaDelloStrato`) e ci clicca col mouse dello strato. Nessuno l'ha provato su un Mac o su un Linux
