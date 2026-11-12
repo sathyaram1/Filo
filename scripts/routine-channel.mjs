@@ -1755,7 +1755,7 @@ if (isMain) {
     }
   }
 
-  // `--feedback`, `--piano`, `--fusione` e `--motivo` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
+  // `--feedback`, `--piano`, `--fusione`, `--doppione-di` e `--motivo` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
   {
     const intentoDi = () => [args[0], args[1]].find((a) => INTENTI_CONSEGNA.includes(a)) || '';
     const fuori = data.feedback !== undefined && cmd !== 'ticket' ? '--feedback vale solo con ticket'
