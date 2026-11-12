@@ -285,6 +285,8 @@
     const modal = root.querySelector('.sn-fb-modal');
     const dragHandle = root.querySelector('.sn-fb-drag');
     const textEl = root.querySelector('.sn-fb-text');
+    const avvisoEl = root.querySelector('.sn-fb-l0');
+    const evidenzeEl = root.querySelector('.sn-fb-evidenze');
     const thumbsEl = root.querySelector('.sn-fb-thumbs');
     const statusEl = root.querySelector('.sn-fb-status');
     const sendBtn = root.querySelector('.sn-fb-send');
