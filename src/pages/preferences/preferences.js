@@ -887,6 +887,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'feedbackL0.enabled': return $('feedbackL0').checked;
       case 'traduzionePagina.nascoste': return modoNascoste($('traduzioneNascoste').value);
       case 'filoParla.downloadOgniMin': return minutiFraDownload({ downloadOgniMin: $('filoParlaDownload').value });
       case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
