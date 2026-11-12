@@ -539,4 +539,9 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   const si = ok('chiedi_si', { sha: 'c'.repeat(40), detail: 'il ramo del server tocca functions/src/l5/gates.js' });
   assert.equal(si.outcome, 'chiedi_si');
   assert.match(messageForServerMerge(si, 'worker/x'), /^Il cancello non porta worker\/x su main di filo-security senza il tuo sì: .*functions\/src\/l5\/gates\.js/);
+  // L'app in attesa del server (#2199.5): il cancello la porta prima del server, e la riga lo dice.
+  const insieme = ok('merged', { sha: 'a'.repeat(40), app: 'd'.repeat(40) });
+  assert.equal(insieme.app, 'd'.repeat(40));
+  assert.match(messageForServerMerge(insieme, 'claude/x'), /parte dell’app in attesa su main di Filo \(ddddddddd\), poi claude\/x su main di filo-security \(aaaaaaaaa\)/);
+  assert.doesNotMatch(messageForServerMerge(ok('merged', { sha: 'a'.repeat(40) }), 'claude/x'), /app/);
 });
