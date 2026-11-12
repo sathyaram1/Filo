@@ -229,11 +229,7 @@ function fileNelTesto(e, radice) {
   const candidati = [e?.location?.file, testo.match(/imported from\s+(.+?)['"]?\s*$/m)?.[1],
     ...percorsi.filter((p) => /\.spec\.m?js$/.test(p)), ...percorsi];
   for (const c of candidati) {
-    let f = String(c || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
-      .replace(/(:\d+){1,2}$/, '');
-    if (!f || f.includes('/node_modules/')) continue;
-    if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
-    else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+    const f = relativoAllaRadice(c, radice);
     if (f.startsWith('tests/')) return f;
   }
   return '';
