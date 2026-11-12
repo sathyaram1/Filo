@@ -46,12 +46,7 @@ test('r2 cancellare una pagina qualunque non toglie dal diario la riga nata da u
       const righe = [...corpo.matchAll(/^\[(\d+)\] .*(che si mangia|Una carbonara)/gm)].map((x) => Number(x[1]));
       return JSON.stringify({ ore: [{ testo: '19:00 cercata la ricetta della carbonara', righe }], memorie: [] });
     };
-    let corpoVisto = '';
-    const fin = C._dip.chiama;
-    C._dip.chiama = async (o) => { corpoVisto = o.messages.map((m) => m.content).join('\n'); return fin(o); };
     try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
-    const pagine = await F.pagine({ da: null, a: null });
-    console.log('DEBUG', JSON.stringify({ corpo: corpoVisto.split('DA COMPATTARE:')[1], righe: await C.righe(false), pagine: pagine.map((p) => [p.id, p.ts]) }, null, 1));
     return { file: `${C._dip.cartella()}/livelli.json` };
   });
   expect(readFileSync(file, 'utf8')).toContain('carbonara');
