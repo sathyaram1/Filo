@@ -42,6 +42,17 @@ function scrive(input, piattaforma = process.platform) {
   return !!(input.control && input.alt) && k.length === 1 && !/^[a-z0-9]$/i.test(k);
 }
 
+// L'incolla battuto mentre lo strato nasce è per il riquadro che si sta aprendo, come le lettere: lasciato alla pagina
+// le darebbe l'immagine negli appunti (#1623.3). Rigiocato come comando, non come tasto: su Mac Cmd+V è del menu.
+function incolla(input, piattaforma = process.platform) {
+  if (!input || input.type !== 'keyDown' || input.isComposing || input.alt) return null;
+  const k = String(input.key || '').toLowerCase();
+  if (k === 'insert') return input.shift && !input.control && !input.meta ? 'paste' : null;
+  const tasto = piattaforma === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
+  if (k !== 'v' || !tasto) return null;
+  return input.shift ? 'pasteAndMatchStyle' : 'paste';
+}
+
 function eventiDi(t) {
   const keyCode = NOMI_TASTO[t.key] || t.key;
   if (t.type === 'keyUp') return [{ type: 'keyUp', keyCode, modifiers: t.modifiers }];
