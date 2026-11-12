@@ -115,10 +115,13 @@ test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la u
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.soglia), { timeout: 10000 }).toBe(40000);
   // Col listino la frase dice costo al mese e attesa, coi prezzi del modello della chat.
   await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA, { timeout: 15000 });
+  // Sotto la parte fissa di ogni richiesta la stima dice da dove la chat compatta davvero, e conta quella.
+  await expect(prefs.locator('#contestoSogliaStima')).toContainText(/token fissi .* la chat compatta da circa [\d.]+\.$/);
   const piuAlta = await prefs.locator('#contestoSogliaStima').textContent();
   await campo.fill('90000');
   await expect(prefs.locator('#contestoSogliaStima'), 'la stima segue la soglia scritta').not.toHaveText(piuAlta, { timeout: 15000 });
   await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA);
+  await expect(prefs.locator('#contestoSogliaStima')).not.toContainText('token fissi');
   await campo.fill('40000');
   await campo.blur();
   await prefs.locator('#sec-contesto').screenshot({ path: 'tests/.shots/compattazione-preferenze.png' });
