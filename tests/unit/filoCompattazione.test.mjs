@@ -143,7 +143,11 @@ test('la risposta di chi compatta: righe delle ore con le fonti citate e l\'inte
   assert.equal(r.ore.length, 1);
   assert.deepEqual(r.ore[0].fonti, ['ab|t2']);
   assert.equal(r.ore[0].da, new Date('2026-11-04T10:05:00Z').toISOString());
-  assert.deepEqual(r.memorie, ['ha due gatti']);
+  assert.deepEqual(r.memorie, [{ testo: 'ha due gatti', fonti: ['ab|t1', 'ab|t2'] }], 'senza righe citate la memoria nasce da tutto il pezzo');
+  // Una memoria che cita le sue righe nasce solo da quei messaggi: il punto del filo nel quaderno.
+  const citata = L.leggiRisposta('{"ore":["10:00 a"],"memorie":[{"testo":"ha due gatti","righe":[1]}]}', righe);
+  assert.deepEqual(citata.memorie, [{ testo: 'ha due gatti', fonti: ['ab|t1'] }]);
+  assert.match(L.ISTRUZIONI, /"memorie":\[\{"testo":"…","righe":\[2\]\}\]/, 'chi compatta sa che le memorie citano le righe');
   // Senza righe citate la riga copre tutto il pezzo.
   assert.deepEqual(L.leggiRisposta('{"ore":["10:00 tutto"]}', righe).ore[0].fonti, ['ab|t1', 'ab|t2']);
   assert.equal(L.leggiRisposta('non so', righe), null);
