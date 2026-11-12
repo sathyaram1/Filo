@@ -974,42 +974,13 @@ async function main() {
   }
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
-  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
-  //    lega al main su cui sono girati.
-  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
-  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
-  if (pendingParts.length) {
-    const riga = await riapriPerIlServer({ id: pratica.id, ramo: branch, pendingParts }, { of: await import('./owner-feedback.mjs') });
-    if (riga) console.log(riga);
-  }
-  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
-  for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
-  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
-  if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
-  const giro = await chiediConProva({
-    root: ROOT, punta: cur, primaProva,
-    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
-    chiedi: (provaUnit) => {
-      process.stdout.write('\n▸ Chiedo al server di fondere\n');
-      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
-      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
-      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
-    },
-    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
-    scrivi: (s) => console.log(`\n${s}`),
-  });
+  //    un'identità che qui non esiste.
+  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo });
   if (giro.fermo) {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
   }
-  const dopo = pratica && pratica.id
-    ? await dopoLaFusioneDellApp({ reply: giro.reply, id: pratica.id, ramo: branch }, {
-      of: await import('./owner-feedback.mjs'),
-      inSospeso: () => partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }),
-    })
-    : { reply: giro.reply, riga: '' };
+  const dopo = giro;
   const reply = dopo.reply;
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
