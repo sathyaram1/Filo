@@ -108,7 +108,7 @@ test('ripartenza di un lavoro server: la ricetta del testo dà un ramo da main c
     scrivi(vecchio, 'c.txt', 'c\n');
     git(vecchio, 'push', '-q', 'origin', 'main');
 
-    execFileSync('git', ['clone', '-q', remoto, clone]);
+    execFileSync('git', ['clone', '-q', '-c', 'core.autocrlf=false', remoto, clone]);
     identita(clone, 'nuovo');
     const t = testoLavoroServer({ clone, canale: '/x/routine-channel.mjs' });
     const sezione = t.slice(t.indexOf('payload.ripartenza'));
