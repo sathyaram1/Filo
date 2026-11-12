@@ -384,6 +384,18 @@ function segnaBase(incognito, base) {
 }
 function base(incognito) { return basi[lato(inIncognito(incognito))]; }
 
+// Soglia vera, anticipo e grezzo (SN_FILO_COMPATTAZIONE.limiti) dalla parte fissa misurata all'ultimo turno e dal peso
+// dei turni del tratto: la stessa misura per la richiesta, la risposta, il timer da fermo e il taglio.
+function limitiDi(lista, incognito, soglia) {
+  return L().limiti({ soglia, base: basi[lato(incognito)], turno: L().pesoTurno(lista, pesoDi) });
+}
+async function limiti(incognito, { ora = Date.now(), tetti = null } = {}) {
+  const inc = inIncognito(incognito);
+  const t = tetti || FC().tetti(null, null);
+  const lista = await daCompattare(inc, { ora, tetti: t });
+  return { ...limitiDi(lista, inc, t.soglia), tokenTratto: Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0)) };
+}
+
 async function righe(incognito) {
   const s = await stato(inIncognito(incognito));
   return { ore: s.ore.slice(), giorni: s.giorni.slice(), da: s.da, a: s.a };
