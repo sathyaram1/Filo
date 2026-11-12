@@ -6917,19 +6917,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     let token = await stimaRichiesta();
     // Dopo un riavvio non c'è una richiesta precedente in memoria: la pausa si misura dall'ultimo messaggio del filo.
     const ultimoUso = round !== 1 ? null : (fotoPrima ? fotoPrima.usata : LC.ultimaAttivita(filo.tutti, { chat: chatId }));
+    // La parte della richiesta che non è tratto né domanda (strumenti, parte fissa, CONTESTO), misurata al primo giro, e
+    // il peso dei turni: la soglia vera, il grezzo che resta e l'anticipo vengono da lì (SN_FILO_COMPATTAZIONE.limiti).
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
-    let tokenTratto = 0;
-    if (ultimoUso != null) { try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {} }
-    // La parte della richiesta che non è tratto né domanda (strumenti, parte fissa, CONTESTO): dice quanto grezzo può
-    // restare e quando compattare in anticipo. Gli stessi pezzi della stima accanto alla soglia.
     if (round === 1) {
-      const FC = globalThis.SN_FILO_CONTESTO;
-      try {
-        Compattazione.segnaBase(incognitoTurno, Math.ceil((PROMPTS.filoChatStatic().length + String(payloadBase.parteUtente || '').length + caratteriStrumenti()) / FC.CARATTERI_PER_TOKEN));
-      } catch (_) {}
+      try { Compattazione.segnaBase(incognitoTurno, parteFissaChat(tools, payloadBase.parteUtente)); } catch (_) {}
+      try { limitiDelTurno = await Compattazione.limiti(incognitoTurno, { tetti: tettiChat }); } catch (_) { limitiDelTurno = null; }
     }
+    const l = limitiDelTurno || {};
     const motivo = LC.motivo({
-      token, soglia: tettiChat.soglia, tokenTratto, ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
+      token, soglia: tettiChat.soglia, base: l.base, turno: l.turno, tokenTratto: ultimoUso != null ? l.tokenTratto || 0 : 0,
+      ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
     });
     if (motivo && compattazioniNelTurno < 2) {
       compattazioniNelTurno++;
