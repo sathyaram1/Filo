@@ -551,6 +551,89 @@
       });
     }
 
+    // Le parti segnate da L0 si ritrovano nel testo com'è adesso: corretta una parte, la sua evidenza sparisce. Il
+    // testo dello sfondo è quello dell'utente, scritto come testo e mai come markup.
+    function aggiornaEvidenze() {
+      evidenzeEl.textContent = '';
+      const v = textEl.value;
+      const tratti = [];
+      for (const p of pezziSegnati) {
+        if (!p.testo) continue;
+        let i = v.indexOf(p.testo);
+        let guardia = 0;
+        while (i >= 0 && guardia++ < 200) { tratti.push([i, i + p.testo.length]); i = v.indexOf(p.testo, i + p.testo.length); }
+      }
+      if (!tratti.length) { evidenzeEl.parentElement.classList.remove('sn-fb-campo--evidenze'); return; }
+      tratti.sort((a, b) => a[0] - b[0]);
+      let at = 0;
+      for (const [a, b] of tratti) {
+        if (b <= at) continue;
+        const da = Math.max(a, at);
+        if (da > at) evidenzeEl.appendChild(document.createTextNode(v.slice(at, da)));
+        const m = document.createElement('mark');
+        m.textContent = v.slice(da, b);
+        evidenzeEl.appendChild(m);
+        at = b;
+      }
+      // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
+      evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
+      evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      evidenzeEl.scrollTop = textEl.scrollTop;
+    }
+    textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+
+    // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
+    function mostraRilettura(r) {
+      pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
+      immaginiSegnate.clear();
+      for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      avvisoEl.textContent = '';
+      const titolo = document.createElement('div');
+      titolo.className = 'sn-fb-l0-titolo';
+      titolo.textContent = String(r?.titolo || 'Prima che parta, ricontrolla.');
+      const lista = document.createElement('ul');
+      lista.className = 'sn-fb-l0-frasi';
+      for (const f of Array.isArray(r?.frasi) ? r.frasi : []) {
+        const li = document.createElement('li');
+        li.textContent = String(f);
+        lista.appendChild(li);
+      }
+      const azioni = document.createElement('div');
+      azioni.className = 'sn-fb-l0-azioni';
+      const correggi = document.createElement('button');
+      correggi.type = 'button';
+      correggi.className = 'sn-fb-btn-secondary sn-fb-l0-correggi';
+      correggi.textContent = 'Correggi';
+      correggi.title = 'Torna al testo, sulla prima parte segnata';
+      correggi.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
+        avvisoEl.hidden = true;
+        const v = textEl.value;
+        const primo = pezziSegnati.map((p) => v.indexOf(p.testo)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+        textEl.focus();
+        if (primo !== undefined) {
+          const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
+          try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
+        } else {
+          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+        }
+      });
+      const manda = document.createElement('button');
+      manda.type = 'button';
+      manda.className = 'sn-fb-btn sn-fb-l0-manda';
+      manda.textContent = 'Manda così';
+      manda.title = 'Manda il feedback com’è, senza rileggerlo';
+      manda.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: false }); });
+      azioni.appendChild(correggi);
+      azioni.appendChild(manda);
+      avvisoEl.appendChild(titolo);
+      avvisoEl.appendChild(lista);
+      avvisoEl.appendChild(azioni);
+      avvisoEl.hidden = false;
+      renderThumbs();
+      aggiornaEvidenze();
+    }
+
     function humanSize(n) {
       const b = Number(n) || 0;
       if (b < 1024) return `${b} B`;
