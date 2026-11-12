@@ -183,6 +183,38 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   expect(await app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.inAttesa()).length)).toBe(0);
 });
 
+// Una memoria nata da una conversazione e tolta dal quaderno: la compattazione che rilegge quella conversazione non la
+// riscrive, e tenuta da una proposta il quaderno dice perché non l'ha scritta.
+const conversazioneTolta = (app, { chat, sospetta }) => app.evaluate(async (_e, { chat, sospetta }) => {
+  const C = globalThis.SN_COMPATTAZIONE;
+  const M = globalThis.SN_FILO_MEMORY;
+  const t0 = Date.now() - 5 * 60 * 60 * 1000;
+  await globalThis.SN_FILO_CHATS.append(chat, { role: 'user', text: 'ho due gatti, Miso e Pepe', ts: new Date(t0).toISOString() });
+  const c = await globalThis.SN_FILO_CHATS.append(chat, { role: 'filo', text: 'Che bei nomi.', ts: new Date(t0 + 1000).toISOString(), ...(sospetta ? { classeLetta: 5 } : {}) });
+  const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: c.eids || (await globalThis.SN_IL_FILO.chat(chat, { ids: true })).eids });
+  const l = buf[buf.length - 1];
+  await M.hideLine({ lezione: { ts: l.ts, text: l.text } });
+  const vero = C._dip.chiama;
+  C._dip.chiama = async () => JSON.stringify({ ore: ['10:00 parlato dei gatti'], memorie: [{ testo: 'L\'utente ha due gatti, Miso e Pepe.', righe: [1] }] });
+  try { return await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
+}, { chat, sospetta });
+
+test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da una proposta il quaderno dice perché', async ({ app, openTab }) => {
+  const r = await conversazioneTolta(app, { chat: 'gatti1', sospetta: false });
+  expect(r.fatto).toBe(true);
+  expect(r.scritte, 'la compattazione non la riscrive').toBe(0);
+  expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
+
+  await conversazioneTolta(app, { chat: 'gatti2', sospetta: true });
+  const q = await openTab('filo://quaderno/quaderno.html');
+  const proposta = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'Miso e Pepe' });
+  await expect(proposta).toBeVisible({ timeout: 10000 });
+  await proposta.hover();
+  await proposta.getByRole('button', { name: 'Tienila in memoria' }).click();
+  await expect(q.getByText('Non l\'ho scritta: somiglia a una riga che avevi tolto.')).toBeVisible({ timeout: 10000 });
+  expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
+});
+
 // Quanto pesano strumenti e parte fissa: le soglie delle prove si misurano da lì, non da un numero scritto oggi.
 const base = (app) => app.evaluate(() => globalThis.SN_FILO_CONTESTO.stimaToken(
   JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()));
