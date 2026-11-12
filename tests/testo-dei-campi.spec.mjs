@@ -56,6 +56,9 @@ test('alla ricarica il testo torna nei campi com\'era, e il sito lo riceve; cart
   await scrivi(page, '#messaggio', 'Buongiorno, vorrei restituire 😀 il pacco <b>n. 42</b>.');
   await scrivi(page, '#carta', '4111 1111 1111 1111');
   await scrivi(page, '#otp', '123456');
+  // Un numero di carta in un campo che non lo dice: è una carta solo dalla quinta cifra in poi.
+  await scrivi(page, '#riferimento', '5555 5555 5555 4444');
+  await page.waitForTimeout(1000);
   await expect.poll(() => quanti(app), { timeout: 8000 }).toBe(2);
 
   await page.reload();
