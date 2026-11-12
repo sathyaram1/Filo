@@ -40,8 +40,14 @@ for (const ms of [0, 250, 400]) {
         wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
       }
       const dt = Date.now() - t0;
-      while (!(s && s.visibile) && Date.now() - t0 < 3000) await new Promise((r) => setTimeout(r, 5));
-      return { dove, lascia, stato, foco, dt, aSchermo: Date.now() - t0 };
+      const traccia = [];
+      while (!(s && s.visibile) && Date.now() - t0 < 3000) {
+        const f = webContents.getFocusedWebContents();
+        const riga = `${f ? f.getURL().slice(0, 14) : '-'}|${s && s.trattenuti ? 'T' + s.trattenuti.length : 'n'}|${s && s.pronta ? 'P' : 'p'}`;
+        if (traccia[traccia.length - 1]?.r !== riga) traccia.push({ t: Date.now() - t0, r: riga });
+        await new Promise((r) => setTimeout(r, 3));
+      }
+      return { dove, lascia, stato, foco, dt, aSchermo: Date.now() - t0, traccia };
     }, { attesa: ms, u: p.url() });
     const r = await premi;
     await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
