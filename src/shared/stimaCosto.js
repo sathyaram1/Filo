@@ -48,6 +48,8 @@
     [A.FILO_CHAT_TRIAGE]: ['breve', U('chat', 'chat')],
     [A.EDITOR_TITLE]: ['breve', U('titolo', 'titoli')],
     [A.FEEDBACK_TITLE]: ['breve', U('segnalazione', 'segnalazioni')],
+    [A.FEEDBACK_L0]: ['breve', U('rilettura', 'riletture')],
+    [A.FEEDBACK_L0_IMMAGINI]: ['immagine', U('rilettura', 'riletture')],
     [A.DECKS_AUTOTAG]: ['breve', U('giro', 'giri')],
     [A.DECKS_SEARCH_FILTER]: ['breve', U('giro', 'giri')],
     [A.SAFEBROWSE_JUDGE]: ['breve', U('sito', 'siti')],
