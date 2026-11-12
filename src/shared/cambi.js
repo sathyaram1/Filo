@@ -112,7 +112,7 @@
       ['brevi', 'brevi (spiegazioni, titoli, correttore)'],
     ].map(([f, di]) => [`lunghezzaRisposte.${f}`, {
       nome: `lunghezza massima delle risposte ${di}`,
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     }])),
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
