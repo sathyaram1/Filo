@@ -195,7 +195,10 @@ function impostazioni(merged) {
   const o = R.opzioni(merged);
   const prima = giorniCorrenti;
   giorniCorrenti = o.giorni;
-  if (!o.attivo) { cancellaTutto().catch(() => {}); return; }
+  if (!o.attivo) {
+    carica().then((p) => (Object.keys(p).length ? cancellaTutto() : null)).catch(() => {});
+    return;
+  }
   if (pagine && o.giorni < prima) {
     pagine = R.pota(pagine, ora(), giorniCorrenti);
     programma();
