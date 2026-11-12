@@ -6,13 +6,20 @@ import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
-const etichette = (page) => menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
+// Le voci del menu già aperto: evaluateAll non aspetta, e prima che si apra darebbe un elenco vuoto (#2443).
+const etichette = async (page) => {
+  await expect(menuDi(page).principale).toBeVisible({ timeout: 8_000 });
+  return menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
+};
+// Il tasto destro arriva al menu solo a listener montati: una casella spenta lo è già nell'HTML, prima delle impostazioni.
+const pronta = (page) => page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 10_000 });
 
 test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o si chiede all’Aiuto', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ tabPreview: { enabled: false } }));
   const page = await openTab('filo://preferences/preferences.html');
   const casella = page.locator('#tabPreviewEnabled');
+  await pronta(page);
   await expect(casella).not.toBeChecked({ timeout: 10_000 });
 
   await page.locator('label', { has: casella }).click({ button: 'right' });
@@ -122,6 +129,7 @@ test('Modelli: la stessa voce sulle impostazioni della pagina', async ({ openTab
   const page = await openTab('filo://options/options.html');
   const casella = page.locator('#useDefaultModels');
   await expect(casella).toBeAttached({ timeout: 10_000 });
+  await pronta(page);
   await page.locator('label', { has: casella }).first().click({ button: 'right' });
   expect(await etichette(page)).toContain('Rimetti di serie');
 });
@@ -134,6 +142,7 @@ test('Modelli: sulla chiave OpenRouter la voce è «Togli la chiave», chiede co
   const campo = page.locator('#apiKey');
   await expect(campo).toBeVisible({ timeout: 10_000 });
   const chiave = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter);
+  await pronta(page);
   await campo.click({ button: 'right' });
   const voci = await etichette(page);
   expect(voci).toContain('Togli la chiave');
