@@ -423,6 +423,7 @@
     if (tastiera && opener && !(x > 0 || y > 0)) {
       try { const r = opener.getBoundingClientRect(); x = r.left + 8; y = r.bottom; } catch (_) {}
     }
+    const scorsoDopo = fotoDelloScorrimento(x, y);
     const root = document.createElement('div');
     root.className = 'sn-menu';
     // UI di Filo dentro la pagina del sito, marcata alla nascita: la traduzione la salta senza
