@@ -1549,6 +1549,8 @@ function clearCompleted(scope = '') {
   for (const [id, rec] of records) {
     if (scopeOf(rec) === scope && !NON_TERMINAL.has(rec.state)) records.delete(id);
   }
+  // Tolte senza evento: la lista che lo dice è più nuova di ogni altra già partita.
+  revisione++;
   persist();
   return listRecords(scope);
 }
