@@ -3410,9 +3410,8 @@ async function eseguiAzioneFilo(action, {
           try {
             let fonte = '';
             try { fonte = chatId ? await globalThis.SN_IL_FILO.ultimaDomanda(chatId) : ''; } catch (_) {}
-            const buf = await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
-            const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-            if (ultima && ultima.text === l.testo) nuova = { ts: ultima.ts, text: ultima.text };
+            const w = await FiloMem.scriviLezione(l.testo, { fonti: fonte ? [fonte] : [] });
+            if (w.riga) nuova = { ts: w.riga.ts, text: w.riga.text };
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
