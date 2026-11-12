@@ -75,7 +75,7 @@ import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
-import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
@@ -183,9 +183,9 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
- * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
- * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
+ * I file da cui scegliere gli spec: il ramo contro `base`; in un giro di riallineamento SOLO quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il lavoro l'ha già
+ * provato la verifica e il lato di main la sua suite: senza file risolti restano gli unit (#1907, #2237).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
@@ -200,12 +200,26 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
     const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
     return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])].sort();
   const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
+  const lavoro = changed.filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...daRiprovare])],
-    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
+    changed: daRiprovare,
+    nota: `Giro di riallineamento: scelgo gli spec dai soli file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}${daRiprovare.length ? '' : ', quindi corro solo gli unit'}. Il resto del lavoro (${lavoro} file) l'ha già provato la verifica, il resto del lato arrivato da main (${resto} file) la suite di main.`,
   };
+}
+
+/** Scarica main su origin/main: i controlli fondevano e sceglievano gli spec su un main vecchio senza dirlo (#2237.3). */
+export function aggiornaMain(root = ROOT) {
+  const fetchOk = git(['fetch', '--quiet', 'origin', refspecMain(MAIN)], { cwd: root }).ok;
+  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
+  return { fetchOk, remoteRefOk };
+}
+
+/** La riga che dice su quale commit di main si confronta e si prova la fusione. PURA. */
+export function testoBaseMain({ base, sha, fetchOk }) {
+  const corto = String(sha || '').slice(0, 8) || '(commit illeggibile)';
+  return `▸ Linea principale: ${base} a ${corto}${fetchOk ? ', appena scaricata' : ', NON aggiornata (lo scaricamento non è riuscito)'}.`;
 }
 
 /**
@@ -513,7 +527,8 @@ export function stimaDurataControlli(nSpec) {
   const n = Math.max(0, Math.floor(Number(nSpec) || 0));
   const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
   const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
-  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${n} spec, circa mezzo minuto l'uno con un worker).` };
+  const cosa = n ? `unit più ${n} spec, circa mezzo minuto l'uno con un worker` : 'solo unit, nessuno spec scelto';
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (${cosa}).` };
 }
 
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
@@ -793,10 +808,10 @@ async function main() {
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
   // la base del diff per gli spec mirati e la guardia sul ramo rimasto indietro.
-  const fetchOk = git(['fetch', 'origin', MAIN]).ok;
-  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`]).ok;
+  const { fetchOk, remoteRefOk } = aggiornaMain(ROOT);
   const { base, note } = resolveDiffBase({ fetchOk, remoteRefOk });
   if (note) console.log(`\n${note}`);
+  console.log(`\n${testoBaseMain({ base, sha: git(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]).out, fetchOk })}`);
 
   {
     const behind = Number(git(['rev-list', '--count', `${shaProvato}..${base}`]).out);

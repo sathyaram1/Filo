@@ -5,7 +5,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, readSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { gitIn, lavoroVivo, timbroFile, comandoLeggibile } from './branch-integrity.mjs';
+import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
 import { leggiMeta, rigaSintetica } from '../session-report.mjs';
@@ -272,7 +272,7 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
-  const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
+  const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
   return { mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce };
 }

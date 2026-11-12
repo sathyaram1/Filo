@@ -89,6 +89,7 @@ import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
 import { registraRamo } from './lib/biglietto-locale.mjs';
+import { refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { letturaMancante, scriviRichiesta, togliRichiesta } from './lib/lettura-diff.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
@@ -999,7 +1000,7 @@ const MAIN = 'main';
 function realignBeforeStart(root = ROOT) {
   const branch = currentBranch(root);
   const workBranch = !!branch && branch !== 'HEAD' && !['main', 'master'].includes(branch.toLowerCase());
-  const fetchOk = tryGit(['fetch', 'origin', MAIN], root).ok;
+  const fetchOk = tryGit(['fetch', 'origin', refspecMain(MAIN)], root).ok;
   const behind = fetchOk ? Number(tryGit(['rev-list', '--count', `HEAD..origin/${MAIN}`], root).out) : 0;
   const plan = realignPlan({ fetchOk, dirty: isDirty(root), behind, workBranch });
   if (plan.message) console.log(`${plan.message}\n`);

@@ -43,6 +43,10 @@ che aveva passato la verifica stanno in fondo a questo testo, sotto
    cancelletto, percorso relativo alla radice del repo, barre normali). Una
    prova che prima era verde e ora è rossa è un rilievo di livello 2,
    interno.
-4. **I controlli automatici**, descritti più sotto.
+4. **I controlli automatici**, descritti più sotto. In questo giro
+   `finish:check` sceglie gli spec dai soli file che il riallineamento ha
+   dovuto risolvere: senza file risolti corre i soli unit, e la durata
+   prevista che stampa prima di partire lo dice. Non allargarla a mano: il
+   resto del lavoro l'ha provato la verifica, il lato di `main` la sua suite.
 
 <!-- includi: _critica-e-livelli.md -->

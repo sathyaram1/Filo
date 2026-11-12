@@ -103,10 +103,10 @@ import { LOCKFILE, rimettiLockfile, sporcoSoloDalLockfile } from './lib/lockfile
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_BYTES, SEGNALA_TOLTA, leggiTestoLivello } from './lib/livelli.mjs';
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
-import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
+import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo, scriviRispostaVerifica } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { dentroLaBusta } from './lib/busta.mjs';
-import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { assicuraStoria, TETTO_STORIA_MS, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
 
@@ -1202,9 +1202,8 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
   const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
   if (!branch) return guasto('nessun ramo di cui calcolare il diff');
   // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
-  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
-  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
-  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  // diff di modifiche già fuse. Niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', refspecMain(main)]);
   const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
   if (!baseSha.ok) {
     return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
@@ -1648,6 +1647,15 @@ export function numeraRisposta(reply, critica) {
   if (r.phase2 && typeof r.phase2 === 'object') r.phase2 = { ...r.phase2, findings: numera(r.phase2.findings), derived: numera(r.phase2.derived) };
   for (const k of ['derived', 'blocking', 'sospesi']) if (Array.isArray(r[k])) r[k] = numera(r[k]);
   return r;
+}
+
+/** La riga che dice dove sta la risposta intera; un file non scritto si dice, la stampa resta. */
+export function rispostaSuFile(scrivi) {
+  try {
+    return `\n(La risposta intera è anche nel file ${scrivi()}: rileggila da lì, non si ristampa.)`;
+  } catch (e) {
+    return `\n(Non ho potuto salvare la risposta in un file: ${e.message}. Vale quella stampata qui sopra.)`;
+  }
 }
 
 export function verifierReplyText(reply, id = '<id>') {
@@ -2828,8 +2836,9 @@ if (isMainModule) {
       if (!lette.ok) { console.error(lette.errore); process.exit(1); }
       const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply, id));
+      const risposta = `stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}\n${verifierReplyText(s.reply, id)}`;
+      console.log(risposta);
+      console.log(rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta)));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;

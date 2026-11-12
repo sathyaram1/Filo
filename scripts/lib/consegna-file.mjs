@@ -36,6 +36,11 @@ export function scriviRuolo(file, testo) {
   return file;
 }
 
+// La risposta del server a un verdetto è lunga e non si ristampa (#2237.4): va accanto al ruolo, intera.
+export function scriviRispostaVerifica(root, testo, base) {
+  return scriviRuolo(join(cartellaConsegna(root, base), 'risposta-verifica.md'), String(testo || ''));
+}
+
 // Al posto del ruolo, in stampa: il suo titolo e dove sta tutto il resto.
 export function rimandoAlRuolo(testo, file) {
   const t = String(testo || '');

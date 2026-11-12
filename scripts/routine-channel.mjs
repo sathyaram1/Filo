@@ -152,7 +152,7 @@ import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-
 import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
-  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER,
+  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER, cartelleDelLavoro,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
@@ -1948,7 +1948,7 @@ if (isMain) {
     const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
     const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
     const esito = await aspettaCartella({
-      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER }),
+      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) }),
       sleep: defaultSleep,
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
@@ -1989,7 +1989,7 @@ if (isMain) {
     const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
     const chiRilascia = typeof data.role === 'string' ? data.role : '';
     if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
-      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER });
+      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
       if (vivo.vivo) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'

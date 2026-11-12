@@ -7,13 +7,13 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
-  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation,
+  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation, cartelleDelLavoro,
 } from '../../scripts/lib/branch-integrity.mjs';
 import { beatFile } from '../../scripts/lib/routine-beat.mjs';
 import { ticketFile } from '../../scripts/lib/routine-ticket.mjs';
@@ -155,7 +155,7 @@ function battitoDi(clone, pid, ticket = T1) {
 
 const ambiente = (clone, extra = {}) => ({
   ...process.env, FILO_REPO_ROOT: clone, FILO_DISPATCH_STATE_DIR: join(clone, '..', 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE: '1',
-  FILO_ROUTINE_TICKET: '', ...extra,
+  FILO_ROUTINE_TICKET: '', FILO_SERVER_CLONE: join(clone, '..', 'filo-security'), ...extra,
 });
 const lineaPrincipale = (clone) => spawnSync(process.execPath, [DISPATCH, '--linea-principale'], { encoding: 'utf8', env: ambiente(clone) });
 
@@ -332,6 +332,42 @@ test('il rilascio di un worker aspetta i suoi processi nella cartella', { skip: 
     srv.close();
     togliCartella(casa);
   }
+});
+
+// #2237.2: il verificatore di un lavoro server aspettava a mano la suite del server, che gira nel clone di filo-security.
+test('aspetta e il rilascio di un worker vedono anche i processi nel clone del server', { skip: !LINUX && 'i processi si leggono da /proc' }, async () => {
+  const { casa, clone } = cartellaSulRamo();
+  const server = join(casa, 'filo-security');
+  mkdirSync(join(server, 'functions'), { recursive: true });
+  const { srv, chiamate, api } = await canaleFinto();
+  const suite = processoVivo(join(server, 'functions'));
+  try {
+    writeFileSync(ticketFile(clone), JSON.stringify({ ticket: T1, since: new Date().toISOString() }));
+    const attesa = spawnSync(process.execPath, [CANALE, 'aspetta', T1], { encoding: 'utf8', env: ambiente(clone, { FILO_ASPETTA_FETTA_MS: '0' }) });
+    assert.equal(attesa.status, USCITA_LAVORO_VIVO, attesa.stderr);
+    assert.match(attesa.stdout, new RegExp(`processo ${suite.pid} .* in ${server.replace(/\\/g, '/').replace(/[.*+?^${}()|[\]]/g, '\\$&')}`));
+    const r = await canale(clone, api, 'release', T1, '--role', 'verifier', '--senza-rapporto');
+    assert.equal(r.code, USCITA_LAVORO_VIVO, r.se);
+    assert.match(r.se, new RegExp(`processo ${suite.pid}`));
+    assert.ok(!chiamate.some((u) => u.endsWith('/routineRelease')));
+    ferma(suite);
+    await aspettaChe(() => { try { process.kill(suite.pid, 0); return false; } catch (_) { return true; } }, { cosa: 'il processo fermato non esce' });
+    const libera = spawnSync(process.execPath, [CANALE, 'aspetta', T1], { encoding: 'utf8', env: ambiente(clone, { FILO_ASPETTA_FETTA_MS: '0' }) });
+    assert.equal(libera.status, 0, libera.stdout + libera.stderr);
+  } finally {
+    ferma(suite);
+    srv.close();
+    togliCartella(casa);
+  }
+});
+
+test('le cartelle del lavoro: il clone del server che esiste, una volta sola; nessuna se non c\'è', () => {
+  // I percorsi passano da resolve come nello strumento: su Windows '/c/…' diventa 'C:\c\…'.
+  const C = resolve('/c');
+  const esiste = (p) => p.startsWith(C + sep);
+  const clone = join(C, 'filo-security');
+  assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone, dalCheckout: join(clone, 'functions'), esiste }), [clone]);
+  assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone: resolve('/x/filo-security'), dalCheckout: '', esiste }), []);
 });
 
 test('un rilascio con la cartella di un altro biglietto non committa, non spedisce e non tocca il marcatore', async () => {

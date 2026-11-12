@@ -76,10 +76,10 @@ test('riallineamento: il commit verificato arriva dal marcatore di chi verifica,
   assert.equal(shaDelRiallineamento(null), '');
 });
 
-// #1907: un ramo verificato, poi main che tocca un'altra area e due file del lavoro, poi il ramo riallineato con un
-// conflitto risolto e uno risolto col lato di main. Si scelgono il lavoro e i suoi conflitti, non l'area solo di main:
-// presa intera, su un ramo vecchio, erano centinaia di spec e ore di corsa.
-test('riallineamento: la scelta include i file in conflitto, anche risolti col lato di main, e non il resto del lato di main', () => {
+// #1907, #2237: un ramo verificato, poi main che tocca un'altra area e due file del lavoro, poi il ramo riallineato con
+// un conflitto risolto e uno risolto col lato di main. Si scelgono i soli conflitti: il resto del lavoro l'ha provato la
+// verifica, l'area solo di main la sua suite (presi interi erano centinaia di spec e ore di corsa).
+test('riallineamento: la scelta è dei soli file in conflitto, anche risolti col lato di main', () => {
   const dir = cartellaTemporanea('riallineamento-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
@@ -106,12 +106,13 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
     const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
     assert.deepEqual(senza.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js'], 'il ramo contro main vede solo la sua area');
     const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
-    assert.deepEqual(con.changed.sort(), ['src/pages/board/c.js', 'src/pages/editor/a.js', 'src/pages/options/o.js'],
-      'il conflitto risolto col lato di main resta scelto; l\'area toccata solo da main no');
+    assert.deepEqual(con.changed, ['src/pages/board/c.js', 'src/pages/editor/a.js'],
+      'il conflitto risolto col lato di main resta scelto; il lavoro senza conflitti e l\'area toccata solo da main no');
     // La stessa definizione della consegna di un riallineamento: un file del lavoro che main ha cambiato in righe
-    // lontane, senza conflitto, non è un file risolto (lo sceglie già il ramo contro main, se il lavoro ci resta).
+    // lontane, senza conflitto, non è un file risolto.
     assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 2\./);
-    assert.match(con.nota, /\(2 file\) l'ha già provato la suite di main/);
+    assert.match(con.nota, /Il resto del lavoro \(1 file\) l'ha già provato la verifica/);
+    assert.match(con.nota, /\(2 file\) la suite di main/);
     const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
     assert.deepEqual(perso.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js']);
     assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
@@ -120,9 +121,10 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
   }
 });
 
-// #2075: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree che
-// hanno spec: si sceglie solo dal lavoro. Presi tutti erano 550 spec e circa sei ore, oltre il tetto di un comando.
-test('riallineamento senza conflitti: tanti file arrivati da main non allargano la scelta oltre il lavoro', () => {
+// #2075, #2237: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree
+// che hanno spec: la modifica del ramo è identica a quella verificata, e bastano gli unit (erano 550 spec e sei ore,
+// poi un'ora per i 110 spec del solo lavoro).
+test('riallineamento senza conflitti: nessuno spec, né del lavoro né dei file arrivati da main', () => {
   const dir = cartellaTemporanea('riallineamento-pulito-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
@@ -142,9 +144,11 @@ test('riallineamento senza conflitti: tanti file arrivati da main non allargano 
     g('rebase', '-q', 'main');
 
     const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
-    assert.deepEqual(con.changed, ['src/pages/editor/a.js'], 'solo il file del lavoro, nessuno dei 300 arrivati da main');
-    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0\./);
-    assert.match(con.nota, /\(300 file\) l'ha già provato la suite di main/);
+    assert.deepEqual(con.changed, [], 'né il file del lavoro, già verificato, né i 300 arrivati da main');
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0, quindi corro solo gli unit\./);
+    assert.match(con.nota, /\(300 file\) la suite di main/);
+    const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
+    assert.deepEqual(senza.changed, ['src/pages/editor/a.js'], 'fuori da un riallineamento la scelta resta il ramo contro main');
   } finally {
     togliCartella(dir);
   }

@@ -34,7 +34,8 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync
 import { resolve, sep } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
-import { senzaToken } from './git-server.mjs';
+import { senzaToken, cartellaCloneServer } from './git-server.mjs';
+import { cartellaDelServer } from './ramo-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
@@ -1104,6 +1105,7 @@ function ultimoCommit(root) {
  */
 export function lavoroVivo(root, {
   mio = '', cosa = SEGNI_TUTTI, adesso = Date.now(), leggiProcessi = processiDiSistema, alive = pidAlive, pid = process.pid,
+  altre = [],
 } = {}) {
   const radice = percorsoVero(resolve(root));
   const battito = readBeat(radice);
@@ -1115,10 +1117,22 @@ export function lavoroVivo(root, {
   const { esclusi, sessione } = questoProcesso(processi || [], pid);
   const segni = segniDiLavoroVivo({
     mio, battito: diQui ? battito : null, battitoVivo, biglietto: leggiMarcatoreBiglietto(radice), timbroMs,
-    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice)] : [radice],
+    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice), ...altre.filter(Boolean)] : [radice],
     esclusi, sessione, adesso, cosa,
   });
   return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
+}
+
+/**
+ * Le cartelle fuori dal checkout dove lavorano i comandi di un worker: il clone di filo-security di un lavoro server
+ * (#2237.2: la suite del server lì `aspetta` non la vedeva). Solo quelle che esistono.
+ */
+export function cartelleDelLavoro(root, { clone = cartellaCloneServer(), dalCheckout = cartellaDelServer(root), esiste = existsSync } = {}) {
+  const viste = new Set();
+  for (const c of [clone, dalCheckout ? resolve(dalCheckout, '..') : '']) {
+    if (c && esiste(c)) viste.add(percorsoVero(resolve(c)));
+  }
+  return [...viste];
 }
 
 const MOSTRATI = 6;

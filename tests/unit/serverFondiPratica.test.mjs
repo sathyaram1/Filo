@@ -24,6 +24,17 @@ test('cartellaDelServer: il checkout del server accanto al repo, dal checkout pr
   assert.equal(cartellaDelServer(resolve('/y', 'Filo'), () => false), '');
 });
 
+// #2237.5: dal clone di un worker (/tmp/filo-lavori/N) il clone del server non sta accanto, ma dove lo mette `git-server clone`.
+test('cartellaDelServer: da un clone di worker trova il clone dei lavori server; da un checkout qualunque no', () => {
+  const clone = resolve('/casa', 'filo-security');
+  const worker = resolve('/tmp', 'filo-lavori', '1');
+  const server = join(clone, 'functions', 'tools', 'server-fondi.js');
+  const marcatore = join(worker, '.claude', 'filo-worker.json');
+  assert.equal(cartellaDelServer(worker, (p) => p === server || p === marcatore, { clone }), join(clone, 'functions'));
+  assert.equal(cartellaDelServer(worker, (p) => p === marcatore, { clone }), '', 'senza il clone del server, niente');
+  assert.equal(cartellaDelServer(resolve('/y', 'Filo'), (p) => p === server, { clone }), '', 'fuori da un worker vale solo il checkout accanto');
+});
+
 test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende le opzioni', () => {
   assert.deepEqual(leggiArgomenti(['claude/x', '--feedback', '910']), { ramo: 'claude/x', pratica: '910', dryRun: false, soloServer: false, nota: null });
   assert.equal(leggiArgomenti(['claude/x', '--feedback', '910', '--solo-server']).soloServer, true);

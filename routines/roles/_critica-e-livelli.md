@@ -9,7 +9,10 @@ lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
 sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: riparte
 dagli spec non ancora verdi, anche se nel frattempo hai committato le prove del
-giro (un cambio al codice invece li rifà tutti). La suite intera (`npm test`)
+giro (un cambio al codice invece li rifà tutti). Lancialo senza filtri
+(`| tail`, `| head`): un filtro trattiene l'uscita fino alla fine e
+l'avanzamento non si vede; quella intera la leggi dal file del comando in
+sottofondo. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
@@ -18,7 +21,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   `tests/rossi-noti.json` (`contenitore.specs` per i contenitori delle routine,
   `specs` per la macchina di chi sviluppa). Un rosso nato mentre giravano
   insieme anche le tue prove può essere solo macchina carica: rilancia quello
-  spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
+  spec da solo prima di farne un rilievo; in dubbio confronta con `main`:
+  `node scripts/spec-su-main.mjs tests/<nome>.spec.mjs` lo corre sul ramo e
+  su `origin/main` appena scaricata, senza ripetizioni, e dice di chi è il
+  rosso.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
 - Nel contenitore delle routine `npx playwright test` si accende da solo lo
