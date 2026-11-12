@@ -991,7 +991,7 @@ test('dopo una pagina letta, un indirizzo fatto stampare a un comando non apre u
   await stubModello(app, [
     { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'trattorie bologna' } }] },
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://trappola.example/trattorie' } }] },
-    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }] },
+    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }] },
     { strumenti: [{ nome: 'NAVIGA', args: { url: RIPETUTO, background: true } }] },
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
