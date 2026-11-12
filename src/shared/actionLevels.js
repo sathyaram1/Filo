@@ -973,6 +973,7 @@
     TOGLI_CHAT: {
       costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
+      dove: (a) => (a && a.per_sempre === true ? 'Una conversazione l\'utente la cancella per sempre a mano dalla home: tasto destro su un suo messaggio, «Togli la conversazione dal filo».' : ''),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = a && a._corrente ? 'questa conversazione' : 'la conversazione';
