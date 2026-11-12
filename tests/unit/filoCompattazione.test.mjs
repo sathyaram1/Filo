@@ -326,10 +326,10 @@ test('la sera di ieri compattata dopo il riassunto del giorno resta nel diario, 
   await scrivi('ab12', 'filo', 'Prenotato.', iso(alle(23) + 5000));
   // Alle 23:30 la sera resta grezza; il giro dei giorni di stamattina riassume ieri senza di lei.
   assert.equal((await Comp.compatta({ incognito: false, ora: alle(23, 30), tetti: tettiDi(), forza: true })).fatto, true);
-  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 1);
-  assert.equal((await Comp.compatta({ incognito: false, ora: Date.now(), tetti: tettiDi(), forza: true })).fatto, true);
+  assert.equal(await Comp.riassumiGiorni({ ora: stamattina }), 1);
+  assert.equal((await Comp.compatta({ incognito: false, ora: stamattina, tetti: tettiDi(), forza: true })).fatto, true);
   assert.match(await Comp.sezione(false), /Lisbona/, 'prima del giro dopo, la riga della sera sta fra le ore');
-  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 1);
+  assert.equal(await Comp.riassumiGiorni({ ora: stamattina }), 1);
   assert.match(giorni.at(-1), /mail al relatore[\s\S]*Lisbona/, 'il giorno si rifà con tutte le sue ore');
   const sez = await Comp.sezione(false);
   assert.match(sez, /GIORNI:\n- ieri: mail al relatore, volo per Lisbona/);
