@@ -846,6 +846,8 @@
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'propostaEmail.attiva': return $('propostaEmailAttiva').checked;
       case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
+      case 'testoDeiCampi.attivo': return $('testoCampiAttivo').checked;
+      case 'testoDeiCampi.giorni': return window.SN_TESTO_CAMPI.opzioni({ testoDeiCampi: { giorni: Number($('testoCampiGiorni').value) } }).giorni;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
