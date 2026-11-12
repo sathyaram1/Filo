@@ -137,13 +137,7 @@
     return pesi.length ? pesi.reduce((a, b) => a + b, 0) / pesi.length : 0;
   }
 
-  // Oltre questa stima, dopo una risposta, si compatta in sottofondo: la quota vale sullo spazio sopra la parte fissa,
-  // che da sola occupa più di metà della soglia di serie.
-  function sogliaAnticipo({ soglia, base } = {}) {
-    const s = Number(soglia);
-    const b = Number(base);
-    return Number.isFinite(b) && b > 0 && b < s ? b + QUOTA_ANTICIPO * (s - b) : s * QUOTA_ANTICIPO;
-  }
+  const sogliaAnticipo = (o) => limiti(o).anticipo;
 
   // Dove finisce il pezzo da compattare: i messaggi da `k` in poi restano grezzi. Le ultime `ore` o gli ultimi `turni`
   // messaggi dell'utente, il più corto dei due, e oltre `maxToken` (pesati con `peso(m)`) meno turni, tenendo sempre
