@@ -1361,8 +1361,11 @@
         return frasiRipristino(a).length ? 2 : 0;
       },
       campo: null,
+      // Toglie un freno solo se le impostazioni di serie ne allentano uno (`_ripristino.allenta`, scritto dal main, #1840).
       difesa: (a) => pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0
-        && !(a && a._ripristino && a._ripristino.livello === 1),
+        && !(a && a._ripristino && a._ripristino.livello === 1) && !(a && a._ripristino && a._ripristino.allenta === false),
+      dove: (a) => (pulsante(a) === 'ripristina_tutto'
+        ? 'Le impostazioni di serie l\'utente le rimette a mano in Preferenze (filo://preferences/preferences.html), sezione «Ripristina tutto».' : ''),
       // Tutte insieme non si rimettono senza un clic, a nessun livello: un «rimetti com'era» capito male le perderebbe.
       perimetro: (a) => !(pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0),
       perchePerimetro: 'Rimettere tutte le impostazioni di serie te lo chiedo sempre prima.',
