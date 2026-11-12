@@ -1,5 +1,12 @@
 // Verifica #2378, giro 1: esplorazione (ricarica immediata, chat senza modulo, sito che si accende tardi).
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
+import { _electron as electron } from '@playwright/test';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
+import { primaFinestra } from '../../helpers/primaFinestra.mjs';
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const pronta = (page) => page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
 
