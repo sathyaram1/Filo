@@ -655,7 +655,16 @@
     const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
     let testo = '';
     let tipo = '';
-    if (d.stato === 'superata') testo = 'Superata da un’altra domanda.';
+    if (d.stato === 'superata') {
+      // Assorbita dalla revisione (§3.6), o sostituita da una domanda nuova sullo stesso lavoro: si apre l'altra.
+      const madre = D.assorbitaIn(d);
+      const da = madre || (e && typeof e.superataDa === 'string' && D.numeroDi(e.superataDa) !== null ? e.superataDa.trim() : '');
+      if (!da) return el('p', 'mg-dq-esito', 'Superata da un’altra domanda.');
+      const p = el('p', 'mg-dq-esito');
+      if (madre) p.append('Assorbita in ', legame('domanda', da), ': è un caso dello stesso problema, e la risposta lì vale anche per questa.');
+      else p.append('Superata da ', legame('domanda', da), '.');
+      return p;
+    }
     // Il compito «Gestisci la domanda» (§3.5) la tiene prima che arrivi a te: si dice cosa sta succedendo e com'è finita.
     else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.';
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
