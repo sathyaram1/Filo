@@ -1053,8 +1053,8 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
       if (!m) continue;
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592); una che ripete una riga tolta dalla persona
       // non si scrive (#872): per i contatori è scartata.
-      if (!m[1].trim()) continue;
       const w = await FiloMem.scriviLezione(m[1], { fonti });
+      if (w.vuota) continue;
       if (w.rifiuto) console.warn('[Filo] lezione automatica scartata:', w.rifiuto);
       if (w.scritta) scritte += 1; else scartate += 1;
     }
