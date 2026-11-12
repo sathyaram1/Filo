@@ -949,6 +949,8 @@
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
       case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
+      case 'testoDeiCampi.attivo': return window.SN_TESTO_CAMPI.opzioni(s).attivo;
+      case 'testoDeiCampi.giorni': return window.SN_TESTO_CAMPI.opzioni(s).giorni;
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
