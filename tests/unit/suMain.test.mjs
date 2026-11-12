@@ -15,7 +15,7 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const { numeroFeedback, regexCitazione, fusioniCheCitano, fileRiscritti, fileInConflitto, ramiInCorso, incroci, modifichePerFile } =
+const { numeroFeedback, regexCitazione, fusioniCheCitano, fusioneCita, fileRiscritti, fileInConflitto, ramiInCorso, incroci, modifichePerFile } =
   await import('../../scripts/lib/su-main.mjs');
 
 const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
