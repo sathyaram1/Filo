@@ -18,7 +18,7 @@ const normale = (app) => app.evaluate(({ BrowserWindow }) => {
   if (!w) return null;
   const tm = w._filoTabs;
   const grezzo = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
-  const url = (t) => tm._urlUtente(grezzo(t));
+  const url = (t) => grezzo(t);
   const davanti = tm.tabs.find((t) => t.id === tm.activeId);
   return { schede: tm.tabs.map(url), davanti: davanti ? url(davanti) : null };
 });
