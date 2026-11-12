@@ -385,15 +385,17 @@
 
   // ── La stima accanto alla soglia (filo_design.txt § GESTIONE DEI MODELLI) ───────────────────
   // Un uso attivo: 600 messaggi al mese, ognuno porta nel tratto ~3.000 token (domanda, risposta, esiti). `base`: strumenti,
-  // parte fissa e CONTESTO; `USO.base` vale per chi non la misura (la stima tipica nelle Opzioni). Fra una compattazione
-  // e l'altra il tratto cresce dal grezzo fino alla soglia dell'anticipo.
-  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 38000 });
+  // parte fissa e CONTESTO, la stessa misura della chat; `USO.base` vale per chi non la misura (la stima tipica nelle
+  // Opzioni) e la sentinella la tiene vicina agli strumenti di oggi. Fra una compattazione e l'altra il tratto cresce dal
+  // grezzo fino alla soglia dell'anticipo.
+  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 42000 });
   // Fra una compattazione e l'altra: il grezzo che resta, quanto cresce il tratto prima della prossima, cosa riceve chi compatta.
-  function ciclo({ soglia, base, uso = USO } = {}) {
+  function ciclo({ soglia, base = USO.base, uso = USO } = {}) {
     const u = { ...USO, ...(uso || {}) };
-    const grezzo = Math.min(TURNI_GREZZI * u.perMessaggio, Math.max(u.perMessaggio, grezzoMassimo({ soglia, base, turno: u.perMessaggio })));
-    const spazio = Math.max(u.perMessaggio, sogliaAnticipo({ soglia, base }) - base - grezzo);
-    return { u, grezzo, spazio, ingresso: spazio + u.parteUtente };
+    const l = limiti({ soglia, base, turno: u.perMessaggio });
+    const grezzo = Math.min(TURNI_GREZZI * u.perMessaggio, Math.max(u.perMessaggio, l.grezzo));
+    const spazio = Math.max(u.perMessaggio, l.anticipo - base - grezzo);
+    return { u, l, grezzo, spazio, ingresso: spazio + u.parteUtente };
   }
   // I token di una compattazione tipica, per la stima di costo delle Opzioni.
   function usoTipico() {
