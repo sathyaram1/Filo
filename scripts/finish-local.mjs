@@ -74,6 +74,7 @@ import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
 import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
+import { cambiatiSoloNeiCommenti } from './lib/solo-commenti.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
@@ -422,6 +423,35 @@ export function specsForChangedFiles(changed, tracked) {
     }
   }
   return [...specs];
+}
+
+function elencoCorto(file, mostrati = 8) {
+  return file.slice(0, mostrati).join(', ') + (file.length > mostrati ? ` e altri ${file.length - mostrati}` : '');
+}
+
+/**
+ * Perché la scelta degli spec è quella, quando non è ovvio: nessuno spec, o file tolti perché cambiano solo nei
+ * commenti. Un lavoro sul server fa girare qui solo gli unit, e chi legge deve sapere perché (#2425). PURA.
+ */
+export function motivoDellaScelta({ changed = [], soloCommenti = [], specs = 0 }) {
+  const tolti = soloCommenti.filter((f) => changed.includes(f));
+  if (specs > 0) return tolti.length ? `▸ Cambiano solo nei commenti, e non scelgono spec: ${elencoCorto(tolti)}.` : '';
+  if (!changed.length) return '▸ Nessuno spec da lanciare: il ramo non cambia file rispetto alla linea principale. Corro solo gli unit.';
+  const altri = changed.filter((f) => !tolti.includes(f));
+  const parti = [
+    ...(tolti.length ? [`${tolti.length} cambiano solo nei commenti (${elencoCorto(tolti)})`] : []),
+    ...(altri.length ? [`${tolti.length ? 'gli altri' : `tutti (${changed.length})`} non li prova nessuno spec (${elencoCorto(altri)})`] : []),
+  ];
+  return `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.`;
+}
+
+/** Gli spec da lanciare per `changed`, fra quelli tracciati in `root`, e i file che non scelgono perché cambiano solo nei commenti. */
+export function specDellaScelta({ changed, base, root = ROOT }) {
+  // `ls-files` e filtro in memoria: `--error-unmatch` stampava un errore per ogni spec inesistente, e sembrava un guasto.
+  const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: root }).out.split('\n').filter(Boolean));
+  const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
+  const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+  return { specs, soloCommenti };
 }
 
 /**
@@ -879,11 +909,10 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
-    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
-    // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const { specs, soloCommenti } = specDellaScelta({ changed, base, root: albero.dir });
+    // Il riallineamento senza file risolti l'ha già detto nella sua nota.
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
+    if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
@@ -919,9 +948,6 @@ async function main() {
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
-    }
-    if (spec.rilancia && !specs.length) {
-      console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
 
