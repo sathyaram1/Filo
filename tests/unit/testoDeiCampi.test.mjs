@@ -96,6 +96,15 @@ test('di serie acceso, una settimana; una durata fuori elenco torna quella di se
   assert.deepEqual(R.opzioni((C.DEFAULT_SETTINGS || globalThis.SN_CONST.DEFAULT_SETTINGS)), { attivo: true, giorni: R.GIORNI_DI_SERIE });
 });
 
+test('dalla chat si accende, si spegne e si sceglie la durata; una durata che non c\'è è un rifiuto con quelle che ci sono', () => {
+  require('../../src/shared/preferences.js');
+  const P = globalThis.SN_PREF;
+  assert.deepEqual(P.buildPreferencePartial('testo dei campi', 'no').partial, { testoDeiCampi: { attivo: false } });
+  assert.deepEqual(P.buildPreferencePartial('conserva il testo', 'sì').partial, { testoDeiCampi: { attivo: true } });
+  assert.deepEqual(P.buildPreferencePartial('durata testo dei campi', '30 giorni').partial, { testoDeiCampi: { giorni: 30 } });
+  assert.match(P.buildPreferencePartial('durata testo dei campi', '365').rifiuto, /1, 7, 30 giorni/);
+});
+
 // ── Il magazzino del main ────────────────────────────────────────────────────────────────────────────────────────────
 let impostazioni = {};
 globalThis.SN_STORAGE = { getSettings: async () => impostazioni };
