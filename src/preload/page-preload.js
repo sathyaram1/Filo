@@ -1200,6 +1200,7 @@ if (!IS_SUBFRAME) {
 } else {
   startCookiesInFrame();
   vediCampiDelicati();
+  testoDaRimettere();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),
