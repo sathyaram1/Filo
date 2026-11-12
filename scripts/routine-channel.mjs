@@ -243,7 +243,7 @@ function defaultSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function lavoroVivoDelWorker() {
   const { sottoAgentiVivi } = await import('./lib/veglia-worker.mjs');
   return () => {
-    const v = lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER });
+    const v = lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
     const figli = sottoAgentiVivi();
     return figli.length ? { ...v, vivo: true, segni: [...figli, ...v.segni] } : v;
   };
