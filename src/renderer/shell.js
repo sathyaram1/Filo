@@ -2642,7 +2642,7 @@
     function chiediChiusura(items) {
       const vive = (Array.isArray(items) ? items : []).filter((r) => r && r.id);
       if (!vive.length) return;
-      for (const r of vive) dls.set(r.id, r);
+      for (const r of vive) applicaEvento('progress', r);
       chiusura = { n: vive.length, nome: vive[0].filename || 'download' };
       if (panelOpen) renderPanel(); else openPanel();
     }
