@@ -28,6 +28,9 @@ for (const ms of [0, 80, 150]) {
       const lascia = !!win._filoTabs.riquadri?.strati?.get(win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents);
       if (attesa) await new Promise((r) => setTimeout(r, attesa));
       const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
+      const s = win._filoTabs.riquadri?.strati?.get(wc);
+      const stato = s ? { pronta: !!s.pronta, visibile: !!s.visibile, chiavi: Object.keys(s).join(',') } : null;
+      const foco = { scheda: wc.isFocused(), strato: s?.vista?.webContents?.isFocused?.() ?? s?.view?.webContents?.isFocused?.() };
       const dove = wc ? wc.getURL() : 'nessuno';
       if (wc) {
         wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
