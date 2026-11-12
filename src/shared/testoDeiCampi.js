@@ -73,10 +73,11 @@
     return out;
   }
 
-  // `salvati` [{ firma, valore }], `presenti` [{ firma, indice }] → [{ indice, valore }]. Nello stesso gruppo i campi si
-  // appaiano in ordine di pagina: due «commento» uguali restano al loro posto.
+  // `salvati` [{ firma, valore }], `presenti` [{ firma, indice }] → [{ indice, valore, da }], `da` la posizione in
+  // `salvati`. Nello stesso gruppo i campi si appaiano in ordine di pagina: due «commento» uguali restano al loro posto.
   function abbina(salvati, presenti) {
-    let restoS = (Array.isArray(salvati) ? salvati : []).filter((x) => x && x.firma && typeof x.valore === 'string');
+    let restoS = (Array.isArray(salvati) ? salvati : []).map((x, da) => (x ? { ...x, da } : null))
+      .filter((x) => x && x.firma && typeof x.valore === 'string');
     let restoP = (Array.isArray(presenti) ? presenti : []).filter((x) => x && x.firma);
     const out = [];
     for (const passo of PASSI) {
