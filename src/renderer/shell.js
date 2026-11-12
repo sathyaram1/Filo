@@ -2584,9 +2584,13 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
-    function syncFromList(items) {
-      dls.clear();
-      if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+    // `res`: una risposta { items, rev }. Può essere più vecchia di eventi già arrivati: quelli restano (#2307).
+    function syncFromList(res) {
+      if (ELENCO) ELENCO.lista(statoElenco, res);
+      else {
+        dls.clear();
+        for (const r of (res && Array.isArray(res.items) ? res.items : [])) dls.set(r.id, r);
+      }
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
