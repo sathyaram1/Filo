@@ -82,7 +82,8 @@ test('ripartenza di un lavoro server: la ricetta del testo dà un ramo da main c
     const remoto = join(dir, 'remoto.git');
     const vecchio = join(dir, 'vecchio');
     const clone = join(dir, 'clone');
-    const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    // Con autocrlf acceso (Windows) il merge riscrive lavoro.txt a CRLF e il confronto col contenuto cade.
+    const git = (cwd, ...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     const identita = (cwd, nome) => { git(cwd, 'config', 'user.email', `${nome}@t`); git(cwd, 'config', 'user.name', nome); git(cwd, 'config', 'commit.gpgsign', 'false'); };
     const scrivi = (cwd, f, s) => { writeFileSync(join(cwd, f), s); git(cwd, 'add', f); git(cwd, 'commit', '-m', f); };
     execFileSync('git', ['init', '--bare', '-b', 'main', remoto]);
