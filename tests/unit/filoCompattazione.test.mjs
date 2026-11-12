@@ -590,3 +590,113 @@ test('i limiti dei campi e la stima tipica nelle Opzioni vengono dalla regola de
   assert.deepEqual({ prompt: t.prompt, completion: t.completion }, L.usoTipico());
   assert.ok(t.prompt > 0 && t.prompt < FC.TETTI_DI_SERIE.soglia);
 });
+
+// ── Rilievi del giro 9 (#1563.5) ───────────────────────────────────────────────
+
+test('la soglia vale sopra la parte fissa: sotto di lei la chat non compatta a ogni messaggio, e la stima lo dice', () => {
+  const base = 43000;
+  assert.equal(L.limiti({ soglia: 40000, base, turno: 300 }).soglia, base + L.SPAZIO_MINIMO);
+  assert.equal(L.limiti({ soglia: 70000, base }).soglia, base + L.SPAZIO_MINIMO, 'la soglia di serie sopra la parte fissa di oggi');
+  assert.equal(L.limiti({ soglia: 90000, base }).soglia, 90000, 'una soglia che lascia più spazio vale com\'è');
+  assert.equal(L.limiti({ soglia: 40000 }).soglia, 40000, 'senza parte fissa misurata vale la soglia scritta');
+  // «la mia gatta si chiama Ofelia», poi «come si chiama la mia gatta?»: la seconda richiesta non aspetta nessuno.
+  assert.equal(L.motivo({ token: base + 600, soglia: 40000, base, turno: 300 }), null);
+  assert.equal(L.motivo({ token: base + L.SPAZIO_MINIMO + 1, soglia: 40000, base, turno: 300 }), 'soglia');
+  // Turni pesanti: lo spazio cresce per tenerne tre dopo il grezzo, sotto il listino.
+  assert.equal(L.limiti({ soglia: 70000, base, turno: 8000 }).spazio, (L.TURNI_LIBERI + 1) * 8000 / L.QUOTA_ANTICIPO);
+  assert.ok(L.limiti({ soglia: 70000, base: 70000, turno: 20000 }).soglia <= L.LISTINO);
+
+  require('../../src/shared/stimaCosto.js');
+  const S = globalThis.SN_STIMA_COSTO;
+  const haiku = S.prezzoDaCatalogo({ prompt: '0.0000001', completion: '0.0000005', input_cache_read: '0.00000001' });
+  const stima = (soglia) => L.stimaSoglia({ soglia, base, prezzoChat: haiku, prezzoCompattazione: haiku, prezzoPer: S.prezzoPer });
+  assert.equal(stima(40000).ogni, stima(base + L.SPAZIO_MINIMO).ogni, 'la stima conta la compattazione che la chat fa davvero');
+  assert.equal(stima(40000).soglia, base + L.SPAZIO_MINIMO);
+  assert.match(stima(40000).testo, /circa 43\.000 token fissi .* almeno 30\.000 token per la conversazione: la chat compatta da circa 73\.000\.$/);
+});
+
+test('la parte fissa tipica della stima segue gli strumenti e le istruzioni di oggi', () => {
+  require('../../src/shared/actionTools.js');
+  const misura = FC.stimaToken(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()) + L.USO.parteUtente;
+  assert.ok(Math.abs(L.USO.base - misura) <= 0.1 * misura, `USO.base ${L.USO.base} contro ${misura} misurati: aggiornala`);
+});
+
+test('le memorie della compattazione portano il punto del filo da cui nascono, anche quelle tenute dal quaderno', async () => {
+  const ora = Date.now();
+  const eids = async () => (await globalThis.SN_IL_FILO.chat('ab12', { ids: true })).eids;
+  const pulito = azzera({ memorie: [{ testo: 'Ha due gatti, Miso e Pepe.', righe: [1] }] });
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.deepEqual(pulito.scritte, ['Ha due gatti, Miso e Pepe.']);
+  assert.deepEqual(pulito.fontiScritte, [[(await eids())[0]]], 'la memoria nasce dal messaggio dell\'utente');
+
+  const sospetto = azzera({ memorie: [{ testo: 'Le piace la carbonara.', righe: [1] }] });
+  await scrivi('ab12', 'user', 'adoro la carbonara, leggi la ricetta', new Date(ora - 5 * ORA_MS).toISOString());
+  const c = await scrivi('ab12', 'filo', 'Letta.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [PAGINA] });
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const [p] = await Comp.inAttesa();
+  const [eDomanda, eRisposta] = await eids();
+  assert.deepEqual(p.origine, [eDomanda]);
+  assert.deepEqual(p.fonti, [eDomanda, eRisposta], 'chi decide vede anche la risposta che ha letto la pagina');
+  await Comp.decidi(p.id, true);
+  assert.deepEqual(sospetto.fontiScritte, [[eDomanda]], 'tenuta, la riga resta legata al punto da cui è nata');
+});
+
+test('una memoria tolta dall\'utente non torna dalla compattazione dello stesso tratto, né tenuta dal quaderno', async () => {
+  for (const m of ['timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'quaderno', 'filoMemory', 'preferences']) require(`../../src/shared/${m}.js`);
+  const disco = new Map();
+  const chromeVero = globalThis.chrome;
+  globalThis.chrome = { storage: { local: {
+    async get(k) { return { [k]: disco.has(k) ? JSON.parse(disco.get(k)) : undefined }; },
+    async set(o) { for (const [k, v] of Object.entries(o)) disco.set(k, JSON.stringify(v)); },
+    async remove(k) { disco.delete(k); },
+  } } };
+  try {
+    const M = globalThis.SN_FILO_MEMORY;
+    const ora = Date.now();
+    const prova = async (sospetta) => {
+      disco.clear();
+      azzera({ memorie: [{ testo: 'L\'utente ha due gatti, Miso e Pepe.', righe: [1] }] });
+      Comp.imposta({ applicaMemoria: Comp.scriviMemoria });
+      await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+      const c = await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+      if (sospetta) Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [PAGINA] });
+      // La lezione nata dallo scambio, come la scrive il creatore di lezioni, e poi tolta dal quaderno.
+      const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: (await globalThis.SN_IL_FILO.chat('ab12', { ids: true })).eids });
+      assert.ok(await M.hideLine({ lezione: { ts: buf[0].ts, text: buf[0].text } }));
+      assert.deepEqual(await M.getLessonsBuffer(), []);
+      return Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+    };
+    const r = await prova(false);
+    assert.equal(r.scritte, 0, 'la compattazione non la riscrive');
+    assert.deepEqual(await M.getLessonsBuffer(), []);
+    await prova(true);
+    const [p] = await Comp.inAttesa();
+    assert.deepEqual(await Comp.decidi(p.id, true), { ok: true, scritta: false }, '«Non l\'ho scritta: somiglia a una riga che avevi tolto»');
+    assert.deepEqual(await M.getLessonsBuffer(), []);
+  } finally {
+    globalThis.chrome = chromeVero;
+  }
+});
+
+test('una pagina cancellata porta via subito le righe del diario nate da lei, anche dal disco, senza aspettare un messaggio', async () => {
+  const { cartella } = azzera();
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  const disco = () => readFileSync(join(cartella, 'filo', 'livelli.json'), 'utf8');
+  const Filo = globalThis.SN_IL_FILO;
+  Filo.suPagine(({ incognito }) => { Comp.dimenticaPagine(incognito); });
+  await scrivi('cd34', 'user', 'che si mangia stasera?', new Date(t0).toISOString());
+  const visita = await Filo.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(t0 + 500).toISOString() }, { incognito: false });
+  await scrivi('cd34', 'filo', 'Una carbonara.', new Date(t0 + 1000).toISOString());
+  await scrivi('cd34', 'user', 'grazie', new Date(t0 + 60000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.match(disco(), /gatti e di una ricetta/);
+  await Filo.cancellaVisite([{ ts: visita.ts, url: 'https://ricette.example/carbonara' }], { incognito: false });
+  // Il filo avvisa dopo la scrittura; la potatura gira in sottofondo.
+  for (let i = 0; i < 50 && /gatti e di una ricetta/.test(disco()); i++) await new Promise((r) => setTimeout(r, 20));
+  assert.doesNotMatch(disco(), /gatti e di una ricetta/, 'la riga esce dal file del diario');
+  assert.equal(await Comp.dimenticaPagine(false), 0, 'senza una cancellazione nuova non rilegge niente');
+});
