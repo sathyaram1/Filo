@@ -249,5 +249,5 @@ test('assorbimento (#1154): l’assorbita porta la madre, la madre le assorbite;
   assert.equal(D.assorbitaIn(null), '');
   assert.deepEqual(D.assorbiteDi({ assorbite: ['D-5', 'D-7', 'D-5', 'nulla', 3, ' D-9 '] }), ['D-5', 'D-7', 'D-9']);
   assert.deepEqual(D.assorbiteDi({ assorbite: 'D-5' }), []);
-  assert.equal(D.validaDomanda({ ...domandaValida(), assorbite: ['D-1'] }).ok, true, 'campo del server: nell’ingresso si ignora');
+  assert.equal(D.validaDomanda(base({ assorbite: ['D-1'] })).ok, true, 'campo del server: nell’ingresso si ignora');
 });
