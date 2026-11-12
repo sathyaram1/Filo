@@ -674,6 +674,48 @@ export async function dopoLaFusioneDellApp({ reply, id, ramo }, { of, inSospeso 
   return { reply: { ...resto, closed: true }, riga: `  la parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva: era l'ultima` };
 }
 
+/**
+ * Il passo 5 del finish: riapre la pratica per il server se serve, registra la punta, chiede la fusione con la prova
+ * degli unit e, fusa, ricontrolla i rami del server (#1336.2). Le parti del server fuori da main si contano a ogni
+ * richiesta: quando main si muove e la prova si rifà, il server può essere arrivato intanto. `deps` è per le prove.
+ * @returns {Promise<{ fermo?: true, prova, reply?, riga: string }>}
+ */
+export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null }, deps = {}) {
+  const log = deps.log || ((s) => console.log(s));
+  const of = deps.of || await import('./owner-feedback.mjs');
+  const chiedi = deps.askServerMerge || askServerMerge;
+  const id = pratica && pratica.id ? String(pratica.id) : '';
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const inSospeso = () => (id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(root) }) : []);
+  const fuori = inSospeso();
+  if (fuori.length) {
+    const riga = await riapriPerIlServer({ id, ramo: branch, pendingParts: fuori }, { of });
+    if (riga) log(riga);
+  }
+  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
+  for (const riga of await (deps.registraNelRegistro || registraNelRegistro)({ ramo: branch, sha: cur, feedbackId: id, root })) log(`  ${riga}`);
+  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
+  if (primaProva) log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
+  let tentativo = 0;
+  const giro = await chiediConProva({
+    root, punta: cur, primaProva,
+    ...(deps.prova ? { prova: deps.prova } : {}),
+    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
+    chiedi: (provaUnit) => {
+      const pendingParts = tentativo++ === 0 ? fuori : inSospeso();
+      log('\n▸ Chiedo al server di fondere');
+      log(id ? `  pratica ${pratica.seq ? `#${pratica.seq}` : id}` : '  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+      for (const p of pendingParts) log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+      return chiedi({ branch, sha: cur, feedbackId: id, pendingParts, provaUnit });
+    },
+    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
+    scrivi: (s) => log(`\n${s}`),
+  });
+  if (giro.fermo) return { fermo: true, prova: giro.prova, riga: '' };
+  const dopo = id ? await dopoLaFusioneDellApp({ reply: giro.reply, id, ramo: branch }, { of, inSospeso }) : { reply: giro.reply, riga: '' };
+  return { prova: giro.prova, reply: dopo.reply, riga: dopo.riga };
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
@@ -989,43 +1031,13 @@ async function main() {
   }
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
-  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
-  //    lega al main su cui sono girati.
-  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
-  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
-  if (pendingParts.length) {
-    const riga = await riapriPerIlServer({ id: pratica.id, ramo: branch, pendingParts }, { of: await import('./owner-feedback.mjs') });
-    if (riga) console.log(riga);
-  }
-  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
-  for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
-  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
-  if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
-  const giro = await chiediConProva({
-    root: ROOT, punta: cur, primaProva,
-    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
-    chiedi: (provaUnit) => {
-      process.stdout.write('\n▸ Chiedo al server di fondere\n');
-      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
-      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
-      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
-    },
-    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
-    scrivi: (s) => console.log(`\n${s}`),
-  });
+  //    un'identità che qui non esiste.
+  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo });
   if (giro.fermo) {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
   }
-  const dopo = pratica && pratica.id
-    ? await dopoLaFusioneDellApp({ reply: giro.reply, id: pratica.id, ramo: branch }, {
-      of: await import('./owner-feedback.mjs'),
-      inSospeso: () => partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }),
-    })
-    : { reply: giro.reply, riga: '' };
-  const reply = dopo.reply;
+  const { reply } = giro;
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
@@ -1036,7 +1048,7 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
-  if (dopo.riga) console.log(dopo.riga);
+  if (giro.riga) console.log(giro.riga);
   if (pratica && pratica.id) {
     const { fraseDaScrivere } = await import('./owner-feedback.mjs');
     const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);
