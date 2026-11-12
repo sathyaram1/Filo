@@ -549,10 +549,13 @@ class StratoDeiRiquadri {
     wc.on('focus', () => { const s = this.strati.get(wc); if (s && s.visibile) s.scriveQui = false; });
     wc.on('before-input-event', (e, input) => {
       const s = this.strati.get(wc);
-      if (!s || !s.trattenuti || !scrive(input)) return;
+      if (!s || !s.trattenuti) return;
+      const comando = incolla(input);
+      if (!comando && !scrive(input)) return;
       // Oltre il tetto (mai raggiunto scrivendo) i tasti tornano alla pagina, nell'ordine: nessuno si perde.
       if (s.trattenuti.length >= TRATTENUTI_MAX) { this._rilascia(s, wc); return; }
       e.preventDefault();
+      if (comando) { s.trattenuti.push({ comando }); return; }
       const modifiers = ['shift', 'control', 'alt'].filter((m) => input[m]);
       s.trattenuti.push({ type: input.type, key: String(input.key), modifiers });
     });
