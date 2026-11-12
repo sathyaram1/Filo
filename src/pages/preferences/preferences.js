@@ -1422,6 +1422,43 @@
     if (r.inCorso && !document.hidden) giroStato = setTimeout(caricaStatoDocumenti, 1500);
   }
 
+  // ── Il testo dei campi dei siti (#2378) ────────────────────────────────────
+  function opzioniTestoCampi() {
+    const sel = $('testoCampiGiorni');
+    sel.textContent = '';
+    for (const g of window.SN_TESTO_CAMPI.GIORNI) {
+      const o = document.createElement('option');
+      o.value = String(g);
+      o.textContent = g === 1 ? '1 giorno' : `${g} giorni`;
+      sel.appendChild(o);
+    }
+  }
+
+  function scriviStatoTestoCampi(r) {
+    const n = Number(r && r.campi) || 0;
+    $('testoCampiStato').textContent = !n ? 'Nessun testo conservato'
+      : `${n === 1 ? 'Un campo' : `${n.toLocaleString('it-IT')} campi`} in ${r.pagine === 1 ? 'una pagina' : `${Number(r.pagine).toLocaleString('it-IT')} pagine`}`;
+    $('testoCampiCancella').disabled = !n;
+  }
+
+  async function caricaStatoTestoCampi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.TESTO_CAMPI_STATO }); } catch (_) { r = null; }
+    if (r && r.ok) scriviStatoTestoCampi(r);
+  }
+
+  async function cancellaTestoCampi() {
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Il testo scritto nei campi dei siti e non ancora inviato non ricomparirà più. Quello che hai nelle schede aperte resta dov\'è.';
+    const ok = Ui
+      ? await Ui.confirm({ title: 'Cancella i testi conservati', text, okLabel: 'Cancella' })
+      : window.confirm(text);
+    if (!ok) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.TESTO_CAMPI_CANCELLA }); } catch (_) { r = null; }
+    if (r && r.ok) scriviStatoTestoCampi(r);
+  }
+
   async function salvaCartelle(nuovo) {
     const elenco = Array.from(new Set(nuovo));
     disegnaCartelle(elenco);
