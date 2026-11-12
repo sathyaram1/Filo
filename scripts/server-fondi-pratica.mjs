@@ -230,7 +230,8 @@ export async function fusioneDalCancello({ cartella, ramo, sha, feedbackId }, { 
  * → null | { dir, togli() } | { errore }
  */
 export function filoConLApp(radice, ramiApp, { git = gitEsito } = {}) {
-  const rami = (Array.isArray(ramiApp) ? ramiApp : []).filter((r) => ramoValido(r));
+  const rami = (Array.isArray(ramiApp) ? ramiApp : [])
+    .filter((r) => ramoValido(r) && git(radice, ['rev-parse', '--verify', '--quiet', `refs/heads/${r}`]).ok);
   if (!rami.length) return null;
   const firma = ['-c', 'user.name=server:fondi', '-c', 'user.email=server-fondi@filo.invalid'];
   const base = ['refs/remotes/origin/main', 'refs/heads/main'].find((r) => git(radice, ['rev-parse', '--verify', '--quiet', r]).ok);
