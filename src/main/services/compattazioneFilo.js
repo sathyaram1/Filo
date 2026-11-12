@@ -409,15 +409,16 @@ async function decidi(idProposta, tieni) {
   const i = s.inAttesa.findIndex((p) => p && p.id === idProposta);
   if (i < 0) return { ok: false };
   const [p] = s.inAttesa.splice(i, 1);
-  let scritta = false;
+  let w = false;
   if (tieni) {
     // Una proposta di prima che tenesse l'origine (`origine` assente) si controlla sulle sue fonti, come una lezione.
     const fonti = { fonti: Array.isArray(p.fonti) ? p.fonti : [], ...(Array.isArray(p.origine) ? { origine: p.origine } : {}) };
-    try { scritta = await _dip.applicaMemoria(p.testo, fonti); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
+    try { w = await _dip.applicaMemoria(p.testo, fonti); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
   }
   await salva(false);
-  return { ok: true, scritta };
+  return { ok: true, scritta: scritta(w), ...(w && w.rifiuto ? { rifiuto: w.rifiuto } : {}) };
 }
+function scritta(w) { return w === true || !!(w && w.scritta); }
 
 // ── Le porte che non sono una richiesta: fermo e giorni ─────────────────────
 // `fn` null: un turno è cominciato, la compattazione da fermo non parte sotto di lui. Un timer per lato: un messaggio in
