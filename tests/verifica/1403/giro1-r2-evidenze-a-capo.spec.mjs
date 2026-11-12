@@ -59,5 +59,5 @@ test('r2 testo che scorre: la riga che va a capo nella casella va a capo anche s
   }, PASSWORD);
   await page.waitForTimeout(200);
   await page.locator('.sn-fb-modal').screenshot({ path: `${SHOTS}/v1403-r2-evidenza.png` });
-  expect(esito.sotto, `con ${esito.k} parole la casella va a capo e lo strato delle evidenze no (barra di ${esito.barra} px)`).toBe(esito.casella);
+  expect(esito.sotto, `una riga lunga (${esito.k} caratteri di codice) va a capo nella casella e non nello strato delle evidenze (barra di ${esito.barra} px): l'evidenza scivola sulla riga sopra`).toBe(esito.casella);
 });
