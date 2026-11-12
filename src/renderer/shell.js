@@ -2433,7 +2433,7 @@
         // possibilità di rispondere (#588).
         const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
           if (res && res.ok === false) avvisiRiga.set(r.id, res.error || 'Risposta non registrata');
-          if (res && res.items) syncFromList(res.items);
+          if (res && res.items) syncFromList(res);
           else if (panelOpen) renderPanel();
         }).catch(() => {});
         addBtn('Scarica', () => rispondi(true), 'si');
