@@ -107,7 +107,7 @@
     const sp = soli(restoP);
     for (const [k, s] of soli(restoS)) {
       const p = sp.get(k);
-      if (s && p) out.push({ indice: p.indice, valore: s.valore });
+      if (s && p) out.push({ indice: p.indice, valore: s.valore, da: s.da });
     }
     return out;
   }
