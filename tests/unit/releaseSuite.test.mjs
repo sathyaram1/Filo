@@ -341,6 +341,34 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         assert.doesNotMatch(r.testo, /NON e partita|non ha lasciato il JSON/);
       });
 
+      // #2313: dalla cloud gli artifact non si scaricano; i registri dei lavori si, con l'API.
+      const REGISTRI = (avvisoJob.match(/^ {6}REGISTRI_DALLA_CLOUD:\s*"(.*)"\s*$/m) || [])[1] || '';
+      const registriDellaCorsa = REGISTRI.replace(/\$\{\{ github\.repository \}\}/g, 'o/r').replace(/\$\{\{ github\.run_id \}\}/g, '1');
+
+      test('suite con i rossi nuovi: l\'errore di ogni rosso sta nel testo, e la strada per i registri che dalla cloud passa', () => {
+        assert.ok(REGISTRI, '`avviso` deve dire, una volta per i suoi due feedback, come leggere i registri dalla cloud');
+        const errori = '✗ tests/a.spec.mjs › il caso rosso\n    in tests/a.spec.mjs:12\n    Error: expect(locator).toBeVisible() failed\n';
+        const r = gira(allarme, {
+          env: { PARTI_ESITO: 'success', REGISTRI_DALLA_CLOUD: registriDellaCorsa },
+          file: {
+            'esiti-suite/chiavi-allarme.txt': 'suite:tests/a.spec.mjs\n',
+            'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › il caso rosso\n',
+            'esiti-suite/rossi-errori.txt': errori,
+            'esiti-suite/verdetto.log': 'Rossi nuovi: 1\n',
+            'esiti-suite/suite-risultati.json': '{}',
+          },
+        });
+        assert.equal(r.stato, 0, r.registro);
+        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso\n\nErrori dei rossi nuovi:\n✗ tests\/a\.spec\.mjs › il caso rosso\n {4}in tests\/a\.spec\.mjs:12\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed/);
+        assert.ok(r.testo.includes('gh api repos/o/r/actions/runs/1/jobs'), r.testo);
+        assert.ok(r.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), r.testo);
+        assert.doesNotMatch(r.testo, /stanno negli artifact di questa esecuzione/, 'gli artifact dalla cloud non si scaricano: non sono la strada');
+        const senza = gira(allarme, { env: { PARTI_ESITO: 'success' }, file: { 'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › x\n' } });
+        assert.doesNotMatch(senza.testo, /Errori dei rossi nuovi/, 'senza errori nessuna intestazione vuota');
+        const unit = gira(allarmeUnit, { env: { REGISTRI_DALLA_CLOUD: registriDellaCorsa }, file: { 'esiti-unit/unit.log': 'not ok 1 - a\n' } });
+        assert.ok(unit.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), 'anche il feedback degli unit dice la strada');
+      });
+
       test('un allarme non consegnato fa rosso `avviso`', () => {
         const r = gira(allarme, { env: { PARTI_ESITO: 'failure', INVIO_ESITO: '1' } });
         assert.notEqual(r.stato, 0);
