@@ -39,7 +39,9 @@ for (const ms of [0, 80, 150]) {
         wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
         wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
       }
-      return { dove, lascia, stato, foco, dt: Date.now() - t0 };
+      const dt = Date.now() - t0;
+      while (!(s && s.visibile) && Date.now() - t0 < 3000) await new Promise((r) => setTimeout(r, 5));
+      return { dove, lascia, stato, foco, dt, aSchermo: Date.now() - t0 };
     }, { attesa: ms, u: p.url() });
     const r = await premi;
     await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
