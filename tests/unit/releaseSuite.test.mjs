@@ -149,6 +149,18 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.ok(elencoVerdetto.indexOf(passo) > elencoVerdetto.findIndex((p) => p.id === 'verdetto'));
   });
 
+  // #2313: con i soli titoli chi prende il feedback rilanciava la suite per vedere l'errore.
+  test('anche l\'errore di ogni rosso nuovo resta leggibile con l\'API, in un passo suo', () => {
+    assert.match(verdettoJob, /node scripts\/suite-verdict\.mjs [^\n]*--errori rossi-errori\.txt/);
+    const passo = elencoVerdetto.find((p) => /annotazioni-github\.mjs rossi-errori\.txt/.test(p.corpo));
+    assert.ok(passo, 'senza annotazioni gli errori di una corsa su un ramo li legge solo chi apre GitHub da un browser');
+    assert.doesNotMatch(passo.corpo, /rossi-nuovi\.txt/, 'nello stesso passo i due file si dividerebbero le dieci annotazioni');
+    assert.match(passo.corpo, /if:\s*always\(\) && steps\.verdetto\.outcome == 'failure'\s*$/m);
+    assert.match(passo.corpo, /continue-on-error:\s*true/);
+    const carica = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
+    assert.match(carica.corpo, /rossi-errori\.txt/, 'l\'avviso lo legge dall\'allegato del verdetto');
+  });
+
   test('esito, verdetto e tracce restano allegati per sette giorni, anche a suite rossa', () => {
     const finale = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
     const tracce = elenco.find((p) => /upload-artifact/.test(p.corpo) && /test-results\//.test(p.corpo));
