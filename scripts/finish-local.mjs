@@ -904,7 +904,10 @@ async function main() {
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root: albero.dir });
+    const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const motivo = spec.rilancia ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
+    if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
