@@ -620,7 +620,7 @@
       });
       const manda = document.createElement('button');
       manda.type = 'button';
-      manda.className = 'sn-fb-btn sn-fb-l0-manda';
+      manda.className = 'sn-fb-btn-secondary sn-fb-l0-manda';
       manda.textContent = 'Manda così';
       manda.title = 'Manda il feedback com’è, senza rileggerlo';
       manda.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: false }); });
