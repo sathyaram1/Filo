@@ -173,7 +173,7 @@ jobs:
         if: always() && !cancelled() && (steps.verdetto.outcome == 'failure' || failure())
         shell: bash
         run: |
-          echo "::error::Suite Playwright con rossi nuovi (o non arrivata in fondo) su ${GITHUB_REF}: l'elenco e gli errori stanno nel verdetto qui sopra e nelle annotazioni. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
+          echo "::error::Suite Playwright con rossi nuovi (o non arrivata in fondo) su ${GITHUB_REF}: l'elenco sta nel verdetto qui sopra, gli errori nelle annotazioni. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
           exit 1
 
   # Il cancello di pubblicazione (release.yml) rifà gli unit test su Windows: un commit rosso lì non uscirà mai, quindi
