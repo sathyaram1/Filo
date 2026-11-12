@@ -84,10 +84,11 @@ test('un ramo pari a main, o che cambia solo versione e novità, non sceglie spe
 test('le tabelle dei feedback ritoccate solo nei commenti (#2046) non trascinano gli spec feedback-*', () => {
   const s = scena();
   try {
-    const commento = '// la fusione provata (linea principale, cita il feedback, dopo nascita e riapertura); ogni altra consegna no.';
-    assert.ok(TRANSIZIONI.includes(commento), 'la scena: il commento che #2046 aveva ritoccato');
+    // Un'ancora che il ritocco di #2046 lascia intatta: la scena regge sia su main sia dopo la fusione del ritocco.
+    const commento = '// «Già risolto su main» (FEEDBACK-STATES.md §3a)';
+    assert.ok(TRANSIZIONI.includes(commento), 'la scena: il commento delle tabelle da ritoccare');
     s.ramo('commenti', {
-      'src/shared/feedbackTransitions.js': TRANSIZIONI.replace(commento, '// la fusione provata (linea principale, cita il feedback, dopo nascita e riapertura; un doppione: è la fusione\n      // dell\'originale, chiuso, dopo la riapertura); ogni altra consegna no.'),
+      'src/shared/feedbackTransitions.js': TRANSIZIONI.replace(commento, '// un doppione si chiude con la fusione dell\'originale, chiuso, dopo la riapertura.\n      ' + commento),
       'FEEDBACK-STATES.md': 'stati\n',
     });
     const r = s.scegli();
