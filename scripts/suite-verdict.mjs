@@ -43,10 +43,11 @@
 // USO
 //   node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>]
 //                                  [--rossi <rossi-noti.json>] [--chiavi <file>]
-//                                  [--parti <N> --esiti <cartella>]
+//                                  [--errori <file>] [--parti <N> --esiti <cartella>]
 //
 //   --chiavi scrive le chiavi dell'allarme (scripts/build-alarm.mjs), una per
 //   riga: cosa è rotto, perché il server non apra un doppione per lo stesso guasto.
+//   --errori scrive l'errore di ogni rosso nuovo, per il testo del feedback.
 //
 //   Come si produce il JSON (Playwright ≥ 1.49):
 //   PLAYWRIGHT_JSON_OUTPUT_NAME=suite.json npx playwright test --reporter=list,json
