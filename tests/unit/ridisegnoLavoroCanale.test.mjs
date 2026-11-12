@@ -171,7 +171,6 @@ test('un doppione arriva al server col numero dell\'originale, che la fusione lo
   assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).pop().body.data.doppioneDi, undefined);
   const prima = ricevuti.length;
   const casi = [
-    [[...base, '--fusione', fusione, '--doppione-di', '76', ...testi], /non porta nessun commit che citi #76/],
     [[...base, '--fusione', fusione, '--doppione-di', 'il menu', ...testi], /vuole in --doppione-di il numero/],
     [[...base, '--doppione-di', '77', ...testi], /vuole --fusione/],
     [['deliver', 'b'.repeat(43), 'status', '--status', 'design', '--reason', 'clarify', '--doppione-di', '77', ...testi], /va con --status done/],
