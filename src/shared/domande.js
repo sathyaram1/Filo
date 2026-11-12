@@ -493,6 +493,22 @@
   }
 
   /**
+   * La domanda che ha assorbito questa (§3.6, la revisione): risponde anche per lei, e l'owner la può riaprire.
+   * '' per ogni altra superata (un'attesa andata avanti per un'altra strada non si riapre). PURA.
+   */
+  function assorbitaIn(domanda) {
+    const e = isOggetto(domanda) && domanda.stato === 'superata' && isOggetto(domanda.esito) && domanda.esito.assorbita === true
+      ? domanda.esito.superataDa : '';
+    return typeof e === 'string' && numeroDi(e) !== null ? e.trim() : '';
+  }
+
+  /** Le domande che questa ha assorbito, valide e una volta sola, nell'ordine in cui sono entrate. PURA. */
+  function assorbiteDi(domanda) {
+    const l = isOggetto(domanda) && Array.isArray(domanda.assorbite) ? domanda.assorbite : [];
+    return [...new Set(l.filter((x) => typeof x === 'string' && numeroDi(x) !== null).map((x) => x.trim()))];
+  }
+
+  /**
    * La domanda coi testi degli autori non fidati passati da `visibile` (#1502): titolo, contesto, opzioni e turni di una
    * domanda non fidata, e i turni non fidati di ogni domanda. Azioni, id e testi dell'owner restano com'erano. PURA.
    */
