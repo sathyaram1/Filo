@@ -67,8 +67,9 @@
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
 //   node scripts/routine-channel.mjs aspetta <biglietto>
-//       → il worker che ha solo da aspettare i suoi comandi in sottofondo (#2185), al massimo una fetta
-//         (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella, 5 = lavorano ancora (si rilancia).
+//       → il worker che ha solo da aspettare i suoi comandi e sotto-agenti in sottofondo (#2185, #2304), al massimo una
+//         fetta (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella né sotto-agente al lavoro,
+//         5 = lavorano ancora (si rilancia).
 //
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
@@ -234,6 +235,19 @@ export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fe
 }
 
 function defaultSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/**
+ * La lettura del lavoro vivo di un worker, una regola per l'attesa e il rilascio: i suoi processi nella cartella e i
+ * sotto-agenti non chiusi della sessione (#2304), che dopo il rilascio scriverebbero nella cartella del prossimo.
+ */
+async function lavoroVivoDelWorker() {
+  const { sottoAgentiVivi } = await import('./lib/veglia-worker.mjs');
+  return () => {
+    const v = lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
+    const figli = sottoAgentiVivi();
+    return figli.length ? { ...v, vivo: true, segni: [...figli, ...v.segni] } : v;
+  };
+}
 
 /**
  * Traduce la risposta del canale nel vocabolario delle routine. PURA.
@@ -1948,7 +1962,7 @@ if (isMain) {
     const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
     const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
     const esito = await aspettaCartella({
-      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) }),
+      controlla: await lavoroVivoDelWorker(),
       sleep: defaultSleep,
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
@@ -1989,12 +2003,12 @@ if (isMain) {
     const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
     const chiRilascia = typeof data.role === 'string' ? data.role : '';
     if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
-      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
+      const vivo = chiRilascia === 'orchestrator' ? lavoroVivo(ROOT, {}) : (await lavoroVivoDelWorker())();
       if (vivo.vivo) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'
           ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
-          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona: «aspetta <biglietto>» di questo stesso script), o fermali se non servono più, poi rilancia lo stesso comando.');
+          : 'Aspetta che finiscano (un comando o un sotto-agente in sottofondo si aspetta, non si abbandona: «aspetta <biglietto>» di questo stesso script), o fermali se non servono più (un sotto-agente con lo strumento TaskStop), poi rilancia lo stesso comando.');
         process.exit(USCITA_LAVORO_VIVO);
       }
     }

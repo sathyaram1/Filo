@@ -1147,6 +1147,7 @@ export function testoLavoroVivo(esito, azione) {
   const righe = [...segni.filter((s) => s.tipo !== 'processo'), ...processi.slice(0, MOSTRATI)].map((s) => {
     if (s.tipo === 'battito') return `battito vivo del biglietto ${s.biglietto}… (pid ${s.pid})`;
     if (s.tipo === 'timbro') return `il gancio di salvataggio del biglietto ${s.biglietto}… ha salvato ${Math.round(s.etaMs / 60000)} minuti fa`;
+    if (s.tipo === 'sotto-agente') return `sotto-agente ${s.nome}${s.descrizione ? ` «${s.descrizione}»` : ''} al lavoro (ultimo passo ${Math.round(s.etaMs / 60000)} minuti fa)`;
     return `processo ${s.pid} «${s.cmd}» in ${s.cwd}`;
   });
   if (processi.length > MOSTRATI) righe.push(`e altri ${processi.length - MOSTRATI} processi`);

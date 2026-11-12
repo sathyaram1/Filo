@@ -76,8 +76,9 @@ che non hai potuto provare si dichiara, non si tace.
 Usando Filo non si vedono due cose: lo stesso conto scritto in due posti, e
 prove che non bastano per quello che il lavoro cambia. Le guarda una lettura
 del diff con la richiesta davanti. Quando la critica è scritta e le prove del
-giro sono nel ramo, prima di registrarla, lancia UN sotto-agente
-(`subagent_type: routine-lettura`; se il tipo non c'è, `general-purpose`) con
+giro sono nel ramo, prima di registrarla, lancia UN sotto-agente in primo
+piano (`subagent_type: routine-lettura`, `run_in_background: false`; se il tipo
+non c'è, `general-purpose`) con
 questo prompt:
 
 > Lancia `node scripts/lettura-diff.mjs`, diventa il ruolo che ti stampa e

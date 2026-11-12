@@ -40,7 +40,8 @@ test('le fette delle due attese restano sotto il timeout predefinito di una chia
 test('l’attesa e il rilascio del worker leggono lo stesso criterio di lavoro vivo', () => {
   const sorgente = readFileSync(CANALE, 'utf8');
   assert.doesNotMatch(sorgente, /cosa:\s*\[\s*'processi'\s*\]/, 'un criterio scritto a mano');
-  assert.equal(sorgente.match(/cosa: SEGNI_RILASCIO_WORKER\b/g)?.length, 2);
+  assert.equal(sorgente.match(/cosa: SEGNI_RILASCIO_WORKER\b/g)?.length, 1, 'una lettura sola, in lavoroVivoDelWorker');
+  assert.equal(sorgente.match(/await lavoroVivoDelWorker\(\)/g)?.length, 2, 'la chiamano l\'attesa e il rilascio');
 });
 
 test('l’elenco d’uso del canale nomina ogni suo comando', () => {
@@ -57,7 +58,7 @@ test('esce 0 appena il processo finisce, senza aspettare il resto della fetta', 
   const r = await aspettaCartella({ controlla: () => letture.shift(), ...o, fetta: 60000, passo: 5000 });
   assert.equal(r.uscita, USCITA_LIBERA);
   assert.equal(o.adesso(), 10000);
-  assert.match(r.testo, /Finito: nessun tuo processo lavora più nella cartella/);
+  assert.match(r.testo, /Finito: nessun tuo processo lavora più nella cartella e nessun tuo sotto-agente è al lavoro/);
 });
 
 test('a fetta finita esce 5, dice chi lavora e di rilanciare', async () => {

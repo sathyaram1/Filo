@@ -277,6 +277,46 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   return { viste: true, ultimoMs, attesa, elenco, chiusoMs: worker ? chiusuraDi(worker.righe) : NaN };
 }
 
+/**
+ * I sotto-agenti lanciati da un agente e non ancora chiusi, dalle voci della cartella delle tracce (`id`, `meta`, `ms`
+ * dell'ultima scrittura): Claude Code segna `finished` nel meta quando un agente chiude. Il worker senza un'attesa per
+ * loro faceva un turno al secondo per non sembrare fermo (#2304). Non contano i figli di un agente già chiuso, né
+ * quelli zitti da più della soglia della veglia: un figlio morto non tiene fermo il rilascio per sempre. PURA.
+ */
+export function sottoAgentiAlLavoro(voci, { adesso = Date.now(), soglia = SOGLIA_FERMO_MS } = {}) {
+  const lista = Array.isArray(voci) ? voci.filter((v) => v && v.meta && typeof v.meta === 'object') : [];
+  const chiusi = new Set(lista.filter((v) => v.meta.finished === true).map((v) => v.id));
+  return lista
+    .filter((v) => {
+      const padre = typeof v.meta.parentAgentId === 'string' ? v.meta.parentAgentId.trim() : '';
+      return padre && v.meta.finished !== true && !chiusi.has(padre) && Number.isFinite(v.ms) && adesso - v.ms < soglia;
+    })
+    .map((v) => ({
+      tipo: 'sotto-agente',
+      nome: nomeSicuro(v.meta.agentType) || 'sotto-agente',
+      descrizione: pulito(v.meta.description).replace(/\s+/g, ' ').trim().slice(0, 80),
+      etaMs: Math.max(0, adesso - v.ms),
+    }));
+}
+
+/** Le voci della cartella delle tracce: id, meta e ultima scrittura della traccia (del meta, se la traccia manca). */
+export function vociSottoAgenti(dir) {
+  let nomi = [];
+  try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.meta.json')) : []; } catch (_) { nomi = []; }
+  return nomi.map((n) => {
+    const base = n.slice(0, -'.meta.json'.length);
+    let meta = null;
+    try { meta = JSON.parse(readFileSync(join(dir, n), 'utf8')); } catch (_) { meta = null; }
+    const traccia = mtime(join(dir, `${base}.jsonl`));
+    return { id: base.replace(/^agent-/, ''), meta, ms: Number.isFinite(traccia) ? traccia : mtime(join(dir, n)) };
+  });
+}
+
+/** I sotto-agenti al lavoro nella sessione, come segni di lavoro vivo per l'attesa e il rilascio del worker. */
+export function sottoAgentiVivi({ sessione = process.env.CLAUDE_CODE_SESSION_ID, configDir = '', adesso = Date.now() } = {}) {
+  return sottoAgentiAlLavoro(vociSottoAgenti(cartellaSottoAgenti({ sessione, configDir })), { adesso });
+}
+
 /** Quando il server ha dato il biglietto, dal registro che il comando ticket scrive per il gancio. NaN se non c'è. */
 export function inizioDalRegistro(ticket, { dir = dirImpostazioniUtente() } = {}) {
   try {

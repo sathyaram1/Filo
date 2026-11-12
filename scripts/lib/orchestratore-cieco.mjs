@@ -23,6 +23,7 @@ export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti
 // lo strumento torna con status async_launched: il worker lavora ancora (#1480, D-90). Un worker fermo su un permesso
 // non manda mai la notifica di fine: decide la veglia (#1797).
 export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: veglialo col comando veglia del tuo ruolo, in primo piano. Con 5 lavora ancora: rilancia la veglia. Con 0 ha finito: vai avanti come dopo un worker finito. Con 3 era fermo e la veglia ha già rilasciato il biglietto col guasto: chiudi il giro. La notifica di fine del worker non decide niente.';
+export const FIGLIO_IN_SOTTOFONDO = 'Questo sotto-agente lavora in sottofondo. Intanto fai altro, senza controllarlo a ripetizione: ogni controllo è un turno intero. Quando resta solo da aspettarlo, la tua attesa in primo piano è il comando aspetta del canale col tuo biglietto: esce 0 quando nessun tuo processo o sotto-agente lavora più, 5 quando lavorano ancora (rilancialo subito). Prima del rilascio va aspettato.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_LANCIO = 'Worker in primo piano, con modello e sforzo decisi dal server (quelli della sua definizione se il server non ne ha detti).';
 export const MOTIVO_IMPOSTAZIONI = 'Durante il giro impostazioni e skill restano quelle di partenza: un worker non deve poter spegnere o affiancare il gancio che rende cieco chi guida il giro.';
@@ -72,7 +73,16 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   const notifica = strumento === "PushNotification" || (strumento === "SendUserFile" && ti.status === "proactive");
   if (notifica && input.hook_event_name === "PreToolUse") return nega(MOTIVO_NOTIFICA);
   if (strumento !== "Agent" && strumento !== "Task") return null;
-  if (input.agent_id) return null;
+  const tornato = (r) => {
+    const stato = !!r && typeof r === "object" && !Array.isArray(r) && typeof r.status === "string" ? r.status : "";
+    return stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
+  };
+  // Un sotto-agente di un worker resta intatto; se gira in sottofondo il worker riceve come aspettarlo (#2304).
+  if (input.agent_id) {
+    if (input.hook_event_name !== "PostToolUse" || tornato(input.tool_response)) return null;
+    const attesa = strumenti ? " Comando: node " + strumenti + "/scripts/routine-channel.mjs aspetta <il tuo biglietto>" : "";
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO + attesa } };
+  }
   if (input.hook_event_name === "PreToolUse") {
     if (ti.run_in_background === true) return nega(MOTIVO_SOTTOFONDO);
     const visti = [...new Set([...String(ti.prompt || "").matchAll(/--ticket[^A-Za-z0-9_-]{1,3}([A-Za-z0-9_-]{32,})/g)].map((m) => m[1]))];
@@ -95,8 +105,7 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   if (input.hook_event_name === "PostToolUse") {
     const r = input.tool_response;
     const oggetto = !!r && typeof r === "object" && !Array.isArray(r);
-    const stato = oggetto && typeof r.status === "string" ? r.status : "";
-    const finito = stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
+    const finito = tornato(r);
     // Claude Code scarta un updatedToolOutput che non ha la forma del ritorno di Agent (una stringa, al posto di un
     // oggetto) e tiene il suo: il testo si sostituisce dentro la forma, e il lancio in sottofondo, che di testo non ne
     // porta, riceve la riga come contesto in più (#1797).
@@ -113,7 +122,7 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
 
 const PRELUDIO = `/*${ETICHETTA}*/const VALIDITA_MS=${VALIDITA_MS},DURATA_VOCE_MS=${DURATA_VOCE_MS},`
   + `MODELLI=${JSON.stringify(MODELLI)},SFORZI=${JSON.stringify(SFORZI)},AL_POSTO_DEL_TESTO=${JSON.stringify(AL_POSTO_DEL_TESTO)},`
-  + `AL_POSTO_VIVO=${JSON.stringify(AL_POSTO_VIVO)},`
+  + `AL_POSTO_VIVO=${JSON.stringify(AL_POSTO_VIVO)},FIGLIO_IN_SOTTOFONDO=${JSON.stringify(FIGLIO_IN_SOTTOFONDO)},`
   + `MOTIVO_SOTTOFONDO=${JSON.stringify(MOTIVO_SOTTOFONDO)},MOTIVO_LANCIO=${JSON.stringify(MOTIVO_LANCIO)},`
   + `MOTIVO_IMPOSTAZIONI=${JSON.stringify(MOTIVO_IMPOSTAZIONI)},MOTIVO_SENZA_BIGLIETTO=${JSON.stringify(MOTIVO_SENZA_BIGLIETTO)},`
   + `MOTIVO_DUE_BIGLIETTI=${JSON.stringify(MOTIVO_DUE_BIGLIETTI)},MOTIVO_REGISTRO=${JSON.stringify(MOTIVO_REGISTRO)},`

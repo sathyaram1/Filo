@@ -11,6 +11,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
+import { claudeConSottoAgenti } from '../helpers/sottoAgenti.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
   TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation, cartelleDelLavoro,
@@ -368,6 +369,36 @@ test('le cartelle del lavoro: il clone del server che esiste, una volta sola; ne
   const clone = join(C, 'filo-security');
   assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone, dalCheckout: join(clone, 'functions'), esiste }), [clone]);
   assert.deepEqual(cartelleDelLavoro(resolve('/r'), { clone: resolve('/x/filo-security'), dalCheckout: '', esiste }), []);
+});
+
+// Dopo il rilascio cartella e ramo passano al prossimo worker: un sotto-agente in sottofondo ci scriverebbe sopra (#2304).
+test('il rilascio di un worker aspetta i suoi sotto-agenti in sottofondo', async () => {
+  const { casa, clone } = cartellaSulRamo();
+  const { srv, chiamate, api } = await canaleFinto();
+  const vivo = claudeConSottoAgenti('s-2304', [{ id: 'w1', tipo: 'routine-worker' }, { id: 'c1', padre: 'w1', tipo: 'Explore', descrizione: 'scettico' }]);
+  const chiuso = claudeConSottoAgenti('s-2304', [{ id: 'w1', tipo: 'routine-worker' }, { id: 'c1', padre: 'w1', finito: true }]);
+  const rilascio = (configDir) => new Promise((ok) => {
+    const p = spawn(process.execPath, [CANALE, 'release', T1, '--role', 'verifier', '--senza-rapporto'],
+      { env: ambiente(clone, { FILO_ROUTINE_API: api, CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_SESSION_ID: 's-2304' }) });
+    let so = ''; let se = '';
+    p.stdout.on('data', (c) => { so += c; });
+    p.stderr.on('data', (c) => { se += c; });
+    p.on('close', (code) => ok({ code, so, se }));
+  });
+  try {
+    writeFileSync(ticketFile(clone), JSON.stringify({ ticket: T1, since: new Date().toISOString() }));
+    const r = await rilascio(vivo);
+    assert.equal(r.code, USCITA_LAVORO_VIVO, r.se);
+    assert.match(r.se, /LAVORO VIVO.*sotto-agente Explore «scettico» al lavoro/);
+    assert.match(r.se, /un sotto-agente con lo strumento TaskStop/);
+    assert.ok(!chiamate.some((u) => u.endsWith('/routineRelease')));
+    const ok = await rilascio(chiuso);
+    assert.equal(ok.code, 0, ok.se);
+    assert.ok(chiamate.some((u) => u.endsWith('/routineRelease')));
+  } finally {
+    srv.close();
+    for (const d of [casa, vivo, chiuso]) togliCartella(d);
+  }
 });
 
 test('un rilascio con la cartella di un altro biglietto non committa, non spedisce e non tocca il marcatore', async () => {

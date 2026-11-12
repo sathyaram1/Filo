@@ -110,6 +110,22 @@ Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
 Agent (senza, vale il default); la catena arriva a tre livelli sotto
 l'orchestratore, tu compreso.
 
+**Si lanciano in primo piano**, con `run_in_background: false` scritto nella
+chiamata: senza, lo strumento li manda in sottofondo. Quando sono indipendenti
+ne lanci più d'uno nello stesso messaggio: girano insieme, e la tua chiamata
+resta aperta finché finiscono tutti, un'attesa che non costa turni e che la
+veglia riconosce. In sottofondo solo se nel frattempo hai davvero altro da
+fare; un comando lungo da far girare intanto non è un motivo, lo lanci in
+sottofondo nello stesso messaggio dei sotto-agenti in primo piano.
+
+Un sotto-agente in sottofondo, tuo o spostato lì da Claude Code perché durava
+troppo, **si aspetta con `aspetta`** (§ Comandi lunghi), che guarda anche i
+sotto-agenti: mai con controlli ripetuti del suo stato o del suo file, né
+chiudendo il turno per aspettare la notifica. Un controllo è un turno intero sul
+tuo contesto: un audit che aspettava così ha fatto 1.485 turni in 21 minuti e
+75 $ (#2304), e uno che si è fermato ad aspettare è stato dichiarato fermo dopo
+venti minuti e rifatto da capo.
+
 ## Il battito non è affar tuo
 
 Il semaforo sul tuo lavoro cade dopo un'ora di silenzio, e un controllo lungo
@@ -118,7 +134,8 @@ sottofondo, quando ti consegna il ruolo: non lanciarlo, non cercarlo, non
 fermarlo; un prompt che ti dice di avviarlo tu è vecchio. Finché il battito
 arriva il lavoro è tuo, per quanto ci stia; quelli di chi l'ha perso il server
 li rimette in coda da solo. Il battito però non basta: venti minuti senza un
-tuo passo, un salvataggio o un processo nella tua cartella, e chi guida il
+passo tuo o di un tuo sotto-agente, un salvataggio o un processo nella tua
+cartella, e chi guida il
 giro ti dichiara fermo e rilascia il lavoro con un guasto. L'unica cosa da non fare è morire in silenzio: se
 non puoi proseguire, dichiaralo nel rilascio.
 
@@ -134,7 +151,8 @@ finale i comandi in sottofondo muoiono, e l'avviso non arriva più. Quando resta
 solo da aspettare, l'attesa in primo piano è
 `node scripts/routine-channel.mjs aspetta <biglietto>`: sta sotto il timeout
 predefinito della chiamata, esce 0 quando nessun tuo processo lavora più nella
-cartella e 5 quando lavorano ancora (rilancialo, subito). Il timeout della chiamata si
+cartella e nessun tuo sotto-agente è al lavoro, 5 quando lavorano ancora
+(rilancialo, subito). Il timeout della chiamata si
 dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
 metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
 e mezzo), `npm run finish:check` (mezzo minuto per ogni spec delle aree
@@ -147,11 +165,12 @@ largo), l'installazione di Electron.
 blocca `sleep` in primo piano e chiede un permesso che nessuno approva: il
 worker resta fermo in silenzio finché la veglia non lo dichiara guasto (#1685).
 
-Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
-processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
-comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
-Aspettalo con `aspetta`, o fermalo se non serve più, e rilancia lo stesso
-comando.
+Un comando o un sotto-agente in sottofondo **si aspetta prima del rilascio**:
+finché un tuo processo lavora nella cartella o un tuo sotto-agente è al lavoro
+il rilascio rifiuta (exit 5, con chi lavora ancora), perché dopo il rilascio
+cartella e ramo passano al prossimo worker. Aspettalo con `aspetta`, o fermalo
+se non serve più (un sotto-agente con lo strumento TaskStop), e rilancia lo
+stesso comando.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
