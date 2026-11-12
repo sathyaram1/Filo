@@ -1146,7 +1146,7 @@
         'per quanto conservare il testo', 'scadenza testo dei campi'],
       costo: 1,
       build(v) {
-        const R = global.SN_TESTO_CAMPI;
+        const R = testoCampi();
         const g = parseInt(String(v).replace(/[^\d]/g, ''), 10);
         if (!R.GIORNI.includes(g)) return { rifiuto: `Il testo dei campi può restare ${R.GIORNI.join(', ')} giorni: scegline uno.` };
         return { partial: { testoDeiCampi: { giorni: g } }, label: `Il testo dei campi resta → ${g === 1 ? '1 giorno' : `${g} giorni`}` };
