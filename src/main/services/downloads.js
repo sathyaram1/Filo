@@ -1754,6 +1754,7 @@ module.exports = {
   safeName,
   marcaOrigine,
   list,
+  elenco,
   clearCompleted,
   remove,
   confirmDownload,
