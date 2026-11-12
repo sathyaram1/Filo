@@ -122,18 +122,15 @@
       const campi = p.campi.filter((c) => c && firmaPulita(c.firma) && typeof c.valore === 'string' && c.valore
         && c.valore.length <= VALORE_MAX && Number(c.t) > limite && Number(c.t) <= ora + DAY_MS).slice(-CAMPI_PER_PAGINA);
       if (!campi.length) continue;
-      const t = Math.max(...campi.map((c) => Number(c.t)));
-      pagine.push([k, { t, campi }, campi.reduce((n, c) => n + c.valore.length, 0)]);
+      pagine.push([k, { t: Math.max(...campi.map((c) => Number(c.t))), campi }]);
     }
-    pagine.sort((a, b) => b[1].t - a[1].t);
-    const out = {};
-    let totale = 0;
-    for (const [k, p, peso] of pagine) {
-      if (totale + peso > TOTALE_MAX) continue;
-      totale += peso;
-      out[k] = p;
-    }
-    return out;
+    return Object.fromEntries(pagine);
+  }
+
+  function pesoTotale(dati) {
+    let n = 0;
+    for (const p of Object.values(dati || {})) for (const c of (p && p.campi) || []) n += String(c.valore || '').length;
+    return n;
   }
 
   // Scrive nella pagina `p` (o la crea) un campo: valore vuoto = via. Torna la pagina, null se resta vuota.
