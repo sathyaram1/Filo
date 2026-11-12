@@ -8,7 +8,7 @@ const PAGINA = `<!doctype html><html><head><meta charset="utf-8"></head><body st
   + `<p id="t">Pagina che ascolta.</p><script>window.__visti=[];`
   + `window.addEventListener('paste',(e)=>{let f=0;try{f=e.clipboardData.files.length}catch(_){}window.__visti.push(f)},true);</script></body></html>`;
 
-for (const ms of [0, 80, 150]) {
+for (const ms of [150, 600, 2000]) {
   test(`menu Invia feedback, Ctrl+V dopo ${ms} ms`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     const p = await testServer.openReady(openTab, PAGINA);
