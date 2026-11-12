@@ -186,6 +186,8 @@
   // Il testo che la chat scrive nella conversazione venendo da fuori (l'esito di un comando dato in chat, il nome di un
   // file scaricato) è una lettura come le altre: imbustato, contato per le uscite (#587), con la vita delle letture.
   const ESTERNO_COMANDO = "dall'output di un comando";
+  // Il messaggio che Filo scrive da sé nel filo (src/main/services/filoParla.js): racconta nomi scritti da altri (#592.4).
+  const ESTERNO_RACCONTO = 'dal messaggio con cui Filo racconta avvisi, sveglie e download, i cui nomi li scrivono altri';
   const daFuoriIl = (m) => !!m && m.role !== 'user' && typeof m.esterno === 'string' && !!m.esterno;
   function letturaDaFuori(m, comando = '') {
     if (!daFuoriIl(m)) return null;
