@@ -512,10 +512,10 @@ test('il grezzo che resta ha un tetto in token: turni pesanti lasciano spazio so
 test('dopo una compattazione entrano almeno tre turni come quelli di adesso prima della prossima, qualunque sia la parte fissa', () => {
   const ora = Date.parse('2026-11-04T18:00:00Z');
   const peso = (m) => m.peso;
-  const soglia = 70000;
-  for (const T of [3000, 5000, 6000]) {
+  // Anche la soglia di serie sotto la parte fissa di oggi (~43.000 token) con turni da 8.000 (un capitolo e i ricordi
+  // ripescati), e una soglia scritta sotto la parte fissa: la regola dello spazio sopra di lei vale per tutte.
+  for (const [soglia, T] of [[70000, 3000], [70000, 5000], [70000, 6000], [70000, 8000], [40000, 3000], [40000, 8000]]) {
     for (let base = 30000; base <= 50000; base += 250) {
-      if ((soglia - base) * L.QUOTA_ANTICIPO < (L.TURNI_LIBERI + 1) * T) continue;
       const lista = [];
       for (let i = 0; i < 8; i++) lista.push(msg('ab', 'user', 80 - i * 5, `d${i}`, ora, { peso: T - 100 }), msg('ab', 'filo', 79 - i * 5, `r${i}`, ora, { peso: 100 }));
       const turno = L.pesoTurno(lista, peso);
