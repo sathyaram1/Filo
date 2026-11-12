@@ -402,13 +402,15 @@
     const { u, ingresso } = ciclo({ soglia: FC().TETTI_DI_SERIE.soglia, base: USO.base });
     return { prompt: Math.round(ingresso), completion: u.uscitaCompattazione };
   }
-  function stimaSoglia({ soglia, base, prezzoChat, prezzoCompattazione, prezzoPer = (p) => p, uso = USO } = {}) {
+  // Una soglia che la regola dello spazio alza lo dice, con la parte fissa e da dove compatta davvero.
+  const migliaia = (n) => numero(Math.round(n / 1000) * 1000);
+  function stimaSoglia({ soglia, base = USO.base, prezzoChat, prezzoCompattazione, prezzoPer = (p) => p, uso = USO } = {}) {
     if (!prezzoChat || !prezzoCompattazione || !(soglia > 0)) return null;
-    const { u, grezzo, spazio, ingresso } = ciclo({ soglia, base, uso });
+    const { u, l, grezzo, spazio, ingresso } = ciclo({ soglia, base, uso });
     const ogni = Math.max(1, Math.round(spazio / u.perMessaggio));
     const pc = prezzoPer(prezzoCompattazione, ingresso);
     const unaCompattazione = ingresso * pc.prompt + u.uscitaCompattazione * pc.completion;
-    const medio = Math.max(base, Math.min(soglia, base + grezzo + spazio / 2));
+    const medio = Math.max(base, Math.min(l.soglia, base + grezzo + spazio / 2));
     const p = prezzoPer(prezzoChat, medio);
     const lettura = p.cacheRead != null ? p.cacheRead : p.prompt;
     const unMessaggio = (medio - u.perMessaggio) * lettura + u.perMessaggio * p.prompt + u.uscitaChat * p.completion;
