@@ -115,7 +115,7 @@ const attached = new WeakSet();
 // Cresce a ogni cambio che le superfici vedono: una lista di risposta più vecchia di un evento già arrivato non lo
 // riscrive (#2307, src/shared/elencoScaricamenti.js).
 let revisione = 0;
-function elenco(scope = '') { return { items: listRecords(scope), rev: revisione }; }
+function elenco(scope = '') { return { ...elenco(scope), rev: revisione }; }
 
 // Ambito di chi guarda: '' per le finestre normali, la partizione per una
 // finestra incognito. Una voce si vede e si comanda solo dal suo ambito.
@@ -1446,32 +1446,32 @@ function quandoRiprovaStreaming(fn) { rifaiStreaming = typeof fn === 'function' 
 
 function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
-  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', items: listRecords(scope) };
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', ...elenco(scope) };
   // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
-  if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, items: listRecords(scope) };
+  if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, ...elenco(scope) };
   // Un video in streaming non ha un file da riscaricare: si rifà il salvataggio dalla pagina (#1488), anche da una
   // voce riuscita («Ri-scarica»), che resta com'è mentre ne nasce una nuova.
   if (rec.via === 'streaming' && !NON_TERMINAL.has(rec.state)) {
     if (!rifaiStreaming || !/^https?:/i.test(String(rec.url || ''))) {
-      return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', items: listRecords(scope) };
+      return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', ...elenco(scope) };
     }
     rifaiStreaming({
       id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '',
       sessione: rec._sessione || null, paese: rec.paese || null,
     });
-    return { ok: true, items: listRecords(scope) };
+    return { ok: true, ...elenco(scope) };
   }
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
-    return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
+    return { ok: false, error: 'Questo scaricamento non è fallito', ...elenco(scope) };
   }
   // Si rifà il clic: dall'indirizzo cliccato (dopo un riavvio resta solo quello finale), con la pagina da cui partiva.
   const indirizzo = /^https?:/i.test(String(rec._primo || '')) ? rec._primo : String(rec.url || '');
   if (!/^https?:/i.test(indirizzo)) {
-    return { ok: false, error: 'Questo file non ha un indirizzo da cui riscaricarlo', items: listRecords(scope) };
+    return { ok: false, error: 'Questo file non ha un indirizzo da cui riscaricarlo', ...elenco(scope) };
   }
   const ses = sessioneDi(rec);
   if (!ses || typeof ses.downloadURL !== 'function') {
-    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', items: listRecords(scope) };
+    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', ...elenco(scope) };
   }
   const k = chiaveRiprova(scope, indirizzo);
   riprove.set(k, (riprove.get(k) || []).concat(rec.id));
@@ -1504,9 +1504,9 @@ function riprova(id, scope = '') {
     rec.endedAt = new Date().toISOString();
     persist();
     broadcast('error', rec);
-    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', items: listRecords(scope) };
+    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', ...elenco(scope) };
   }
-  return { ok: true, items: listRecords(scope) };
+  return { ok: true, ...elenco(scope) };
 }
 
 // #588.8 — un file scaricato si trascina come da una cartella del sistema: su un campo per caricare file di un sito,
@@ -1584,12 +1584,12 @@ const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostat
 function confirmDownload(id, allow, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec || rec.state !== 'pending') {
-    return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
+    return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', ...elenco(scope) };
   }
   if (!rec._piuFile) contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
   // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
   const manual = liveManual.get(id);
-  if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
+  if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, ...elenco(scope) }; }
   if (!allow) {
     const item = liveItems.get(id);
     rec._final = true;   // il 'done' che segue cancel() non deve riscrivere l'esito
@@ -1606,15 +1606,15 @@ function confirmDownload(id, allow, scope = '') {
     persist();
     broadcast('error', rec);
     contaFine(rec);
-    return { ok: true, items: listRecords(scope) };
+    return { ok: true, ...elenco(scope) };
   }
-  if (rec._arrivato) { completa(rec); return { ok: true, items: listRecords(scope) }; }
+  if (rec._arrivato) { completa(rec); return { ok: true, ...elenco(scope) }; }
   // Ancora in corso: prosegue come un download qualsiasi, e il file esce dalla
   // quarantena quando arriva in fondo (completa()).
   rec.state = 'progressing';
   persist();
   broadcast('progress', rec);
-  return { ok: true, items: listRecords(scope) };
+  return { ok: true, ...elenco(scope) };
 }
 
 // Chi ha servito i byte: in un record nativo `url` è già l'ultimo indirizzo,
