@@ -109,6 +109,7 @@ import { dentroLaBusta } from './lib/busta.mjs';
 import { assicuraStoria, TETTO_STORIA_MS, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
+import { leggiRispostaCritica, scriviRispostaCritica } from './lib/risposta-critica.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -1448,7 +1449,7 @@ function sealTransition(state, by) {
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
- * si stampa intera: non sta da nessun'altra parte.
+ * si stampa intera e resta in un file della consegna (lib/risposta-critica.mjs).
  */
 async function recordVerifier(id, critiqueText, domande = []) {
   const guard = guardIdentity(id);
@@ -2130,6 +2131,8 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
+    '  --risposta-critica [<id>] [--ticket <b>]   ristampa la risposta del server all\'ultima critica',
+    '                         registrata su questo ramo (sola lettura: niente server, niente stato)',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
@@ -2837,8 +2840,23 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
       const risposta = `stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}\n${verifierReplyText(s.reply, id)}`;
+      // La critica è già registrata: un file che non si scrive non la disfa, ma chi legge deve sapere che la stampa è l'unica copia.
+      let salvata = '';
+      try { salvata = scriviRispostaCritica(ROOT, { id, ramo: ramoCorrente(ROOT), sha: s.verifierSha || headSha(ROOT) || '', testo: risposta }); } catch (e) {
+        process.stderr.write(`[dispatch] risposta non salvata su file (${e.message}): questa stampa è l'unica copia, leggila intera.\n`);
+      }
       console.log(risposta);
-      console.log(rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta)));
+      const suFile = rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta));
+      // Una riga sola in fondo, perché sopravviva a un `| tail`, che è il filtro che l'ha persa (#2316).
+      console.log(salvata ? `\nLa risposta intera sta anche in ${salvata}; se l'hai filtrata o persa la ristampa: node scripts/dispatch.mjs --risposta-critica ${id}` : suFile);
+      process.exit(0);
+    } else if (flag === '--risposta-critica') {
+      // Sola lettura: niente server, niente stato, niente battito. Il biglietto a mano si accetta e non serve.
+      const [, id, ...avanzo] = argv;
+      if ((id && SEMBRA_OPZIONE(id)) || avanzo.length) { console.error('Uso: --risposta-critica [<id>] [--ticket <b>]. Niente è stato toccato.'); process.exit(1); }
+      const r = leggiRispostaCritica(ROOT, { id: id || '', ramo: ramoCorrente(ROOT) });
+      if (r.errore) { console.error(r.errore); process.exit(2); }
+      console.log(r.testo);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
