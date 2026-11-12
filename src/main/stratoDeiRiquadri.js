@@ -42,6 +42,17 @@ function scrive(input, piattaforma = process.platform) {
   return !!(input.control && input.alt) && k.length === 1 && !/^[a-z0-9]$/i.test(k);
 }
 
+// L'incolla battuto mentre lo strato nasce è per il riquadro che si sta aprendo, come le lettere: lasciato alla pagina
+// le darebbe l'immagine negli appunti (#1623.3). Rigiocato come comando, non come tasto: su Mac Cmd+V è del menu.
+function incolla(input, piattaforma = process.platform) {
+  if (!input || input.type !== 'keyDown' || input.isComposing || input.alt) return null;
+  const k = String(input.key || '').toLowerCase();
+  if (k === 'insert') return input.shift && !input.control && !input.meta ? 'paste' : null;
+  const tasto = piattaforma === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
+  if (k !== 'v' || !tasto) return null;
+  return input.shift ? 'pasteAndMatchStyle' : 'paste';
+}
+
 function eventiDi(t) {
   const keyCode = NOMI_TASTO[t.key] || t.key;
   if (t.type === 'keyUp') return [{ type: 'keyUp', keyCode, modifiers: t.modifiers }];
@@ -367,15 +378,20 @@ class StratoDeiRiquadri {
     if (s.trattenuti || col !== s.wc) return;
     s.trattenuti = [];
     clearTimeout(s.timerTrattenuti);
-    s.timerTrattenuti = setTimeout(() => this._rilascia(s, s.wc), TRATTIENI_MS);
+    s.timerTrattenuti = setTimeout(() => this._rilascia(s, s.wc, false), TRATTIENI_MS);
   }
 
-  _rilascia(s, dove) {
+  // `scelta`: la pagina l'ha scelta l'utente (un clic, la tastiera rimasta a lei). Senza, l'incolla trattenuto si perde:
+  // arriverebbe al sito secondi dopo, senza che nessuno l'abbia voluto lì.
+  _rilascia(s, dove, scelta = true) {
     clearTimeout(s.timerTrattenuti);
     const tasti = s.trattenuti;
     s.trattenuti = null;
     if (!tasti || !tasti.length || !vivo(dove)) return;
-    for (const t of tasti) for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
+    for (const t of tasti) {
+      if (t.comando) { if (scelta) { try { dove[t.comando](); } catch (_) {} } continue; }
+      for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
+    }
   }
 
   // La vista è grande quanto la scheda, così i riquadri si posano come nella pagina; la cornice la ritaglia alla zona
@@ -535,10 +551,13 @@ class StratoDeiRiquadri {
     wc.on('focus', () => { const s = this.strati.get(wc); if (s && s.visibile) s.scriveQui = false; });
     wc.on('before-input-event', (e, input) => {
       const s = this.strati.get(wc);
-      if (!s || !s.trattenuti || !scrive(input)) return;
+      if (!s || !s.trattenuti) return;
+      const comando = incolla(input);
+      if (!comando && !scrive(input)) return;
       // Oltre il tetto (mai raggiunto scrivendo) i tasti tornano alla pagina, nell'ordine: nessuno si perde.
       if (s.trattenuti.length >= TRATTENUTI_MAX) { this._rilascia(s, wc); return; }
       e.preventDefault();
+      if (comando) { s.trattenuti.push({ comando }); return; }
       const modifiers = ['shift', 'control', 'alt'].filter((m) => input[m]);
       s.trattenuti.push({ type: input.type, key: String(input.key), modifiers });
     });
@@ -652,7 +671,7 @@ class StratoDeiRiquadri {
   _butta(s) {
     clearTimeout(s.timerVuoto);
     clearInterval(s.timerRitorno);
-    this._rilascia(s, s.wc);
+    this._rilascia(s, s.wc, false);
     try { s.vuoto.stacca(); } catch (_) {}
     if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
     for (const chiudi of [...s.attese.values()]) chiudi({ ok: false });
@@ -691,4 +710,4 @@ function aiutoAllaPagina(stratoWc, op, args) {
   return r.strato._allaPagina(r.s, String(op || ''), args);
 }
 
-module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, scrive, INDIRIZZO, TIPI, OP_PAGINA };
+module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, scrive, incolla, INDIRIZZO, TIPI, OP_PAGINA };

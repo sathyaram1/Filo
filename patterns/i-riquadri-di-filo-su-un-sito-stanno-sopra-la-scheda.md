@@ -60,7 +60,8 @@ lì non c'è codice di altri.
 - **Tastiera ed Esc:** chi apre un riquadro ci scrive, quindi lo strato prende la tastiera; mentre nasce (uno strato
   freddo tarda qualche decimo) i tasti che scrivono battuti sulla pagina si trattengono e gli arrivano dopo, o tornano
   alla pagina se la tastiera resta a lei o l'utente ci clicca; le scorciatoie no, agirebbero due volte (`scrive`,
-  sentinella in `tests/unit/riquadriSopraLaScheda.test.mjs`); quando non ha più niente la rende alla pagina; un riquadro che copre la pagina e torna a vedersi (cambio di scheda, lo scatto del feedback) se la
+  sentinella in `tests/unit/riquadriSopraLaScheda.test.mjs`), tranne l'incolla: lasciato alla pagina le darebbe gli
+  appunti (#1623.3), quindi si trattiene e torna come comando (`incolla`); se lo strato non arriva si perde; quando non ha più niente la rende alla pagina; un riquadro che copre la pagina e torna a vedersi (cambio di scheda, lo scatto del feedback) se la
   riprende, e così lo strato dove l'utente scriveva l'ultima volta (`scriveQui`: la casella dell'Aiuto, tornando da
   un'altra scheda o dalla barra), o i tasti andrebbero al sito. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità (l'Aiuto non si
   chiude con Esc, come nella pagina, e con solo lui aperto il tasto resta della pagina); la scorciatoia che
@@ -78,7 +79,7 @@ lì non c'è codice di altri.
   quando sta nel suo angolo, perché gli avvisi di lei gli si mettano a sinistra. Anche la finestrella di accesso ha il
   suo, grande quanto la finestra.
 - **Test:** `tests/riquadri-fuori-dal-sito.spec.mjs` e `tests/aiuto-fuori-dal-sito.spec.mjs` (la lamentela: il sito non
-  legge niente, nemmeno cercando; l'Aiuto lavora sulla pagina; con lui aperto un trascinamento vero arriva alla pagina,
+  legge niente, nemmeno cercando, né riceve la foto lasciata o incollata nel feedback (#1623.3); l'Aiuto lavora sulla pagina; con lui aperto un trascinamento vero arriva alla pagina,
   coi gesti del sistema di `tests/helpers/gestiVeri.mjs`, solo su Linux con X), e gli
   spec che guardano i riquadri con `tests/helpers/riquadri.mjs`, che li trova nella scheda o nello strato
   (`nelloStrato`, `paginaDelloStrato`) e ci clicca col mouse dello strato. Nessuno l'ha provato su un Mac o su un Linux

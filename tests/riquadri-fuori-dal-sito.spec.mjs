@@ -3,6 +3,9 @@
 // nello strato sopra la scheda. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
@@ -339,4 +342,98 @@ test('feedback su un sito: se l\'invio con lo screenshot non riesce, la tastiera
   await expect.poll(async () => (await statoDi(app, p, '.sn-fb-status'))?.testo || '').toContain('rete giù');
   await expect.poll(() => app.evaluate(({ webContents }) => String(webContents.getFocusedWebContents()?.getURL() || '')))
     .toMatch(/^filo:\/\/riquadri\//);
+});
+
+// #1623.3: una foto lasciata sul feedback o incollata nella sua casella (Ctrl+V o «Incolla» di Filo) entra fra gli
+// allegati, e il sito che ascolta rilasci e incolla non la riceve. Il rilascio parte dove lo manda il sistema, sullo strato che copre la pagina.
+test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, e il sito non la riceve', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const file = join(cartellaInCasa('filo-test-1623-3-'), 'estratto conto.png');
+  writeFileSync(file, PNG);
+  const p = await testServer.openReady(openTab, pagina(`<script>
+    window.__file = [];
+    for (const t of ['dragenter', 'dragover', 'drop']) window.addEventListener(t, (e) => {
+      for (const f of (e.dataTransfer && e.dataTransfer.files) || []) window.__file.push(t + ' ' + f.name);
+    }, true);
+    window.addEventListener('paste', (e) => { for (const it of e.clipboardData.items) if (it.getAsFile()) window.__file.push('incolla ' + it.type); }, true);
+  </script>`));
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, p, '.sn-fb-modal')).not.toBeNull();
+  const box = await statoDi(app, p, '.sn-fb-modal');
+  expect(box.nelloStrato).toBe(true);
+
+  const strato = await paginaDelloStrato(app, p);
+  const s = await strato.context().newCDPSession(strato);
+  const data = { items: [], files: [file], dragOperationsMask: 1 };
+  const punto = { x: box.x + box.width / 2, y: box.y + box.height / 3 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, ...punto, data });
+  await s.detach().catch(() => {});
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(1);
+
+  await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
+  }, PNG.toString('base64'));
+  const dove = await clicca(app, p, '.sn-fb-text');
+  await dove.keyboard.press('ControlOrMeta+V');
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(2);
+
+  // «Incolla» dal tasto destro di Filo sulla casella.
+  const menu = menuDi(await clicca(app, p, '.sn-fb-text', { button: 'right' }));
+  await menu.locator('.sn-menu-paste-main').click({ timeout: 10_000 });
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(3);
+
+  await p.waitForTimeout(400);
+  expect(await p.evaluate(() => window.__file)).toEqual([]);
+});
+
+// #1623.3: Ctrl+V premuto mentre il riquadro sta ancora nascendo (la prima apertura su una pagina tarda qualche decimo)
+// è per il riquadro: la pagina non riceve l'immagine negli appunti. Il tasto passa dal main, come quello dell'utente.
+async function ctrlVMentreNasce(app, p, apri) {
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const px = Buffer.alloc(48 * 32 * 4);
+    for (let i = 0; i < 48 * 32; i++) px.set([0, 0, 255, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: 48, height: 32 }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
+  await p.evaluate(() => { window.__incollati = []; window.addEventListener('paste', (e) => window.__incollati.push(e.clipboardData.files.length), true); });
+  const scheda = (u) => app.evaluate(({ BrowserWindow }, url) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === url).view.webContents.focus();
+  }, u);
+  await scheda(p.url());
+  await apri();
+  const giaAschermo = await app.evaluate(async ({ BrowserWindow }, u) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
+    await new Promise((r) => setTimeout(r, 60));
+    const s = win._filoTabs.riquadri?.strati?.get(wc);
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+    return !!(s && s.pronta && s.visibile);
+  }, p.url());
+  expect(giaAschermo, 'il riquadro era già a schermo: la prova non prova la nascita').toBe(false);
+}
+
+test('feedback su un sito: Ctrl+V subito dopo averlo aperto mette la foto fra gli allegati, e il sito non la riceve', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, pagina());
+  await ctrlVMentreNasce(app, p, () => app.evaluate(({ BrowserWindow }, u) => {
+    const tab = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u);
+    tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: 'globalThis.SN_FEEDBACK_UI.open()' }]);
+  }, p.url()));
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(1);
+  await p.waitForTimeout(400);
+  expect(await p.evaluate(() => window.__incollati)).toEqual([]);
+});
+
+test('Aiuto su un sito: Ctrl+V subito dopo averlo aperto non porta l\'immagine al sito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, pagina());
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await ctrlVMentreNasce(app, p, async () => { shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id); });
+  const strato = await paginaDelloStrato(app, p);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+  await p.waitForTimeout(1000);
+  expect(await p.evaluate(() => window.__incollati)).toEqual([]);
 });
