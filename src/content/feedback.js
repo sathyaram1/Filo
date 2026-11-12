@@ -1047,6 +1047,11 @@
     updateClearBtn();
     textEl.focus();
     if (proposta) inFondo();
+    if (ripresa) {
+      renderThumbs();
+      if (ripresa.rilettura) mostraRilettura(ripresa.rilettura);
+      if (ripresa.messaggio) statusEl.textContent = String(ripresa.messaggio);
+    }
   }
 
   global.SN_FEEDBACK_UI = { open, close };
