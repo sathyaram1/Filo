@@ -84,6 +84,35 @@ test('Ctrl+V appena aperto il feedback (strato ancora freddo): l\'immagine non v
   expect(sito, 'il sito ha ricevuto l\'incolla').toEqual([]);
 });
 
+test('Ctrl+V appena aperto l\'Aiuto (strato ancora freddo): l\'immagine non va al sito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const p = await testServer.openReady(openTab, pagina());
+  await immagineNegliAppunti(app);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents.focus();
+  }, p.url());
+  shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const t = await app.evaluate(async ({ BrowserWindow }, u) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const wc = win._filoTabs.tabs.find((x) => x.view.webContents.getURL() === u).view.webContents;
+    await new Promise((r) => setTimeout(r, 120));
+    const s = win._filoTabs.riquadri?.strati?.get(wc);
+    const giaPronto = !!(s && s.pronta && s.visibile);
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+    return { giaPronto, esiste: !!s };
+  }, p.url());
+  const strato = await paginaDelloStrato(app, p);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+  await p.waitForTimeout(1500);
+  const sito = await visti(p);
+  console.log('aiuto freddo:', JSON.stringify(t), 'sito', JSON.stringify(sito));
+  expect(sito, 'il sito ha ricevuto l\'incolla').toEqual([]);
+});
+
 test('Incolla dal tasto destro nella casella del feedback: entra fra gli allegati e il sito non riceve niente', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const p = await testServer.openReady(openTab, pagina());
