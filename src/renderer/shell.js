@@ -2454,10 +2454,10 @@
       } else if (r.state === 'completed') {
         if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
-        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {}));
       } else {
         if (r.state === 'interrupted' && /^https?:/i.test(String(r.url || ''))) addBtn('Riprova', () => riprovaDownload(r.id));
-        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {}));
       }
       row.appendChild(actions);
       // #588.8 — un file arrivato si trascina dalla sua riga: sul campo per caricare file di un sito, nella chat.
@@ -2516,7 +2516,7 @@
           if (panelOpen) renderPanel();
         }).catch(() => {})]);
       }
-      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {})]);
+      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res)).catch(() => {})]);
       menuRiga.id = r.id;
       menuRiga.voci = voci;
       if (panelOpen) renderPanel();
