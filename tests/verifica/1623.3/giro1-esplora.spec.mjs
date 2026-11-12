@@ -58,11 +58,23 @@ test('Ctrl+V appena aperto il feedback (strato ancora freddo): l\'immagine non v
     const tab = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u);
     const wc = tab.view.webContents;
     wc.focus();
+    const t0 = Date.now();
     wc.executeJavaScriptInIsolatedWorld(999, [{ code: 'globalThis.SN_FEEDBACK_UI.open()' }]);
-    await new Promise((r) => setTimeout(r, 30));
-    wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
-    wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
-    wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+    let pronto = null;
+    let premuto = null;
+    for (let i = 0; i < 300; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      const s = win._filoTabs.riquadri?.strati?.get(wc);
+      if (pronto === null && s && s.pronta && s.visibile) pronto = Date.now() - t0;
+      if (premuto === null && Date.now() - t0 >= 150) {
+        premuto = Date.now() - t0;
+        wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+        wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
+        wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+      }
+      if (pronto !== null && premuto !== null) break;
+    }
+    console.log('freddo: strato a schermo dopo', pronto, 'ms, Ctrl+V a', premuto, 'ms');
   }, p.url());
   await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
   await p.waitForTimeout(1500);
