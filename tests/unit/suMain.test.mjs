@@ -74,6 +74,23 @@ test('le fusioni che citano il feedback: la sua, e quella di un altro lavoro che
   assert.deepEqual(fusioniCheCitano(dir, '999'), []);
 });
 
+test('una fusione cita un feedback col suo messaggio o un commit del ramo fuso, non con la storia di main prima di lei (#2046)', (t) => {
+  const dir = repo();
+  t.after(() => togliCartella(dir));
+  git(dir, ['checkout', '-qb', 'lavoro']);
+  commit(dir, 'il menu si apre (#12)', { 'a.js': righe(40, { 3: 'x' }) });
+  git(dir, ['checkout', '-q', 'main']);
+  const sola = commit(dir, 'merge-gate: #120 via server');
+  git(dir, ['merge', '-q', '--no-ff', 'lavoro', '-m', 'merge-gate: #30 via server']);
+  const fusione = git(dir, ['rev-parse', 'HEAD']);
+  assert.equal(fusioneCita(dir, fusione, '#30'), true, 'il suo messaggio');
+  assert.equal(fusioneCita(dir, fusione, '12'), true, 'un commit del ramo fuso');
+  assert.equal(fusioneCita(dir, fusione, '120'), false, 'un commit di main venuto prima non è suo');
+  assert.equal(fusioneCita(dir, fusione, '1'), false);
+  assert.equal(fusioneCita(dir, sola, '120'), true, 'un commit senza ramo cita col suo messaggio');
+  assert.equal(fusioneCita(dir, git(dir, ['rev-list', '--max-parents=0', 'HEAD']), '12'), false, 'il primo commit, senza genitori');
+});
+
 test('un riallineamento pulito non riscrive niente, anche se main ha cambiato le righe accanto', (t) => {
   const dir = repo();
   t.after(() => togliCartella(dir));
