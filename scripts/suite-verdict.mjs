@@ -93,6 +93,38 @@ export function statoFinale(test) {
   return 'unexpected'; // failed, timedOut, interrupted
 }
 
+/** Un percorso di un errore relativo alla radice del repo, barre normali; '' per uno di node_modules. PURA. */
+function relativoAllaRadice(p, radice) {
+  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  let f = String(p || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
+    .replace(/(:\d+){1,2}$/, '');
+  if (!f || f.includes('/node_modules/')) return '';
+  if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
+  else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+  return f;
+}
+
+/**
+ * Il testo di un errore di Playwright senza i colori del terminale, con la posizione in testa: è quello che chi
+ * prende il feedback legge, perché dalla cloud gli artifact della corsa non si scaricano (#2313). PURA.
+ */
+export function testoErrore(e, radice = ROOT) {
+  if (!e || typeof e !== 'object') return '';
+  const testo = String(e.message || e.value || e.stack || '').replace(COLORI, '').replace(/\r/g, '').trim();
+  const file = e.location?.file ? relativoAllaRadice(e.location.file, radice) : '';
+  const dove = file ? `in ${file}${e.location.line ? `:${e.location.line}` : ''}` : '';
+  return [dove, testo].filter(Boolean).join('\n');
+}
+
+/** Gli errori dell'ultimo tentativo di un test rosso, uniti; '' per un test che non è rosso. PURA. */
+export function erroreDelTest(test, radice = ROOT) {
+  if (statoFinale(test) !== 'unexpected') return '';
+  const results = Array.isArray(test?.results) ? test.results : [];
+  const ultimo = results[results.length - 1];
+  const errori = Array.isArray(ultimo?.errors) && ultimo.errors.length ? ultimo.errors : ultimo?.error ? [ultimo.error] : [];
+  return [...new Set(errori.map((e) => testoErrore(e, radice)).filter(Boolean))].join('\n\n');
+}
+
 /**
  * Tutti i casi del JSON, appiattiti: { spec, titolo, titoloCompleto, stato }.
  * `titoloCompleto` porta anche i describe che lo contengono (« › » fra un
