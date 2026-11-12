@@ -26,6 +26,14 @@ export function datiWorker({ env = process.env, root = null } = {}) {
   return indice ? { indice, paralleli } : null;
 }
 
+/** Il marcatore del clone di worker in `root` (con la cartella della sessione in `principale`), o null. */
+export function marcatoreWorker(root) {
+  try {
+    const m = JSON.parse(readFileSync(resolve(root, MARCATORE_WORKER), 'utf8'));
+    return m && typeof m === 'object' && typeof m.principale === 'string' && m.principale ? m : null;
+  } catch (_) { return null; }
+}
+
 /** File di prova insieme per worker: le CPU divise fra i worker, almeno uno; 0 = decide node. PURA. */
 export function concorrenzaUnit(paralleli, cpu = cpus().length) {
   const k = Number(paralleli);

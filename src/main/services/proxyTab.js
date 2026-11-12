@@ -1,32 +1,11 @@
-// Proxy per-tab — "Apri da un altro paese" (vedi proxy-per-tab-spec.md).
-//
-// Questo modulo è l'astrazione ProxyProvider: traduce (paese, tier) in una
-// configurazione proxy applicabile a una session Electron. NESSUN provider
-// commerciale è integrato qui: l'endpoint arriva da env o impostazioni come
-// template URL, con `{country}` sostituito dal codice paese — è il formato
-// con cui i provider reali fanno il geo-targeting (di solito nel campo
-// username, es. `socks5://user-{country}:pass@gate.provider.com:7000`).
-//
-// Config (env vince sulle impostazioni, così i test e il deploy non toccano
-// lo storage utente):
-//   FILO_PROXY_DATACENTER  / settings.proxy.datacenter   → tier default
-//   FILO_PROXY_RESIDENTIAL / settings.proxy.residential  → tier fallback
-//   FILO_PROXY_BYPASS      / settings.proxy.bypass       → proxyBypassRules
-//
-// Anti-leak DNS: con schema socks5 Chromium risolve i nomi LATO PROXY
-// (semantica socks5h) — verificato dal test di accettazione in
-// tests/proxy-tab.spec.mjs, che fa caricare un hostname irrisolvibile in
-// locale attraverso un SOCKS5 di test. L'anti-leak WebRTC vive in tabs.js
-// (_applySecurity: policy disable_non_proxied_udp sulle tab proxate).
-//
-// Niente require('electron') a livello di modulo: la parte pura (resolve,
-// parsing) deve girare anche sotto node:test (tests/unit/).
+// Proxy per-tab «Apri da un altro paese»: (paese, tier) → config proxy per una session.
+// Nessun provider integrato: l'endpoint è un template con `{country}`, da env o settings.
+// Con socks5 i nomi li risolve il proxy. Niente electron qui: la parte pura gira sotto node.
 
 'use strict';
 
-// Location curate per la UI (~7, non 50 — vedi spec §3). Il codice paese è
-// ISO 3166-1 alpha-2 minuscolo; `resolve` accetta comunque qualsiasi codice
-// a 2 lettere (il linguaggio naturale può chiedere paesi fuori lista).
+// Location curate per la UI; `resolve` accetta comunque qualsiasi codice a due lettere: il
+// linguaggio naturale può chiedere paesi fuori lista.
 const LOCATIONS = [
   { code: 'us', label: 'Stati Uniti', flag: '🇺🇸' },
   { code: 'gb', label: 'Regno Unito', flag: '🇬🇧' },
@@ -37,12 +16,10 @@ const LOCATIONS = [
   { code: 'jp', label: 'Giappone', flag: '🇯🇵' },
 ];
 
-// Due tier di costo (spec §1): datacenter è il default, residenziale è il
-// fallback quando il sito blocca gli IP datacenter (decisione che vive nel
-// livello "regole d'azione", feedback separato — qui solo la selezione).
+// Datacenter di default, residenziale quando il sito blocca gli IP datacenter; la decisione
+// sta nelle regole d'azione, qui c'è solo la selezione.
 const TIERS = { DATACENTER: 'datacenter', RESIDENTIAL: 'residential' };
 
-// Codice paese normalizzato ('FR' → 'fr') o null se non è un alpha-2 valido.
 function normalizeCountry(country) {
   const c = String(country || '').trim().toLowerCase();
   return /^[a-z]{2}$/.test(c) ? c : null;
@@ -52,8 +29,7 @@ function normalizeTier(tier) {
   return tier === TIERS.RESIDENTIAL ? TIERS.RESIDENTIAL : TIERS.DATACENTER;
 }
 
-// Config effettiva del provider: env > impostazioni. `settings` è l'oggetto
-// delle impostazioni (può mancare), `env` è iniettabile per i test.
+// env > impostazioni; `env` è iniettabile per i test.
 function configFrom(settings, env = process.env) {
   const s = (settings && settings.proxy) || {};
   return {
@@ -98,9 +74,7 @@ function endpointFor(template, country) {
   return { proxyRules: `${scheme}://${hostPort}`, auth };
 }
 
-// (paese, tier) → { proxyRules, bypassRules, auth, country, tier } oppure
-// null se il tier richiesto non è configurato. Non fa fallback fra tier:
-// la scelta datacenter→residenziale è una decisione del chiamante.
+// Niente fallback fra tier: la scelta è del chiamante. null se il tier non è configurato.
 function resolve(country, { tier, settings, env } = {}) {
   const code = normalizeCountry(country);
   if (!code) return null;
@@ -119,12 +93,11 @@ function resolve(country, { tier, settings, env } = {}) {
   };
 }
 
-// ─── credenziali proxy HTTP: registro partition → auth ─────────────────────
-// Chromium chiede le credenziali del proxy con l'evento `login` su app
-// (authInfo.isProxy). Mappiamo la session della partition proxata alle sue
-// credenziali; l'handler globale risponde solo per le session registrate.
+// Chromium chiede le credenziali del proxy con l'evento `login` su app: si mappa la session
+// della partition alle sue, e l'handler globale risponde solo per quelle registrate.
 
-const authBySession = new Map(); // partition → { ses, auth }
+// Accanto alle credenziali, le regole: chi esce per conto della scheda (la finestra nascosta dei link) le ripete uguali.
+const authBySession = new Map(); // partition → { ses, auth, rete: { proxyRules, proxyBypassRules } | null }
 let loginWired = false;
 
 function wireLoginHandler() {
@@ -135,31 +108,117 @@ function wireLoginHandler() {
   loginWired = true;
   app.on('login', (event, webContents, _request, authInfo, callback) => {
     if (!authInfo || !authInfo.isProxy || !webContents) return;
-    for (const { ses, auth } of authBySession.values()) {
-      if (webContents.session === ses) {
-        event.preventDefault();
-        try { callback(auth.username, auth.password); } catch (_) {}
-        return;
-      }
-    }
+    const auth = credenzialiDellaSessione(webContents.session);
+    if (!auth) return;
+    event.preventDefault();
+    try { callback(auth.username, auth.password); } catch (_) {}
   });
 }
 
-// Registra (o rimuove, con auth=null) le credenziali per una partition proxata.
-function setPartitionAuth(partition, ses, auth) {
-  if (auth && auth.username) {
-    authBySession.set(partition, { ses, auth });
-    wireLoginHandler();
-  } else {
-    authBySession.delete(partition);
-  }
+// Le ultime regole e credenziali date a ogni sessione, anche dopo clearPartitionAuth: la sessione le ricorda lei.
+const ultimaReteDi = new WeakMap();
+
+// Chromium ricorda la password del proxy per indirizzo: un fornitore col paese nel nome utente ha lo stesso indirizzo
+// per ogni paese, e senza dimenticare le credenziali vecchie si uscirebbe dal paese di prima (#1272).
+function dimenticaSeCambia(ses, chiave) {
+  if (!ses || typeof ses !== 'object') return null;
+  const prima = ultimaReteDi.get(ses);
+  ultimaReteDi.set(ses, chiave);
+  if (prima === undefined || prima === chiave) return null;
+  return Promise.resolve()
+    .then(() => (typeof ses.clearAuthCache === 'function' ? ses.clearAuthCache() : null))
+    .then(() => (typeof ses.closeAllConnections === 'function' ? ses.closeAllConnections() : null))
+    .catch(() => {});
+}
+
+// La partition proxata con regole e credenziali di `resolved` (quello di resolve()). Torna la promessa da aspettare
+// prima di caricare quando le credenziali vecchie vanno dimenticate, altrimenti null.
+function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null, country = '', tier = '' } = {}) {
+  const conAuth = auth && auth.username ? auth : null;
+  const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
+  const dimentica = dimenticaSeCambia(ses, JSON.stringify([proxyRules, bypassRules, conAuth && conAuth.username, conAuth && conAuth.password]));
+  if (!conAuth && !rete) { authBySession.delete(partition); return dimentica; }
+  const paese = normalizeCountry(country) ? { country: normalizeCountry(country), tier: normalizeTier(tier) } : null;
+  authBySession.set(partition, { ses, auth: conAuth, rete, paese });
+  if (conAuth) wireLoginHandler();
+  return dimentica;
 }
 
 function clearPartitionAuth(partition) {
   authBySession.delete(partition);
 }
 
+function voceDellaSessione(ses) {
+  if (!ses) return null;
+  for (const v of authBySession.values()) if (v.ses === ses) return v;
+  return null;
+}
+
+function credenzialiDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.auth ? v.auth : null;
+}
+
+// { proxyRules, proxyBypassRules?, auth } della sessione proxata, o null per una sessione che esce come il sistema.
+function reteDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.rete ? { ...v.rete, auth: v.auth } : null;
+}
+
+// La regola «apri sempre da un altro paese» (#152) che vale per `url`, o null: la sceglie qui sia la scheda che naviga sia
+// chi decide se un sito si può contattare dalla connessione vera (#1273.3).
+function regolaPer(url, regole) {
+  if (!regole || !/^https?:\/\//i.test(String(url || ''))) return null;
+  const dom = require('../../shared/stessoSito').voceSalvata(String(url), Object.keys(regole));
+  return (dom && regole[dom] && regole[dom].country && regole[dom]) || null;
+}
+
+// Le regole lette dalla memoria di Filo. Un errore si propaga: chi le chiede per contattare un sito, nel dubbio non lo contatta.
+async function leggiRegole() {
+  const FM = globalThis.SN_FILO_MEMORY;
+  return (FM && (await FM.listProxyRules())) || {};
+}
+
+// Un programma esterno (yt-dlp) vuole il proxy come indirizzo intero; i socks con i nomi risolti dal proxy, come fa
+// Chromium: il DNS di casa direbbe il sito a chi guarda la rete. '' per uno schema che il programma non sa usare.
+const SCHEMI_PROGRAMMA = Object.freeze({ http: 'http', https: 'https', socks4: 'socks4a', socks5: 'socks5h' });
+function indirizzoPerProgramma(proxyRules, auth = null) {
+  let u;
+  try { u = new URL(String(proxyRules || '').trim()); } catch (_) { return ''; }
+  const schema = SCHEMI_PROGRAMMA[u.protocol.replace(/:$/, '').toLowerCase()];
+  if (!schema || !u.hostname) return '';
+  const chi = auth && auth.username ? `${encodeURIComponent(auth.username)}:${encodeURIComponent(auth.password || '')}@` : '';
+  return `${schema}://${chi}${u.host}`;
+}
+
+const paeseDi = (p) => (p && normalizeCountry(p.country) ? { country: normalizeCountry(p.country), tier: normalizeTier(p.tier) } : null);
+
+// Da dove esce un programma che scarica per conto di una scheda (#2301): dal proxy della sua sessione, dal paese già
+// scelto per quel lavoro (`paese`, per «Riprova») o dalla regola del sito. Se uno di questi vale ma non si può usare,
+// `{ rifiuto }`: mai la connessione vera al suo posto. `paese` torna solo se non viene dalla regola, che si rilegge.
+async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole = leggiRegole,
+  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.() } = {}) {
+  const voce = voceDellaSessione(ses);
+  if (voce && voce.rete) {
+    const proxy = indirizzoPerProgramma(voce.rete.proxyRules, voce.auth);
+    return proxy ? { proxy, paese: voce.paese || null } : { rifiuto: true, paese: voce.paese || null };
+  }
+  let scelta = paeseDi(paese);
+  const tieni = scelta;
+  if (!scelta) {
+    try { scelta = paeseDi(regolaPer(url, await regole())); } catch (_) { return { rifiuto: true, paese: null }; }
+  }
+  if (!scelta) return { proxy: '', paese: null };
+  let settings = null;
+  try { settings = await impostazioni(); } catch (_) {}
+  const resolved = resolve(scelta.country, { tier: scelta.tier, settings });
+  const proxy = resolved ? indirizzoPerProgramma(resolved.proxyRules, resolved.auth) : '';
+  return proxy ? { proxy, paese: tieni } : { rifiuto: true, paese: tieni };
+}
+
 module.exports = {
+  regolaPer,
+  leggiRegole,
   LOCATIONS,
   TIERS,
   normalizeCountry,
@@ -169,6 +228,10 @@ module.exports = {
   providerHost,
   endpointFor,
   resolve,
-  setPartitionAuth,
+  registraRete,
   clearPartitionAuth,
+  credenzialiDellaSessione,
+  reteDellaSessione,
+  indirizzoPerProgramma,
+  uscitaPerProgramma,
 };

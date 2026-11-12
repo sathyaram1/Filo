@@ -1,5 +1,5 @@
 // Il lavoro locale sul server con la sua pratica (#908): la controlla, la prende in carico, lancia server:fondi di
-// filo-security e a fusione riuscita la chiude solo se la parte dell'app è già su main o con --solo-server (#915).
+// filo-security e a fusione riuscita la chiude solo se la parte dell'app è su main, riletta dopo la fusione (#915, #939), o con --solo-server.
 // Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N>
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -8,16 +8,18 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { estraiOpzioneFeedback, risolviFeedback } from './lib/pratica-locale.mjs';
 import { argomentiDaNpm } from './lib/argomenti.mjs';
-import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, RAMO_RE, parteTardiva } from './lib/parti-lavoro.mjs';
+import {
+  FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, RAMO_ROUTINE_RE, dopoLaFusione, parteTardiva, ramoValido, riaperturaConAltraInArrivo, serverUltimaParte,
+} from './lib/parti-lavoro.mjs';
 import { cartellaDelServer } from './lib/ramo-server.mjs';
+// Le note che server:fondi scrive sono modelli fissi: passano anche da un terminale senza biglietto pulito (#1428.1).
+import { NOTE_FISSE, chiudeApp as fraseChiudeApp, comandoSoloServer, percheRiaperta, testoFine } from './lib/note-fisse.mjs';
 
-export { cartellaDelServer };
+export { cartellaDelServer, RAMO_ROUTINE_RE };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
 export const PRATICA_ENV = 'FILO_SERVER_PRATICA';
-// I lavori server delle routine hanno su filo-security il nome del ramo dell'app, `worker/<id>-<ora>` (#1159).
-export const RAMO_ROUTINE_RE = /^worker\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 const USO = 'Uso, dal repo Filo: npm run server:fondi -- claude/<ramo> --feedback <N> [--solo-server] [--dry-run]';
 
 export const SENZA_PRATICA = [
@@ -41,7 +43,7 @@ export function leggiArgomenti(argv, env = {}) {
   if (sconosciute.length) return { errore: `argomenti non capiti (${sconosciute.join(' ')})` };
   if (altri.length > 1) return { errore: `un ramo solo, non ${altri.length} (${altri.join(' ')})` };
   const ramo = ramoCanonico(altri[0]);
-  if (ramo && (!(RAMO_RE.test(ramo) || RAMO_ROUTINE_RE.test(ramo)) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) {
+  if (ramo && !ramoValido(ramo)) {
     return { errore: `porto su main solo rami claude/<nome>, o worker/<nome> delle routine: «${altri[0]}» no` };
   }
   return { ramo, pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
@@ -55,8 +57,11 @@ export function ramoCanonico(r) {
   return String(r || '').trim().replace(/^refs\/heads\//, '').replace(/^(refs\/remotes\/)?origin\//, '');
 }
 
-export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di filo-security (npm run server:fondi).`;
-export const notaFine = (ramo, sha) => `Fuso su main di filo-security: ${ramo}${sha ? ` a ${sha.slice(0, 9)}` : ''}. In produzione va col deploy, npm run server:pubblica.`;
+export const notaFine = testoFine;
+// Con deploy.yml su main la spinta appena fatta la pubblica GitHub: un server:pubblica adesso correrebbe insieme al suo.
+export const perIlDeploy = (daGitHub) => (daGitHub
+  ? 'Il deploy lo fa GitHub (deploy.yml) per questa spinta: niente server:pubblica adesso. Se la corsa è rossa, rilanciala, o npm run server:pubblica a corsa finita.'
+  : 'Per il deploy: npm run server:pubblica, da filo-security/functions.');
 
 /**
  * I rami dell'app legati alla pratica (verify-local start --feedback, in ogni worktree del repo), ancora esistenti e non ancora su
@@ -86,6 +91,18 @@ export function ramiApertiDellaPratica(id, { radice = ROOT, git = gitIn, leggi =
     && git(radice, ['rev-parse', '--verify', '--quiet', `refs/heads/${g}`]) !== null
     && git(radice, ['merge-base', '--is-ancestor', g, 'refs/remotes/origin/main']) === null) rami.add(g);
   return [...rami];
+}
+
+/**
+ * La pratica riletta dopo la fusione del server: la parte dell'app può essere arrivata mentre giravano i test (#939).
+ * Una rilettura fallita lascia la pratica com'era, aperta, col motivo.
+ * @returns {Promise<{ esito: 'chiusa'|'chiudi'|'aperta', motivo?: string }>}
+ */
+export async function rileggiDopoLaFusione(id, { of, bearer, ramo, ramiAperti = ramiApertiDellaPratica }) {
+  const letta = await of.partiDellaPratica(id, { bearer }).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
+  if (!letta.ok) return { esito: 'aperta', motivo: letta.motivo };
+  const ramiApp = (ramiAperti || ramiApertiDellaPratica)(id, { ramoGemello: ramo });
+  return { esito: dopoLaFusione({ status: letta.status, ultima: serverUltimaParte({ parti: letta.parti, ramiApp }) }) };
 }
 
 function gitIn(cwd, args) {
@@ -153,6 +170,18 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
+/** main del server letto adesso da origin: sha, null se origin non si legge. */
+function mainRemotoServer(cartella) {
+  const r = gitEsito(dirname(cartella), ['ls-remote', 'origin', 'refs/heads/main']);
+  if (!r.ok) return null;
+  const sha = String(r.out).trim().split(/\s+/)[0] || '';
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+}
+
+function deployDaGitHub(cartella) {
+  return gitEsito(cartella, ['cat-file', '-e', 'refs/remotes/origin/main:.github/workflows/deploy.yml']).ok;
+}
+
 /** La punta di `ramo` su origin del server, appena letta: '' se su origin il ramo non c'è, null se origin non si legge. */
 function puntaRamoServer(cartella, ramo) {
   const radice = dirname(cartella);
@@ -168,6 +197,65 @@ function puntaRamoServer(cartella, ramo) {
 export const USCITA_SOLO_APP = 5;
 // La stessa dello strumento del server: un ramo worker/* va in conflitto con main del server, lo riallineano le routine.
 export const USCITA_CONFLITTO_MAIN = 6;
+// La stessa dello strumento del server: GitHub rifiuta la spinta su main, che dopo il passo 10 scrive solo il cancello.
+export const USCITA_SPINTA_RIFIUTATA = 7;
+
+/**
+ * La fusione che la spinta dal PC non può più fare la chiede al cancello (#1159 fase 2), sullo stesso sha. A fusione
+ * fatta origin/main del server si rilegge e il checkout di main, se c'è, avanza. → codice d'uscita (0 = fuso).
+ */
+export async function fusioneDalCancello({ cartella, ramo, sha, feedbackId }, { chiedi, allinea = allineaMainServer, log, err }) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha || ''))) {
+    err(`server:fondi: GitHub rifiuta la spinta su main e non so quale commit di ${ramo} chiedere al cancello. Non ho toccato niente.`);
+    return 1;
+  }
+  log(`main di filo-security lo scrive solo il cancello: gli chiedo di portarci ${String(sha).slice(0, 9)} di ${ramo}.`);
+  const { askServerMergeServer, messageForServerMerge } = await import('./lib/owner-merge.mjs');
+  const risposta = await (chiedi || askServerMergeServer)({ branch: ramo, sha, feedbackId });
+  const riga = messageForServerMerge(risposta, ramo);
+  if (risposta.outcome !== 'merged') {
+    err(`server:fondi: ${riga}`);
+    return risposta.outcome === 'unreachable' ? 4 : 1;
+  }
+  log(riga);
+  allinea(cartella, log);
+  return 0;
+}
+
+/**
+ * Il server registra che main del server su `sha` l'ha portato server:fondi dal PC (#1521): senza la voce, il suo
+ * controllo dei riferimenti allarma. Main è già spinto: un no si dice e basta. `prima`: main letto da origin prima di
+ * server:fondi; uguale a `sha` vuol dire niente spinto (ramo già dentro), e registrarlo sdoganerebbe chi l'ha portato lì.
+ */
+export async function registraMainDalPc({ ramo, sha, prima, feedbackId }, { registra, err }) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha || ''))) {
+    err('Attenzione: non leggo lo sha di main del server dopo la spinta, e il server non sa che l’ha portato server:fondi: aprirà un allarme su main fuori registro, che puoi chiudere.');
+    return false;
+  }
+  if (prima === sha) return false;
+  if (!/^[0-9a-f]{40}$/.test(String(prima || ''))) {
+    err(`Attenzione: non ho letto main del server prima della fusione, e non so se l’ha mosso questo server:fondi: non lo registro. Se il server apre un allarme su main fuori registro per ${sha.slice(0, 9)} ed è questa spinta, chiudilo.`);
+    return false;
+  }
+  const { registraSpintaServer, messageForServerMerge } = await import('./lib/owner-merge.mjs');
+  const risposta = await (registra || registraSpintaServer)({ branch: ramo, sha, feedbackId });
+  if (risposta && risposta.outcome === 'registrato') return true;
+  err(`Attenzione: main del server è su ${sha.slice(0, 9)}, ma il server non l’ha registrato come portato da server:fondi (${messageForServerMerge(risposta, ramo).replace(/\.$/, '')}). Aprirà un allarme su main fuori registro: se è questa spinta, chiudilo.`);
+  return false;
+}
+
+/** origin/main del server riletto, e il checkout di main portato lì solo in avanti; un passo che non riesce si dice e basta. */
+function allineaMainServer(cartella, log) {
+  const radice = dirname(cartella);
+  if (!gitEsito(radice, ['fetch', '--quiet', 'origin']).ok) { log('  ! git fetch del server non riuscito: rileggi origin/main quando puoi'); return; }
+  const elenco = gitEsito(radice, ['worktree', 'list', '--porcelain']);
+  const blocchi = elenco.ok ? String(elenco.out).split(/\r?\n\r?\n/) : [];
+  const main = blocchi.find((b) => /^branch refs\/heads\/main\r?$/m.test(b));
+  const dove = main ? ((main.match(/^worktree (.+?)\r?$/m) || [])[1] || '') : '';
+  if (!dove) return;
+  const ff = gitEsito(dove, ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']);
+  if (!ff.ok) log(`  ! il checkout di main del server (${dove}) non avanza da solo: git merge --ff-only origin/main`);
+}
 
 /**
  * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
@@ -256,32 +344,49 @@ export async function esegui(argv, deps = {}) {
     const daFondere = verdetto || (ramoServer.sha ? { ok: true, server: { sha: ramoServer.sha } } : null);
     const letta = await of.partiDellaPratica(r.id, { bearer });
     if (!letta.ok) { err(`La pratica ${chi} non si legge (${letta.motivo}). Non ho toccato niente.`); return 3; }
-    // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).
+    // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
+    const ramiApp = (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
+    // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915), salvo che dell'app
+    // arrivi ancora un ramo: lasciata chiusa, la pratica lo rifiuterebbe, quindi si riapre, anche per un seguito (#938).
     let tardiva = null;
+    let riapertaDa = null;
     if (letta.status === 'done') {
-      const t = parteTardiva({
+      const caso = {
         status: letta.status, parti: letta.parti, parte: 'server', ramo: a.ramo, solo: a.soloServer, locale: letta.locale, ora: (deps.ora || Date.now)(),
-      });
+      };
+      const t = ramiApp.length ? riaperturaConAltraInArrivo(caso) : parteTardiva(caso);
       if (!t.ok) { err(`La pratica ${chi} è chiusa e non vale per questo ramo: ${t.motivo}. Per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
-      tardiva = t;
+      if (ramiApp.length) {
+        const prova = await of.scrivi(r.id, 'todo', '', { bearer, dryRun: true });
+        if (!prova.ok) { err(`La pratica ${chi} è chiusa e ${ramiApp.join(', ')} dell'app, legato a lei, non è su main, ma non si riapre (${prova.motivo}). Non ho toccato niente.`); return 3; }
+        riapertaDa = t;
+      } else tardiva = t;
     } else {
       // La stessa presa in carico della verifica: rifiuta una pratica nei Ricevuti prima di muovere il server.
-      const prova = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer, dryRun: true });
+      const prova = await of.annotaPratica(r.id, NOTE_FISSE.serverInizio({ ramo: a.ramo }), { bearer, dryRun: true });
       if (!prova.ok) { err(`La pratica ${chi} non porta un lavoro (${prova.motivo}): per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
     }
     const figlio = { ...env, [PRATICA_ENV]: chi };
     const lancia = deps.lancia || lanciaServer;
     // La parte dell'app già su main: questa è l'ultima. Altrimenti l'app può ancora arrivare, anche da un ramo che da
     // qui non si vede, e la pratica si chiude solo a parola (--solo-server), che resta scritta per chi arrivasse dopo.
-    // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
-    const ramiApp = tardiva ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
-    const ultima = !!letta.parti.app && !ramiApp.length;
+    const ultima = serverUltimaParte({ parti: letta.parti, ramiApp });
     const solo = a.soloServer && !ultima && !tardiva;
     const chiude = !tardiva && (ultima || solo);
-    const quando = tardiva ? new Date(tardiva.at).toISOString() : '';
+    const quando = tardiva || riapertaDa ? new Date((tardiva || riapertaDa).at).toISOString() : '';
     const numero = chi.replace(/^#/, '');
-    const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
-    const soloComando = `npm run server:fondi -- ${a.ramo} --feedback ${numero} --solo-server`;
+    // Le frasi delle note si compongono prima di toccare il server: un nome che un modello fisso non accetta ferma qui.
+    let perche = '';
+    let chiudeApp = '';
+    let soloComando = '';
+    try {
+      if (riapertaDa) perche = percheRiaperta({ chiusaDa: riapertaDa.chiusaDa || 'app', quando: riapertaDa.at, ramiApp });
+      chiudeApp = fraseChiudeApp({ ramiApp, numero });
+      soloComando = comandoSoloServer({ ramo: a.ramo, numero });
+    } catch (e) {
+      err(`server:fondi: ${e.message}. Non ho toccato niente.`);
+      return 2;
+    }
     // Ci si ferma prima di fondere: dopo, la pratica sarebbe chiusa e il rilancio senza --solo-server rifiutato.
     if (solo && ramiApp.length) {
       err([
@@ -294,7 +399,7 @@ export async function esegui(argv, deps = {}) {
     const dopo = tardiva
       ? `resterebbe chiusa, con la nota di quest'ultima parte (l'ha chiusa la fusione della parte ${NOME_PARTE.app}, ${quando})`
       : chiude
-        ? `si chiuderebbe con «${notaFine(a.ramo, '')}»`
+        ? `si chiuderebbe con «${testoFine(a.ramo, '')}»`
         : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}${ramiApp.length ? '' : `. Se il lavoro sta solo sul server: ${soloComando}`}`;
     // La prova guarda lo stesso sha che fonderebbe la fusione vera, non la punta del ramo.
     const fissate = { lancia, fissa: deps.fissa || ramoFisso, log, err };
@@ -302,24 +407,37 @@ export async function esegui(argv, deps = {}) {
       const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, { ...fissate, prova: true });
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
-        : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
+        : riapertaDa
+          ? `PROVA: la pratica ${chi} è chiusa, ma ${ramiApp.join(', ')} dell'app le è legato e non è su main: si riaprirebbe, andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`
+          : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
       return k;
     }
     if (tardiva) {
       log(`Pratica ${chi}: l'ha chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), meno di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore fa: vale per quest'ultima parte.`);
     } else {
-      const presa = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer });
+      if (riapertaDa) {
+        const riaperta = await of.scrivi(r.id, 'todo', NOTE_FISSE.serverRiaperta({ ramo: a.ramo, chiusaDa: riapertaDa.chiusaDa || 'app', quando: riapertaDa.at, ramiApp }), { bearer });
+        if (!riaperta.ok) { err(`La pratica ${chi} non si è riaperta (${riaperta.motivo}): non porto il ramo su main senza.`); return 1; }
+        log(`Pratica ${chi} riaperta: ${perche}`);
+      }
+      const presa = await of.annotaPratica(r.id, NOTE_FISSE.serverInizio({ ramo: a.ramo }), { bearer });
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    const mainPrima = (deps.mainPrima || mainRemotoServer)(cartella);
+    let k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    const dalPc = k === 0;
+    if (k === USCITA_SPINTA_RIFIUTATA) {
+      const shaCancello = (daFondere && daFondere.server && daFondere.server.sha) || (deps.puntaRamo || puntaRamoServer)(cartella, a.ramo) || '';
+      k = await fusioneDalCancello({ cartella, ramo: a.ramo, sha: shaCancello, feedbackId: r.id }, { chiedi: deps.chiediAlCancello, allinea: deps.allinea, log, err });
+    }
     if (k === USCITA_CONFLITTO_MAIN && !tardiva) {
       err(`main del server non si è mosso. La pratica ${chi} torna alle routine per il riallineamento al giro del PC (npm run orchestra -- fusioni-server).`);
       return k;
     }
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
-      await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
+      await of.annotaPratica(r.id, NOTE_FISSE.serverFermo({ ramo: a.ramo, uscita: k }), { bearer }).catch(() => null);
       err(`La pratica ${chi} resta in lavorazione: sistema e rilancia lo stesso comando.`);
       return k;
     }
@@ -328,32 +446,44 @@ export async function esegui(argv, deps = {}) {
     if (verificato && sha && sha !== verificato) {
       err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
     }
+    // La fusione chiesta al cancello la registra il server; la spinta dal PC la dice questo passo.
+    if (dalPc) await registraMainDalPc({ ramo: a.ramo, sha, prima: mainPrima, feedbackId: r.id }, { registra: deps.registraMain, err });
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
+    const daGitHub = (deps.deployDaGitHub || deployDaGitHub)(cartella);
     if (tardiva) {
-      const nota = `${notaFine(a.ramo, sha)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando}), e resta chiusa.`;
+      const nota = NOTE_FISSE.serverFineTardiva({ ramo: a.ramo, sha, daGitHub, quando: tardiva.at });
       const annotata = await of.scrivi(r.id, 'done', nota, { bearer, attore: 'routine' });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha annotato (${annotata.motivo}).`);
-      log(`${a.ramo} è su main del server. La pratica ${chi} resta chiusa, con la nota di quest'ultima parte. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+      log(`${a.ramo} è su main del server. La pratica ${chi} resta chiusa, con la nota di quest'ultima parte. ${perIlDeploy(daGitHub)}`);
       return annotata.ok ? 0 : 1;
     }
-    if (!chiude) {
-      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}.${ramiApp.length ? '' : ` Se il lavoro stava solo sul server: ${soloComando}.`}`;
+    const riletta = chiude ? { esito: 'chiudi' } : await rileggiDopoLaFusione(r.id, { of, bearer, ramo: a.ramo, ramiAperti: deps.ramiAperti });
+    if (riletta.esito === 'chiusa') {
+      const nota = NOTE_FISSE.serverFineChiusaIntanto({ ramo: a.ramo, sha, daGitHub });
+      const annotata = await of.scrivi(r.id, 'done', nota, { bearer, attore: 'routine' });
+      if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha annotato (${annotata.motivo}).`);
+      log(`${a.ramo} è su main del server. La pratica ${chi} l'ha chiusa intanto la fusione della parte ${NOME_PARTE.app}: resta chiusa. ${perIlDeploy(daGitHub)}`);
+      return annotata.ok ? 0 : 1;
+    }
+    if (riletta.esito === 'aperta') {
+      if (riletta.motivo) err(`La pratica ${chi} non si rilegge dopo la fusione (${riletta.motivo}): se intanto la parte ${NOME_PARTE.app} è arrivata su main, rilancia lo stesso comando e la chiude.`);
+      const nota = NOTE_FISSE.serverFineAperta({ ramo: a.ramo, sha, daGitHub, ramiApp, numero });
       const annotata = await of.annotaPratica(r.id, nota, { bearer });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha registrato (${annotata.motivo}).`);
       log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}.`);
       // Con un ramo dell'app legato --solo-server si rifiuta: consigliarlo manderebbe in un vicolo.
       if (!ramiApp.length) log(`Se il lavoro stava solo sul server, chiudila con: ${soloComando}`);
-      log('Per il deploy: npm run server:pubblica, da filo-security/functions.');
+      log(perIlDeploy(daGitHub));
       return annotata.ok ? 0 : 1;
     }
-    const notaChiusura = solo ? `${notaFine(a.ramo, sha)} Il lavoro stava solo sul server (--solo-server).` : notaFine(a.ramo, sha);
+    const notaChiusura = NOTE_FISSE.serverFineChiusa({ ramo: a.ramo, sha, daGitHub, solo, intanto: !chiude });
     const chiusa = await of.scrivi(r.id, 'done', notaChiusura, { bearer, attore: 'routine' });
     if (!chiusa.ok) {
-      err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaChiusura}" --come-routine`);
+      err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaChiusura.testo}" --come-routine`);
       return 1;
     }
-    log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+    log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. ${perIlDeploy(daGitHub)}`);
     const frase = await of.fraseDaScrivere(r.id, chi, { bearer });
     if (frase) log(frase);
     return 0;

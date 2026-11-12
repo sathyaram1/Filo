@@ -12,7 +12,8 @@
 //
 // PROTOCOLLO marcatori (powershell/cmd/sh):
 //   - FILO_RDY_<sid>            riga di "pronto" (e prompt da rimuovere, con cmd);
-//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
+//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory;
+//   - FILO_EFINE_<sid>:<n>      su stderr, fine dello stderr del comando n (solo sh/bash).
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
@@ -22,6 +23,7 @@
 // dell'assistente con cmd (terminal.js), che arriva già passato dal gate dei livelli.
 
 const { spawn } = require('node:child_process');
+const { programmaIntero } = require('./programmaIntero');
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -31,7 +33,7 @@ const path = require('node:path');
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
 // I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
 // solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
-const { resolveShell, PRELUDI_CODIFICA, righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL } = require('./terminal');
+const { resolveShell, PRELUDI_CODIFICA, righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL, ambienteComandi } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
@@ -52,20 +54,14 @@ function defaultCwd() {
 // in avanti: la riga di «pronto» parte nello stesso pezzo del preludio, quindi
 // andrebbe persa e la sessione resterebbe muta per sempre.
 //
-// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte con
-// i caratteri speciali scritti come numeri e lo rimette insieme PowerShell, che
-// ricostruisce il testo da sé senza passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
-// caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
-// quello che un utente digita di solito si comportano come si sono sempre
-// comportati. Il testo ricomposto gira nello scope di chi chiama, quindi anche
-// per un comando accentato le variabili e la cartella restano quelle della
-// sessione: continua a essere un terminale vero.
+// La cura è non far viaggiare caratteri non ASCII sul filo: il comando parte con i caratteri speciali scritti come
+// numeri e lo rimette insieme PowerShell, senza passare da nessuna tabella. Sempre, non solo per gli accenti, perché
+// il testo serve anche come dato a chi conta gli esiti dei programmi (#718, terminal.js); gira nello scope di chi
+// chiama, quindi variabili, cartella ed `exit` restano quelli di un terminale vero.
 const SOLO_ASCII = /^[\x00-\x7F]*$/;
 
 function comandoPerPowerShell(command, coda = '') {
-  const cmd = String(command == null ? '' : command);
-  if (!SOLO_ASCII.test(cmd)) return invocaCodificato(cmd, coda);
-  return coda ? `${cmd}\n${coda}` : cmd;
+  return invocaCodificato(String(command == null ? '' : command), coda);
 }
 
 // cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
@@ -169,11 +165,27 @@ function randSid() {
   return 'F' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-5);
 }
 
+// #892.4 — nudo sullo stdin, un comando che non si chiude (un apostrofo, un `if` senza `fi`) si prende come testo la
+// riga del marcatore e i comandi dopo: la sessione resta «in corso» per sempre. Fra apici il testo è sempre chiuso, e
+// l'errore di sintassi lo dà `eval`; `command` davanti tiene viva dash, che a un errore di `eval` uscirebbe.
+function comandoPerPosix(command) {
+  return `command eval '${String(command == null ? '' : command).replace(/'/g, "'\\''")}'`;
+}
+
+// stdout e stderr sono due tubi: l'errore di un comando poteva arrivare dopo il suo marcatore e finire sotto il comando
+// dopo. Il segno su stderr chiude anche quel tubo; chi ha chiuso lo stderr della shell lo aspetta al più ATTESA_ERR_MS.
+// Una riga sola: bash legge lo stdin a byte, e un comando che chiede (`cp -i`) si prendeva i marcatori come risposta.
+function righePosix(command, sid, n) {
+  return `${comandoPerPosix(command)}; __filo_s=$?; printf 'FILO_EFINE_${sid}:${n}\\n' >&2; `
+    + `printf 'FILO_META_${sid}:%s:%s\\n' "$__filo_s" "$PWD"\n`;
+}
+const ATTESA_ERR_MS = 800;
+
 // Config per shell: come avviare il processo persistente, la riga di "pronto"
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
-  const ambiente = env ? { env } : {};
+  const ambiente = { env: ambienteComandi(env || process.env) };
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
   // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
   // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
@@ -184,8 +196,8 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       args: [],
       options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
-      wrap: (command) =>
-        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+      wrap: (command, n) => righePosix(command, sid, n),
+      fineErr: true,
     };
   }
   if (shell === 'cmd') {
@@ -203,7 +215,7 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       file: process.env.ComSpec || 'cmd.exe',
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...ambiente.env, [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
       wrap: (command) => {
         let { testo, file } = comandoPerCmd(command);
@@ -219,16 +231,15 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
     };
   }
   if (shell === 'bash') {
-    // WSL bash persistente. `--cd` accetta sia path Windows sia Linux e imposta
-    // la dir iniziale; il resto va via stdin. Letto da pipe → niente prompt.
+    // `--cd` accetta path Windows e Linux; letto da pipe, niente prompt da ripulire.
     const args = ['--cd', startCwd || defaultCwd(), '--', 'bash'];
     return {
       file: 'wsl.exe',
       args,
       options: { windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
-      wrap: (command) =>
-        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+      wrap: (command, n) => righePosix(command, sid, n),
+      fineErr: true,
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
@@ -275,17 +286,25 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
     proc: null,
     queue: [],        // comandi in attesa: { command, cb }
     current: null,    // comando in esecuzione: { cb }
-    _buf: '',         // buffer di linea per stdout
+    _buf: '',
     _pendingBlank: 0, // righe vuote in attesa (separatori prompt/marcatore)
     exec, write, chiudi, kill,
   };
 
   const META_PREFIX = `FILO_META_${sid}:`;
   const RDY_LINE = `FILO_RDY_${sid}`;
+  const ERR_PREFIX = `FILO_EFINE_${sid}:`;
+  const ERR_RE = new RegExp(`${ERR_PREFIX}(\\d+)\\n`);
+  let numero = 0;
+  let errBuf = '';
+  // Il marcatore è arrivato, lo stderr del comando non ancora: { code, cwd, timer }.
+  let inAttesa = null;
 
   let proc;
   try {
-    proc = spawn(cfg.file, cfg.args, cfg.options);
+    const programma = programmaIntero(cfg.file);
+    if (!programma) throw new Error(`${cfg.file} non è nel PATH`);
+    proc = spawn(programma, cfg.args, cfg.options);
   } catch (err) {
     session.dead = true;
     session._spawnError = err.message || String(err);
@@ -297,27 +316,67 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   proc.stdout && proc.stdout.on('data', onStdout);
   proc.stderr && proc.stderr.on('data', (chunk) => {
-    // stderr non passa dal protocollo a righe: lo inoltriamo grezzo al comando
-    // corrente (rosso nella bolla). Normalizziamo solo i \r\n.
-    if (session.current && session.current.cb.onData) {
-      session.current.cb.onData({ chunk: String(chunk).replace(/\r\n/g, '\n'), stream: 'stderr' });
+    // stderr non passa dal protocollo a righe: si inoltra grezzo al comando corrente,
+    // normalizzando solo i fine riga.
+    const testo = String(chunk).replace(/\r\n/g, '\n');
+    if (!cfg.fineErr) { emitErr(testo); return; }
+    errBuf += testo;
+    let m;
+    while ((m = ERR_RE.exec(errBuf))) {
+      emitErr(errBuf.slice(0, m.index));
+      errBuf = errBuf.slice(m.index + m[0].length);
+      stderrFinito(Number(m[1]));
     }
+    const tieni = segnoAMeta(errBuf);
+    emitErr(errBuf.slice(0, errBuf.length - tieni));
+    errBuf = errBuf.slice(errBuf.length - tieni);
   });
   proc.on('error', (err) => fatal(err.message || String(err)));
   proc.on('close', (uscita) => {
     session.dead = true;
     if (cfg.pulisci) cfg.pulisci();
+    const attesa = inAttesa;
+    if (attesa) { clearTimeout(attesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
-    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
+    if (cur && cur.cb.onExit) cur.cb.onExit(attesa ? { code: attesa.code, cwd: attesa.cwd } : { code: 0, cwd: session.cwd, chiusa: true, uscita });
     drainQueueErr('shell terminata');
   });
 
-  // Invia la riga di "pronto": quando la rivediamo in output, la sessione è
-  // operativa e svuotiamo la coda.
+  function emitErr(text) {
+    if (text && session.current && session.current.cb.onData) session.current.cb.onData({ chunk: text, stream: 'stderr' });
+  }
+
+  // Quanto della coda di stderr può essere l'inizio del segno: si trattiene finché non arriva il resto.
+  function segnoAMeta(buf) {
+    for (let k = Math.max(0, buf.length - ERR_PREFIX.length - 16); k < buf.length; k++) {
+      const t = buf.slice(k);
+      if (ERR_PREFIX.startsWith(t) || (t.startsWith(ERR_PREFIX) && /^\d*$/.test(t.slice(ERR_PREFIX.length)))) return buf.length - k;
+    }
+    return 0;
+  }
+
+  function stderrFinito(n) {
+    const cur = session.current;
+    if (!cur || cur.n !== n) return;
+    cur.errFinito = true;
+    if (inAttesa) chiudiComando();
+  }
+
+  function chiudiComando() {
+    const attesa = inAttesa;
+    if (!attesa) return;
+    clearTimeout(attesa.timer);
+    inAttesa = null;
+    const cur = session.current;
+    session.current = null;
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: attesa.code, cwd: attesa.cwd });
+    pump();
+  }
+
+  // Quando la riga di "pronto" torna in output la sessione è operativa e si svuota la coda.
   try { proc.stdin.write(cfg.ready); } catch (_) {}
 
-  // ── stdout: parsing a righe con soppressione delle righe vuote di prompt ──
   function onStdout(chunk) {
     session._buf += chunk;
     let nl;
@@ -327,12 +386,9 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
       if (line.endsWith('\r')) line = line.slice(0, -1);
       processLine(line);
     }
-    // Una coda parziale senza newline (es. output con -NoNewline) resta in
-    // _buf: la mostriamo subito se NON contiene l'inizio di un marcatore, così
-    // i comandi che non terminano con a-capo restano reattivi.
+    // Una coda senza newline si mostra subito solo se non contiene l'inizio di un marcatore:
+    // restare reattivi non deve costare un marcatore spezzato a metà.
     if (session._buf && session._buf.indexOf(META_PREFIX) === -1 && session._buf !== RDY_LINE) {
-      // niente: la teniamo finché non arriva il newline, per non spezzare un
-      // eventuale marcatore a metà. (I comandi comuni terminano con newline.)
     }
   }
 
@@ -347,7 +403,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   }
 
   function processLine(line) {
-    // Riga di "pronto"/prompt: segnale di sessione operativa + da rimuovere.
+    // Riga di "pronto"/prompt: segnale di sessione operativa, e da rimuovere.
     if (line === RDY_LINE) {
       session._pendingBlank = 0; // la riga vuota che la precede era un separatore
       if (!session.ready) { session.ready = true; pump(); }
@@ -355,7 +411,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
     }
     if (!session.ready) return; // rumore pre-pronto (es. prompt iniziale di cmd)
 
-    // Marcatore di fine comando (può essere "incollato" a output senza newline).
+    // Marcatore di fine comando: può arrivare "incollato" a output senza newline.
     const idx = line.indexOf(META_PREFIX);
     if (idx !== -1) {
       const before = line.slice(0, idx);
@@ -368,28 +424,28 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
       const code = codeStr === '' ? 0 : (parseInt(codeStr, 10) || 0);
       if (cwdStr) session.cwd = cwdStr;
       const cur = session.current;
-      session.current = null;
-      if (cur && cur.cb.onExit) cur.cb.onExit({ code, cwd: session.cwd });
-      pump();
+      inAttesa = { code, cwd: session.cwd, timer: null };
+      if (cfg.fineErr && cur && !cur.errFinito) inAttesa.timer = setTimeout(chiudiComando, ATTESA_ERR_MS);
+      else chiudiComando();
       return;
     }
 
-    // Riga vuota: differita. Se segue un prompt/marcatore la scartiamo (è un
-    // separatore), altrimenti la emettiamo quando arriva la prossima riga vera.
+    // Riga vuota differita: dopo un prompt o un marcatore è un separatore e si scarta,
+    // altrimenti si emette quando arriva la prossima riga vera.
     if (line === '') { session._pendingBlank++; return; }
 
     flushBlanks();
     emitOut(line + '\n');
   }
 
-  // ── coda comandi ──────────────────────────────────────────────────────────
   function pump() {
     if (session.dead || session.current || !session.ready) return;
     const next = session.queue.shift();
     if (!next) return;
     session.current = next;
     session._pendingBlank = 0;
-    try { proc.stdin.write(cfg.wrap(next.command)); }
+    next.n = ++numero;
+    try { proc.stdin.write(cfg.wrap(next.command, next.n)); }
     catch (err) {
       session.current = null;
       next.cb.onError && next.cb.onError({ message: err.message || String(err) });
@@ -415,9 +471,10 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function kill() {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     try {
       if (process.platform === 'win32' && proc.pid) {
-        // /T termina anche i figli (npm, build, ecc.) che kill() lascerebbe orfani.
+        // /T termina anche i figli (npm, build…) che kill() lascerebbe orfani.
         spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
       } else {
         proc.kill('SIGTERM');
@@ -427,6 +484,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function fatal(message) {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
     if (cur && cur.cb.onError) cur.cb.onError({ message });
@@ -443,59 +501,34 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   return session;
 }
 
-// Verifica veloce e "usa e getta" se un comando esiste nella shell scelta.
-// Serve all'evidenziazione live della dashboard in modalità terminale: un
-// "/comando" inesistente va colorato di rosso. È separata dalla sessione
-// persistente (che è in streaming) per non interferire con essa.
-//
-// SICUREZZA: il nome del comando NON viene mai interpolato in una stringa di
-// shell né appeso a un `-Command`. Sui resolver POSIX e su `where.exe` viaggia
-// come argomento (argv), che non passa da nessuna shell. Su PowerShell viaggia
-// in una VARIABILE D'AMBIENTE (`$env:FILO_WHICH_CMD`): il valore di un env non
-// viene mai rivalutato come codice, quindi `node;calc` resta la stringa
-// "node;calc", non due comandi. (Trappola di Windows PowerShell 5.1: i token
-// messi DOPO `-Command '<script>'` NON finiscono in `$args` — vengono
-// concatenati ed ESEGUITI. Per questo il nome non tocca mai la riga di
-// `-Command`.)
-//
-// Builtin di cmd.exe che `where` non vede (non sono eseguibili nel PATH).
+// SICUREZZA: il nome del comando non finisce mai su una riga di shell (il perché sta in
+// existenceProbes). Sotto: i builtin di cmd che `where` non vede.
 const CMD_BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
   'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
   'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
 
-// I "probe" per verificare l'esistenza di un comando, in ordine di tentativo:
-// si prova il primo, e SOLO se non conferma si passa al successivo. Ogni probe
-// è { file, args } e l'esistenza è segnalata da exit code 0.
+// In ordine: si passa al probe successivo SOLO se il precedente non conferma. Ogni probe è
+// { file, args }, e l'esistenza è l'exit code 0.
 function existenceProbes({ shell, cmd }) {
   if (process.platform !== 'win32') {
-    // Linux/macOS (incluse le routine cloud): /bin/sh, `command -v` copre
-    // builtin, funzioni ed eseguibili nel PATH.
+    // `command -v` copre builtin, funzioni ed eseguibili nel PATH.
     return [{ file: '/bin/sh', args: ['-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
   }
   if (shell === 'cmd') {
-    // cmd.exe: i builtin li abbiamo già coperti a monte; `where` trova gli
-    // eseguibili nel PATH.
+    // cmd.exe: i builtin sono già coperti a monte, `where` trova gli eseguibili nel PATH.
     return [{ file: 'where.exe', args: [cmd] }];
   }
   if (shell === 'bash') {
-    // WSL bash.
     return [{ file: 'wsl.exe', args: ['--', 'bash', '-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
   }
-  // PowerShell (default). `where.exe` PER PRIMO: risolve ogni eseguibile nel
-  // PATH in ~100ms ed è affidabile anche con gli shim .ps1/.cmd di npm. NON
-  // partire da Get-Command: per quegli shim (es. `firebase.ps1`) deve fare
-  // l'analisi dello script e ci mette anche 5s — oltre il timeout — finendo per
-  // colorare di rosso un comando perfettamente valido. Get-Command resta come
-  // fallback per ciò che `where` non vede: cmdlet, alias e funzioni (ls, cd,
-  // Get-ChildItem…). A quel punto NON è mai un eseguibile esterno → niente
-  // analisi pesante → risolve in fretta.
+  // `where.exe` per primo: regge gli shim .ps1/.cmd di npm in ~100ms, dove Get-Command deve
+  // leggere lo script e può sforare il timeout, colorando di rosso un comando valido.
   return [
     { file: 'where.exe', args: [cmd] },
     {
       file: 'powershell.exe',
-      // Il nome NON è un argomento della riga `-Command` (in 5.1 verrebbe
-      // eseguito, non passato in $args): entra come env, che PowerShell tratta
-      // come dato. `-Name` prende una stringa, non la rivaluta.
+      // Il nome entra come env, che PowerShell tratta come dato: sulla riga `-Command` in 5.1
+      // verrebbe ESEGUITO invece che passato in $args.
       args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
         'if (Get-Command -Name $env:FILO_WHICH_CMD -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }'],
       env: { FILO_WHICH_CMD: cmd },
@@ -507,42 +540,97 @@ function existenceProbes({ shell, cmd }) {
 // attesa: con la macchina carica anche `where.exe` supera i dieci secondi (#1063).
 const ATTESA_PROBE_MS = 10000;
 
-// Esegue UN probe e risolve true se il processo esce con codice 0.
+// Un probe risponde 'si' (uscito 0), 'no' (uscito con un altro codice) o 'incerto': scaduto, non partito, ucciso
+// da un segnale. Un incerto non è un «non esiste»: con la macchina carica colorava di rosso comandi validi (#1176).
 function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS) {
   return new Promise((resolve) => {
     let done = false;
     let proc;
     const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
-      // `env` del probe: il nome del comando da controllare viaggia qui (mai
-      // sulla riga di comando di PowerShell), così non può essere eseguito.
-      const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
-      proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
-    } catch (_) { resolve(false); return; }
-    const timer = setTimeout(() => finish(false), attesaMs);
-    proc.on('error', () => { clearTimeout(timer); finish(false); });
-    proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
+      // L'env dei probe: vedi existenceProbes.
+      const env = ambienteComandi({ ...process.env, ...(probeEnv || {}) });
+      const programma = programmaIntero(file);
+      if (!programma) { resolve('incerto'); return; }
+      proc = spawn(programma, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
+    } catch (_) { resolve('incerto'); return; }
+    const timer = setTimeout(() => finish('incerto'), attesaMs);
+    proc.on('error', () => { clearTimeout(timer); finish('incerto'); });
+    proc.on('exit', (code) => {
+      clearTimeout(timer);
+      finish(code === 0 ? 'si' : (typeof code === 'number' ? 'no' : 'incerto'));
+    });
   });
 }
 
+// true se un probe conferma, false solo se TUTTI dicono no, null altrimenti: dopo un `where.exe` scaduto il «no» di
+// Get-Command non basta, perché sbaglia proprio sugli shim npm che `where` avrebbe visto.
+async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
+  let incerto = false;
+  for (const probe of probes) {
+    const esito = await runProbe(probe, cwd, attesaMs);
+    if (esito === 'si') return true;
+    if (esito === 'incerto') incerto = true;
+  }
+  return incerto ? null : false;
+}
+
+// Su NTFS, exFAT e /mnt di WSL ogni documento ha il permesso d'esecuzione: un programma lo dicono i primi byte (`#!`,
+// ELF, Mach-O, il PE che WSL lancia). Un file che non si lascia leggere resta quello che diceva il permesso.
+const SEGNI_ESEGUIBILE = [[0x23, 0x21], [0x7f, 0x45, 0x4c, 0x46], [0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf],
+  [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe]].map((s) => Buffer.from(s));
+const SEGNO_PE = Buffer.from('MZ');
+function contenutoEseguibile(p, { pe = false } = {}) {
+  let fd = null;
+  try {
+    fd = fs.openSync(p, 'r');
+    const testa = Buffer.alloc(4);
+    const letti = fs.readSync(fd, testa, 0, 4, 0);
+    const segni = pe ? [...SEGNI_ESEGUIBILE, SEGNO_PE] : SEGNI_ESEGUIBILE;
+    return segni.some((s) => letti >= s.length && testa.subarray(0, s.length).equals(s));
+  } catch (_) {
+    return true;
+  } finally {
+    if (fd != null) { try { fs.closeSync(fd); } catch (_) {} }
+  }
+}
+
+// PATHEXT più gli script di PowerShell e gli installatori; in WSL il bit d'esecuzione non si vede da qui: decide il contenuto.
+function programmaWindowsAlPercorso(p, shell) {
+  const file = (f) => { try { return fs.statSync(f).isFile(); } catch (_) { return false; } };
+  if (shell === 'bash') return file(p) && contenutoEseguibile(p, { pe: true });
+  const est = new Set(String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
+    .toLowerCase().split(';').filter(Boolean).concat(['.ps1', '.msi']));
+  if (est.has(path.extname(p).toLowerCase())) return file(p);
+  return [...est].some((e) => file(p + e));
+}
+
+// #892.5 — dash (il /bin/sh di Debian e Ubuntu) risponde sì a `command -v` per qualunque percorso che c'è, documento o
+// cartella: la regola la tiene Node, uguale per ogni shell POSIX. Il `~` lo espande la shell anche davanti a un programma.
+function programmaPosixAlPercorso(cmd, cwd) {
+  const p = /^~(?=\/|$)/.test(cmd) ? path.join(os.homedir(), cmd.slice(1)) : path.resolve(cwd || defaultCwd(), cmd);
+  try {
+    if (!fs.statSync(p).isFile()) return false;
+    fs.accessSync(p, fs.constants.X_OK);
+  } catch (_) { return false; }
+  return contenutoEseguibile(p);
+}
+
+// true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
-  // Niente da controllare, o token chiaramente non un nome di comando
-  // (newline/null): consideralo "non esiste".
+  // Niente da controllare, o token che non è un nome di comando (newline/null): "non esiste".
   if (!cmd || /[\n\r\0]/.test(cmd)) return false;
   // Builtin cmd.exe: sì senza spawnare nulla.
   if (process.platform === 'win32' && shell === 'cmd' && CMD_BUILTINS.has(cmd.toLowerCase())) {
     return true;
   }
   // Un programma dato col percorso (anche fra virgolette, #968): `where.exe` rifiuta i percorsi e cmd resterebbe
-  // rosso. Fuori da Windows `command -v` qui sotto risolve già un percorso, e controlla anche che sia eseguibile.
-  if (process.platform === 'win32' && /[\\/]/.test(cmd)) {
-    try { if (fs.statSync(path.resolve(cwd || defaultCwd(), cmd)).isFile()) return true; } catch (_) {}
-  }
-  for (const probe of existenceProbes({ shell, cmd })) {
-    if (await runProbe(probe, cwd, attesaMs)) return true;
-  }
-  return false;
+  // rosso. Lì un documento esistente non è un programma (#892.1): conta solo un'estensione che si esegue, scritta o
+  // sottintesa. Fuori da Windows decide il bit d'esecuzione (programmaPosixAlPercorso).
+  if (process.platform === 'win32' && /[\\/]/.test(cmd)) return programmaWindowsAlPercorso(path.resolve(cwd || defaultCwd(), cmd), shell);
+  if (process.platform !== 'win32' && cmd.includes('/')) return programmaPosixAlPercorso(cmd, cwd);
+  return esitoDeiProbe(existenceProbes({ shell, cmd }), cwd, attesaMs);
 }
 
 // `existenceProbes` è esportata SOLO per il guard di regressione nei test
@@ -551,6 +639,8 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
 // su una macchina carica.
 module.exports = {
   createSession, defaultCwd, commandExists, existenceProbes,
+  // per la guardia di #1176: un probe scaduto o non partito non diventa un «non esiste».
+  esitoDeiProbe,
   // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
   // la usano il comando one-shot dell'assistente e il popup di conferma.
   cartellaViva, cartellaPerComando, usableCwd, unitaDiRete,

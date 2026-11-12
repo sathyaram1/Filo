@@ -34,6 +34,9 @@ Tre unit test rossi solo su Windows.
   nella shell vera), si asserisce la relazione e non il valore:
   `encodingPrelude(s) === PRELUDI_CODIFICA[resolveShell(s)]`. Vale su ogni sistema e
   diventa rossa se qualcuno lega il risultato alla richiesta.
+- Un percorso che il codice compone con `path` si aspetta componendolo allo stesso modo,
+  non scritto a mano: `join('/x/schede', '12.json')` su Windows è `\x\schede\12.json`
+  (#1780, `tests/unit/schede.test.mjs`).
 - Se il caso non c'entra con la proprietà, si scelgono dati che non ne dipendono: due
   nomi che differiscono per l'accento, non per le maiuscole, danno la stessa ambiguità
   dappertutto.
@@ -42,6 +45,24 @@ Tre unit test rossi solo su Windows.
 
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
+
+## Lo stesso percorso vuol dire due cose (#1610)
+
+Il percorso che una prova scrive ha il significato del sistema su cui gira, e il
+codice lo legge con il `path` e il `process.platform` di quel sistema. Il caso:
+`/net/nas/condivisa` è un altro computer sul Mac e su Linux, ma su Windows è la
+cartella `\net\nas\condivisa` dell'unità corrente. La prova aspettava un rifiuto
+che su Windows sarebbe stato un errore. Su Windows lo stesso rifiuto si prova con
+`\\nas\condivisa`. Il resto della prova resta uguale sui due lati.
+
+Lì vicino: su Windows un percorso che parte da `\` prende l'unità della cartella
+corrente, e il runner di GitHub lavora su `D:` mentre la casa finta sta su `C:`.
+Fra due unità `path.win32.relative` non dà un `..`: dà il percorso di arrivo, che è
+assoluto. «Dentro la casa» quindi vuol dire relativo, senza `..` in testa e non
+assoluto. Una prova che dipende dall'unità prova anche il caso `D:` in modo
+esplicito, così lo vede pure il Linux delle routine.
+
+Riferimento: `tests/unit/percorsiDiRete.test.mjs`.
 
 ## Il contenitore senza gestore di finestre (#465.1)
 
@@ -127,12 +148,18 @@ il rosso ferma le versioni per tutti:
   `fuoriDa(cartella, percorso)` (`tests/helpers/percorsi.mjs`). E un nome relativo
   rimesso insieme con `join(radice, nome)` incolla i due dischi
   (`D:\a\Filo\Filo\C:\Users\…`): si usa `resolve`.
+- **Le barre.** `relative(ROOT, f)` su Windows dà `src\shared\x.js`: confrontato con
+  un `'src/shared/x.js'` scritto a mano non si trova mai (#2186). Un percorso che fa da
+  chiave si normalizza prima, `.split(sep).join('/')`; in un messaggio può restare com'è.
 - **Il node che gira.** Il processo che esegue la prova tiene aperto il proprio
   eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
   collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
   con EPERM. Si copia.
+- **L'import di un percorso.** `import(join(ROOT, 'x.js'))` su Windows legge `D:` come
+  schema di un URL e lancia `ERR_UNSUPPORTED_ESM_URL_SCHEME` (#2223): si importa
+  `pathToFileURL(percorso).href`.
 
-Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+Sentinella di queste forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
 **Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
 nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
@@ -146,7 +173,12 @@ rimette com'era. Regge solo perché il codice la chiede al momento, da un punto 
 prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
 fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
 (`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
-dà un ramo che la suite in GitHub non corre mai (#1171).
+dà un ramo che la suite in GitHub non corre mai (#1171). Un caso nuovo che non si
+sceglie la piattaforma è rosso anche su Linux: le prove dell'aggiornatore si rifanno
+con Node che si crede Windows e Mac (`tests/unit/aggiornamentiDaOgniSistema.test.mjs`,
+#1146). Da Windows non si finge: un Node di Windows che si crede Linux sceglie
+un'altra shell e il rosso sarebbe della finzione; un caso che presume Windows è già
+rosso su Linux da sé.
 
 **Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
 la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
@@ -212,18 +244,59 @@ Le forme che cadevano, e cosa le ha sostituite:
   6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
   riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
   misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
-  minimo di ciascuno (`rapportoFraCosti`). Una finestra di tempo fra due figli che devono
-  sovrapporsi si toglie facendoli girare in fila.
+  minimo di ciascuno (`rapportoFraCosti`). Quando i dati quasi vuoti non sono il paragone giusto
+  (un flush di 4 MB copia comunque 4 MB), si paragona lo stesso lavoro fatto per intero; e se il
+  campione ha un pezzo da non contare (la scrittura su disco), `ora` è un orologio che corre solo
+  nella finestra misurata (#1228, `tests/unit/storageScritturePerChiave.test.mjs`). Un `await` fra
+  partenza e arrivo nasconde la soglia fissa alla sentinella: lì la regola la tiene chi scrive.
+  Una finestra di tempo fra due figli che devono sovrapporsi si toglie facendoli girare in fila.
 - **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
   test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
   sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
   ritentano anche loro (`maxRetries`).
-- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
-  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+- **Il tetto del lanciatore** (20 minuti in cui un file non va avanti, non la sua durata: un
+  file sano sotto carico è lento ma avanza): il file fermo si chiude da solo, rosso col suo
+  nome, e gli altri girano (#1231). Node mostra in diretta solo i passi del primo file in
+  corso: se in un tetto non finisce nessun file, con lui si chiudono i file partiti da più
+  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
+  chiude la corsa (il disco pieno). L'avviso di chiusura nomina sempre chi la teneva ferma:
+  i file in corso o, se non ce n'è più, quelli già chiusi che non l'hanno sbloccata (#1573:
+  chiuso il file, una corsa che non finiva lo stesso diceva «non è andato avanti niente»).
+  Una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
   risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
-  lanciatore, e la riprova dei rossi pure (`--solo`).
+  lanciatore, e la riprova dei rossi pure (`--solo`). Una prova che fa girare altri file di
+  prova con un ambiente suo (le prove da sole in sessione, #1214) usa la stessa guardia,
+  `lanciaSorvegliato`, col tetto delle attese: cinque minuti sulla durata della corsa
+  cadevano con due corse insieme su un portatile lento.
+- **Un file non si appende sul primo errore.** Un intervallo vero che tiene vivo il processo
+  per tutto il file tiene vivo anche una promessa rimasta a metà: si accende solo finché
+  l'attesa vera è in viaggio (`tests/helpers/letturaIsolata.mjs`). Un pacchetto che il
+  codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
+  col nome del pacchetto.
+
+### Una prova che guarda un momento lo tiene aperto lei (#1321)
+
+Con quattro esecuzioni in parallelo le prove della chat della home cadevano a caso. La
+risposta in streaming usciva in pezzi a 500 ms l'uno dall'altro e la prova doveva vedere la
+testa senza la coda in quel mezzo secondo; il ragionamento in corso durava 3,6 s e la prova
+doveva cliccarci due volte e fare una foto; la riga «Avvio un timer…» restava 2,5 s.
+
+- Il modello finto si ferma dove la prova deve guardare (`await` di una promessa che la
+  prova scioglie con `app.evaluate(() => globalThis.__…())`). Senza il comportamento
+  provato la prova resta rossa: lo stato atteso non arriva mai.
+- La fine del turno si aspetta su un segno della pagina (il tasto d'invio che torna, il
+  bottone dell'azione), con un tetto che copre le attese che l'app fa apposta: aperta una
+  pagina, il turno aspetta fino a 5 s che arrivi (`esitoApertura`), e la prova ne dava 3.
+- Un'azione che apre un sito apre il server di prova (`testServer.html(…, { pubblico: true })`):
+  con example.com il turno aspettava la rete, che nei contenitori non c'è.
+- Un'attesa che prova un'assenza («nessuna scritta, nemmeno dopo un secondo») resta: guarda
+  che non succeda niente, non scommette che qualcosa arrivi prima di un orologio.
+
+Prove: `tests/dashboard-chat-streaming.spec.mjs`, `tests/dashboard-chat-attivita.spec.mjs`
+(A, B), `tests/dashboard-chat-strumenti.spec.mjs` (C). L'altra metà di quei rossi era un
+difetto vero: [Il filo dell'attesa](il-filo-dell-attesa.md), «La diretta si chiude sul segno di fine».
 
 ## Il verso opposto (#937)
 
@@ -245,3 +318,46 @@ prova, rossi solo in una routine. Il lanciatore toglie ai test nome e cartella d
 transcript (`ambientePerITest`, sentinella in `tests/unit/unitRunner.test.mjs`); un
 figlio che una prova lancia da sé prende l'ambiente da lì, così un `node --test` a mano
 dà lo stesso esito del lanciatore.
+
+## La pagina nascosta che Playwright tiene sveglia (#1494)
+
+«Salta le pubblicità dei video» riconosce il «Salta» da un'animazione CSS muta, che il
+motore fa partire quando disegna il pulsante. Una pagina nascosta (scheda dietro,
+finestra ridotta a icona o coperta) non disegna: `requestAnimationFrame` si ferma, le
+animazioni non partono, e la pubblicità suonava per intero. La prova «in una scheda in
+secondo piano salta lo stesso» era verde lo stesso.
+
+Playwright, per ogni pagina che aggancia, chiede a Chromium di emulare il fuoco
+(`Emulation.setFocusEmulationEnabled`), e Chromium tratta come visibile una pagina col
+fuoco emulato. Sotto Playwright una scheda dietro, con la vista grande zero e
+`setVisible(false)`, risponde `visibilityState === 'visible'` e disegna a 60 fotogrammi
+al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright risponde
+`hidden` e i fotogrammi vanno a zero.
+
+- Ciò che cambia a pagina nascosta (animazioni, `rAF`, `IntersectionObserver`,
+  `ResizeObserver`, `visibilitychange`, timer rallentati) si prova con
+  `apriFiloSenzaPlaywright()` di `tests/helpers/filoSenzaPlaywright.mjs`: guida il main
+  dal suo ispettore, come `app.evaluate`, e lascia le pagine senza client di debug.
+  Anche il Node è parte del sistema: il contenitore delle routine ha il 22, la suite e
+  gli unit su GitHub girano sul `node-version` dei workflow (oggi 20), senza il
+  `WebSocket` globale. Il client dell'ispettore è perciò il `ws` di Playwright, e le
+  quattro prove nate così erano rosse solo su main (#1611, sentinella
+  `tests/unit/filoSenzaPlaywright.test.mjs`).
+- La prova asserisce prima la precondizione, `document.visibilityState === 'hidden'`
+  nella pagina: senza, crede di guardare una scheda dietro e ne guarda una visibile.
+- Le anteprime delle schede svegliano per un attimo la scheda dietro che cambia
+  (`src/main/tabs/anteprime.js`): la prova che deve vedere la pagina nascosta le spegne
+  (`anteprime.chiudi()`), o l'esito dipende da quando scatta la foto.
+- La finestra dei test, parcheggiata fuori schermo e trasparente, tiene nascoste anche
+  le schede davanti. Per la differenza fra davanti e dietro serve la finestra vera
+  (`FILO_HIDE_WINDOW: '0'`), solo su Linux, dove lo schermo è virtuale.
+
+Misurato su Electron 44 e Linux, una pagina nascosta tiene la sua misura;
+`getBoundingClientRect`, `checkVisibility` ed `elementFromPoint` rispondono giusto, i
+timer girano a un secondo, `MutationObserver` funziona e `sendInputEvent` arriva al frame
+principale come clic vero. Il clic del protocollo di debug mandato alla pagina e
+instradato dal punto a un riquadro d'altro sito, con la pagina nascosta o appena tornata
+davanti (non ancora disegnata), lo riceve spesso la pagina che lo ospita; mandato alla
+sessione del riquadro stesso (`Target.setAutoAttach` con `flatten`), nel suo punto, gli
+arriva anche nascosta. Lo spostamento del mouse dello stesso protocollo non risponde
+finché la pagina non disegna.

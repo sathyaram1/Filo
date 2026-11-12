@@ -1,56 +1,35 @@
-// Editor di Filo — prototipo.
-// Pannello testo (contenteditable, serializzato in JSON compatibile ProseMirror)
-// + griglia moduli configurabile (7 colonne × 10 righe) con workspace/pagine,
-// drag-and-drop, salvataggio su localStorage nel formato di editor-spec.md.
+// Editor di Filo: testo contenteditable serializzato in JSON compatibile ProseMirror, a tutta larghezza; gli
+// strumenti stanno nel pannello di destra (#1433, src/shared/pannelloDestro.js) e la chat è l'Aiuto.
+// Formato di salvataggio in editor-spec.md.
 
 (() => {
   'use strict';
 
-  // La griglia è ridimensionabile dall'utente (impostazione nella vista moduli):
-  // per questo COLS/ROWS sono variabili, non costanti. Il default resta 7×10.
-  let GRID_COLS = 7;
-  let GRID_ROWS = 10;
-  const GRID_MIN_COLS = 3, GRID_MAX_COLS = 12;
-  const GRID_MIN_ROWS = 4, GRID_MAX_ROWS = 16;
-  const GRID_DEFAULT_COLS = 7, GRID_DEFAULT_ROWS = 10;
-  // Chiave legacy: il vecchio documento singolo. Resta come sorgente di
-  // migrazione (letta una volta) e come backup; non viene più scritta.
+  // Documento singolo di migrazione: si legge una volta, non si scrive mai.
   const STORAGE_KEY = 'filo.editor.doc';
-  // Nuova chiave: la COLLEZIONE di file { version, activeId, files:[...] }.
-  // Scelta di storage (vedi report): la collezione resta su localStorage — l'I/O
-  // di autosalvataggio dev'essere sincrono e veloce (ogni ~1.2s mentre si scrive)
-  // e deve poter scrivere anche su `beforeunload`, dove un archivio asincrono
-  // (storage.json) non farebbe in tempo a scaricare. Quando il versionamento
-  // illimitato (feedback fratello) farà crescere i dati, saranno gli SNAPSHOT di
-  // versione — dati "freddi", scritti di rado — a spostarsi su storage.json/file
-  // dedicati, tenendo su localStorage solo l'indice e il file corrente ("caldi").
+  // La COLLEZIONE su localStorage: l'autosalvataggio dev'essere sincrono e scrivere anche su
+  // `beforeunload`, dove un archivio asincrono non fa in tempo.
   const COLLECTION_KEY = 'filo.editor.collection';
-  // Storico versioni: dati "freddi" (scritti solo a ogni modifica automatica di
-  // Filo o snapshot), tenuti FUORI da localStorage — vivono sull'archivio file
-  // dell'app (storage.json, via chrome.storage.local) così possono crescere
-  // illimitati senza saturare la persistenza calda. Vedi editorVersions.js.
+  // Storico versioni: dati freddi, fuori da localStorage — vivono sull'archivio dell'app così
+  // possono crescere senza saturare la persistenza calda. Vedi editorVersions.js.
   const VERSIONS_KEY = 'filo.editor.versions';
   const STORE = window.SN_EDITOR_STORE;
   const VERS = window.SN_EDITOR_VERSIONS;
+  const CONFERMA = window.SN_CONFERMA_SUL_POSTO;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
-  // I nomi dei tasti nelle etichette: su Mac sono un'altra cosa (Cmd+B, non
-  // Ctrl+B). Si chiedono sempre qui, non si scrivono a mano.
+  // Il nome di un tasto si chiede a SN_TASTI, mai scritto a mano (CLAUDE.md § Mac).
   const TASTI = window.SN_TASTI;
   const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
   const conTasto = (testo, accel) => `${testo} (${tasto(accel)})`;
 
-  // ── Riferimenti DOM ───────────────────────────────────────────────────
+  // Riferimenti DOM
   const $ = (id) => document.getElementById(id);
   const root = $('root');
   const docEl = $('doc');
   const saveStateEl = $('saveState');
-  const gridEl = $('grid');
-  const sidebarToggle = $('sidebarToggle');
-  const settingsView = $('settingsView');
   const docWrap = $('docWrap');
-  const paletteEl = $('palette');
   const overlay = $('overlay');
   const overlayBox = $('overlayBox');
   const docbarEl = $('docbar');
@@ -58,81 +37,51 @@
   const docTitleEl = $('docTitle');
   const docPopEl = $('docPop');
 
-  // ── Metadati tipi di modulo ───────────────────────────────────────────
-  const MODULE_TYPES = {
-    switch:           { label: 'Switch', icon: 'apps', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.', singleton: true },
-    'word-count':     { label: 'Conteggio parole', icon: 'transcribe', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Numero di parole, aggiornato in tempo reale.' },
-    'search-replace': { label: 'Cerca e sostituisci', icon: 'reload', defaultW: 2, defaultH: 2, minW: 2, minH: 2, desc: 'Trova ed evidenzia, sostituisci nel testo.' },
-    comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
-    chat:             { label: 'Chat', icon: 'filoLogo', defaultW: 3, defaultH: 3, minW: 3, minH: 3, desc: 'Chat con LLM che vede il documento.' },
-    // ── Moduli di formattazione (agiscono sul testo selezionato nell'editor) ──
-    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
-    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
-    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
-    undo:             { label: 'Indietro', icon: 'back', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Annulla l\'ultima modifica.' },
-    redo:             { label: 'Avanti', icon: 'forward', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Ripeti la modifica annullata.' },
-    'text-size':      { label: 'Dimensione testo', glyph: 'A±', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
-    align:            { label: 'Allineamento', glyph: '≡', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Allinea il testo a sinistra, centro, destra o giustificato.' },
-    font:             { label: 'Font', glyph: '<span style="font-family:Georgia,serif">F</span>', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia il tipo di carattere del testo selezionato.' },
-    // `fixed`: modulo di sistema. Non eliminabile, non aggiungibile dalla palette
-    // e "appuntato" su tutte le pagine (visibile qualunque sia lo switch attivo).
-    settings:         { label: 'Impostazioni', icon: 'options', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Apri/chiudi la modalità modifica moduli.', fixed: true },
+  // Gli strumenti del pannello: quali sono e come si chiamano lo dice il catalogo (SN_PANNELLI_APP), qui come si
+  // disegnano. `desc` è il suggerimento.
+  const PANNELLI = window.SN_PANNELLI_APP;
+  const nomeElemento = (id) => (PANNELLI && PANNELLI.nome('editor', id)) || id;
+  const ELEMENTO_META = {
+    'word-count':     { icon: 'transcribe', desc: 'Numero di parole, aggiornato in tempo reale.' },
+    'search-replace': { icon: 'reload', desc: 'Trova ed evidenzia, sostituisci nel testo.' },
+    comment:          { icon: 'share', desc: 'Seleziona testo e aggiungi commenti.' },
+    bold:             { glyph: '<b>B</b>', desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
+    italic:           { glyph: '<i>I</i>', desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
+    underline:        { glyph: '<u>U</u>', desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
+    undo:             { icon: 'back', desc: 'Annulla l\'ultima modifica.' },
+    redo:             { icon: 'forward', desc: 'Ripeti la modifica annullata.' },
+    'text-size':      { glyph: 'A±', desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
+    align:            { glyph: '≡', desc: 'Allinea il testo a sinistra, centro, destra o giustificato.' },
+    font:             { glyph: '<span style="font-family:Georgia,serif">F</span>', desc: 'Cambia il tipo di carattere del testo selezionato.' },
+    settings:         { icon: 'options', desc: 'Scorciatoie e regolazioni degli strumenti.' },
   };
-
-  // Un modulo è "fisso" (di sistema) se il suo tipo è marcato fixed.
-  const isFixed = (m) => !!(m && MODULE_TYPES[m.type] && MODULE_TYPES[m.type].fixed);
-
-  // Un modulo è "appuntato" su tutte le pagine se è fisso (impostazioni) OPPURE
-  // se è lo switch: lo switch deve restare visibile e occupare la stessa cella su
-  // OGNI pagina, così l'utente può sempre cambiare pagina e — modificandolo da una
-  // qualunque vista — lo modifica per tutte (è un unico modulo condiviso).
-  const isPinned = (m) => isFixed(m) || (!!m && m.type === 'switch');
-
-  // Un tipo "singleton" può esistere in una sola copia (lo switch: è l'UNICO
-  // modo per navigare le pagine, averne due lascia un doppione ingombrante e non
-  // eliminabile — dato che lo switch è protetto dalla cancellazione). Un tipo è
-  // aggiungibile dalla palette / dal box "Aggiungi modulo" solo se non è fisso e,
-  // se singleton, non ne esiste già uno.
-  const canAddType = (type) => {
-    const meta = MODULE_TYPES[type];
-    if (!meta || meta.fixed) return false;
-    if (meta.singleton && doc.modules.some((mm) => mm.type === type)) return false;
-    return true;
+  const iconaElemento = (id, size = 16) => {
+    const m = ELEMENTO_META[id] || {};
+    return m.glyph ? `<span class="ed-glifo">${m.glyph}</span>` : (ICONS[m.icon] ? ICONS[m.icon](size) : '');
   };
+  // Il pannello di destra, creato all'avvio (più sotto).
+  let pannello = null;
 
-  // Icone-preset per lo switch (estetiche, non vincolano i moduli).
-  const SWITCH_PRESETS = {
-    pen:  ICONS.editor,
-    chat: ICONS.filoLogo,
-    serif: null, // reso come "A" testuale
-  };
-
-  // ── Stato ─────────────────────────────────────────────────────────────
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
   let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
   let versionsReady = Promise.resolve(); // risolta quando lo storico è caricato
   let trash = [];        // documenti eliminati recuperabili (più recenti in cima)
   let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
-  let settingsMode = false;
   let commenting = false;
-  let saveTimer = null;
   // Snapshot manuali: `manualBaseline` è lo stato di riferimento (contenuto
   // serializzato) da cui misurare quanto l'utente ha scritto/cancellato a mano
   // prima di decidere se salvare un punto di ripristino. `manualSnapTimer` è la
   // pausa di scrittura oltre cui si valuta lo snapshot (vedi maybeRecordManualVersion).
   let manualBaseline = null;
   let manualSnapTimer = null;
-  // Pausa di scrittura (ms) dopo l'ultima battuta prima di valutare uno snapshot
-  // manuale. Più lunga dell'autosalvataggio (1.2s): uno snapshot è un checkpoint,
-  // non un salvataggio, e deve scattare solo quando ci si ferma davvero.
+  // Pausa (ms) prima di valutare uno snapshot manuale. Più lunga dell'autosalvataggio: uno
+  // snapshot è un checkpoint, e deve scattare solo quando ci si ferma davvero.
   const MANUAL_SNAPSHOT_IDLE = 3500;
   let uid = 0;
   const newId = (p) => `${p}-${Date.now().toString(36)}-${(uid++).toString(36)}`;
 
-  // ════════════════════════════════════════════════════════════════════
-  //  DOCUMENTO: modello & persistenza
-  // ════════════════════════════════════════════════════════════════════
+  // DOCUMENTO: modello & persistenza
 
   function blankDoc() {
     const now = new Date().toISOString();
@@ -140,97 +89,29 @@
       meta: { title: 'Documento senza titolo', created: now, modified: now, version: 1 },
       content: { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
       comments: [],
-      modules: [
-        mkModule('switch', 0, 6, 2, 1, 0, {
-          activePage: 0,
-          pages: [
-            { z: 0, name: 'Scrittura', icon: 'pen' },
-            { z: 1, name: 'Revisione', icon: 'serif' },
-          ],
-        }),
-        mkModule('word-count', 0, 0, 1, 1, 0, { count: 'words' }),
-        mkModule('search-replace', 0, 1, 2, 2, 1, {}),
-        mkModule('comment', 2, 0, 1, 1, 1, {}),
-        mkModule('chat', 0, 3, 3, 3, 1, {}),
-        // Ingranaggio impostazioni: modulo fisso, angolo in basso a destra.
-        // Un doc vuoto è sempre alla griglia di default (non ha meta.grid): usa
-        // le costanti di default, non GRID_COLS/ROWS correnti (che potrebbero
-        // riflettere un ALTRO file più grande aperto un attimo prima).
-        mkModule('settings', GRID_DEFAULT_COLS - 1, GRID_DEFAULT_ROWS - 1, 1, 1, 0, {}),
-      ],
+      modules: [],
     };
   }
 
-  // Garantisce che esista sempre un (solo) modulo impostazioni fisso, anche per
-  // documenti salvati prima della sua introduzione. Lo colloca nella prima cella
-  // libera partendo dall'angolo in basso a destra.
-  function ensureSettingsModule() {
-    if (!doc || !Array.isArray(doc.modules)) return;
-    const existing = doc.modules.filter((m) => m.type === 'settings');
-    if (existing.length > 1) doc.modules = doc.modules.filter((m) => m.type !== 'settings').concat(existing[0]);
-    if (existing.length >= 1) return;
-    const z = activePage();
-    for (let y = GRID_ROWS - 1; y >= 0; y--) {
-      for (let x = GRID_COLS - 1; x >= 0; x--) {
-        if (fits({ x, y, w: 1, h: 1 }, z)) {
-          doc.modules.push(mkModule('settings', x, y, 1, 1, z, {}));
-          return;
-        }
-      }
-    }
-    // Nessuna cella libera: forza l'angolo (verrà comunque renderizzato sopra).
-    doc.modules.push(mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, z, {}));
-  }
 
-  function mkModule(type, x, y, w, h, z, data) {
-    return { id: newId('mod'), type, x, y, w, h, z, data: data || {} };
-  }
-
-  // Converte rettangolo interno {x,y,w,h,z} ↔ cells[] del formato spec.
-  function rectToCells(m) {
-    const cells = [];
-    for (let dy = 0; dy < m.h; dy++)
-      for (let dx = 0; dx < m.w; dx++)
-        cells.push({ x: m.x + dx, y: m.y + dy, z: m.z });
-    return cells;
-  }
-  function cellsToRect(cells) {
-    const xs = cells.map((c) => c.x), ys = cells.map((c) => c.y);
-    const minX = Math.min(...xs), minY = Math.min(...ys);
-    return {
-      x: minX, y: minY,
-      w: Math.max(...xs) - minX + 1,
-      h: Math.max(...ys) - minY + 1,
-      z: cells[0] ? cells[0].z || 0 : 0,
-    };
-  }
-
-  // Serializza un MODELLO doc (in memoria) nel formato di storage, SENZA toccare
-  // il DOM: usato per creare file vuoti e per snapshot generici. Il file attivo
-  // passa da serialize(), che prima allinea il modello al DOM.
-  //
-  // Il risultato è una COPIA PROFONDA, mai un alias del modello vivo: questo
-  // serializzato finisce sia nella collezione sia negli snapshot dello storico
-  // versioni, e uno snapshot che continua a cambiare insieme al documento non è
-  // uno snapshot (era la causa dell'incoerenza prima/dopo il riavvio: in memoria
-  // la chat di un modulo "seguiva" le modifiche, su disco no).
+  // Serializza un MODELLO senza toccare il DOM (file vuoti, snapshot); il file attivo passa da
+  // serialize(). COPIA PROFONDA: uno snapshot che cambia col documento non è uno snapshot.
   function serializeDocModel(d) {
     const meta = { ...(d.meta || {}) };
     if (!meta.title) meta.title = 'Documento senza titolo';
+    // La griglia dei moduli non c'è più (#1433): la sua misura e i moduli del documento si buttano.
+    delete meta.grid;
     return cloneJson({
       id: d.id,
       meta,
       content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
       comments: Array.isArray(d.comments) ? d.comments : [],
-      modules: (d.modules || []).map((m) => ({
-        id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
-      })),
+      modules: [],
     });
   }
 
   function serialize() {
-    // Il titolo non è più editabile dall'UI dell'editor: si conserva quello del
-    // modello (la rinomina avviene dal menu documenti).
+    // Il titolo si rinomina dal menu documenti, non dall'UI dell'editor: qui si conserva.
     if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
     doc.meta.modified = new Date().toISOString();
     refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
@@ -238,22 +119,7 @@
     return serializeDocModel(doc);
   }
 
-  // Applica al modello la dimensione griglia salvata (clamp nei limiti). Riparte
-  // SEMPRE dal default 7×10 e poi applica l'eventuale `meta.grid`: così passando
-  // da un file con griglia grande a uno senza, la griglia torna al default (con
-  // un solo documento non capitava mai, ora sì).
-  function loadGridSize() {
-    GRID_COLS = GRID_DEFAULT_COLS;
-    GRID_ROWS = GRID_DEFAULT_ROWS;
-    const g = doc && doc.meta && doc.meta.grid;
-    if (g && Number.isFinite(g.cols) && Number.isFinite(g.rows)) {
-      GRID_COLS = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, g.cols));
-      GRID_ROWS = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, g.rows));
-    }
-  }
-
-  // Costruisce il modello doc in memoria (moduli come rettangoli) da un file
-  // serializzato della collezione. Era il corpo del vecchio loadDoc().
+  // Costruisce il modello doc in memoria (moduli come rettangoli) da un file serializzato.
   function parseStoredDoc(raw) {
     if (!raw || !raw.meta) return null;
     return {
@@ -261,19 +127,12 @@
       meta: raw.meta,
       content: raw.content || { type: 'doc', content: [] },
       comments: Array.isArray(raw.comments) ? raw.comments : [],
-      modules: (raw.modules || []).map((m) => {
-        const rect = Array.isArray(m.cells) && m.cells.length ? cellsToRect(m.cells) : { x: 0, y: 0, w: 1, h: 1, z: 0 };
-        return { id: m.id || newId('mod'), type: m.type, ...rect, data: m.data || {} };
-      }),
+      modules: [],
     };
   }
 
-  // ── Collezione: persistenza ───────────────────────────────────────────
-  // localStorage resta la persistenza "calda" (sincrona, scrivibile anche su
-  // beforeunload). In PIÙ rispecchiamo la collezione sull'archivio dell'app
-  // (storage.json, via chrome.storage.local): è così che Filo, dal main, vede i
-  // file dell'editor e ci scrive gli appunti in autonomia. Il mirror è
-  // fire-and-forget: non deve rallentare la digitazione.
+  // localStorage è la persistenza calda (sincrona, scrivibile su beforeunload); in PIÙ si
+  // rispecchia sull'archivio, da cui Filo vede i file. Il mirror è fire-and-forget.
   function readCollectionRaw() {
     try { return JSON.parse(localStorage.getItem(COLLECTION_KEY)); } catch (_) { return null; }
   }
@@ -295,18 +154,14 @@
       }
     } catch (_) { /* mirror best-effort */ }
   }
-  // Confronto "chi è più fresco" fra due versioni dello stesso file (per il
-  // merge locale↔archivio). meta.modified è ISO ovunque; fallback a 0.
+  // meta.modified è ISO ovunque; fallback a 0.
   function fileTs(f) {
     const m = f && f.meta && f.meta.modified;
     const d = m != null ? Date.parse(m) : NaN;
     return Number.isFinite(d) ? d : (typeof m === 'number' ? m : 0);
   }
-  // Fonde due collezioni: unione dei file per id, tenendo per gli id in comune
-  // quello più recente (così un appunto scritto da Filo mentre l'editor era
-  // chiuso non va perso, e un'eventuale modifica locale più recente vince).
-  // `keepLocalId` forza a tenere la versione LOCALE di quel file (usato per il
-  // file attivo con modifiche non ancora salvate).
+  // Unione per id; per gli id in comune vince il più recente, così un appunto scritto da Filo a
+  // editor chiuso non va perso. `keepLocalId` forza la versione locale (il file attivo).
   function mergeCollections(local, remote, keepLocalId) {
     const byId = new Map();
     for (const f of (remote && remote.files) || []) byId.set(f.id, f);
@@ -328,17 +183,8 @@
     return serializeDocModel(model);
   }
 
-  // Carica (o migra) la collezione da localStorage (persistenza calda), come
-  // sempre e in modo SINCRONO: così il primo render è immediato e deterministico
-  // (nessun cambio di timing rispetto a prima). I file che Filo ha scritto
-  // nell'archivio dell'app (appunti, migrazione) vengono fusi subito dopo, in
-  // modo asincrono, da `reloadFromArchive()`.
-  //
-  // NON rispecchia sull'archivio: al primo avvio su un profilo la collezione qui
-  // è un foglio bianco appena inventato, e scriverlo nell'archivio CANCELLEREBBE
-  // i file che Filo ci ha già messo (gli appunti storici migrati all'avvio del
-  // main) prima che `reloadFromArchive()` faccia in tempo a leggerli. Il mirror
-  // lo fa `reloadFromArchive()`, che è l'unico punto che conosce entrambi i lati.
+  // Caricamento SINCRONO: il primo render è immediato e deterministico, i file scritti da Filo
+  // si fondono dopo. NON rispecchia: scrivere il foglio bianco cancellerebbe i suoi appunti.
   function loadCollection() {
     collection = STORE.migrateToCollection({
       collection: readCollectionRaw(),
@@ -349,21 +195,14 @@
     localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
   }
 
-  // Ricarica la collezione dall'archivio quando Filo (main) ci ha scritto un
-  // appunto: fonde i file nuovi/aggiornati senza perdere le modifiche locali in
-  // corso, aggiorna il selettore documenti e, se il file attivo è cambiato sotto
-  // e non ci sono modifiche in sospeso, lo riapre per mostrare il nuovo testo.
-  // Nota: se l'utente sta modificando PROPRIO il file su cui Filo scrive senza
-  // aver salvato, vincono le modifiche locali; l'appunto di Filo resta comunque
-  // nello storico versioni del file (source "filo"), quindi è recuperabile.
+  // Ricarica dall'archivio quando Filo ci ha scritto: fonde senza perdere le modifiche locali
+  // in corso. Se l'utente stava modificando vince lui; l'appunto resta nello storico.
   async function reloadFromArchive() {
     const remoteRaw = await readArchivedCollection();
     const remoteFiles = (remoteRaw && Array.isArray(remoteRaw.files)) ? remoteRaw.files : null;
     if (!remoteFiles || !remoteFiles.length) {
-      // Archivio vuoto (o assente): è il locale a doverlo seminare, altrimenti
-      // Filo non vedrebbe i documenti dell'utente finché non salva a mano.
-      // (Prima questo mirror lo faceva `loadCollection()`, ma da lì cancellava
-      // l'archivio invece di seminarlo — vedi il commento lassù.)
+      // Archivio vuoto: è il locale a doverlo seminare, o Filo non vedrebbe i documenti
+      // dell'utente finché non salva a mano.
       writeCollection();
       return;
     }
@@ -386,14 +225,45 @@
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
   }
 
-  // Copia lo stato del file attivo (dal DOM/modello) dentro la collezione.
+  // La data di modifica si muove solo se il documento è cambiato: aprirlo, lasciarlo o salvarlo uguale non è
+  // scriverlo, e il filo conta le scritture da lei (#1561).
   function syncActiveIntoCollection() {
     if (!doc) return;
+    const senzaData = (f) => { try { return JSON.stringify({ ...f, meta: { ...(f.meta || {}), modified: null } }); } catch (_) { return null; } };
+    const prima = STORE.findFile(collection, doc.id);
+    const eraDel = prima && prima.meta ? prima.meta.modified : undefined;
+    const com = prima ? senzaData(prima) : null;
     STORE.replaceFile(collection, doc.id, serialize());
     collection.activeId = doc.id;
+    const dopo = STORE.findFile(collection, doc.id);
+    if (com && eraDel && dopo && dopo.meta && senzaData(dopo) === com) {
+      dopo.meta.modified = eraDel;
+      if (doc.meta) doc.meta.modified = eraDel;
+    }
   }
 
+  // Il documento parte dopo la pausa e prima che la scheda, la finestra o Filo si chiudano: la regola delle caselle.
+  const documentoAlSicuro = window.SN_CASELLE.crea();
+  documentoAlSicuro.registra('doc', () => save(false));
+
+  // Gli errori che si leggono nell'Editor si contano per tipo, mai col testo (#1461).
+  function contaErroreVisto(ev) {
+    try {
+      const r = chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO, ...ev });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+  const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
+  // Gli strumenti del pannello (#1471, #1433): per tipo cosa gli succede, e i trascinamenti.
+  // Mai il testo del documento, né quello che si scrive in uno strumento.
+  const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
+  // Il titolo automatico e la chat del documento (#1465): esiti e fasce, mai il titolo né il testo.
+  const contaRiquadro = (cosa, campi) => contaErroreVisto({ misura: 'riquadro', cosa, ...campi });
+  const contaModulo = (m, evento) => { if (m && m.type) contaGesto({ gesto: 'modulo_editor', modulo: m.type, evento }); };
+  const contaTrascinamento = (ev) => { if (ev) contaErroreVisto(ev); };
+
   function save(flash) {
+    documentoAlSicuro.spedita('doc');
     try {
       syncActiveIntoCollection();
       writeCollection();
@@ -403,25 +273,27 @@
       if (flash) setTimeout(() => { if (!dirty) saveStateEl.textContent = ''; }, 1500);
     } catch (e) {
       saveStateEl.textContent = 'Errore';
+      contaErroreVisto({ misura: 'avviso', chiave: 'editor_non_salvato' });
       console.error('[Filo editor] save', e);
     }
   }
+  // Il nome del documento si conferma quando il cursore lascia il campo:
+  // registrato qui, si conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_CASELLE.alVolo();
+
   function markDirty() {
     dirty = true;
     saveStateEl.textContent = 'Non salvato';
     saveStateEl.classList.add('dirty');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => save(false), 1200);
+    documentoAlSicuro.cambiato('doc', null, { pausa: 1200 });
     // Snapshot manuale "a pausa": dopo che l'utente smette di scrivere, valuta
     // se la deriva è abbastanza grande da meritare un punto di ripristino.
     clearTimeout(manualSnapTimer);
     manualSnapTimer = setTimeout(() => maybeRecordManualVersion(), MANUAL_SNAPSHOT_IDLE);
   }
 
-  // ── Storico versioni: persistenza sull'archivio app (storage.json) ────────
-  // Carica lo storico all'avvio. Asincrono e tollerante: se manca o è corrotto,
-  // si parte da uno storico vuoto (nessuna versione = nessun ripristino, ma la
-  // prima modifica di Filo ne creerà una).
+  // Asincrono e tollerante: se lo storico manca o è corrotto si parte da vuoto, e la prima
+  // modifica di Filo ne creerà una.
   function loadVersions() {
     versionsReady = Promise.resolve()
       .then(() => (window.chrome && chrome.storage && chrome.storage.local
@@ -433,9 +305,8 @@
       .catch(() => { versions = {}; });
     return versionsReady;
   }
-  // Scrittura "fredda": fire-and-forget, non blocca la digitazione. Lo storico è
-  // testo e cresce piano, quindi riscrivere l'intero blob a ogni versione è
-  // sostenibile (le versioni si creano solo alle modifiche di Filo/agli snapshot).
+  // Scrittura fredda, fire-and-forget: lo storico cresce piano, quindi riscrivere l'intero blob
+  // a ogni versione è sostenibile.
   function persistVersions() {
     try {
       if (window.chrome && chrome.storage && chrome.storage.local) {
@@ -454,9 +325,8 @@
     } catch (_) { return ''; }
   }
 
-  // Registra un punto di ripristino con il contenuto PRE-modifica di Filo: così
-  // ripristinandolo si torna a com'era il file prima che l'AI lo toccasse.
-  // Ritorna la versione creata (o null se identica all'ultima → nessun rumore).
+  // Il punto di ripristino porta il contenuto PRE-modifica: ripristinandolo si torna a com'era
+  // prima che l'AI lo toccasse. Null se identica all'ultima → nessun rumore.
   function recordFiloVersion(preContent) {
     if (!doc || !VERS) return null;
     const ts = Date.now();
@@ -471,28 +341,16 @@
     return res.created ? res.version : null;
   }
 
-  // ── Snapshot MANUALI: versionare anche le modifiche a mano significative ──
-  // Le modifiche di Filo creano sempre un punto di ripristino; quelle a mano no
-  // — versionare a ogni battuta sarebbe rumore. Politica (invisibile all'utente):
-  //   • soglia — snapshot solo se, dall'ultimo riferimento, l'utente ha
-  //     scritto/cancellato abbastanza testo (logica pura in editorVersions.js);
-  //   • pausa — si valuta dopo che l'utente smette di scrivere (debounce), non
-  //     durante la digitazione;
-  //   • confine — si valuta anche quando si cambia/chiude documento (punto
-  //     naturale in cui il file si sincronizza), così un blocco scritto e poi
-  //     abbandonato senza pausa non va perso.
-  // `manualBaseline` è lo stato da cui si misura la deriva; ogni snapshot (o
-  // modifica di Filo, o ripristino) lo riallinea allo stato corrente.
+  // Le modifiche di Filo creano sempre un punto di ripristino, quelle a mano no: versionare a
+  // ogni battuta è rumore. Si valuta dopo una pausa, e al cambio o alla chiusura del file.
 
-  // Riallinea il riferimento: dopo, serve nuova deriva significativa per un altro
-  // snapshot. Passa un contenuto esplicito, o lascia che lo prenda dal modello.
+  // Riallinea il riferimento: dopo, serve nuova deriva significativa per un altro snapshot.
   function setManualBaseline(content) {
     manualBaseline = content || (doc ? serializeDocModel(doc) : null);
   }
 
-  // Crea uno snapshot 'manual' del documento CORRENTE se la deriva dall'ultimo
-  // riferimento supera la soglia. Silenzioso (nessun toast: il versionamento
-  // manuale è invisibile finché non serve). Ritorna la versione creata o null.
+  // Snapshot 'manual' se la deriva supera la soglia. Silenzioso: il versionamento manuale è
+  // invisibile finché non serve.
   function maybeRecordManualVersion() {
     clearTimeout(manualSnapTimer);
     if (!doc || !VERS) return null;
@@ -511,12 +369,8 @@
     return res.created ? res.version : null;
   }
 
-  // Ripristina una versione: prima salva lo stato corrente come versione (così
-  // anche il ripristino è annullabile e non si perde nulla), poi riporta il
-  // CORPO del documento (testo + commenti) a quello scelto e ri-renderizza se è
-  // il file attivo. Nome del documento, conversazione con Filo e disposizione
-  // dei riquadri NON tornano indietro: appartengono al documento di adesso, non
-  // al testo di allora (vedi SN_EDITOR_VERSIONS.composeRestored).
+  // Prima salva lo stato corrente come versione, così anche il ripristino è annullabile. Torna
+  // indietro il solo CORPO: il nome è del documento di adesso.
   function restoreVersion(fileId, versionId) {
     if (!VERS) return false;
     const v = VERS.get(versions, fileId, versionId);
@@ -542,9 +396,8 @@
       activateFile(STORE.findFile(collection, fileId));
     }
     writeCollection();
-    // Il ripristino è un gesto delicato: lo stato di prima è già salvato qui
-    // sopra, quindi l'avviso lo offre subito indietro — stessa simmetria delle
-    // modifiche automatiche di Filo, che sono sempre annullabili sul posto.
+    // Lo stato di prima è già salvato, quindi l'avviso lo offre subito indietro — come le
+    // modifiche automatiche di Filo, sempre annullabili.
     showEditorToast('Versione ripristinata.', {
       label: 'Annulla',
       onClick: () => {
@@ -555,9 +408,8 @@
     return true;
   }
 
-  // Offre l'annullamento immediato dell'ultima modifica automatica di Filo con un
-  // toast "Annulla". Lo storico completo (sfogliabile) è una feature a parte; qui
-  // garantiamo l'invariante minima: una modifica di Filo è SEMPRE annullabile.
+  // Invariante minima: una modifica di Filo è SEMPRE annullabile sul posto. Lo storico
+  // sfogliabile è una feature a parte.
   function offerUndoFilo(versionId, fileId) {
     showEditorToast('Filo ha modificato il documento.', {
       label: 'Annulla',
@@ -565,20 +417,15 @@
     });
   }
 
-  // ── Pannello "Storico versioni": sfoglia e ripristina QUALSIASI versione ──
-  // Il toast "Annulla" copre solo l'ultima modifica di Filo; questo pannello dà
-  // accesso all'intero storico (invariante UX: se salviamo N versioni, l'utente
-  // deve poterle vedere tutte). Le versioni stanno sull'archivio app e
-  // sopravvivono al reload; qui le mostriamo dalla più recente alla più vecchia.
+  // Pannello «Storico versioni»: il toast «Annulla» copre solo l'ultima modifica di Filo, qui
+  // c'è tutto (se salviamo N versioni, si devono poter vedere tutte). Dalla più recente.
 
-  // Testo semplice da una versione (il contenuto ProseMirror serializzato), per
-  // l'anteprima. Delega alla logica pura in editorVersions.js — stessa estrazione
-  // usata dalla soglia degli snapshot manuali: una sorgente sola, niente deriva.
+  // Delega alla logica pura in editorVersions.js — la stessa estrazione della soglia degli
+  // snapshot: una sorgente sola.
   function versionPlainText(v) {
     return VERS && v ? VERS.plainText(v.content) : '';
   }
 
-  // Etichetta + classe del badge in base alla sorgente della versione.
   function versionSourceMeta(v) {
     const src = v && v.source;
     if (src === 'filo') return { tag: 'Modifica di Filo', cls: 'filo' };
@@ -586,7 +433,6 @@
     return { tag: 'Modifica manuale', cls: 'manual' };
   }
 
-  // Anteprima corta (prime righe non vuote) per la riga della lista.
   function versionPreviewShort(v) {
     const text = versionPlainText(v);
     if (!text) return '';
@@ -594,53 +440,24 @@
     return line.length > 180 ? line.slice(0, 179).trimEnd() + '…' : line;
   }
 
-  // Quante versioni sono renderizzate al momento (paginazione anti-raffica per
-  // storie molto lunghe: si parte da un lotto e si carica il resto su richiesta).
+  // Paginazione anti-raffica per storie molto lunghe: si parte da un lotto e si carica il
+  // resto su richiesta.
   const VERS_HISTORY_BATCH = 40;
   let versHistoryShown = VERS_HISTORY_BATCH;
 
-  // Che cosa tocca un ripristino: il pannello mostra solo l'anteprima del testo,
-  // quindi il confine va detto una volta, in chiaro, prima di premere.
+  // Che cosa tocca un ripristino: il pannello mostra solo l'anteprima del testo, quindi il
+  // confine va detto prima di premere.
   const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
-    + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
+    + 'Il nome del documento resta com\'è adesso.';
 
-  // Il pannello è a schermo? (serve a tenerlo allineato quando lo stato cambia
-  // da fuori, per esempio annullando un ripristino dall'avviso.)
+  // Serve a tenerlo allineato quando lo stato cambia da fuori (per esempio annullando un
+  // ripristino dall'avviso).
   function isVersionHistoryOpen() {
     return !overlay.hidden && !!overlayBox.querySelector('.ed-vh-list, .ed-vh-empty');
   }
 
-  // ── Coda di gesto (guardia anti secondo-colpo) ──────────────────────────
-  // Quando un clic CAMBIA ciò che sta sotto il cursore, il colpo di coda di un
-  // doppio clic non trova più il comando premuto ma quello che ne ha preso il
-  // posto, e fa una cosa che l'utente non ha chiesto:
-  //   • pannello versioni → apriva l'anteprima di un'altra versione, o peggio
-  //     ne ripristinava una sbagliata;
-  //   • pannello che si chiude → il colpo cadeva sul foglio dietro e apriva da
-  //     solo "Aggiungi modulo";
-  //   • menu documenti → la × di un documento ne eliminava DUE, perché la lista
-  //     si accorciava e sotto il cursore arrivava la × di quello dopo;
-  //   • avvisi in basso a destra → premeva l'"Annulla" dell'avviso appena
-  //     comparso al posto di quello vecchio, disfacendo l'annullamento stesso;
-  //   • cestino → bruciava la conferma "Confermi?" comparsa sul posto e
-  //     cancellava un documento per sempre in un colpo solo.
-  // Quel colpo non è una nuova intenzione: è la coda del gesto precedente (il
-  // browser lo marca con `detail > 1`, cioè "clic ravvicinati sullo stesso
-  // punto"), e va ignorato.
-  //
-  // La guardia è UNA SOLA e sta sulla FINESTRA, non sul contenitore che si è
-  // ridisegnato: il colpo di coda atterra spesso FUORI da quella zona (il foglio
-  // dietro a un pannello chiuso, la riga scivolata su in una lista più corta),
-  // dove un ascoltatore locale non lo vedrebbe passare.
-  // Scatta in due modi, e il primo non deve ricordarselo nessuno:
-  //   1. DA SÉ — sotto il cursore c'è ora un elemento diverso da quello appena
-  //      premuto (o lo stesso con un'altra etichetta): la pagina è cambiata
-  //      sotto il gesto, comunque sia successo. Vale anche per le zone scritte
-  //      domani, che non devono armare niente per essere protette.
-  //   2. ARMATA a mano — per i cambi che il confronto non può vedere: un
-  //      elemento che sta uscendo di scena ma è ancora lì mentre sfuma (gli
-  //      avvisi), o un bottone che cambia significato restando lo stesso nodo
-  //      ("Elimina definitivamente" → "Confermi?").
+  // Coda di gesto: il secondo colpo di un doppio clic cade su ciò che ha preso il posto del
+  // comando premuto (`detail > 1`) e va ignorato. Guardia UNA SOLA, e sulla FINESTRA.
   const STALE_CLICK_MS = 1000;
   let staleArmedAt = 0;
   let lastClickEl = null;
@@ -718,8 +535,8 @@
       e.stopPropagation();
       if (restoreVersion(fileId, b.dataset.id)) renderVersionHistory(fileId);
     }));
-    // Click/Invio sulla riga (fuori dal bottone): apri l'anteprima ampia prima
-    // di decidere, così "Ripristina" non è mai una sorpresa a scatola chiusa.
+    // Click/Invio sulla riga (fuori dal bottone): apre l'anteprima ampia, così «Ripristina» non
+    // è mai una sorpresa a scatola chiusa.
     overlayBox.querySelectorAll('.ed-vh-item').forEach((it) => {
       const open = (e) => { if (e.target.closest('.ed-vh-restore')) return; showVersionPreview(fileId, it.dataset.id); };
       it.addEventListener('click', open);
@@ -728,7 +545,6 @@
     staleClick.arm();
   }
 
-  // Anteprima ampia di una singola versione, con conferma di ripristino.
   function showVersionPreview(fileId, versionId) {
     const v = VERS ? VERS.get(versions, fileId, versionId) : null;
     if (!v) return;
@@ -753,48 +569,44 @@
     staleClick.arm();
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
-  // ════════════════════════════════════════════════════════════════════
+  // COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
 
-  // Rende attivo un file serializzato: costruisce il modello, azzera lo stato
-  // transitorio della vista e ri-renderizza tutto. NON persiste (chi chiama
-  // decide quando scrivere).
+  // Rende attivo un file serializzato. NON persiste: chi chiama decide quando scrivere.
   function activateFile(raw) {
     doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
     collection.activeId = doc.id;
-    // Stato di vista che non deve "trascinarsi" da un file all'altro: torna
-    // sempre alla vista testo (fuori dalla modalità modifica moduli).
+    // Stato di vista che non deve trascinarsi da un file all'altro.
     commenting = false;
-    toggleSettingsMode(false);
-    ensureSettingsModule();
-    loadGridSize();
+    root.classList.remove('commenting');
     renderDocBody();
-    renderGrid();
-    updateWordCountModules();
+    aggiornaElementi();
     renderDocSwitcher();
-    // Nuovo file attivo → nuovo riferimento per gli snapshot manuali: il testo
-    // già presente al caricamento non conta come "modifica a mano" (misuriamo la
-    // deriva DA QUI). Annulla anche l'eventuale valutazione in sospeso del vecchio.
+    // Nuovo file attivo → nuovo riferimento per gli snapshot manuali: il testo già presente al
+    // caricamento non è una modifica a mano.
     clearTimeout(manualSnapTimer);
     setManualBaseline(serializeDocModel(doc));
   }
 
-  // Passa a un altro file: salva prima quello corrente, poi attiva il target.
   function switchToFile(id) {
     if (!doc || id === doc.id) { closeDocPop(); return; }
     const target = STORE.findFile(collection, id);
     if (!target) return;
-    // Confine naturale: se lasciando il file l'utente ha scritto a mano
-    // abbastanza, salva un punto di ripristino prima di cambiare documento.
+    // Confine naturale: lasciando il file, se l'utente ha scritto a mano abbastanza si salva un
+    // punto di ripristino.
     maybeRecordManualVersion();
     syncActiveIntoCollection();
     activateFile(target);
-    writeCollection();
+    segnaAperto();
     closeDocPop();
   }
 
-  // Crea un nuovo documento vuoto e lo apre.
+  // Il documento che l'utente mette davanti si salva con l'ora: il filo segna così i documenti aperti, anche solo
+  // letti, e la distingue da due editor che si rubano il documento a ogni salvataggio (src/shared/filoAccaduti.js).
+  function segnaAperto() {
+    collection.apertoAlle = new Date().toISOString();
+    writeCollection();
+  }
+
   function createFile() {
     if (doc) { maybeRecordManualVersion(); syncActiveIntoCollection(); }
     const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
@@ -803,28 +615,21 @@
     closeDocPop();
   }
 
-  // Clone profondo JSON-safe (i file/serializzati sono già JSON puri).
   function cloneJson(v) {
     try { return v == null ? v : JSON.parse(JSON.stringify(v)); }
     catch (_) { return v; }
   }
-  // Accorcia un testo aggiungendo un'ellissi (per il nome nel toast).
   function ellipsize(s, max) {
     const t = String(s == null ? '' : s);
     return t.length > max ? t.slice(0, Math.max(0, max - 1)).trimEnd() + '…' : t;
   }
 
-  // ── Cestino dei documenti eliminati ──────────────────────────────────────
-  // L'avviso "Annulla" copre solo i secondi immediatamente successivi: è comodo
-  // ma non può essere l'UNICA rete (basta chiudere la pagina, o lasciar passare
-  // il tempo, e il documento sarebbe perso per sempre). Ogni eliminazione
-  // finisce quindi anche qui, con il suo testo, i commenti, i riquadri e lo
-  // storico versioni, e resta recuperabile dal menu documenti finché non la si
-  // butta a mano o non esce dagli ultimi TRASH_MAX documenti eliminati.
+  // Cestino dei documenti eliminati: l'avviso «Annulla» copre pochi secondi e non può essere
+  // l'unica rete. Ogni eliminazione resta recuperabile finché non esce dagli ultimi TRASH_MAX.
   const TRASH_KEY = 'filo.editor.trash';
   const TRASH_MAX = 12;
-  // Tetto di dimensione: il cestino vive nella persistenza "calda" insieme alla
-  // collezione, che non va saturata. Oltre la soglia si buttano i più vecchi.
+  // Tetto di dimensione: il cestino vive nella persistenza calda insieme alla collezione, che
+  // non va saturata.
   const TRASH_MAX_BYTES = 1_500_000;
 
   function readTrashRaw() {
@@ -844,9 +649,8 @@
       try { localStorage.setItem(TRASH_KEY, JSON.stringify(trash)); } catch (__) {}
     }
   }
-  // Butta davvero via un documento cestinato: via anche il suo storico versioni,
-  // che finché resta nel cestino invece va conservato (un ripristino deve
-  // riportare indietro anche i punti di ripristino).
+  // Via anche il suo storico versioni, che finché il documento resta nel cestino va invece
+  // conservato: un ripristino deve riportare indietro anche quello.
   function purgeTrashEntry(entryId) {
     const i = trash.findIndex((e) => e.id === entryId);
     if (i < 0) return null;
@@ -865,7 +669,6 @@
     }
     return entry;
   }
-  // Applica i due tetti (numero e dimensione) buttando i più vecchi.
   function enforceTrashLimits() {
     while (trash.length > TRASH_MAX) purgeTrashEntry(trash[trash.length - 1].id);
     let guard = 0;
@@ -876,8 +679,8 @@
       purgeTrashEntry(trash[trash.length - 1].id);
     }
   }
-  // Un file è "ancora vuoto"? Serve a non buttare via il foglio bianco creato al
-  // posto dell'ultimo documento eliminato se nel frattempo ci è stato scritto.
+  // Serve a non buttare il foglio bianco creato al posto dell'ultimo documento eliminato se nel
+  // frattempo ci è stato scritto.
   function fileIsEmpty(file) {
     if (!file) return false;
     const txt = VERS ? VERS.plainText(file) : '';
@@ -889,7 +692,6 @@
     return true;
   }
 
-  // Il modello del documento contiene almeno un nodo immagine?
   function contentHasImage(content) {
     const root = content && content.content ? content.content : content;
     let found = false;
@@ -902,16 +704,8 @@
     return found;
   }
 
-  // Elimina un documento. Invariante: resta sempre almeno un file — se si
-  // cancella l'ultimo, se ne crea uno vuoto al suo posto.
-  //
-  // L'eliminazione è ISTANTANEA (nessuna conferma: l'attrito su un'azione
-  // frequente è negativo) ma REVERSIBILE — coerente col principio di Filo "il
-  // software deve poter essere usato male": un tocco per sbaglio non deve poter
-  // cancellare per sempre un documento. Subito dopo compare un avviso "…
-  // eliminato" con "Annulla" (ripristina file, posizione e storico) e, in ogni
-  // caso, il documento resta nel cestino: l'avviso è la scorciatoia, il cestino
-  // è la rete di sicurezza che sopravvive anche alla chiusura della pagina.
+  // Invariante: resta sempre almeno un file — cancellando l'ultimo se ne crea uno vuoto.
+  // Nessuna conferma (l'attrito su un'azione frequente) ma reversibile: avviso e cestino.
   function deleteFile(id) {
     const target = STORE.findFile(collection, id);
     if (!target) return;
@@ -937,8 +731,7 @@
     }
     writeCollection();
 
-    // Nel cestino (in cima: i più recenti per primi). Lo storico versioni NON
-    // viene buttato: resta nell'archivio finché il documento è recuperabile.
+    // Nel cestino i più recenti per primi; lo storico resta (vedi sotto, purgeTrashEntry).
     const entry = {
       id: newId('trash'),
       file: snapFile,
@@ -958,9 +751,8 @@
     });
   }
 
-  // Ripristina un file eliminato (dall'avviso "Annulla" o dal cestino): lo
-  // reinserisce alla sua posizione, ne ripristina lo storico e, se era il file
-  // aperto, lo riapre. Idempotente: premere due volte non duplica nulla.
+  // Ripristina un file eliminato: posizione, storico e, se era aperto, riapertura. Idempotente:
+  // premere due volte non duplica nulla.
   function restoreDeletedFile(entry) {
     if (!entry || !entry.file || !entry.file.id) return false;
     const file = entry.file;
@@ -971,10 +763,8 @@
     }
     // Non perdere ciò che l'utente sta scrivendo su un ALTRO file nel frattempo.
     syncActiveIntoCollection();
-    // Se avevo creato un foglio vuoto perché era l'ultimo file, toglilo — ma
-    // SOLO se è rimasto vuoto: se nel frattempo l'utente ci ha scritto, quel
-    // foglio è un documento vero e buttarlo sarebbe la perdita che vogliamo
-    // evitare (resterebbe comunque nel cestino, ma sparirebbe senza motivo).
+    // Si toglie solo se è rimasto vuoto: se ci è stato scritto è un documento vero, e buttarlo
+    // sarebbe la perdita che vogliamo evitare.
     if (entry.createdBlankId) {
       const blank = STORE.findFile(collection, entry.createdBlankId);
       const blankLive = (doc && doc.id === entry.createdBlankId) ? serialize() : blank;
@@ -994,9 +784,8 @@
     return true;
   }
 
-  // ── Pannello "Cestino": vedi e recupera i documenti eliminati ─────────────
-  // Invariante UX: se l'app conserva N documenti eliminati, l'utente deve
-  // poterli vedere tutti — e poterli anche buttare davvero, se vuole.
+  // Invariante UX: se l'app conserva N documenti eliminati, li si deve poter vedere tutti — e
+  // anche buttare davvero.
   function trashEntryTitle(entry) {
     const f = entry && entry.file;
     return (f && f.meta && f.meta.title) || STORE.DEFAULT_TITLE;
@@ -1040,7 +829,7 @@
       </div>`;
     }).join('');
     openOverlay(`<h3>Cestino</h3>
-      <p class="ed-vh-scope">I documenti eliminati restano qui (gli ultimi ${TRASH_MAX}) con testo, commenti, riquadri e storico versioni. Ripristinandone uno torna al suo posto nell'elenco.</p>
+      <p class="ed-vh-scope">I documenti eliminati restano qui (gli ultimi ${TRASH_MAX}) con testo, commenti e storico versioni. Ripristinandone uno torna al suo posto nell'elenco.</p>
       <div class="ed-vh-list">${rows}</div>
       <div class="ed-overlay-actions">
         <button class="ed-btn ed-tr-empty" id="trEmpty">Svuota cestino</button>
@@ -1051,22 +840,18 @@
       const entry = trash.find((e) => e.id === b.dataset.id);
       if (entry && restoreDeletedFile(entry)) closeOverlay();
     }));
-    // Eliminare per sempre è l'UNICA azione irreversibile qui: chiede conferma
-    // sul posto (il bottone diventa "Confermi?"), senza finestre di mezzo.
-    // La conferma sul posto è a sua volta un elemento che compare SOTTO il
-    // cursore: senza guardia bastava un doppio clic per bruciarla e cancellare
-    // il documento per sempre in un colpo solo, che è il contrario di ciò che
-    // una conferma serve a garantire.
+    // Eliminare per sempre è l'UNICA azione irreversibile qui, e la conferma sul posto è a sua
+    // volta un elemento che compare SOTTO il cursore: senza guardia bastava un doppio clic.
     overlayBox.querySelectorAll('.ed-tr-purge').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.confirm !== '1') {
         b.dataset.confirm = '1';
-        b.textContent = 'Confermi?';
+        CONFERMA.arma(b, 'Confermi?');
         b.classList.add('danger');
         staleClick.arm();
         setTimeout(() => {
           if (!b.isConnected || b.dataset.confirm !== '1') return;
           b.dataset.confirm = '';
-          b.textContent = 'Elimina definitivamente';
+          CONFERMA.disarma(b, 'Elimina definitivamente');
           b.classList.remove('danger');
         }, 4000);
         return;
@@ -1080,7 +865,9 @@
     if (emptyBtn) emptyBtn.addEventListener('click', () => {
       if (emptyBtn.dataset.confirm !== '1') {
         emptyBtn.dataset.confirm = '1';
-        emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
+        // La scatola resta quella di «Svuota cestino»: il conto va nel suggerimento, non nella scritta.
+        CONFERMA.arma(emptyBtn, 'Confermi?');
+        emptyBtn.title = `Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
         emptyBtn.classList.add('danger');
         staleClick.arm();
         return;
@@ -1090,25 +877,22 @@
       renderTrashPanel();
       renderDocSwitcher();
     });
-    // Il cestino si ridisegna dopo ogni eliminazione definitiva: stessa guardia
-    // del pannello versioni sul secondo colpo di un doppio clic.
+    // Il cestino si ridisegna dopo ogni eliminazione definitiva: stessa guardia sul secondo colpo
+    // di un doppio clic.
     staleClick.arm();
   }
 
-  // Rinomina un documento (il nome mostrato nel menu e nel selettore).
-  // `manual` (default true) segna che il titolo l'ha scelto l'utente: così la
-  // generazione automatica del titolo (a ~100 parole) non lo sovrascrive mai.
-  //
-  // ATTENZIONE: il marchio "l'ha scelto l'utente" vale SOLO se il nome finale è
-  // un nome vero. Aprire la rinomina e confermarla a vuoto (Invio su campo
-  // vuoto, blur, o conferma del titolo di default) lascia il documento SENZA
-  // nome: marcarlo comunque come manuale spegneva per sempre il titolo
-  // automatico di quel documento. Il flag segue quindi il titolo risultante:
-  // nome vero → true, documento di nuovo senza nome → false (auto-titolo di
-  // nuovo possibile).
+  // `manual` (default true) segna che il titolo l'ha scelto l'utente: il titolo automatico non
+  // lo sovrascrive. Vale solo se il nome finale è vero: il flag segue il titolo risultante.
   function renameFileAction(id, title, { manual = true } = {}) {
+    const prima = STORE.findFile(collection, id);
+    const diFilo = manual && titoloDiFilo(prima) ? { ...prima.meta } : null;
     STORE.renameFile(collection, id, title);
     const f = STORE.findFile(collection, id);
+    // Il titolo che Filo aveva scritto, riscritto a mano: quanto dopo (#1465).
+    if (diFilo && f && f.meta && f.meta.title !== diFilo.title) {
+      contaRiquadro('editor_titolo', { via: diFilo.titleAutoVia, riscrittoDopoMs: Math.max(0, Date.now() - diFilo.titleAutoAt) });
+    }
     const named = !!(f && f.meta && f.meta.title && f.meta.title !== STORE.DEFAULT_TITLE);
     if (f && f.meta && manual) f.meta.titleManual = named;
     if (doc && doc.id === id && doc.meta && f && f.meta) {
@@ -1120,24 +904,24 @@
     rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
-  // ── Titolo automatico dal contenuto (#379.4) ──────────────────────────
-  // Quando un documento senza nome raggiunge ~100 parole, Filo gli propone UNA
-  // VOLTA SOLA un titolo generato dal contenuto (più la conversazione del modulo
-  // chat e la memoria di Filo come contesto). Il titolo resta modificabile a
-  // mano e rigenerabile dal menu contestuale (tasto destro sul titolo).
+  // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve uno; poi lo segue il riassunto (#1570).
+  // Scritto a mano non cambia più da solo; «Rigenera titolo» dal tasto destro resta.
   const AUTO_TITLE_WORDS = 100;
-  let autoTitleBusy = false;
+  // Per documento: un titolo o un riassunto in volo per un altro non salta il tiro di questo (#1697).
+  const titoliInVolo = new Set();
+  const riassuntiInVolo = new Set();
 
-  const TITLE_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Genera un TITOLO molto breve (2-6 parole) per il '
-    + 'documento qui sotto, nella STESSA lingua del testo. Il titolo deve '
-    + 'descrivere il contenuto del documento. Usa l\'eventuale conversazione e la '
-    + 'memoria SOLO come contesto per capire meglio l\'argomento, non come oggetto '
-    + 'del titolo. Rispondi SOLO col titolo: niente virgolette, niente punto '
-    + 'finale, niente spiegazioni.';
+  // Le regole di titolo e riassunto stanno qui una volta: le chiamate da sole e quella unica le compongono.
+  const REGOLA_TITOLO = 'un TITOLO molto breve (2-6 parole), nella STESSA lingua del testo, che descriva il contenuto del '
+    + 'documento qui sotto';
+  const REGOLA_RIASSUNTO = 'un RIASSUNTO di 1-2 frasi (massimo due righe), nella STESSA lingua del testo, che spieghi COSA '
+    + 'CONTIENE il documento qui sotto. Serve a orientarsi tra più file senza aprirli: descrivi l\'argomento e il tipo di '
+    + 'contenuto, non i dettagli';
+  const SOLO_CONTESTO = 'Usa l\'eventuale conversazione e la memoria SOLO come contesto per capire meglio l\'argomento, '
+    + 'non come oggetto del testo che scrivi.';
+  const TITLE_SYSTEM_PROMPT = `Sei l'assistente di Filo. Genera ${REGOLA_TITOLO}. ${SOLO_CONTESTO} `
+    + 'Rispondi SOLO col titolo: niente virgolette, niente punto finale, niente spiegazioni.';
 
-  // Normalizza l'output del modello in un titolo pulito (prima riga, senza
-  // virgolette/punteggiatura di contorno, lunghezza limitata).
   function cleanTitle(raw) {
     let t = String(raw == null ? '' : raw).trim();
     t = t.split(/\r?\n/)[0].trim();
@@ -1146,21 +930,6 @@
     t = t.replace(/[.。·]+$/, '').trim();
     if (t.length > 80) t = t.slice(0, 80).trim();
     return t;
-  }
-
-  // Messaggi della/e chat dell'editor del file attivo (contesto per il titolo).
-  function editorChatMessages() {
-    const out = [];
-    if (!doc || !Array.isArray(doc.modules)) return out;
-    for (const m of doc.modules) {
-      if (m.type !== 'chat' || !m.data || !Array.isArray(m.data.messages)) continue;
-      for (const msg of m.data.messages) {
-        const c = msg && typeof msg.content === 'string' ? msg.content.trim() : '';
-        if (!c || c === '…') continue;
-        out.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: c.slice(0, 1000) });
-      }
-    }
-    return out.slice(-12);
   }
 
   // La memoria arriva al modello recintata come nella chat: la scrive Filo da
@@ -1183,19 +952,25 @@
     } catch (_) { return ''; }
   }
 
-  // Applica un titolo generato dall'AI al file `id`: segna che è automatico (così
-  // conta come "già generato" e non viene più riproposto in automatico) e toglie
-  // il flag manuale (ora il titolo è dell'AI).
-  function applyGeneratedTitle(id, raw) {
+  // Il titolo in vista l'ha scritto Filo, con la via e l'ora: quelli di prima dei contatori (#1465) non le hanno.
+  function titoloDiFilo(f) {
+    const m = f && f.meta;
+    return !!(m && m.titleAuto && !m.titleManual && m.title && m.title !== STORE.DEFAULT_TITLE
+      && Number.isFinite(m.titleAutoAt) && ['automatico', 'rigenerato'].includes(m.titleAutoVia));
+  }
+
+  // Titolo automatico: conta come «già generato» e toglie il flag manuale. `firma` è il testo da cui è nato: il
+  // titolo si rifà quando il testo se ne allontana (SN_EDITOR_SUMMARY.titoloDaRifare).
+  function applyGeneratedTitle(id, raw, via = 'automatico', firma = null) {
     const clean = cleanTitle(raw);
     if (!clean) return false;
     STORE.renameFile(collection, id, clean);
     const f = STORE.findFile(collection, id);
-    if (f && f.meta) { f.meta.titleAuto = true; f.meta.titleManual = false; }
+    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via, titleSig: firma };
+    if (f && f.meta) Object.assign(f.meta, segno);
     if (doc && doc.id === id && doc.meta) {
       doc.meta.title = f.meta.title;
-      doc.meta.titleAuto = true;
-      doc.meta.titleManual = false;
+      Object.assign(doc.meta, segno);
     }
     writeCollection();
     renderDocSwitcher();
@@ -1203,83 +978,81 @@
     return true;
   }
 
-  // Genera (o rigenera) il titolo del file ATTIVO via il canale AI della chat.
-  //  - auto:true  → tiro automatico a 100 parole, silenzioso, UNA VOLTA SOLA.
-  //  - auto:false → rigenerazione esplicita dal menu (con feedback a video).
+  // Un titolo automatico che arriva dopo che l'utente ne ha scritto uno a mano non lo sostituisce.
+  function titoloScrittoAMano(id) {
+    const f = STORE.findFile(collection, id);
+    return !!(f && f.meta && f.meta.titleManual);
+  }
+
+  // auto:true → primo titolo a 100 parole, silenzioso; dopo lo rifà il riassunto, nella sua chiamata.
+  // auto:false → rigenerazione esplicita dal menu, con feedback a video.
   async function generateTitleForActive({ auto } = {}) {
     if (!doc || !doc.meta) return false;
     const id = doc.id;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
+    syncActiveIntoCollection();
+    const prima = STORE.findFile(collection, id);
+    const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
     if (auto) {
-      // Segna SUBITO come "già tentato" così non si ripete a ogni battitura né si
-      // moltiplicano le chiamate: la generazione automatica è una sola. In caso
-      // di errore l'utente ha comunque "Rigenera titolo" nel menu contestuale.
+      // Segna SUBITO come «già tentato»: la generazione automatica è una sola. In caso di errore
+      // resta «Rigenera titolo» nel menu.
       doc.meta.titleAuto = true;
       const f0 = STORE.findFile(collection, id);
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
+    if (!window.SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    const contesto = contestoDelDocumento(await filoMemoryText());
+    const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
+    const via = auto ? 'automatico' : 'rigenerato';
+    const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_TITLE || 'editor_title', payload: { messages },
-      });
+      // Rifatto a mano chiede una risposta nuova: la stessa domanda tornerebbe uguale dalla cache.
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
-      const ok = applyGeneratedTitle(id, rawText);
-      if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
+      if (auto && titoloScrittoAMano(id)) return false;
+      const ok = applyGeneratedTitle(id, rawText, via, firma);
+      esito(ok ? 'applicato' : 'vuoto');
+      if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
+      if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
-    } catch (_) {
-      if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
+    } catch (e) {
+      esito('fallito');
+      if (!auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code }); }
       return false;
     } finally {
       if (docSwitchBtn) docSwitchBtn.classList.remove('ed-doc-generating');
     }
   }
 
-  // Tiro automatico: parte dall'input del testo, una sola volta, e solo se il
-  // file non ha già un titolo scelto a mano.
+  // Primo titolo: parte dall'input del testo, una volta, e solo se il file non ha già un titolo scelto a mano.
   function maybeAutoTitle() {
     if (!doc || !doc.meta) return;
     if (doc.meta.titleAuto || doc.meta.titleManual) return;
-    if (autoTitleBusy) return;
+    const id = doc.id;
+    if (titoliInVolo.has(id)) return;
     if (textStats().words < AUTO_TITLE_WORDS) return;
-    autoTitleBusy = true;
-    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { autoTitleBusy = false; });
+    titoliInVolo.add(id);
+    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { titoliInVolo.delete(id); });
   }
 
-  // ── Riassunto per file, mantenuto aggiornato (#379.5) ─────────────────────
-  // Ogni file porta un RIASSUNTO di un paio di righe (`meta.summary`), generato
-  // dallo stesso canale AI del titolo (testo + chat del documento + memoria).
-  // A differenza del titolo (una-tantum) il riassunto si RIGENERA quando il file
-  // cambia in modo significativo. Il riassunto entra nel contesto di Filo al
-  // posto del testo integrale (lato main): qui lo produciamo e lo salviamo nella
-  // collezione (rispecchiata su storage.json), così il main lo legge.
+  // Riassunto per file (#379.5): stesso canale AI del titolo, ma si RIGENERA quando il file
+  // cambia molto. Entra nel contesto di Filo al posto del testo integrale.
   const SUMMARY = window.SN_EDITOR_SUMMARY || null;
   const SUMMARY_DEBOUNCE_MS = 7000;
-  let autoSummaryBusy = false;
   let summaryTimer = null;
 
-  const SUMMARY_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Scrivi un RIASSUNTO di 1-2 frasi (massimo due '
-    + 'righe) che spieghi COSA CONTIENE il documento qui sotto, nella STESSA '
-    + 'lingua del testo. Serve a orientarsi tra più file senza aprirli: descrivi '
-    + 'l\'argomento e il tipo di contenuto, non i dettagli. Usa l\'eventuale '
-    + 'conversazione e la memoria SOLO come contesto. Rispondi SOLO col riassunto: '
-    + 'niente virgolette, niente preamboli, niente elenco.';
+  const SUMMARY_SYSTEM_PROMPT = `Sei l'assistente di Filo. Scrivi ${REGOLA_RIASSUNTO}. `
+    + `${SOLO_CONTESTO} Rispondi SOLO col riassunto: niente virgolette, niente preamboli, niente elenco.`;
+  const TITOLO_E_RIASSUNTO_PROMPT = `Sei l'assistente di Filo. Prima scrivi ${REGOLA_TITOLO}; poi `
+    + `${REGOLA_RIASSUNTO}. ${SOLO_CONTESTO} Rispondi con due righe esatte, senza virgolette né altro:\n`
+    + 'TITOLO: <il titolo, senza punto finale>\nRIASSUNTO: <il riassunto, senza preamboli né elenco>';
 
   function cleanSummary(raw) {
     let t = String(raw == null ? '' : raw).trim();
@@ -1289,9 +1062,8 @@
     return t;
   }
 
-  // Applica un riassunto generato al file `id`: lo salva e registra la "firma"
-  // (numero di parole di adesso) per capire in futuro se il file è cambiato
-  // abbastanza da giustificare una rigenerazione.
+  // La «firma» (parole di adesso) dice in futuro se il file è cambiato abbastanza da meritare
+  // una rigenerazione.
   function applyGeneratedSummary(id, raw) {
     const clean = cleanSummary(raw);
     if (!clean) return false;
@@ -1301,70 +1073,109 @@
     f.meta.summary = clean;
     f.meta.summarySig = SUMMARY ? SUMMARY.makeSig(f) : { words: 0, at: Date.now() };
     f.meta.summaryAt = new Date().toISOString();
+    delete f.meta.summaryFailSig;
     if (doc && doc.id === id && doc.meta) {
       doc.meta.summary = clean;
       doc.meta.summarySig = f.meta.summarySig;
       doc.meta.summaryAt = f.meta.summaryAt;
+      delete doc.meta.summaryFailSig;
     }
     writeCollection();
     return true;
   }
 
-  // Genera (o rigenera) il riassunto del file ATTIVO via il canale AI della chat.
-  async function generateSummaryForActive() {
+  // Fermato dal tetto, lo stesso testo si fermerebbe uguale: il riassunto automatico aspetta un cambio vero (#1302).
+  function segnaRiassuntoFallito(id, firma, r) {
+    const tetto = r && r.code === 'RISPOSTA_TAGLIATA' && r.finishReason !== 'error';
+    const f = tetto && firma ? STORE.findFile(collection, id) : null;
+    if (!f) return false;
+    if (!f.meta) f.meta = {};
+    f.meta.summaryFailSig = firma;
+    if (doc && doc.id === id && doc.meta) doc.meta.summaryFailSig = firma;
+    writeCollection();
+    return true;
+  }
+
+  // Con `manuale` chi ha chiesto il riassunto sa com'è andata.
+  async function generateSummaryForActive({ manuale = false } = {}) {
     if (!doc || !doc.meta) return false;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
     syncActiveIntoCollection();
     const id = doc.id;
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) return false;
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
-      { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+    if (!window.SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
+    const prima = STORE.findFile(collection, id);
+    const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
+    // Il titolo non scritto a mano viaggia con il riassunto: nessuna chiamata in più (#1570).
+    const conTitolo = !!(SUMMARY && prima && firma && !titoliInVolo.has(id) && SUMMARY.titoloDaRifare(prima, firma.words));
+    const contesto = contestoDelDocumento(await filoMemoryText());
+    const conDocumento = (letto) => [
+      { role: 'system', content: conTitolo ? TITOLO_E_RIASSUNTO_PROMPT : SUMMARY_SYSTEM_PROMPT },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_SUMMARY || 'editor_summary', payload: { messages },
-      });
+      // `intera`: un riassunto fermato dal tetto non si salva e non va alla chat come se fosse completo (#1302).
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true, intera: true } : { intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) return false;
-      return applyGeneratedSummary(id, rawText);
-    } catch (_) {
+      if (rawText == null) {
+        // L'automatico lo dice una volta sola: il prossimo tentativo arriva solo dopo un cambio vero del testo.
+        if (segnaRiassuntoFallito(id, firma, r) || manuale) avvisoNonGenerato(manuale ? 'il riassunto' : 'il riassunto automatico', r);
+        return false;
+      }
+      const parti = conTitolo ? SUMMARY.titoloERiassunto(rawText) : { titolo: '', riassunto: rawText };
+      if (parti.titolo && !titoloScrittoAMano(id)) {
+        const nuovo = applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
+        contaRiquadro('editor_titolo', { via: 'automatico', esito: nuovo ? 'applicato' : 'vuoto' });
+      }
+      const ok = applyGeneratedSummary(id, parti.riassunto);
+      if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
+      if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
+      return ok;
+    } catch (e) {
+      if (manuale) avvisoNonGenerato('il riassunto', { error: e && e.message, code: e && e.code });
       return false;
     }
   }
 
-  // Tiro automatico: dopo una pausa nella scrittura, (ri)genera il riassunto del
-  // file attivo se serve (abbastanza testo e riassunto assente o stantìo). Il
-  // debounce evita chiamate a ogni battitura; la firma evita rigenerazioni
-  // inutili quando il contenuto è cambiato poco.
+  // Titolo o riassunto chiesti a mano che non arrivano: il perché, come nelle chat, e il tasto per la pagina dove si
+  // toglie l'ostacolo (Crediti, Opzioni). «Non sono riuscito» da solo lasciava senza motivo e senza strada (#1344.1).
+  function avvisoNonGenerato(cosa, r) {
+    const CE = window.SN_CHAT_ERRORS;
+    const frase = CE ? CE.sentence(CE.fromResponse(r, '')) : '';
+    const pagina = CE?.rimedioPagina?.(r) || null;
+    const via = pagina
+      ? { label: pagina.label, title: pagina.title, durata: 15000, onClick: () => sendMessage({ type: MSG.OPEN_URL, url: pagina.url }) }
+      : undefined;
+    showEditorToast(`Non sono riuscito a generare ${cosa}.${frase ? ` ${frase}` : ''}`, via);
+  }
+
+  // Il debounce evita chiamate a ogni battitura, la firma evita rigenerazioni quando il contenuto
+  // è cambiato poco.
   function maybeAutoSummary() {
     if (!SUMMARY || !doc) return;
     if (summaryTimer) { clearTimeout(summaryTimer); summaryTimer = null; }
     summaryTimer = setTimeout(() => {
       summaryTimer = null;
-      if (autoSummaryBusy || !doc) return;
+      if (!doc || riassuntiInVolo.has(doc.id)) return;
       syncActiveIntoCollection();
-      const f = STORE.findFile(collection, doc.id);
-      if (!f || !SUMMARY.needsSummary(f)) return;
-      autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive()).finally(() => { autoSummaryBusy = false; });
+      const id = doc.id;
+      const f = STORE.findFile(collection, id);
+      // Un titolo da rifare chiama anche a parità di parole, ma non su un testo ormai troppo corto per un riassunto.
+      const perTitolo = SUMMARY.fileWords(f) >= SUMMARY.MIN_WORDS && SUMMARY.titoloDaRifare(f);
+      if (!f || !(SUMMARY.needsSummary(f) || perTitolo)) return;
+      riassuntiInVolo.add(id);
+      Promise.resolve(generateSummaryForActive()).finally(() => { riassuntiInVolo.delete(id); });
     }, SUMMARY_DEBOUNCE_MS);
   }
 
-  // Duplica il file attivo (contenuto, moduli e commenti); il titolo derivato è
-  // segnato come "a mano" così non viene rigenerato in automatico.
+  // Il titolo derivato è segnato «a mano» così non viene rigenerato in automatico.
   function duplicateActiveFile() {
-    if (!doc) return;
-    syncActiveIntoCollection();
-    const src = STORE.findFile(collection, doc.id);
+    if (doc) duplicateFile(doc.id);
+  }
+  function duplicateFile(id) {
+    if (!id) return;
+    if (doc && doc.id === id) syncActiveIntoCollection();
+    const src = STORE.findFile(collection, id);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
     delete copy.id;
@@ -1378,9 +1189,8 @@
     closeDocPop();
   }
 
-  // ── Menu contestuale sul titolo (tasto destro) ────────────────────────
-  // Coerente con patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md:
-  // preventDefault + popup con le classi .sn-select-pop/.sn-select-option.
+  // Menu contestuale proprio, con preventDefault e le classi .sn-select-*. Pattern in
+  // patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md.
   let titleMenuEl = null;
   function closeTitleMenu() {
     if (!titleMenuEl) return;
@@ -1398,9 +1208,10 @@
   function onTitleMenuKeydown(e) {
     if (e.key === 'Escape') closeTitleMenu();
   }
-  function openTitleMenu(x, y) {
+  // `file`: una voce dell'elenco documenti (#2096): il menu è di quel documento, e l'elenco resta aperto.
+  function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
-    closeDocPop();
+    if (!file) closeDocPop();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -1412,21 +1223,29 @@
       o.addEventListener('click', () => { closeTitleMenu(); onClick(); });
       menu.appendChild(o);
     };
+    if (file) {
+      const voce = () => docPopEl && docPopEl.querySelector(`.ed-doc-item[data-id="${CSS.escape(file.id)}"]`);
+      if (file.id !== collection.activeId) add('Apri', () => { switchToFile(file.id); closeDocPop(); });
+      add('Rinomina', () => { const it = voce(); if (it) startInlineRename(it, file); });
+      add('Duplica', () => duplicateFile(file.id));
+      add('Elimina', () => deleteFile(file.id));
+    } else {
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
     add('Rigenera riassunto', () => {
-      if (autoSummaryBusy) return;
-      autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive())
-        .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
-        .finally(() => { autoSummaryBusy = false; });
+      const id = doc && doc.id;
+      if (!id || riassuntiInVolo.has(id)) return;
+      riassuntiInVolo.add(id);
+      Promise.resolve(generateSummaryForActive({ manuale: true }))
+        .finally(() => { riassuntiInVolo.delete(id); });
     });
     add('Storico versioni', () => openVersionHistory());
-    // Parità di cammini col menu documenti: se c'è qualcosa nel cestino lo si
-    // raggiunge anche col tasto destro sul titolo.
+    // Parità di cammini col menu documenti: il cestino si raggiunge anche col tasto destro sul
+    // titolo.
     if (trash.length) add(`Cestino (${trash.length})`, () => openTrashPanel());
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
+    }
     document.body.appendChild(menu);
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = menu.offsetWidth, h = menu.offsetHeight;
@@ -1463,12 +1282,14 @@
     const finish = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       const val = input.value;
       if (docSwitchBtn) docSwitchBtn.style.display = '';
       input.remove();
       if (save) renameFileAction(doc.id, val, { manual: true });
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => finish(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -1477,7 +1298,7 @@
     input.addEventListener('blur', () => finish(true));
   }
 
-  // ── Menu documenti (selettore in alto a sinistra) ─────────────────────
+  // Menu documenti (selettore in alto a sinistra)
   function activeTitle() {
     const f = STORE.activeFile(collection);
     return (f && f.meta && f.meta.title) || 'Documento senza titolo';
@@ -1503,7 +1324,6 @@
       name.textContent = (f.meta && f.meta.title) || 'Documento senza titolo';
       item.appendChild(name);
 
-      // Apri il file cliccando la riga (ma non le azioni).
       item.addEventListener('click', (e) => {
         if (e.target.closest('.ed-doc-act') || e.target.closest('.ed-doc-item-input')) return;
         switchToFile(f.id);
@@ -1532,9 +1352,8 @@
     nu.innerHTML = `${ICONS.plus ? ICONS.plus(14) : '+'}<span>Nuovo documento</span>`;
     nu.addEventListener('click', createFile);
     docPopEl.appendChild(nu);
-    // Storico versioni del documento attivo: stessa affordance del "Nuovo
-    // documento", così la si trova dal menu in alto a sinistra (oltre che dal
-    // tasto destro sul foglio). Parità di cammini.
+    // Storico del documento attivo anche dal menu in alto a sinistra, oltre che dal tasto destro
+    // sul foglio: parità di cammini.
     const hist = document.createElement('button');
     hist.type = 'button';
     hist.className = 'ed-doc-new ed-doc-history';
@@ -1542,8 +1361,8 @@
     hist.innerHTML = `${ICONS.history ? ICONS.history(14) : '⟲'}<span>Storico versioni</span>`;
     hist.addEventListener('click', () => { closeDocPop(); openVersionHistory(); });
     docPopEl.appendChild(hist);
-    // Cestino: compare solo quando c'è qualcosa da recuperare (una voce sempre
-    // presente e sempre vuota sarebbe solo rumore nel menu).
+    // Il cestino compare solo quando c'è qualcosa da recuperare: una voce sempre vuota sarebbe
+    // rumore.
     if (trash.length) {
       const bin = document.createElement('button');
       bin.type = 'button';
@@ -1554,10 +1373,8 @@
       bin.addEventListener('click', openTrashPanel);
       docPopEl.appendChild(bin);
     }
-    // Il menu si ricostruisce anche mentre è aperto (eliminando un documento la
-    // lista si accorcia e le righe salgono di un posto): stessa coda di gesto
-    // del pannello versioni, qui col prezzo più alto — il colpo di coda cadeva
-    // sulla × del documento sotto e ne eliminava due invece di uno.
+    // Il menu si ricostruisce anche mentre è aperto (le righe salgono): stessa coda di gesto, qui
+    // col prezzo più alto — il colpo di coda cadeva sulla × del documento sotto.
     staleClick.arm();
   }
 
@@ -1578,9 +1395,8 @@
     const input = document.createElement('input');
     input.className = 'ed-doc-item-input';
     input.type = 'text';
-    // Stessa regola della rinomina dalla docbar: "Documento senza titolo" non è
-    // un nome, è l'assenza di un nome — quindi va come segnaposto, non come
-    // testo già scritto da riscrivere.
+    // «Documento senza titolo» non è un nome, è l'assenza di un nome: va come segnaposto, non
+    // come testo già scritto da riscrivere.
     const curName = (f.meta && f.meta.title) || '';
     input.value = curName === STORE.DEFAULT_TITLE ? '' : curName;
     input.placeholder = STORE.DEFAULT_TITLE;
@@ -1589,9 +1405,11 @@
     const commit = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       if (save) renameFileAction(f.id, input.value);
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => commit(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); commit(true); }
@@ -1618,6 +1436,7 @@
     document.removeEventListener('mousedown', onDocPopOutside, true);
   }
   function onDocPopOutside(e) {
+    if (titleMenuEl && titleMenuEl.contains(e.target)) return;
     if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
   }
   if (docSwitchBtn) {
@@ -1625,8 +1444,7 @@
       e.stopPropagation();
       docPopEl.hidden ? openDocPop() : closeDocPop();
     });
-    // Tastiera, parità col tasto destro: Shift+F10 / tasto Menu apre il menu
-    // contestuale del titolo ancorato alla docbar.
+    // Tastiera, parità col tasto destro: Shift+F10 / tasto Menu apre lo stesso menu.
     docSwitchBtn.addEventListener('keydown', (e) => {
       if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
@@ -1635,27 +1453,21 @@
       }
     });
   }
-  // Tasto destro sul titolo (o su tutta la docbar): menu contestuale del file.
   if (docbarEl) {
     docbarEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openTitleMenu(e.clientX, e.clientY);
+      const it = e.target && e.target.closest ? e.target.closest('.ed-doc-item') : null;
+      const file = it ? collection.files.find((f) => f.id === it.dataset.id) : null;
+      openTitleMenu(e.clientX, e.clientY, { file });
     });
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  //  EDITOR DI TESTO (contenteditable ↔ JSON ProseMirror)
-  // ════════════════════════════════════════════════════════════════════
+  // EDITOR DI TESTO (contenteditable ↔ JSON ProseMirror)
 
   const MARK_TAGS = { B: 'bold', STRONG: 'bold', I: 'italic', EM: 'italic', U: 'underline', S: 'strike', STRIKE: 'strike', DEL: 'strike' };
 
-  // Immagini incollate nel foglio. Il documento è un modello JSON che riconosce
-  // solo blocchi/marche di testo: un <img> senza nodo corrispondente veniva
-  // scartato al primo salvataggio, così l'immagine spariva al reload. Le
-  // trattiamo come nodo inline `image` con solo src (+ alt): nessun handler
-  // (onerror…) né altro attributo sopravvive al round-trip, quindi un <img>
-  // ostile incollato non può eseguire codice quando il foglio si ricostruisce.
-  // Src ammesse: data:image/… (il caso dell'incolla), http(s) e blob:.
+  // Un <img> senza nodo sparisce al salvataggio: diventa un nodo inline `image` con solo
+  // src (+ alt), così nessun handler sopravvive al round-trip. Src: data:, http(s), blob:.
   const IMG_SRC_OK = /^(data:image\/|https?:|blob:)/i;
   function imgToPM(el) {
     const src = (el.getAttribute('src') || '').trim();
@@ -1664,14 +1476,26 @@
     return { type: 'image', attrs: { src, ...(alt ? { alt } : {}) } };
   }
 
-  // Le marche sono oggetti { type, attrs? }: i tag (B/I/U/S) producono marche
-  // semplici; il font-size — applicato come stile inline su uno <span>/<font> —
-  // diventa una marca con attrs.size così sopravvive al round-trip.
+  // Il collegamento e l'evidenziato messi dalla fila del tasto destro (#1434) restano al salvataggio: solo indirizzi del
+  // web e della posta, e un colore scritto come colore.
+  const LINK_OK = /^(https?:|mailto:)/i;
+  const COLORE_OK = /^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)|[a-z]{3,20})$/i;
+  const SENZA_COLORE = /^(transparent|initial|inherit|unset|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\))$/i;
+  function coloreDi(v) {
+    const c = String(v || '').trim();
+    return c && COLORE_OK.test(c) && !SENZA_COLORE.test(c) ? c : '';
+  }
+
+  // Le marche sono { type, attrs? }: i tag B/I/U/S danno marche semplici; il font-size, che è
+  // stile inline, diventa una marca con attrs.size così sopravvive al round-trip.
+  const ANCORA = String.fromCharCode(0x200b);
   function inlineToPM(parent, marks) {
     const out = [];
     parent.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        if (node.nodeValue) out.push({ type: 'text', text: node.nodeValue, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
+        // Lo spazio di larghezza zero è l'ancora dell'incolla lungo (incollaLungo), non testo dell'utente.
+        const testo = node.nodeValue.split(ANCORA).join('');
+        if (testo) out.push({ type: 'text', text: testo, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -1684,18 +1508,21 @@
       if (extra && !next.some((m) => m.type === extra)) next = [...next, { type: extra }];
       const fs = el.style && el.style.fontSize;
       if (fs) next = [...next.filter((m) => m.type !== 'fontSize'), { type: 'fontSize', attrs: { size: fs } }];
-      // Font: applicato come <span style="font-family:…"> (styleWithCSS) o, in
-      // alcune build, come <font face="…">. Entrambi diventano una marca
-      // fontFamily così sopravvivono al round-trip.
+      // Il font arriva come <span style> o, in alcune build, come <font face>: entrambi diventano
+      // una marca fontFamily, così sopravvivono al round-trip.
       const ff = (el.style && el.style.fontFamily) || (el.tagName === 'FONT' ? el.getAttribute('face') : '');
       if (ff) next = [...next.filter((m) => m.type !== 'fontFamily'), { type: 'fontFamily', attrs: { family: ff } }];
+      const sfondo = coloreDi(el.style && el.style.backgroundColor);
+      if (sfondo && !el.classList.contains('ed-find-hit')) next = [...next.filter((m) => m.type !== 'highlight'), { type: 'highlight', attrs: { color: sfondo } }];
+      else if (el.style && SENZA_COLORE.test(String(el.style.backgroundColor || ''))) next = next.filter((m) => m.type !== 'highlight');
+      const href = el.tagName === 'A' ? String(el.getAttribute('href') || '').trim() : '';
+      if (href && LINK_OK.test(href)) next = [...next.filter((m) => m.type !== 'link'), { type: 'link', attrs: { href } }];
       out.push(...inlineToPM(el, next));
     });
     return out;
   }
 
-  // Allineamento di un blocco: legge lo stile inline text-align (o l'attributo
-  // align legacy). Ritorna '' se non impostato o non valido.
+  // '' se non impostato o non valido.
   function blockAlign(el) {
     let a = (el.style && el.style.textAlign) || (el.getAttribute && el.getAttribute('align')) || '';
     a = String(a).toLowerCase();
@@ -1728,9 +1555,8 @@
       } else if (tag === 'DIV' || tag === 'P') {
         content.push({ type: 'paragraph', ...(align ? { attrs: { align } } : {}), content: inlineToPM(el, []) });
       } else if (tag === 'IMG') {
-        // Immagine incollata come figlia diretta del foglio (contenteditable la
-        // lascia spesso fuori da qualsiasi paragrafo): incapsulala in un
-        // paragrafo così ha un blocco che la contiene nel modello.
+        // contenteditable lascia spesso l'immagine incollata fuori da qualsiasi paragrafo:
+        // incapsularla dà al modello un blocco che la contiene.
         const img = imgToPM(el);
         if (img) content.push({ type: 'paragraph', content: [img] });
       }
@@ -1739,12 +1565,8 @@
     return { type: 'doc', content };
   }
 
-  // Escapa anche le virgolette (doppie e singole): escapeHtml è usata pure
-  // dentro attributi delimitati da virgolette (style="font-family:…",
-  // value="…"). I nomi di font composti ("Times New Roman", Times, serif)
-  // contengono virgolette doppie letterali: senza &quot; l'attributo style si
-  // chiuderebbe alla prima virgoletta e la formattazione andrebbe persa al
-  // round-trip salva→render.
+  // Escapa anche le virgolette: escapeHtml è usata dentro attributi delimitati da virgolette, e
+  // i nomi di font composti ne contengono — senza &quot; l'attributo si chiuderebbe alla prima.
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -1768,6 +1590,12 @@
       if (fs && fs.attrs && fs.attrs.size) html = `<span style="font-size:${escapeHtml(fs.attrs.size)}">${html}</span>`;
       const ff = marks.find((m) => m.type === 'fontFamily');
       if (ff && ff.attrs && ff.attrs.family) html = `<span style="font-family:${escapeHtml(ff.attrs.family)}">${html}</span>`;
+      const hl = marks.find((m) => m.type === 'highlight');
+      const colore = hl && hl.attrs ? coloreDi(hl.attrs.color) : '';
+      if (colore) html = `<span style="background-color:${escapeHtml(colore)}">${html}</span>`;
+      const ln = marks.find((m) => m.type === 'link');
+      const href = ln && ln.attrs ? String(ln.attrs.href || '').trim() : '';
+      if (href && LINK_OK.test(href)) html = `<a href="${escapeHtml(href)}">${html}</a>`;
       return html;
     }).join('');
   }
@@ -1801,17 +1629,15 @@
 
   function renderDocBody() {
     docEl.innerHTML = pmToHtml(doc.content);
-    // Documento vuoto → paragrafo con <br> così il caret ha dove posarsi. Un
-    // foglio con la sola immagine (nessun testo) NON è vuoto: senza il controllo
-    // sull'<img> verrebbe azzerato e l'immagine persa al reload.
+    // Documento vuoto → paragrafo con <br> così il caret ha dove posarsi. Un foglio con la sola
+    // immagine NON è vuoto: senza il controllo sull'<img> verrebbe azzerato e l'immagine persa.
     if (!docEl.firstChild || (!docEl.textContent.trim() && !docEl.querySelector('img'))) docEl.innerHTML = '<p><br></p>';
     refreshCollapseToggles();
     applyCommentHighlights();
   }
 
-  // Cliccare nello spazio vuoto del foglio (margini, area sotto il testo) deve
-  // dare il focus all'editor e posare il caret in fondo: senza questo l'area
-  // editabile coincide col solo testo e il "foglio" sembra non scrivibile.
+  // Cliccare nello spazio vuoto del foglio deve dare il focus e posare il caret in fondo: senza,
+  // l'area editabile coincide col solo testo e il foglio sembra non scrivibile.
   function focusDocAtEnd() {
     docEl.focus();
     const sel = window.getSelection();
@@ -1829,17 +1655,14 @@
     focusDocAtEnd();
   });
 
-  // ── Formattazione ───────────────────────────────────────────────────
+  // Formattazione
   function exec(cmd, val) {
     docEl.focus();
     document.execCommand(cmd, false, val);
     onDocInput();
   }
-  // Variante che forza l'output in CSS inline (styleWithCSS). Serve per i comandi
-  // che vogliamo serializzare in modo pulito: l'allineamento (style text-align sul
-  // blocco) e la dimensione del testo (<span style="font-size:…">). Riportiamo
-  // subito styleWithCSS a false così grassetto/corsivo continuano a usare i tag
-  // <b>/<i> (che il serializzatore già conosce).
+  // Forza il CSS inline per i comandi che vogliamo serializzare puliti (allineamento,
+  // dimensione), poi torna false: grassetto e corsivo restano <b>/<i>, che il serializzatore sa.
   function execCss(cmd, val) {
     docEl.focus();
     document.execCommand('styleWithCSS', false, true);
@@ -1847,15 +1670,13 @@
     document.execCommand('styleWithCSS', false, false);
     onDocInput();
   }
-  // Dimensione testo: indice 1..7 (3 = normale). A+/A− muovono l'indice e
-  // applicano la dimensione corrispondente alla selezione corrente.
+  // Dimensione testo: indice 1..7 (3 = normale).
   let fontSizeIdx = 3;
   function stepFontSize(dir) {
     fontSizeIdx = Math.max(1, Math.min(7, fontSizeIdx + dir));
     execCss('fontSize', String(fontSizeIdx));
   }
-  // SVG per le icone di allineamento: 4 righe la cui posizione comunica
-  // sinistra/centro/destra/giustificato.
+  // 4 righe la cui posizione comunica sinistra/centro/destra/giustificato.
   function alignSvg(kind) {
     const rows = [[3, 12], [6, 8], [9, 12], [12, 8]];
     const lines = rows.map(([y, len]) => {
@@ -1867,11 +1688,8 @@
     }).join('');
     return `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${lines}</svg>`;
   }
-  // Bottone di un modulo di formattazione. Il mousedown con preventDefault è
-  // intenzionale: tenere il default farebbe perdere la selezione/focus
-  // dell'editor (cliccare un elemento esterno collassa la selezione), e il
-  // comando di formattazione non agirebbe sul testo voluto. In modalità modifica
-  // moduli lasciamo invece passare il click così si apre la configurazione.
+  // Il preventDefault sul mousedown è intenzionale: il default farebbe perdere la selezione e il
+  // comando non agirebbe sul testo voluto.
   function fmtButton(label, title, onAct) {
     const b = document.createElement('button');
     b.className = 'ed-fmt-btn';
@@ -1880,12 +1698,12 @@
     b.title = title;
     b.setAttribute('aria-label', title);
     b.addEventListener('mousedown', (e) => {
-      if (settingsMode) return;
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       onAct();
     });
-    b.addEventListener('click', (e) => { if (!settingsMode) e.stopPropagation(); });
+    b.addEventListener('click', (e) => e.stopPropagation());
     return b;
   }
   const SIMPLE_FORMATS = {
@@ -1895,28 +1713,27 @@
     undo:      { glyph: ICONS.back ? ICONS.back(16) : '↶', title: 'Indietro (annulla)', act: () => exec('undo') },
     redo:      { glyph: ICONS.forward ? ICONS.forward(16) : '↷', title: 'Avanti (ripeti)', act: () => exec('redo') },
   };
-  function renderSimpleFormat(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderSimpleFormat(host, type) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt';
-    const cfg = SIMPLE_FORMATS[m.type];
-    pad.appendChild(fmtButton(cfg.glyph, cfg.title, cfg.act));
-    cell.appendChild(pad);
+    const cfg = SIMPLE_FORMATS[type];
+    const b = fmtButton(`<span class="ed-fmt-glifo">${cfg.glyph}</span><span class="ed-fmt-nome">${escapeHtml(nomeElemento(type))}</span>`, cfg.title, () => { contaModulo({ type }, 'usato'); cfg.act(); });
+    b.classList.add('ed-fmt-largo');
+    pad.appendChild(b);
+    host.appendChild(pad);
   }
-  function renderTextSize(cell, _m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderTextSize(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row';
-    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => stepFontSize(-1));
-    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => stepFontSize(1));
+    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => { contaModulo({ type: 'text-size' }, 'usato'); stepFontSize(-1); });
+    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => { contaModulo({ type: 'text-size' }, 'usato'); stepFontSize(1); });
     minus.dataset.size = 'down';
     plus.dataset.size = 'up';
     pad.appendChild(minus);
     pad.appendChild(plus);
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
-  function renderAlign(cell, _m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderAlign(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row ed-align';
     const defs = [
@@ -1926,17 +1743,15 @@
       ['justify', 'Giustifica', 'justifyFull'],
     ];
     for (const [kind, title, cmd] of defs) {
-      const b = fmtButton(alignSvg(kind), title, () => execCss(cmd));
+      const b = fmtButton(alignSvg(kind), title, () => { contaModulo({ type: 'align' }, 'usato'); execCss(cmd); });
       b.dataset.align = kind;
       pad.appendChild(b);
     }
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
 
-  // I controlli che aprono un menu nativo (es. il <select> del font) rubano il
-  // focus all'editor e collassano la selezione: senza un preventDefault il
-  // comando non saprebbe più su QUALE testo agire. Salviamo il range prima che
-  // il menu si apra e lo ripristiniamo prima di applicare il comando.
+  // I menu nativi (il <select> del font) rubano il focus e collassano la selezione: si salva il
+  // range prima che il menu si apra e lo si ripristina prima del comando.
   let savedDocRange = null;
   function saveDocSelection() {
     const sel = window.getSelection();
@@ -1948,9 +1763,8 @@
     sel.removeAllRanges();
     sel.addRange(savedDocRange);
   }
-  // ~30 famiglie comuni, buona varietà (serif, sans-serif, monospace, display,
-  // corsivi). Garamond incluso. Ogni voce è uno stack con fallback sicuri così
-  // l'applicazione regge anche dove il font esatto non è installato.
+  // ~30 famiglie comuni, con stack di fallback sicuri così l'applicazione regge anche dove il
+  // font esatto non è installato.
   const FONT_LIST = [
     ['Arial, Helvetica, sans-serif', 'Arial'],
     ['Helvetica, Arial, sans-serif', 'Helvetica'],
@@ -1988,13 +1802,9 @@
     ['Copperplate, "Copperplate Gothic Light", fantasy', 'Copperplate'],
   ];
 
-  // Picker del font: dropdown custom (stile coerente con gli altri menu a
-  // tendina di Filo, classi .sn-select-*) con campo di ricerca per filtrare i
-  // font scrivendo. Sotto resta un <select> nativo NASCOSTO come sorgente di
-  // verità: serve all'accessibilità e ai test (Playwright `selectOption`), e
-  // applica il font tramite il suo handler `change` (condiviso con la UI custom).
-  function renderFont(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  // Dropdown custom (classi .sn-select-*) con ricerca; sotto resta un <select> nativo nascosto
+  // come sorgente di verità, per l'accessibilità e per i test, che applica il font col `change`.
+  function renderFont(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-font';
 
@@ -2087,10 +1897,23 @@
       setHover(vis[i]);
     };
 
+    // La ricerca fra i font, per i contatori (#1461): dall'apertura alla scelta, la posizione del font, o niente.
+    let ricerca = null;
+    const contaRicerca = (ev) => {
+      try {
+        const r = chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'font', ...ev });
+        if (r && typeof r.catch === 'function') r.catch(() => {});
+      } catch (_) {}
+    };
     function choose(val) {
+      if (val && ricerca) {
+        const i = visibleOptions().findIndex((o) => o.dataset.value === val);
+        contaRicerca({ esito: 'scelta', attesaMs: Date.now() - ricerca.t0, posizione: i >= 0 ? i + 1 : null });
+        ricerca.scelto = true;
+      }
       if (val) {
         sel.value = val;
-        sel.dispatchEvent(new Event('change', { bubbles: true })); // → applica il font
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
       }
       close();
       button.focus();
@@ -2109,23 +1932,15 @@
         pop.style.bottom = 'auto';
         pop.style.top = `${r.bottom + 4}px`;
       }
-      // …e dentro la finestra. La tendina è larga almeno 180px (min-width) anche
-      // quando il modulo è più stretto, e i moduli stanno nella colonna di
-      // destra: allineata al bordo sinistro del bottone, la parte che sporge
-      // finisce fuori dallo schermo e i nomi dei font si leggono a metà. Si
-      // misura la larghezza VERA (quella calcolata, non quella chiesta) e la si
-      // riporta dentro, con un filo di margine.
+      // …e dentro la finestra. La tendina ha min-width 180px e i moduli stanno a destra: allineata
+      // al bordo sinistro del bottone sporgerebbe fuori. Si misura la larghezza VERA e si rientra.
       const MARGINE = 8;
       const largh = pop.getBoundingClientRect().width || r.width;
       const massimo = window.innerWidth - largh - MARGINE;
       pop.style.left = `${Math.max(MARGINE, Math.min(r.left, massimo))}px`;
     }
-    // La finestra non sta ferma mentre la tendina è aperta: la si stringe, e in
-    // Filo si zooma di continuo. Riposare solo all'apertura vuol dire calcolare
-    // il rientro su uno spazio che un istante dopo non esiste più: misurato, in
-    // una finestra da 1280 la tendina sta fra 859 e 1039, e portando la finestra
-    // a 520 restava lì, cioè tutta fuori dalla pagina. Il pattern di Filo sulla
-    // posa dei riquadri lo dice in una riga: il ritaglio si rifà a OGNI misura.
+    // La finestra non sta ferma mentre la tendina è aperta (e in Filo si zooma di continuo): posare
+    // solo all'apertura calcola il rientro su uno spazio che un istante dopo non c'è più.
     const riposa = () => { if (!pop.hidden) placePop(); };
     function open() {
       if (!pop.hidden) return;
@@ -2147,9 +1962,13 @@
         window.visualViewport.addEventListener('scroll', riposa);
       }
       setTimeout(() => search.focus(), 0);
+      ricerca = { t0: Date.now(), scelto: false };
+      contaRicerca({ esito: 'aperta' });
     }
     function close() {
       if (pop.hidden) return;
+      if (ricerca && !ricerca.scelto) contaRicerca({ esito: 'vuota' });
+      ricerca = null;
       pop.hidden = true;
       wrap.classList.remove('sn-open');
       button.setAttribute('aria-expanded', 'false');
@@ -2163,13 +1982,9 @@
       }
     }
 
-    button.addEventListener('mousedown', (e) => {
-      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
-      saveDocSelection();
-    });
+    button.addEventListener('mousedown', () => saveDocSelection());
     button.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (settingsMode) return;
       pop.hidden ? open() : close();
     });
     search.addEventListener('input', () => applyFilter(search.value));
@@ -2180,28 +1995,24 @@
       else if (e.key === 'Escape') { e.preventDefault(); close(); button.focus(); }
     });
 
-    // In modalità modifica moduli il click apre la configurazione (parità con gli
-    // altri moduli); altrimenti salva la selezione prima che il menu la perda.
-    sel.addEventListener('mousedown', (e) => {
-      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
-      saveDocSelection();
-    });
+    // Salva la selezione prima che il menu la perda.
+    sel.addEventListener('mousedown', () => saveDocSelection());
     sel.addEventListener('change', (e) => {
-      if (settingsMode) return;
       e.stopPropagation();
       const font = sel.value;
       sel.selectedIndex = 0; // torna al placeholder "Font…"
       valueEl.textContent = 'Font…';
       if (!font) return;
+      contaModulo({ type: 'font' }, 'usato');
       restoreDocSelection();
       execCss('fontName', font);
     });
 
     pad.appendChild(wrap);
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
 
-  // ── Shortcut markdown a livello blocco ──────────────────────────────
+  // Shortcut markdown a livello blocco
   function handleMarkdownBlock() {
     const sel = window.getSelection();
     if (!sel || !sel.isCollapsed || !sel.anchorNode) return false;
@@ -2227,12 +2038,10 @@
     return false;
   }
 
-  // ── Titoli collassabili ──────────────────────────────────────────────
+  // Titoli collassabili
   function headingLevel(el) {
     return /^H([1-3])$/.test(el.tagName) ? Number(el.tagName[1]) : 0;
   }
-  // Nasconde/mostra i fratelli di un titolo fino al prossimo titolo di pari o
-  // superiore livello.
   function applyCollapseToSiblings(h, collapsing) {
     const lvl = headingLevel(h);
     let sib = h.nextElementSibling;
@@ -2243,11 +2052,8 @@
       sib = sib.nextElementSibling;
     }
   }
-  // Ricalcola DA CAPO chi è nascosto, partendo solo da `data-collapsed` sui
-  // titoli (l'unica fonte di verità dello stato di collasso) e riallinea le
-  // frecce. Ricalcolare invece di "togglare in loco" è ciò che rende corretto
-  // il caso annidato: riaprendo un titolo di livello alto, le sotto-sezioni
-  // ancora chiuse restano chiuse invece di sbucare tutte insieme.
+  // Ricalcola DA CAPO partendo solo da `data-collapsed` sui titoli (unica fonte di verità): è
+  // ciò che rende corretto l'annidamento — le sotto-sezioni chiuse restano chiuse.
   function reapplyCollapseState() {
     docEl.querySelectorAll('.ed-hidden-by-collapse').forEach((el) => el.classList.remove('ed-hidden-by-collapse'));
     docEl.querySelectorAll('h1, h2, h3').forEach((h) => {
@@ -2267,11 +2073,8 @@
       btn.addEventListener('click', (e) => { e.preventDefault(); toggleCollapse(h, btn); });
       h.insertBefore(btn, h.firstChild);
     });
-    // Lo stato di collasso vive sul titolo (`data-collapsed`), non sul bottone:
-    // ogni digitazione ricrea i bottoni, ma il titolo sopravvive. Ripristina le
-    // frecce e ri-nascondi i fratelli, così una sezione chiusa resta chiusa e
-    // coerente anche dopo aver scritto un carattere (e nuovo contenuto in una
-    // sezione chiusa nasce nascosto, non "sbucato").
+    // Lo stato di collasso vive sul titolo, non sul bottone: ogni digitazione ricrea i bottoni, il
+    // titolo sopravvive. Una sezione chiusa resta chiusa, e il contenuto nuovo nasce nascosto.
     reapplyCollapseState();
   }
   function toggleCollapse(h, btn) {
@@ -2283,16 +2086,13 @@
     delete h.dataset.searchOpened;
     reapplyCollapseState();
   }
-  // Blocco di primo livello (figlio diretto del foglio) che contiene `node`.
   function topLevelBlockOf(node) {
     let el = node && node.nodeType === 1 ? node : (node && node.parentElement);
     while (el && el.parentElement && el.parentElement !== docEl) el = el.parentElement;
     return el && el.parentElement === docEl ? el : null;
   }
-  // Catena dei titoli che GOVERNANO il blocco di `node`, dal più vicino al più
-  // esterno. Solo i titoli di livello più alto (numero minore) possono
-  // nasconderlo: risalendo i fratelli precedenti si tiene la catena scendendo
-  // di livello, e ci si ferma al primo H1.
+  // Solo i titoli di livello più alto possono nascondere un blocco: risalendo i fratelli
+  // precedenti si tiene la catena scendendo di livello, e ci si ferma al primo H1.
   function governingHeadings(node) {
     const chain = [];
     const el = topLevelBlockOf(node);
@@ -2310,15 +2110,8 @@
     }
     return chain;
   }
-  // Riapre le sezioni chiuse che stanno nascondendo `node`, così qualsiasi cosa
-  // ci si voglia fare (portarci la vista, sostituire una parola) avvenga sotto
-  // gli occhi dell'utente. Ritorna true se ha davvero riaperto qualcosa.
-  //
-  // `opts.temporary` marca l'apertura come PRESTITO della ricerca: è
-  // un'apertura di passaggio, non una scelta dell'utente, e si richiude da sé
-  // appena la ricerca si sposta altrove o finisce (feedback #385 bis: cercando
-  // lettera per lettera restavano aperte le sezioni delle corrispondenze
-  // intermedie, e l'impaginazione costruita a mano andava rifatta).
+  // Riapre le sezioni che nascondono `node`: ogni cosa avviene sotto gli occhi dell'utente.
+  // `opts.temporary` = PRESTITO della ricerca: si richiude appena la ricerca si sposta (#385).
   function revealCollapsedFor(node, opts) {
     const el = topLevelBlockOf(node);
     if (!el || !el.classList.contains('ed-hidden-by-collapse')) return false;
@@ -2332,23 +2125,20 @@
     if (opened) reapplyCollapseState();
     return opened;
   }
-  // Le sezioni che nascondevano `node` diventano dell'utente: aperte per una
-  // ragione che resta valida anche quando la ricerca se ne va (ci ha scritto
-  // dentro, o ci è stata sostituita una parola e deve poterla vedere).
+  // Le sezioni diventano dell'utente: aperte per una ragione che resta valida anche quando la
+  // ricerca se ne va (ci ha scritto dentro, o ci è stata sostituita una parola).
   function keepRevealedFor(node) {
     governingHeadings(node).forEach((h) => { delete h.dataset.searchOpened; });
   }
-  // Se il cursore è dentro una sezione aperta in prestito dalla ricerca, quella
-  // sezione smette di essere in prestito: nessun testo sparisce da sotto il
-  // cursore mentre l'utente ci sta lavorando.
+  // Se il cursore è dentro una sezione in prestito, quella smette di esserlo: nessun testo
+  // sparisce da sotto il cursore mentre ci si lavora.
   function keepRevealedAtCaret() {
     const sel = window.getSelection();
     if (!sel || !sel.anchorNode || !docEl.contains(sel.anchorNode)) return;
     keepRevealedFor(sel.anchorNode);
   }
-  // Richiude tutte le sezioni aperte in prestito dalla ricerca, tranne quelle
-  // che stanno mostrando `keepNode` (la corrispondenza su cui si è adesso).
-  // Le sezioni aperte a mano dall'utente non hanno il marchio e non si toccano.
+  // Richiude le sezioni in prestito tranne quella che mostra `keepNode`. Quelle aperte a mano
+  // non hanno il marchio e non si toccano.
   function closeBorrowedSectionsExcept(keepNode) {
     keepRevealedAtCaret();
     const keep = new Set(keepNode ? governingHeadings(keepNode) : []);
@@ -2369,13 +2159,12 @@
     keepRevealedAtCaret();
     refreshCollapseToggles();
     markDirty();
-    updateWordCountModules();
+    aggiornaElementi();
     maybeAutoTitle();
     maybeAutoSummary();
   }
 
   docEl.addEventListener('input', () => {
-    // markdown block shortcut (dopo lo spazio)
     handleMarkdownBlock();
     onDocInput();
   });
@@ -2393,8 +2182,228 @@
     const text = cd.getData('text/plain');
     if (!text) return;
     e.preventDefault();
-    document.execCommand('insertText', false, text);
+    const righe = text.split(/\r\n?|\n/);
+    if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
+    else incollaLungo(righe);
   });
+  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475). L'incolla lungo è UN insertHTML,
+  // così si annulla in un passo (#1475.2). Chrome lo paga al quadrato quando arriva in un blocco vuoto: la selezione
+  // allora prende un carattere vicino, che torna nel frammento al suo posto, e un foglio senza testo si svuota prima.
+  const INCOLLA_A_RIGHE = 50;
+  const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
+  const PARAGRAFO = /^(P|DIV|H[1-6])$/;
+  function bloccoDi(nodo) {
+    let b = nodo;
+    while (b && b !== docEl && !(b.nodeType === 1 && BLOCCO.test(b.tagName))) b = b.parentNode;
+    return b && b !== docEl ? b : null;
+  }
+  function htmlDi(range) {
+    const box = document.createElement('div');
+    box.appendChild(range.cloneContents());
+    return box.innerHTML;
+  }
+  // Il carattere preso in prestito torna dentro gli stessi tag in linea (grassetto, link…) che aveva nel blocco.
+  function carattereVestito(range, blocco, suo = range.startContainer) {
+    let pezzo = spaziVisibili(range.toString());
+    for (let n = suo.parentNode; n && n !== blocco; n = n.parentNode) {
+      const vuoto = n.cloneNode(false).outerHTML;
+      const chiude = vuoto.lastIndexOf('</');
+      pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
+    }
+    return pezzo;
+  }
+  // Un carattere solo, senza immagini o a capo in mezzo: il frammento lo può riscrivere com'era.
+  function carattereSemplice(range) {
+    if (range.toString().length !== 1) return false;
+    return !range.cloneContents().querySelector('img, br');
+  }
+  function ultimoTesto(el) {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let ultimo = null;
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.nodeValue.length) ultimo = t;
+    return ultimo;
+  }
+  // Dopo l'incolla il cursore sta in fondo a quello che è entrato: si riporta prima di ciò che c'era dopo.
+  function cursoreIndietro(caratteri) {
+    const sel = window.getSelection();
+    if (!caratteri || !sel || !sel.rangeCount) return;
+    const blocco = bloccoDi(sel.anchorNode);
+    if (!blocco) return;
+    const prima = document.createRange();
+    prima.setStart(blocco, 0);
+    prima.setEnd(sel.anchorNode, sel.anchorOffset);
+    let resta = Math.max(0, prima.toString().length - caratteri);
+    const w = document.createTreeWalker(blocco, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (resta <= t.nodeValue.length) { sel.collapse(t, resta); return; }
+      resta -= t.nodeValue.length;
+    }
+  }
+  function riga(r) { return r ? spaziVisibili(r) : '<br>'; }
+  function incollaLungo(righe) {
+    const sel = window.getSelection();
+    const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const ultima = righe.length - 1;
+    // In una citazione ogni riga resta citazione, come con l'incolla corto.
+    const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
+      const t = i === 0 || tag === 'blockquote' ? tag : 'p';
+      return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
+    }).join('');
+    const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
+    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito. Un elenco o
+    // una citazione appena aperti invece sono dell'utente: lì si incolla dentro (#1697).
+    const primo = r && bloccoDi(r.startContainer);
+    if (r && !/[^\r\n]/.test(docEl.textContent.split(ANCORA).join('')) && !docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
+      const tag = primo ? primo.tagName.toLowerCase() : 'p';
+      docEl.textContent = '';
+      sel.collapse(docEl, 0);
+      document.execCommand('insertHTML', false, paragrafi(tag));
+      return;
+    }
+    // Il cursore posato sul foglio fra due blocchi (un clic nel vuoto) va dentro il blocco accanto.
+    if (r && r.collapsed && r.startContainer === docEl) {
+      const prima = docEl.childNodes[r.startOffset - 1];
+      const accanto = prima || docEl.childNodes[r.startOffset];
+      if (accanto) {
+        r.selectNodeContents(accanto);
+        r.collapse(!prima);
+      }
+    }
+    // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
+    const dentro = (n, giu) => {
+      while (n && n.nodeType === 1 && !BLOCCO.test(n.tagName) && (giu ? n.firstElementChild : n.lastElementChild)) n = giu ? n.firstElementChild : n.lastElementChild;
+      return n;
+    };
+    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
+      const b = dentro(docEl.childNodes[r.startOffset], true);
+      const w = b.nodeType === 1 ? document.createTreeWalker(b, NodeFilter.SHOW_TEXT) : null;
+      let t = w ? w.nextNode() : b;
+      while (t && w && t.parentNode.closest('[contenteditable="false"]')) t = w.nextNode();
+      r.setStart(t || b, 0);
+    }
+    if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
+      const b = dentro(docEl.childNodes[r.endOffset - 1], false);
+      r.setEnd(b, b.nodeType === 3 ? b.length : b.childNodes.length);
+    }
+    const blocco = r && bloccoDi(r.startContainer);
+    const bloccoFine = r && bloccoDi(r.endContainer);
+    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
+
+    // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto.
+    if (blocco.tagName === 'LI' && bloccoFine === blocco) {
+      const prima = document.createRange();
+      prima.setStart(blocco, 0);
+      prima.setEnd(r.startContainer, r.startOffset);
+      const dopo = document.createRange();
+      dopo.setStart(r.endContainer, r.endOffset);
+      dopo.setEnd(blocco, blocco.childNodes.length);
+      const lista = blocco.parentNode.tagName === 'OL' ? 'ol' : 'ul';
+      const voci = righe.map((x, i) => `<li>${i === 0 ? htmlDi(prima) : ''}${(i === 0 && prima.toString()) || (i === ultima && dopo.toString()) ? spaziVisibili(x) : riga(x)}${i === ultima ? htmlDi(dopo) : ''}</li>`).join('');
+      const tutta = document.createRange();
+      tutta.selectNodeContents(blocco);
+      scegli(tutta);
+      document.execCommand('insertHTML', false, `<${lista}>${voci}</${lista}>`);
+      cursoreIndietro(dopo.toString().length);
+      return;
+    }
+    // Un carattere invisibile piantato davanti alla selezione: Chrome non incolla in un blocco vuoto, dove paga al
+    // quadrato, e la selezione può finire in un elenco o in una citazione (#1697). Il modello non lo salva.
+    const conAncora = () => {
+      const z = document.createTextNode(ANCORA);
+      const davanti = r.cloneRange();
+      davanti.collapse(true);
+      davanti.insertNode(z);
+      r.setStart(z, 1);
+      scegli(r);
+      const t0 = blocco.tagName;
+      document.execCommand('insertHTML', false, paragrafi(PARAGRAFO.test(t0) || t0 === 'BLOCKQUOTE' ? t0.toLowerCase() : 'p'));
+    };
+    if (!PARAGRAFO.test(blocco.tagName) || !PARAGRAFO.test(bloccoFine.tagName)) {
+      if (blocco.tagName === 'LI') document.execCommand('insertText', false, righe.join('\n'));
+      else conAncora();
+      return;
+    }
+    const tag = blocco.tagName.toLowerCase();
+    // Testo prima del cursore nel suo blocco: l'ultimo carattere entra in testa alla prima riga.
+    const indietro = r.cloneRange();
+    indietro.setStart(blocco, 0);
+    indietro.setEnd(r.startContainer, r.startOffset);
+    if (indietro.toString().length) {
+      sel.collapse(r.startContainer, r.startOffset);
+      sel.modify('move', 'backward', 'character');
+      const car = document.createRange();
+      car.setStart(sel.anchorNode, sel.anchorOffset);
+      car.setEnd(r.startContainer, r.startOffset);
+      if (carattereSemplice(car) && bloccoDi(car.startContainer) === blocco) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, carattereVestito(car, blocco)));
+        return;
+      }
+      scegli(r);
+    }
+    // Testo dopo il cursore: il primo carattere chiude l'ultima riga, e il cursore torna prima di lui.
+    const avanti = r.cloneRange();
+    avanti.setStart(r.endContainer, r.endOffset);
+    avanti.setEnd(bloccoFine, bloccoFine.childNodes.length);
+    if (avanti.toString().length) {
+      sel.collapse(r.endContainer, r.endOffset);
+      sel.modify('move', 'forward', 'character');
+      const car = document.createRange();
+      car.setStart(r.endContainer, r.endOffset);
+      car.setEnd(sel.anchorNode, sel.anchorOffset);
+      if (carattereSemplice(car) && bloccoDi(car.endContainer) === bloccoFine) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(car.endContainer, car.endOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, '', carattereVestito(car, bloccoFine, car.endContainer)));
+        cursoreIndietro(1);
+        return;
+      }
+      scegli(r);
+    }
+    // Blocco vuoto dopo un paragrafo con testo: si prende in prestito l'ultimo carattere di quello.
+    const sopra = blocco.previousElementSibling;
+    const coda = sopra && sopra.parentNode === blocco.parentNode && PARAGRAFO.test(sopra.tagName) ? ultimoTesto(sopra) : null;
+    if (coda) {
+      const car = document.createRange();
+      car.setStart(coda, coda.nodeValue.length - 1);
+      car.setEnd(sopra, sopra.childNodes.length);
+      if (carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        const suo = sopra.tagName.toLowerCase();
+        document.execCommand('insertHTML', false, `<${suo}>${carattereVestito(car, sopra, coda)}</${suo}>${paragrafi(tag)}`);
+        return;
+      }
+    }
+    // O prima di un paragrafo semplice con testo: il suo primo carattere chiude il frammento, in un paragrafo suo.
+    const sotto = bloccoFine.nextElementSibling;
+    const testa = sotto && sotto.parentNode === bloccoFine.parentNode && sotto.tagName === 'P' && bloccoFine.tagName === 'P'
+      ? document.createTreeWalker(sotto, NodeFilter.SHOW_TEXT).nextNode() : null;
+    if (testa) {
+      const car = document.createRange();
+      car.setStart(sotto, 0);
+      car.setEnd(testa, 1);
+      if (testa.nodeValue.length && carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(testa, 1);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, `${paragrafi(tag)}<p>${carattereVestito(car, sotto, testa)}</p>`);
+        cursoreIndietro(1);
+        sel.modify('move', 'backward', 'character');
+        return;
+      }
+    }
+    conAncora();
+  }
+  // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
+  function spaziVisibili(s) {
+    const esc = s.replace(/\t/g, '    ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/ {2,}/g, (m) => ` ${'&nbsp;'.repeat(m.length - 1)}`).replace(/^ /, '&nbsp;');
+  }
 
   // ── Zoom del foglio ─────────────────────────────────────────────────
   // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
@@ -2442,518 +2451,65 @@
   });
   docWrap.addEventListener('wheel', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
-    // deltaY<0 (pinch-out / scroll su) → ingrandisci. Passo proporzionale al
-    // delta così il pinch del trackpad (incrementi piccoli) resta fluido.
+    // Passo proporzionale al delta, così il pinch del trackpad resta fluido.
     e.preventDefault();
     zoomLevel *= Math.exp(-e.deltaY * 0.0015);
     applyZoom();
   }, { passive: false });
 
-  // ════════════════════════════════════════════════════════════════════
-  //  GRIGLIA & MODULI
-  // ════════════════════════════════════════════════════════════════════
+  // GRIGLIA & MODULI
 
-  function getSwitch() { return doc.modules.find((m) => m.type === 'switch') || null; }
-  function getPages() {
-    const sw = getSwitch();
-    if (sw && Array.isArray(sw.data.pages) && sw.data.pages.length) return sw.data.pages;
-    return [{ z: 0, name: 'Pagina 1', icon: '1' }];
-  }
-  function activePage() {
-    const sw = getSwitch();
-    return sw ? (sw.data.activePage || 0) : 0;
-  }
-  function setActivePage(z) {
-    const sw = getSwitch();
-    if (sw) sw.data.activePage = z;
-    renderGrid();
-    markDirty();
-  }
-
-  function moduleAt(x, y, z) {
-    return doc.modules.find((m) => m.z === z && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) || null;
-  }
-  function fits(rect, z, ignoreId) {
-    if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > GRID_COLS || rect.y + rect.h > GRID_ROWS) return false;
-    for (const m of doc.modules) {
-      if (m.id === ignoreId) continue;
-      // I moduli appuntati (impostazioni, switch) vivono su tutte le pagine:
-      // la loro cella va riservata su qualunque z.
-      if (m.z !== z && !isPinned(m)) continue;
-      const overlap = rect.x < m.x + m.w && rect.x + rect.w > m.x && rect.y < m.y + m.h && rect.y + rect.h > m.y;
-      if (overlap) return false;
-    }
-    return true;
-  }
-  // Verifica che un rettangolo entri su TUTTE le pagine esistenti. Serve per i
-  // moduli appuntati (lo switch): per spostarli o allargarli deve esserci spazio
-  // su ogni pagina, non solo su quella attiva.
-  function fitsAllPages(rect, ignoreId) {
-    for (const p of getPages()) {
-      if (!fits(rect, p.z, ignoreId)) return false;
-    }
-    return true;
-  }
-  // Sceglie il controllo di collisione giusto per il modulo: i moduli appuntati
-  // devono entrare su tutte le pagine, gli altri solo sulla pagina indicata.
-  function fitsFor(m, rect, z) {
-    return isPinned(m) ? fitsAllPages(rect, m.id) : fits(rect, z, m.id);
-  }
-
-  // La griglia CSS ha 7×10 come default nel CSS; quando l'utente cambia la
-  // dimensione applichiamo i template inline così la griglia segue il modello.
-  function applyGridTemplate() {
-    gridEl.style.gridTemplateColumns = `repeat(${GRID_COLS}, 1fr)`;
-    gridEl.style.gridTemplateRows = `repeat(${GRID_ROWS}, 1fr)`;
-  }
-
-  // Cambia la dimensione della griglia (clamp nei limiti). I moduli che
-  // finirebbero fuori dai nuovi confini vengono riportati dentro (clamp di
-  // posizione/dimensione) così non spariscono.
-  function setGridSize(cols, rows) {
-    cols = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, Math.round(cols)));
-    rows = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, Math.round(rows)));
-    if (cols === GRID_COLS && rows === GRID_ROWS) return;
-    GRID_COLS = cols;
-    GRID_ROWS = rows;
-    for (const m of doc.modules) {
-      if (m.w > GRID_COLS) m.w = GRID_COLS;
-      if (m.h > GRID_ROWS) m.h = GRID_ROWS;
-      if (m.x + m.w > GRID_COLS) m.x = Math.max(0, GRID_COLS - m.w);
-      if (m.y + m.h > GRID_ROWS) m.y = Math.max(0, GRID_ROWS - m.h);
-    }
-    if (!doc.meta) doc.meta = {};
-    doc.meta.grid = { cols: GRID_COLS, rows: GRID_ROWS };
-    applyGridTemplate();
-    renderGrid();
-    renderGridControls();
-    markDirty();
-  }
-
-  // Controllo "Dimensione griglia" mostrato nella vista moduli, sopra la palette.
-  function renderGridControls() {
-    const host = $('gridSize');
-    if (!host) return;
-    host.innerHTML = `
-      <div class="ed-gs-title">Dimensione griglia</div>
-      <div class="ed-gs-row">
-        <span class="ed-gs-cap">Colonne</span>
-        <button class="ed-gs-btn" data-gs="cols-" aria-label="Meno colonne">−</button>
-        <span class="ed-gs-val" id="gsCols">${GRID_COLS}</span>
-        <button class="ed-gs-btn" data-gs="cols+" aria-label="Più colonne">+</button>
-        <span class="ed-gs-sep"></span>
-        <span class="ed-gs-cap">Righe</span>
-        <button class="ed-gs-btn" data-gs="rows-" aria-label="Meno righe">−</button>
-        <span class="ed-gs-val" id="gsRows">${GRID_ROWS}</span>
-        <button class="ed-gs-btn" data-gs="rows+" aria-label="Più righe">+</button>
-      </div>`;
-    const on = (sel, fn) => { const b = host.querySelector(sel); if (b) b.addEventListener('click', fn); };
-    on('[data-gs="cols-"]', () => setGridSize(GRID_COLS - 1, GRID_ROWS));
-    on('[data-gs="cols+"]', () => setGridSize(GRID_COLS + 1, GRID_ROWS));
-    on('[data-gs="rows-"]', () => setGridSize(GRID_COLS, GRID_ROWS - 1));
-    on('[data-gs="rows+"]', () => setGridSize(GRID_COLS, GRID_ROWS + 1));
-  }
-
-  // Fuori dai campi di testo Filo usa Ctrl+Z per tornare alla pagina precedente
-  // (src/content/content.js): se un modulo l'ha salvato, qui vince il modulo (#545).
+  // Ctrl+Z dato a un elemento del pannello: fuori dai campi il tasto va a lui, e il preload lo deve sapere.
   function dichiaraCtrlZ() {
     const annulla = TASTI_EDITOR.find((t) => t.suo === 'undo');
-    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut
-      && prendeIlTasto(annulla, TASTI.pressioneScritta(m.data.shortcut) || {}));
+    const preso = elementiConScorciatoia().some(({ c }) => prendeIlTasto(annulla, pressioneDi(c) || {}));
     if (preso) document.documentElement.dataset.filoCtrlZ = 'pagina';
     else delete document.documentElement.dataset.filoCtrlZ;
   }
 
-  function renderGrid() {
-    dichiaraCtrlZ();
-    const z = activePage();
-    applyGridTemplate();
-    gridEl.innerHTML = '';
-
-    const occupied = new Set();
-    // Moduli della pagina corrente + moduli appuntati (impostazioni e switch,
-    // visibili su ogni pagina).
-    const onPage = doc.modules.filter((m) => (m.z === z && !isPinned(m)) || isPinned(m));
-    for (const m of onPage) {
-      const cell = document.createElement('div');
-      cell.className = 'ed-module';
-      cell.dataset.type = m.type;
-      cell.dataset.id = m.id;
-      cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
-      cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
-      renderModuleBody(cell, m);
-      attachModuleDrag(cell, m);
-      if (!isFixed(m)) attachModuleResize(cell, m);
-      cell.addEventListener('click', (e) => {
-        // I moduli fissi gestiscono il click internamente (es. ingranaggio →
-        // toggle modalità modifica); non aprono il pannello di configurazione.
-        if (settingsMode && !isFixed(m)) { e.stopPropagation(); openModuleConfig(m); }
-      });
-      gridEl.appendChild(cell);
-      for (let dy = 0; dy < m.h; dy++) for (let dx = 0; dx < m.w; dx++) occupied.add(`${m.x + dx},${m.y + dy}`);
-    }
-    // celle vuote
-    for (let y = 0; y < GRID_ROWS; y++) {
-      for (let x = 0; x < GRID_COLS; x++) {
-        if (occupied.has(`${x},${y}`)) continue;
-        const empty = document.createElement('div');
-        empty.className = 'ed-cell-empty';
-        empty.style.gridColumn = `${x + 1}`;
-        empty.style.gridRow = `${y + 1}`;
-        empty.innerHTML = ICONS.plus ? ICONS.plus(16) : '+';
-        empty.addEventListener('click', () => openAddModule(x, y, z));
-        attachCellDrop(empty, x, y, z);
-        gridEl.appendChild(empty);
-      }
-    }
+  // Gli strumenti del pannello che stanno disegnati: si riempiono di nuovo quando cambia il testo o il documento.
+  function aggiornaElementi() {
+    if (!pannello) return;
+    const wc = pannello.host('word-count');
+    if (wc && wc._wcFill) wc._wcFill();
+    const cm = pannello.host('comment');
+    if (cm && cm._cmFill) cm._cmFill();
   }
 
-  // ── Drag & drop ──────────────────────────────────────────────────────
-  // Trascinamento moduli: pointer-based (mousedown sull'handle ⠿). Più
-  // affidabile e scopribile del drag&drop nativo HTML5 (che non dava feedback di
-  // cursore e falliva silenziosamente), e mantiene selezionabile il testo dei
-  // moduli chat perché il drag parte SOLO dall'handle. Mentre trascini, il
-  // cursore diventa una "mano che afferra" (classe .ed-dragging in editor.css).
-  function attachModuleDrag(cell, m) {
-    if (isFixed(m)) return; // moduli fissi (es. ingranaggio): non si spostano
-    const handle = cell.querySelector('.ed-mod-drag');
-    if (handle) {
-      // Dall'handle ⠿ il drag parte subito (scorciatoia sempre disponibile).
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        startModuleDrag(cell, m);
-      });
-    }
-
-    // Drag da QUALSIASI punto del modulo "tenendo premuto" (feedback alpha:
-    // afferrare il modulo da ovunque, non solo dalla maniglia). Per non rubare i
-    // click sui controlli né la selezione del testo, il drag si "arma" solo se il
-    // pulsante resta premuto ~220ms restando fermo: un click rapido o un
-    // trascinamento immediato (selezione testo) annullano l'arming.
-    cell.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      // I controlli interattivi e la maniglia/resize gestiscono già il proprio
-      // mousedown: lì un long-press non deve trasformarsi in drag.
-      if (e.target.closest('.ed-mod-drag, .ed-mod-resize, .ed-mod-resize-h, button, input, textarea, select, a, [contenteditable="true"]')) return;
-      const startX = e.clientX, startY = e.clientY;
-      const HOLD_MS = 220, MOVE_TOL = 6;
-      let timer = 0;
-      const cleanup = () => {
-        clearTimeout(timer);
-        document.removeEventListener('mousemove', onPreMove, true);
-        document.removeEventListener('mouseup', onPreUp, true);
-        cell.classList.remove('ed-arming');
-      };
-      const onPreMove = (ev) => {
-        // Movimento prima dell'arming = interazione normale (selezione/scroll):
-        // lascia perdere il drag.
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_TOL) cleanup();
-      };
-      const onPreUp = () => cleanup();
-      timer = setTimeout(() => {
-        cleanup();
-        window.getSelection && window.getSelection().removeAllRanges();
-        startModuleDrag(cell, m);
-      }, HOLD_MS);
-      cell.classList.add('ed-arming');
-      document.addEventListener('mousemove', onPreMove, true);
-      document.addEventListener('mouseup', onPreUp, true);
-    });
-  }
-
-  function startModuleDrag(cell, m) {
-    const z = activePage();
-    cell.classList.add('dragging');
-    document.body.classList.add('ed-dragging');
-    let target = null;     // {x, y} cella valida sotto il puntatore
-    let targetEl = null;   // elemento .ed-cell-empty evidenziato
-    // Anteprima fantasma: un riquadro a opacità ridotta che occupa l'intera
-    // impronta (w×h) del modulo nella posizione dove finirà al rilascio, così
-    // l'utente vede dove atterrerà mentre trascina.
-    let ghost = null;
-    const meta = MODULE_TYPES[m.type] || {};
-    const ghostLabel = meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](20) : escapeHtml(meta.label || ''));
-    const showGhost = (x, y) => {
-      if (!ghost) {
-        ghost = document.createElement('div');
-        ghost.className = 'ed-drag-ghost';
-        ghost.innerHTML = `<span>${ghostLabel}</span>`;
-        gridEl.appendChild(ghost);
-      }
-      ghost.style.gridColumn = `${x + 1} / span ${m.w}`;
-      ghost.style.gridRow = `${y + 1} / span ${m.h}`;
-      ghost.style.display = '';
-    };
-    const hideGhost = () => { if (ghost) ghost.style.display = 'none'; };
-    const removeGhost = () => { if (ghost) { ghost.remove(); ghost = null; } };
-    const clearHighlight = () => {
-      if (targetEl) { targetEl.classList.remove('drop-target'); targetEl = null; }
-    };
-    const onMove = (ev) => {
-      // La cella in drag ha pointer-events:none, così elementFromPoint vede la
-      // cella vuota sottostante.
-      const el = document.elementFromPoint(ev.clientX, ev.clientY);
-      const empty = el && el.closest ? el.closest('.ed-cell-empty') : null;
-      clearHighlight();
-      target = null;
-      if (empty && gridEl.contains(empty)) {
-        const x = parseInt(empty.style.gridColumnStart || empty.style.gridColumn, 10) - 1;
-        const y = parseInt(empty.style.gridRowStart || empty.style.gridRow, 10) - 1;
-        if (Number.isFinite(x) && Number.isFinite(y) && fitsFor(m, { x, y, w: m.w, h: m.h }, z)) {
-          empty.classList.add('drop-target');
-          targetEl = empty;
-          target = { x, y };
-          showGhost(x, y);
-        } else {
-          hideGhost();
-        }
-      } else {
-        hideGhost();
-      }
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove, true);
-      document.removeEventListener('mouseup', onUp, true);
-      document.body.classList.remove('ed-dragging');
-      cell.classList.remove('dragging');
-      clearHighlight();
-      removeGhost();
-      if (target) { m.x = target.x; m.y = target.y; m.z = z; renderGrid(); markDirty(); }
-    };
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('mouseup', onUp, true);
-  }
-  function attachCellDrop(empty, x, y, z) {
-    empty.addEventListener('dragover', (e) => { e.preventDefault(); empty.classList.add('drop-target'); });
-    empty.addEventListener('dragleave', () => empty.classList.remove('drop-target'));
-    empty.addEventListener('drop', (e) => {
-      e.preventDefault();
-      empty.classList.remove('drop-target');
-      let payload;
-      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { return; }
-      if (payload.move) {
-        const m = doc.modules.find((mm) => mm.id === payload.move);
-        if (!m) return;
-        const target = { x, y, w: m.w, h: m.h };
-        if (fitsFor(m, target, z)) { m.x = x; m.y = y; m.z = z; renderGrid(); markDirty(); }
-      } else if (payload.add) {
-        addModule(payload.add, x, y, z);
-      }
-    });
-  }
-
-  function addModule(type, x, y, z) {
-    const meta = MODULE_TYPES[type];
-    // Guardia difensiva: non si aggiunge un modulo fisso né un secondo singleton
-    // (es. un secondo switch), anche se un payload di drag arrivasse comunque qui.
-    if (!meta || !canAddType(type)) return;
-    let w = meta.defaultW, h = meta.defaultH;
-    // riduci se non entra
-    while (w > meta.minW && !fits({ x, y, w, h }, z)) w--;
-    while (h > meta.minH && !fits({ x, y, w, h }, z)) h--;
-    if (!fits({ x, y, w, h }, z)) { flashOverlayMsg('Spazio insufficiente per questo modulo.'); return; }
-    const data = type === 'switch'
-      ? { activePage: 0, pages: [{ z: 0, name: 'Pagina 1', icon: '1' }, { z: 1, name: 'Pagina 2', icon: '2' }] }
-      : (type === 'word-count' ? { count: 'words' } : {});
-    doc.modules.push(mkModule(type, x, y, w, h, z, data));
-    renderGrid();
-    markDirty();
-  }
-
-  function openAddModule(x, y, z) {
-    const items = Object.entries(MODULE_TYPES).filter(([type]) => canAddType(type)).map(([type, meta]) => `
-      <button class="ed-btn" data-add="${type}" style="display:flex;justify-content:flex-start;gap:10px;width:100%;margin-bottom:6px">
-        <span style="color:var(--sn-accent);display:inline-flex">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>
-        <span>${meta.label} <span style="color:var(--sn-muted);font-size:11px">${meta.defaultW}×${meta.defaultH}</span></span>
-      </button>`).join('');
-    openOverlay(`<h3>Aggiungi modulo</h3>${items}`);
-    overlayBox.querySelectorAll('[data-add]').forEach((b) => {
-      b.addEventListener('click', () => { closeOverlay(); addModule(b.dataset.add, x, y, z); });
-    });
-  }
-
-  // ── Render contenuto moduli ───────────────────────────────────────────
-  function renderModuleBody(cell, m) {
-    const handle = document.createElement('span');
-    handle.className = 'ed-mod-drag';
-    handle.textContent = '⠿';
-    cell.appendChild(handle);
-    switch (m.type) {
-      case 'switch': return renderSwitch(cell, m);
-      case 'word-count': return renderWordCount(cell, m);
-      case 'search-replace': return renderSearchReplace(cell, m);
-      case 'comment': return renderCommentModule(cell, m);
-      case 'chat': return renderChat(cell, m);
-      case 'settings': return renderSettingsModule(cell, m);
-      case 'bold':
-      case 'italic':
-      case 'underline':
-      case 'undo':
-      case 'redo': return renderSimpleFormat(cell, m);
-      case 'text-size': return renderTextSize(cell, m);
-      case 'align': return renderAlign(cell, m);
-      case 'font': return renderFont(cell, m);
-    }
-  }
-
-  // ── Modulo: impostazioni (ingranaggio, fisso) ──────────────────────────
-  function renderSettingsModule(cell, _m) {
-    cell.classList.add('ed-settings-mod');
-    cell.title = 'Impostazioni moduli';
-    cell.innerHTML = (ICONS.options ? ICONS.options(18) : '⚙');
-    // Click sull'ingranaggio: apre/chiude la modalità modifica moduli. Va in
-    // capture/stopPropagation così non scatta il click generico della cella.
-    cell.addEventListener('click', (e) => { e.stopPropagation(); toggleSettingsMode(); });
-  }
-
-  // ── Modulo: switch / workspace ─────────────────────────────────────────
-  function renderSwitch(cell, m) {
-    cell.classList.add('ed-switch');
-    const pages = m.data.pages || [];
-    const left = document.createElement('div');
-    left.className = 'ed-switch-arrow' + (pages.length <= (MODULE_TYPES.switch.minW) ? ' disabled' : '');
-    left.textContent = '‹';
-    left.title = 'Rimuovi pagina';
-    left.addEventListener('click', (e) => { e.stopPropagation(); shrinkSwitch(m); });
-
-    const right = document.createElement('div');
-    right.className = 'ed-switch-arrow' + (pages.length >= 4 ? ' disabled' : '');
-    right.textContent = '›';
-    right.title = 'Aggiungi pagina';
-    right.addEventListener('click', (e) => { e.stopPropagation(); growSwitch(m); });
-
-    const icons = document.createElement('div');
-    icons.className = 'ed-switch-icons';
-    pages.forEach((p, idx) => {
-      const ic = document.createElement('div');
-      ic.className = 'ed-switch-icon' + ((m.data.activePage || 0) === p.z ? ' active' : '');
-      ic.title = p.name;
-      ic.innerHTML = switchIconHtml(p.icon, idx);
-      ic.addEventListener('click', (e) => { if (!settingsMode) { e.stopPropagation(); setActivePage(p.z); } });
-      icons.appendChild(ic);
-    });
-    cell.appendChild(left);
-    cell.appendChild(icons);
-    cell.appendChild(right);
-  }
-  function switchIconHtml(icon, idx) {
-    if (icon === 'pen' && ICONS.editor) return ICONS.editor(16);
-    if (icon === 'chat' && ICONS.filoLogo) return ICONS.filoLogo(16);
-    if (icon === 'serif') return '<span style="font-family:Georgia,serif;font-size:15px">A</span>';
-    return escapeHtml(icon || String(idx + 1));
-  }
-  const MAX_PAGES = 4;
-
-  // La larghezza dello switch (in colonne) È il numero di pagine: 2 colonne → 2
-  // pagine, 3 → 3, ecc. Allargare crea pagine, rimpicciolire ne elimina.
-
-  // Una pagina è "vuota" se non contiene moduli oltre a quelli appuntati (lo
-  // switch stesso e l'ingranaggio impostazioni, presenti su ogni pagina).
-  function pageHasModules(z, switchId) {
-    return doc.modules.some((mm) => mm.id !== switchId && !isPinned(mm) && mm.z === z);
-  }
-
-  // Aggiunge UNA pagina allargando lo switch di una colonna. Ritorna true se è
-  // riuscita; se non c'è spazio su tutte le pagine (o si è al massimo) mostra un
-  // toast discreto in basso a destra e ritorna false senza modificare nulla.
-  function growSwitch(m) {
-    const pages = m.data.pages;
-    if (pages.length >= MAX_PAGES) {
-      showEditorToast(`Lo switch può avere al massimo ${MAX_PAGES} pagine.`);
-      return false;
-    }
-    const newW = pages.length + 1;
-    if (m.x + newW > GRID_COLS || !fitsAllPages({ x: m.x, y: m.y, w: newW, h: m.h }, m.id)) {
-      showEditorToast('Spazio insufficiente in tutte le pagine: lo switch non può allargarsi.');
-      return false;
-    }
-    const usedZ = pages.map((p) => p.z);
-    let z = 0; while (usedZ.includes(z)) z++;
-    pages.push({ z, name: `Pagina ${pages.length + 1}`, icon: String(pages.length + 1) });
-    m.w = newW;
-    renderGrid();
-    markDirty();
-    return true;
-  }
-
-  // Rimpicciolire lo switch = eliminare una pagina. Apre un box che avverte e fa
-  // scegliere QUALE pagina eliminare (le pagine con moduli vanno svuotate prima).
-  function shrinkSwitch(m) {
-    if (m.data.pages.length <= MODULE_TYPES.switch.minW) {
-      showEditorToast(`Lo switch deve avere almeno ${MODULE_TYPES.switch.minW} pagine.`);
-      return;
-    }
-    openDeletePageDialog(m);
-  }
-
-  // Elimina la pagina con z = `z` (se vuota) e accorcia lo switch di una colonna.
-  function deletePage(m, z) {
-    const pages = m.data.pages;
-    if (pages.length <= MODULE_TYPES.switch.minW) return false;
-    const idx = pages.findIndex((p) => p.z === z);
-    if (idx < 0) return false;
-    if (pageHasModules(z, m.id)) {
-      showEditorToast('La pagina contiene moduli: spostali o eliminali prima.');
-      return false;
-    }
-    pages.splice(idx, 1);
-    if ((m.data.activePage || 0) === z) m.data.activePage = pages[0].z;
-    m.w = Math.max(MODULE_TYPES.switch.minW, pages.length);
-    renderGrid();
-    markDirty();
-    return true;
-  }
-
-  function openDeletePageDialog(m) {
-    const pages = m.data.pages;
-    const rows = pages.map((p, idx) => {
-      const occupied = pageHasModules(p.z, m.id);
-      const name = escapeHtml(p.name || `Pagina ${idx + 1}`);
-      return `<div class="ed-stat-row">
-        <span>${name}${occupied ? ' <em style="color:var(--sn-muted);font-style:normal">· contiene moduli</em>' : ''}</span>
-        <button class="ed-btn danger" data-del-z="${p.z}"${occupied ? ' disabled title="Svuota la pagina prima"' : ''}>Elimina</button>
-      </div>`;
+  // Impostazioni (l'ingranaggio): uno per strumento, le sue regolazioni e la sua scorciatoia.
+  function openStrumentiConfig() {
+    const ids = (PANNELLI ? PANNELLI.catalogo('editor').elementi.map((e) => e.id) : []).filter((id) => id !== 'settings');
+    const righe = ids.map((id) => {
+      const c = candidatoDi(pannello ? pannello.config(id) : {});
+      const dentro = pannello && pannello.elementi().includes(id);
+      const nota = [c ? nomeMostrato(c) : '', dentro ? '' : 'non nel pannello'].filter(Boolean).join(' · ');
+      return `<button class="ed-btn ed-strumento" data-strumento="${id}">
+        <span class="ed-strumento-icona">${iconaElemento(id, 16)}</span>
+        <span class="ed-strumento-nome">${escapeHtml(nomeElemento(id))}</span>
+        <span class="ed-strumento-nota">${escapeHtml(nota)}</span></button>`;
     }).join('');
-    openOverlay(`<h3>Rimpicciolire lo switch elimina una pagina</h3>
-      <p style="font-size:13px;color:var(--sn-muted);margin:0 0 14px">Quale pagina vuoi eliminare? Le pagine che contengono moduli vanno svuotate prima.</p>
-      ${rows}
-      <div class="ed-overlay-actions"><button class="ed-btn" id="cancelDelPage">Annulla</button></div>`);
-    const cancel = overlayBox.querySelector('#cancelDelPage');
-    if (cancel) cancel.addEventListener('click', closeOverlay);
-    overlayBox.querySelectorAll('button[data-del-z]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const ok = deletePage(m, Number(btn.dataset.delZ));
-        if (ok) closeOverlay();
-      });
-    });
+    openOverlay(`<h3>Strumenti</h3>${righe}
+      <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+    $('ovClose').addEventListener('click', closeOverlay);
+    overlayBox.querySelectorAll('[data-strumento]').forEach((b) => b.addEventListener('click', () => openModuleConfig(b.dataset.strumento)));
+  }
+  // La stessa cornice degli altri strumenti (renderSimpleFormat): un pulsante dentro la sua scheda.
+  function renderSettingsModule(host) {
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ed-fmt-btn ed-fmt-largo ed-strumenti-btn';
+    b.innerHTML = `<span class="ed-fmt-glifo">${ICONS.options ? ICONS.options(16) : '⚙'}</span><span class="ed-fmt-nome">Impostazioni degli strumenti</span>`;
+    b.title = 'Scorciatoie e regolazioni degli strumenti';
+    b.addEventListener('click', (e) => { e.stopPropagation(); openStrumentiConfig(); });
+    pad.appendChild(b);
+    host.appendChild(pad);
   }
 
-  // Porta lo switch a `targetLen` pagine: allarga (crea) o rimpicciolisce
-  // (chiede quale eliminare). Usata dal ridimensionamento a trascinamento.
-  function reconcileSwitchPages(m, targetLen) {
-    const cur = m.data.pages.length;
-    if (targetLen > cur) {
-      while (m.data.pages.length < targetLen) {
-        if (!growSwitch(m)) break; // niente spazio / max raggiunto: toast già mostrato
-      }
-      renderGrid(); // ripristina la larghezza visiva se l'aggiunta è stata rifiutata
-    } else if (targetLen < cur) {
-      renderGrid();            // ripristina la larghezza reale prima di chiedere
-      openDeletePageDialog(m); // l'eliminazione effettiva avviene dopo la scelta
-    } else {
-      renderGrid();
-    }
-  }
 
-  // ── Modulo: conteggio parole ───────────────────────────────────────────
-  // Estrae il testo del documento inserendo un separatore ai confini di blocco.
-  // docEl.textContent concatena i blocchi (p/div/li/h…) SENZA separatore, così
-  // l'ultima parola di un blocco e la prima del successivo si fondono (es.
-  // "Hello world" + "Foo bar" → "Hello worldFoo bar") e parole/caratteri/frasi
-  // risultano sottostimati su più righe. Ricostruiamo il testo a mano — niente
-  // dipendenza dal layout come innerText — aggiungendo "\n" dopo ogni blocco e
-  // per ogni <br>.
+  // docEl.textContent concatena i blocchi SENZA separatore: l'ultima parola di un blocco e la
+  // prima del successivo si fondono e i conteggi calano. Si ricostruisce il testo a mano.
   function docPlainText() {
     const BLOCK = /^(P|DIV|LI|H[1-6]|BLOCKQUOTE|PRE|UL|OL|SECTION|ARTICLE|FIGURE|FIGCAPTION|TABLE|TR|HR)$/;
     let out = '';
@@ -2972,6 +2528,38 @@
     walk(docEl);
     return out;
   }
+  // Quello che chat, titolo e riassunto mandano al modello: intero fino al tetto, oltre col taglio detto (#1475).
+  function docPerIlModello() {
+    return window.SN_EDITOR_SUMMARY.testoAlModello(docPlainText());
+  }
+  // `costruisci(letto)` dà i messaggi; se il modello rifiuta il documento perché non gli sta nella finestra, si
+  // rimanda più corto e `letto` dice il taglio a chi lo mostra.
+  async function chiediSulDocumento(action, costruisci, extra = {}, testo = docPlainText()) {
+    let letto = window.SN_EDITOR_SUMMARY.testoAlModello(testo);
+    let r = null;
+    for (let giro = 0; giro < 4; giro++) {
+      const messages = costruisci(letto);
+      r = await sendMessage({ type: MSG.AI_REQUEST, action, payload: { messages }, ...extra });
+      if (r && r.ok) break;
+      const caratteri = window.SN_FILO_CONTESTO ? window.SN_FILO_CONTESTO.caratteriDi(messages) : 0;
+      const corto = window.SN_EDITOR_SUMMARY.rilettoDopoRifiuto(testo, letto, r, caratteri);
+      if (!corto) break;
+      letto = corto;
+    }
+    return { r, letto };
+  }
+  function notaTaglio(letto, perCosa) {
+    return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
+  }
+  function contestoDelDocumento(memory) {
+    const parts = [];
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
+    return parts;
+  }
+  function bloccoDocumento(letto) {
+    const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
+    return `DOCUMENTO:\n${avviso ? `${avviso}\n` : ''}${letto.testo}`;
+  }
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
     // Una "parola" ha almeno un carattere alfanumerico: i token di sola
@@ -2988,27 +2576,27 @@
     const readingMin = words ? Math.max(1, Math.round(words / 200)) : 0;
     return { words, chars, sentences, paragraphs, readingMin };
   }
-  function renderWordCount(cell, m) {
-    cell.classList.add('ed-wc');
-    const pad = document.createElement('div');
+  // Cosa conta lo scelgono le impostazioni dell'elemento, e si rilegge a ogni giro.
+  function renderWordCount(host) {
+    const pad = document.createElement('button');
+    pad.type = 'button';
     pad.className = 'ed-mod-pad ed-wc';
-    const num = document.createElement('div'); num.className = 'wc-num';
-    const cap = document.createElement('div'); cap.className = 'wc-cap';
+    pad.title = 'Statistiche del documento';
+    const num = document.createElement('span'); num.className = 'wc-num';
+    const cap = document.createElement('span'); cap.className = 'wc-cap';
     pad.appendChild(num); pad.appendChild(cap);
-    cell.appendChild(pad);
-    const metric = m.data.count || 'words';
+    host.appendChild(pad);
     const fill = () => {
+      const scelto = pannello ? pannello.config('word-count').count : '';
+      const metric = PANNELLI && PANNELLI.CONTI.includes(scelto) ? scelto : 'words';
       const s = textStats();
       const v = { words: s.words, chars: s.chars, sentences: s.sentences, paragraphs: s.paragraphs }[metric];
       num.textContent = v;
-      cap.textContent = { words: 'parole', chars: 'caratteri', sentences: 'frasi', paragraphs: 'paragrafi' }[metric];
+      cap.textContent = { words: v === 1 ? 'parola' : 'parole', chars: v === 1 ? 'carattere' : 'caratteri', sentences: v === 1 ? 'frase' : 'frasi', paragraphs: v === 1 ? 'paragrafo' : 'paragrafi' }[metric];
     };
     fill();
-    cell._wcFill = fill;
-    pad.addEventListener('click', (e) => { if (settingsMode) return; e.stopPropagation(); showStatsOverlay(); });
-  }
-  function updateWordCountModules() {
-    gridEl.querySelectorAll('.ed-module[data-type="word-count"]').forEach((c) => { if (c._wcFill) c._wcFill(); });
+    host._wcFill = fill;
+    pad.addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'word-count' }, 'usato'); showStatsOverlay(); });
   }
   function showStatsOverlay() {
     const s = textStats();
@@ -3022,13 +2610,10 @@
     $('ovClose').addEventListener('click', closeOverlay);
   }
 
-  // ── Modulo: cerca e sostituisci ────────────────────────────────────────
+  // Modulo: cerca e sostituisci
   let findState = { hits: [], idx: -1, term: '' };
-  // Quanto la ricerca aspetta, dopo l'ultimo tasto premuto, prima di "andare"
-  // sulla corrispondenza (aprire la sezione chiusa che la nasconde e portarci
-  // la vista). Scrivendo "ornitorinco" lettera per lettera le corrispondenze
-  // intermedie ("o" → ottimo, "or" → orso) sono di passaggio: senza pausa la
-  // ricerca inseguirebbe ognuna di esse aprendo sezioni che non c'entrano.
+  // Quanto la ricerca aspetta prima di andare sulla corrispondenza: scrivendo lettera per
+  // lettera, senza pausa inseguirebbe le corrispondenze intermedie aprendo sezioni a caso.
   const FIND_REVEAL_DELAY_MS = 350;
   let findRevealTimer = null;
   function cancelFindReveal() {
@@ -3036,13 +2621,12 @@
     clearTimeout(findRevealTimer); findRevealTimer = null;
     return true;
   }
-  function renderSearchReplace(cell, m) {
+  function renderSearchReplace(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-sr';
     pad.innerHTML = `
-      <input type="text" placeholder="Cerca" data-sr="find" />
+      <div class="ed-sr-campo"><input type="text" placeholder="Cerca" data-sr="find" /><span class="ed-sr-count" data-sr="count"></span></div>
       <input type="text" placeholder="Sostituisci" data-sr="repl" />
-      <div class="ed-sr-count" data-sr="count"></div>
       <div class="ed-sr-row">
         <button data-sr="prev">‹ Prec</button>
         <button data-sr="next">Succ ›</button>
@@ -3051,13 +2635,18 @@
         <button data-sr="one">Sostituisci</button>
         <button data-sr="all">Tutto</button>
       </div>`;
-    cell.appendChild(pad);
+    host.appendChild(pad);
     const findInput = pad.querySelector('[data-sr="find"]');
     const replInput = pad.querySelector('[data-sr="repl"]');
     const countEl = pad.querySelector('[data-sr="count"]');
-    cell._srFocus = () => findInput.focus();
+    host._srFocus = () => { findInput.focus(); findInput.select(); };
     const updateCount = () => { countEl.textContent = findState.hits.length ? `${findState.idx + 1}/${findState.hits.length}` : (findInput.value ? 'nessun risultato' : ''); };
     const run = () => { runFind(findInput.value); updateCount(); };
+    // Un uso è una ricerca, non ogni tasto né ogni sostituzione: uno per volta che il campo prende il fuoco.
+    let usato = false;
+    const contaUnaVolta = () => { if (!usato) { usato = true; contaModulo({ type: 'search-replace' }, 'usato'); } };
+    findInput.addEventListener('input', contaUnaVolta);
+    findInput.addEventListener('focus', () => { usato = false; });
     findInput.addEventListener('input', run);
     findInput.addEventListener('click', (e) => e.stopPropagation());
     // Invio = "vai lì" (Shift+Invio: indietro), come in qualsiasi campo di
@@ -3069,24 +2658,67 @@
         updateCount();
         return;
       }
-      // Esc = "ho finito di cercare": via le evidenziazioni e via le sezioni
-      // aperte solo per mostrare i risultati, il foglio torna com'era.
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        findInput.value = '';
-        runFind('', { immediate: true });
-        updateCount();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); }
     });
+    // Esc = "ho finito di cercare": via le evidenziazioni e le sezioni aperte solo per i risultati, e si torna a
+    // scrivere nel foglio, dopo la corrispondenza su cui ci si era fermati; il pannello aperto per cercare si chiude.
+    function finitoDiCercare() {
+      const dopo = puntoDopoCorrispondenza();
+      findInput.value = '';
+      runFind('', { immediate: true });
+      updateCount();
+      if (pannello && !pannello.bloccato()) pannello.chiudi();
+      docEl.focus();
+      const r = (dopo && dopo()) || (ultimaSelezioneFoglio && ultimaSelezioneFoglio.startContainer.isConnected ? ultimaSelezioneFoglio : null);
+      if (!r) { focusDocAtEnd(); return; }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    replInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); } });
     replInput.addEventListener('click', (e) => e.stopPropagation());
     pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
     pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
-    // NB: dopo replaceOne NON si rilancia run(): ri-eseguire la ricerca
-    // azzererebbe l'indice alla prima corrispondenza e ri-matcherebbe dentro
-    // il testo appena inserito (feedback #310). replaceOne avanza da sé.
-    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); replaceOne(replInput.value); updateCount(); });
-    pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); replaceAll(findInput.value, replInput.value); run(); });
+    // Dopo replaceOne NON si rilancia run(): una ri-scansione azzererebbe l'indice e ri-matcherebbe
+    // dentro il testo appena inserito (#310). replaceOne avanza da sé.
+    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceOne(replInput.value); updateCount(); });
+    pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceAll(findInput.value, replInput.value); run(); });
   }
+  // La posizione subito dopo la corrispondenza corrente, come offset nel testo del suo blocco: smontati i mark i
+  // nodi cambiano, l'offset no. Restituisce chi la ricalcola dopo lo smontaggio.
+  function puntoDopoCorrispondenza() {
+    const cur = findState.hits[findState.idx];
+    const ultimo = cur && cur.marks[cur.marks.length - 1];
+    if (!ultimo || !ultimo.isConnected) return null;
+    const block = findBlockOf(ultimo.firstChild || ultimo);
+    // Qui i mark contano: è il loro testo che si misura.
+    const testi = () => {
+      const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.parentElement && !n.parentElement.closest('.ed-collapse-toggle') && findBlockOf(n) === block
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+      });
+      const out = [];
+      let n; while ((n = w.nextNode())) out.push(n);
+      return out;
+    };
+    let off = 0;
+    let fine = -1;
+    for (const t of testi()) { off += t.nodeValue.length; if (ultimo.contains(t)) fine = off; }
+    if (fine < 0) return null;
+    return () => {
+      let cum = 0;
+      for (const t of testi()) {
+        if (cum + t.nodeValue.length >= fine) { const r = document.createRange(); r.setStart(t, fine - cum); r.collapse(true); return r; }
+        cum += t.nodeValue.length;
+      }
+      return null;
+    };
+  }
+  let ultimaSelezioneFoglio = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && docEl.contains(sel.anchorNode)) ultimaSelezioneFoglio = sel.getRangeAt(0).cloneRange();
+  });
   function clearFind() {
     // Uno spostamento ancora in attesa punterebbe a evidenziazioni che stiamo
     // per smontare: si annulla qui e lo ripianifica chi rilancia la ricerca.
@@ -3099,12 +2731,8 @@
     });
     findState = { hits: [], idx: -1, term: '' };
   }
-  // Blocco (p/div/h/li/blockquote) più interno che contiene un nodo testo, o
-  // docEl come fallback. La ricerca lavora sul testo CONCATENATO di un blocco,
-  // non nodo per nodo: così trova le parole spezzate da un tag inline
-  // (grassetto/corsivo/sottolineato) — che il browser rappresenta come più nodi
-  // testo ("al" + "fa") — senza però matchare a cavallo di due paragrafi
-  // (feedback #228).
+  // La ricerca lavora sul testo CONCATENATO di un blocco, non nodo per nodo: trova le parole
+  // spezzate da un tag inline senza matchare a cavallo di due paragrafi (#228).
   function findBlockOf(node) {
     let el = node.parentElement;
     while (el && el !== docEl) {
@@ -3113,9 +2741,8 @@
     }
     return docEl;
   }
-  // Nodi testo del blocco `block`, in ordine, escludendo: i toggle di collasso
-  // (UI iniettata), il testo già dentro un mark di ricerca (per non ri-matcharlo)
-  // e il testo appartenente a un blocco annidato (processato a parte).
+  // Esclusi: i toggle di collasso (UI iniettata), il testo già dentro un mark (per non
+  // ri-matcharlo) e quello di un blocco annidato (processato a parte).
   function findTextNodesOfBlock(block) {
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => {
@@ -3130,10 +2757,8 @@
     let n; while ((n = walker.nextNode())) nodes.push(n);
     return nodes;
   }
-  // Avvolge l'intervallo [from,to) del testo concatenato di un blocco (dato come
-  // lista ordinata di nodi testo) in uno o più <mark.ed-find-hit> — uno per nodo
-  // testo intersecato. Una singola occorrenza può quindi vivere in più mark
-  // (parte normale + parte in grassetto): il chiamante li raggruppa in UN hit.
+  // Una singola occorrenza può vivere in più mark (parte normale + parte in grassetto): il
+  // chiamante li raggruppa in UN hit.
   function wrapFindRange(nodes, from, to) {
     const marks = [];
     let cum = 0;
@@ -3159,14 +2784,11 @@
   function runFind(term, opts) {
     clearFind();
     if (!term) {
-      // Campo svuotato: nessuna corrispondenza da mostrare, e le sezioni che la
-      // ricerca aveva aperto in prestito tornano chiuse come le aveva lasciate
-      // l'utente.
+      // Campo svuotato: le sezioni in prestito tornano chiuse come le aveva lasciate l'utente.
       highlightCurrent(opts);
       return;
     }
     findState.term = term;
-    // Elenco (in ordine documento) dei blocchi che contengono testo cercabile.
     const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => n.parentElement && n.parentElement.closest('.ed-collapse-toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });
@@ -3178,9 +2800,8 @@
     }
     const lc = term.toLowerCase();
     for (const block of blocks) {
-      // Cerca sul testo concatenato del blocco; a ogni match lo avvolge (i suoi
-      // nodi escono dall'haystack alla passata dopo, perché già dentro un mark),
-      // così il match successivo si trova e gli offset restano validi.
+      // I nodi già avvolti escono dall'haystack alla passata dopo, così il match successivo si
+      // trova e gli offset restano validi.
       while (true) {
         const nodes = findTextNodesOfBlock(block);
         const text = nodes.map((t) => t.nodeValue).join('');
@@ -3196,13 +2817,8 @@
     // le sezioni aperte per la ricerca di prima.
     highlightCurrent(opts);
   }
-  // Evidenzia la corrispondenza corrente e programma l'"andarci sopra".
-  //
-  // Evidenziazione e contatore sono SEMPRE immediati (l'utente vede subito che
-  // la ricerca risponde). Ciò che aspetta è lo spostamento: aprire la sezione
-  // chiusa che nasconde la corrispondenza e scorrere fin lì. Mentre si scrive
-  // aspetta una pausa (`FIND_REVEAL_DELAY_MS`); quando la navigazione è
-  // esplicita (Prec/Succ, Invio, Sostituisci) avviene subito.
+  // Evidenziazione e contatore sono SEMPRE immediati: si deve vedere subito che la ricerca
+  // risponde. Ad aspettare è solo lo spostamento, e solo mentre si scrive.
   function highlightCurrent(opts) {
     findState.hits.forEach((h, i) => h.marks.forEach((mk) => mk.classList.toggle('current', i === findState.idx)));
     cancelFindReveal();
@@ -3210,18 +2826,14 @@
     const node = cur && cur.marks[0] ? cur.marks[0] : null;
     const go = () => {
       findRevealTimer = null;
-      // Prima si richiudono le sezioni aperte in prestito per le corrispondenze
-      // di prima: resta aperta solo quella dove ci si è davvero fermati. Se il
-      // campo è stato svuotato (nessuna corrispondenza) si richiudono tutte, e
-      // l'impaginazione dell'utente torna com'era.
+      // Prima si richiudono le sezioni in prestito delle corrispondenze di prima: resta aperta solo
+      // quella dove ci si è fermati. Campo svuotato → si richiudono tutte.
       closeBorrowedSectionsExcept(node);
       if (!node) return;
-      // Una corrispondenza dentro una sezione chiusa è invisibile: il contatore
-      // direbbe "1/1" mentre sul foglio non si illumina niente e Prec/Succ non
-      // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
-      // arriva sopra (feedback #385).
+      // Una corrispondenza dentro una sezione chiusa è invisibile: il contatore direbbe «1/1»
+      // mentre sul foglio non si illumina niente (#385).
       revealCollapsedFor(node, { temporary: true });
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      node.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     };
     if (opts && opts.immediate) go();
     else findRevealTimer = setTimeout(go, FIND_REVEAL_DELAY_MS);
@@ -3231,17 +2843,15 @@
     findState.idx = (findState.idx + dir + findState.hits.length) % findState.hits.length;
     highlightCurrent({ immediate: true });
   }
-  // Invio nel campo Cerca = "portami sulla corrispondenza". Se lo spostamento
-  // era ancora in attesa della pausa di scrittura lo esegue subito su quella
-  // corrente; altrimenti passa alla successiva (Shift+Invio: la precedente).
+  // Invio = portami sulla corrispondenza: se lo spostamento era in attesa della pausa lo esegue
+  // subito, altrimenti passa alla successiva (Shift+Invio: la precedente).
   function jumpFind(dir) {
     if (!findState.hits.length) return;
     if (cancelFindReveal() && dir > 0) { highlightCurrent({ immediate: true }); return; }
     stepFind(dir);
   }
-  // Rimpiazza tutti i mark di un hit col testo di sostituzione (nel primo mark;
-  // gli altri — le altre porzioni di una parola formattata — vengono rimossi,
-  // insieme ai wrapper di formattazione rimasti vuoti, es. <strong></strong>).
+  // Gli altri mark — le altre porzioni di una parola formattata — si rimuovono insieme ai wrapper
+  // di formattazione rimasti vuoti.
   function replaceHitMarks(hit, replacement) {
     const marks = hit.marks;
     const first = marks[0];
@@ -3261,17 +2871,12 @@
   function replaceOne(replacement) {
     const cur = findState.hits[findState.idx];
     if (!cur) return;
-    // Niente sostituzioni invisibili: se la corrispondenza è ancora in una
-    // sezione chiusa (lo spostamento poteva essere in attesa della pausa) la si
-    // apre PRIMA di toccare il testo. Questa apertura NON è in prestito: lì il
-    // testo è cambiato, l'utente deve poterlo vedere e restare aperta.
+    // Niente sostituzioni invisibili: la sezione chiusa si apre PRIMA di toccare il testo. E NON
+    // in prestito: lì il testo è cambiato, deve restare aperta.
     cancelFindReveal();
     revealCollapsedFor(cur.marks[0]);
     keepRevealedFor(cur.marks[0]);
-    // Sostituisce SOLO la corrispondenza corrente e avanza alla successiva
-    // senza ri-eseguire la ricerca: una ri-scansione ripartirebbe dalla prima
-    // corrispondenza e ri-troverebbe il termine dentro il testo appena
-    // inserito (es. cerca "cat", sostituisci "cats" → loop sulla stessa parola).
+    // Avanza senza ri-eseguire la ricerca: vedi sopra, il bottone «sostituisci» (#310).
     replaceHitMarks(cur, replacement);
     findState.hits.splice(findState.idx, 1);
     if (!findState.hits.length) {
@@ -3285,31 +2890,41 @@
   function replaceAll(term, replacement) {
     if (!term) return;
     runFind(term, { immediate: true });
-    // Nessuna sostituzione invisibile: prima si riaprono tutte le sezioni chiuse
-    // che contengono una corrispondenza, così l'utente vede cosa è stato
-    // cambiato invece di scoprirlo per caso più tardi (feedback #385). Anche
-    // qui l'apertura resta: dentro quelle sezioni il testo è cambiato.
+    // Prima si riaprono tutte le sezioni con una corrispondenza, così si vede cosa è cambiato
+    // invece di scoprirlo per caso (#385). Anche qui l'apertura resta.
     findState.hits.forEach((hit) => { revealCollapsedFor(hit.marks[0]); keepRevealedFor(hit.marks[0]); });
     findState.hits.forEach((hit) => replaceHitMarks(hit, replacement));
     clearFind();
     onDocInput();
   }
 
-  // ── Modulo: commenta ───────────────────────────────────────────────────
-  function renderCommentModule(cell, m) {
-    cell.classList.add('ed-comment-mod');
+  // Modulo: commenta
+  function renderCommentModule(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-comment-mod';
-    pad.innerHTML = `<div class="cm-count">${doc.comments.filter((c) => !c.resolved).length}</div><div class="wc-cap">commenti</div>`;
-    cell.appendChild(pad);
-    pad.addEventListener('click', (e) => {
-      if (settingsMode) return;
-      e.stopPropagation();
-      if (doc.comments.length) showCommentsList();
-      else startCommenting();
-    });
+    pad.innerHTML = `<button type="button" class="ed-cm-nuovo" title="Seleziona il testo da commentare">${ICONS.share ? ICONS.share(14) : ''}<span>Commenta</span></button>
+      <button type="button" class="ed-cm-elenco" title="Tutti i commenti"><span class="cm-count"></span><span class="wc-cap"></span></button>`;
+    host.appendChild(pad);
+    const fill = () => {
+      const n = doc ? doc.comments.filter((c) => !c.resolved).length : 0;
+      pad.querySelector('.cm-count').textContent = n;
+      pad.querySelector('.wc-cap').textContent = n === 1 ? 'aperto' : 'aperti';
+      pad.querySelector('.ed-cm-elenco').hidden = !(doc && doc.comments.length);
+    };
+    fill();
+    host._cmFill = fill;
+    pad.querySelector('.ed-cm-nuovo').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); startCommenting(); });
+    pad.querySelector('.ed-cm-elenco').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); showCommentsList(); });
   }
+  // Chi ha già selezionato il testo commenta quello: l'invito a selezionare è per chi non l'ha fatto.
   function startCommenting() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && sel.toString().trim() && docEl.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      commenting = false;
+      root.classList.remove('commenting');
+      promptComment(sel);
+      return;
+    }
     commenting = true;
     root.classList.add('commenting');
     flashOverlayMsg('Seleziona il testo da commentare…', 1200);
@@ -3336,11 +2951,8 @@
     // calcola subito l'ancora (il range può invalidarsi mentre l'overlay è aperto)
     const range = sel.getRangeAt(0);
     const offsets = pmOffsets(range);
-    // Il testo dell'ancora vive nello spazio del "testo puro" del documento:
-    // Selection.toString() inserisce interruzioni di riga tra i blocchi, ma il
-    // testo puro (concatenazione dei nodi testo) non ne contiene mai — senza
-    // questa normalizzazione una selezione multi-paragrafo non matcherebbe mai
-    // (commento orfano fin dalla creazione).
+    // Selection.toString() mette interruzioni di riga fra i blocchi, il testo puro no: senza
+    // normalizzare, una selezione multi-paragrafo sarebbe orfana fin dalla creazione.
     const anchorText = offsets
       ? commentDocText().slice(offsets.from, offsets.to)
       : selectedText.replace(/\r?\n/g, '');
@@ -3352,21 +2964,14 @@
       const anchor = { from: offsets ? offsets.from : -1, to: offsets ? offsets.to : -1, text: anchorText };
       const c = { id, text, anchor, created: new Date().toISOString(), resolved: false };
       doc.comments.push(c);
-      // Stesso cammino del re-ancoraggio al reload: evidenzia anche selezioni
-      // multi-blocco (dove surroundContents fallirebbe).
+      // Stesso cammino del re-ancoraggio al reload, multi-blocco compreso (wrapCommentRange).
       highlightComment(c);
       closeOverlay();
       onDocInput();
-      renderGrid();
     });
   }
-  // ── Ancoraggio commenti ────────────────────────────────────────────────
-  // L'ancora di un commento è { from, to, text }: offset sul testo puro del
-  // documento (concatenazione dei nodi testo, esclusi i toggle di collasso che
-  // sono UI iniettata) + il testo selezionato come fallback. Al reload il
-  // documento viene ri-renderizzato da JSON: gli offset restano validi perché
-  // il testo puro è identico; se il testo è cambiato (edit senza ri-salvataggio
-  // dell'ancora) si ripiega sulla ricerca di `text`.
+  // Ancoraggio commenti { from, to, text }: offset sul testo puro più il testo scelto come
+  // fallback. Al reload gli offset reggono; se il testo è cambiato si cerca `text`.
   function commentTextNodes() {
     const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => n.parentElement && n.parentElement.closest('.ed-collapse-toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
@@ -3378,9 +2983,8 @@
   function commentDocText(nodes) {
     return (nodes || commentTextNodes()).map((n) => n.nodeValue).join('');
   }
-  // Offset {from,to} di un Range sul testo puro. Ritorna null se i confini non
-  // cadono in nodi testo del documento (es. selezione anomala): in quel caso
-  // l'ancora vive solo di `text`.
+  // Null se i confini non cadono in nodi testo del documento: in quel caso l'ancora vive solo di
+  // `text`.
   function pmOffsets(range) {
     if (!range) return null;
     let cum = 0, from = -1, to = -1;
@@ -3392,9 +2996,8 @@
     }
     return (from >= 0 && to >= 0 && to > from) ? { from, to } : null;
   }
-  // Avvolge l'intervallo [from,to) del testo puro in span .ed-commented (uno
-  // per nodo testo intersecato: funziona anche su selezioni multi-blocco, dove
-  // surroundContents fallirebbe). Ritorna true se ha evidenziato qualcosa.
+  // Uno span per nodo testo intersecato: funziona anche su selezioni multi-blocco, dove
+  // surroundContents fallirebbe.
   function wrapCommentRange(c, from, to) {
     const nodes = commentTextNodes();
     let cum = 0, wrapped = false;
@@ -3419,17 +3022,12 @@
     }
     return wrapped;
   }
-  // Evidenzia un singolo commento a partire dalla sua ancora. Preferisce gli
-  // offset (se il testo lì sotto coincide ancora), altrimenti cerca il testo.
+  // Preferisce gli offset se il testo lì sotto coincide ancora, altrimenti cerca il testo.
   function highlightComment(c) {
     const a = c.anchor;
     if (!a || !a.text) return false;
-    // Ancore salvate da versioni precedenti possono contenere le interruzioni
-    // di riga della selezione multi-paragrafo: il testo puro del documento non
-    // ne ha mai, quindi si confronta sempre la forma normalizzata. `a.from`
-    // resta valido (pmOffsets lavora già sul testo puro); la lunghezza si
-    // riprende dal testo normalizzato, non da `a.to` (che per le ancore legacy
-    // contava anche i newline).
+    // Un'ancora può contenere le interruzioni di riga di una selezione multi-paragrafo: si
+    // confronta sempre la forma normalizzata, e la lunghezza si riprende da lì, non da `a.to`.
     const aText = String(a.text).replace(/\r?\n/g, '');
     if (!aText) return false;
     const text = commentDocText();
@@ -3456,8 +3054,8 @@
     removeCommentSpans();
     doc.comments.forEach((c) => highlightComment(c));
   }
-  // Prima del salvataggio ri-calcola le ancore dagli span presenti nel DOM: se
-  // l'utente ha editato il testo attorno, gli offset salvati restano allineati.
+  // Ri-calcola le ancore dagli span nel DOM: se l'utente ha editato il testo attorno, gli offset
+  // salvati restano allineati.
   function refreshCommentAnchors() {
     const nodes = commentTextNodes();
     const starts = new Map();
@@ -3496,28 +3094,23 @@
         <button class="ed-btn primary" id="ovClose">Chiudi</button>
       </div>`);
     $('ovClose').addEventListener('click', closeOverlay);
-    // Invariante UX: se dal modulo si crea il PRIMO commento con un click, dalla
-    // lista si deve poter avviare anche il secondo (prima l'unica via era la
-    // scorciatoia, di default non impostata, o svuotare tutti i commenti).
-    // startCommenting() rimpiazza l'overlay con l'invito a selezionare il testo.
+    // Invariante UX: se dal modulo si crea il PRIMO commento con un click, dalla lista si deve
+    // poter avviare anche il secondo.
     $('ovNew').addEventListener('click', startCommenting);
     overlayBox.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => {
       const c = doc.comments.find((x) => x.id === b.dataset.resolve); if (c) c.resolved = !c.resolved;
-      markDirty(); renderGrid(); showCommentsList();
+      markDirty(); aggiornaElementi(); showCommentsList();
     }));
     overlayBox.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
       doc.comments = doc.comments.filter((x) => x.id !== b.dataset.del);
       removeCommentSpans(b.dataset.del); // tutti gli span (multi-blocco compreso)
-      markDirty(); renderGrid();
+      markDirty(); aggiornaElementi();
       if (doc.comments.length) showCommentsList(); else closeOverlay();
     }));
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  //  Formattazione guidata dalla chat (comandi tipo "scrivi in grassetto
-  //  tutti i titoli"). La chat può rispondere con un blocco JSON di "azioni"
-  //  che applichiamo direttamente al documento, oltre alla risposta testuale.
-  // ════════════════════════════════════════════════════════════════════
+  // Formattazione guidata dalla chat: la chat può rispondere con un blocco JSON di «azioni» che
+  // applichiamo al documento, oltre alla risposta testuale.
 
   // Stile inline → tag canonico (per applicare) + tag equivalenti (da togliere).
   const STYLE_TAGS = {
@@ -3542,7 +3135,6 @@
     return map[k] || k;
   }
 
-  // Normalizza il target (stringa o oggetto {contains}).
   function normalizeTarget(t) {
     if (t && typeof t === 'object') {
       const sub = t.contains || t.text || t.match || t.value;
@@ -3559,12 +3151,10 @@
     return k;
   }
 
-  // Elementi-blocco di primo livello del documento.
   function blockEls() {
     return Array.from(docEl.children).filter((n) => n.nodeType === Node.ELEMENT_NODE && n.tagName !== 'BR');
   }
 
-  // Risolve un target in lista di blocchi del documento.
   function resolveTargets(target) {
     const t = normalizeTarget(target);
     const all = blockEls();
@@ -3595,8 +3185,7 @@
     return [blockEl];
   }
 
-  // Avvolge i figli "di contenuto" di host (escluso il toggle di collasso) in un
-  // nuovo elemento creato da makeWrapper(). Ritorna il wrapper (o null se vuoto).
+  // Ritorna il wrapper (o null se vuoto).
   function wrapChildren(host, makeWrapper) {
     const toggle = host.querySelector(':scope > .ed-collapse-toggle');
     const kids = Array.from(host.childNodes).filter((n) => n !== toggle);
@@ -3608,8 +3197,7 @@
     return wrapper;
   }
 
-  // Toglie (scarta) tutti gli elementi con quel tag dentro host, preservandone i
-  // figli. Serve sia per rimuovere uno stile sia per evitare wrapping duplicati.
+  // Serve sia per rimuovere uno stile sia per evitare wrapping duplicati.
   function unwrapTag(host, tagName) {
     host.querySelectorAll(tagName).forEach((el) => {
       const parent = el.parentNode;
@@ -3617,7 +3205,6 @@
       parent.removeChild(el);
     });
   }
-  // Rimuove gli <span>/<font> che portano una certa proprietà di stile inline.
   function unwrapStyledSpans(host, prop) {
     Array.from(host.querySelectorAll('span, font')).forEach((el) => {
       if (el.style && el.style[prop]) {
@@ -3660,7 +3247,6 @@
     return map[k] || v;
   }
 
-  // Applica uno stile inline al contenuto di un host (heading/paragrafo/li).
   function applyInlineStyle(host, style, value) {
     const s = normalizeStyle(style);
     const off = value === false || value === 'false' || value === 'off' || value === 'no' || value === 0;
@@ -3695,12 +3281,11 @@
     return false;
   }
 
-  // Applica una lista di azioni di formattazione al documento. Ritorna il numero
-  // di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
+  // Ritorna il numero di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
   function applyFormatActions(actions) {
     if (!Array.isArray(actions)) return 0;
-    // Cattura lo stato PRIMA di mutare il DOM: se la modifica automatica di Filo
-    // cambia davvero qualcosa, questo diventa il punto di ripristino annullabile.
+    // Cattura lo stato PRIMA di mutare il DOM: se la modifica di Filo cambia davvero qualcosa,
+    // questo diventa il punto di ripristino annullabile.
     const preContent = doc ? serialize() : null;
     let touched = 0;
     for (const a of actions) {
@@ -3732,9 +3317,8 @@
     return touched;
   }
 
-  // Estrae { actions, reply } da una risposta della chat. Cerca un blocco
-  // ```json … ``` o, in mancanza, un oggetto JSON con campo "actions".
-  // Ritorna null se la risposta non contiene azioni (→ va mostrata come testo).
+  // Cerca un blocco ```json … ``` o un oggetto JSON con campo «actions». Null se la risposta non
+  // contiene azioni (→ va mostrata come testo).
   function parseFormatActions(text) {
     if (!text || typeof text !== 'string') return null;
     let jsonStr = null;
@@ -3756,146 +3340,9 @@
     return null;
   }
 
-  // Istruzioni date al modello: come e quando emettere le azioni di formattazione.
-  const CHAT_FORMAT_INSTRUCTIONS = [
-    'Sei un assistente di scrittura dentro un editor di testo. Oltre a rispondere a domande, puoi MODIFICARE la formattazione del documento quando l\'utente lo chiede.',
-    '',
-    'Quando l\'utente chiede di cambiare l\'estetica o la formattazione del testo (grassetto, corsivo, sottolineato, barrato, dimensione, font, allineamento), rispondi SOLO con un oggetto JSON dentro un blocco ```json con questa forma:',
-    '{"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Ho messo in grassetto tutti i titoli."}',
-    '',
-    'Campi:',
-    '- op: "format" (stile inline) oppure "align" (allineamento del blocco)',
-    '- target: "all" (tutto il documento), "headings" (tutti i titoli), "h1"/"h2"/"h3" (un livello di titolo), "paragraphs" (i paragrafi), "selection" (il testo selezionato), oppure {"contains":"testo"} per i blocchi che contengono quel testo',
-    '- style (solo per op "format"): "bold" | "italic" | "underline" | "strike" | "fontSize" | "fontFamily"',
-    '- value: per bold/italic/underline/strike usa true (applica) o false (rimuovi); per fontSize una dimensione CSS come "1.4em" o "20px" (o "large"/"small"); per fontFamily il nome del font ("Georgia","Arial","Times New Roman",...); per op "align" usa "left"|"center"|"right"|"justify"',
-    '- reply: una frase breve in italiano che conferma cosa hai fatto',
-    '',
-    'Puoi includere più operazioni in "actions". Esempio: "scrivi in grassetto tutti i titoli" → {"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Fatto: titoli in grassetto."}',
-    '',
-    'Se invece l\'utente fa una domanda o chiede un\'analisi (non una modifica di formattazione), rispondi normalmente in testo, SENZA JSON.',
-    '',
-    'Documento corrente:',
-    '',
-  ].join('\n');
-
   // Espone i motori di parsing/applicazione per i test (e per debug).
   window.__filoEditorFormat = { parseFormatActions, applyFormatActions, resolveTargets };
 
-  // ── Modulo: chat LLM ───────────────────────────────────────────────────
-  function renderChat(cell, m) {
-    if (!Array.isArray(m.data.messages)) m.data.messages = [];
-    const pad = document.createElement('div');
-    pad.className = 'ed-mod-pad ed-chat';
-    pad.innerHTML = `
-      <div class="ed-chat-log" data-chat="log"></div>
-      <div class="ed-chat-input">
-        <textarea data-chat="input" placeholder="Chiedi al documento…"></textarea>
-        <button data-chat="send">↑</button>
-      </div>`;
-    cell.appendChild(pad);
-    // Perché il turno non è riuscito, in italiano: la regola sta in
-    // SN_CHAT_ERRORS, come per ogni altra chat di Filo (#663).
-    const erroreInChat = (res, ripiego) => {
-      const CE = window.SN_CHAT_ERRORS;
-      if (!CE) return 'Errore: ' + ((res && res.error) || ripiego);
-      return CE.sentence(CE.fromResponse(res, ripiego));
-    };
-    const log = pad.querySelector('[data-chat="log"]');
-    const input = pad.querySelector('[data-chat="input"]');
-    const sendBtn = pad.querySelector('[data-chat="send"]');
-    // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
-    // pagina è aperta: è un fatto di quel momento, non entra nel documento.
-    const noteRipiego = new WeakMap();
-    const renderLog = () => {
-      log.innerHTML = '';
-      for (const msg of m.data.messages) {
-        const b = document.createElement('div');
-        b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
-        b.textContent = msg.content;
-        log.appendChild(b);
-        const nota = noteRipiego.get(msg);
-        if (nota) {
-          const n = document.createElement('div');
-          n.className = 'ed-chat-note';
-          n.textContent = nota;
-          log.appendChild(n);
-        }
-      }
-      log.scrollTop = log.scrollHeight;
-    };
-    renderLog();
-    const send = async () => {
-      const text = input.value.trim();
-      if (!text) return;
-      input.value = '';
-      m.data.messages.push({ role: 'user', content: text });
-      renderLog();
-      // Il documento si fissa alla domanda: la risposta resta sua anche se intanto se ne apre un altro.
-      const conv = conversazioneDelModulo(m);
-      annotaNelFilo(conv, 'user', text);
-      const thinking = { role: 'assistant', content: '…' };
-      m.data.messages.push(thinking);
-      renderLog();
-      const docText = docPlainText().slice(0, 6000);
-      const messages = [
-        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + docText },
-        ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
-      ];
-      try {
-        const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
-        });
-        const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-        if (raw == null) {
-          thinking.content = erroreInChat(r, 'nessuna risposta');
-        } else {
-          if (r.keyFallback && r.keyFallback.line) {
-            noteRipiego.set(thinking, r.keyFallback.line);
-            sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
-          }
-          // Se la risposta contiene azioni di formattazione, applicale al
-          // documento e mostra in chat la conferma; altrimenti è testo normale.
-          const parsed = parseFormatActions(raw);
-          if (parsed && parsed.actions.length) {
-            const n = applyFormatActions(parsed.actions);
-            thinking.content = parsed.reply
-              || (n ? 'Fatto.' : 'Non ho trovato testo a cui applicare la formattazione.');
-            if (!n && !parsed.reply) {
-              thinking.content = 'Non ho trovato testo a cui applicare la formattazione.';
-            }
-          } else {
-            thinking.content = raw;
-          }
-          annotaNelFilo(conv, 'filo', thinking.content);
-        }
-      } catch (e) {
-        thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
-      }
-      renderLog();
-      markDirty();
-    };
-    sendBtn.addEventListener('click', (e) => { e.stopPropagation(); send(); });
-    input.addEventListener('click', (e) => e.stopPropagation());
-    // Il tasto microfono: si parla, e la domanda parte come con l'invio (o resta da correggere).
-    window.SN_VOCE_CHAT?.collega({ campo: input, contenitore: input.parentNode, prima: sendBtn, invia: () => send() });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
-  }
-
-  // La chat di un modulo entra nel filo come riga ripiegata (#974): documento e modulo dicono quale conversazione.
-  function conversazioneDelModulo(m) {
-    if (!doc || !m) return null;
-    return {
-      rif: `${doc.id}:${m.id}`,
-      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
-      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
-    };
-  }
-  function annotaNelFilo(conv, role, text) {
-    if (!conv || !String(text || '').trim()) return;
-    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP, app: 'editor', ...conv, messaggi: [{ role, text }] });
-  }
   // Il documento rinominato (a mano o dal titolo automatico): le righe delle sue chat dicono il nome nuovo.
   function rinominaNelFilo(id, title) {
     if (!id) return;
@@ -3913,86 +3360,65 @@
     });
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  //  IMPOSTAZIONI (modulo 0) & customizzazione
-  // ════════════════════════════════════════════════════════════════════
-  function toggleSettingsMode(on) {
-    settingsMode = on != null ? on : !settingsMode;
-    root.classList.toggle('settings-mode', settingsMode);
-    settingsView.hidden = !settingsMode;
-    docWrap.hidden = settingsMode;
-    if (settingsMode) { renderGridControls(); renderPalette(); }
-  }
-  function renderPalette() {
-    paletteEl.innerHTML = '';
-    for (const [type, meta] of Object.entries(MODULE_TYPES)) {
-      if (!canAddType(type)) continue;
-      const item = document.createElement('div');
-      item.className = 'ed-palette-item';
-      item.setAttribute('draggable', 'true');
-      item.innerHTML = `
-        <div class="pi-title"><span class="pi-ico">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>${meta.label}</div>
-        <div class="pi-desc">${meta.desc}</div>
-        <div class="pi-size">Dimensione ${meta.defaultW}×${meta.defaultH}</div>`;
-      item.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ add: type }));
-        e.dataTransfer.effectAllowed = 'copy';
-      });
-      paletteEl.appendChild(item);
-    }
-  }
-
-  function openModuleConfig(m) {
-    const meta = MODULE_TYPES[m.type];
+  // Le regolazioni di uno strumento del pannello: la sua scorciatoia, e cosa conta il conteggio.
+  function openModuleConfig(id) {
+    if (!pannello || !PANNELLI || !PANNELLI.noto('editor', id)) return;
+    const m = { type: id, id, data: pannello.config(id) };
+    const meta = { label: nomeElemento(id) };
+    const nelPannello = pannello.elementi().includes(id);
     let specific = '';
     if (m.type === 'word-count') {
       const cur = m.data.count || 'words';
       specific = `<div class="ed-field"><label>Conta</label><select id="cfgCount">
         ${['words', 'chars', 'sentences', 'paragraphs'].map((v) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${({ words: 'Parole', chars: 'Caratteri', sentences: 'Frasi', paragraphs: 'Paragrafi' })[v]}</option>`).join('')}
       </select></div>`;
-    } else if (m.type === 'switch') {
-      specific = '<div class="ed-field"><label>Pagine</label>' + (m.data.pages || []).map((p, i) => `
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <input type="text" value="${escapeHtml(p.name)}" data-pname="${i}" />
-          <select data-picon="${i}" style="flex:0 0 90px">
-            ${['1', '2', '3', '4', 'pen', 'chat', 'serif'].map((ic) => `<option value="${ic}" ${p.icon === ic ? 'selected' : ''}>${({ pen: '✎ Penna', chat: '◌ Chat', serif: 'A Serif' })[ic] || ic}</option>`).join('')}
-          </select>
-        </div>`).join('') + '</div>';
     }
-    // Lo switch è un modulo di sistema (appuntato): è l'UNICO modo per navigare
-    // fra le pagine della griglia. Eliminarlo lascerebbe l'utente bloccato sulla
-    // prima pagina, con i moduli delle altre pagine irraggiungibili. Come
-    // l'ingranaggio impostazioni, non offriamo il bottone "Elimina" — per ridurre
-    // le pagine si rimpicciolisce lo switch (che avverte pagina per pagina).
-    const deletable = !isPinned(m);
     const libera = scorciatoiaLibera(m);
     const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
+    const giaSalvata = candidatoDi(m.data);
+    const mostrata = nomeMostrato(giaSalvata);
     openOverlay(`<h3>${meta.label}</h3>
-      <div class="ed-field"${senzaAzione && !m.data.shortcut ? ' hidden' : ''}><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="${libera ? `es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(m.data.shortcut || '')}" />
+      <div class="ed-field"${senzaAzione && !giaSalvata ? ' hidden' : ''}><label for="cfgShortcut">Scorciatoia da tastiera</label>
+        <input type="text" id="cfgShortcut" autocomplete="off" spellcheck="false" placeholder="Premi i tasti${libera ? `, es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(mostrata)}" />
         <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt)${libera ? `, es. ${escapeHtml(libera)}` : ''}, così non ruba una lettera mentre scrivi.</div>
-        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
+        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div>
+        <div class="ed-field-hint ed-field-nota" id="cfgShortcutNota" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
-        ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
+        <button class="ed-btn" id="cfgPannello">${nelPannello ? 'Togli dal pannello' : 'Metti nel pannello'}</button>
         <button class="ed-btn" id="cfgCancel">Annulla</button>
         <button class="ed-btn primary" id="cfgSave">Salva</button>
       </div>`);
     $('cfgCancel').addEventListener('click', closeOverlay);
-    if (deletable) $('cfgDelete').addEventListener('click', () => {
-      // Guardia difensiva: un modulo appuntato non è mai eliminabile.
-      if (isPinned(m)) { closeOverlay(); return; }
-      if (m.type === 'chat') dimenticaNelFilo({ rif: `${doc.id}:${m.id}` });
-      doc.modules = doc.modules.filter((x) => x.id !== m.id);
-      closeOverlay(); renderGrid(); markDirty();
+    $('cfgPannello').addEventListener('click', () => {
+      closeOverlay();
+      if (nelPannello) pannello.togli(id);
+      else pannello.aggiungi(id);
+      contaModulo(m, nelPannello ? 'tolto' : 'aggiunto');
     });
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
     const cfgShortcutTaken = $('cfgShortcutTaken');
-    cfgShortcut.addEventListener('input', () => {
+    const cfgShortcutNota = $('cfgShortcutNota');
+    // L'ultima combinazione premuta nel campo: { mostrata, c }. Riscrivere a mano il campo la lascia.
+    let registrata = null;
+    let primaDellAttesa = null;
+    function pulisci() {
       cfgShortcut.classList.remove('ed-field-invalid');
       cfgShortcutHint.hidden = true;
       cfgShortcutTaken.hidden = true;
+      cfgShortcutNota.hidden = true;
+    }
+    cfgShortcut.addEventListener('input', () => { registrata = null; primaDellAttesa = null; pulisci(); });
+    // Una combinazione premuta (o quella salvata) è un pezzo solo: Backspace e Canc la tolgono tutta.
+    cfgShortcut.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const v = cfgShortcut.value;
+      if (!v || !((registrata && v === registrata.mostrata) || (giaSalvata && v === mostrata))) return;
+      e.preventDefault();
+      cfgShortcut.value = '';
+      registrata = null;
+      pulisci();
     });
     function mostraAvviso(testo) {
       cfgShortcut.classList.add('ed-field-invalid');
@@ -4005,24 +3431,72 @@
       cfgShortcutHint.hidden = false;
     }
     const AVVISO_SENZA_AZIONE = `«${meta.label}» non ha un'azione unica da far partire con un tasto: svuota il campo e salva.`;
+    // Col fuoco nel campo una combinazione con Ctrl, Cmd o Alt si registra invece di fare la sua cosa (#893);
+    // le lettere si scrivono, perché una scorciatoia si può anche scrivere a mano.
+    cfgShortcut.addEventListener('focus', () => avviaAscolto(cfgShortcut, {
+      premuto(e) {
+        const plat = TASTI.piattaforma();
+        const r = TASTI.tastoFisicoDaEvento(e, layoutTastiera, plat);
+        if (!r) return;
+        if (r.attesa) {
+          if (primaDellAttesa == null) primaDellAttesa = cfgShortcut.value;
+          const mac = plat === 'darwin';
+          const tenuti = [(e.ctrlKey || (e.metaKey && mac)) && 'Ctrl', e.metaKey && !mac && 'Win', e.altKey && 'Alt', e.shiftKey && 'Shift', '…'].filter(Boolean);
+          cfgShortcut.value = TASTI.etichettaScritta(tenuti.join('+'), plat);
+          return;
+        }
+        if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+        pulisci();
+        if (r.rifiuto) { mostraRifiuto(r.rifiuto); return; }
+        const c = { nome: r.nome, tasto: r.tasto, car: r.car };
+        registrata = { mostrata: TASTI.etichettaScritta(r.nome, plat), c };
+        cfgShortcut.value = registrata.mostrata;
+        const no = senzaAzione ? null : rifiuto(c, m);
+        if (no) mostraRifiuto(no);
+      },
+      lasciato(e) {
+        if (primaDellAttesa == null || e.ctrlKey || e.metaKey || e.altKey) return;
+        cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+      },
+    }));
+    cfgShortcut.addEventListener('blur', () => {
+      if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+      primaDellAttesa = null;
+      fermaAscolto();
+    });
     // Una scorciatoia salvata prima di questi controlli può essere già morta:
     // lo si dice all'apertura, non solo quando la si riscrive.
-    const giaSalvata = String(m.data.shortcut || '').trim();
     const rifiutoGiaSalvata = rifiuto(giaSalvata, m);
     if (giaSalvata && senzaAzione) mostraAvviso(AVVISO_SENZA_AZIONE);
     else if (rifiutoGiaSalvata) mostraRifiuto(rifiutoGiaSalvata);
+    else if (giaSalvata && !giaSalvata.tasto) {
+      cfgShortcutNota.textContent = `Non so ancora quale tasto è ${mostrata} su questa tastiera: premi la combinazione per fissarla. Intanto parte come prima.`;
+      cfgShortcutNota.hidden = false;
+    }
     $('cfgSave').addEventListener('click', () => {
-      const rawShortcut = cfgShortcut.value.trim();
-      if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
-      const r = rifiuto(rawShortcut, m);
-      if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
-      m.data.shortcut = rawShortcut;
-      if (m.type === 'word-count') m.data.count = $('cfgCount').value;
-      if (m.type === 'switch') {
-        overlayBox.querySelectorAll('[data-pname]').forEach((inp) => { m.data.pages[Number(inp.dataset.pname)].name = inp.value; });
-        overlayBox.querySelectorAll('[data-picon]').forEach((sel) => { m.data.pages[Number(sel.dataset.picon)].icon = sel.value; });
+      const scritta = cfgShortcut.value.trim();
+      if (scritta && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
+      let c = null;
+      if (scritta && registrata && scritta === registrata.mostrata) c = registrata.c;
+      else if (scritta && giaSalvata && scritta === mostrata) c = giaSalvata;
+      else if (scritta) {
+        const v = daScritta(scritta, m);
+        if (v.rifiuto) { mostraRifiuto(v.rifiuto); cfgShortcut.focus(); return; }
+        c = v.c;
       }
-      closeOverlay(); renderGrid(); markDirty();
+      const r = rifiuto(c, m);
+      if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
+      // La configurazione la conserva il main: le scorciatoie di Filo la confrontano subito con le loro (#842).
+      const config = {};
+      if (c) { config.shortcut = c.nome; if (c.tasto) config.tasto = c.tasto; }
+      if (m.type === 'word-count') config.count = $('cfgCount').value;
+      const nuovaScorciatoia = `${m.data.shortcut || ''}|${m.data.tasto || ''}` !== `${config.shortcut || ''}|${config.tasto || ''}`;
+      closeOverlay();
+      pannello.configura(id, config).then(() => { dichiaraCtrlZ(); aggiornaElementi(); });
+      contaModulo(m, 'configurato');
+      if (nuovaScorciatoia) contaModulo(m, c ? 'scorciatoia_si' : 'scorciatoia_no');
     });
     // Invio in un campo conferma come «Salva», come Esc annulla (#545).
     overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
@@ -4033,18 +3507,146 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  // Nome scritto e tasto premuto si leggono SOLO con SN_TASTI: ogni lettura fatta
-  // qui in casa divergeva («Ctrl+Minus», «Ctrl++») e salvava tasti morti (#545).
+  // Nome scritto, tasto premuto e controlli comuni (tasti di Filo e del sistema, nomi sconosciuti, simboli che
+  // cambiano) stanno in SN_TASTI, la stessa regola delle scorciatoie di Filo: qui solo l'Editor e i suoi moduli (#545, #842).
+  // Si salva il tasto fisico (m.data.tasto, #893); m.data.shortcut ne tiene il nome, e da solo è una scorciatoia
+  // salvata come testo prima, che parte come allora.
+
+  // Cosa scrive ogni tasto lo dice il sistema, e cambia se l'utente cambia tastiera: si richiede a ogni campo.
+  let layoutTastiera = null;
+  function leggiLayout() {
+    try {
+      const k = navigator.keyboard;
+      if (!k || typeof k.getLayoutMap !== 'function') return Promise.resolve(layoutTastiera);
+      return Promise.resolve(k.getLayoutMap()).then((mappa) => {
+        const o = {};
+        mappa.forEach((v, c) => { o[c] = v; });
+        layoutTastiera = o;
+        return o;
+      }, () => layoutTastiera);
+    } catch (_) { return Promise.resolve(layoutTastiera); }
+  }
+
+  // Una scorciatoia di modulo: { nome } in forma Windows, `tasto` se è legata al tasto fisico, `car` il carattere
+  // uscito premendola (solo appena premuta: serve ai confronti coi tasti scritti a nome, come «Ctrl+?»).
+  function candidatoDi(data) {
+    const nome = data && typeof data.shortcut === 'string' ? data.shortcut.trim() : '';
+    if (!nome) return null;
+    return TASTI.tastoValido(data.tasto) ? { nome, tasto: data.tasto } : { nome };
+  }
+  function nomeMostrato(c) {
+    if (!c) return '';
+    if (!c.tasto) return c.nome;
+    return TASTI.etichettaScritta((layoutTastiera && TASTI.nomeTastoFisico(c.tasto, layoutTastiera)) || c.nome, TASTI.piattaforma());
+  }
+  function pressioneDi(c) {
+    if (!c) return null;
+    return c.tasto ? TASTI.pressioneFisica(c.tasto, layoutTastiera, TASTI.piattaforma(), c.car) : TASTI.pressioneScritta(c.nome);
+  }
+  function colpisce(c, e) {
+    return !!c && !!e && (c.tasto ? TASTI.combaciaFisico(e, c.tasto) : matchShortcut(e, c.nome));
+  }
+  // Due scorciatoie partono dallo stesso tasto? Quella scritta si prova sulla pressione dell'altra, come farebbe il tasto vero.
+  function stessoTasto(a, b) {
+    if (a.tasto && b.tasto) return a.tasto === b.tasto;
+    const [fisica, altra] = b.tasto ? [b, a] : [a, b];
+    return colpisce(altra, pressioneDi(fisica));
+  }
+  // Scritta a mano: { c } o { rifiuto }. Senza sapere com'è fatta la tastiera, una lettera o un simbolo restano testo.
+  function daScritta(sc, m) {
+    const r = TASTI.tastoFisicoDaScritta(sc, layoutTastiera, TASTI.piattaforma());
+    // Un simbolo da premere che però Filo o l'Editor si prendono comunque («Ctrl+_» è lo zoom): meglio dire quello.
+    if (r && r.rifiuto && m && (r.rifiuto.tipo === 'senzaTastoProprio' || r.rifiuto.tipo === 'simbolo')) {
+      const comeTesto = rifiuto({ nome: String(sc).trim() }, m);
+      if (comeTesto && (comeTesto.tipo === 'presa' || comeTesto.tipo === 'sistema')) return { rifiuto: comeTesto };
+    }
+    if (r && r.rifiuto) return { rifiuto: r.rifiuto };
+    return { c: r ? { nome: r.nome, tasto: r.tasto } : { nome: String(sc).trim() } };
+  }
+
+  // Le scorciatoie salvate come testo si legano al tasto appena si sa com'è fatta la tastiera; quelle che non si
+  // convertono (un simbolo senza un tasto suo) restano testo, e il pannello dello strumento lo dice.
+  function convertiPannello() {
+    if (!pannello || !PANNELLI) return;
+    for (const { id } of PANNELLI.catalogo('editor').elementi) {
+      const d = pannello.config(id);
+      if (typeof d.shortcut !== 'string' || !d.shortcut.trim() || TASTI.tastoValido(d.tasto)) continue;
+      const r = TASTI.tastoFisicoDaScritta(d.shortcut, layoutTastiera, TASTI.piattaforma());
+      if (!r || !r.tasto) continue;
+      pannello.configura(id, { ...d, shortcut: r.nome, tasto: r.tasto });
+    }
+    dichiaraCtrlZ();
+  }
+
+  // I vecchi moduli (#1433) si leggono all'apertura, prima che il primo salvataggio li butti, e passano agli strumenti;
+  // senza risposta dal main restano nei documenti, e la prossima apertura ci riprova.
+  let moduliVecchi = [];
+  const conModuli = (f) => !!(f && Array.isArray(f.modules) && f.modules.length);
+  function ricordaModuli() {
+    moduliVecchi = ((collection && collection.files) || []).filter(conModuli)
+      .map((f) => ({ id: f.id, meta: { modified: f.meta && f.meta.modified }, modules: cloneJson(f.modules) }));
+  }
+  async function migraModuli() {
+    const files = (collection && collection.files) || [];
+    const fonte = { activeId: collection.activeId, files: [...moduliVecchi, ...files.filter((f) => conModuli(f) && !moduliVecchi.some((v) => v.id === f.id))] };
+    if (!fonte.files.length && !files.some((f) => f && f.meta && f.meta.grid)) return;
+    const config = PANNELLI ? PANNELLI.configDaModuli('editor', fonte) : {};
+    const r = await sendMessage({ type: MSG.PANNELLO_APP_MODIFICA, app: 'editor', op: 'migra', config });
+    if (!r || !r.ok) return;
+    moduliVecchi = [];
+    for (const f of files) { if (f) { f.modules = []; if (f.meta) delete f.meta.grid; } }
+    writeCollection();
+  }
+
+  // Gli strumenti con una scorciatoia, dentro o fuori dal pannello: la scorciatoia è dello strumento, come Ctrl+B è del
+  // Grassetto anche fuori dal pannello (#1433). Sentinella: tests/editor-scorciatoie-strumenti.spec.mjs.
+  function elementiConScorciatoia() {
+    if (!pannello || !PANNELLI) return [];
+    const ids = PANNELLI.catalogo('editor').elementi.map((e) => e.id);
+    return ids.filter((id) => AZIONE_SCORCIATOIA[id])
+      .map((id) => ({ id, c: candidatoDi(pannello.config(id)) }))
+      .filter((x) => x.c);
+  }
+
+  // Il campo che sta registrando una combinazione: il main gli lascia anche i tasti che si prende prima della
+  // pagina (patterns/chi-registra-una-combinazione-riceve-anche-i-tasti-che-filo.md), e li rinnova finché ascolta.
+  let ascolto = null;
+  function chiediTasti(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REGISTRA_TASTI, attivo })).catch(() => {}); } catch (_) {}
+  }
+  function avviaAscolto(el, gestori) {
+    if (ascolto && ascolto.el === el) return;
+    fermaAscolto();
+    const html = document.documentElement;
+    ascolto = { el, ...gestori, ctrlZ: html.dataset.filoCtrlZ, rinnovo: setInterval(() => chiediTasti(true), 20000) };
+    // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
+    html.dataset.filoCtrlZ = 'pagina';
+    chiediTasti(true);
+    leggiLayout();
+  }
+  function fermaAscolto() {
+    if (!ascolto) return;
+    const a = ascolto;
+    ascolto = null;
+    clearInterval(a.rinnovo);
+    if (a.ctrlZ === undefined) delete document.documentElement.dataset.filoCtrlZ;
+    else document.documentElement.dataset.filoCtrlZ = a.ctrlZ;
+    chiediTasti(false);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (!ascolto || e.target !== ascolto.el || !(e.ctrlKey || e.metaKey || e.altKey)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.isComposing || e.repeat) return;
+    ascolto.premuto(e);
+  }, true);
+  window.addEventListener('keyup', (e) => { if (ascolto && e.target === ascolto.el) ascolto.lasciato(e); }, true);
+
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const p = TASTI.pressioneScritta(sc);
     return !!p && (p.ctrlKey || p.metaKey || p.altKey);
-  }
-  // Valida: un modificatore reale e un tasto finale, così non coincide con la
-  // digitazione di una lettera.
-  function isValidShortcut(sc) {
-    return shortcutHasRealModifier(sc) && !TASTI.tipoModificatore(TASTI.pressioneScritta(sc).key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
@@ -4060,10 +3662,9 @@
   // `suo`: il modulo per cui quel tasto fa già la sua cosa, e può averlo.
   const TASTI_EDITOR = [
     { tasti: ['s'], cosa: 'salva il documento', fa: () => save(true) },
-    { tasti: ['\\'], cosa: 'mostra e nasconde la barra laterale', fa: toggleSidebar },
-    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace',
-      attivo: () => doc.modules.some((x) => x.type === 'search-replace'),
-      fa: () => triggerModuleShortcut(doc.modules.find((x) => x.type === 'search-replace')) },
+    { tasti: ['\\'], cosa: 'apre e chiude il pannello degli strumenti', fa: () => { if (pannello) pannello.commuta('tasto'); } },
+    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace', attivo: () => !!pannello,
+      fa: () => triggerModuleShortcut('search-replace') },
     // Shift indifferente: su molte tastiere il "+" si fa con Shift. Il tasto lo
     // prende Filo prima di questa pagina (fa: null): qui non va dato a un modulo.
     { cosa: 'zooma il foglio', prende: (e) => !e.altKey && !!ZOOM_TASTI[e.key], fa: null },
@@ -4080,57 +3681,53 @@
     { tasti: ['v'], cosa: 'incolla', delBrowser: true, fa: null },
     { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', delBrowser: true, fa: null },
     { tasti: ['a'], cosa: 'seleziona tutto', delBrowser: true, fa: null },
+    // Cancellare e muoversi per parole, o fino all'inizio e alla fine: un modulo li toglierebbe a chi scrive.
+    { cosa: 'serve a cancellare e a muoversi nel testo', scrittura: true, fa: null },
   ];
+  const TASTI_SCRITTURA = ['Backspace', 'Canc', '←', '→', '↑', '↓', 'Inizio', 'Fine'];
+  // Su Mac per parole si va con Opzione; Cmd vale Ctrl come ovunque.
+  function tastoDiScrittura(e) {
+    const mod = TASTI.suMac() && e.altKey && !e.ctrlKey && !e.metaKey ? 'Alt' : (e.ctrlKey || e.metaKey) ? 'Ctrl' : '';
+    return !!mod && TASTI_SCRITTURA.some((k) => TASTI.combacia(e, `${mod}+${k}`) || TASTI.combacia(e, `${mod}+Shift+${k}`));
+  }
   function prendeIlTasto(t, e) {
+    if (t.scrittura) return tastoDiScrittura(e);
     if (!(e.ctrlKey || e.metaKey)) return false;
     if (t.delBrowser && TASTI.suMac()) return false;
     if (t.prende) return t.prende(e);
     return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
-  function tastoEditorDi(sc) {
-    const e = TASTI.pressioneScritta(sc);
-    return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
-  }
-  // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
-  function motivoScorciatoiaPresa(sc, m) {
-    if (!sc) return '';
-    const nome = TASTI ? TASTI.etichettaScritta(sc) : sc;
-    if (TASTI && TASTI.riservato(sc)) {
-      return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
-    }
-    // Prima dei tasti dell'Editor: la pressione che descrive non è quella vera.
-    const cambia = TASTI.modificatoreCheCambiaSimbolo(sc);
-    if (cambia === 'Shift') return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
-    if (cambia) return `Con ${tasto(cambia)} il simbolo cambia, quindi ${nome} non partirebbe mai`;
-    const t = tastoEditorDi(sc);
-    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
-    const e = TASTI.pressioneScritta(sc);
-    const altro = e && doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
-    if (altro) {
-      const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
-      return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
-    }
+  // Perché una scorciatoia non partirebbe mai su questo modulo per i tasti dell'Editor o di un altro modulo ('' = va bene).
+  // Il tasto si prova con la pressione che fa su questa tastiera: sulla francese Ctrl+6 scrive «-», ed è lo zoom.
+  function motivoScorciatoiaPresa(c, m) {
+    const e = pressioneDi(c);
+    if (!e) return '';
+    const nome = TASTI.etichettaScritta(c.nome, TASTI.piattaforma());
+    const t = TASTI_EDITOR.find((x) => prendeIlTasto(x, e));
+    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo strumento non partirebbe mai`;
+    const altro = elementiConScorciatoia().find((x) => x.id !== m.type && stessoTasto(c, x.c));
+    if (altro) return `${nome} è già la scorciatoia di «${nomeElemento(altro.id)}», e partirebbe solo quello`;
     return '';
   }
-  // Perché una scorciatoia scritta non si salva su questo modulo, o null. La
+  // Perché una scorciatoia (un candidato, vedi `candidatoDi`) non si salva su questo modulo, o null. La
   // stessa regola rifiuta al salvataggio, avvisa all'apertura e sceglie gli
   // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
-  function rifiuto(sc, m) {
-    if (!sc) return null;
-    const ignoto = TASTI.pezzoSconosciuto(sc);
-    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
-    const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
-    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichettaScritta(sc.replace(/[+\s-]+$/, '')) };
-    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
-    if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
-    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
-    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichettaScritta(sc) };
-    const motivo = motivoScorciatoiaPresa(sc, m);
+  function rifiuto(c, m) {
+    if (!c) return null;
+    const plat = TASTI.piattaforma();
+    const comune = c.tasto
+      ? TASTI.rifiutoFisico(c.tasto, layoutTastiera, plat, { car: c.car, nome: TASTI.etichettaScritta(c.nome, plat) })
+      : TASTI.rifiutoScritta(c.nome, plat);
+    if (comune) return comune;
+    const motivo = motivoScorciatoiaPresa(c, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
   function testoRifiuto(r, m) {
     const libera = scorciatoiaLibera(m);
     const perEsempio = libera ? `, per esempio ${libera}` : '';
+    if (r.tipo === 'senzaTastoProprio') return `Su questa tastiera «${r.nome}» non ha un tasto suo: premi la combinazione invece di scriverla.`;
+    if (r.tipo === 'macControl') return `Su Mac le scorciatoie dei moduli si fanno con ${tasto('Ctrl')}, non con Control.`;
+    if (r.tipo === 'win') return `Il tasto ${TASTI.piattaforma() === 'linux' ? 'Super' : 'Windows'} lo usa il sistema: usa Ctrl o Alt.`;
     if (r.tipo === 'modificatore') {
       return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
     }
@@ -4140,34 +3737,46 @@
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
     }
     if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
-    return `${r.motivo}: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'altgr') return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'simbolo') {
+      return r.modificatore === 'Shift'
+        ? `Con Shift il simbolo cambia, quindi ${r.nome} scritta così non partirebbe mai: premi la combinazione invece di scriverla, o scegline un'altra${perEsempio}.`
+        : `Con ${tasto(r.modificatore)} il simbolo cambia, quindi ${r.nome} non partirebbe mai: scegline un'altra${perEsempio}.`;
+    }
+    const motivo = r.cosa ? `${r.nome} è già di Filo (${r.cosa}) e non arriverebbe mai a questo modulo` : r.motivo;
+    return `${motivo}: scegline un'altra${perEsempio}.`;
   }
   // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
   const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
   const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'].map((a) => tasto(a));
   function primaLibera(candidati, m) {
-    return candidati.find((sc) => !rifiuto(sc, m)) || '';
+    return candidati.find((sc) => { const v = daScritta(sc, m); return !!v.c && !rifiuto(v.c, m); }) || '';
   }
   function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
-  // La scorciatoia di un modulo fa quello che fa il suo clic. Un tipo che qui non
+  // La scorciatoia di uno strumento fa quello che fa il suo clic. Uno che qui non
   // c'è ha più azioni (o nessuna): il campo non gli offre una scorciatoia (#545).
   const AZIONE_SCORCIATOIA = {
     'word-count': () => showStatsOverlay(),
-    'search-replace': (cell) => cell && cell._srFocus && cell._srFocus(),
+    'search-replace': (host) => host && host._srFocus && host._srFocus(),
     comment: () => startCommenting(),
-    chat: (cell) => { const t = cell && cell.querySelector('[data-chat="input"]'); if (t) t.focus(); },
     bold: () => SIMPLE_FORMATS.bold.act(),
     italic: () => SIMPLE_FORMATS.italic.act(),
     underline: () => SIMPLE_FORMATS.underline.act(),
     undo: () => SIMPLE_FORMATS.undo.act(),
     redo: () => SIMPLE_FORMATS.redo.act(),
   };
-  function triggerModuleShortcut(m) {
-    const fa = AZIONE_SCORCIATOIA[m.type];
+  function triggerModuleShortcut(id) {
+    const fa = AZIONE_SCORCIATOIA[id];
     if (!fa) return;
-    if ((m.z || 0) !== activePage()) setActivePage(m.z);
-    fa(gridEl.querySelector(`.ed-module[data-id="${m.id}"]`));
+    // La ricerca prende solo il fuoco: l'uso lo conta la ricerca scritta.
+    if (id !== 'search-replace') { contaModulo({ type: id }, 'usato'); fa(pannello ? pannello.host(id) : null); return; }
+    if (!pannello) return;
+    // Cerca e sostituisci vuole il suo campo: il tasto apre il pannello, come farebbe chi ci va col mouse, e se lo
+    // strumento era stato tolto ce lo rimette, perché chi preme il tasto vuole cercare adesso.
+    if (!pannello.aperto()) pannello.apri('tasto');
+    if (pannello.host(id)) { fa(pannello.host(id)); return; }
+    Promise.resolve(pannello.aggiungi(id)).then(() => fa(pannello.host(id)));
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -4177,8 +3786,9 @@
   // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
   // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
   let overlayGen = 0;
-  function openOverlay(html) { staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Un campo tolto col fuoco dentro non sempre manda il blur: l'ascolto dei tasti si chiude qui.
+  function openOverlay(html) { fermaAscolto(); staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { fermaAscolto(); staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   // Allo scadere chiude solo sé stesso: chiudeva qualunque pannello ci fosse, compreso il commento aperto nel frattempo.
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
@@ -4187,19 +3797,8 @@
   }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
-  // Toast discreto in basso a destra per i fallimenti "non bloccanti" (es. uno
-  // switch che non si può allargare per mancanza di spazio). Stile coerente con
-  // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
-  //
-  // Gli avvisi si IMPILANO (uno per evento, ciascuno col suo timer): prima ce
-  // n'era uno solo, riusato, e il nuovo avviso distruggeva il precedente insieme
-  // al suo bottone — quindi un "Annulla" poteva sparire prima che l'utente
-  // riuscisse a premerlo, anche a causa di un avviso che arrivava da solo.
-  // Impilandoli l'azione resta raggiungibile finché non scade il SUO tempo.
-  // Come ogni stack nell'angolo (vedi
-  // patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md)
-  // ha due argini: un tetto al numero di card vive e un tetto
-  // all'altezza col contenitore che scorre.
+  // Gli avvisi si IMPILANO, uno per evento col suo timer: con uno solo riusato il nuovo
+  // distruggeva l'«Annulla» del precedente. Due argini, numero e altezza (PATTERNS.md).
   const ED_TOAST_MAX = 4;
   let edToastHost = null;
   // Col puntatore su un avviso i tempi di tutta la pila aspettano (regola in avvisiTempo.js).
@@ -4218,20 +3817,17 @@
     }
     return edToastHost;
   }
-  // Rimuove le card più vecchie oltre il tetto: teniamo le più recenti, come lo
-  // stack di notifiche della shell. Nessun rischio di perdita dati: l'undo di
-  // un'eliminazione resta comunque nel cestino dei documenti.
+  // Oltre il tetto si tengono le più recenti. Nessun rischio di perdita: l'undo di
+  // un'eliminazione resta comunque nel cestino.
   function enforceEdToastCap() {
     const host = edToastHostEl();
     const live = Array.from(host.children).filter((c) => c.dataset.closing !== '1');
     for (let i = 0; i < live.length - ED_TOAST_MAX; i++) removeEdToast(live[i], true);
   }
-  // Attenzione: va misurato a transizione FINITA. Durante l'entrata la card è
-  // traslata verso il basso di qualche pixel, e in un contenitore scrollabile
-  // una traslazione allarga l'area scrollabile: misurando subito il contenitore
-  // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
-  // per sempre (due soli avvisi mostravano la scrollbar).
+  // Va misurato a transizione FINITA: durante l'entrata la card è traslata, e in un contenitore
+  // scrollabile ciò allarga l'area scrollabile — la barra resterebbe lì per sempre.
   let edToastOverflowTimer = null;
+  const motionMs = (ms) => (window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(ms) : ms);
   function syncEdToastOverflow() {
     clearTimeout(edToastOverflowTimer);
     edToastOverflowTimer = setTimeout(() => {
@@ -4239,7 +3835,7 @@
       const scrollable = host.scrollHeight - host.clientHeight > 2;
       host.classList.toggle('scrolling', scrollable);
       if (scrollable) host.scrollTop = host.scrollHeight;
-    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
+    }, motionMs(260)); // > della transizione di entrata/uscita (0.18s / 0.22s)
   }
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
@@ -4251,9 +3847,9 @@
     el.classList.remove('show');
     const via = () => { try { el.remove(); } catch (_) {} edToastTempi.lascia(el); syncEdToastOverflow(); };
     if (immediate) { via(); return; }
-    setTimeout(via, 220);
+    setTimeout(via, motionMs(220));
   }
-  // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
+  // `action` opzionale = { label, onClick, title?, durata? }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
   function showEditorToast(text, action) {
     const el = document.createElement('div');
@@ -4267,6 +3863,7 @@
       btn.type = 'button';
       btn.className = 'ed-toast-action';
       btn.textContent = action.label;
+      if (action.title) btn.title = action.title;
       btn.addEventListener('click', () => {
         removeEdToast(el);
         try { action.onClick(); } catch (_) {}
@@ -4293,126 +3890,13 @@
     void el.offsetWidth;
     el.classList.add('show');
     syncEdToastOverflow();
-    // Con un'azione lascio più tempo per cliccarla.
-    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(hasAction ? 7000 : 3400), () => removeEdToast(el));
+    // Con un'azione lascio più tempo per cliccarla; col tasto per un'altra pagina ancora di più, come sulle pagine web.
+    const base = hasAction ? Math.max(7000, Number(action.durata) || 0) : 3400;
+    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(base), () => removeEdToast(el));
     return el;
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  //  Resize moduli nella griglia
-  // ════════════════════════════════════════════════════════════════════
-  function attachModuleResize(cell, m) {
-    const meta = MODULE_TYPES[m.type];
-    if (!meta) return;
-    if (m.type === 'switch') {
-      // Ridimensionare lo switch = cambiare il numero di pagine (larghezza in
-      // colonne == numero di pagine). Durante il drag mostriamo solo un'anteprima
-      // della larghezza; al rilascio riconciliamo le pagine (crea/elimina).
-      const handle = document.createElement('div');
-      handle.className = 'ed-mod-resize-h';
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startX = e.clientX;
-        const startLen = m.data.pages.length;
-        const colWidth = gridEl.clientWidth / GRID_COLS;
-        let targetLen = startLen;
-        const onMove = (ev) => {
-          const delta = Math.round((ev.clientX - startX) / colWidth);
-          targetLen = Math.max(meta.minW, Math.min(MAX_PAGES, GRID_COLS - m.x, startLen + delta));
-          cell.style.gridColumn = `${m.x + 1} / span ${targetLen}`;
-        };
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          reconcileSwitchPages(m, targetLen);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      cell.appendChild(handle);
-    } else {
-      const handle = document.createElement('div');
-      handle.className = 'ed-mod-resize';
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const startW = m.w;
-        const startH = m.h;
-        const colWidth = gridEl.clientWidth / GRID_COLS;
-        const rowHeight = gridEl.clientHeight / GRID_ROWS;
-        const onMove = (ev) => {
-          const dw = Math.round((ev.clientX - startX) / colWidth);
-          const dh = Math.round((ev.clientY - startY) / rowHeight);
-          const newW = Math.max(meta.minW, Math.min(GRID_COLS - m.x, startW + dw));
-          const newH = Math.max(meta.minH, Math.min(GRID_ROWS - m.y, startH + dh));
-          if ((newW !== m.w || newH !== m.h) && fits({ x: m.x, y: m.y, w: newW, h: newH }, m.z, m.id)) {
-            m.w = newW;
-            m.h = newH;
-            cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
-            cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
-          }
-        };
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          renderGrid();
-          markDirty();
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      cell.appendChild(handle);
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════
-  //  Splitter text-pane ↔ sidebar
-  // ════════════════════════════════════════════════════════════════════
-  const splitterEl = $('splitter');
-  const sidebarEl = $('sidebar');
-  const textPaneEl = $('textPane');
-  if (splitterEl) {
-    splitterEl.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      splitterEl.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      const onMove = (ev) => {
-        const rootRect = root.getBoundingClientRect();
-        const pct = ((rootRect.right - ev.clientX) / rootRect.width) * 100;
-        const clamped = Math.max(20, Math.min(60, pct));
-        sidebarEl.style.flex = `0 0 ${clamped}%`;
-        sidebarEl.style.maxWidth = `${clamped}%`;
-        textPaneEl.style.flex = `1 1 ${100 - clamped}%`;
-      };
-      const onUp = () => {
-        splitterEl.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
-  // ════════════════════════════════════════════════════════════════════
-  //  Toggle sidebar, scorciatoie globali, bootstrap
-  // ════════════════════════════════════════════════════════════════════
-  function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
-
-  sidebarToggle.addEventListener('click', toggleSidebar);
-
-  // Il suggerimento nomina un tasto, e su Mac quel tasto è Cmd: l'HTML non può
-  // saperlo (è un file solo per tutti i sistemi), quindi lo scriviamo qui.
-  sidebarToggle.title = conTasto('Mostra/nascondi sidebar', 'Ctrl+\\');
-
-  if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
-
+  // Tasti globali, bootstrap
   window.addEventListener('keydown', (e) => {
     // A pannello aperto la tastiera è del pannello: Esc lo chiude, e nessun tasto
     // agisce sul foglio o sui moduli che stanno dietro (#545).
@@ -4430,35 +3914,32 @@
       if (t.suo && !isEditableTarget(e.target)) break;
       return;
     }
-    // scorciatoie personalizzate dei moduli
-    for (const m of doc.modules) {
-      if (AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut && matchShortcut(e, m.data.shortcut)) {
+    for (const { id, c } of elementiConScorciatoia()) {
+      if (colpisce(c, e)) {
         // Difesa per le scorciatoie senza modificatore già salvate (prima della
         // validazione): mentre si scrive nel documento o in un campo di testo NON
         // devono rubare il tasto — lascia digitare normalmente la lettera.
-        if (!shortcutHasRealModifier(m.data.shortcut) && isEditableTarget(e.target)) continue;
-        e.preventDefault(); triggerModuleShortcut(m); return;
+        if (!c.tasto && !shortcutHasRealModifier(c.nome) && isEditableTarget(e.target)) continue;
+        e.preventDefault(); triggerModuleShortcut(id); return;
       }
     }
   });
 
   window.addEventListener('beforeunload', () => {
-    // Ultimo confine "chiusura": prova a fissare un punto di ripristino se
-    // l'utente ha scritto molto e sta chiudendo senza pausa. Best-effort — la
-    // scrittura dello storico è asincrona, quindi su una chiusura brusca può non
-    // fare in tempo; i confini affidabili sono la pausa e il cambio documento.
+    // Ultimo confine: un punto di ripristino se si chiude senza pausa. Best-effort, la scrittura è
+    // asincrona; i confini affidabili sono la pausa e il cambio documento.
     maybeRecordManualVersion();
     if (dirty) save(false);
   });
 
-  // ── Tema ────────────────────────────────────────────────────────────
-  // pageBootstrap applica solo il tema di SISTEMA; come le altre pagine
-  // (dashboard/options/…), l'editor deve rispettare il tema SALVATO, altrimenti
-  // passando dalla dashboard all'editor il tema cambia in modo incoerente.
+  // pageBootstrap applica solo il tema di SISTEMA; come le altre pagine l'editor deve rispettare
+  // il tema SALVATO, o passando dalla dashboard il tema cambierebbe.
   async function applySavedTheme() {
     try {
       const settings = await (window.SN_STORAGE?.getSettings?.());
       if (!settings) return;
+      // I tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente: la vecchia si libera per i moduli, la nuova è presa (#842).
+      TASTI.usaScorciatoieFilo(settings.scorciatoie);
       window.SN_PAGE_THEME = settings.theme || 'system';
       let theme = settings.theme || 'system';
       if (theme === 'system') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -4475,8 +3956,7 @@
     });
   } catch (_) {}
 
-  // Hook di test/integrazione per lo storico versioni (usato dagli spec e da chi
-  // costruirà la UI di storico sopra a questo). Espone la lista e il ripristino.
+  // Hook di test per lo storico versioni: lista e ripristino.
   window.__filoEditorVersions = {
     list: (fileId) => (VERS ? VERS.listFor(versions, fileId || (doc && doc.id)) : []),
     restore: (fileId, versionId) => restoreVersion(fileId, versionId),
@@ -4484,21 +3964,82 @@
     ready: () => versionsReady,
     flush: () => persistVersions(),
     openHistory: () => openVersionHistory(),
-    // Valuta subito uno snapshot manuale (stesso codice della pausa di scrittura
-    // e del cambio documento), senza aspettare il debounce: usato dagli spec.
+    // Valuta subito uno snapshot manuale senza aspettare il debounce: usato dagli spec.
     snapshotManual: () => maybeRecordManualVersion(),
   };
 
-  // Boot
+  // Gli strumenti del pannello di destra: quali ci sono lo sceglie l'utente, come si disegnano lo dice l'Editor.
+  const RENDER = {
+    'word-count': renderWordCount,
+    'search-replace': renderSearchReplace,
+    comment: renderCommentModule,
+    'text-size': renderTextSize,
+    align: renderAlign,
+    font: renderFont,
+    settings: renderSettingsModule,
+    bold: (h) => renderSimpleFormat(h, 'bold'),
+    italic: (h) => renderSimpleFormat(h, 'italic'),
+    underline: (h) => renderSimpleFormat(h, 'underline'),
+    undo: (h) => renderSimpleFormat(h, 'undo'),
+    redo: (h) => renderSimpleFormat(h, 'redo'),
+  };
+  const ELEMENTI = {};
+  for (const id of Object.keys(RENDER)) {
+    ELEMENTI[id] = {
+      disegna: RENDER[id],
+      icona: (n) => iconaElemento(id, n),
+      voci: () => (id === 'settings' ? [] : [{ etichetta: `Impostazioni di «${nomeElemento(id)}»…`, fa: () => openModuleConfig(id) }]),
+    };
+  }
+  pannello = window.SN_PANNELLO_DESTRO ? window.SN_PANNELLO_DESTRO.crea({
+    app: 'editor',
+    elementi: ELEMENTI,
+    scorrimento: () => docWrap,
+    // Il pannello aperto da uno strumento (impostazioni, commento) e la tendina dei font sono suoi: non lo chiudono.
+    appartiene: (t) => !!(t.closest && t.closest('#overlay, .ed-font-pop, .ed-toasts')),
+    riquadroAperto: () => !overlay.hidden,
+    suCambio: () => { aggiornaElementi(); dichiaraCtrlZ(); },
+    mossa: (evento, id) => contaModulo({ type: id }, evento),
+  }) : null;
+
+  // L'Aiuto in questa pagina è la chat del documento (#1433): lo legge intero, e ne cambia la formattazione con le
+  // azioni che la chat dell'Editor sapeva già fare (applyFormatActions, che crea il punto di ripristino).
+  window.SN_AIUTO_APP = Object.freeze({
+    app: 'editor',
+    segnaposto: 'Chiedi al documento…',
+    documento: (prima = null, rifiuto = null, caratteri = 0) => {
+      const S = window.SN_EDITOR_SUMMARY;
+      const testo = docPlainText();
+      const letto = prima ? S.rilettoDopoRifiuto(testo, prima, rifiuto, caratteri) : S.testoAlModello(testo);
+      if (!letto) return null;
+      return { ...letto, id: doc ? doc.id : '', titolo: (doc && doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE, avviso: S.avvisoTaglio(letto), nota: S.notaTaglio(letto) };
+    },
+    // `perId`: il documento letto quando è partita la domanda. Se nel frattempo ne è aperto un altro la modifica non
+    // tocca quello (null): era chiesta per l'altro.
+    applica: (azioni, perId = '') => (perId && (!doc || doc.id !== perId) ? null : applyFormatActions(azioni)),
+    // Per i contatori (#1465): il documento letto intero o no, e quante azioni di formato sono andate a segno.
+    conta: (campi) => contaRiquadro('editor_chat', { ...campi }),
+    conversazione: (rif) => (doc ? {
+      app: 'editor',
+      rif: `${doc.id}:aiuto-${String(rif || '').slice(0, 80)}`,
+      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
+      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
+    } : null),
+  });
+
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
-  loadTrash();                              // documenti eliminati recuperabili
+  loadTrash();
   loadCollection();                         // da localStorage (sincrono)
+  ricordaModuli();
   // ?file=<id>: un documento scelto da fuori (la carta dell'Editor nella home, #870). Può stare solo
   // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
   const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
   activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
-  reloadFromArchive().then(() => {
+  const archivioLetto = reloadFromArchive().then(() => {
     if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
+    else if (doc && STORE.findFile(collection, doc.id)) segnaAperto();
   });
+  // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
+  Promise.all([archivioLetto, leggiLayout()]).then(migraModuli).then(convertiPannello, () => {});
 })();

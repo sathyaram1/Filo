@@ -127,6 +127,7 @@ export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, c
   righe.push(
     '',
     'Cosa fare: apri le corse rosse qui sopra, capisci quali rossi si ripetono e correggili finché un commit di main non torna verde; se un rosso è d\'ambiente del contenitore senza schermo, va in tests/rossi-noti.json (contenitore.specs) col titolo esatto. Ogni suite rossa su main ha già aperto il suo feedback, anche quando il rosso sono gli unit test su Windows: parti da quelli.',
+    'Dalla cloud registro e allegati di una corsa non si scaricano: i suoi rossi stanno nelle annotazioni del lavoro, che si leggono con l\'API (gh api repos/<repo>/actions/runs/<corsa>/jobs, poi gh api repos/<repo>/check-runs/<id del lavoro>/annotations).',
   );
   if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
   return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con la suite verde`, testo: righe.join('\n') };
@@ -152,15 +153,25 @@ export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde
   return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: c'è un commit verde ma la versione non esce`, testo: righe.join('\n') };
 }
 
+/** Il tetto di una risposta di `gh api`: quello di Node (1 MB) le cento corse intere l'hanno superato, ENOBUFS (#1989). */
+const GH_TETTO_BYTE = 64 * 1024 * 1024;
+/** I soli campi di corse e lavori che la scelta e i testi leggono: la risposta non cresce coi campi che GitHub aggiunge. */
+export const CAMPI_CORSA = ['id', 'head_sha', 'conclusion', 'status', 'event', 'head_branch', 'html_url', 'created_at', 'updated_at'];
+export const CAMPI_LAVORO = ['name', 'conclusion'];
+const SOLO_CORSE = `{workflow_runs: [(.workflow_runs // [])[] | {${CAMPI_CORSA.join(', ')}}]}`;
+const SOLO_LAVORI = `{jobs: [(.jobs // [])[] | {${CAMPI_LAVORO.join(', ')}}]}`;
+
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const gitForse = (...a) => { try { return git(...a); } catch { return ''; } };
-const ghApi = (percorso) => JSON.parse(execFileSync('gh', ['api', percorso], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+const ghApi = (percorso, jq = '') => JSON.parse(execFileSync('gh', ['api', percorso, ...(jq ? ['--jq', jq] : [])], {
+  encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: GH_TETTO_BYTE,
+}));
 const eAntenato = (a, b) => { try { git('merge-base', '--is-ancestor', a, b); return true; } catch { return false; } };
 // Le fusioni su main, non i commit dei rami fusi; il commit del numero di versione non è codice.
 const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--first-parent', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
 
 function leggiCorse(repo, filtro) {
-  const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`);
+  const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`, SOLO_CORSE);
   return Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
 }
 
@@ -181,7 +192,7 @@ async function main() {
     if (!passate.has(r?.id)) {
       let ok = false;
       try {
-        ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)?.jobs);
+        ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`, SOLO_LAVORI)?.jobs);
       } catch (e) {
         erroreLavori ||= `lavori della corsa ${r?.id}: ${String(e.stderr || e.message || e).trim().split('\n')[0]}`;
         ok = null;
@@ -261,7 +272,7 @@ async function main() {
   if (fermo === 'dopo-il-verde') {
     let pubblicazioni = [];
     try {
-      const j = ghApi(`repos/${repo}/actions/workflows/release.yml/runs?branch=main&per_page=8`);
+      const j = ghApi(`repos/${repo}/actions/workflows/release.yml/runs?branch=main&per_page=8`, SOLO_CORSE);
       pubblicazioni = Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
     } catch { /* il testo lo dice: nessuna letta */ }
     const { titolo, testo } = testoFermoDopoIlVerde({

@@ -91,3 +91,60 @@ test('la risposta di Filo mostra grassetto e link cliccabili; il link interno re
   try { await page.screenshot({ path: 'tests/.shots/dashboard-chat-markdown.png' }); } catch (_) {}
   await app.evaluate(() => { try { globalThis.__restoreMd?.(); } catch (_) {} });
 });
+
+// #853.2 — il testo di un link fatto di codice usciva «0», il grassetto dentro un link restava con gli asterischi, un
+// URL attaccato a del codice si portava dietro un segnaposto, e una lunga fila di [ bloccava la pagina per secondi.
+test('i link della risposta tengono codice e grassetto, e una fila di quadre aperte non blocca la chat', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  const LINK = [
+    'Vedi [`Array.prototype.map()`](https://developer.mozilla.org/it/docs/Web/JavaScript/Reference/Global_Objects/Array/map).',
+    '',
+    'Fonte: [**Wikipedia**](https://it.wikipedia.org/wiki/Roma)',
+    '',
+    'Pagina: https://example.com/guida`index.html` fine.',
+  ].join('\n');
+  // Col disegno di prima questa fila costava decine di secondi; adesso pochi millisecondi.
+  const QUADRE = `Vedi ${'['.repeat(200_000)} fine della spiegazione`;
+  await app.evaluate(async (_e, { LINK, QUADRE }) => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__restoreMd = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const utente = [...(messages || [])].reverse().find((m) => m && m.role === 'user');
+      const testo = JSON.stringify(utente ? utente.content : '').includes('quadre') ? QUADRE : LINK;
+      const full = JSON.stringify({ text: testo, actions: [] });
+      try { onDelta && onDelta(full); } catch (_) {}
+      return { text: full, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  }, { LINK, QUADRE });
+
+  await page.locator('#input').fill('dammi i link');
+  await page.locator('#sendBtn').click();
+  const bolla = page.locator('.dash-bubble-filo.dash-bubble-md').last();
+  await expect(bolla.locator('a.filo-md-link').first()).toBeVisible({ timeout: 8_000 });
+  const mdn = bolla.locator('a.filo-md-link[href*="developer.mozilla.org"]');
+  await expect(mdn).toHaveText('Array.prototype.map()');
+  await expect(mdn.locator('code')).toHaveText('Array.prototype.map()');
+  const wiki = bolla.locator('a.filo-md-link[href="https://it.wikipedia.org/wiki/Roma"]');
+  await expect(wiki).toHaveText('Wikipedia');
+  await expect(wiki.locator('strong')).toHaveText('Wikipedia');
+  await expect(bolla.locator('a.filo-md-link[href="https://example.com/guida"]')).toHaveText('https://example.com/guida');
+  await expect(bolla.locator('code', { hasText: 'index.html' })).toBeVisible();
+  const segnaposti = await bolla.evaluate((el) => {
+    const re = /[\uE000\uE001]/;
+    return re.test(el.textContent) || [...el.querySelectorAll('a')].some((a) => re.test(a.getAttribute('href') || ''));
+  });
+  expect(segnaposti, 'segnaposti interni finiti nel testo o negli indirizzi').toBe(false);
+  try { await bolla.screenshot({ path: 'tests/.shots/dashboard-chat-link-codice.png' }); } catch (_) {}
+
+  await page.locator('#input').fill('una fila di quadre');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-md').last()).toContainText('fine della spiegazione', { timeout: 10_000 });
+  // La pagina risponde ancora: il campo prende quello che si scrive.
+  await page.locator('#input').fill('ancora qui');
+  await expect(page.locator('#input')).toHaveValue('ancora qui');
+  await app.evaluate(() => { try { globalThis.__restoreMd?.(); } catch (_) {} });
+});

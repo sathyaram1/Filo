@@ -4,6 +4,7 @@
 // spiegazione del modello non arriva.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Pagina di prova</h1>
@@ -16,7 +17,7 @@ test('un link che imita un dominio noto lo dice a parole', async ({ openTab, tes
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#falso').click({ button: 'right' });
 
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
 
   const avviso = menu.locator('.sn-menu-link-warn');
@@ -36,7 +37,7 @@ test('un link che imita un dominio noto lo dice a parole', async ({ openTab, tes
 test('l’avviso c’è prima e a prescindere dalla spiegazione del modello', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#falso').click({ button: 'right' });
-  const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+  const avviso = menuDi(page).locator('.sn-menu .sn-menu-link-warn');
   // Compare da subito: non aspetta il primo pezzo della risposta AI, che in un
   // ambiente senza provider non arriva mai.
   await expect(avviso).toBeVisible({ timeout: 3000 });
@@ -49,10 +50,10 @@ test('l’avviso c’è prima e a prescindere dalla spiegazione del modello', as
 test('un link normale non si prende un avviso', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#pulito').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
   await page.waitForTimeout(800);
-  await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
 
 test('un indirizzo di tutti i giorni non si prende l’avviso', async ({ openTab, testServer }) => {
@@ -61,16 +62,16 @@ test('un indirizzo di tutti i giorni non si prende l’avviso', async ({ openTab
   // rosso sui link di ogni giorno smette di essere letto quando serve.
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#gitlab').click({ button: 'right' });
-  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
   await page.waitForTimeout(800);
-  await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
 
 test('la spiegazione arriva da sola: nel menu non c’è niente da cliccare', async ({ openTab, testServer }) => {
   // Il manifesto prometteva «Spiega link» e «Spiegazione», voci che non
   // esistono: la sezione si riempie da sola all'apertura del menu (#725).
   const page = await testServer.openReady(openTab, HTML);
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
 
   await page.locator('#falso').click({ button: 'right' });
   await expect(menu.locator('.sn-menu-inline[data-subject="link"]')).toBeVisible();
@@ -113,7 +114,7 @@ for (const [forma, scheda] of Object.entries(SCHEDE)) {
   test(`immagine-link sospetta (${forma}): il menu dice dell'imitazione`, async ({ openTab, testServer }) => {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">${scheda}</body></html>`);
     await page.locator('#clic').click({ button: 'right', position: { x: 20, y: 20 } });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu).toBeVisible();
     // È davvero il menu dell'immagine-link: voci del collegamento e sezione dell'immagine.
     await expect(menu.getByText('Apri in nuova tab').first()).toBeVisible();
@@ -134,9 +135,9 @@ test('un’immagine dentro un link normale non si prende l’avviso', async ({ o
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
     <a href="https://esempio-tranquillo.test/articolo"><img id="clic" src="${PX}" width="240" height="140" style="background:#e07b39"></a></body></html>`);
   await page.locator('#clic').click({ button: 'right', position: { x: 20, y: 20 } });
-  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="image"]')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline[data-subject="image"]')).toBeVisible();
   await page.waitForTimeout(800);
-  await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
 
 // #725.2 — le imitazioni più comuni nelle mail di phishing: il nome vero c'è
@@ -154,7 +155,7 @@ for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
       <p><a id="lnk" href="${href}">Verifica il tuo conto</a></p></body></html>`);
     await page.locator('#lnk').click({ button: 'right' });
-    const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+    const avviso = menuDi(page).locator('.sn-menu .sn-menu-link-warn');
     await expect(avviso).toBeVisible({ timeout: 3000 });
     const testo = ((await avviso.textContent()) || '').trim();
     expect(testo).toMatch(atteso);

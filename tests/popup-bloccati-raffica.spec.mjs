@@ -1,5 +1,6 @@
-// #480 — Le pagine che aprono tanti popup insieme: gli avvisi «Bloccato popup da…» restano pochi, dentro l'area
-// della pagina e chiudibili. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
+// #480 — Le pagine che aprono tanti popup insieme: gli avvisi «Bloccato popup da…» a schermo restano pochi, dentro
+// l'area della pagina e chiudibili; quelli oltre il tetto aspettano dietro il «+N» (#1477).
+// Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -45,9 +46,13 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
     await shell.evaluate((u) => window.filoShell.tabs.open(u), raffica(testServer, quando, 12, `Sito ${i}`));
   }
   const vista = await avvisi();
+  const altre = vista.locator('.avvisi-testa [data-pila="apri"]');
   await expect(vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toHaveCount(5, { timeout: 15000 });
+  await expect(altre, 'le cinque oltre il tetto non si perdono').toHaveText('+5 avvisi', { timeout: 15000 });
   await shell.waitForTimeout(1500);
   await expect(vista.locator('.shell-notif'), 'il tetto tiene anche a raffica finita').toHaveCount(5);
+  await expect(altre).toHaveText('+5 avvisi');
+  await expect(shell.locator('.shell-notif'), 'un avviso per scheda').toHaveCount(10);
 
   // La vista sta sotto la barra e dentro la finestra, larga quanto le carte: il resto del lato destro è della pagina.
   await expect.poll(async () => (await posa(app)).b.height).toBeGreaterThan(0);
@@ -57,16 +62,25 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
   expect(p.b.x + p.b.width).toBeLessThanOrEqual(p.W);
   expect(p.b.width).toBeLessThanOrEqual(400);
 
-  // La più recente è in vista con la sua X; ogni altra si raggiunge scorrendo, e la sua X la chiude.
+  // La più recente è in vista con la sua X, e il «+N» si raggiunge scorrendo.
   await expect(vista.locator('.shell-notif').last().locator('.shell-notif-close')).toBeInViewport();
-  for (let resto = 5; resto > 0; resto--) {
-    const x = vista.locator('.shell-notif.show').first().locator('.shell-notif-close');
+  await altre.scrollIntoViewIfNeeded();
+  await expect(altre).toBeInViewport();
+
+  // Tutte e dieci si chiudono con la loro X: chiusa una a schermo, entra una di quelle che aspettavano.
+  for (let resto = 10; resto > 0; resto--) {
+    const nid = await vista.locator('.shell-notif.show').first().getAttribute('data-nid');
+    const x = vista.locator(`.shell-notif[data-nid="${nid}"] .shell-notif-close`);
     await x.scrollIntoViewIfNeeded();
     await expect(x).toBeInViewport();
     await x.click();
     await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(resto - 1, { timeout: 4000 });
     // La chiusura torna alla pila disegnata con un viaggio in più: senza aspettarla si riclicca la carta che sparisce.
-    await expect(vista.locator('.shell-notif.show')).toHaveCount(resto - 1, { timeout: 4000 });
+    await expect(vista.locator(`.shell-notif.show[data-nid="${nid}"]`)).toHaveCount(0, { timeout: 4000 });
+    await expect(vista.locator('.shell-notif.show')).toHaveCount(Math.min(5, resto - 1), { timeout: 4000 });
+    const fuori = resto - 1 - 5;
+    if (fuori > 0) await expect(altre).toHaveText(`+${fuori} ${fuori === 1 ? 'avviso' : 'avvisi'}`);
+    else await expect(vista.locator('.avvisi-testa')).toBeHidden();
   }
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 });

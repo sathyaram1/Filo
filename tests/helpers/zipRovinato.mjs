@@ -1,6 +1,7 @@
 // Rovina una voce di uno zip scritto da buildExportZip, come un gestore di archivi o un disco che perde byte (#1088):
 // `conMetodo` le dà un metodo che Filo non legge (bzip2 = 12, LZMA = 14), `conByteCambiato` le cambia un byte,
-// `conIndiceRotto` rompe la sua riga nell'indice in fondo; `tutteCon` fa lo stesso su ogni voce dell'archivio.
+// `conIndiceRotto` rompe la sua riga nell'indice in fondo; `tutteCon` fa lo stesso su ogni voce dell'archivio;
+// `conRecordFinale` rovina un campo del record che chiude l'archivio (#1256).
 
 function voce(zip, nome) {
   const eocd = zip.length - 22;
@@ -77,5 +78,18 @@ export function tutteCon(zip, come) {
       out.writeUInt16LE(out.readUInt16LE(v.locale + 6) | 1, v.locale + 6);
     }
   }
+  return out;
+}
+
+// `campo`: 'numero' (le voci dichiarate diventano `valore`, di serie 1) | 'firma' | 'dimensione' (dell'indice, più
+// piccola di `valore`, di serie 1) | 'inizio' (dell'indice, spostato di `valore`, di serie 1).
+export function conRecordFinale(zip, campo, valore = 1) {
+  const out = Buffer.from(zip);
+  const fine = out.length - 22;
+  if (campo === 'numero') { out.writeUInt16LE(valore, fine + 8); out.writeUInt16LE(valore, fine + 10); }
+  else if (campo === 'firma') out[fine] ^= 0xff;
+  else if (campo === 'dimensione') out.writeUInt32LE(out.readUInt32LE(fine + 12) - valore, fine + 12);
+  else if (campo === 'inizio') out.writeUInt32LE(out.readUInt32LE(fine + 16) + valore, fine + 16);
+  else throw new Error(`campo sconosciuto: ${campo}`);
   return out;
 }

@@ -17,6 +17,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -67,12 +68,14 @@ test('pagina Sicurezza: controlli personali default ON e persistenti; nessun cam
   await expect(page.locator('#sec-safebrowse-llm')).toBeChecked();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeChecked();
 
-  // La chiave NON è più un campo per-utente: il vecchio input è sparito e al suo
-  // posto c'è la nota che dice che è gestita centralmente in "Modelli predefiniti".
+  // La chiave NON è un campo per-utente: arriva col programma e vale anche senza accesso (#815).
   await expect(page.locator('#sec-safebrowse-key')).toHaveCount(0);
   const note = page.locator('#sec-safebrowse-key-managed');
   await expect(note).toBeVisible();
-  await expect(note).toContainText('Modelli predefiniti');
+  await expect(note).toContainText('anche senza aver fatto l\'accesso');
+  await expect(note).not.toContainText('amministratore');
+  await expect(page.locator('#sec-safebrowse-desc')).toContainText('«confermo»');
+  await expect(page.locator('#sec-safebrowse-desc')).not.toContainText('ignorare');
 
   // I toggle personali restano e si persistono: spegni il giudizio AI, ricarica.
   await page.locator('#sec-safebrowse-llm').uncheck();
@@ -134,57 +137,6 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   expect(active.on).toBe(true);
 });
 
-// L'avviso sta in una vista sopra la scheda (#813.5), non nella pagina: qui la si trova, si guarda cosa copre e si
-// scrive come scrive la tastiera vera, nel webContents che ha il fuoco.
-async function vistaAvviso(app, ms = 8000) {
-  const fine = Date.now() + ms;
-  while (Date.now() < fine) {
-    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avviso-sito.html'); } catch (_) { return false; } });
-    if (p) return p;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('la vista dell\'avviso non è nata');
-}
-
-function copertura(app) {
-  return app.evaluate(({ BrowserWindow, webContents }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (!tm) continue;
-      const tab = tm.tabs.find((t) => t.id === tm.activeId);
-      const v = tm.avvisoSito.vista;
-      const figli = w.contentView.children;
-      const vb = v ? v.getBounds() : null;
-      const tb = tab.view.getBounds();
-      const col = webContents.getFocusedWebContents();
-      let tastiera = 'altro';
-      if (v && col === v.webContents) tastiera = 'avviso';
-      else if (col === tab.view.webContents) tastiera = 'pagina';
-      return {
-        coperta: tm.avvisoSito.coperta() === tab,
-        sopra: !!v && figli.indexOf(v) > figli.indexOf(tab.view),
-        stessiBordi: !!vb && vb.x === tb.x && vb.y === tb.y && vb.width === tb.width && vb.height === tb.height && tb.width > 0,
-        tastiera,
-      };
-    }
-    return null;
-  });
-}
-
-async function scriviDallaTastiera(app, testo) {
-  await app.evaluate(({ webContents }, t) => {
-    const wc = webContents.getFocusedWebContents();
-    if (!wc) throw new Error('nessun webContents ha la tastiera');
-    for (const ch of t) {
-      const tasto = ch === '\r' ? 'Return' : ch;
-      wc.sendInputEvent({ type: 'keyDown', keyCode: tasto });
-      wc.sendInputEvent({ type: 'char', keyCode: ch });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: tasto });
-    }
-  }, testo);
-}
-
-const COPERTA = { coperta: true, sopra: true, stessiBordi: true, tastiera: 'avviso' };
 const SEGNALATO = 'Sito segnalato come pericoloso';
 
 test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, shell }) => {

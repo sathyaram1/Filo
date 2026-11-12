@@ -30,7 +30,12 @@
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
+//   enqueue(payload, { dallOwner, attendiMs }) -> { id, queued:true, tentativo? }  — accoda + prova subito (payload.name =
+//     titolo già scelto); con attendiMs, `tentativo` è la Promise dell'esito del primo tentativo (vedi attendiTentativo).
+//     Con `trattieni` la voce è salvata ma non parte finché non la si rilascia (la rilettura L0, #1403); il segno
+//     non si salva, così la voce che un riavvio trova ancora trattenuta parte. `nuova` dice se la voce è nata adesso.
+//   rilascia(id, { attendiMs }) -> { tentativo? }            — la voce trattenuta parte
+//   ritira(id) -> Promise<boolean>                           — la voce trattenuta esce dalla coda senza partire
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
@@ -119,9 +124,13 @@
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
-    // Recupera i feedback accodati e non ancora inviati (es. app riavviata mentre
-    // era offline) e prova subito a smaltirli.
+    // Un feedback accodato offline riparte al prossimo avvio.
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
+  }
+
+  // I contatori del servizio (#1472): rinunce e attese d'accesso per motivo, mai la voce.
+  function conta(nome, ...a) {
+    try { require('./contatoriServizio').misura(nome, ...a); } catch (_) {}
   }
 
   function scheduleFlush(delay) {
@@ -130,20 +139,77 @@
     if (timer && typeof timer.unref === 'function') timer.unref(); // non tenere vivo il processo
   }
 
+  // Chi ha premuto «Invia» aspetta il primo tentativo della sua voce, così dice «inviato» solo a consegna avvenuta
+  // (#1667). Esito: 'consegnato' | 'in_coda' | 'rinuncia'; allo scadere di `entroMs` è 'in_coda'.
+  const attese = new Map(); // id -> [risolvi]
+  function rispondi(id, esito) {
+    const l = attese.get(id);
+    if (!l || !l.length) return false;
+    attese.delete(id);
+    for (const r of l) r(esito);
+    return true;
+  }
+  function attendiTentativo(id, entroMs) {
+    // Senza giri automatici (le prove) nessun tentativo è in arrivo.
+    if (!auto) return Promise.resolve({ esito: 'in_coda' });
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        const l = (attese.get(id) || []).filter((r) => r !== fine);
+        if (l.length) attese.set(id, l); else attese.delete(id);
+        resolve({ esito: 'in_coda' });
+      }, entroMs);
+      if (typeof t.unref === 'function') t.unref();
+      function fine(esito) { clearTimeout(t); resolve(esito); }
+      attese.set(id, (attese.get(id) || []).concat(fine));
+    });
+  }
+
   async function enqueue(payload, opts) {
     await load();
     const id = (payload && payload.submissionId)
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const dallOwner = !!(opts && opts.dallOwner);
+    // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
+    const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
-    if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
-      if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
+    const nuova = !queue.some((it) => it.id === id);
+    const trattieni = nuova && !!(opts && opts.trattieni);
+    if (nuova) {
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner, trattenuta: trattieni });
+      if (queue.length > MAX_ITEMS) {
+        conta('rinuncia', 'troppe', queue.length - MAX_ITEMS);
+        queue = queue.slice(-MAX_ITEMS);
+      }
       await persist();
     }
+    if (trattieni) return { id, queued: true, nuova, trattenuta: true };
+    return { ...parti(id, opts), id, queued: true, nuova };
+  }
+
+  function parti(id, opts) {
+    const entroMs = Number(opts && opts.attendiMs) || 0;
+    const tentativo = entroMs > 0 ? attendiTentativo(id, entroMs) : null;
+    // Un invio nuovo si prova adesso, non al giro di backoff fissato per una voce vecchia (fino a mezzo minuto).
+    if (timer && !flushing) { clearTimeout(timer); timer = null; }
     scheduleFlush(0);
-    return { id, queued: true };
+    return tentativo ? { tentativo } : {};
+  }
+
+  function rilascia(id, opts) {
+    const it = queue.find((x) => x.id === String(id));
+    if (!it) return {};
+    it.trattenuta = false;
+    return parti(it.id, opts);
+  }
+
+  async function ritira(id) {
+    await load();
+    const trovata = queue.some((it) => it.id === String(id) && it.trattenuta);
+    if (!trovata) return false;
+    remove(String(id));
+    await persist();
+    return true;
   }
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
@@ -169,6 +235,7 @@
 
   // Detto una volta per voce e per motivo; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
   function attendiAccesso(it, motivo, perche) {
+    if (it.attesaContata !== perche) { it.attesaContata = perche; conta('attesaAccesso', perche); }
     it.attesaAccesso = true;
     logFn('voce dell\'owner ferma finché torna il suo accesso:', it.id, motivo);
     if (it.avvisatoAccesso === perche || !onAttesaOwnerFn) return;
@@ -201,6 +268,7 @@
     try {
       await load();
       for (const it of queue.slice()) {
+        if (it.trattenuta) continue;
         // Voce già rinunciata: non si tenta più di spedirla e non scade, si
         // prova solo a dirlo. Detto, esce dalla coda.
         if (it.rinuncia) {
@@ -211,16 +279,16 @@
         // Una voce dell'owner che aspetta il suo accesso non scade: buttarla perderebbe il feedback, che parte appena torna.
         if (!it.attesaAccesso && Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
+          conta('rinuncia', 'scaduta');
           remove(it.id);
           try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
         }
-        if (it.tokenRifiutato) continue;
+        if (it.tokenRifiutato) { rispondi(it.id, { esito: 'in_coda' }); continue; }
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
-          // Titolo breve generato al momento dell'invio (offline ripiega sul
-          // fallback), calcolato UNA volta e riusato dai ritentativi.
+          // Titolo calcolato UNA volta all'invio e riusato dai ritentativi (offline: ripiego).
           if (!it.prepared) {
             let name = '';
             if (prepareFn) {
@@ -236,15 +304,17 @@
             try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (e) {
               it.attempts = (it.attempts || 0) + 1;
               anyFail = true;
+              rispondi(it.id, { esito: 'in_coda' });
               logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
               continue;
             }
-            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); rispondi(it.id, { esito: 'in_coda' }); anyFail = true; continue; }
           }
           // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
           const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
+          rispondi(it.id, { esito: 'consegnato', id: result && result.id });
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
@@ -252,11 +322,16 @@
           // Riprovare non cambia niente finché quella copia di Filo resta com'è,
           // e intanto chi ha mandato la segnalazione ha già letto «inviato»:
           // restava in coda un giorno intero e poi spariva senza una parola.
-          // Qui si smette subito e glielo si dice.
-          if (fb.isEncryptionError && fb.isEncryptionError(e)) {
-            logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
+          // Qui si smette subito e glielo si dice. Lo stesso per un feedback rimasto vuoto per sempre (#1667).
+          const vuotoPerSempre = !!(e && e.vuoto && e.permanente);
+          if ((fb.isEncryptionError && fb.isEncryptionError(e)) || vuotoPerSempre) {
+            logFn('rinuncio, non partirà mai:', it.id, e?.message || e);
+            if (!vuotoPerSempre) conta('rinuncia', 'cifratura');
             it.rinuncia = true;
             it.motivoRinuncia = e?.message || String(e);
+            // Chi aspetta il primo tentativo (il riquadro) lo dice lui e lo annuncia se nessuno lo legge più: un
+            // secondo avviso nella cornice ripeterebbe la stessa frase (#1681).
+            if (rispondi(it.id, { esito: 'rinuncia', motivo: it.motivoRinuncia })) { remove(it.id); continue; }
             if (annunciaRinuncia(it)) remove(it.id);
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
@@ -264,11 +339,13 @@
           if (it.dallOwner && e && e.accessoOwner) {
             it.tokenRifiutato = true;
             attendiAccesso(it, e.message || 'token rifiutato', 'rifiutato');
+            rispondi(it.id, { esito: 'in_coda' });
             continue;
           }
           it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
+          rispondi(it.id, { esito: 'in_coda' });
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
         }
       }
@@ -291,16 +368,24 @@
   global.SN_FEEDBACK_OUTBOX = {
     init,
     enqueue,
+    rilascia,
+    ritira,
     flush,
     accessoCambiato,
     size: () => queue.length,
-    // ---- helper per i test (logica pura, nessun effetto in produzione) ----
+    // Per i contatori (#1472): quante voci aspettano e da quanto la più vecchia, solo numeri.
+    stato: () => {
+      const t = queue.map((it) => Number(it.queuedAt)).filter((x) => Number.isFinite(x));
+      return { voci: queue.length, piuVecchiaMs: t.length ? Math.max(0, Date.now() - Math.min(...t)) : null };
+    },
+    // helper per i test (logica pura, nessun effetto in produzione)
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; ancora = false; auto = true;
       prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
+      for (const id of [...attese.keys()]) rispondi(id, { esito: 'in_coda' });
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

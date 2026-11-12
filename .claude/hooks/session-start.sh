@@ -11,6 +11,10 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# Per le worktree che la sessione crea a mano: stessa regola e stesso valore di scripts/lib/carattere-commento.mjs.
+CC=$(git config --get-regexp '^core\.comment(char|string)$' 2>/dev/null | tail -n 1 | cut -s -d' ' -f2-)
+if [ -z "$CC" ] || [ "$CC" = "#" ]; then git config --local --replace-all core.commentChar ';' >/dev/null 2>&1 || true; fi
+
 echo "## Stato git (auto)"
 echo ""
 echo "### Worktree attivi"

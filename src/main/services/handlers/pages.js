@@ -15,15 +15,34 @@ module.exports = function register(on, ctx) {
   // A un sito torna solo ciò che il content script usa: la voce con lo stesso indirizzo può essere già salvata da un altro sito.
   const voceVerso = (entry, origin) => (!entry || isFilo(origin) ? entry : { id: entry.id, category: entry.category || null });
 
+  const schedaDi = (sender) => sender?.win?._filoTabs?.tabs?.find((t) => t.id === sender?.tab?.id) || null;
+  const origineDi = (u) => { try { return new URL(String(u || '')).origin; } catch (_) { return ''; } };
+  // La pagina da cui si salva conta quanto quella salvata (#1823): un link di una mail porta con sé quello che la mail
+  // ha mostrato. Dal mittente, mai dal messaggio.
+  const conProvenienza = (pagina, sender) => ({ ...(pagina || {}), da: String(sender?.tab?.url || sender?.url || '') });
+
+  // L'icona è quella che la scheda ha già scaricato con la sua sessione (#1273): l'indirizzo che manda la pagina non si segue.
+  // Senza mittente chiama il main stesso (la scorciatoia), che icona e proxy della scheda li passa già.
+  // Da una scheda col proxy la voce lo ricorda: un'icona mancante non si chiederà fuori dal proxy.
   on(MSG.SAVE_PAGE, async (msg, sender, origin) => {
-    const entry = await SavedPages.save(msg.page);
-    maybeCategorizeAsync(entry, msg.page).catch((e) => console.warn('[Filo] categorize failed', e));
+    const page = { ...(msg.page || {}) };
+    let proxy = msg.proxy || null;
+    if (sender) {
+      const tab = schedaDi(sender);
+      page.favicon = tab && tab.favicon && tab._origineIcona === origineDi(page.url) ? tab.favicon : '';
+      proxy = tab ? tab.proxy : null;
+    }
+    const entry = await SavedPages.save(page, { proxy });
+    maybeCategorizeAsync(entry, conProvenienza(msg.page, sender)).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
 
+  // Un link non ha una scheda che ne abbia scaricato l'icona: la chiede una volta il riordino delle icone, se la scheda
+  // da cui lo salvi non passa da un proxy.
   on(MSG.SAVE_LINK, async (msg, sender, origin) => {
-    const entry = await SavedPages.save({ url: msg.url, title: msg.title });
-    maybeCategorizeAsync(entry, { url: msg.url, title: msg.title }).catch((e) => console.warn('[Filo] categorize failed', e));
+    const tab = schedaDi(sender);
+    const entry = await SavedPages.save({ url: msg.url, title: msg.title }, { proxy: tab ? tab.proxy : null });
+    maybeCategorizeAsync(entry, conProvenienza({ url: msg.url, title: msg.title }, sender)).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
 
@@ -49,16 +68,38 @@ module.exports = function register(on, ctx) {
     return { ok: true, categories: await Categorizer.listCategories() };
   });
 
+  // `nome`: la categoria nuova scritta a mano; se ne esiste già una con quel nome si usa quella.
   soloFilo(MSG.MOVE_PAGE_CATEGORY, async (msg) => {
-    const p = await Categorizer.movePageToCategory(msg.pageId, msg.categoryId);
-    return { ok: true, page: p };
+    let categoryId = msg.categoryId || null;
+    if (msg.nome !== undefined) {
+      const nome = String(msg.nome || '').trim();
+      const max = globalThis.SN_CONST.CATEGORY_NAME_MAX;
+      if (!nome) return { ok: false, error: 'empty_name' };
+      if (nome.length > max) return { ok: false, error: 'name_too_long', max };
+      // Senza la pagina non si crea niente: una categoria vuota resterebbe nelle Opzioni senza averla chiesta.
+      if (!(await SavedPages.list()).some((p) => p.id === msg.pageId)) return { ok: false, error: 'not_found' };
+      categoryId = (await Categorizer.ensureCategory({ name: nome })).id;
+    }
+    const p = await Categorizer.movePageToCategory(msg.pageId, categoryId);
+    return p ? { ok: true, page: p } : { ok: false, error: 'not_found' };
   });
 
   soloFilo(MSG.GET_SAVED_PAGES, async () => ({ ok: true, pages: await SavedPages.list() }));
 
   soloFilo(MSG.REMOVE_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.remove(msg.id) }));
 
+  soloFilo(MSG.RESTORE_SAVED_PAGE, async (msg) => {
+    const { pages, entry } = await SavedPages.rimetti(msg.id, await Categorizer.listCategories());
+    return { ok: !!entry, pages };
+  });
+
   soloFilo(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
+
+  // Il bottone di una pagina salvata in chat (#845): l'indirizzo è quello in elenco, non uno che manda la pagina.
+  soloFilo(MSG.APRI_PAGINA_SALVATA, async (msg, sender) => {
+    const r = await ctx.apriPaginaSalvata(msg.id, { sender, tieni: msg.tieni === true, confermato: msg.confermato === true });
+    return r.ok ? { ok: true, tolta: r.tolta } : { ok: false, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+  });
 
   // La miniatura la scatta il main dalla scheda di chi la chiede: un'immagine mandata dalla pagina qui non si decodifica (#839).
   on(MSG.SET_SAVED_PAGE_THUMB, async (msg, sender, origin) => {

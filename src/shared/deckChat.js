@@ -36,6 +36,20 @@
     return Object.keys(out).length ? out : null;
   }
 
+  // Dove si toglie l'ostacolo che la bolla nomina: solo i campi da cui SN_CHAT_ERRORS ricava la pagina, così il tasto
+  // resta anche riaprendo la chat e nessun indirizzo viaggia nel salvataggio.
+  function rimedioDi(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    const out = {};
+    if (/^[A-Z_]{1,40}$/.test(str(v.code))) out.code = v.code;
+    if (v.keyRefused === true) out.keyRefused = true;
+    if (v.reason === 'crediti') out.reason = 'crediti';
+    const n = Math.floor(Number(v.maxTokens));
+    if (n > 0) out.maxTokens = n;
+    if (/^[a-z_]{1,20}$/.test(str(v.finishReason))) out.finishReason = v.finishReason;
+    return Object.keys(out).length ? out : null;
+  }
+
   // Solo DATI: lo stato di vista (lista aperta, ragionamento aperto, «già aggiunte» che si ricava dal mazzo di
   // adesso) non si conserva, così alla riapertura le liste vecchie sono chiuse e l'ultima aperta (§3.3). Il turno
   // (`turn`) è l'identità di una risposta: chi la completa, la riprova o ne salva i nomi la ritrova da lì. Una
@@ -58,6 +72,8 @@
     if (m.pending || m.interrupted) { out.interrupted = true; return out; }
     // Fermata dall'utente (#792): resta detta così, col suo Riprova, anche riaprendo la chat.
     if (m.stopped === true) { out.stopped = true; return out; }
+    const rimedio = rimedioDi(m.rimedio);
+    if (rimedio) out.rimedio = rimedio;
     if (m.error) { out.error = str(m.error) || 'nessuna risposta'; return out; }
     const reply = str(m.reply);
     if (reply) out.reply = reply;

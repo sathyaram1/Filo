@@ -49,11 +49,12 @@ const registra = (app, n, prefisso) => app.evaluate(async (_e, { n, prefisso, pa
 }, { n, prefisso, pagina: PAGINA });
 
 // La pagina disegna le voci a lotti mentre si scorre: «le mostra tutte» vuol dire che scorrendo fino in fondo ci sono tutte.
+// Un lotto per giro: con le pause di un secondo di expect.poll, 3000 voci erano trenta secondi di attesa della prova (#1115.1).
 async function scorriFinoInFondo(page, n) {
   await expect.poll(async () => {
     await page.locator('.sn-history-item').last().scrollIntoViewIfNeeded();
     return page.locator('.sn-history-item').count();
-  }, { timeout: 30_000 }).toBe(n);
+  }, { timeout: 60_000, intervals: [50] }).toBe(n);
 }
 
 test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene la cronologia', async ({ app, openTab }) => {
@@ -186,6 +187,13 @@ test('con 3000 voci la pagina si apre e cerca senza bloccarsi, e scorrendo e cer
     return performance.now() - t;
   });
   expect(ms, `un tasto nella ricerca ha bloccato la pagina per ${Math.round(ms)} ms`).toBeLessThan(500);
+  // Il tempo dipende dalla macchina; quello che lo tiene basso su tutte no: le voci fuori schermo non si impaginano (#1115.1).
+  const impaginate = await page.evaluate(() => {
+    const voci = [...document.querySelectorAll('.sn-history-item .sn-history-output')];
+    return { tutte: voci.length, viste: voci.filter((v) => v.checkVisibility({ contentVisibilityAuto: true })).length };
+  });
+  expect(impaginate.tutte).toBeGreaterThanOrEqual(100);
+  expect(impaginate.viste, `${impaginate.viste} voci su ${impaginate.tutte} impaginate a ogni tasto`).toBeLessThan(25);
 
   // La più vecchia si trova cercandola, e cancellando la ricerca si arriva in fondo scorrendo.
   await page.locator('#search').fill('domanda 0');

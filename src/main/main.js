@@ -5,14 +5,29 @@
 //   - manager dei tab basato su WebContentsView
 //   - servizi (storage, providers AI, saved pages, ecc.)
 
+// Il passo «moduli_caricati» dei contatori d'avvio: da qui alla fine del codice in cima al file, prima di whenReady.
+const inizioModuli = Date.now();
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
 
-// In test mode, redirigi anche userData (cookies, cache, ecc.) sotto la
-// directory temp così l'isolamento è completo.
+// Anche userData (cookie, cache) va nella temp, o l'isolamento non è completo.
 if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
+
+// Il lucchetto vale per la cartella dei dati, quindi dopo userData e prima di ogni require pesante: la seconda copia
+// esce senza caricare shim e loader (#1092). Sentinella: tests/unit/secondaApertura.test.mjs.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  return;
+}
+
+// Dopo userData, prima di ogni altro require: un modulo caricato prima non passa dalla cache (#2118).
+const cacheCodice = require('./cacheCodice');
+cacheCodice.accendi(app);
+
+// «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
+try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
 
 // Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
 try { require('./services/dizionari').prepara(app); } catch (_) {}
@@ -23,17 +38,17 @@ if (process.platform === 'win32') {
   try { app.setAppUserModelId('ai.filo.desktop'); } catch (_) {}
 }
 
-// User agent pulito (vedi src/main/userAgent.js per il perché). Togliamo i
-// token `filo/<ver>` ed `Electron/<ver>` dalla UA di default così i login dei
-// siti esterni (Google, Claude, …) non scambiano Filo per un browser embedded
-// e non rifiutano l'accesso. `userAgentFallback` è il default ereditato da ogni
-// session/webContents che non imposta una UA propria, quindi vale per tutte le
-// tab. Va fissato PRIMA di whenReady.
+// UA pulita (il perché in src/main/userAgent.js). `userAgentFallback` è quella
+// che eredita ogni session, e va fissata PRIMA di whenReady.
+// I client hints che una UA riscritta fa sparire li rimette services/clientHints.js, dall'unico onBeforeSendHeaders.
 try {
   const { stripEmbeddedUaTokens } = require('./userAgent');
   const cleaned = stripEmbeddedUaTokens(app.userAgentFallback || '', app.getName());
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
+// In OGNI sessione, anche incognito e proxy: senza client hints Google respinge l'accesso (#1616). Il GPC resta spento finché la modalità non lo accende.
+app.on('session-created', (ses) => { try { require('./services/cookies').ensureHeaderHook(ses); } catch (_) {} });
+app.on('session-created', (ses) => configureSpellchecker(ses));
 
 // Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
 // non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).
@@ -55,26 +70,23 @@ require('./test-window-mode').webglAncheSenzaScheda(app);
 require('./shim/chrome-api');
 require('./services/loader');
 
-// Solo in test: esponi i singleton di handlers/defaults su globalThis così i
-// test Playwright (che girano nel main via app.evaluate, dove `require` non è
-// iniettato) possono esercitare la catena reale chiave-condivisa → motore. Va
-// fatto in modo SINCRONO qui (non dentro whenReady) perché i test che dipendono
-// solo dal fixture `app` possono valutare prima che il callback async finisca.
+// Dentro app.evaluate `require` non esiste: i test arrivano ai servizi veri da
+// qui. SINCRONO, non dentro whenReady: un test può valutare prima che finisca.
 if (process.env.NODE_ENV === 'test') {
-  // Niente browser né gestore file aperti dal sistema durante i test: su un
-  // contenitore senza desktop l'apertura non torna mai e l'app non si chiude
-  // più (vedi test-window-mode.js). Le prove che vogliono lo stub lo mettono
-  // dopo, per conto loro, sopra a questo.
+  // Niente browser né gestore file aperti dal sistema durante i test: su un contenitore
+  // senza desktop l'apertura non torna mai e l'app non si chiude più.
   try { require('./test-window-mode').silenziaApertureDiSistema(require('electron').shell); } catch (_) {}
   try {
     globalThis.__filoHandlers = require('./services/handlers');
     globalThis.__filoDefaults = require('./services/defaultsStore');
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
+    globalThis.__filoBloccoYouTube = require('./services/bloccoYouTube');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
     globalThis.__filoDizionari = require('./services/dizionari');
+    globalThis.__filoDizionarioDiFilo = require('./services/dizionarioDiFilo');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -82,6 +94,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAuth = require('./auth/google-auth');
     globalThis.__filoUpdater = require('./updater');
     globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
+    globalThis.__filoCancellaTutto = require('./cancellaTutto');
   } catch (_) {}
 }
 
@@ -90,16 +103,27 @@ if (process.env.NODE_ENV === 'test') {
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
 const {
-  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+  createMainWindow, ridaiFinestraNormale, onFinestraNormale, attendiAvvio, riaperturaDaSistema,
 } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { installaMenuApplicazione } = require('./menu');
 const { initAutoUpdater, installaAllAvvioSeServe } = require('./updater');
 
-// Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
-// libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
+// PRIMA di app.whenReady, o i privilegi dello schema non si applicano.
 require('./protocol').registerProtocolSchemes();
+
+// Le eccezioni del main che nessuno gestisce (#1466), per i contatori anonimi: solo il nome della classe, mai messaggio
+// né stack. Il monitor non cambia quello che Electron fa di un'eccezione (il suo avviso); un rifiuto senza gestione,
+// che Electron si limitava a scrivere, resta scritto qui.
+const contatori = () => globalThis.SN_CONTATORI_MAIN || null;
+process.on('uncaughtExceptionMonitor', (err, origine) => {
+  try { contatori()?.eccezione(origine === 'unhandledRejection' ? 'rejection' : 'uncaught', err); } catch (_) {}
+});
+process.on('unhandledRejection', (motivo) => {
+  try { console.warn('[Filo] promessa rifiutata senza gestione:', motivo); } catch (_) {}
+  try { contatori()?.eccezione('rejection', motivo); } catch (_) {}
+});
 
 let mainWindow = null;
 
@@ -126,13 +150,13 @@ let invitoInAttesa = null;
 // codice dentro è storto. Chi ha cliccato aspetta che succeda qualcosa, e lo
 // dice la pagina Crediti — è il riscatto a rifiutarlo, con la sua frase.
 function apriInvito(code) {
-  // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
-  // aspetta lì e parte appena la finestra c'è.
-  if (!mainWindow) { invitoInAttesa = { code }; return true; }
-  try { revealWindow(mainWindow); } catch (_) {}
+  // Con la principale chiusa e Filo acceso (Mac, o un'altra finestra aperta) ne nasce una: Crediti si apre lì. Ad
+  // avvio a freddo ancora a metà l'invito aspetta e parte appena la finestra c'è.
+  const win = ridaiFinestraNormale();
+  if (!win) { invitoInAttesa = { code }; return true; }
   // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
   // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
-  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, win); } catch (_) {}
   return true;
 }
 
@@ -175,11 +199,11 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
-// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
-function configureSpellchecker() {
+// Le lingue del correttore nativo, in ogni sessione (incognito e proxy compresi, #1447.3): senza, Electron usa solo
+// quella dell'app, segna ogni parola italiana e la correzione in cima al menu (`_spell:native`, tabs.js) manca. La
+// scelta e il perché niente inglese forzato: spellLanguages.js.
+function configureSpellchecker(ses) {
   try {
-    const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
@@ -190,93 +214,119 @@ function configureSpellchecker() {
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
 
+const msModuli = Date.now() - inizioModuli;
+
 app.whenReady().then(async () => {
+  // I passi dell'avvio per i contatori anonimi (#1466): quanto pesa ognuno, non solo il tutto.
+  const passo = (nome, t0) => { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} };
+  try { contatori()?.passoAvvio('moduli_caricati', msModuli); } catch (_) {}
+  let t = Date.now();
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
+  try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
+  try { await require('./services/correttoreMigrazione').migra(); } catch (e) { console.warn('[Filo] correttore a due segni:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  passo('impostazioni_lette', t);
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
+  // Com'era finita la volta prima e il segno di questa: dopo l'installatore (il lucchetto è già in cima al file).
+  try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {}
+  t = Date.now();
   await registerFiloProtocol();
   registerIpcHandlers();
-  configureSpellchecker();
-  // La barra dei menu di Filo, al posto di quella di serie di Electron. Su Mac
-  // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
-  // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
+  passo('protocollo_ipc', t);
+  try { require('./services/dizionarioDiFilo').prepara({ locale: app.getLocale(), dopoMs: 1500 }); } catch (_) {}
+  // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
 
-  const Storage = globalThis.SN_STORAGE;
+  // Le scelte che valgono dal primo istante si fissano qui, sincrone; gli init che leggono il disco partono dopo, insieme.
+  let s = impostazioniAvvio;
+  try { s = (await globalThis.SN_STORAGE.getSettings()) || impostazioniAvvio; } catch (_) {}
   try {
-    const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
-    const Cookies = require('./services/cookies');
-    Cookies.configureFromSettings(s);
+    require('./services/cookies').configureFromSettings(s);
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
     try { require('./services/accessoGoogle').init(); } catch (_) {}
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
-    // Anti-fingerprinting: carica/genera il master secret persistente e fissa
-    // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
-    try { await require('./services/fingerprint').init(s); } catch (_) {}
-    // Backstop del wipe: se dei cookie di tracker noti sono rimasti su disco
-    // (es. da prima di attivare l'Automatico, o da un'uscita interrotta),
-    // ripuliscili PRIMA di aprire qualsiasi tab. I cookie funzionali/di login
-    // restano. In privacy le sessioni sono effimere; in manual non tocchiamo nulla.
-    try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
-    // Ad-blocking per-dominio basato su liste (StevenBlack/EasyList): applica il
-    // blocco alla sessione di default, carica la cache e — se attivo e stantia —
-    // avvia un refresh in background. Non blocca l'avvio.
-    try { await require('./services/adblock').init(s); } catch (_) {}
     try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
-    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
-    try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
-    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
-    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
-    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // Le scorciatoie scelte dall'utente (#842) valgono dal primo tasto premuto.
+    try { require('./shortcuts').configura(s); } catch (_) {}
+    require('./shortcuts').seguiPannelli().catch(() => {});
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
-    // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
-    try { await require('./services/permessiPagine').carica(); } catch (_) {}
-    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
-    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
-    try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
+    try { require('./services/filoParla').configura(s); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
+    // Le icone delle voci rimaste senza copia (#1273), una volta sola e dopo l'avvio.
+    try { require('./services/iconeVecchie').avvio(); } catch (_) {}
     // La cronologia AI di storage.json passa ai suoi file subito, non alla prima richiesta: fino ad allora ogni scrittura la ripaga.
     setTimeout(() => { globalThis.SN_HISTORY?.prepara().catch(() => {}); }, 2000);
   } catch (_) {}
 
-  // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
-  // token si rinnova alla prima richiesta che lo serve). Vedi src/main/auth/.
+  // Le due identità: entrambe leggono solo file, niente rete all'avvio.
   try { require('./auth/google-auth').restore(); } catch (_) {}
-  // Identità dell'installazione (#598): l'account anonimo Firebase a cui sono
-  // legati crediti e chiave personale. Solo rilettura del file, niente rete.
   try { require('./auth/anon-auth').restore(); } catch (_) {}
 
-  // Carica in background la config "modelli predefiniti" condivisa da Firestore
-  // (modelli pubblici + eventuali chiavi ruotate dall'admin, se loggati). Non
-  // blocca l'avvio: finché non arriva si usano i default da costanti/build.
+  // I due in background non bloccano l'avvio: finché la config remota non
+  // arriva valgono i default del codice, e senza chiavi resta l'analisi locale.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
+  // Le impostazioni già lette: i siti fidati (#967) devono valere prima che si apra la prima scheda.
+  try { require('./services/handlers').wireSafebrowse(impostazioniAvvio).catch(() => {}); } catch (_) {}
 
-  // Configura il rilevatore di siti pericolosi con chiave GSB/LLM/rete/sandbox
-  // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
-  try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
-
-  // #410.1 — intercetta gli scaricamenti della navigazione (clic su un link a
-  // un file) sulla sessione predefinita: carica la cronologia persistita e
-  // aggancia will-download così la barra in alto ne mostra l'avanzamento.
-  try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
+  // Quello che la prima scheda deve trovare pronto, insieme e mentre la finestra si apre (#1092, #1479): la riapertura
+  // delle schede li aspetta (attendiAvvio in window.js). Nessuno legge quello che scrive un altro.
+  const init = (nome, fn) => {
+    const t0 = Date.now();
+    return Promise.resolve().then(fn).catch(() => {}).then(() => { if (nome) passo(nome, t0); });
+  };
+  const pronti = Promise.all([
+    // Anti-fingerprinting: il master secret persistente e la modalità (off/default/privacy).
+    init('fingerprint', () => require('./services/fingerprint').init(s)),
+    init('adblock', () => require('./services/adblock').init(s)),
+    // #1974 — le regole di YouTube dalla copia su disco: la prima scheda di YouTube le chiede prima dei suoi script.
+    init(null, () => require('./services/bloccoYouTube').init(s)),
+    // Le risposte date ai siti: il controllo dei permessi è sincrono e una pagina riaperta chiede subito.
+    init('permessi', () => require('./services/permessiPagine').carica()),
+    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
+    init(null, () => require('./tabs/tabCookies').loadRemembered()),
+    // Lo storico e l'aggancio di will-download: uno scaricamento della prima scheda passa da Filo.
+    init(null, () => require('./services/downloads').init()),
+  ]);
+  attendiAvvio(pronti);
 
   // Una finestra normale può nascere anche senza di noi (la scadenza che deve
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  // Nelle prove, quando è nata la finestra e quando la prima scheda ha potuto partire (tests/seconda-apertura.spec.mjs).
+  if (process.env.NODE_ENV === 'test') {
+    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null, msModuli, cacheCodice: cacheCodice.accesa() };
+    pronti.then(() => { globalThis.__filoAvvio.pronti = Date.now(); });
+  }
+
+  // Dopo la prima scheda: niente di questo cambia come si apre.
+  pronti.then(() => {
+    // Qualche secondo dopo, per prendere anche i moduli che l'avvio carica in ritardo.
+    setTimeout(() => cacheCodice.scrivi(), 5000).unref?.();
+    // I cookie dei tracker rimasti da una chiusura brusca (quella normale li toglie uscendo).
+    try { require('./services/cookies').wipeTrackerCookies(s).catch(() => {}); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e la rinfresca quando è vecchia.
+    try { require('./services/firmatariC2pa').init().catch(() => {}); } catch (_) {}
+    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
+    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
+    try { require('./services/editorFiles').migrateNotesToEditor().catch(() => {}); } catch (_) {}
+  });
+  try { require('./cancellaTutto').annuncia(); } catch (_) {}
   // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
   // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
   if (process.env.NODE_ENV !== 'test') {
@@ -299,31 +349,21 @@ app.whenReady().then(async () => {
   try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
 
-  // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
-  // notifica di sistema e avvisa le dashboard aperte (che fanno partire la
-  // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.
+  // #322 — le scadenze si controllano nel main: altrimenti una sveglia scatta
+  // solo se la newtab è aperta.
   try { require('./services/alarmWatcher').start(); } catch (_) {}
+  try { require('./services/correttoreSpinte').avvia(); } catch (_) {}
 
   // Controlla le GitHub Releases e scarica in sottofondo; quando installare lo dice updater.js (no-op in dev/test).
   initAutoUpdater(impostazioniAvvio);
 
-  // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
-  // verifica che i content script si caricano in quest'ultima, cattura
-  // screenshot di entrambe, scrive un report e si chiude.
-  //
-  // ORDINE: il sentinel — l'unica cosa che lo script fuori sta aspettando — si
-  // scrive appena lo stato delle schede è quello da riportare, PRIMA delle
-  // catture. Le catture sono diagnostica: aprono altre finestre e aspettano che
-  // finiscano di caricare, cioè dipendono dalla rete e da quanto è carica la
-  // macchina. Scrivendo il sentinel dopo, una cattura lenta diventava
-  // indistinguibile da un'app che non parte — «sentinel non scritto entro 20 s»
-  // su un avvio andato benissimo. Adesso l'esito è deciso dal boot, e il resto
-  // può prendersi il suo tempo (o fallire) senza cambiarlo.
+  // Smoke: l'ORDINE è la regola. Il sentinel è l'unica cosa che lo script fuori aspetta e va
+  // scritto PRIMA delle catture: dopo, una cattura lenta sembra un'app che non parte.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
-    // Aspetta una promessa fino a un tetto: nessuna attesa dello smoke può
-    // durare per sempre, o l'app resta appesa senza dire niente.
+    // Nessuna attesa dello smoke può durare per sempre: l'app resterebbe
+    // appesa senza dire niente.
     const entro = (promessa, ms, cosa) => Promise.race([
       promessa,
       new Promise((r) => setTimeout(() => { console.log(`[smoke] ${cosa}: scaduti ${ms}ms, proseguo`); r(null); }, ms)),
@@ -332,7 +372,7 @@ app.whenReady().then(async () => {
       const tabs = mainWindow?._filoTabs;
       const ready = tabs && tabs.tabs.length > 0 && tabs.tabs.some((t) => !t.loading);
       if (!ready) { setTimeout(checkReady, 250); return; }
-      // Diamo un attimo al renderer per dipingere dopo did-stop-loading.
+      // did-stop-loading non vuol dire dipinto: un attimo al renderer.
       await new Promise((r) => setTimeout(r, 800));
       const outDir = path.dirname(process.env.FILO_SMOKE);
       // Il verdetto, subito: da qui in poi è tutta diagnostica.
@@ -343,10 +383,8 @@ app.whenReady().then(async () => {
         }));
         console.log('[smoke] sentinel scritto:', process.env.FILO_SMOKE);
       } catch (e) { console.log('[smoke] sentinel non scritto:', e?.message || String(e)); }
-      // Forza la finestra in primo piano. Quando spawn-ata da Node non
-      // sempre Windows la mostra automaticamente; senza una composizione
-      // visibile, capturePage delle child WebContentsView fallisce con
-      // "display surface not available" e desktopCapturer non la vede.
+      // Senza una composizione visibile capturePage fallisce con "display
+      // surface not available", e da Node Windows non la mostra da sé.
       try {
         mainWindow.show();
         mainWindow.moveTop();
@@ -375,25 +413,23 @@ app.whenReady().then(async () => {
           console.log(`[smoke] capture ${label} threw:`, e?.stack || e?.message || String(e));
         }
       };
-      // Cattura: shell (= primary webContents), tab attiva (di solito fallisce
-      // — vedi electron#24694), e composito via desktopCapturer.
       await dump('shell', mainWindow.webContents);
-      // captureUrl: apre URL in una BrowserWindow dedicata e cattura il
-      // primary. Workaround a electron#24694 (capturePage su WebContentsView
-      // restituisce empty image in molte configurazioni).
+      // Aggiro electron#24694: capturePage su una WebContentsView torna
+      // un'immagine vuota, quindi l'URL si riapre in una finestra dedicata.
       const captureUrl = async (label, url, preloadName) => {
         try {
           const captureWin = new BrowserWindow({
             width: 1280, height: 800, show: true,
             webPreferences: {
-              preload: path.join(__dirname, '..', 'preload', preloadName),
+              // Come le schede: la pagina web col preload impacchettato, in sandbox; quella interna col suo.
+              preload: preloadName === 'page-preload.js' ? require('./preloadPacchetto').percorsoDelPreload() : path.join(__dirname, '..', 'preload', preloadName),
               contextIsolation: preloadName !== 'internal-preload.js',
-              sandbox: false, nodeIntegration: false,
+              sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
+          // Non è una scheda: senza il segno la pagina interna parlerebbe ai servizi come un sito (#1506).
+          captureWin.webContents._filoVistaInterna = preloadName === 'internal-preload.js';
           captureWin.loadURL(url);
-          // Con un tetto: una pagina che non finisce mai di caricare (rete
-          // lenta, richiesta appesa) non deve bloccare la chiusura dell'app.
           await entro(
             new Promise((res) => captureWin.webContents.once('did-stop-loading', res)),
             15_000, `attesa caricamento ${label}`,
@@ -412,8 +448,7 @@ app.whenReady().then(async () => {
         if (tabCaptureWin) tabCaptureWin.close();
       }
 
-      // Test pagina esterna + content script: apri una pagina file:// che
-      // non è filo:// e verifica che i content script si carichino bene.
+      // Una pagina che NON è filo://: è l'unico modo di provare i content script.
       const testPageUrl = 'file:///' + path.join(__dirname, '..', '..', 'tests', 'fixtures', 'test-page.html').replace(/\\/g, '/');
       const csWin = await captureUrl('test-page', testPageUrl, 'page-preload.js');
       if (csWin) {
@@ -461,24 +496,55 @@ app.whenReady().then(async () => {
     setTimeout(checkReady, 500);
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) assicuraFinestraNormale();
-  });
+  // Su Mac la riapertura di Filo acceso arriva qui, non come seconda copia: stessa regola (#1606.1).
+  app.on('activate', (_e, visibili) => { riaperturaDaSistema(visibili !== false); });
 });
 
-// Alla chiusura salva sincronicamente la sessione (tab aperti) così alla
-// prossima apertura vengono ripristinati anche se l'utente esce subito dopo
-// aver aperto/chiuso un tab (il salvataggio normale è con debounce).
+// Salvataggio SINCRONO delle schede aperte: quello normale ha un debounce, e
+// chi esce subito dopo aver aperto una scheda la perderebbe.
 app.on('before-quit', () => {
+  try { contatori()?.inizioChiusura(); } catch (_) {}
   try {
-    const tm = mainWindow?._filoTabs;
+    // Chi scrive e cosa (la finestra ancora da riaprire, quella già chiusa) lo decide tabs.js.
+    const stato = mainWindow?._filoTabs?.statoPerLUscita?.() || null;
     const Storage = require('./shim/storage');
+    // L'ora dei contatori viaggia con le schede: dopo questa scrittura non ne parte un'altra (#1466).
+    let contati = {};
+    try { contati = contatori()?.perLaChiusura() || {}; } catch (_) { contati = {}; }
     // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
-    if (tm && Storage?.setSync) {
+    if (stato && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
-      Storage.setSync({ [key]: tm.sessionState() });
-    } else Storage?.flushSync?.();
+      Storage.setSync({ [key]: stato, ...contati });
+    } else if (Object.keys(contati).length && Storage?.setSync) Storage.setSync(contati);
+    else Storage?.flushSync?.();
   } catch (_) {}
+});
+
+// L'ultimo istante dell'uscita: il segno «chiusa» con quanto è durata, letto dall'avvio dopo (#1466).
+app.on('will-quit', () => {
+  try { contatori()?.fineChiusura(); } catch (_) {}
+});
+
+// Uscire distrugge le schede senza chiudere le loro pagine: chi aveva caselle da spedire perdeva l'ultima modifica.
+// Si aspetta come alla chiusura di una scheda (chiusuraConCaselle), una volta sola.
+let congedoUscitaFatto = false;
+app.on('before-quit', (e) => {
+  if (congedoUscitaFatto) return;
+  congedoUscitaFatto = true;
+  // Tutte le finestre: una che rifiuta di chiudersi mentre aspetta annullerebbe l'uscita (su Mac Filo resterebbe aperto).
+  const { congedaSchede } = require('./tabs/chiusuraConCaselle');
+  const attese = BrowserWindow.getAllWindows()
+    .map((w) => { try { return w.isDestroyed() ? null : congedaSchede(w._filoTabs); } catch (_) { return null; } })
+    .filter(Boolean);
+  // Le attività ancora aperte nelle pagine (#1467) si contano e vanno sul disco: il salvataggio dei contatori aspetta.
+  try {
+    const contatori = globalThis.SN_CONTATORI_MAIN?.congeda?.();
+    if (contatori) attese.push(Promise.race([contatori, new Promise((r) => setTimeout(r, 1500))]));
+  } catch (_) {}
+  if (!attese.length) return;
+  e.preventDefault();
+  const esci = () => { try { app.quit(); } catch (_) {} };
+  Promise.all(attese).then(esci, esci);
 });
 
 // Wipe dei cookie-tracker all'uscita (modalità 'default'): i cookie funzionali e
@@ -496,29 +562,38 @@ app.on('before-quit', (e) => {
   try { pending = Promise.all([pending, require('./services/cookieIncorporati').allUscita()]); } catch (_) {}
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
-  const finish = () => { cookieWipeDone = true; app.quit(); };
-  const timer = setTimeout(finish, 2500);
-  pending.then(() => { clearTimeout(timer); finish(); }, () => { clearTimeout(timer); finish(); });
+  // L'esito della pulizia va nei contatori (#1469) e i contatori sul disco, prima di uscire: al più 400 ms in più.
+  const finish = (esito) => {
+    if (cookieWipeDone) return;
+    cookieWipeDone = true;
+    let scritto = Promise.resolve();
+    try {
+      const M = globalThis.SN_CONTATORI_MAIN;
+      const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+      if (M && N) scritto = Promise.race([M.allUscita(esito ? N.pulizia(esito) : null), new Promise((r) => setTimeout(r, 400))]);
+    } catch (_) {}
+    scritto.catch(() => {}).then(() => app.quit());
+  };
+  // In Privacy e a mano la pulizia non c'è: si salta, e non si conta.
+  const saltata = (r) => { const w = Array.isArray(r) ? r[0] : r; return !!(w && w.skipped); };
+  const timer = setTimeout(() => {
+    try { contatori()?.tettoChiusura(); } catch (_) {}
+    finish('tetto_2500ms');
+  }, 2500);
+  pending.then((r) => { clearTimeout(timer); finish(saltata(r) ? null : 'finita'); }, () => { clearTimeout(timer); finish(null); });
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Single instance: la seconda apertura ridà focus all'esistente.
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
-  app.on('second-instance', (_event, argv) => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-    // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
-    // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
-    // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
-    // l'indirizzo si CERCA, mai si prende per indice.
-    apriInvitoDaArgv(argv);
-  });
-}
+// La seconda apertura porta davanti la finestra normale, e la rifà se Filo è rimasto acceso senza (#1606).
+app.on('second-instance', (_event, argv) => {
+  try { contatori()?.secondaIstanza(); } catch (_) {}
+  ridaiFinestraNormale();
+  // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
+  // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
+  // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
+  // l'indirizzo si CERCA, mai si prende per indice.
+  apriInvitoDaArgv(argv);
+});

@@ -5,11 +5,8 @@
 
   const { STORAGE_KEYS, DEFAULT_SETTINGS } = global.SN_CONST;
 
-  // Chiavi il cui valore va SOSTITUITO interamente invece di fuso ricorsivamente.
-  // Servono per oggetti-mappa il cui contratto è "questa è la lista completa,
-  // chi manca è stato rimosso" (es. modelRegistry: rimuovere un nickname dalla
-  // UI deve cancellarlo dallo storage, non lasciarlo lì in vita perché era in
-  // target).
+  // Chiavi da SOSTITUIRE invece di fondere: il loro contratto è «questa è la lista completa,
+  // chi manca è stato rimosso»: togliere un nickname dalla UI deve cancellarlo davvero.
   const REPLACE_KEYS = new Set(['modelRegistry', 'themeTokens']);
 
   function deepMerge(target, source, path = '') {
@@ -43,13 +40,22 @@
       const seed = (global.SN_TEST_MODELS && global.SN_TEST_MODELS.registry) || global.SN_CONST.DEFAULT_MODEL_REGISTRY;
       stored.modelRegistry = { ...seed };
     }
-    // Stesso seme per le catene delle funzioni: nell'app restano vuote (una
-    // funzione senza modello si ferma e lo dice), nei test partono dal registro
-    // di prova.
+    // Stesso seme per le catene delle funzioni: vuote nell'app (una funzione senza
+    // modello si ferma e lo dice), dal registro di prova nei test.
     if (!stored.models && global.SN_TEST_MODELS && global.SN_TEST_MODELS.models) {
       stored.models = { ...global.SN_TEST_MODELS.models };
     }
-    return deepMerge(DEFAULT_SETTINGS, stored);
+    return siti(deepMerge(DEFAULT_SETTINGS, stored));
+  }
+
+  // I siti dove Filo è spento si confrontano per nome: un indirizzo incollato prima di #843 («https://sito.it/x»)
+  // non escludeva niente. Ogni lettura e ogni scrittura li vede ridotti, chiunque li abbia scritti.
+  function siti(settings) {
+    const N = global.SN_NOMI_SITO;
+    if (!N || !settings || !Array.isArray(settings.blocklist)) return settings;
+    const ridotti = N.ripulisciElenco(settings.blocklist);
+    const uguale = ridotti.length === settings.blocklist.length && ridotti.every((x, i) => x === settings.blocklist[i]);
+    return uguale ? settings : { ...settings, blocklist: ridotti };
   }
 
   async function getSettings() {
@@ -63,7 +69,7 @@
 
   async function updateSettings(partial) {
     const current = await getSettings();
-    const merged = deepMerge(current, partial);
+    const merged = siti(deepMerge(current, partial));
     await setSettings(merged);
     return merged;
   }

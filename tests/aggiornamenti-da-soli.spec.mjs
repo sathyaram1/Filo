@@ -207,9 +207,9 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   const pref = await openTab('filo://preferences/preferences.html');
   await expect(pref.locator('#aggiornamentiAutomatici')).toBeChecked({ timeout: 8_000 });
 
+  // Un'impostazione ferma sulla conferma chiude il turno (#1130): la frase va scritta insieme.
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'a1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'aggiornamenti_automatici', valore: false }) }] },
-    { text: 'Ti chiedo conferma.' },
+    { text: 'Ti chiedo conferma.', toolCalls: [{ id: 'a1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'aggiornamenti_automatici', valore: false }) }] },
   ]);
   await chat.bringToFront();
   await chat.locator('#input').fill('non aggiornarti da solo');

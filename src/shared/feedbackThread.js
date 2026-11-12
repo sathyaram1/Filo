@@ -1,52 +1,20 @@
-// Logica pura: trasforma un feedback (segnalazione + note) nella sua
-// CONVERSAZIONE a turni, così la dashboard può mostrarla a "bolle di chat"
-// invece di un unico blocco di testo dove segnalazione, risposte di Filo e
-// risposte dell'utente si mescolano (feedback #108: "un feedback ha testo
-// originale, risposta del modello, mia risposta, altre domande… ogni turno in
-// un box diverso").
-//
-// Il dato resta UNO solo (il campo `notes` su Firestore): qui non si cambia lo
-// schema, si PARSA ciò che già c'è. La struttura delle note è quella prodotta
-// dai due cammini che le scrivono:
-//   - le routine/Filo scrivono il loro report/le domande come testo libero;
-//   - la dashboard, quando l'utente riapre o risponde, APPENDE un blocco
-//     `--- Riaperto il <ts> ---\n<testo>` (o `--- La tua risposta del <ts> ---`).
-// Quindi: il segmento iniziale delle note è il turno di Filo; ogni marcatore
-// di riapertura/risposta apre un turno dell'utente.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Trasforma un feedback (segnalazione + note) nella sua CONVERSAZIONE a turni (#108).
+// Il dato resta UNO, il campo `notes`: qui non si cambia lo schema, si parsa ciò che c'è.
+// Il segmento iniziale è il turno di Filo, e ogni marcatore apre un turno nuovo.
 
 (function (global) {
   'use strict';
 
-  // Marcatori che, dentro `notes`, aprono un turno dell'UTENTE. Il primo
-  // ("Riaperto il") è quello storico già presente su Firestore: va riconosciuto
-  // per retro-compatibilità. Il secondo è quello che usa la risposta dal tab
-  // Chiarimenti. Cattura (group 1) il timestamp scritto nel marcatore.
+  // «Riaperto il» è già su Firestore e va riconosciuto; l'altro lo usa il tab Chiarimenti.
+  // Il gruppo 1 cattura il timestamp.
   const USER_TURN_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*(.*?)\s*---\s*$/;
 
-  // Marcatore che, dentro `notes`, apre un nuovo turno dell'AGENTE/MODELLO. Serve
-  // quando una routine RI-risolve un feedback già lavorato (riaperto): il nuovo
-  // report va APPESO come turno separato, non sovrascrive lo storico (report
-  // precedente + annotazione di riapertura dell'utente). Senza questo marcatore
-  // il parser attribuirebbe il nuovo report al turno utente precedente. Cattura
-  // (group 1) il timestamp.
+  // Quando una routine ri-risolve un feedback riaperto il report va APPESO come turno nuovo:
+  // senza questo marcatore il parser lo attribuirebbe al turno utente precedente.
   const MODEL_TURN_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*(.*?)\s*---\s*$/;
 
-  // Allegati PER-TURNO (#190.3). Il modello dati dei feedback ha `images`/`files`
-  // PIATTI sul documento (la segnalazione originale). Per legare un allegato a un
-  // singolo COMMENTO/turno — senza aggiungere campi a Firestore né cambiare le
-  // regole (il campo `notes` è già scrivibile dagli admin) — codifichiamo gli
-  // allegati di un turno come RIGHE-MARCATORE dentro `notes`, una per allegato:
-  //
-  //   @@filo-attachment {"kind":"img","url":"https://…"}
-  //   @@filo-attachment {"kind":"file","url":"https://…","name":"x.pdf","type":"application/pdf"}
-  //
-  // Il parser le riconosce e le toglie dal corpo del turno, raccogliendole in
-  // `turn.attachments`. Così l'allegato resta ANCORATO al turno in cui è stato
-  // incollato (a differenza degli array piatti, che li mescolerebbero tutti con
-  // la segnalazione originale). JSON su singola riga = nomi con spazi/caratteri
-  // speciali gestiti dall'escaping, prefisso improbabile nella prosa.
+  // Un allegato si lega al TURNO codificandolo come riga dentro `notes`, un JSON per riga:
+  // Firestore non ha campi per-turno e `images`/`files` sono piatti (#190.3).
   const ATTACH_PREFIX = '@@filo-attachment ';
 
   // Serializza un allegato { kind, url, name?, type? } nella sua riga-marcatore.
@@ -61,9 +29,8 @@
     return ATTACH_PREFIX + JSON.stringify(obj);
   }
 
-  // Riconosce una riga-marcatore di allegato e la decodifica, oppure null se la
-  // riga è prosa normale. Difensivo: scarta URL non http(s) (no javascript:/data:
-  // → niente vettore XSS quando l'URL finisce in un href/src in dashboard).
+  // Null se la riga è prosa normale.
+  // Scarta gli URL non http(s): un javascript:/data: finirebbe in un href come XSS.
   function parseAttachmentLine(line) {
     const s = String(line || '');
     if (s.indexOf(ATTACH_PREFIX) !== 0) return null;
@@ -83,18 +50,13 @@
     }
   }
 
-  // Serializza una lista di allegati nelle loro righe-marcatore (una per riga).
   function attachmentsBlock(attachments) {
     const list = Array.isArray(attachments) ? attachments : [];
     return list.map(serializeAttachment).filter(Boolean).join('\n');
   }
 
-  // I prefissi di `clientId` che dicono "questo testo l'ha scritto un'istanza di
-  // Claude, non una persona". Tre, e restano TRE cose diverse (vedi authorKind):
-  //   agent:   l'agente esploratore che gira sull'app in cerca di problemi;
-  //   routine: le automazioni in cloud, col loro ruolo dopo i due punti;
-  //   local:   la sessione locale — Claude che lavora sulla macchina dell'owner,
-  //            in chat con lui. È la provenienza di chi apre un feedback da lì.
+  // I prefissi di `clientId` che dicono «questo l'ha scritto un'istanza di Claude»,
+  // e restano TRE cose diverse: l'esploratore, le routine in cloud, la sessione locale.
   const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
 
   // Un nome riservato vale solo con la prova che scrivono l'admin o il server (#595, #912): senza, è un utente nello
@@ -177,6 +139,10 @@
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti
+  //   agent:costruzione     → 'costruzione' l'allarme della pubblicazione (#1002): lo
+  //                                      apre il SERVER quando costruzione o suite di
+  //                                      una versione sono rosse; non è un'istanza di
+  //                                      Claude e il testo è una coda di registro
   //   agent:/routine:<altro>→ 'claude'   automazione di ruolo ignoto (storico: fino
   //                                      al 2026-08-08 nessuno si firmava)
   //   <altro>               → 'user'     un utente / alpha tester esterno
@@ -195,13 +161,13 @@
     verifier: 'verifier',
     secaudit: 'verifier',
     residuo: 'residuo',
+    costruzione: 'costruzione',
   };
   function authorKind(fb) {
     var c = senderOf(fb);
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
-    // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
-    // punti da mappare, è una categoria sola.
+    // La sessione locale non ha ruoli dopo i due punti: è una categoria sola.
     if (c.indexOf('local:') === 0) return 'local';
     if (c.indexOf('agent:') === 0 || c.indexOf('routine:') === 0) {
       var role = c.slice(c.indexOf(':') + 1).trim().toLowerCase();
@@ -210,84 +176,60 @@
     return 'user';
   }
 
+  // Scritto da Filo (chat o segnalazione automatica), per conto di chi: 'owner' se porta la prova dell'admin, 'user'
+  // se lo dichiara soltanto, '' se non è di Filo. Solo per l'etichetta: categoria e fiducia restano di authorKind (#953).
+  function filoPerConto(fb) {
+    const c = senderOf(fb);
+    const resto = c.indexOf('owner:') === 0 ? c.slice('owner:'.length) : c;
+    if (resto.indexOf('filo:') !== 0 && resto.indexOf('auto:') !== 0) return '';
+    return fb && typeof fb === 'object' && fb.senderProof === 'admin' ? 'owner' : 'user';
+  }
+
   // ── Chi può entrare in coda da solo ────────────────────────────────────────
-  // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
-  // mittenti si fida di far entrare in coda senza passare da lui.
-  //
-  // UN INTERRUTTORE PER OGNI AUTORE CHE LA DASHBOARD MOSTRA. Fino a oggi le
-  // cinque istanze di Claude (esplorazione, sviluppo, verifica, rilievi
-  // residui, sessione locale) stavano dietro un interruttore solo: la coda le
-  // distingueva con cinque icone diverse ma la fiducia era una sola, quindi
-  // per non far entrare da solo l'esploratore bisognava fermare anche la
-  // sessione locale. I due assi ora coincidono: chi si vede separato si regola
-  // separato.
-  //
-  // `filo` resta SEPARATO dalle automazioni: un feedback che nasce da Filo è
-  // la voce di un utente vero filtrata da un modello, non un processo
-  // dell'owner. Metterli insieme farebbe entrare in coda del contenuto scritto
-  // da un utente sotto l'etichetta "automazioni".
-  //
-  // L'ordine è quello della dashboard (AUTHOR_RANK in manage.js): prima le
-  // persone, poi le istanze di Claude dalla più vicina all'owner, in fondo Filo.
-  var AUTO_APPROVE_GROUPS = [
-    'owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo',
-  ];
+  // L'automatica ha un sottointerruttore per livello di fiducia, mai per mittente (SPEC-DOMANDE.md §10: il mittente
+  // non dà permessi). SPECCHIO di filo-security functions/src/autoApprove.js, che decide davvero: stessi casi in
+  // tests/unit/autoApprove.test.mjs e nel gemello del server.
+  var AUTO_APPROVE_GROUPS = ['fidato', 'non_fidato'];
 
-  // Le istanze di Claude. Servono al ripiego sul vecchio interruttore unico
-  // (vedi resolveAutoApprove): un documento salvato prima di oggi ha solo
-  // `claude`, e quel "no" deve continuare a valere per tutte e cinque finché
-  // l'owner non sceglie diversamente. Senza questo, spezzare l'interruttore
-  // riaprirebbe da solo cinque porte che l'owner aveva chiuso.
-  var CLAUDE_GROUPS = ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'];
+  // Le mappe salvate prima del §10 avevano un interruttore per mittente: non riaprono da sole ciò che l'owner aveva
+  // chiuso. All'automatica arrivano fidati solo i ritrovamenti delle routine e gli allarmi; non fidato chiunque.
+  var LEGACY_GROUPS = {
+    fidato: ['worker', 'verifier', 'residuo', 'prober', 'claude'],
+    non_fidato: ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo'],
+  };
 
-  // Il gruppo di fiducia di un mittente = la sua categoria d'autore, quella che
-  // la dashboard mostra come icona. Una funzione sola per i due assi.
-  function autoApproveGroup(clientId) {
-    return authorKind(clientId);
+  // Il gruppo è la fiducia del feedback: assente o ignota vale non fidato.
+  function autoApproveGroup(fiducia) {
+    return fiducia === 'fidato' ? 'fidato' : 'non_fidato';
   }
 
   /**
-   * La mappa salvata → la mappa completa, un valore per ogni gruppo. PURA.
-   *
-   * Due ripieghi, in quest'ordine:
-   *   · gruppo assente e mappa con il vecchio `claude` → eredita quel valore
-   *     (solo per le istanze di Claude: è l'interruttore che le teneva tutte);
-   *   · tutto il resto assente → ammesso, che è la semantica che l'automatica
-   *     aveva prima che i sottointerruttori esistessero.
-   *
-   * Mappa assente del tutto ⇒ `null`: il chiamante sa che non c'è scelta
-   * registrata e ammette tutti.
+   * La mappa salvata → un valore per ogni gruppo. Un gruppo assente eredita dai vecchi interruttori per mittente (uno
+   * spento lo chiude); senza nemmeno quelli è ammesso. Mappa assente ⇒ `null`: il chiamante ammette tutti. PURA.
    */
   function resolveAutoApprove(map) {
     if (!map || typeof map !== 'object') return null;
-    var legacy = map.claude;
     var out = {};
     for (var i = 0; i < AUTO_APPROVE_GROUPS.length; i++) {
       var g = AUTO_APPROVE_GROUPS[i];
-      if (typeof map[g] === 'boolean') out[g] = map[g];
-      else if (legacy === false && CLAUDE_GROUPS.indexOf(g) >= 0) out[g] = false;
-      else out[g] = true;
+      out[g] = typeof map[g] === 'boolean'
+        ? map[g]
+        : !LEGACY_GROUPS[g].some(function (k) { return map[k] === false; });
     }
     return out;
   }
 
-  // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
-  // solo. PURA: la config arriva già letta.
-  //   cfg = { enabled: bool, autoApprove?: { <gruppo>: bool, … } }
-  // Interruttore master spento ⇒ mai, qualunque cosa dicano i sottointerruttori
-  // (è lo stato sicuro: uno solo da spegnere per fermare tutto).
-  // Mappa assente ⇒ tutti ammessi: è la semantica che l'automatica aveva prima
-  // che i sottointerruttori esistessero, e non deve cambiare da sola.
-  function autoApproveAllowed(clientId, cfg) {
+  // Un feedback giudicato sicuro può entrare in coda da solo? Master spento ⇒ mai (uno solo da spegnere per fermare
+  // tutto); mappa assente ⇒ tutti ammessi. PURA.
+  function autoApproveAllowed(fiducia, cfg) {
     if (!cfg || cfg.enabled !== true) return false;
     var map = resolveAutoApprove(cfg.autoApprove);
     if (!map) return true;
-    return map[autoApproveGroup(clientId)] !== false;
+    return map[autoApproveGroup(fiducia)] !== false;
   }
 
-  // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
-  // prefisso e NON marca i feedback già di origine modello (agent:/routine:),
-  // che owner non sono. Cap a 100 char = limite `clientId` delle Firestore rules.
+  // Idempotente, e NON marca i feedback di origine modello, che owner non sono.
+  // Cap a 100 caratteri, il limite di `clientId` nelle firestore rules.
   function ownerize(clientId) {
     const c = String(clientId || '');
     if (!c || isFromModel(c) || c.startsWith('owner:')) return c;
@@ -307,8 +249,6 @@
   function splitNotes(notes) {
     const lines = righe(notes || '');
     const segments = [];
-    // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
-    // domande scritte dalla routine).
     let current = { role: 'model', ts: null, lines: [], atts: [] };
     for (const line of lines) {
       const mu = USER_TURN_RE.exec(line);
@@ -320,7 +260,6 @@
         segments.push(current);
         current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [] };
       } else {
-        // Riga-allegato del turno corrente o prosa normale.
         const att = parseAttachmentLine(line);
         if (att) current.atts.push(att);
         else current.lines.push(line);
@@ -329,19 +268,12 @@
     segments.push(current);
     return segments
       .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts }))
-      // Tiene i segmenti con testo OPPURE con soli allegati (es. una risposta
-      // fatta solo di un'immagine, senza parole).
+      // Si tiene anche il segmento di soli allegati: una risposta può essere una sola immagine.
       .filter((s) => s.body.length > 0 || s.attachments.length > 0);
   }
 
-  // Costruisce la conversazione completa di un feedback.
-  // turni: { role, kind, body, ts }
-  //   role  'model' (Filo) | 'user' (utente) — decide il lato/colore della bolla
-  //   kind  'report' (la segnalazione iniziale) | 'note' (turno di Filo) |
-  //         'reply' (risposta/riapertura dell'utente) — decide l'etichetta
-  //   body  testo del turno (da escapare a valle, qui resta grezzo)
-  //   ts    timestamp del turno se noto (ISO per la segnalazione, stringa già
-  //         localizzata per i marcatori di riapertura), altrimenti null
+  // role decide lato e colore della bolla; kind ('report'|'note'|'reply') decide l'etichetta.
+  // `body` resta grezzo, da escapare a valle.
   function parse(feedback) {
     const f = feedback || {};
     const turns = [];
@@ -352,8 +284,7 @@
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
-        // Gli allegati della segnalazione originale vivono nei campi PIATTI
-        // `images`/`files`, non nelle note: la dashboard li mostra a parte.
+        // Gli allegati della segnalazione stanno nei campi PIATTI: la dashboard li mostra a parte.
         attachments: [],
       });
     }
@@ -369,22 +300,18 @@
     return turns;
   }
 
-  // Marcatore da APPENDERE alle note quando l'utente risponde dal tab
-  // Chiarimenti (o riapre). Centralizzato qui così il parser e chi scrive
-  // restano allineati su una sola forma.
+  // Centralizzato qui così il parser e chi scrive restano allineati su una sola forma.
   function userTurnMarker(ts, label) {
     const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
     return `--- ${label || 'La tua risposta del'} ${when} ---`;
   }
 
-  // Appende un turno dell'utente al blob note esistente, conservando lo storico.
-  // opts.attachments: lista di allegati { kind, url, name?, type? } ANCORATI a
-  // questo turno (serializzati come righe-marcatore subito sotto al testo).
+  // `opts.attachments` sono ANCORATI a questo turno: righe subito sotto al testo.
   function appendUserTurn(oldNotes, replyText, opts) {
     const o = opts || {};
     const reply = String(replyText || '').trim();
     const attBlock = attachmentsBlock(o.attachments);
-    // Una risposta fatta di soli allegati (senza parole) è valida.
+    // Una risposta fatta di soli allegati è valida.
     if (!reply && !attBlock) return String(oldNotes || '');
     const parts = [userTurnMarker(o.ts, o.label)];
     if (reply) parts.push(reply);
@@ -394,8 +321,7 @@
     return prev ? `${prev}\n\n${block}` : block;
   }
 
-  // Marcatore da APPENDERE quando l'AGENTE (una routine) ri-risolve un feedback
-  // già lavorato. Simmetrico a userTurnMarker.
+  // Simmetrico a userTurnMarker, per quando una routine ri-risolve un feedback già lavorato.
   function modelTurnMarker(ts, label) {
     const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
     return `--- ${label || "Aggiornamento dell'agente del"} ${when} ---`;
@@ -437,14 +363,8 @@
     return prev ? `${prev}\n\n${block}` : block;
   }
 
-  // ── Compositore note editabile (tab Ricevuti/Da risolvere/Bozze/Agente) ──
-  // Lì l'admin modifica l'INTERO blob `notes` come testo libero in una textarea.
-  // Per gestire gli allegati senza mostrargli le righe-marcatore grezze:
-  //   stripAttachments(notes) → { text, attachments } toglie le righe-marcatore
-  //     dal testo (lasciando intatti i marcatori di turno `--- … ---`) e ritorna
-  //     gli allegati raccolti, da mostrare come thumbnail sotto la textarea.
-  //   composeNotes(text, attachments) → ri-incorpora gli allegati come righe in
-  //     coda al testo al momento del salvataggio (inverso di stripAttachments).
+  // Dove l'admin modifica l'INTERO blob in una textarea non deve vedere le righe-marcatore:
+  // stripAttachments le toglie, composeNotes le ri-incorpora al salvataggio.
   function stripAttachments(notes) {
     const lines = String(notes || '').split('\n');
     const kept = [];
@@ -525,14 +445,19 @@
   // respinta dalle regole subito dopo: il feedback diventava immobile (nessun
   // cambio di stato, nessun commento) mentre il server, che le regole le
   // bypassa, continuava a gonfiarlo — cioè il guaio che questo tetto esiste per
-  // impedire. 44.000 byte diventano 58.798 cifrati: ci stanno.
-  const NOTES_MAX = 44000;
+  // impedire. 400.000 byte diventano 533.465 cifrati: le regole ne ammettono
+  // 540.000, e il documento intero resta sotto il MiB di Firestore.
+  //
+  // Dimensionato sul caso peggiore realistico (#1333): dieci giri di bocciatura
+  // con critica al suo tetto (anch'esso in byte, scripts/lib/tetto-critica.mjs)
+  // e report lunghi, più segnalazioni e domande, in qualunque lingua, devono
+  // lasciare leggibile il primo turno. La sentinella è
+  // tests/unit/tettiConversazione.test.mjs.
+  const NOTES_MAX = 400000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
-  // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
-  // marcatore, poi un blocco per ogni marcatore di turno (marcatore incluso).
-  // Diverso da splitNotes(): qui NON si perde nulla (marcatori, righe vuote,
-  // allegati restano dove sono) perché il risultato torna su Firestore.
+  // Diverso da splitNotes(): qui non si perde nulla, marcatori e righe vuote comprese,
+  // perché il risultato torna su Firestore.
   function rawBlocks(notes) {
     const lines = righe(notes || '');
     const blocks = [];
@@ -549,17 +474,8 @@
     return blocks.filter((b, i) => i === 0 || b.length > 0);
   }
 
-  /**
-   * Quanto OCCUPA questo testo. In BYTE UTF-8, non in caratteri.
-   *
-   * È la differenza che ha fatto saltare il tetto: le regole Firestore contano
-   * i byte del testo cifrato, che è ASCII e cresce in proporzione ai byte del
-   * chiaro. Una conversazione di 40.000 CARATTERI accentati, o in cirillico o
-   * in giapponese, sono 60.000-120.000 byte: passava il taglio e veniva
-   * respinta dalle regole subito dopo. Con l'italiano quasi non si vede — ed è
-   * il motivo per cui un tetto contato in caratteri sembra funzionare finché
-   * qualcuno non scrive un feedback in un'altra lingua.
-   */
+  // In BYTE UTF-8, non in caratteri: le regole contano i byte del cifrato.
+  // Quarantamila caratteri accentati o giapponesi sono 60.000-120.000 byte.
   function byteLen(s) {
     if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s).length;
     return Buffer.byteLength(s, 'utf8');
@@ -571,12 +487,19 @@
     if (byteLen(s) <= limit) return s;
     const blocks = rawBlocks(s);
     // Toglie i blocchi più vecchi finché il resto (+ la riga che dichiara il
-    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno.
-    while (blocks.length > 1) {
-      blocks.shift();
-      const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
+    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno. Le misure
+    // si sommano una volta sola: col tetto a centinaia di KB, ricomporre il
+    // testo a ogni turno tolto costava secondi a ogni scrittura.
+    const misure = blocks.map(byteLen);
+    const testa = byteLen(`${TRIM_MARK}\n\n`);
+    let resto = misure.reduce((a, b) => a + b, 0) + blocks.length - 1;
+    for (let i = 1; i < blocks.length; i++) {
+      resto -= misure[i - 1] + 1;
+      if (testa + resto > limit) continue;
+      const candidate = `${TRIM_MARK}\n\n${blocks.slice(i).join('\n').replace(/^\n+/, '')}`;
       if (byteLen(candidate) <= limit) return candidate;
     }
+    blocks.splice(0, blocks.length - 1);
     // Un turno solo, più lungo del tetto: tiene l'inizio (marcatore compreso) e
     // taglia la coda. Si taglia a byte e si arretra finché non si è spezzato un
     // carattere a metà: un troncamento in mezzo a una lettera accentata
@@ -589,36 +512,14 @@
       const troppi = byteLen(tagliato) - spazio;
       tagliato = tagliato.slice(0, Math.max(0, tagliato.length - Math.max(1, Math.ceil(troppi / 4))));
     }
-    // Un carattere fuori dal piano base (un'emoji) in JS sono DUE unità: se il
-    // taglio cade in mezzo resta mezza emoji, che non è più un carattere.
+    // Un'emoji in JS sono DUE unità: tagliare in mezzo lascia mezzo carattere.
     const ultimo = tagliato.charCodeAt(tagliato.length - 1);
     if (ultimo >= 0xD800 && ultimo <= 0xDBFF) tagliato = tagliato.slice(0, -1);
     return head + tagliato + '…';
   }
 
-  /**
-   * Cosa legge CHI HA MANDATO il feedback, quando gli viene detto che è risolto.
-   *
-   * I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8). `userNote` è la frase scritta
-   * per lui: breve, in chiaro, leggibile sulla SUA macchina, che non ha — giusta-
-   * mente — nessuna chiave. `notes` è un'altra cosa: è il report per l'owner,
-   * con le scelte della lavorazione, e da qui in avanti viaggia cifrato.
-   * Mostrargli quello era il motivo per cui il report non poteva essere protetto.
-   *
-   * RETROCOMPATIBILITÀ: i feedback già chiusi hanno un testo solo, in chiaro,
-   * dentro `notes`. Per quelli si continuano a estrarre i turni del modello, come
-   * prima — altrimenti chi torna su un feedback vecchio non leggerebbe più
-   * niente. Se invece `notes` è cifrato e la frase non c'è, non si mostra il
-   * ciphertext: si tace, che è meglio di un blob.
-   */
-  /**
-   * Il report NON è leggibile da chi sta guardando? Due forme, e vanno
-   * riconosciute entrambe: il testo cifrato così com'è (nessuna chiave in
-   * giro), e il SEGNAPOSTO che l'app mette al suo posto quando ha provato a
-   * decifrare e non ci è riuscita. Riconoscerne una sola è come non averne
-   * nessuna: nel caso scoperto la casella di modifica resta aperta su un
-   * segnaposto, e il primo salvataggio cancella il report vero.
-   */
+  // `userNote` è la frase in chiaro per chi ha mandato, `notes` il report cifrato per l'owner.
+  // Si riconoscono sia il cifrato sia il SEGNAPOSTO, o il primo salvataggio cancella il report.
   function reportUnreadable(notes) {
     const s = String(notes || '').trim();
     return s.startsWith('FENC') || s.startsWith('[cifrato');
@@ -647,19 +548,18 @@
     originOf,
     authorKind,
     senderOf,
+    filoPerConto,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.
     LOCAL_CLIENT_ID: 'local:claude',
     MODEL_PREFIXES,
-    // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
-    // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
-    // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
+    // L'automatica per fiducia (§10): specchio di filo-security functions/src/autoApprove.js.
     autoApproveGroup,
     autoApproveAllowed,
     resolveAutoApprove,
     AUTO_APPROVE_GROUPS,
-    CLAUDE_GROUPS,
+    LEGACY_GROUPS,
     ownerize,
     userTurnMarker,
     istanteDelMarcatore,

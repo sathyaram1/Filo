@@ -268,3 +268,75 @@ test('inchiostro: col fondo chiaro vince quello scuro del tema, col fondo scuro 
   assert.deepEqual(TC.readableInk([[128, 128, 128]], [[120, 120, 120], [140, 140, 140]]), [0, 0, 0]);
   assert.ok(Math.abs(TC.contrastRatio([0, 0, 0], [255, 255, 255]) - 21) < 1e-9);
 });
+
+// ------------------------------------------------------------
+// Ordine arcobaleno della barra e della Cronologia (#822)
+// ------------------------------------------------------------
+
+const ordina = (list) => [...list].sort((a, b) => TC.compareRainbow(a.c, b.c)).map((x) => x.n);
+
+test('ordine: grigi chiari dal più chiaro, poi i colori per tinta, poi i grigi scuri col più scuro in fondo, poi i senza colore com\'erano', () => {
+  const schede = [
+    { n: 'senza1', c: null },
+    { n: 'nero', c: 'rgb(0, 0, 0)' },
+    { n: 'blu', c: 'rgb(0, 0, 255)' },
+    { n: 'grigioChiaro', c: 'rgb(200, 200, 200)' },
+    { n: 'senza2', c: 'non un colore' },
+    { n: 'grigioScuro', c: 'rgb(60, 60, 60)' },
+    { n: 'bianco', c: 'rgb(255, 255, 255)' },
+    { n: 'rosso', c: 'rgb(255, 0, 0)' },
+    { n: 'mezzoScuro', c: 'rgb(127, 127, 127)' },
+    { n: 'verde', c: 'rgb(0, 255, 0)' },
+    { n: 'mezzoChiaro', c: 'rgb(128, 128, 128)' },
+    { n: 'senza3', c: undefined },
+    { n: 'crema', c: 'rgb(250, 245, 240)' },
+  ];
+  assert.deepEqual(ordina(schede), [
+    'bianco', 'crema', 'grigioChiaro', 'mezzoChiaro',
+    'rosso', 'verde', 'blu',
+    'mezzoScuro', 'grigioScuro', 'nero',
+    'senza1', 'senza2', 'senza3',
+  ]);
+});
+
+test('ordine: i rossi che tendono al magenta aprono l\'arcobaleno accanto al rosso pieno, i magenta lo chiudono (#822.1)', () => {
+  const schede = [
+    { n: 'blu', c: 'rgb(0, 0, 255)' },
+    { n: 'netflix', c: 'rgb(229, 9, 20)' },
+    { n: 'arancio', c: 'rgb(255, 140, 0)' },
+    { n: 'magenta', c: 'rgb(255, 0, 255)' },
+    { n: 'youtube', c: 'rgb(255, 0, 0)' },
+    { n: 'rosaShocking', c: 'rgb(255, 20, 147)' },
+    { n: 'pinterest', c: 'rgb(230, 0, 35)' },
+    { n: 'viola', c: 'rgb(128, 0, 255)' },
+  ];
+  assert.deepEqual(ordina(schede), ['pinterest', 'netflix', 'youtube', 'arancio', 'blu', 'viola', 'magenta', 'rosaShocking']);
+  // Il taglio sta a metà fra magenta e rosso (330°): appena sopra si apre, appena sotto si chiude.
+  assert.ok(TC.rainbowKey('rgb(255, 0, 127)')[1] < TC.rainbowKey('rgb(255, 0, 0)')[1]);
+  assert.ok(TC.rainbowKey('rgb(255, 0, 129)')[1] > TC.rainbowKey('rgb(255, 0, 255)')[1]);
+});
+
+test('ordine: è grigio quello che hasIdentity scarta, alla stessa soglia di croma', () => {
+  for (const c of ['rgb(123, 100, 100)', 'rgb(124, 100, 100)', 'rgb(15, 15, 15)', 'rgb(29, 161, 242)', 'rgb(250, 250, 252)']) {
+    assert.equal(TC.rainbowKey(c)[0] === 1, TC.hasIdentity(c), c);
+  }
+});
+
+test('ordine: con saturazione_tab a 0 una scheda rossa e una blu restano rosso, blu', () => {
+  const spento = { ...TC.defaultParams(), saturazione_tab: 0 };
+  const rosso = TC.extractIdentityFromPixels(makeFavicon(16, 16, () => [220, 20, 20, 255]), 16, 16, spento);
+  const blu = TC.extractIdentityFromPixels(makeFavicon(16, 16, () => [20, 40, 220, 255]), 16, 16, spento);
+  // A schermo le due schede sono grigie: l'ordine deve venire dal colore estratto.
+  assert.equal(TC.hasIdentity(TC.rgbCss(TC.adaptIdentity(rosso, spento))), false);
+  assert.deepEqual(ordina([{ n: 'blu', c: blu }, { n: 'rosso', c: rosso }]), ['rosso', 'blu']);
+});
+
+test('la barra ordina con la funzione condivisa, senza una copia propria', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const radice = join(__dirname, '..', '..', 'src');
+  for (const f of [join(radice, 'main', 'tabs.js')]) {
+    const src = await readFile(f, 'utf8');
+    assert.match(src, /compareRainbow\(/, f);
+    assert.doesNotMatch(src, /function hueOf\b/, f);
+  }
+});

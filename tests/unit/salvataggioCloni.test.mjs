@@ -10,6 +10,20 @@ import { clone, git, remoto, runHookAsync, runHookRaw, scene, stdinEdit, togliSc
 import { aspettaChe } from '../helpers/attese.mjs';
 
 test.after(togliScene);
+test('il clone della scena nasce pulito anche dove git converte le fini riga, come su Windows (#1993)', () => {
+  const { origin, base } = scene();
+  const globale = resolve(base, 'gitconfig-crlf');
+  writeFileSync(globale, '[core]\n\tautocrlf = true\n', 'utf8');
+  const prima = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = globale;
+  try {
+    const dir = clone(origin, base, 'clone-crlf', 'claude/crlf');
+    assert.equal(readFileSync(resolve(dir, 'README.md'), 'utf8'), 'base\n');
+    assert.equal(git(dir, ['status', '--porcelain']), '', 'appena clonato niente risulta modificato, o finirebbe nel primo salvataggio');
+  } finally {
+    if (prima === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = prima;
+  }
+});
 describe('#1157 — si salva solo la cartella di chi ha modificato', () => {
   test('il caso di oggi resta identico: una sessione, una cartella, salvata e spedita, stdout vuoto', () => {
     for (const stdin of [stdinEdit('§'), JSON.stringify({ hook_event_name: 'PostToolUse' }), '']) {

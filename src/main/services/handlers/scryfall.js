@@ -1,6 +1,5 @@
-// Handler di dominio: client Scryfall per il deck builder (§13.2) + commander.
-// La pagina non parla mai con Scryfall direttamente: passa da qui, così rate
-// limit e cache sono condivisi fra tutte le superfici.
+// Client Scryfall per il deck builder e il commander: la pagina non parla mai con Scryfall
+// direttamente, così rate limit e cache restano condivisi fra tutte le superfici.
 
 const { soloFilo } = require('./origine');
 
@@ -16,9 +15,10 @@ module.exports = function register(on, ctx) {
   // economico. Una rete più larga di così la chat la dichiara col numero e chiede un vincolo in più.
   const JUDGE_MAX_CARDS = 1050;
   const SORT_WORDS = { cmc: 'costo di mana', name: 'nome', price: 'prezzo' };
+  // Lotti della probabilità in chat: dieci tengono l'errore sotto i tre decimi di punto e la risposta sotto il mezzo secondo.
+  const CHAT_PROB_BATCHES = 10;
 
-  // Identity del mazzo per il filtro automatico (§4): dai colori del
-  // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
+  // Identity dai colori del commander: senza commander nessun vincolo, si cerca in tutto.
   async function identityOf(deckId) {
     if (!deckId) return null;
     const deck = await Store.get(String(deckId));
@@ -63,7 +63,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Conteggio ristampe per nome (modulo "Prezzo e dati" del detail, §5.2).
   on(MSG.SCRYFALL_PRINTS, async (msg) => {
     try {
       const prints = await Scry.prints(msg?.name);
@@ -73,14 +72,11 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Chat unificata del Builder (§3-§4) ─────────────────────────────────────
-  // Ricerca e chat sono lo stesso pannello: il messaggio dell'utente passa
-  // dall'LLM che decide se è una ricerca (→ query Scryfall, eseguita QUI col
-  // filtro identity automatico), una selezione cross-mazzo (→ scryfall_id presi
-  // dal contesto degli altri mazzi) o solo conversazione (→ reply).
+  // Ricerca e chat sono lo stesso pannello: è l'LLM a decidere se il messaggio è una ricerca
+  // (query eseguita QUI col filtro identity), una selezione cross-mazzo o conversazione.
 
-  // Riga compatta di contesto per il prompt: nome + tag (+ id dove serve
-  // all'LLM per rispondere con scryfall_id reali, cioè negli ALTRI mazzi).
+  // Riga di contesto per il prompt: l'id solo dove serve al modello per rispondere con
+  // scryfall_id reali, cioè negli altri mazzi.
   function cardLine(entry, card, withId) {
     const name = (card && card.name) || entry.scryfall_id;
     const tags = (entry.tags && entry.tags.length) ? ` — tag: ${entry.tags.join(', ')}` : '';
@@ -135,6 +131,18 @@ module.exports = function register(on, ctx) {
     return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
 
+  // Il codice e il rifiuto della chiave dicono alla pagina dove si toglie l'ostacolo: la frase da sola non ci porta (#663).
+  function rimedioDi(e) {
+    const R = globalThis.SN_WALLET;
+    return {
+      ...(e && e.code ? { code: e.code } : {}),
+      ...(R && R.keyRefusalOf && R.keyRefusalOf(e) ? { keyRefused: true } : {}),
+      ...(e && e.reason === 'crediti' ? { reason: 'crediti' } : {}),
+      ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
+      ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
+    };
+  }
+
   // Scryfall che non risponde non è una carta che non esiste, né una query sbagliata: la frase dice quale dei due.
   function scryfallDownText(e) {
     if (Scry.isTimeout && Scry.isTimeout(e)) return e.userText;
@@ -176,11 +184,8 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.DECKS_CHAT, async (msg, sender) => {
-    // Ragionamento del modello (CoT, #331): accumulato qui e ritornato alla
-    // pagina (che lo mostra in un blocco collassabile); se la pagina ha aperto
-    // un canale live (reasoningReqId) ogni chunk viene anche inoltrato subito,
-    // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
-    // turno fallito ritorna il ragionamento raccolto fin lì.
+    // Il ragionamento torna alla pagina, che lo mostra collassato. Dichiarato fuori dal try:
+    // anche un turno fallito ritorna quello raccolto fin lì.
     let reasoning = '';
     // Fermabile da subito, prima di qualunque attesa: un «Ferma» arrivato mentre si legge il mazzo spegne lo stesso
     // la chiamata al modello prima che parta. Pagina chiusa o ricaricata: la risposta non la leggerebbe nessuno.
@@ -201,7 +206,9 @@ module.exports = function register(on, ctx) {
     const smettiDiGuardare = Chats && Chats.onLeave ? Chats.onLeave(wc, () => ac.abort()) : () => {};
     const fermata = () => ({ ok: false, stopped: true, error: 'fermata', ...(reasoning ? { reasoning } : {}) });
     // Ogni chiamata al modello del turno porta il segnale, compresi giudice, tag e pareri: fermato, non ne parte un'altra.
-    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError()) : handleAIRequest({ ...args, signal }));
+    // Il segnale di chi chiama (la ricerca che ha deciso che il servizio è giù) vale insieme a quello del turno.
+    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError())
+      : handleAIRequest({ ...args, signal: args && args.signal ? AbortSignal.any([args.signal, signal]) : signal }));
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
@@ -209,18 +216,16 @@ module.exports = function register(on, ctx) {
       const deck = deckId ? await Store.get(deckId) : null;
       if (!deck) return { ok: false, error: 'not_found' };
 
-      // Contesto: nomi/tag del mazzo corrente + degli altri mazzi (per le
-      // query cross-mazzo, §4). I nomi arrivano dalla cache carte (le carte di
-      // un mazzo sono già state risolte quando sono entrate).
+      // Contesto: nomi e tag del mazzo corrente e degli altri, per le query cross-mazzo. I nomi
+      // vengono dalla cache carte, già risolti quando sono entrati nel mazzo.
       const all = await Store.list();
       const others = all.filter((d) => d.id !== deck.id);
       const allIds = [];
       for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
       const known = await Scry.cards(allIds, { signal }).catch(() => ({}));
 
-      // `let`, non `const`: se in questo stesso turno l'utente stabilisce il
-      // commander (build-around, sotto), va ricalcolato PRIMA della ricerca, così
-      // la query e il filtro duro restano nei colori del commander appena scelto.
+      // Se nello stesso turno l'utente stabilisce il commander, l'identity va ricalcolata PRIMA
+      // della ricerca: query e filtro devono stare nei colori appena scelti.
       let identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
         ? deck.commanderMeta.colors : null;
       const sys = PROMPTS.decksChat({
@@ -260,9 +265,10 @@ module.exports = function register(on, ctx) {
         payload: { messages },
         origin: 'filo://decks',
         onReasoning,
+        conSeguito: true,
       });
       if (signal.aborted) return fermata();
-      const parsed = Q.parseAgentReply(r.text);
+      const parsed = Q.parseAgentReply(r.text, r.finishReason);
       // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo. Il testo è
       // di Filo, non del modello: resta vero anche se la conferma non arriva (Annulla, mazzo lasciato) o se il
       // modello scrive di averla già svuotata.
@@ -280,9 +286,15 @@ module.exports = function register(on, ctx) {
       // Il turno è andato solo in parte (ricerca non partita, carte non controllate) e la risposta dice di riprovare:
       // la bolla allora tiene il tasto Riprova, come una risposta in errore.
       let retryable = false;
+      // Il controllo delle carte non è partito per un ostacolo che si toglie in Crediti o nelle Opzioni: la risposta
+      // arriva lo stesso, e la bolla porta il tasto per andarci accanto a Riprova.
+      let rimedio = null;
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
+      // Fermata al tetto di lunghezza (#1097.3): lo dice la risposta stessa.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+      if (interrotta) reply = [reply, interrotta].filter(Boolean).join('\n');
       let deckOut = null;
       // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
       let title = parsed.title;
@@ -363,8 +375,9 @@ module.exports = function register(on, ctx) {
           const status = Number(e1 && e1.status);
           const detail = String((e1 && e1.details) || '');
           let explained = false;
+          // La correzione fermata dal tetto: la bolla dice quella causa, non di riformulare (#1302).
+          let tagliata = null;
           if (Number.isFinite(status) && status >= 400 && status < 500 && status !== 429) {
-            // Query rifiutata (sintassi): il modello la corregge o spiega.
             try {
               // #593 (quarto giro di verifica) — IL MOTIVO DEL RIFIUTO LO
               // SCRIVE IL SERVIZIO REMOTO, E QUESTA RIGA È LA VOCE DI FILO.
@@ -384,15 +397,16 @@ module.exports = function register(on, ctx) {
                   'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
                   (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
+              // La query corretta è un dato: fermata dal tetto non si usa, e si passa alla spiegazione qui sotto (#1302).
               const r2 = await ai({
                 action: ACTIONS.DECKS_CHAT,
                 payload: { messages: retryMessages },
                 origin: 'filo://decks',
                 onReasoning,
+                intera: true,
               });
               const p2 = Q.parseAgentReply(r2.text);
-              // La reply del retry si accoda solo se aggiunge qualcosa (il
-              // modello a volte ripete la stessa frase del primo tentativo).
+              // La reply del retry si accoda solo se aggiunge qualcosa: spesso ripete la prima.
               if (p2.reply && p2.reply !== parsed.reply) {
                 reply = [reply, p2.reply].filter(Boolean).join('\n');
               }
@@ -404,19 +418,27 @@ module.exports = function register(on, ctx) {
                 sort = p2.sort || sort;
                 sr = await runSearch(p2.query, criterion);
               } else if (p2.reply) {
-                // Niente query: il modello ha SPIEGATO il problema — è la
-                // risposta per l'utente, il messaggio generico non serve.
+                // Il modello ha già spiegato il problema: è quella la risposta, il messaggio
+                // generico no.
                 explained = true;
               }
             } catch (e2) {
               if (signal.aborted) throw e2;
               sr = null;
+              if (e2 && e2.code === 'RISPOSTA_TAGLIATA') tagliata = e2;
             }
           }
           if (!sr && !explained) {
             retryable = true;
             const rejected = Number.isFinite(status) && status >= 400 && status < 500 && status !== 429;
-            reply = [reply, rejected
+            const CE = globalThis.SN_CHAT_ERRORS;
+            if (tagliata && CE) {
+              const dove = rimedioDi(tagliata);
+              if (CE.rimedioPagina(dove)) rimedio = dove;
+            }
+            reply = [reply, tagliata && CE
+              ? `La query «${parsed.query}» non è stata accettata da Scryfall e ho provato a correggerla, ma ${CE.fraseTagliata(tagliata.finishReason, { vuota: !!tagliata.vuota })}`
+              : rejected
               ? `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`
               : `La ricerca non è arrivata: ${scryfallDownText(e1)}. Riprova tra poco.`,
             ].filter(Boolean).join('\n');
@@ -462,6 +484,8 @@ module.exports = function register(on, ctx) {
               broken: !!sr.broken, why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
             });
             if (note) reply = [reply, note].filter(Boolean).join('\n');
+            const dove = fr.error ? rimedioDi(fr.error) : null;
+            if (dove && globalThis.SN_CHAT_ERRORS && globalThis.SN_CHAT_ERRORS.rimedioPagina(dove)) rimedio = dove;
             // In cache vanno le carte che si mostrano, non le centinaia della rete larga.
             Scry.remember(cardIds.map((id) => cards[id]).filter(Boolean)).catch(() => {});
             cards = Object.fromEntries(cardIds.filter((id) => cards[id]).map((id) => [id, cards[id]]));
@@ -477,21 +501,13 @@ module.exports = function register(on, ctx) {
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
 
-      // Invariante DURA di color identity (§4/§8.4): l'agente non deve MAI
-      // proporre carte fuori dai colori del commander. Il filtro sulla QUERY
-      // (buildSearchQuery, `id<=`) copre il caso normale, ma il modello può
-      // scriversi un vincolo `id:` esplicito sbagliato (che quel filtro lascia
-      // passare, per rispettare l'override manuale dell'utente) o pescare da un
-      // altro mazzo carte fuori identità: qui si applica il filtro sui DATI
-      // reali della carta (colorIdentity ⊆ colori commander), che nessuna
-      // sintassi di query può aggirare. L'import via chat (lista incollata
-      // dall'utente, più sotto) resta fuori: è una scelta esplicita dell'utente,
-      // non una proposta dell'agente, e la riga di legalità la segnala comunque.
+      // Invariante DURA: mai proporre carte fuori dai colori del commander. Il filtro sulla query
+      // copre il caso normale, qui si filtra sui DATI della carta, che nessuna sintassi aggira.
       let identityDropped = 0;
       if (identityColors && cardIds.length) {
         const kept = cardIds.filter((id) => {
           const c = cards[id];
-          // Dato carta mancante: non scartare per un dubbio (meglio mostrarla).
+          // Dato carta mancante: non si scarta per un dubbio, meglio mostrarla.
           if (!c) return true;
           if (Q.withinIdentity(c.colorIdentity, identityColors)) return true;
           identityDropped += 1;
@@ -505,12 +521,8 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Import via chat (§11.2): l'utente incolla una lista grezza, l'LLM la
-      // interpreta (typo/italiano/formati strani) in nomi+quantità sopra —
-      // qui il SISTEMA risolve ogni nome su Scryfall (fuzzy match, MAI si
-      // fida di un id inventato dal modello) e propone la stessa CardList di
-      // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
-      // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
+      // L'LLM interpreta la lista incollata, ma è il SISTEMA a risolvere ogni nome su Scryfall:
+      // mai un id inventato dal modello, e l'aggiunta resta un'azione esplicita dell'utente.
       let importPending = null;
       // Il commander senza lista o sostituito su richiesta l'ha già gestito il ramo sopra: qui resta solo il CANDIDATO
       // di una lista incollata.
@@ -561,9 +573,8 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL
-      // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
-      // aggiornato torna alla pagina, che rinfresca header e statistiche.
+      // L'LLM estrae il numero, il tetto lo applica IL SISTEMA: non ci si fida di un modello che
+      // dice di averlo già fatto.
       if (parsed.hasBudget) {
         draft = Decks.setBudget(draft || (await Store.get(deck.id)) || deck, parsed.budget);
         edits.push((d) => Decks.setBudget(d, parsed.budget));
@@ -574,21 +585,42 @@ module.exports = function register(on, ctx) {
       }
 
       // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo
-      // gira QUI, locale e gratis; il risultato si accoda alla reply.
+      // gira QUI, locale e gratis, con le condizioni e i lotti del riquadro (stessi
+      // seed: a parità di condizioni il numero coincide entro l'errore); fra un
+      // lotto e l'altro il main respira.
       if (parsed.prob) {
         const Stats = globalThis.SN_DECK_STATS;
-        const library = Stats.buildLibrary(draft || deck, known);
-        const r2 = Stats.simulate({ library, want: parsed.prob.needs, turn: parsed.prob.turn });
-        const pct = (r2.probability * 100).toFixed(1).replace('.', ',');
-        const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
-        reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT', { useGrouping: true })} mani simulate).`]
-          .filter(Boolean).join('\n');
+        const base = draft || deck;
+        const p = parsed.prob;
+        const cats = Stats.categoriesOf(base, known);
+        // Una categoria che il mazzo non ha darebbe 0% o mulligan infiniti: si dice.
+        const missing = [...new Set([...p.needs, ...p.keep].map((w) => w.tag))].filter((t) => !cats.includes(t));
+        let probTxt;
+        if (missing.length) {
+          probTxt = `Nel mazzo non c'è la categoria ${missing.map((t) => `«${t}»`).join(', ')}`
+            + (cats.length ? `: puoi chiedere ${cats.join(', ')}.` : '. Tagga le carte per averne.');
+        } else {
+          const library = Stats.buildLibrary(base, known);
+          // Un mulligan detto senza la mano da tenere parte da quella del riquadro (#791).
+          const keep = p.mulligans > 0 && !p.keep.length && Stats.DEFAULT_KEEP.every((w) => cats.includes(w.tag))
+            ? Stats.DEFAULT_KEEP : p.keep;
+          const cond = { game: p.game, mulligans: p.mulligans, keep, extraDraws: p.extraDraws };
+          let hits = 0; let iters = 0;
+          for (let seed = 1; seed <= CHAT_PROB_BATCHES && !signal.aborted; seed++) {
+            const r2 = Stats.simulate({ library, want: p.needs, turn: p.turn, ...cond, iterations: Stats.PROB_BATCH, seed });
+            hits += r2.hits; iters += r2.iterations;
+            if (hits === 0 || hits === iters) break; // caso certo o impossibile
+            await new Promise((res) => setImmediate(res));
+          }
+          const pct = (hits / Math.max(1, iters) * 100).toFixed(1).replace('.', ',');
+          const wantsTxt = p.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
+          probTxt = `Probabilità di avere ${wantsTxt} al turno ${p.turn} (${Stats.describeConditions(cond)}): ≈ ${pct}% (${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate).`;
+        }
+        reply = [reply, probTxt].filter(Boolean).join('\n');
       }
 
-      // Auto-tag via chat (§7): "tagga il mazzo con ramp, draw, removal…".
-      // I giudizi li fa IL SISTEMA (LLM economico in batch + cache carta/tag),
-      // mai il modello della chat "a parole". Il mazzo aggiornato torna alla
-      // pagina, che rinfresca elenco (gruppi per tag) e statistiche.
+      // I giudizi li fa IL SISTEMA, con un LLM economico in batch e cache, mai il modello della
+      // chat a parole.
       if (parsed.tagWith.length) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
         const base = draft || deck;
@@ -605,10 +637,8 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Valutazione batch esplicita (§6.1): "valuta il mazzo" / "valuta questi
-      // risultati". MAI in automatico: solo su richiesta. Calcola i pareri
-      // mancanti/stantii in un colpo e li mette in cache (§6.2); la sintesi
-      // complessiva va nella reply della chat.
+      // MAI in automatico, solo su richiesta: calcola in un colpo i pareri mancanti o stantii e li
+      // mette in cache.
       if (parsed.evaluate) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
         const base = draft || deck;
@@ -656,6 +686,7 @@ module.exports = function register(on, ctx) {
         ...(sort && (cardIds.length || hadList) ? { sort } : {}),
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
         ...(retryable ? { retryable: true } : {}),
+        ...(rimedio ? { rimedio } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),
@@ -669,6 +700,7 @@ module.exports = function register(on, ctx) {
       return {
         ok: false,
         error: friendlyChatError(e) || 'chat fallita',
+        ...rimedioDi(e),
         ...(reasoning ? { reasoning } : {}),
       };
     } finally {
@@ -703,11 +735,8 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Import/Export testuale (§11), via switcher ─────────────────────────────
-  // Parser RIGIDO e deterministico (IE = SN_DECK_IMPORT_EXPORT, logica pura,
-  // MAI l'LLM — quello è il cammino della chat sopra). PREVIEW risolve ogni
-  // nome via Scryfall fuzzy PRIMA di scrivere qualunque cosa: l'utente vede
-  // cosa entrerà nel mazzo (e cosa non si è capito) e conferma con APPLY.
+  // Parser RIGIDO e deterministico, mai l'LLM: la preview risolve ogni nome PRIMA di scrivere
+  // qualcosa, l'utente vede cosa entrerà e conferma con APPLY.
   on(MSG.DECKS_IMPORT_PREVIEW, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));
@@ -730,18 +759,15 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Applica un import già confermato dall'utente (§11.1): merge delle carte
-  // già risolte (mai un nome libero qui — solo scryfall_id già verificati
-  // dalla preview) + commander opzionale, SOLO se il mazzo non ne ha già uno
-  // (non sovrascrive mai una scelta esistente senza un'azione dedicata).
+  // Solo scryfall_id già verificati dalla preview, mai un nome libero; il commander si scrive
+  // solo se il mazzo non ne ha già uno.
   on(MSG.DECKS_IMPORT_APPLY, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));
       if (!deck) return { ok: false, error: 'not_found' };
       const rawEntries = Array.isArray(msg?.entries) ? msg.entries : [];
-      // Una qty <= 0 (o non numerica) significa "non includere": si scarta,
-      // NON si forza a 1 (0 è falsy — il vecchio `Number(...) || 1` la
-      // trasformava in una copia fantasma).
+      // Una qty <= 0 o non numerica significa «non includere»: si scarta, NON si forza a 1 — 0 è
+      // falsy e diventava una copia fantasma.
       const entries = rawEntries
         .map((e) => ({ scryfall_id: String((e && e.scryfallId) || ''), qty: Math.floor(Number(e && e.qty)) }))
         .filter((e) => e.scryfall_id && Number.isFinite(e.qty) && e.qty > 0);
@@ -764,7 +790,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Esporta il mazzo nello STESSO formato testuale dell'import (§11.1).
+  // Esporta nello STESSO formato testuale dell'import (§11.1).
   on(MSG.DECKS_EXPORT, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));

@@ -95,6 +95,12 @@ test('richieste vuote, lunghissime o con a capo e segni: niente ricerca, o una r
   assert.ok(t.length < 260, 'la richiesta nel popup è corta');
   assert.ok(!/[«»].*[«»].*[«»]/.test(t.replace(/^[^«]*«/, '')), 'le virgolette del popup non si chiudono da dentro la richiesta');
   assert.ok(f.ricerche[0].cosa.length <= 500);
+  // #592.7 — nel popup la richiesta sta intera nel suo riquadro, e le parole di Filo non la contengono.
+  const parti = f.domande[0].parti;
+  const filo = parti.filter((x) => typeof x === 'string').join('');
+  const riquadri = parti.filter((x) => typeof x !== 'string').map((x) => x.citazione);
+  assert.ok(!filo.includes('Il sito non vedrà niente'), 'la richiesta è fra le parole di Filo');
+  assert.equal(riquadri[0], f.ricerche[0].cosa, 'nel riquadro c\'è quello che si cerca davvero');
 });
 
 test('la busta per l\'Aiuto: candidati numerati, cartella coi nomi di Filo, si mostra col numero e non con un percorso', async () => {

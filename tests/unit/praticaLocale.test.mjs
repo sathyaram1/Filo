@@ -49,6 +49,19 @@ test('risolviFeedback: #N → l’id del documento col sotto-numero giusto', asy
   assert.equal(r2.id, 'figlio');
 });
 
+// #1517: un documento estraneo col numero di un altro non diventa «quella» pratica per finish, fondi o leggi.
+test('risolviFeedback: due documenti #5 → rifiuta ed elenca gli id; lettura piena → non sceglie', async () => {
+  const doc = (id, sub) => ({ document: { name: `p/documents/feedback/${id}`, ...(sub == null ? { fields: {} } : { fields: { subSeq: { integerValue: String(sub) } } }) } });
+  const due = rete(() => ({ status: 200, body: [doc('vero', null), doc('estraneo', 0), doc('figlio', 1)] }));
+  const r = await risolviFeedback('#5', { bearer: 't', base: 'B', fetchImpl: due.fetchImpl });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /#5 è il numero di 2 feedback \(vero, estraneo\)/);
+  assert.deepEqual(r.doppi, ['vero', 'estraneo']);
+  assert.deepEqual(await risolviFeedback('#5.1', { bearer: 't', base: 'B', fetchImpl: due.fetchImpl }), { ok: true, id: 'figlio', seq: 5 });
+  const piena = rete(() => ({ status: 200, body: [doc('vero', 0), ...Array.from({ length: 199 }, (_, i) => doc(`f${i}`, i + 1))] }));
+  assert.match((await risolviFeedback('#5', { bearer: 't', base: 'B', fetchImpl: piena.fetchImpl })).motivo, /non so dire se è uno solo/);
+});
+
 test('risolviFeedback: numero che non esiste, id che non esiste, rete che risponde male', async () => {
   const vuota = rete(() => ({ status: 200, body: [{ readTime: 'x' }] }));
   assert.match((await risolviFeedback('5', { bearer: 't', base: 'B', fetchImpl: vuota.fetchImpl })).motivo, /nessun feedback #5/);

@@ -4,9 +4,8 @@
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { risultatoOwnerFiducia } from './lib/owner-fiducia.mjs';
 
-const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
-export const OWNER_FIDUCIA_URL = `${BASE}/ownerFiducia`;
 // 500 per lotto (il server): 20.000 lotti sono dieci milioni di feedback. Oltre ci si ferma e lo si dice.
 export const TETTO_LOTTI = 20000;
 
@@ -52,21 +51,12 @@ export function rigaConto(t) {
   return `${come}: ${t.fidati} fidati, ${t.nonFidati} non fidati, ${t.giaImpostati} avevano già la fiducia${errori}. Lotti: ${t.lotti}.`;
 }
 
-async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const refresh = findAdminRefreshToken();
-  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
-  const idToken = await mintIdToken(refresh);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data }),
-  });
-  let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
-  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
-  return body.result || {};
+// Un lotto scrive fino a 500 feedback: il tetto è quello della funzione sul server (nove minuti), non i 30 s di una richiesta.
+const TEMPO_LOTTO_MS = 9 * 60 * 1000;
+
+/** Un lotto al server, con la chiamata comune. rete: i suoi deps. → il `result`, o un Error col motivo a parole. */
+export function chiamaLotto(data, rete = {}) {
+  return risultatoOwnerFiducia(data, { tempoMs: TEMPO_LOTTO_MS, ...rete });
 }
 
 async function main() {
@@ -74,7 +64,7 @@ async function main() {
   if (args.errore) { console.error(args.errore); return 2; }
   console.log(args.dalVero ? 'Migrazione della fiducia, dal vero: scrivo solo dove manca.' : 'Migrazione della fiducia a secco: conto e basta (--dal-vero per scrivere).');
   const t = await migraTutto({
-    chiama: (data) => chiamaServer(data),
+    chiama: (data) => chiamaLotto(data),
     dalVero: args.dalVero,
     ogniLotto: (tot) => console.log(`  lotto ${tot.lotti}: ${tot.fidati + tot.nonFidati + tot.giaImpostati} feedback visti finora`),
   });

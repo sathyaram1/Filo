@@ -14,8 +14,10 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+require(join(ROOT, 'src', 'shared', 'contenutoEsterno.js'));
 require(join(ROOT, 'src', 'shared', 'messages.js'));
 require(join(ROOT, 'src', 'shared', 'decks.js'));
+require(join(ROOT, 'src', 'shared', 'chatErrors.js'));
 require(join(ROOT, 'src', 'shared', 'scryfallQuery.js'));
 require(join(ROOT, 'src', 'shared', 'deckChat.js'));
 require(join(ROOT, 'src', 'shared', 'deckOpinions.js'));
@@ -63,8 +65,11 @@ let aiReply = '{}';
 let modelHangs = false;
 let cancello = null;
 const aiCalls = [];
+// `aiTurno`: un modello finto che sceglie la risposta chiamata per chiamata (n da 1), al posto di `aiReply`.
+let aiTurno = null;
 const handleAIRequest = async (args) => {
   aiCalls.push(args);
+  if (aiTurno) return aiTurno(args, aiCalls.length);
   if (cancello) await cancello;
   if (modelHangs) {
     await new Promise((_, reject) => {
@@ -97,7 +102,28 @@ function seedDeck() {
 
 beforeEach(() => {
   db.clear(); puts = 0; aiCalls.length = 0;
-  aiReply = '{}'; modelHangs = false; searchHangs = false; searchError = null; cancello = null;
+  aiReply = '{}'; modelHangs = false; searchHangs = false; searchError = null; cancello = null; aiTurno = null;
+});
+
+// #1302: la query corretta dopo un rifiuto di Scryfall fermata dal tetto dice la lunghezza massima e porta il tasto per
+// le Preferenze, non «riformula».
+test('la query corretta fermata dal tetto: la bolla dice la lunghezza massima, non di riformulare', async () => {
+  const CE = globalThis.SN_CHAT_ERRORS;
+  const deck = seedDeck();
+  searchError = Object.assign(new Error('Scryfall 400'), { status: 400, details: 'unknown keyword' });
+  aiTurno = (args, n) => {
+    if (n === 1) return { text: JSON.stringify({ reply: 'Cerco.', query: 'o:hast3 t:creatur' }), finishReason: 'stop' };
+    assert.equal(args.intera, true);
+    throw CE.erroreTagliata('length');
+  };
+  const r = await chat({ deckId: deck.id, text: 'creature con rapidità', reasoningReqId: 'q1' }, scheda(1));
+  assert.equal(aiCalls.length, 2);
+  assert.equal(r.ok, true);
+  assert.match(r.reply, /lunghezza massima/);
+  assert.match(r.reply, /Preferenze/);
+  assert.doesNotMatch(r.reply, /riformulare/);
+  assert.equal(r.rimedio?.code, 'RISPOSTA_TAGLIATA');
+  assert.equal(CE.rimedioPagina(r.rimedio)?.dove, 'preferenze');
 });
 
 test('Ferma annulla davvero la chiamata al modello e il turno torna «fermato»', async () => {

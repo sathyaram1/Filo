@@ -1,94 +1,15 @@
-## Il livello e la sede di ogni rilievo
-
-Ogni rilievo porta DUE cose indipendenti: il **livello** (quanto è grave) e
-la **sede** (a chi tocca: a questo lavoro o a un altro). Si scrivono insieme
-fra quadre, prima la cifra e poi la lettera: `[3i]`, `[2e]`, `[1i?]`, `[0e]`.
-La lettera è obbligatoria: un rilievo senza sede viene respinto con la
-spiegazione, non prende un valore in silenzio.
-
-### Il livello: quanti lo incontrano
-
-Il metro è la frequenza — quanti utenti lo incontreranno — non «esiste un
-caso in cui si rompe» (esiste sempre). Filo ha pochi utenti e deve arrivare a
-molti: un giro di correzione speso su un caso raro è tolto a ciò che un utente
-nuovo vede per primo. La ricerca resta larga; è il livello che va dato con
-misura.
-
-- **3** — sicurezza (dati cancellati o portati fuori, attacchi alle routine),
-  perdite importanti di soldi (un ciclo che fa milioni di chiamate al server),
-  Filo inutilizzabile. Solo se ci si arriva con una pagina, un documento o
-  un'azione NORMALE, senza condizioni particolari.
-- **2** — una funzione che non funziona nel caso normale (quello che la
-  maggior parte degli utenti prova per primo) o più di una volta su cinque; un
-  danno cosmetico enorme ed evidentissimo; una porta di sicurezza che richiede
-  una condizione rara (un gesto insolito, una grafia particolare).
-- **1** — una funzione che fallisce di rado (meno di una volta su cinque), non
-  cosmetica; un danno cosmetico locale ma evidente.
-- **0** — un danno cosmetico raro.
-
-Linea guida: **il 20% dello sforzo che dà l'80% del risultato**; il resto si
-rimanda a quando ci saranno i mezzi (utenti paganti, modelli migliori o più
-economici). Dopo una cura le vie rimaste sono rare per definizione, e il
-livello scende da solo. Vale anche per la sicurezza: una porta che
-l'attaccante raggiunge solo con una condizione rara è un 2, non un 3. Un
-rilievo di livello basso non si perde: alzargli il livello per salvarlo non
-serve, e costa.
-
-Accertati che ogni rilievo sia reale: se hai un dubbio, verificalo prima di
-scriverlo. Se sei in dubbio sul livello, scegli il più basso.
-
-### La sede: interno, vicino o esterno
-
-**Interno** (`i`) se una delle due:
-
-- il difetto sta nello **scenario scritto nella segnalazione**: i suoi esempi,
-  i suoi passi, la cosa che chiede, coi casi ovvi di quella cosa (in «rendi
-  allegabili i documenti», un docx che non si allega è interno; il livello lo
-  decide il caso: un pdf che non si allega è 2, un formato sconosciuto è 0);
-- oppure **l'ha creato questo ramo**: il lavoro o una delle sue correzioni.
-  Prima di scrivere `i` per questo motivo lo controlli sul codice, non a
-  intuito: `git diff origin/main...HEAD -- <file>` sul punto che hai davanti.
-
-**Vicino** (`v`): il difetto NON è di questo lavoro (per il resto sarebbe
-esterno), ma sta in un file che il ramo modifica già. Lo controlli sul codice:
-il file è nell'elenco di `git diff --name-only origin/main...HEAD`. Se c'è, è
-`v`; se non c'è, è `e`.
-
-**Esterno** (`e`) tutto il resto: un difetto che c'era già su `main` fuori
-dallo scenario, in un file che il ramo non tocca; un'altra porta della stessa
-classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
-aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
-suo: non si disfa il lavoro fatto).
-
-La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
-resta un 3. Il giro continua per i rilievi interni; un vicino può essere
-corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
-lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
-livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
-suo feedback.
-
-**Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
-rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
-prodotto o di gusto. Un difetto non chiede decisioni.
-
-| segnalazione e rilievo | livello e sede |
-|---|---|
-| «Filo legge le pagine web» (esempi: quanto costa, a che ora apre): il listino della pizzeria sparisce dalla lettura | 2i |
-| stessa segnalazione: il freno sugli indirizzi non riconosce i dati scritti al contrario | 1e |
-| «limita le azioni dopo una lettura» (memoria, schede, impostazioni, terminale, rete): il limite non tiene sulle schede | 2i |
-| stessa segnalazione: un collegamento scritto in chat porta fuori i dati con un gesto normale | 3e |
-| «il timer non suona»: chiesto a parole, Filo dice che la manopola del volume — aggiunta dalla correzione — non esiste | 1i |
-| stessa segnalazione: la pagina Preferenze aperta in un'altra scheda cancella le modifiche fatte altrove (c'era già su `main`, per tutte le pagine) | 2e |
-| stessa segnalazione: nella pagina del timer, che il ramo modifica, l'etichetta del secondo allarme è tagliata (c'era già su `main`) | 1v |
-| si scrive nelle chiavi SSH con un solo OK, sul cammino della segnalazione | 3i |
-| la finestra ridimensionata a menu aperto non fa rientrare il menu, fuori dallo scenario | 0e |
+<!-- includi: _livelli-e-sede.md -->
 
 ## I controlli automatici: partono subito, in sottofondo
 
 Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
-gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
+gli spec delle aree toccate dal ramo: mezzo minuto a spec, un ramo largo passa
+l'ora; la durata prevista la stampa prima di partire) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
-contesto. L'esito lo leggi prima di registrare. La suite intera (`npm test`)
+contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
+sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: riparte
+dagli spec non ancora verdi, anche se nel frattempo hai committato le prove del
+giro (un cambio al codice invece li rifà tutti). La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
@@ -100,11 +21,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
-- Nel contenitore delle routine gli spec che aprono Electron si lanciano con
-  `node scripts/lancia-electron.mjs npx playwright test <percorso>`, che mette
-  davanti `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a -n <base del worker>` come
-  `finish:check`; un `npx playwright test` lanciato a mano no. Un rosso
-  all'avvio senza quei due non è un rosso.
+- Nel contenitore delle routine `npx playwright test` si accende da solo lo
+  schermo virtuale con la sandbox spenta, come `finish:check`; senza xvfb si
+  ferma prima di aprire Electron e lo dice. Quello stop non è un rosso del
+  codice.
 
 ## La critica
 
@@ -119,7 +39,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
 [1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
-[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
+[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto; consiglio caldo.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
 
@@ -135,13 +55,27 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
   `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
-  fixture del repo, come ogni spec). In un giro locale la cartella te la dice
-  il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
-  in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
-  asserisce niente) si cancella. Si cancella anche quella di un rilievo
-  **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
-  suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre.
+  fixture del repo, come ogni spec), e si committano rosse: il segno di rosso
+  atteso (`test.fail`) va solo su quella di un rilievo messo da parte che resta
+  nel ramo, mai su una di un rilievo che registri. Segnata, conta il corpo: se
+  fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
+  porta è chiusa e le togli il segno. Una prova che era solo esplorazione
+  (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
+  quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
+  nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
+  esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
+  sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
+  Se la critica ha un `[3i?]` o un `[2i?!]` il lavoro si ferma e i `?` restano
+  a chi riprende: lì esce solo la prova degli esterni.
+  A una prova che copre anche un rilievo che resta togli solo il caso di quello
+  che esce, e il suo numero dal nome (`git mv`).
+  **La pulizia che non dipende dall'esito si fa prima del verdetto**, nel
+  commit della critica: si sa già, e ogni commit dopo il verdetto è un passo in
+  più che i cancelli devono controllare (lì si può solo togliere). La fiducia
+  non c'entra, e nemmeno il push: quel commit lo spedisce la registrazione
+  stessa, prima di chiedere l'esito al server.
+  La registrazione rifiuta una critica che ha ancora nel ramo una prova di
+  questi, o un caso col loro numero nel titolo, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
@@ -152,9 +86,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.
   Serve alla pulizia: quelle dei rilievi che la risposta del server mette da
-  parte le togli tu, appena la leggi e prima di ogni correzione, in un commit che
-  toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
-  comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
+  parte le togli tu appena la leggi, in un commit che toglie solo quelle, e lo
+  registri con `--record-pulizia` (la risposta ti dà il comando e ripete il
+  numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
   caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
@@ -164,7 +98,11 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
   in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
-  Se la risposta dice che il lavoro passa, le togli seguendola.
+  Una che la pulizia ha dimenticato esce con un'altra: un commit a parte che
+  toglie solo lei, registrato finché è l'ultimo.
+  Se la risposta dice che il lavoro passa, togli solo le prove che lei elenca
+  (i rilievi che il server ha messo da parte); se non ne elenca, dopo il
+  verdetto il ramo non si tocca più.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
@@ -176,20 +114,31 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
-[0e] …" [--segnala <file.md>]
+[1i?] …
+[0e] …" [--domanda <file.json>]
 ```
 
 <!-- includi: _segnala.md -->
 
-Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
-rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
-`--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
-QUELLA consegna ferma il lavoro come per chi risolve.
+**Ogni rilievo col `?` porta la sua domanda**, lo stesso JSON di
+`domanda.mjs chiedi` con almeno due opzioni: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nella domanda. Con un rilievo `?` il
+file di `--domanda` ha la domanda; con più rilievi `?` ha un elenco JSON di
+domande, una per rilievo, nell'ordine in cui stanno nella critica. Un rilievo
+`?` senza la sua domanda, o una domanda senza il suo rilievo, e la critica non
+parte. Le opzioni agiscono su `payload.id`; per un rilievo che esce in un
+feedback derivato il server le sposta sul derivato, che nasce col titolo della
+domanda. Un difetto non va lì: è un rilievo col suo livello.
+
+Se il lavoro si ferma lo decidono il livello e il segno, mai la domanda: su un
+rilievo `blocca` non si scrive, e la critica che lo porta non parte. Fermano
+i rilievi interni col `?` di livello 3 o col `!` (`[2i?!]`): il lavoro aspetta
+l'owner in ogni esito, e i rilievi da correggere restano davanti a chi
+riprende dopo la sua risposta. Un `[2i?]` va avanti: chi corregge applica
+l'opzione che consigli, e la sua domanda esce in un feedback derivato. Un 1 col
+`?`, un vicino col `?` o un esterno di qualunque livello va avanti in un
+feedback derivato con la sua domanda, che l'owner decide a parte. Una scelta
+che non deve fermare il lavoro si scrive col segno che non lo ferma.
 
 La critica registrata non si modifica più.
 

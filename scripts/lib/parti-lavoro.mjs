@@ -10,6 +10,14 @@ export const FINESTRA_PARTE_TARDIVA_MS = 48 * 60 * 60 * 1000;
 export const NOME_PARTE = Object.freeze({ app: 'dell’app', server: 'del server' });
 
 export const RAMO_RE = /^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+// I lavori server delle routine hanno su filo-security il nome del ramo dell'app, `worker/<id>-<ora>` (#1159).
+export const RAMO_ROUTINE_RE = /^worker\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+
+/** Un ramo che server:fondi porta su main: claude/<nome> o worker/<nome>, senza le forme che git rifiuta. PURA. */
+export function ramoValido(ramo) {
+  const r = String(ramo || '');
+  return (RAMO_RE.test(r) || RAMO_ROUTINE_RE.test(r)) && !/\.\.|\.lock$|\.$|\/\./.test(r);
+}
 
 /**
  * `localMerges` dai campi REST del feedback: { app?: ms, server?: ms }, le parti già su main, `solo` se una parte
@@ -56,6 +64,49 @@ export function parteTardiva({ status, parti = {}, parte, ramo = '', solo = fals
     return no(`la parte ${NOME_PARTE[altra]} è su main da più di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore`);
   }
   return { ok: true, altra, at: parti[altra] };
+}
+
+/**
+ * Pratica chiusa, e dell'altra parte c'è ancora un ramo legato fuori da main: la parte `parte` la riapre (#938). Vale
+ * la parte tardiva, e anche il seguito di una parte già passata, se l'ultima fusione è di questo lavoro (stesso ramo),
+ * da poco, e nessuno ha detto che stava tutto da una parte. PURA. `chiusaDa`: la parte la cui fusione l'ha chiusa.
+ * @returns {{ ok: true, chiusaDa: string, at: number } | { ok: false, motivo: string }}
+ */
+export function riaperturaConAltraInArrivo({ status, parti = {}, parte, ramo = '', solo = false, locale = false, ora = Date.now() } = {}) {
+  const t = parteTardiva({ status, parti, parte, ramo, solo, locale, ora });
+  if (t.ok) return { ok: true, chiusaDa: t.altra, at: t.at };
+  if (status !== 'done' || !locale || !PARTI.includes(parte) || !parti[parte]) return t;
+  const no = (motivo) => ({ ok: false, motivo });
+  if (solo) return no(`dici che il lavoro sta tutto nella parte ${NOME_PARTE[parte]}, ma dell’altra parte c’è ancora un ramo legato alla pratica`);
+  if (parti.solo) return no(`l’ha chiusa la parte ${NOME_PARTE[parti.solo]} dicendo che il lavoro stava tutto lì`);
+  if (parti.ramo !== ramo) {
+    return no(`l’ha chiusa la fusione di ${parti.ramo || 'un ramo senza nome'}, e un seguito vale solo dallo stesso nome di ramo, non da ${ramo || 'un ramo senza nome'}`);
+  }
+  const chiusaDa = PARTI.filter((p) => parti[p]).sort((a, b) => parti[b] - parti[a])[0];
+  const eta = ora - parti[chiusaDa];
+  if (eta > FINESTRA_PARTE_TARDIVA_MS || eta < -10 * 60 * 1000) {
+    return no(`l’ultima fusione di questo lavoro è su main da più di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore`);
+  }
+  return { ok: true, chiusaDa, at: parti[chiusaDa] };
+}
+
+/**
+ * La parte del server, fusa, è l'ultima: quella dell'app è registrata su main e dell'app non resta fuori nessun ramo
+ * legato alla pratica (un seguito, o una parte ancora in arrivo). PURA.
+ */
+export function serverUltimaParte({ parti = {}, ramiApp = [] } = {}) {
+  return !!parti.app && !ramiApp.length;
+}
+
+/**
+ * Chi fonde una parte decide prima di fondere se è l'ultima: con due fusioni sovrapposte ciascuna decide prima che
+ * l'altra registri la sua, e la pratica resterebbe aperta con tutto su main (#939). Dopo la fusione si rilegge la
+ * pratica e si rifà il conto (`ultima`, con le parti rilette). PURA.
+ * @returns {'chiusa'|'chiudi'|'aperta'} chiusa = l'ha già chiusa l'altra fusione
+ */
+export function dopoLaFusione({ status = '', ultima = false } = {}) {
+  if (status === 'done') return 'chiusa';
+  return ultima ? 'chiudi' : 'aperta';
 }
 
 /**

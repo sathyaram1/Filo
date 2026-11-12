@@ -44,6 +44,11 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
       provider: 'openrouter', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio senza riuso' },
       output: 'risposta B', origin: 'filo://dashboard', costEur: 0.0002,
       usage: { promptTokens: 8000, completionTokens: 40, cachedPromptTokens: 0 } },
+    // #1412 — prima chiamata su Claude coi punti di cache: niente riuso, ma la scrittura in cache si vede.
+    { id: 'h-write', timestamp: new Date(now - 2000).toISOString(), action: 'filo_chat',
+      provider: 'openrouter', model: 'anthropic/claude-haiku-5.5', servedBy: 'Anthropic', input: { userMessage: 'messaggio che scrive in cache' },
+      output: 'risposta C', origin: 'filo://dashboard', costEur: 0.004,
+      usage: { promptTokens: 41000, completionTokens: 40, cachedPromptTokens: 0, cacheWriteTokens: 38500 } },
   ];
 
   const userData = cartellaTemporanea('filo-hist-reuse-');
@@ -63,7 +68,7 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
     expect(page, 'la pagina cronologia deve aprirsi').toBeTruthy();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.locator('.sn-history-item')).toHaveCount(2);
+    await expect(page.locator('.sn-history-item')).toHaveCount(3);
 
     // La voce con riuso lo dichiara con la sua percentuale…
     const reused = page.locator('.sn-history-item', { hasText: 'messaggio con riuso' });
@@ -75,6 +80,13 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
     // La voce SENZA riuso lo dice esplicitamente: "zero" è l'informazione utile.
     const notReused = page.locator('.sn-history-item', { hasText: 'messaggio senza riuso' });
     await expect(notReused.locator('.sn-history-reuse')).toHaveText('riuso 0%');
+    await expect(notReused.locator('.sn-history-reuse')).not.toHaveAttribute('title', /messi da parte/);
+
+    // La chiamata che ha scritto in cache dice quanto, e chi l'ha servita.
+    const written = page.locator('.sn-history-item', { hasText: 'messaggio che scrive in cache' });
+    await expect(written.locator('.sn-history-meta')).toContainText('via Anthropic');
+    await expect(written.locator('.sn-history-reuse')).toHaveText('riuso 0%');
+    await expect(written.locator('.sn-history-reuse')).toHaveAttribute('title', /41\.000.*38\.500 token messi da parte/);
 
     // Traccia visiva ispezionabile.
     try {

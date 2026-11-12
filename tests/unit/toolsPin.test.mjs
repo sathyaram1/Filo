@@ -21,8 +21,8 @@
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,7 @@ const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
   PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
+  absolutizeOutput, absolutizePrinted, pinnedCommit, lavoroGiaPreso,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -280,6 +281,95 @@ test('più comandi nella stessa ricetta vengono riscritti tutti', () => {
   assert.ok(fuori.includes(`node "${base}/scripts/lib/b.mjs"`), fuori);
 });
 
+// ── I testi stampati (#763) ────────────────────────────────────────────────
+
+const REPO_VERO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const flussoFinto = () => {
+  const scritto = [];
+  return { scritto, write: (c) => { scritto.push(c); return true; } };
+};
+
+test('i comandi che gli strumenti stampano, quelli del server compresi, portano agli strumenti fissati', async () => {
+  // Le porte di #763: il pass senza nota, la pulizia delle prove, e le istruzioni del server che dispatch ristampa.
+  const { verifierReplyText, secauditSenzaNota } = await import('../../scripts/dispatch.mjs');
+  const f = flussoFinto();
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [f] }), true);
+  f.write(verifierReplyText({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, text: 'rotto' }],
+      derived: [{ level: 0, text: 'raro' }],
+      instructions: 'Consegna con node scripts/dispatch.mjs --record-fixed X "<report>".\nPoi node scripts/routine-channel.mjs release <biglietto> --role fixer',
+    },
+  }, 'X'));
+  f.write(`${secauditSenzaNota('pass', '')}\n`);
+  const tutto = f.scritto.join('');
+  assert.ok(!/node scripts\//.test(tutto), `resta un comando relativo:\n${tutto}`);
+  const base = comeScritto('/strumenti');
+  for (const c of ['dispatch.mjs" --record-pulizia X', 'dispatch.mjs" --record-fixed X', 'routine-channel.mjs" release', 'dispatch.mjs" --record-secaudit <id> pass', 'dispatch.mjs" --record-fixed <id>']) {
+    assert.ok(tutto.includes(`node "${base}/scripts/${c}`), `manca ${c}:\n${tutto}`);
+  }
+});
+
+test('un JSON stampato resta intatto: dentro c\'è testo di altri, e le virgolette lo romperebbero', () => {
+  const busta = `${JSON.stringify({ feedback: 'danno ancora `node scripts/dispatch.mjs …`' }, null, 2)}\n`;
+  assert.equal(absolutizePrinted(busta, '/strumenti', '/progetto'), busta);
+  assert.doesNotThrow(() => JSON.parse(absolutizePrinted(busta, '/strumenti', '/progetto')));
+  // Una parentesi in testa non basta a fare un JSON.
+  assert.ok(absolutizePrinted('[dispatch] rilancia: node scripts/dispatch.mjs --help', '/strumenti', '/progetto')
+    .includes(`node "${comeScritto('/strumenti')}/scripts/dispatch.mjs"`));
+  assert.equal(absolutizePrinted(Buffer.from('node scripts/x.mjs'), '/t', '/p').toString(), 'node scripts/x.mjs');
+});
+
+test('a strumenti NON fissati le stampe restano quelle scritte, e il filtro non si somma', () => {
+  const f = flussoFinto();
+  const scrivi = f.write;
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/progetto', streams: [f] }), false);
+  assert.equal(f.write, scrivi);
+  const g = flussoFinto();
+  absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [g] });
+  const una = g.write;
+  absolutizeOutput('/progetto', { toolsRoot: '/altrove', streams: [g] });
+  assert.equal(g.write, una);
+});
+
+test('ogni strumento che le ricette nominano passa le sue stampe dal filtro', () => {
+  const ruoli = resolve(REPO_VERO, 'routines', 'roles');
+  const nomi = new Set();
+  for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+    for (const m of readFileSync(resolve(ruoli, f), 'utf8').matchAll(/\bnode\s+scripts\/([A-Za-z0-9._-]+\.mjs)/g)) nomi.add(m[1]);
+  }
+  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs'), [...nomi].join(', '));
+  for (const n of nomi) {
+    assert.match(readFileSync(resolve(REPO_VERO, 'scripts', n), 'utf8'), /\babsolutizeOutput\(/,
+      `${n} stampa comandi che dalla cartella di lavoro portano agli strumenti del ramo`);
+  }
+});
+
+test('dalla copia, i testi che gli strumenti stampano portano alla copia', () => {
+  const dove = resolve(tmpdir(), `filo-strumenti-stampe-${process.pid}`);
+  const casa = cartellaTemporanea('filo-progetto-stampe-');
+  try {
+    const pin = pinTools(REPO_VERO, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+    const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE_TICKET: '' };
+    const casi = [
+      ['dispatch.mjs', ['--record-secaudit', 'X', 'pass'], 'dispatch.mjs" --record-secaudit'],
+      ['routine-channel.mjs', ['deliver', 'b-prova-con-la-forma-vera-di-un-biglietto', 'domanda', '--notes', 'x'], 'domanda.mjs" chiedi'],
+      ['lancia-electron.mjs', [], 'lancia-electron.mjs" <comando>'],
+    ];
+    for (const [strumento, args, atteso] of casi) {
+      const r = spawnSync(process.execPath, [resolve(dove, 'scripts', strumento), ...args], { cwd: casa, env, encoding: 'utf8' });
+      const tutto = `${r.stdout}${r.stderr}`;
+      assert.ok(tutto.includes(`${basename(dove)}/scripts/${atteso}`), `${strumento}: il comando non nomina la copia:\n${tutto.slice(-600)}`);
+      assert.ok(!/node scripts\//.test(tutto), `${strumento}: resta un comando relativo:\n${tutto.slice(-600)}`);
+    }
+  } finally {
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+  }
+});
+
 // ── Il controllo che conta ─────────────────────────────────────────────────
 
 test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', async () => {
@@ -329,6 +419,10 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
     assert.ok(existsSync(resolve(dove, 'routines', 'roles', 'orchestrator.md')),
       'anche le ricette dei ruoli devono seguire gli strumenti');
     assert.equal(pinnedRepoRoot(dove), resolve(REPO), 'la copia deve ricordare il progetto');
+    // Senza il commit la sessione vecchia non si riconosce più, in silenzio (#1796).
+    assert.equal(pinnedCommit(dove), execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim(),
+      'la copia deve ricordare il commit intero da cui viene');
+    assert.equal(lavoroGiaPreso(dove), false, 'una copia appena fissata non ha ancora preso biglietti');
     // E le istruzioni consegnate devono puntare alla copia, non al progetto.
     assert.ok(!/node scripts\//.test(out.so),
       `le istruzioni rimandano ancora agli strumenti del ramo:\n${out.so.slice(0, 400)}`);
@@ -355,7 +449,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: '', num: '', branch: '', payload: {} }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -369,7 +463,8 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
   try {
     // Il progetto: strumenti veri (servono a farlo girare) e ricetta AGGIORNATA.
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'),
+    // La busta del server finto non ha il feedback: dispatch consegna la ricetta del guasto, senza toccare git.
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'),
       'RICETTA AGGIORNATA\nRilascia con node scripts/routine-channel.mjs release <biglietto>\n', 'utf8');
 
     // Il giro fissa gli strumenti finché la cartella è ancora aggiornata.
@@ -377,7 +472,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     assert.equal(pin.ok, true, pin.why);
 
     // Poi si apre il ramo vecchio: da qui il progetto dice un'altra cosa.
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
 
     const out = await new Promise((fine) => {
       const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova-con-la-forma-vera-di-un-biglietto'], {
@@ -549,7 +644,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: '', num: '', branch: '', payload: {} }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -563,7 +658,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
   try {
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
     cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'ricetta\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'ricetta\n', 'utf8');
     const pin = pinTools(casa, { dest: dove });
     assert.equal(pin.ok, true, pin.why);
 
@@ -644,6 +739,10 @@ async function laboratorioGit() {
   g(['init', '-q', '-b', 'main']);
   g(['config', 'user.email', 't@t']);
   g(['config', 'user.name', 't']);
+  // Come Windows di serie, così il suo rosso si vede anche dal cancello su Linux; la fine riga la decide
+  // `.gitattributes` del repo, come nel progetto vero: senza, un file rimesso dal commit usciva CRLF (#2056).
+  g(['config', 'core.autocrlf', 'true']);
+  cpSync(resolve(REPO, '.gitattributes'), resolve(casa, '.gitattributes'));
   // Gli strumenti veri: la guardia gira dentro dispatch, non da sola.
   // Tutto quello che la copia pretende: enumerarlo a mano qui vorrebbe dire
   // ricostruire lo stesso elenco in due posti, e vederli divergere.
@@ -770,6 +869,33 @@ test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async (
     const out = await preflightIn(casa);
     assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
     assert.match(out.se, /non salvata|non salvato/, 'e dire che la cartella non è pulita');
+  } finally {
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
+  }
+});
+
+// Un install fatto prima del preflight (dall'ambiente, o in una sessione ripresa) riscrive package-lock.json: non è
+// roba di nessuno, e non deve costare il giro (#2040). Il resto della cartella sporca ferma ancora, qui sopra.
+test('lockfile riscritto da npm prima del preflight: torna com\'è nel commit e il giro parte', async () => {
+  const { casa, altrove, g } = await laboratorioGit();
+  try {
+    const lock = (v) => `{\n  "name": "filo",\n  "version": "${v}",\n  "lockfileVersion": 3\n}\n`;
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.246'), 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'lockfile']); g(['push', '-q', 'origin', 'main']);
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
+    assert.match(out.se, /package-lock\.json riscritto da npm: rimesso com'è nel commit/);
+    assert.equal(g(['status', '--porcelain']), '');
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.246'));
+
+    // Con altro di sporco accanto non si tocca niente: la cartella ferma il giro com'è.
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'), 'ricetta mezza\n', 'utf8');
+    const ferma = await preflightIn(casa);
+    assert.equal(ferma.code, 3, `doveva fermarsi: ${ferma.so.slice(0, 200)}`);
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.256'));
   } finally {
     togliCartella(casa, { tentativi: 10 });
     if (typeof altrove === 'string') togliCartella(altrove);

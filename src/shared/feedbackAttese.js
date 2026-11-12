@@ -1,0 +1,325 @@
+// Le attese fra feedback (#903): «aspetta #676, #663.2». Lettura dei numeri, rifiuti alla scrittura, stato di ciascuno, priorità ereditata (#1630).
+// Non tocca la rete: chi scrive passa `risolvi`, `leggiAttese` e `leggi`. Il server la incorpora al deploy (bake-shared): un cambio qui va su main solo con un lavoro server.
+// Test: tests/unit/feedbackAttese.test.mjs. Il campo: FEEDBACK-STATES.md.
+
+(function (global) {
+  'use strict';
+
+  const CAMPO = 'waitsFor';
+  const MAX = 20;
+  const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+  const NUM_RE = /^#?(\d{1,7})(?:\.(\d{1,6}))?$/;
+  // Il giro di attese si cerca fino in fondo; oltre questi documenti si rifiuta invece di scrivere un giro non visto.
+  const MAX_VISITATI = 2000;
+  // Parole che si scrivono fra i numeri e non sono numeri.
+  const PAROLE = new Set(['e', 'and', 'aspetta', 'aspettano', 'aspettare']);
+
+  const STATO = Object.freeze({
+    FUSO: 'fuso', APERTO: 'aperto', CHIUSO: 'chiuso', CANCELLATO: 'cancellato', IGNOTO: 'ignoto',
+  });
+  const ETICHETTA = Object.freeze({
+    fuso: 'fuso', aperto: 'non ancora fuso', chiuso: 'chiuso senza fusione', cancellato: 'cancellato', ignoto: 'stato non letto',
+  });
+  const CHIUSI_SENZA_FUSIONE = new Set(['archived', 'attack_confirmed', 'spam_confirmed']);
+
+  /** «676», «#676», «676.0» → '676'; «#663.2» → '663.2'; altro → ''. */
+  function normalizzaNumero(raw) {
+    const m = NUM_RE.exec(String(raw == null ? '' : raw).trim());
+    if (!m || Number(m[1]) < 1) return '';
+    const sub = m[2] !== undefined ? Number(m[2]) : 0;
+    return sub > 0 ? `${Number(m[1])}.${sub}` : String(Number(m[1]));
+  }
+
+  /**
+   * I numeri scritti dall'owner («aspetta #676, #663.2», «676 663.2», un array). Doppioni tolti, mai un taglio.
+   * @returns {{ ok: true, numeri: string[] } | { ok: false, motivo: string }}
+   */
+  function leggiNumeri(testo) {
+    const grezzo = Array.isArray(testo) ? testo.join(' ') : String(testo == null ? '' : testo);
+    const pezzi = grezzo.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean)
+      .filter((s) => !PAROLE.has(s.toLowerCase()));
+    const numeri = [];
+    for (const p of pezzi) {
+      const n = normalizzaNumero(p);
+      if (!n) return { ok: false, motivo: `«${p.slice(0, 30)}» non è un numero di feedback` };
+      if (!numeri.includes(n)) numeri.push(n);
+    }
+    if (numeri.length > MAX) {
+      return { ok: false, motivo: `sono ${numeri.length} numeri: un feedback ne aspetta al più ${MAX}, togline ${numeri.length - MAX}` };
+    }
+    return { ok: true, numeri };
+  }
+
+  /** Le attese scritte su un feedback, ripulite: [{ id, num }] (id validi, senza doppioni). */
+  function atteseDi(fb) {
+    const raw = fb && fb[CAMPO];
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    const visti = new Set();
+    for (const w of raw) {
+      const id = String((w && typeof w === 'object' ? w.id : w) || '').trim();
+      if (!ID_RE.test(id) || visti.has(id)) continue;
+      visti.add(id);
+      out.push({ id, num: w && typeof w === 'object' ? normalizzaNumero(w.num) : '' });
+    }
+    return out;
+  }
+
+  /**
+   * Lo stato di un aspettato: `doc` con lo stato leggibile, `{ missing: true }` se cancellato, undefined se non letto.
+   * Fuso = done, o archived con resolvedInVersion (il done verificato dall'owner). Stessa regola della coda.
+   */
+  function statoAttesa(doc) {
+    if (doc === undefined || doc === null) return STATO.IGNOTO;
+    if (doc.missing) return STATO.CANCELLATO;
+    const s = String(doc.status || '').trim();
+    if (!s || s.startsWith('FENC')) return STATO.IGNOTO;
+    if (s === 'done') return STATO.FUSO;
+    if (s === 'archived' && String(doc.resolvedInVersion || '').trim()) return STATO.FUSO;
+    if (CHIUSI_SENZA_FUSIONE.has(s)) return STATO.CHIUSO;
+    return STATO.APERTO;
+  }
+
+  /** [{ id, num, stato }]. `trova(id)` → il documento noto, o undefined. */
+  function statiDelleAttese(fb, trova) {
+    const cerca = typeof trova === 'function' ? trova : () => undefined;
+    return atteseDi(fb).map((w) => ({ id: w.id, num: w.num, stato: statoAttesa(cerca(w.id)) }));
+  }
+
+  /** Aspetta ancora almeno un feedback non fuso? Un aspettato mai letto conta come non fuso, come per la coda. */
+  function aspettaAncora(fb, trova) {
+    return statiDelleAttese(fb, trova).some((w) => w.stato !== STATO.FUSO);
+  }
+
+  /**
+   * Le attese per la scheda del manutentore (#2262), con la regola di aspettaAncora: `aspetta` solo quelle che
+   * bloccano, ciascuna col suo stato ([{ num, stato }]); `aspettava` i numeri di quelle già fuse.
+   */
+  function atteseDellaScheda(fb, trova) {
+    const stati = statiDelleAttese(fb, trova);
+    return {
+      aspetta: stati.filter((w) => w.stato !== STATO.FUSO).map((w) => ({ num: w.num, stato: w.stato })),
+      aspettava: stati.filter((w) => w.stato === STATO.FUSO).map((w) => w.num),
+    };
+  }
+
+  function etichetta(w) {
+    return w && w.num ? `#${w.num}` : 'un feedback senza numero';
+  }
+
+  /** «#676, #663.2». */
+  function testoAttese(lista) {
+    return (Array.isArray(lista) ? lista : []).map(etichetta).join(', ');
+  }
+
+  /**
+   * Le attese da scrivere su `id`, controllate: esistono, non sono lui, non chiudono un giro, al più MAX.
+   * `risolvi(num)` → id o null (non esiste; un guasto si lancia). `leggiAttese(ids)` → Map id → attese di quel
+   * feedback (`atteseDi`). `num` = il numero di `id`, per i messaggi. `gia` = le attese che `id` ha adesso: un loro
+   * numero non si risolve di nuovo e quelle con l'id in `tieni` restano come sono, così un aspettato cancellato non blocca le altre.
+   * @returns {Promise<{ ok: true, attese: Array<{id,num}> } | { ok: false, motivo: string }>}
+   */
+  async function valida({ id, num = '', numeri, gia = [], tieni = [], risolvi, leggiAttese }) {
+    const lista = Array.isArray(numeri) ? numeri.map(normalizzaNumero) : [];
+    if (lista.some((n) => !n)) return { ok: false, motivo: 'c’è un numero di feedback non valido' };
+    const salvate = atteseDi({ [CAMPO]: gia });
+    const perNumero = new Map(salvate.filter((w) => w.num).map((w) => [w.num, w]));
+    const tenute = salvate.filter((w) => (Array.isArray(tieni) ? tieni : []).map(String).includes(w.id));
+    const quante = new Set([...lista, ...tenute.map((w) => w.num || w.id)]).size;
+    if (quante > MAX) {
+      return { ok: false, motivo: `sono ${quante} numeri: un feedback ne aspetta al più ${MAX}, togline ${quante - MAX}` };
+    }
+    const proprio = normalizzaNumero(num);
+    const attese = [];
+    for (const n of lista) {
+      if (proprio && n === proprio) return { ok: false, motivo: `#${n} è questo stesso feedback: non può aspettare sé stesso` };
+      const nota = perNumero.get(n);
+      // eslint-disable-next-line no-await-in-loop
+      const altro = nota ? nota.id : await risolvi(n);
+      if (!altro) return { ok: false, motivo: `#${n} non esiste` };
+      if (String(altro) === String(id)) return { ok: false, motivo: `#${n} è questo stesso feedback: non può aspettare sé stesso` };
+      if (!attese.some((a) => a.id === String(altro))) attese.push({ id: String(altro), num: n });
+    }
+    for (const w of tenute) if (!attese.some((a) => a.id === w.id)) attese.push({ id: w.id, num: w.num });
+    if (!attese.length || !id) return { ok: true, attese };
+    const giro = await cercaGiro(String(id), attese, leggiAttese);
+    if (giro && giro.troppi) return { ok: false, motivo: `le attese a catena superano ${MAX_VISITATI} feedback: non so dire se chiudono un giro` };
+    if (giro) {
+      const io = proprio ? `#${proprio}` : 'questo feedback';
+      const catena = giro.map((n) => (n ? `#${n}` : 'un feedback senza numero')).join(', che aspetta ');
+      return { ok: false, motivo: `giro di attese: ${io} aspetterebbe ${catena}, che aspetta ${io}` };
+    }
+    return { ok: true, attese };
+  }
+
+  /**
+   * Cosa passare a `valida`, calcolato sulle attese lette adesso (`prima`). `numeri` è l'elenco intero e sostituisce;
+   * senza, restano quelle lette tranne `togli` (id), per numero o per id quelle senza, e `aggiungi` si unisce. PURA.
+   * @returns {{ numeri: string[], tieni: string[] }}
+   */
+  function daScrivereSu(prima, { numeri, aggiungi = [], togli = [] } = {}) {
+    if (Array.isArray(numeri)) return { numeri: numeri.slice(), tieni: [] };
+    const via = new Set((Array.isArray(togli) ? togli : []).map(String));
+    const restano = atteseDi({ [CAMPO]: prima }).filter((w) => !via.has(w.id));
+    const nuovi = (Array.isArray(aggiungi) ? aggiungi : []).map(normalizzaNumero);
+    return {
+      numeri: [...new Set([...restano.map((w) => w.num).filter(Boolean), ...nuovi])],
+      tieni: restano.filter((w) => !w.num).map((w) => w.id),
+    };
+  }
+
+  // Le riletture concesse a una scrittura che trova il documento cambiato dopo averlo letto.
+  const RILETTURE = 8;
+  const pausaRilettura = (i) => new Promise((r) => setTimeout(r, Math.round(Math.min(1600, 100 * 2 ** (i - 1)) * (0.5 + Math.random()))));
+
+  /** La risposta di Firestore a una scrittura con la versione come condizione, quando il documento non è più quello letto. PURA. */
+  function conflittoDiScrittura(status, testo) {
+    if (status === 404 || status === 409 || status === 412) return true;
+    return status === 400 && /FAILED_PRECONDITION|ABORTED|base version/i.test(String(testo || ''));
+  }
+
+  /**
+   * Le attese si scrivono solo sull'elenco letto (#1756.1): chi le scrive ricalcola da quelle di adesso e scrive con la
+   * versione letta come condizione; se intanto un altro ha scritto, rilegge e ricalcola, invece di cancellargli la sua.
+   * `leggi()` → { versione, ... } o null; `calcola(letto)` → { fine: esito } per chiudere senza scrivere, o { scrivi: dati };
+   * `scrivi(dati, versione)` → l'esito, o { conflitto: true } se il documento non era più a quella versione.
+   */
+  async function scriviSullaLettura({ leggi, calcola, scrivi, tentativi = RILETTURE, pausa = pausaRilettura }) {
+    for (let i = 1; i <= tentativi; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const letto = await leggi();
+      // eslint-disable-next-line no-await-in-loop
+      const passo = await calcola(letto);
+      if (!passo || !('scrivi' in passo)) return passo ? passo.fine : { ok: false, motivo: 'niente da scrivere' };
+      if (!letto || !letto.versione) {
+        return { ok: false, motivo: 'la lettura non dice la versione del documento: non scrivo su un elenco che potrebbe essere cambiato' };
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const esito = await scrivi(passo.scrivi, letto.versione);
+      if (!esito || !esito.conflitto) return esito;
+      // eslint-disable-next-line no-await-in-loop
+      if (i < tentativi) await pausa(i);
+    }
+    return { ok: false, conflitto: true, motivo: `le attese sono cambiate ${tentativi} volte di seguito mentre le scrivevo: non ho scritto niente, riprova` };
+  }
+
+  /** Il percorso (numeri) da un'attesa diretta fino a un feedback che aspetta `selfId`, o null. */
+  async function cercaGiro(selfId, attese, leggiAttese) {
+    const prima = new Map();
+    let frontiera = [];
+    for (const a of attese) {
+      if (prima.has(a.id)) continue;
+      prima.set(a.id, { da: null, num: a.num });
+      frontiera.push(a.id);
+    }
+    const percorso = (id) => {
+      const out = [];
+      for (let x = id; x; x = prima.get(x).da) out.unshift(prima.get(x).num);
+      return out;
+    };
+    while (frontiera.length) {
+      // eslint-disable-next-line no-await-in-loop
+      const mappa = await leggiAttese(frontiera.slice());
+      const prossima = [];
+      for (const id of frontiera) {
+        const sue = mappa && typeof mappa.get === 'function' ? (mappa.get(id) || []) : [];
+        for (const w of sue) {
+          if (!w || !w.id) continue;
+          if (w.id === selfId) return percorso(id);
+          if (prima.has(w.id)) continue;
+          prima.set(w.id, { da: id, num: w.num || '' });
+          prossima.push(w.id);
+          if (prima.size > MAX_VISITATI) return { troppi: true };
+        }
+      }
+      frontiera = prossima;
+    }
+    return null;
+  }
+
+  /**
+   * 1..3, 0 = nessuna. null = illeggibile (un cifrato, un testo storto): chi eredita non lo scambia per 0,
+   * altrimenti una priorità vera rimasta cifrata verrebbe riscritta più bassa.
+   */
+  function prioritaDi(doc) {
+    const raw = doc ? doc.priority : undefined;
+    if (raw === undefined || raw === null || raw === '' || raw === false) return 0;
+    const n = typeof raw === 'number' ? raw : (/^\s*\d+(?:\.\d+)?\s*$/.test(String(raw)) ? Number(raw) : NaN);
+    if (!Number.isFinite(n)) return null;
+    const p = Math.round(n);
+    return p >= 1 && p <= 3 ? p : 0;
+  }
+
+  /** La scrittura `prima` → `dopo` (prima null alla nascita) chiede l'eredità: priorità salita, o un'attesa nuova. */
+  function scattaEredita(prima, dopo) {
+    const p = prioritaDi(dopo);
+    if (!p || !atteseDi(dopo).length) return false;
+    const p0 = prima ? prioritaDi(prima) : 0;
+    if (p0 === null || p > p0) return true;
+    const gia = new Set(atteseDi(prima).map((w) => w.id));
+    return atteseDi(dopo).some((w) => !gia.has(w.id));
+  }
+
+  /**
+   * Chi sale quando `fonte` ({ id, num, priority, waitsFor }, in chiaro) ha la priorità o le attese nuove: ogni aspettato
+   * aperto sotto la sua priorità sale fino a lei, e a catena i suoi. Mai verso il basso; fusi, chiusi e cancellati restano.
+   * `leggi(ids)` → Map id → documento in chiaro ({ num, status, resolvedInVersion, priority, waitsFor }) o { missing: true }.
+   * `da` è chi lo aspetta direttamente (per `notaEredita`); `illeggibili` sono quelli saltati per stato o priorità non letti.
+   * @returns {Promise<{ ok: true, alzati: Array<{ id, num, prima, dopo, da: { id, num } }>, illeggibili: Array<{ id, num }> }
+   *   | { ok: false, motivo: string }>}
+   */
+  async function ereditaPriorita(fonte, leggi) {
+    const p = prioritaDi(fonte);
+    const alzati = [];
+    const illeggibili = [];
+    if (!p) return { ok: true, alzati, illeggibili };
+    const fonteId = String((fonte && fonte.id) || '');
+    const visti = new Set(fonteId ? [fonteId] : []);
+    let frontiera = [{ id: fonteId, num: normalizzaNumero(fonte && fonte.num), attese: atteseDi(fonte) }];
+    while (frontiera.length) {
+      const coppie = [];
+      for (const chi of frontiera) {
+        for (const w of chi.attese) {
+          if (visti.has(w.id)) continue;
+          visti.add(w.id);
+          coppie.push({ w, da: { id: chi.id, num: chi.num } });
+        }
+      }
+      if (visti.size > MAX_VISITATI) {
+        return { ok: false, motivo: `le attese a catena superano ${MAX_VISITATI} feedback: l'eredità di priorità non è stata calcolata` };
+      }
+      if (!coppie.length) break;
+      // eslint-disable-next-line no-await-in-loop
+      const mappa = await leggi(coppie.map((c) => c.w.id));
+      const prossima = [];
+      for (const { w, da } of coppie) {
+        const doc = mappa && typeof mappa.get === 'function' ? mappa.get(w.id) : undefined;
+        const num = normalizzaNumero(doc && doc.num) || w.num;
+        const stato = statoAttesa(doc);
+        if (stato === STATO.IGNOTO) { illeggibili.push({ id: w.id, num }); continue; }
+        if (stato !== STATO.APERTO) continue;
+        const prima = prioritaDi(doc);
+        if (prima === null) { illeggibili.push({ id: w.id, num }); continue; }
+        // Chi vale già quanto la fonte ha i suoi aspettati in regola: l'eredità li ha alzati quando è salito lui.
+        if (prima >= p) continue;
+        alzati.push({ id: w.id, num, prima, dopo: p, da });
+        prossima.push({ id: w.id, num, attese: atteseDi(doc) });
+      }
+      frontiera = prossima;
+    }
+    return { ok: true, alzati, illeggibili };
+  }
+
+  /** «priorità 3: la eredita da #1630, che lo aspetta». */
+  function notaEredita(alzato) {
+    const a = alzato || {};
+    return `priorità ${a.dopo}: la eredita da ${etichetta(a.da)}, che lo aspetta`;
+  }
+
+  global.SN_FB_ATTESE = {
+    CAMPO, MAX, STATO, ETICHETTA,
+    normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
+    daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
+    prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);

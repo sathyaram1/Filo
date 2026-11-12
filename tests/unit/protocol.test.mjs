@@ -49,6 +49,20 @@ test('serve una pagina HTML interna con header CSP', async () => {
   assert.equal(csp, FILO_PAGE_CSP);
   assert.match(csp, /script-src 'self' filo:/);
   assert.match(csp, /object-src 'none'/);
+  // #1506 — un sito non incornicia una pagina di Filo.
+  assert.match(csp, /(^|; )frame-ancestors 'self' filo:(;|$)/);
+});
+
+// #830.4: le altre pagine si scrivono <host>/<host>.html, e chi scrive così l'indirizzo della home la deve trovare.
+test('l\'indirizzo della home scritto come «newtab.html» apre la home', async () => {
+  const home = await (await filoHandler({ url: 'filo://newtab/' })).text();
+  assert.match(home, /id="input"/, 'filo://newtab/ non è più la home');
+  for (const url of ['filo://newtab/newtab.html', 'filo://newtab/NewTab.html', 'filo://newtab/newtab.html?accoglienza=1']) {
+    const res = await filoHandler({ url });
+    assert.equal(res.status, 200, `${url} non si apre`);
+    assert.equal(await res.text(), home, `${url} non apre la home`);
+    assert.equal(res.headers.get('content-security-policy'), FILO_PAGE_CSP, `${url} senza CSP`);
+  }
 });
 
 test('NON aggiunge CSP a risorse non-HTML (es. CSS)', async () => {
@@ -97,4 +111,24 @@ test('lo schema filo chiede la cache del codice V8, insieme a standard', () => {
   assert.ok(filo, 'lo schema filo non è registrato coi privilegi');
   assert.equal(filo.privileges.codeCache, true);
   assert.equal(filo.privileges.standard, true);
+});
+
+// #1414: le pagine dell'owner sono entrate in Gestione; il vecchio indirizzo, da qualunque strada arrivi, porta lì.
+test('i vecchi indirizzi delle pagine dell\'owner rimandano alla loro sezione di Gestione', async () => {
+  const casi = {
+    'filo://admin-defaults/admin-defaults.html': 'filo://manage/manage.html#predefiniti',
+    'filo://admin-defaults/': 'filo://manage/manage.html#predefiniti',
+    'filo://ADMIN-DEFAULTS/Admin-Defaults.html?x=1': 'filo://manage/manage.html#predefiniti',
+    'filo://credits/owner.html': 'filo://manage/manage.html#utenti',
+    'filo://credits/OWNER.html#qualcosa': 'filo://manage/manage.html#utenti',
+  };
+  for (const [da, a] of Object.entries(casi)) {
+    const res = await filoHandler({ url: da });
+    assert.equal(res.status, 302, `${da} non rimanda`);
+    assert.equal(res.headers.get('location'), a, `${da} rimanda nel posto sbagliato`);
+  }
+  // La pagina Crediti dell'utente resta dov'è, e così Gestione.
+  for (const resta of ['filo://credits/credits.html', 'filo://manage/manage.html']) {
+    assert.equal((await filoHandler({ url: resta })).status, 200, `${resta} non si apre più`);
+  }
 });

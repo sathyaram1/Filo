@@ -41,6 +41,8 @@
 .rt-redeem { margin-top: 12px; max-width: 360px; }
 .rt-redeem label { margin-top: 10px; }
 .rt-redeem .sn-btn { margin-top: 14px; }
+.rt-redeem #redeemLascia { margin-left: 8px; }
+.rt-redeem #redeemLascia[hidden] { display: none; }
 .rt-redeem-msg {
   margin: 12px 0 0;
   font-size: 13px;
@@ -103,7 +105,7 @@
   border-radius: var(--sn-radius);
   border: 1px solid var(--sn-border);
   font-variant-numeric: tabular-nums;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .rt-cell--off {
   background: var(--sn-hover);
@@ -127,7 +129,7 @@
 }
 /* Sblocco appena rivelato: un tocco celebrativo. */
 .rt-cell--justunlocked {
-  animation: rt-pop 600ms ease;
+  animation: rt-pop calc(600ms * var(--sn-motion, 1)) ease;
 }
 @keyframes rt-pop {
   0% { transform: scale(0.9); }
@@ -272,7 +274,7 @@
   left: 8px;
   color: var(--sn-muted);
   display: inline-block;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .rt-hist-row--open .rt-hist-when::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) {
@@ -428,7 +430,7 @@
 .rt-slot-label { font-weight: 700; font-size: 15px; }
 .rt-slot-icon { font-size: 26px; line-height: 1; }
 .rt-slot-pts { font-size: 12px; color: var(--sn-muted); }
-.rt-slot--revealed { animation: rt-pop 400ms ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
+.rt-slot--revealed { animation: rt-pop calc(400ms * var(--sn-motion, 1)) ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
 .rt-slot--waiting .rt-slot-pts { font-style: italic; }
 .rt-slot-spinner {
   width: 18px;
@@ -436,7 +438,7 @@
   border-radius: 50%;
   border: 2px solid var(--sn-border);
   border-top-color: var(--sn-accent);
-  animation: rt-spin 800ms linear infinite;
+  animation: rt-spin calc(800ms * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes rt-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
@@ -528,3 +530,21 @@
   box-sizing: border-box;
 }
 .rt-pausa p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--sn-muted); text-align: center; }
+
+/* Il bottone d'invio sta sulla riga del titolo: si vede da ogni scheda della pagina (#991). */
+/* Il margine del titolo passa alla riga, così titolo e bottone stanno sulla stessa linea. */
+.rt-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.sn-page .rt-head h1 { margin: 0 auto 0 0; }
+.sn-page button.rt-attack-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rt-attack-icon { display: inline-flex; }
+.rt-attack-icon svg { display: block; }

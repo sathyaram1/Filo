@@ -53,14 +53,15 @@ function cartellaDiSerie(chiave) {
 }
 
 /** La voce dell'impostazione com'è scritta → chiave di serie o percorso assoluto; '' se non è una cartella. PURA. */
-function voceCartella(v) {
-  let s = String(v == null ? '' : v).trim().replace(/^["'«]+|["'»]+$/g, '').trim();
+function voceCartella(v, { path: P = path, casa = os.homedir() } = {}) {
+  // La pulizia è quella del perimetro: il costo misura la cartella che si legge qui (#1499).
+  let s = classifica().C.pulisciPercorso(v);
   if (!s) return '';
   const chiave = SINONIMI_CARTELLE[s.toLowerCase()];
   if (chiave) return chiave;
-  if (s === '~') return os.homedir();
-  if (/^~[\\/]/.test(s)) s = path.join(os.homedir(), s.slice(2));
-  return path.isAbsolute(s) ? path.resolve(s) : '';
+  if (s === '~') return casa;
+  if (/^~[\\/]/.test(s)) s = P.join(casa, s.slice(2));
+  return P.isAbsolute(s) ? P.resolve(s) : '';
 }
 
 function nomeDellaVoce(voce) {
@@ -115,6 +116,23 @@ async function radici(impostazioni) {
     out.push({ voce, percorso, nome: nomeDellaVoce(voce), esiste });
   }
   return out;
+}
+
+const diRete = (...ps) => ps.some((p) => require('./documentRead').percorsoDiRete(p));
+
+/**
+ * La cartella chiesta a una ricerca, risolta come la legge l'indice: { voce, percorso, serie, rete }. `rete`: porta a
+ * un altro computer e non sta dentro una cartella dell'elenco (lì quel computer l'ha scelto l'utente): non si tocca.
+ */
+async function cartellaChiesta(v, rs = null) {
+  const voce = voceCartella(v);
+  const serie = !!DI_SERIE[voce];
+  const percorso = serie ? cartellaDiSerie(voce) : voce;
+  let rete = false;
+  if (percorso && !serie && diRete(v, percorso)) {
+    rete = !(rs || await radici()).some((r) => r.esiste && r.percorso && dentro(percorso, r.percorso));
+  }
+  return { voce, percorso, serie, rete };
 }
 
 // Le cartelle da percorrere: quelle che esistono, senza quelle già dentro un'altra (si leggerebbero due volte).
@@ -407,17 +425,25 @@ function riassuntoIndice(rs, sotto) {
 
 /**
  * Cerca fra i documenti. `cartella`: solo dentro quella (anche fuori dall'elenco, letta per l'occasione).
- * → { risultati: [...], indice: {...}, fermata, cartellaMancante }
+ * `fuori(percorso)`: il motivo per non leggere la cartella risolta ('' = si legge), chiesto prima di toccarla.
+ * → { risultati: [...], indice: {...}, fermata, cartellaMancante, cartellaDiRete, cartellaFuori }
  */
-async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null, segnale = null } = {}) {
+async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null, segnale = null, fuori = null } = {}) {
   await carica();
   const rs = await radici();
   let sotto = daPercorrere(rs);
   let extra = [];
   let cartellaMancante = '';
   if (cartella) {
-    const c = voceCartella(cartella);
-    const p = c && DI_SERIE[c] ? cartellaDiSerie(c) : c;
+    const ch = await cartellaChiesta(cartella, rs);
+    const p = ch.percorso;
+    const negata = p && !ch.serie && !ch.rete && typeof fuori === 'function' ? fuori(p) : '';
+    if (ch.rete || negata) {
+      return {
+        risultati: [], indice: riassuntoIndice(rs, sotto), fermata: false, cartellaMancante: '',
+        cartellaDiRete: ch.rete ? String(cartella) : '', cartellaFuori: negata || '',
+      };
+    }
     let esiste = false;
     if (p) { try { esiste = (await fsp.stat(p)).isDirectory(); } catch (_) { esiste = false; } }
     if (!esiste) cartellaMancante = String(cartella);
@@ -469,7 +495,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
       punteggio: Math.round(o.punteggio * 100) / 100,
     });
   }
-  return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante };
+  return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante, cartellaDiRete: '', cartellaFuori: '' };
 }
 
 /**
@@ -489,14 +515,20 @@ async function doveSta(percorso) {
   return pezzi.length > 2 ? `${pezzi[0]} › … › ${pezzi[pezzi.length - 1]}` : pezzi.join(' › ');
 }
 
-/** Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). */
+/**
+ * Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). Le scrive il modello
+ * e si guardano prima dell'OK: una su un altro computer non si tocca (#1499), la si sceglie da Preferenze.
+ */
 async function cartelleMancanti(elenco) {
   const out = [];
+  let rs = null;
   for (const v of Array.isArray(elenco) ? elenco : []) {
     const voce = voceCartella(v);
     if (voce && DI_SERIE[voce]) continue;
     let ok = false;
-    if (voce) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
+    if (voce && diRete(v, voce) && !rs) rs = await radici();
+    const altrove = !!rs && (await cartellaChiesta(v, rs)).rete;
+    if (voce && !altrove) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
     if (!ok) out.push(String(v));
   }
   return out;
@@ -515,8 +547,10 @@ function elencoOccasionali(lista) {
   return Array.from(occasionali.keys()).sort((a, b) => occasionali.get(b) - occasionali.get(a)).map((c) => {
     let documenti = 0;
     for (const p of voci.keys()) if (dentro(p, c) && !inLista(p)) documenti += 1;
+    // Una cercata prima che la rete si rifiutasse (#1499): a ogni apertura delle Preferenze si contatterebbe quel computer.
+    const rete = diRete(c);
     let esiste = false;
-    try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; }
+    if (!rete) { try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; } }
     return { percorso: c, nome: nomeOccasionale(c), documenti, esiste, quando: occasionali.get(c) || null };
   });
 }
@@ -600,7 +634,7 @@ function avviaInSottofondo() {
 }
 
 module.exports = {
-  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
+  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, cartellaChiesta, nomeDellaVoce, cartelleMancanti,
   cartellaDiSerie, elimina, dimentica, occasionaliFra, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,

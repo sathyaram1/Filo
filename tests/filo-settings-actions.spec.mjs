@@ -122,7 +122,7 @@ test('CANCELLA_MEMORIA: Filo non svuota la memoria da solo, nemmeno confermata, 
     expect(r.executed).toBe(false);
     expect(r.needsConfirm).toBeUndefined();
     expect(r.no).toBe(true);
-    expect(r.error).toContain('Memoria di Filo');
+    expect(r.error).toContain('quaderno delle memorie');
   }
   const mem = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
   expect(mem.PROFILO).toBe('utente di prova');

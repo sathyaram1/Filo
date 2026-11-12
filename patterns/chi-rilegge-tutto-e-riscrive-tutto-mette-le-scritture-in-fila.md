@@ -69,3 +69,22 @@ quel turno con la risposta, togli quel turno) e il main la applichi sulla
 versione salvata di adesso, dentro la fila. Un turno che non c'è più (svuotato
 nel frattempo) non si riscrive: si risponde che non c'è. Così è fatta la chat
 dei mazzi (`src/main/services/deckChats.js`, #787, secondo giro di verifica).
+
+Rileggere dalla pagina prima di spedire non basta, e costa due volte: mentre la
+lettura viaggia arriva l'eco di un altro cambio (il tema toccato subito dopo) e
+riporta indietro in memoria quello che si stava per salvare, e la spedizione
+parte dopo il «niente più» della scheda che si chiude. Così i colori delle
+Preferenze si perdevano a intermittenza (#1343.1): ora la pagina manda i soli
+token toccati (`tokenModifica`) e il main li posa sulla mappa salvata
+(`SN_THEME_TOKENS.conModifica`).
+
+## Quando chi scrive sta su più computer
+
+Una fila vive in un processo solo: due agenti su due macchine che toccano lo
+stesso documento di Firestore non la vedono. Lì la scrittura porta la versione
+letta come condizione (`currentDocument.updateTime`); se il server la rifiuta
+perché intanto qualcuno ha scritto, si rilegge, si ricalcola la modifica
+sull'elenco nuovo e si riprova, con un tetto che rifiuta dicendolo. La pagina
+continua a mandare il suo gesto, non l'elenco. Così si scrivono le attese fra
+feedback da riga di comando, dai pacchetti e da Gestione (#1756.1,
+`SN_FB_ATTESE.scriviSullaLettura`).

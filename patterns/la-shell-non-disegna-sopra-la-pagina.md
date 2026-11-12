@@ -57,7 +57,10 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   chiave, e con «togli e rimetti» restava lì col suo valore. Un riquadro nuovo in
   quell'angolo usa la stessa variabile nel suo `bottom`: lo controlla
   `tests/unit/angoloAvvisiBarra.test.mjs` sui fogli di `src/styles` e `src/pages`
-  (una posizione scritta da JS la sentinella non la vede). Il valore è in px CSS della scheda,
+  (una posizione scritta da JS la sentinella non la vede). Quello che non sale ma sta
+  accanto all'angolo, come il campo della home in fondo alla pagina, si stringe a
+  sinistra della pila: la vista scrive anche la sua larghezza (`--filo-avvisi-barra-larga`,
+  0 senza avvisi; `tests/home-avvisi-invio.spec.mjs`). Il valore è in px CSS della scheda,
   quindi dipende dal suo zoom: il preload della pagina segnala ogni cambio di zoom,
   da qualunque parte arrivi (`filo:zoom-cambiato`), e il main lo riscrive.
 - **Il tasto destro** su una carta apre il menu di Filo con le sue azioni e

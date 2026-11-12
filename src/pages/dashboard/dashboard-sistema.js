@@ -35,6 +35,8 @@
     MSG = deps.MSG;
     host = deps.host;
     ICONS = deps.ICONS || {};
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     // L'ora sopra, grande; sotto la riga delle icone, che in una colonna stretta va a capo da sola.
     riga = document.createElement('div');
     riga.className = 'dash-sis-icone';
@@ -51,23 +53,36 @@
     window.addEventListener('offline', () => chiedi({ subito: true }));
     programmaRichiamo();
     programmaOra();
+    // Chi usa la home sta per mandare un turno anche senza scrivere (un suggerimento, «Riprova», «Continua»), e una
+    // bozza lasciata lì parte con un Invio anche dopo una pausa lunga: finché è così il lettore resta sveglio (#1097.1).
+    for (const t of ['pointermove', 'pointerdown', 'keydown', 'wheel']) document.addEventListener(t, () => scrive(), { passive: true, capture: true });
+    // A tempo è un riscaldamento, non un gesto: con l'utente via da minuti il main non legge (#1302).
+    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive({ riscalda: true }); }, 60 * 1000);
+    // Tornati alla finestra (Alt+Tab) con una bozza, il prossimo gesto è un Invio: il lettore parte adesso (#1302).
+    window.addEventListener('focus', () => { if (deps.bozza && deps.bozza()) scrive({ entra: true }); });
   }
 
   async function chiedi({ subito = false } = {}) {
     if (!segue()) return;
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
+    if (r && Array.isArray(r.pannelli)) pannelli = r.pannelli;
     if (r && r.ok && r.stato) aggiornato(r.stato);
   }
 
-  // Chi scrive in chat manderà presto un turno che vuole lo stato di adesso: il lettore parte mentre si scrive,
-  // così all'invio la lettura è pronta. Serve solo alla home che non lo tiene già sveglio da sé.
-  function scrive() {
-    if (!send || segue() || document.visibilityState === 'hidden') return;
-    const adesso = Date.now();
-    if (adesso - svegliatoPerChat < 20 * 1000) return;
-    svegliatoPerChat = adesso;
-    send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
+  // Chi entra nel campo della chat o ci scrive manderà presto un turno che vuole lo stato di adesso: il lettore parte
+  // subito, così all'invio la lettura è pronta (#1097.1). Anche con la home che lo segue: dopo una pausa dorme.
+  // `entra`: il campo ha appena preso il fuoco, cosa rara: non aspetta il passo dei tasti e non lo consuma, così il
+  // primo tasto dopo un fuoco preso all'apertura della home sveglia comunque il lettore che nel frattempo dorme.
+  function scrive({ entra = false, riscalda = false } = {}) {
+    if (!send || document.visibilityState === 'hidden') return;
+    if (!entra) {
+      const adesso = Date.now();
+      if (adesso - svegliatoPerChat < 20 * 1000) return;
+      // Un riscaldamento a vuoto (utente assente) non consuma il passo dei gesti veri.
+      if (!riscalda) svegliatoPerChat = adesso;
+    }
+    send({ type: MSG.SISTEMA_STATO, perChat: true, ...(riscalda ? { riscalda: true } : {}) }).catch(() => {});
   }
 
   function programmaRichiamo() {
@@ -100,8 +115,18 @@
   }
 
   function applicaImpostazioni(settings) {
+    const prima = JSON.stringify(preferiti);
+    preferiti = Array.isArray(settings && settings.bluetoothPreferiti) ? settings.bluetoothPreferiti.filter((p) => typeof p === 'string' && p) : [];
     cambiaVisibili(Sis().vociVisibili(settings));
+    // Un preferito messo o tolto mentre l'elenco è aperto: l'ordine si rilegge.
+    if (box && box.voce === 'bluetooth' && box.elenco && prima !== JSON.stringify(preferiti)) caricaElenco(box);
   }
+
+  // I gesti sul riquadro (#1471): per voce, come la si apre o la si trascina, e i comandi dati da qui.
+  function contaGesto(campi) {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', ...campi })).catch(() => {}); } catch (_) {}
+  }
+  const contaVoce = (voce, come) => contaGesto({ gesto: 'riquadro_sistema', voce, come });
 
   function creaVoce(v) {
     const el = document.createElement('div');
@@ -116,14 +141,16 @@
     const testo = document.createElement('span');
     testo.className = 'dash-sis-testo';
     el.append(icona, testo);
-    el.addEventListener('click', () => apriBox(v, el));
+    el.addEventListener('click', () => { contaVoce(v, 'clic'); apriBox(v, el); });
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      contaVoce(v, 'tasto_destro');
       apriBox(v, el, { x: e.clientX, y: e.clientY });
     });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
+        contaVoce(v, 'tastiera');
         apriBox(v, el);
       }
     });
@@ -133,6 +160,13 @@
       if (!d || !e.dataTransfer) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', d.copia);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'voce_sistema');
+    });
+    // Presa da una chat, la voce è trascinata in chat; lasciata dove nessuno la prende, un trascinamento a vuoto.
+    el.addEventListener('dragend', (e) => {
+      const ev = global.SN_GESTI && global.SN_GESTI.fine(e, 'voce_sistema');
+      if (ev) contaGesto(ev);
+      else if (global.SN_GESTI) contaVoce(v, 'trascina_in_chat');
     });
     if (v === 'ora') host.append(el, riga);
     else riga.appendChild(el);
@@ -186,7 +220,13 @@
     window.removeEventListener('scroll', scorre, true);
     window.removeEventListener('resize', chiudiBox);
   }
-  function fuori(e) { if (box && !box.el.contains(e.target)) chiudiBox(); }
+  // Il menu del tasto destro aperto su una riga del riquadro, e la conferma che chiede, non lo chiudono: la loro azione
+  // ha bisogno della riga per dire com'è andata.
+  function fuori(e) {
+    if (!box || box.el.contains(e.target)) return;
+    if (e.target && e.target.closest && e.target.closest('.sn-menu, .sn-confirm-host')) return;
+    chiudiBox();
+  }
   // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
   function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
   function tasto(e) {
@@ -270,6 +310,7 @@
     dove.replaceChildren();
     dove.hidden = !r;
     if (!r) return;
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'comando_sistema_non_riuscito' })).catch(() => {}); } catch (_) {}
     const frase = document.createElement('div');
     frase.textContent = r.frase || 'Il sistema non ha eseguito il comando.';
     dove.appendChild(frase);
@@ -294,6 +335,7 @@
     const questo = box;
     inAttesa(opt, true);
     const r = await comanda(richiesta);
+    if (r.ok && questo) contaVoce(questo.voce, 'comando_dato');
     if (!questo || box !== questo) return;
     inAttesa(opt, false);
     // L'annuncio del nuovo stato può arrivare mentre l'opzione aspettava: la si rietichetta adesso.
@@ -313,6 +355,7 @@
       const n = volumeVoluto;
       volumeVoluto = null;
       const r = await comanda({ cosa: 'volume', livello: n });
+      if (r.ok) contaVoce('volume', 'comando_dato');
       if (box && box === questo) mostraErrore(questo.errore, r.ok ? null : r);
       if (!r.ok) volumeVoluto = null;
     }
@@ -347,6 +390,7 @@
     lista.appendChild(attesa);
     const r = await comanda({ cosa, elenca: true });
     if (box !== questo || questo.letture !== giro) return;
+    if (r.ok && cosa === 'bluetooth' && Array.isArray(r.elenco)) r.elenco = inCimaIPreferiti(r.elenco);
     lista.replaceChildren();
     if (!r.ok) {
       const err = document.createElement('div');
@@ -370,10 +414,12 @@
       if (v.attiva && !(questo.ultimo && questo.ultimo.wifi === false)) {
         const opt = creaOpzione(`Collegato a ${v.nome}`, () => {}, 'dash-sis-attuale');
         opt.setAttribute('aria-disabled', 'true');
+        opt._riga = { cosa, v, questo, collegato: true };
         return opt;
       }
       const opt = creaOpzione(`Collegati a ${v.nome}`, (o) => esegui(o, { cosa: 'wifi', rete: v.nome }, () => caricaElenco(questo)));
       opt.title = v.nome;
+      opt._riga = { cosa, v, questo, collegato: false };
       return opt;
     }
     // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
@@ -381,7 +427,125 @@
     const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
+    if (preferito(v)) opt.classList.add('dash-sis-preferito');
+    opt._riga = { cosa, v, questo, collegato };
     return opt;
+  }
+
+  // ── I preferiti e il tasto destro sulle righe del riquadro (#2096) ──
+  // I preferiti sono un'impostazione (bluetoothPreferiti, scritta dal main): la pagina li legge per metterli in cima.
+  let preferiti = [];
+  let pannelli = [];
+  const preferito = (v) => !!v && preferiti.includes(v.indirizzo);
+  function inCimaIPreferiti(elenco) {
+    const posto = (v) => { const i = preferiti.indexOf(v.indirizzo); return i < 0 ? Infinity : i; };
+    return elenco.map((v, i) => [v, i]).sort((a, b) => (posto(a[0]) - posto(b[0])) || (a[1] - b[1])).map(([v]) => v);
+  }
+  const iconaMenu = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
+  const voceMenu = (label, nomeIcona, fai) => ({ type: 'item', icon: iconaMenu(nomeIcona), label, onClick: () => { Promise.resolve(fai()).catch(() => {}); } });
+  const apriPannello = (pannello) => send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, pannello }).catch(() => {});
+
+  async function copiaNome(nome) {
+    try { await navigator.clipboard.writeText(nome); } catch (_) {}
+  }
+  // Un comando dato dal menu di una riga: la riga mostra l'attesa, il riquadro l'errore, e l'elenco si rilegge.
+  async function dallaRiga(opt, richiesta) {
+    const q = opt._riga && opt._riga.questo;
+    if (q && box === q && opt.isConnected) return esegui(opt, richiesta, () => caricaElenco(q));
+    const r = await comanda(richiesta);
+    if (!r.ok && box && box.errore) mostraErrore(box.errore, r);
+    return r;
+  }
+  async function dimentica(opt) {
+    const { cosa, v } = opt._riga;
+    const C = global.SN_CONFIRM_UI;
+    const bt = cosa === 'bluetooth';
+    const ok = C ? await C.confirm({
+      title: bt ? 'Dimenticare il dispositivo?' : 'Dimenticare la rete?',
+      parti: [bt ? 'Il computer dimentica' : 'Il computer dimentica la rete', { citazione: v.nome },
+        bt ? 'Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.' : 'Per ricollegarti servirà di nuovo la password.'],
+      text: bt ? `Il computer dimentica «${v.nome}». Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.`
+        : `Il computer dimentica la rete «${v.nome}». Per ricollegarti servirà di nuovo la password.`,
+      okLabel: 'Dimentica',
+    }) : false;
+    if (!ok) return null;
+    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
+  }
+
+  function vociRiga(opt) {
+    const { cosa, v, collegato } = opt._riga;
+    const out = [];
+    if (cosa === 'bluetooth') {
+      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      const fra = preferito(v);
+      out.push(voceMenu(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
+        () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
+      out.push(voceMenu('Dimentica…', 'trash', () => dimentica(opt)));
+      out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+      if (pannelli.includes('bluetooth')) out.push(voceMenu('Impostazioni Bluetooth del sistema', 'options', () => apriPannello('bluetooth')));
+      return out;
+    }
+    if (!collegato) out.push(voceMenu('Collegati', 'wifi', () => dallaRiga(opt, { cosa, rete: v.nome })));
+    out.push(voceMenu('Dimentica la rete…', 'trash', () => dimentica(opt)));
+    out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+    if (pannelli.includes('wifi')) out.push(voceMenu('Impostazioni Wi-Fi del sistema', 'options', () => apriPannello('wifi')));
+    return out;
+  }
+
+  // Il volume e gli interruttori del riquadro: valori pronti, muto, e il pannello del sistema.
+  function vociComandi(q, el) {
+    if (q.voce === 'volume') {
+      const muto = !!(q.ultimo && q.ultimo.muto);
+      const out = [0, 25, 50, 100].map((n) => voceMenu(`Volume ${Sis().alPercento(n)}`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
+      out.push(voceMenu(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
+      if (pannelli.includes('audio')) out.push(voceMenu('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
+      return out;
+    }
+    if (!q.radio || !q.radio.contains(el)) return [];
+    const wifi = q.voce === 'rete';
+    const out = [];
+    if (!q.radio.hidden && q.radio.textContent) out.push(voceMenu(q.radio.textContent, wifi ? 'wifi' : 'bluetooth', () => q.radio.click()));
+    if (pannelli.includes(wifi ? 'wifi' : 'bluetooth')) {
+      out.push(voceMenu(wifi ? 'Impostazioni Wi-Fi del sistema' : 'Impostazioni Bluetooth del sistema', 'options', () => apriPannello(wifi ? 'wifi' : 'bluetooth')));
+    }
+    return out;
+  }
+
+  // Letto da src/content/content.js: le voci del tasto destro sulle righe del riquadro aperto.
+  // Una riga di sistema nella chat (dashboard-attivita.js, segnaSistema): il riquadro della sua voce, e il comando che
+  // la disfa dove c'è. I preferiti no: sono un'impostazione, e il filo ha già il suo Annulla per quel cambio.
+  const FRASI_ANNULLA = (a) => (a.livello != null ? `Rimetti il volume ${Sis().alPercento(a.livello)}`
+    : a.collega != null ? (a.collega ? 'Ricollega' : 'Scollega')
+        : a.acceso != null ? `${a.acceso ? 'Riaccendi' : 'Rispegni'} ${a.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}` : 'Annulla');
+  function vociRigaChat(riga) {
+    const s = riga._sistema;
+    const out = [voceMenu('Apri il riquadro di sistema', s.voce === 'rete' ? 'wifi' : s.voce, () => apri(s.voce))];
+    if (s.annulla) {
+      out.push(voceMenu(`Annulla · ${FRASI_ANNULLA(s.annulla)}`, 'undo', async () => {
+        const r = await comanda(s.annulla);
+        if (r.ok) s.annulla = null;
+        else apri(s.voce, r);
+      }));
+    }
+    return out;
+  }
+  // Il riquadro di una voce aperto da fuori (una riga della chat); `errore`, se c'è, lo dice subito.
+  function apri(v, errore = null) {
+    const x = voci[v];
+    if (!x) return;
+    apriBox(v, x.el);
+    if (errore && box && box.errore) mostraErrore(box.errore, errore);
+  }
+
+  function vociMenu(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const rigaChat = el && el.closest('.dash-activity-row');
+    if (rigaChat && rigaChat._sistema) return vociRigaChat(rigaChat);
+    if (!el || !box || !box.el.contains(el)) return [];
+    const opt = el.closest('.sn-select-option');
+    if (opt && opt._riga) return vociRiga(opt);
+    if (box.comandi && box.comandi.contains(el)) return vociComandi(box, el);
+    return [];
   }
 
   function creaComandi(questo, x) {
@@ -532,5 +696,5 @@
     el.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
   }
 
-  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive };
+  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive, apri };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

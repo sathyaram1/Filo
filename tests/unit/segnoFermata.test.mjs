@@ -31,6 +31,7 @@ test('ogni motivo dei Ricevuti ha un segno, con la forma del suo livello', () =>
     [{ status: 'design', statusReason: 'decisione' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'loop' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'arenato' }, 'rombo', 'l3'],
+    [{ status: 'design', statusReason: 'guasto' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'locale' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'judges' }, 'cerchio', 'l2'],
     [{ status: 'design' }, 'cerchio', 'l2'],
@@ -84,9 +85,19 @@ test('richiede lavoro locale: rombo azzurro in lista, gli altri rombi restano ve
   assert.equal(s.classe, 'locale');
   assert.match(s.testo, /lavoro locale/);
   assert.equal(MR.LIVELLO_COLORI.locale, '#26c9fc');
-  for (const statusReason of ['clarify', 'decisione', 'loop', 'arenato']) {
+  for (const statusReason of ['clarify', 'decisione', 'loop', 'arenato', 'guasto']) {
     assert.equal(MR.segnoFermata({ status: 'design', statusReason }).classe, 'design', statusReason);
   }
+});
+
+// #1241: un guasto rimandato all'owner si leggeva come lavoro locale, o come verdetto dei giudici.
+test('fermo per un guasto: segno, frase e motivo dicono guasto, non lavoro locale né giudici', () => {
+  const fb = { status: 'design', statusReason: 'guasto', notes: 'Guasto, non lavoro locale: guasto: filo-security. Domanda D-9.' };
+  for (const testo of [MR.segnoFermata(fb).testo, MR.judgesNote(fb).text, MR.reasonText('guasto')]) {
+    assert.match(testo, /guasto/i, testo);
+    assert.doesNotMatch(testo, /giudici|lavoro locale/i, testo);
+  }
+  assert.equal(MR.chiedeLavoroLocale(fb), false);
 });
 
 test('richiede lavoro locale: nel dettaglio il rombo è azzurro e dice perché, anche prima del documento intero', () => {

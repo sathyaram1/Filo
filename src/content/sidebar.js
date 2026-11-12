@@ -1,15 +1,6 @@
-// Sidebar Aiuto (Fase 2). Agente vision multi-turn.
-//
-// Modalità UI:
-// - Espansa: pannello completo con header, conversazione, input.
-// - Collassata: solo una barra con input. Click fuori dal pannello la collassa.
-//   Focus/typing nell'input la riapre.
-// - L'AI controlla via `collapse` se collassare dopo la sua risposta.
-//
-// Log azioni utente: dopo un click sul target o l'accept di un fill, viene
-// mostrata una riga grigia compatta ("click su menu", "testo inserito"…),
-// non un finto messaggio utente. La cronologia inviata all'AI contiene
-// comunque un marcatore testuale così l'agente sa cosa è successo.
+// Sidebar Aiuto: agente vision multi-turn. Espansa mostra la conversazione, collassata la
+// sola barra d'input; il click fuori collassa, il fuoco riapre, l'AI può chiedere collapse.
+// Su un sito sta nello strato sopra la scheda (#1509.3): patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 (function (global) {
   'use strict';
@@ -17,8 +8,6 @@
   const { ACTIONS, PROMPTS } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
-  const Highlight = global.SN_HIGHLIGHT;
-  const Extract = global.SN_EXTRACT;
   const Popup = global.SN_POPUP;
   // #593 — la porta unica del contenuto esterno. Qui serve per due cose: la
   // nota di sistema resta una frase di Filo su una riga, e quello che viene
@@ -26,6 +15,44 @@
   // cronologia gia imbustato.
   const Esterno = global.SN_ESTERNO;
   const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
+
+  // Tre posti. Nello strato sopra un sito il pannello è qui e la pagina sotto: la si legge e la si tocca chiedendo al
+  // suo frame principale (src/content/aiutoPagina.js). Nel documento di un sito c'è solo la facciata, che apre lo
+  // strato e tiene lo stato per la barra e il menu. Sulle pagine di Filo, o senza strato, pannello e pagina stanno qui.
+  const nelloStrato = !!global.SN_FILO_UI?.nelloStrato;
+  const PaginaQui = {
+    leggi: async (a) => global.SN_AIUTO_PAGINA.leggi(a),
+    azione: async (page) => global.SN_AIUTO_PAGINA.azione(page),
+    evidenzia: async (h) => global.SN_AIUTO_PAGINA.evidenzia(h, (ev) => suAzioneUtente(ev)),
+    auto: async (a) => global.SN_AIUTO_PAGINA.auto(a),
+    pulisci: async (a) => global.SN_AIUTO_PAGINA.pulisci(a),
+  };
+  async function chiediSotto(op, args) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.AIUTO_ALLA_PAGINA, op, args });
+      return r && r.ok ? r.esito : null;
+    } catch (_) { return null; }
+  }
+  const PaginaSotto = {
+    leggi: (a) => chiediSotto('leggi', a),
+    azione: (page) => chiediSotto('azione', { page }),
+    evidenzia: (h) => chiediSotto('evidenzia', h),
+    auto: (a) => chiediSotto('auto', a),
+    pulisci: (a) => chiediSotto('pulisci', a),
+  };
+  const Pagina = nelloStrato ? PaginaSotto : PaginaQui;
+  const azioniDiPagina = () => (global.SN_AIUTO_PAGINA && global.SN_AIUTO_PAGINA.AZIONI) || {};
+  // La pagina su cui si lavora come l'ha vista l'ultima lettura: nello strato non è `location`.
+  let paginaNota = { url: '', titolo: '' };
+  function paginaOra() {
+    if (!nelloStrato) return { url: location.href, titolo: document.title };
+    if (!paginaNota.url && global.SN_PAGINA_SOTTO) {
+      paginaNota = { url: String(global.SN_PAGINA_SOTTO.url || ''), titolo: String(global.SN_PAGINA_SOTTO.titolo || '') };
+    }
+    return paginaNota;
+  }
+  // L'indirizzo da cui aspettare la pagina dopo un passo: nello strato lo prende la pagina stessa, quando legge.
+  const urlPrimaDelPasso = () => (nelloStrato ? '' : location.href);
 
   let root = null;
   let stackEntry = null;
@@ -37,6 +64,15 @@
   // Se true, click fuori dal pannello NON lo collassa (es. AI ha richiesto chat aperta)
   let aiPrefersOpen = false;
   let docClickHandler = null;
+  // Chiuso mentre Filo risponde (#1432): il pannello si nasconde invece di sparire, e la risposta resta da aprire.
+  let nascosto = false;
+  // Ridotto dall'utente (▾, clic fuori): la risposta che arriva non lo riapre da sé, la annuncia la barra laterale.
+  let ridottoDallUtente = false;
+  let nonLetta = false;
+  let inVolo = 0;
+  let voce = null;
+  let statoVoce = 'pronto';
+  let ascoltaCambi = null;
 
   // Telemetria sessione per la raccolta dei percorsi (pathsCollector.js), che
   // oggi è spenta: il riquadro con pollice su/giù non compare e niente esce.
@@ -61,19 +97,79 @@
       feedbackShown: false,
       webSearchCount: 0,
       documentiCount: 0,
+      // Per i contatori (#1467): l'esito dell'ultimo turno (null finché è in corso) e i passi, mai cosa c'era nella pagina.
+      esito: null,
+      passiDaSolo: 0,
+      passiCliccati: 0,
+      nonTrovati: 0,
+      // I documenti davvero cercati: `documentiCount` conta anche le ricerche rifiutate, per il tetto.
+      documentiLetti: 0,
+      // Chiusa con la × mentre una risposta arrivava: finita prima, qualunque cosa dica poi la risposta.
+      chiusaPrima: false,
+      // Dal clic sul passo indicato alla risposta che lo segue: una pagina che se ne va qui l'ha portata via il passo.
+      dopoPasso: false,
+      id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      contata: false,
     };
   }
-  // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
-  // Ignoriamo silenziosamente le ricerche oltre questo limite.
+  const datiSessione = (s) => ({
+    esito: s.chiusaPrima ? 'chiusa_prima' : s.esito || (s.dopoPasso ? 'pagina_cambiata' : 'chiusa_prima'), passiDaSolo: s.passiDaSolo,
+    passiCliccati: s.passiCliccati, nonTrovati: s.nonTrovati, documenti: s.documentiLetti, id: s.id,
+  });
+  // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va. Finché è aperta il
+  // main ne tiene l'ultimo stato, e la conta lui se la scheda si chiude (chiudere non dà alla pagina nessun evento).
+  function contaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    s.contata = true;
+    try { Popup?.conta?.({ misura: 'aiuto', ...datiSessione(s) }); } catch (_) {}
+  }
+  function segnaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    try { Popup?.conta?.({ misura: 'in-corso', cosa: 'aiuto', ...datiSessione(s) }); } catch (_) {}
+  }
+  try { window.addEventListener('pagehide', () => contaSessione()); } catch (_) {}
+  // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
+  // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
+  // Ogni passo che l'Aiuto fa da solo è una chiamata pagata, e una pagina può chiederne all'infinito (#1049): oltre il
+  // tetto di fila si ferma e chiede. Largo, perché aprire una a una trenta sezioni è un uso vero e costa solo un clic.
+  const MAX_PASSI_DA_SOLO = 20;
+  let passiDaSolo = 0;
+  let continuaAperto = null;
+  // Le scelte con «Continua» sotto l'ultima risposta interrotta: una risposta nuova o un gesto le spengono (#1302).
+  let seguitoAperto = null;
+  // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
+  // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
+  let valutazione = null;
+  // Il documento dell'app (l'Editor) di cui parla la conversazione: cambiato a metà, il modello lo sa.
+  let docConversazione = '';
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
-  function isOpen() { return !!(root && root.isConnected); }
+  function apertoQui() { return !!(root && root.isConnected); }
 
-  function close() {
+  // La pagina di Filo che ha l'Aiuto come sua chat (l'Editor, #1433): il documento che legge e le azioni che lo
+  // cambiano. Solo nelle pagine di Filo: altrove quel nome non vale niente.
+  function appDellaPagina() {
+    const a = location.protocol === 'filo:' ? global.SN_AIUTO_APP : null;
+    return a && typeof a.documento === 'function' ? a : null;
+  }
+
+  // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
+  function close({ davvero = false } = {}) {
     if (!root) return;
-    Highlight.clear();
-    try { Highlight.clearForceHover?.(); } catch (_) {}
+    if (!davvero && inVolo > 0) {
+      if (session) { session.chiusaPrima = true; segnaSessione(); }
+      if (!nascosto) nascondi();
+      return;
+    }
+    // Chiuso davvero: niente parte più, e una chiamata ancora in volo non si paga fino in fondo.
+    fermaLavoro();
+    Pagina.pulisci({ hover: true }).catch(() => {});
+    evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
     if (docClickHandler) {
       document.removeEventListener('mousedown', docClickHandler, true);
       docClickHandler = null;
@@ -84,21 +180,61 @@
     root = null;
     convFilo = '';
     history = [];
+    allegati = { immagini: [], riferimenti: [] };
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
+    contaSessione();
     session = null;
+    nascosto = false;
+    ridottoDallUtente = false;
+    nonLetta = false;
+    // La chat se ne va: la dettatura ancora in corso o in attesa d'invio è annullata, il testo lasciato nella casella tenuto.
+    try { voce?.scollega(); } catch (_) {}
+    voce = null;
+    statoVoce = 'pronto';
+    valutazione = null;
+    docConversazione = '';
+    cambiato();
   }
 
-  function open(context) {
-    if (isOpen()) return;
-    if (root) close();
+  function nascondi() {
+    nascosto = true;
+    Pagina.pulisci({ hover: true }).catch(() => {});
+    evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
+    try { voce?.ferma(); } catch (_) {}
+    root.classList.add('sn-sidebar-nascosta');
+    cambiato();
+  }
+
+  // Già lì, ridotto o nascosto: «Aiuto» lo mostra intero, con la risposta arrivata nel frattempo.
+  function mostra() {
+    nascosto = false;
+    if (session && session.chiusaPrima) { session.chiusaPrima = false; segnaSessione(); }
+    root.classList.remove('sn-sidebar-nascosta');
+    expand({ ai: false });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+    cambiato();
+  }
+
+  function apri(context) {
+    if (apertoQui()) { mostra(); return; }
+    if (root) close({ davvero: true });
+    facciata.attiva = false;
     history = [];
+    allegati = { immagini: [], riferimenti: [] };
     documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
+    passiDaSolo = 0;
+    continuaAperto = null;
+    seguitoAperto = null;
+    valutazione = null;
+    docConversazione = '';
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -108,13 +244,15 @@
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
-    session.initialUrl = location.href;
-    // Se invocata dal menu tasto destro su una scheda, informiamo l'agente del
-    // contesto: una riga di storia (non mostrata in chat, ma inviata all'LLM)
-    // così "sa" che la richiesta parte da un click sulla tab.
+    paginaNota = { url: '', titolo: '' };
+    const qui = paginaOra();
+    session.initialUrl = qui.url;
+    segnaSessione();
+    // Aperta dal tasto destro su una scheda: una riga di storia non mostrata in chat dice
+    // all'agente che la richiesta parte da lì.
     if (context && context.source === 'tab') {
-      const ctxTitle = context.title || document.title || '';
-      const ctxUrl = context.url || location.href;
+      const ctxTitle = context.title || qui.titolo || '';
+      const ctxUrl = context.url || qui.url;
       history.push({
         role: 'user',
         kind: 'action',
@@ -132,29 +270,27 @@
     root = document.createElement('div');
     root.className = 'sn-sidebar';
     global.SN_FILO_UI?.mark(root);
-    // Traccia osservabile della fonte di invocazione (utile a debug/test e a
-    // future differenziazioni UI): presente solo se aperta dal menu di una tab.
+    // Fonte di invocazione osservabile per i test: c'è solo se aperta dal menu di una scheda.
     if (context && context.source) root.dataset.invokedFrom = context.source;
     root.innerHTML = `
       <div class="sn-sidebar-header">
         <span class="sn-sidebar-title">${I18n.t('menu_help')}</span>
         <div class="sn-sidebar-actions">
           <button class="sn-sidebar-collapse" type="button" title="Collassa">▾</button>
-          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}" title="${I18n.t('popup_close')}">×</button>
         </div>
       </div>
       <div class="sn-sidebar-conv"></div>
       <div class="sn-sidebar-meta"></div>
+      <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
-        <textarea rows="1" placeholder="Dimmi cosa vuoi fare sulla pagina…"></textarea>
-        <button type="submit">↵</button>
+        <textarea rows="1" placeholder="${appDellaPagina()?.segnaposto || 'Dimmi cosa vuoi fare sulla pagina…'}"></textarea>
+        <button type="submit" aria-label="${I18n.t('popup_send')}" title="${I18n.t('popup_send')}">↵</button>
       </form>
     `;
     document.documentElement.appendChild(root);
-    // Partecipa allo stacking dei popup: la sidebar appare sopra ai box aperti
-    // prima e sotto a quelli aperti dopo (es. modale feedback). In passato la
-    // sidebar usava uno z-index hardcoded altissimo e finiva sempre sopra a
-    // tutto, schiacciando il modale feedback aperto successivamente (feedback alpha).
+    // Partecipa allo stacking dei popup: sopra quelli aperti prima, sotto quelli aperti dopo.
+    // Con uno z-index fisso altissimo finiva sopra al modale feedback, aperto dopo di lei.
     stackEntry = Popup?.registerStack?.(root) || null;
 
     root.querySelector('.sn-sidebar-close').addEventListener('click', close);
@@ -162,37 +298,98 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
+    // #2085 — una scheda lasciata sul campo diventa un gettone; all'invio il main ne legge la pagina.
+    const G = global.SN_SCHEDE_IN_CHAT;
+    gettoni = G ? G.campo(ta, G.azioni()) : null;
+    try { togliRilascioScheda(); } catch (_) {}
+    togliRilascioScheda = gettoni && global.SN_SCHEDA_TRASCINATA
+      ? global.SN_SCHEDA_TRASCINATA.registraChat(form, (s) => !!root && !nascosto && gettoni.aggiungi(s)) : () => {};
+    // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
+    ta.addEventListener('drop', (e) => {
+      if (!e.isTrusted) return;
+      let testo = '';
+      try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
+      try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
+    });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
-      if (!text) return;
+      if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
+      const { immagini, riferimenti } = allegati;
+      const schede = gettoni ? gettoni.schede() : [];
       ta.value = '';
-      submit({ userMessage: text });
+      if (gettoni) gettoni.svuota();
+      allegati = { immagini: [], riferimenti: [] };
+      disegnaAllegati();
+      submit({ userMessage: text, immagini, riferimenti, schede });
     };
-    form.addEventListener('submit', (e) => e.preventDefault());
-    form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
+    // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
+    ta.addEventListener('paste', (e) => {
+      if (!e.isTrusted) return;
+      const files = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === 'file' && /^image\//i.test(it.type || ''))
+        .map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length) return;
       e.preventDefault();
+      allega(files);
+    });
+    // «Incolla» del tasto destro e della cronologia degli appunti: l'evento lo manda Filo (src/content/actions.js).
+    form.addEventListener('filo:paste-image', (e) => {
+      if (!global.SN_FILO_UI?.veroONostro?.(e) || !e.detail?.blob) return;
+      e.preventDefault();
+      allega([e.detail.blob]);
+    });
+    const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
+    const conRiferimento = (e) => riferimentiAmmessi() && conTipoRiferimento(e.dataTransfer);
+    for (const tipo of ['dragenter', 'dragover']) {
+      root.addEventListener(tipo, (e) => {
+        if (!e.isTrusted || !(conImmagini(e) || conRiferimento(e))) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+      });
+    }
+    root.addEventListener('drop', (e) => {
+      if (!e.isTrusted) return;
+      // Sulla casella il rilascio lo conta già il suo ascoltatore.
+      if (rilascio(e, { conta: e.target !== ta })) { e.stopPropagation(); return; }
+      if (!conImmagini(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      allega(e.dataTransfer.files);
+    });
+    form.addEventListener('submit', (e) => e.preventDefault());
+    // Mentre l'Aiuto lavora il tasto è il quadrato che lo ferma (#578.1), e Invio a casella vuota fa lo stesso; con
+    // qualcosa scritto Invio manda. Fermare, come chiudere, non chiede un gesto vero: toglie lavoro, non ne aggiunge.
+    const tasto = form.querySelector('button[type="submit"]');
+    tasto.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (tasto.dataset.modo === 'ferma') { if (!quadratoAppena(tasto)) fermaDallUtente(); ta.focus(); return; }
       if (gestoVero(e)) invia();
     });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (gestoVero(e)) invia();
+        if (!gestoVero(e)) return;
+        const vuota = !ta.value.trim() && !allegati.immagini.length && !allegati.riferimenti.length;
+        if (vuota && lavora()) { if (!e.repeat && !quadratoAppena(tasto)) fermaDallUtente(); return; }
+        invia();
       }
     });
+    aggiornaTasto();
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere). Diretta, non dal
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
-    global.SN_VOCE_CHAT?.collega({
+    voce = global.SN_VOCE_CHAT?.collega({
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
-      invia,
-    });
-    // Focus o tasto sull'input → riapri la chat
-    ta.addEventListener('focus', () => expand({ ai: false }));
-    ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });
+      invia, suStato: (s) => { if (!ta.isConnected) return; statoVoce = s; cambiato(); },
+    }) || null;
+    // Focus o tasto sull'input → riapri la chat. Ridotto dall'utente lo riapre solo un suo gesto sulla casella: il
+    // microfono che ci scrive e ci rimette il cursore no, da qualunque icona l'abbia fermato (#1432).
+    ta.addEventListener('focus', () => { if (!ridottoDallUtente) expand({ ai: false }); });
+    ta.addEventListener('pointerdown', (e) => { if (e.isTrusted && collapsed) expand({ ai: false }); });
+    ta.addEventListener('input', (e) => { if (collapsed && (e.isTrusted || !ridottoDallUtente)) expand({ ai: false }); });
 
-    // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
     docClickHandler = (e) => {
-      if (!root || collapsed) return;
+      if (!root || collapsed || nascosto) return;
       if (root.contains(e.target)) return;
       if (aiPrefersOpen) return;
       collapse({ ai: false });
@@ -200,22 +397,255 @@
     document.addEventListener('mousedown', docClickHandler, true);
 
     ta.focus();
+    cambiato();
   }
-
-  // ---------- Espandi/collassa ----------
 
   function expand({ ai = false } = {}) {
     if (!root) return;
+    // La scelta dell'utente vince su quella del modello: la risposta resta da aprire, e la barra la annuncia.
+    if (ai && (ridottoDallUtente || nascosto)) { aiPrefersOpen = true; return; }
     collapsed = false;
+    ridottoDallUtente = false;
     root.classList.remove('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = true;
+    if (!nascosto) nonLetta = false;
+    cambiato();
   }
 
   function collapse({ ai = false } = {}) {
     if (!root) return;
     collapsed = true;
+    if (!ai) ridottoDallUtente = true;
     root.classList.add('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = false;
+    cambiato();
+  }
+
+  // ---------- Lo stato per la barra laterale (#1432) ----------
+
+  const CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false, angolo: false });
+  // Nel documento di un sito: il pannello sta nello strato, e qui c'è lo stato che lui manda.
+  const facciata = { attiva: false, vivo: false, stato: CHIUSO };
+  const inFacciata = () => !nelloStrato && !root && facciata.attiva;
+
+  function stato() {
+    if (inFacciata()) return { ...facciata.stato };
+    const visibile = apertoQui() && !nascosto;
+    return {
+      pannello: !visibile ? 'chiuso' : collapsed ? 'ridotto' : 'aperto',
+      voce: visibile ? statoVoce : 'pronto',
+      nonLetta: apertoQui() && nonLetta,
+      // Nel suo angolo in basso a destra: gli avvisi della pagina sotto gli si mettono a sinistra (#845).
+      angolo: visibile && !root.dataset.spostata,
+    };
+  }
+
+  // Nello strato lo stato va anche alla pagina sotto: è lei che lo dice alla barra laterale e al suo menu.
+  let statoDetto = '';
+  function cambiato() {
+    if (nelloStrato) {
+      const s = { ...stato(), vivo: apertoQui() };
+      const firma = JSON.stringify(s);
+      if (firma !== statoDetto) { statoDetto = firma; chiediSotto('stato', s); }
+    }
+    if (!nelloStrato) { try { Popup?.accantoAllAiuto?.(inFacciata() && facciata.stato.angolo); } catch (_) {} }
+    if (typeof ascoltaCambi !== 'function') return;
+    try { ascoltaCambi(stato()); } catch (_) {}
+  }
+
+  // Lo stato del pannello nello strato, arrivato alla pagina. true se preso.
+  function dalloStrato(s) {
+    if (nelloStrato || root || !s || typeof s !== 'object') return false;
+    facciata.stato = {
+      pannello: ['chiuso', 'ridotto', 'aperto'].includes(s.pannello) ? s.pannello : 'chiuso',
+      voce: typeof s.voce === 'string' && s.voce.length <= 40 ? s.voce : 'pronto',
+      nonLetta: !!s.nonLetta,
+      angolo: !!s.angolo,
+    };
+    facciata.vivo = !!s.vivo;
+    if (facciata.vivo) facciata.attiva = true;
+    cambiato();
+    return true;
+  }
+
+  function comandoAlloStrato(d) {
+    try { return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AIUTO_ALLO_STRATO, ...d })).catch(() => null); } catch (_) { return Promise.resolve(null); }
+  }
+
+  // Lo strato non c'è più (andato via con il suo processo): la facciata torna a dire chiuso.
+  function lasciaFacciata() {
+    facciata.attiva = false;
+    facciata.vivo = false;
+    facciata.stato = CHIUSO;
+    cambiato();
+  }
+  // Tornata dalla cache di navigazione: lo strato se n'è andato con la navigazione, il suo Aiuto con lui.
+  try { window.addEventListener('pageshow', (e) => { if (e.persisted && inFacciata()) lasciaFacciata(); }); } catch (_) {}
+
+  // L'icona Aiuto della barra: il clic fa quello che l'icona mostra, decisi dalla stessa regola.
+  function passo(context) {
+    const aspetto = global.SN_DISPOSIZIONE_ICONE?.aspettoAiuto?.(stato());
+    const detta = aspetto ? aspetto.icona === 'mic' : (stato().pannello === 'aperto');
+    if (detta && inFacciata()) {
+      comandoAlloStrato({ comando: 'passo' }).then((r) => { if (!(r && r.ok)) { lasciaFacciata(); open(context); } });
+      return;
+    }
+    if (detta && voce) { voce.premi(); return; }
+    open(context);
+  }
+
+  // «Valuta» del tasto destro su un campo (#1449): il testo intero del campo e la richiesta di giudicarlo, nella
+  // conversazione aperta o in una nuova.
+  // Su un sito il campo resta nella pagina e l'Aiuto nello strato ne riceve il testo e un numero per ritrovarlo.
+  function valuta({ campo, testo } = {}) {
+    const t = String(testo || '');
+    if (!campo || !t.trim()) return;
+    if (!nelloStrato && !root) {
+      const id = global.SN_AIUTO_PAGINA?.campoValutato?.(campo);
+      const dati = { invocazione: { source: 'valuta' }, valuta: { campo: id, testo: t } };
+      if (id && global.SN_RIQUADRI_SOPRA?.apri('aiuto', dati, () => valutaQui(campo, t))) { facciata.attiva = true; return; }
+    }
+    valutaQui(campo, t);
+  }
+  function valutaQui(campo, t) {
+    apri({ source: 'valuta' });
+    if (!root) return;
+    valutazione = { campo, mandato: t };
+    contaValuta('chiesta');
+    submit({ valuta: t, daGesto: true });
+  }
+  // «Valuta» nella famiglia del correttore (#1586): richieste, risposte e correzioni, mai il testo.
+  function contaValuta(esito) {
+    try { Popup?.conta?.({ misura: 'riquadro', cosa: 'correttore_valuta', esito }); } catch (_) {}
+  }
+
+  // Il campo valutato sta qui, o nella pagina sotto lo strato ({ sotto: numero }): lì lo si legge e corregge chiedendo.
+  const campoSotto = (c) => !!(c && typeof c === 'object' && typeof c.sotto === 'string');
+  async function testoDelCampo(c) {
+    if (!campoSotto(c)) return global.SN_SPELLCHECK?.testoDelCampo?.(c) || '';
+    const r = await chiediSotto('campo', { id: c.sotto, cosa: 'testo' });
+    return r && typeof r.testo === 'string' ? r.testo : '';
+  }
+  async function sostituisciNelCampo(c, prima, dopo, vicinoA) {
+    if (campoSotto(c)) {
+      const r = await chiediSotto('campo', { id: c.sotto, cosa: 'sostituisci', prima, dopo, vicinoA });
+      return !r || r.sparito ? { sparito: true } : r;
+    }
+    const SC = global.SN_SPELLCHECK;
+    if (!SC || !c.isConnected) return { sparito: true };
+    return SC.sostituisciNelCampo(c, prima, dopo, vicinoA);
+  }
+  // Il pezzo che una correzione aveva tolto torna fra il testo che gli era rimasto attorno (#1449.3).
+  async function rimettiNelCampo(c, pezzo, { sx, dx }, vicinoA) {
+    if (campoSotto(c)) {
+      const r = await chiediSotto('campo', { id: c.sotto, cosa: 'rimetti', pezzo, sx, dx, vicinoA });
+      return !r || r.sparito ? { sparito: true } : r;
+    }
+    const SC = global.SN_SPELLCHECK;
+    if (!SC || !c.isConnected) return { sparito: true };
+    return SC.rimettiNelCampo(c, pezzo, sx, dx, vicinoA);
+  }
+
+  // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
+  async function testoCambiato() {
+    if (!valutazione) return null;
+    const ora = await testoDelCampo(valutazione.campo);
+    return ora.trim() && ora !== valutazione.mandato ? ora : null;
+  }
+
+  function estratto(testo) {
+    const s = Array.from(String(testo || '').replace(/\s+/g, ' ').trim());
+    return s.length > 120 ? `${s.slice(0, 119).join('')}…` : s.join('');
+  }
+
+  // Su un sito l'Aiuto si apre nello strato sopra la scheda, mai nel suo documento (#1509.3). Se lo strato non si può
+  // fare si apre qui, come prima.
+  function open(context) {
+    if (nelloStrato || root) { apri(context); return; }
+    const invocazione = context && typeof context === 'object'
+      ? { source: String(context.source || ''), title: String(context.title || ''), url: String(context.url || '') }
+      : null;
+    if (global.SN_RIQUADRI_SOPRA?.apri('aiuto', { invocazione }, () => apri(context))) { facciata.attiva = true; return; }
+    apri(context);
+  }
+
+  function isOpen() { return apertoQui() || (inFacciata() && facciata.vivo); }
+
+  // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
+  function chiudi(opts) {
+    if (inFacciata()) { comandoAlloStrato({ comando: 'chiudi', davvero: !!(opts && opts.davvero) }); return; }
+    close(opts);
+  }
+
+  // Nello strato: quello che la pagina sotto chiede al pannello.
+  function dallaPagina(d) {
+    if (!nelloStrato || !d || typeof d !== 'object') return;
+    if (d.comando === 'passo') passo();
+    else if (d.comando === 'chiudi') close({ davvero: !!d.davvero });
+    else if (d.comando === 'posa') posaDelPasso(Number(d.id) || 0, d.rect || null);
+    else if (d.comando === 'azione') suAzioneUtente(d);
+  }
+
+  // ---------- La nota del passo, nello strato (#1509.3) ----------
+  // Su un sito la cornice del passo sta nella pagina, che la tiene sul bersaglio e dice qui dove sta; nota, valore
+  // proposto e «Accetta» stanno qui, dove il sito non li legge e non li preme, e il pannello si scosta dal bersaglio.
+  let passoQui = 0;
+  let notaPasso = null;
+  function mostraNotaPasso(h) {
+    togliNotaPasso();
+    passoQui = h.id;
+    if (!nelloStrato || (!h.note && h.action !== 'fill')) return;
+    const tip = document.createElement('div');
+    tip.className = 'sn-highlight-tip sn-nota-del-passo';
+    global.SN_FILO_UI?.mark(tip);
+    tip.style.zIndex = '2147483500';
+    tip.style.visibility = 'hidden';
+    if (h.note) {
+      const nota = document.createElement('div');
+      nota.className = 'sn-highlight-note';
+      nota.textContent = h.note;
+      tip.appendChild(nota);
+    }
+    if (h.action === 'fill') {
+      const valore = document.createElement('div');
+      valore.className = 'sn-highlight-value';
+      valore.textContent = h.value ? `«${h.value}»` : '';
+      const accetta = document.createElement('button');
+      accetta.type = 'button';
+      accetta.className = 'sn-highlight-accept';
+      accetta.textContent = '✓ Accetta';
+      accetta.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!gestoVero(e) || accetta.disabled) return;
+        accetta.disabled = true;
+        chiediSotto('accetta', { id: h.id }).then((r) => {
+          if (r && r.ok) { if (notaPasso && notaPasso.id === h.id) togliNotaPasso(); return; }
+          if (accetta.isConnected) accetta.disabled = false;
+        });
+      });
+      tip.append(valore, accetta);
+    }
+    document.documentElement.appendChild(tip);
+    notaPasso = { id: h.id, el: tip };
+  }
+  function togliNotaPasso() {
+    if (notaPasso) { try { notaPasso.el.remove(); } catch (_) {} }
+    notaPasso = null;
+  }
+  // Sopra il bersaglio, o sotto se in alto non c'è posto; null: il bersaglio non c'è più.
+  function posaDelPasso(id, rect) {
+    if (!id || id !== passoQui) return;
+    if (!rect) { togliNotaPasso(); return; }
+    ensureNotOverTarget(rect);
+    if (!notaPasso || notaPasso.id !== id) return;
+    const tip = notaPasso.el;
+    tip.style.maxWidth = `${Math.min(360, window.innerWidth - 16)}px`;
+    const alto = tip.offsetHeight || 24;
+    let top = rect.top - alto - 6;
+    if (top < 4) top = rect.bottom + 6;
+    tip.style.left = `${Math.max(4, rect.left)}px`;
+    tip.style.top = `${top}px`;
+    tip.style.visibility = '';
   }
 
   // ---------- Drag header ----------
@@ -245,6 +675,8 @@
       root.style.bottom = bassoPer(startBottom, rect.left, rect.width);
       root.style.right = 'auto';
       root.style.top = 'auto';
+      root.dataset.spostata = '1';
+      cambiato();
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
@@ -263,8 +695,7 @@
     window.addEventListener('mouseup', () => { dragging = false; });
   }
 
-  // Sposta la sidebar di lato se sta coprendo il rettangolo dato (di solito il
-  // target evidenziato). Mantiene l'ancoraggio al bottom; cambia solo l'asse X.
+  // Sposta la sidebar di lato se copre il rettangolo: cambia solo X, il bottom resta.
   function ensureNotOverTarget(rect) {
     if (!root || !rect) return;
     const sr = root.getBoundingClientRect();
@@ -275,7 +706,6 @@
     const w = root.offsetWidth;
     const margin = 16;
     const targetCenter = (rect.left + rect.right) / 2;
-    // Sposta la sidebar dalla parte opposta del target.
     const newLeft = targetCenter > window.innerWidth / 2
       ? margin
       : Math.max(0, window.innerWidth - w - margin);
@@ -288,33 +718,415 @@
     root.style.right = 'auto';
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
+    root.dataset.spostata = '1';
+    cambiato();
   }
 
-  // ---------- Rendering conv ----------
+  // ---------- Allegati (#1623) ----------
+
+  // Le immagini date all'Aiuto: lasciate sulla pagina o sul pannello, incollate. Il pannello sta nel documento del
+  // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto si rimpiccioliscono: l'Aiuto non apre file dal
+  // disco, e un percorso lo leggerebbe il sito.
+  const Allegati = global.SN_CONST.ALLEGATI_CHAT;
+  let allegati = { immagini: [], riferimenti: [] };
+  let gettoni = null;
+  let togliRilascioScheda = () => {};
+  // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
+  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js), e il contenuto lo dà il main (#2300).
+  const conTipoRiferimento = (dt) => !!global.SN_TRASCINO_INTERNO?.porta(dt, 'riferimento');
+  // Il riferimento è testo che l'utente porta lui, come uno incollato: oltre il tetto il taglio si scrive.
+  const RIFERIMENTO_MAX = 30000;
+  function formaRiferimento(v) {
+    const titolo = v && typeof v.titolo === 'string' ? v.titolo.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    let testo = v && typeof v.testo === 'string' ? v.testo : '';
+    if (!titolo && !testo.trim()) return null;
+    if (testo.length > RIFERIMENTO_MAX) testo = `${testo.slice(0, RIFERIMENTO_MAX)}\n[… tagliato qui: altri ${testo.length - RIFERIMENTO_MAX} caratteri]`;
+    return { titolo: titolo || 'Riferimento', testo };
+  }
+  // I riferimenti li scrivono solo le pagine di Filo. Lo strato è filo: ma serve sempre un sito: lì valgono come sul sito.
+  function riferimentiAmmessi() {
+    try { return !nelloStrato && location.protocol === 'filo:'; } catch (_) { return false; }
+  }
+  function aggiungiRiferimento(r) {
+    if (pannelloPerAllegati() !== true) return;
+    if (!allegati.riferimenti.some((x) => x.titolo === r.titolo && x.testo === r.testo)) allegati.riferimenti.push(r);
+    disegnaAllegati();
+    root?.querySelector('.sn-sidebar-input textarea')?.focus();
+  }
+  // Un riferimento lasciato sul pannello lo prende la chat, e nella casella non si versa il suo testo. Ci arriva anche
+  // dal preload, che sul pannello tiene il sito all'oscuro del rilascio (src/preload/rilascio-file.js).
+  function rilascio(e, { conta = true } = {}) {
+    if (!e || !e.isTrusted) return false;
+    // Su un sito il riferimento si ignora: chi lo trascina potrebbe essere il sito, e un testo nascosto dietro un titolo
+    // arriverebbe al modello come parola dell'utente. Lì entra il suo testo, a vista nella casella.
+    if (!riferimentiAmmessi() || !conTipoRiferimento(e.dataTransfer)) {
+      // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
+      if (conta && e.target?.matches?.('.sn-sidebar-input textarea')) {
+        let testo = '';
+        try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
+        try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
+      }
+      return false;
+    }
+    e.preventDefault();
+    let origine = '';
+    try { origine = global.SN_GESTI?.origineDi(e.dataTransfer) || ''; } catch (_) { origine = ''; }
+    const { aVista, dati } = global.SN_TRASCINO_INTERNO.arriva(e.dataTransfer, 'riferimento');
+    // Un riferimento che il main non conosce l'ha scritto altri (una pagina web, un'altra app): il suo testo entra
+    // nella casella a vista, come un testo qualunque, e non arriva al modello dietro un titolo.
+    dati.then((v) => {
+      const r = formaRiferimento(v);
+      if (r) aggiungiRiferimento(r);
+      else versaNellaCasella(aVista);
+      if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(origine, 'chat_aiuto', !!(r || aVista))); } catch (_) {} }
+    });
+    return true;
+  }
+  function versaNellaCasella(testo) {
+    const ta = root?.querySelector('.sn-sidebar-input textarea');
+    if (!ta || !testo || pannelloPerAllegati() !== true) return;
+    ta.focus();
+    let scritto = false;
+    try { scritto = document.execCommand('insertText', false, testo); } catch (_) { scritto = false; }
+    if (!scritto) {
+      ta.setRangeText(testo, ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  function testoRiferimenti(riferimenti) {
+    return riferimenti.map((r) => `Riferimento «${r.titolo}», trascinato dall'utente nella chat:\n${r.testo}`).join('\n\n');
+  }
+  // Il gettone del riferimento: il titolo in grassetto, e il contenuto in un riquadro all'hover o al fuoco.
+  function gettoneRiferimento(r) {
+    const v = document.createElement('span');
+    v.className = 'rif';
+    v.tabIndex = 0;
+    const b = document.createElement('b');
+    b.textContent = r.titolo;
+    const anteprima = document.createElement('span');
+    anteprima.className = 'anteprima';
+    anteprima.setAttribute('role', 'tooltip');
+    anteprima.textContent = r.testo;
+    v.append(b, anteprima);
+    return v;
+  }
+  // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
+  let chiusoPerche = () => 'sito';
+  const chiuso = () => { try { return String(chiusoPerche() || ''); } catch (_) { return 'sito'; } };
+  const ombre = new WeakMap();
+  function ombraDi(el, css) {
+    let o = ombre.get(el);
+    if (!o) {
+      o = el.attachShadow({ mode: 'closed' });
+      global.SN_SUGGERIMENTO?.ombra?.(el, o);
+      const stile = document.createElement('style');
+      stile.textContent = css;
+      o.appendChild(stile);
+      ombre.set(el, o);
+    }
+    return o;
+  }
+  const CSS_ALLEGATI = `
+:host { display: block; }
+.riga { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 10px 2px; }
+.voce { position: relative; display: inline-flex; }
+img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display: block; }
+.rif {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 4px 10px; border-radius: 8px; border: 1px solid var(--sn-border); background: var(--sn-bg); cursor: default;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.rif:hover, .rif:focus-visible { border-color: var(--sn-accent); outline: none; }
+.rif b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rif .togli { position: static; flex: none; }
+.anteprima {
+  display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2;
+  width: min(320px, 80vw); max-height: 260px; overflow: auto; padding: 8px 10px; border-radius: 8px;
+  white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; font-weight: 400; line-height: 1.45;
+  background: var(--sn-bg); color: var(--sn-fg); border: 1px solid var(--sn-border); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.rif:hover .anteprima, .rif:focus-within .anteprima { display: block; }
+.bolla .rif { background: transparent; }
+.togli {
+  all: unset; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1;
+  background: var(--sn-fg); color: var(--sn-bg);
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease;
+}
+.togli:hover, .togli:focus-visible { transform: scale(1.12); background: var(--sn-accent); color: #fff; }
+.bolla { display: flex; flex-wrap: wrap; gap: 6px; }
+:host(.con-testo) .bolla { margin-bottom: 6px; }
+.bolla img { width: auto; height: auto; max-width: 100%; max-height: 160px; }
+`;
+
+  function disegnaAllegati() {
+    const host = root && root.querySelector('.sn-sidebar-allegati');
+    if (!host) return;
+    host.hidden = !allegati.immagini.length && !allegati.riferimenti.length;
+    const o = ombraDi(host, CSS_ALLEGATI);
+    for (const n of Array.from(o.childNodes)) if (n.localName !== 'style') n.remove();
+    const riga = document.createElement('div');
+    riga.className = 'riga';
+    for (const r of allegati.riferimenti) {
+      const v = gettoneRiferimento(r);
+      const togli = document.createElement('button');
+      togli.type = 'button';
+      togli.className = 'togli';
+      togli.textContent = '×';
+      togli.title = 'Togli';
+      togli.setAttribute('aria-label', 'Togli dal messaggio');
+      togli.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati.riferimenti = allegati.riferimenti.filter((x) => x !== r);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      v.appendChild(togli);
+      riga.appendChild(v);
+    }
+    for (const im of allegati.immagini) {
+      const v = document.createElement('div');
+      v.className = 'voce';
+      if (im.nome) v.title = im.nome;
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      const togli = document.createElement('button');
+      togli.type = 'button';
+      togli.className = 'togli';
+      togli.textContent = '×';
+      togli.title = 'Togli';
+      togli.setAttribute('aria-label', 'Togli dal messaggio');
+      togli.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati.immagini = allegati.immagini.filter((x) => x !== im);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      v.append(img, togli);
+      riga.appendChild(v);
+    }
+    o.appendChild(riga);
+  }
+
+  const Immagini = global.SN_IMMAGINI_CHAT;
+
+  // Il pannello pronto a ricevere: false dove Filo è spento, null con l'Aiuto spento (e lo si dice).
+  function pannelloPerAllegati() {
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return null; }
+    if (!isOpen() || nascosto) open();
+    else if (collapsed) expand({ ai: false });
+    return true;
+  }
+  // Quello che non entra lo si dice, tutto in un avviso: nessun file lasciato sparisce in silenzio.
+  function allegatiArrivati({ grandi = 0, rotte = 0, altri = 0 } = {}) {
+    disegnaAllegati();
+    const frasi = [];
+    if (grandi) frasi.push(Allegati.fraseTroppoGrandi(grandi));
+    if (rotte) frasi.push(Allegati.fraseIlleggibili(rotte));
+    if (altri) frasi.push(Allegati.fraseNonImmaginiAiuto(altri));
+    if (frasi.length) Popup?.showToast?.(frasi.join(' '));
+    try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+  const conta = (n) => Math.max(0, Math.floor(Number(n) || 0));
+  const RIFIUTO = new Set([400, 413, 415, 422]);
+  function togliImmaginiDallaStoria() {
+    let n = 0;
+    for (const m of history) {
+      if (m && Array.isArray(m.immagini) && m.immagini.length) { n += m.immagini.length; delete m.immagini; }
+    }
+    return n;
+  }
+
+  // Ogni strada passa da qui: oltre il tetto o in un formato che il modello non legge, l'immagine si ridisegna.
+  async function allegaUna(blob, nome, conti) {
+    const dataUrl = blob && Immagini ? await Immagini.perLaChat(blob) : '';
+    if (dataUrl) allegati.immagini.push({ dataUrl, nome });
+    else conti.rotte += 1;
+  }
+
+  // Tutti i file lasciati: le immagini entrano, degli altri si dice che all'Aiuto non vanno. Torna se l'Aiuto le ha
+  // prese (anche solo per dire perché non entrano).
+  async function allega(files) {
+    const tutti = Array.from(files || []).filter(Boolean);
+    const lista = tutti.filter((f) => /^image\//i.test(f.type || ''));
+    if (!tutti.length) return false;
+    if (versoLoStrato()) {
+      const perche = chiusoPerAllegati();
+      if (perche !== true) return perche;
+      const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
+      const buone = lista.filter((f) => f.size <= Allegati.tettoLetturaByte);
+      conti.grandi = lista.length - buone.length;
+      return mandaAlloStrato(await lette(buone.map((f) => ({ blob: f, nome: f.name || '' })), conti), conti);
+    }
+    const pronto = pannelloPerAllegati();
+    if (!pronto) return pronto === null;
+    const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
+    for (const f of lista) {
+      if (f.size > Allegati.tettoLetturaByte) { conti.grandi += 1; continue; }
+      await allegaUna(f, f.name || '', conti);
+      if (!root) return true;
+    }
+    allegatiArrivati(conti);
+    return true;
+  }
+
+  // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede, sulla barra o in un riquadro, già lette.
+  async function allegaDaFuori({ immagini = [], grandi = 0, rotte = 0, altri = 0 } = {}) {
+    const buone = (Array.isArray(immagini) ? immagini : []).filter((im) => im && /^data:image\//i.test(String(im.dataUrl || '')));
+    const conti = { grandi: conta(grandi), rotte: conta(rotte), altri: conta(altri) };
+    if (!buone.length && !conti.grandi && !conti.rotte && !conti.altri) return false;
+    if (versoLoStrato()) {
+      if (chiusoPerAllegati() !== true) return false;
+      const voci = buone.map((im) => ({ blob: Immagini?.blobDa(im.dataUrl), nome: typeof im.nome === 'string' ? im.nome : '' }));
+      return mandaAlloStrato(await lette(voci, conti), conti);
+    }
+    if (!pannelloPerAllegati()) return false;
+    for (const im of buone) {
+      await allegaUna(Immagini?.blobDa(im.dataUrl), typeof im.nome === 'string' ? im.nome : '', conti);
+      if (!root) return true;
+    }
+    allegatiArrivati(conti);
+    return true;
+  }
+
+  // Su un sito il pannello sta nello strato (#1509.3): le immagini si leggono qui e gli arrivano a pezzi sotto il suo
+  // tetto, coi conti di quelle che non entrano sull'ultimo, perché l'avviso le dica una volta.
+  const PEZZO_ALLO_STRATO = 6 * 1024 * 1024;
+  const versoLoStrato = () => !nelloStrato && !root && !!global.SN_RIQUADRI_SOPRA && location.protocol !== 'filo:';
+  // true se il pannello le può prendere; false dove Filo è spento; con l'Aiuto spento lo si dice, e valgono prese.
+  function chiusoPerAllegati() {
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return null; }
+    return true;
+  }
+  async function lette(voci, conti) {
+    const out = [];
+    for (const v of voci) {
+      const dataUrl = v.blob && Immagini ? await Immagini.perLaChat(v.blob) : '';
+      if (dataUrl) out.push({ dataUrl, nome: v.nome });
+      else conti.rotte += 1;
+    }
+    return out;
+  }
+  function mandaAlloStrato(immagini, conti) {
+    const pezzi = [[]];
+    let peso = 0;
+    for (const im of immagini) {
+      const p = im.dataUrl.length + im.nome.length;
+      if (pezzi[pezzi.length - 1].length && peso + p > PEZZO_ALLO_STRATO) { pezzi.push([]); peso = 0; }
+      pezzi[pezzi.length - 1].push(im);
+      peso += p;
+    }
+    pezzi.forEach((pezzo, i) => {
+      const ultimo = i === pezzi.length - 1;
+      const dati = { immagini: pezzo, ...(ultimo ? conti : {}) };
+      // Senza strato il pannello si apre qui, con le stesse immagini.
+      const qui = () => {
+        apri();
+        allegati.immagini.push(...pezzo);
+        allegatiArrivati(ultimo ? conti : {});
+      };
+      if (global.SN_RIQUADRI_SOPRA.apri('aiuto', { invocazione: null, allegati: dati }, qui)) facciata.attiva = true;
+      else qui();
+    });
+    return true;
+  }
+
+  function immaginiNellaBolla(msg, immagini, riferimenti = []) {
+    if (!msg || (!immagini.length && !riferimenti.length)) return;
+    const box = document.createElement('div');
+    box.className = 'sn-sidebar-msg-immagini';
+    if (msg.textContent.trim()) box.classList.add('con-testo');
+    const o = ombraDi(box, CSS_ALLEGATI);
+    const bolla = document.createElement('div');
+    bolla.className = 'bolla';
+    for (const r of riferimenti) bolla.appendChild(gettoneRiferimento(r));
+    for (const im of immagini) {
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      bolla.appendChild(img);
+    }
+    o.appendChild(bolla);
+    msg.prepend(box);
+  }
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
+  // #2096 — una domanda scritta dal tasto destro di una pagina di Filo (una voce delle impostazioni): «Spiega cosa fa»
+  // la manda, «Chiedi a Filo» la lascia nella casella da finire. Sui siti l'Aiuto sta nello strato: lì non serve.
+  function chiediDaPagina(testo, { invia = false } = {}) {
+    const t = String(testo || '').trim();
+    if (!t || nelloStrato) return false;
+    apri({ source: 'menu' });
+    const ta = root && root.querySelector('.sn-sidebar-input textarea');
+    if (!ta) return false;
+    if (invia) { submit({ userMessage: t }); return true; }
+    ta.value = `${t} `;
+    try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    ta.focus();
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+    return true;
+  }
+
+  // I tasti dei messaggi, una volta per conversazione a schermo: Rispondi cita nella casella dell'Aiuto.
+  const azioniConv = new WeakMap();
+  function azioniSu(conv) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (!conv || !A || azioniConv.has(conv)) return;
+    const Md = global.SN_MARKDOWN;
+    azioniConv.set(conv, A.attacca(conv, {
+      messaggio: '.sn-sidebar-msg-user, .sn-sidebar-msg-assistant',
+      testo: (el) => (el.classList.contains('sn-sidebar-msg-assistant') && Md && Md.testo ? Md.testo(el._scritto || '') : el._scritto || ''),
+      ruolo: (el) => (el.classList.contains('sn-sidebar-msg-user') ? 'user' : 'filo'),
+      rispondi: (_el, testo) => A.citaNelCampo(root && root.querySelector('.sn-sidebar-input textarea'), testo),
+    }));
+  }
+  // Le stesse azioni dal tasto destro, sulle pagine di Filo (sui siti il menu non legge le voci della pagina).
+  function vociMessaggio(target) {
+    const conv = convEl();
+    const a = conv && azioniConv.get(conv);
+    return a ? a.vociMenu(target) : [];
+  }
+
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
-  function nelFiloAiuto(role, text) {
+  function nelFiloAiuto(role, text, schede = []) {
     if (!convFilo || !String(text || '').trim()) return;
+    // Nell'Editor la riga è del documento («nell'Editor su tesi»), come quella della chat che c'era lì prima.
+    let conv = null;
+    try { conv = appDellaPagina()?.conversazione?.(convFilo) || null; } catch (_) { conv = null; }
     try {
       chrome.runtime.sendMessage({
-        type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: convFilo, soggetto: document.title,
-        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
+        type: MSG.FILO_CONVERSAZIONE_APP, ...(conv || { app: 'aiuto', rif: convFilo, soggetto: paginaOra().titolo }),
+        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text), ...(schede.length ? { schede } : {}) }],
       }).catch(() => {});
     } catch (_) {}
+  }
+
+  // Filo ha detto qualcosa che l'utente, che ha ridotto o chiuso il pannello, non vede: la barra lo annuncia (#1432).
+  function rispostaArrivata() {
+    if (nonLetta || !(nascosto || (collapsed && ridottoDallUtente))) return;
+    nonLetta = true;
+    cambiato();
   }
 
   function appendChatMessage(role, text, { nelFilo = true } = {}) {
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
+    if (role === 'assistant') { rispostaArrivata(); spegniSeguito(); }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
-    // #418 — le risposte di Filo (assistant) vanno rese con la stessa
-    // formattazione leggera di popup e chat della home (grassetto, corsivo,
-    // codice, elenchi, LINK cliccabili). Il testo dell'utente resta letterale.
+    // #2096 — Copia e Rispondi al passaggio del mouse, come nella home: il testo come l'ha scritto chi parla.
+    if (String(text || '').trim()) { msg.classList.add('sn-con-azioni-msg'); msg._scritto = String(text); }
+    azioniSu(conv);
+    // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
+    // il testo dell'utente resta letterale.
     if (role === 'assistant' && global.SN_MARKDOWN) {
       msg.innerHTML = global.SN_MARKDOWN.render(text);
     } else {
@@ -338,6 +1150,7 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', (e) => {
       if (!gestoVero(e)) return;
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
@@ -355,6 +1168,7 @@
     if (!afterEl || !choices || !choices.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'sn-sidebar-choices';
+    const chiedeSeguito = (c) => c.prompt === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
     choices.forEach((c) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -362,93 +1176,179 @@
       btn.textContent = c.label;
       btn.addEventListener('click', (e) => {
         if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
+        // A turno in corso il seguito partirebbe insieme a quel turno: il tasto resta per dopo.
+        if (chiedeSeguito(c) && inVolo > 0) return;
         wrap.classList.add('sn-sidebar-choices-used');
-        // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
+    if (choices.some(chiedeSeguito)) seguitoAperto = wrap;
     afterEl.insertAdjacentElement('afterend', wrap);
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
   }
+  function spegniSeguito() {
+    if (!seguitoAperto) return;
+    seguitoAperto.classList.add('sn-sidebar-choices-used');
+    seguitoAperto.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    seguitoAperto = null;
+  }
 
-  // Indicatore "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
-  // Le frasi non sono il reasoning vero (non disponibile), ma sono una prova di
-  // funzionamento — abbastanza varie e specifiche da non sembrare uno spinner.
-  const THINKING_PHRASES = [
-    'Leggo la pagina…',
-    'Analizzo lo screenshot…',
-    'Identifico gli elementi interattivi…',
-    'Confronto con la tua richiesta…',
-    'Cerco il menu giusto…',
-    'Valuto il prossimo passo…',
-    'Controllo la struttura del DOM…',
-    'Capisco il contesto…',
-    'Scelgo il target migliore…',
-    'Verifico che la pagina sia cambiata…',
-    'Compongo la risposta…',
-    'Riconosco i pattern noti…',
-    'Stimo cosa serve all\'utente…',
-  ];
+  // Le correzioni di «Valuta» (#1449): un clic scrive la correzione nel campo valutato, un altro la toglie. Escono verso
+  // il sito, quindi passano prima dalla porta delle uscite, come il testo di un «fill» (#810).
+  async function mostraCorrezioni(afterEl, correzioni, { campo, mandato }) {
+    if (!afterEl || !campo || !correzioni.length) return;
+    const fermi = await Promise.all(correzioni.map((c) => campoFermato(c.dopo)));
+    const frase = fermi.find(Boolean);
+    if (frase) fermata(frase);
+    const buone = correzioni.filter((_, i) => !fermi[i]);
+    if (!buone.length || !afterEl.isConnected) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-correzioni';
+    for (const c of buone) wrap.appendChild(bottoneCorrezione(c, campo, Math.max(0, String(mandato || '').indexOf(c.prima))));
+    afterEl.insertAdjacentElement('afterend', wrap);
+    for (let i = 0; i < buone.length; i++) contaValuta('correzione_mostrata');
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
 
-  function appendThinking() {
+  function bottoneCorrezione(c, campo, vicinoA) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-correzione';
+    const pezzo = (cls, testo) => {
+      const el = document.createElement('span');
+      el.className = cls;
+      el.textContent = testo;
+      return el;
+    };
+    const riga = pezzo('sn-sidebar-correzione-riga', '');
+    riga.append(pezzo('sn-sidebar-correzione-prima', c.prima));
+    if (c.dopo) riga.append(pezzo('sn-sidebar-correzione-freccia', '→'), pezzo('sn-sidebar-correzione-dopo', c.dopo));
+    btn.appendChild(riga);
+    if (c.perche) btn.appendChild(pezzo('sn-sidebar-correzione-perche', c.perche));
+    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto. Una
+    // correzione che toglie senza scrivere tiene il pezzo tolto e il testo che gli è rimasto attorno.
+    let scritta = null;
+    let tolto = null;
+    const stato = () => {
+      btn.classList.toggle('sn-sidebar-correzione-fatta', scritta !== null);
+      btn.setAttribute('aria-pressed', scritta !== null ? 'true' : 'false');
+      btn.title = I18n.t(scritta !== null ? 'help_correzione_togli' : 'help_correzione_applica');
+    };
+    const diLa = (chiave, ...arg) => appendActionLog(I18n.t(chiave, ...arg))?.classList.add('sn-sidebar-log-intera');
+    stato();
+    // Un clic alla volta: nello strato la risposta della pagina arriva dopo, e un secondo clic scriverebbe due volte.
+    let occupato = false;
+    btn.addEventListener('click', async (e) => {
+      if (!gestoVero(e) || occupato) return;
+      occupato = true;
+      try {
+        if (scritta === null) {
+          const r = await sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
+          if (r.sparito) { diLa('help_correzione_sparito'); return; }
+          if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
+          scritta = r.dove;
+          tolto = c.dopo ? null : { pezzo: r.tolto || c.prima, sx: r.sx || '', dx: r.dx || '' };
+          contaValuta('correzione_accettata');
+        } else {
+          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta)
+            : tolto ? await rimettiNelCampo(campo, tolto.pezzo, tolto, scritta) : {};
+          if (r.sparito) { diLa('help_correzione_sparito'); return; }
+          if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
+          vicinoA = r.dove;
+          scritta = null;
+          contaValuta('correzione_tolta');
+        }
+        stato();
+      } finally { occupato = false; }
+    });
+    return btn;
+  }
+
+  // L'attesa di un passo (#578.1), con le regole della chat della home (patterns/il-filo-dell-attesa.md): niente frasi
+  // inventate. Una rotella finché non c'è niente di vero; l'azione in corso la dice lei; il ragionamento vero scorre su
+  // una riga sola e un clic lo apre per intero. Sempre testo, mai HTML: il ragionamento può ricopiare la pagina.
+  function creaAttesa() {
     const conv = convEl();
     if (!conv) return null;
     const wrap = document.createElement('div');
-    wrap.className = 'sn-sidebar-thinking';
-    const lines = [];
-    for (let i = 0; i < 3; i++) {
-      const ln = document.createElement('div');
-      ln.className = 'sn-sidebar-thinking-line';
-      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
-      wrap.appendChild(ln);
-      lines.push(ln);
-    }
+    wrap.className = 'sn-sidebar-attesa';
+    wrap.dataset.fase = 'attesa';
+    const testa = document.createElement('button');
+    testa.type = 'button';
+    testa.className = 'sn-sidebar-attesa-testa';
+    testa.setAttribute('aria-expanded', 'false');
+    testa.setAttribute('aria-label', 'Il ragionamento');
+    const rotella = document.createElement('span');
+    rotella.className = 'sn-sidebar-rotella';
+    rotella.setAttribute('aria-hidden', 'true');
+    const riga = document.createElement('span');
+    riga.className = 'sn-sidebar-attesa-riga';
+    const rigaTesto = document.createElement('span');
+    riga.append(rigaTesto);
+    testa.append(rotella, riga);
+    const corpo = document.createElement('div');
+    corpo.className = 'sn-sidebar-attesa-corpo';
+    corpo.hidden = true;
+    wrap.append(testa, corpo);
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
 
-    // Pool casuale senza ripetizioni ravvicinate
-    const pool = THINKING_PHRASES.slice();
-    let recent = [];
-    function nextPhrase() {
-      const candidates = pool.filter((p) => !recent.includes(p));
-      const src = candidates.length ? candidates : pool;
-      const phrase = src[Math.floor(Math.random() * src.length)];
-      recent.push(phrase);
-      if (recent.length > 4) recent.shift();
-      return phrase;
-    }
-
-    // Inizializza con 3 frasi diverse
-    lines[0].textContent = nextPhrase();
-    lines[1].textContent = nextPhrase();
-    lines[2].textContent = nextPhrase();
-
-    let stopped = false;
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      // Shift: top esce, mid → top, bottom → mid, nuovo → bottom
-      lines[0].textContent = lines[1].textContent;
-      lines[1].textContent = lines[2].textContent;
-      lines[2].textContent = nextPhrase();
-      // Re-trigger animazione del bottom
-      lines[2].classList.remove('sn-sidebar-thinking-enter');
-      void lines[2].offsetWidth;
-      lines[2].classList.add('sn-sidebar-thinking-enter');
+    const t0 = Date.now();
+    let ragionamento = '';
+    let azione = '';
+    let finita = false;
+    const apri = (v) => {
+      corpo.hidden = !v;
+      testa.setAttribute('aria-expanded', v ? 'true' : 'false');
+      wrap.classList.toggle('sn-sidebar-attesa-aperta', v);
+      if (v) corpo.scrollTop = finita ? 0 : corpo.scrollHeight;
     };
-    const interval = setInterval(tick, 900);
-    // Primo enter
-    lines[2].classList.add('sn-sidebar-thinking-enter');
-
+    testa.addEventListener('click', () => { if (ragionamento) apri(corpo.hidden); });
+    const disegna = () => {
+      if (finita) return;
+      wrap.dataset.fase = azione ? 'azione' : ragionamento ? 'pensa' : 'attesa';
+      rigaTesto.textContent = azione || ragionamento.replace(/\s+/g, ' ').trim().slice(-90);
+    };
+    const chiudi = (fase, testo) => {
+      finita = true;
+      wrap.dataset.fase = fase;
+      rigaTesto.textContent = testo;
+      testa.title = ragionamento ? 'Il ragionamento' : '';
+    };
     return {
       el: wrap,
-      stop() { stopped = true; clearInterval(interval); },
+      // L'azione vera che sta accadendo adesso («Leggo la pagina»), '' quando è finita.
+      azione(t) { azione = String(t || ''); disegna(); },
+      ragiona(pezzo, { intero = false } = {}) {
+        if (finita || !pezzo) return;
+        // Il ragionamento intero arriva con la risposta: i pezzi in diretta possono restare indietro.
+        if (intero) { if (pezzo.length < ragionamento.length) return; ragionamento = pezzo; } else ragionamento += pezzo;
+        wrap.classList.add('sn-sidebar-attesa-pensata');
+        corpo.textContent = ragionamento;
+        if (!corpo.hidden) corpo.scrollTop = corpo.scrollHeight;
+        disegna();
+      },
+      // Risposta arrivata: senza ragionamento non resta niente; con, una riga chiusa che lo riapre.
+      fine() {
+        if (finita) return;
+        if (!ragionamento) { finita = true; wrap.remove(); return; }
+        apri(false);
+        const s = Math.max(1, Math.round((Date.now() - t0) / 1000));
+        chiudi('fatto', `Ragionamento · ${s} s`);
+      },
+      // Fermato dall'utente: la riga lo dice e il ragionamento a metà resta aperto, come nella home.
+      ferma() {
+        if (finita) return;
+        chiudi('fermato', global.SN_CHAT_ERRORS.FERMATO_QUI);
+        if (ragionamento) apri(true);
+      },
     };
   }
 
-  // Riga grigia compatta per i log delle azioni utente
   function appendActionLog(text) {
     const conv = convEl();
     if (!conv) return null;
@@ -475,9 +1375,8 @@
     q.className = 'sn-sidebar-feedback-q';
     q.textContent = 'Ha funzionato? Aiutami a migliorare:';
     wrap.appendChild(q);
-    // La domanda da sola sembrava un parere privato a chi scrive Filo, e
-    // invece il sì pubblica i passi dove li legge chiunque: dirlo dove si
-    // sceglie, non solo nella pagina che spiega la privacy (#584).
+    // La domanda da sola sembrava un parere privato, e invece il sì pubblica i passi dove li
+    // legge chiunque: va detto qui, dove si sceglie, non solo nella pagina sulla privacy (#584).
     const nota = document.createElement('div');
     nota.className = 'sn-sidebar-feedback-nota';
     // La riga dice cosa succede, e dice il vero: dall'indirizzo e dai nomi dei
@@ -493,6 +1392,7 @@
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
     const bottoni = row.attachShadow({ mode: 'closed' });
+    global.SN_SUGGERIMENTO?.ombra?.(row, bottoni);
     const stile = document.createElement('style');
     stile.textContent = CSS_RISPOSTA;
     bottoni.appendChild(stile);
@@ -567,7 +1467,7 @@
   border: 1px solid var(--sn-border);
   border-radius: 999px;
   font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-sidebar-feedback-btn:hover {
   background: var(--sn-accent);
@@ -601,16 +1501,13 @@
     return { x: r.x + r.width / 2, y: r.y + r.height / 2, disabled: b.disabled, label: b.textContent };
   }
 
-  // Da questa pagina un percorso condiviso partirebbe? Lo sa solo il processo
-  // principale (protocollo, nome del sito, spazio nella coda), ed è la stessa
-  // risposta che darebbe la raccolta: una porta sola, o il riquadro promette
-  // una cosa e la raccolta ne fa un'altra (#584, settimo giro). Se la domanda
-  // non arriva a destinazione non si promette niente.
+  // Se da questa pagina un percorso partirebbe davvero lo sa solo il main, ed è la stessa
+  // porta che usa la raccolta: una sola, o il riquadro promette ciò che non accade (#584).
   async function percorsoRaccoglibile() {
     try {
       const r = await chrome.runtime.sendMessage({
         type: MSG.PATH_COLLECTABLE,
-        payload: { url: (session && session.initialUrl) || location.href },
+        payload: { url: (session && session.initialUrl) || paginaOra().url },
       });
       return !!(r && r.raccoglibile);
     } catch (_) { return false; }
@@ -622,13 +1519,8 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Qui non parte NESSUN identificativo del mittente, neanche vuoto.
-          // Da #585 chi manda si presenta al server col token dell'identità
-          // dell'installazione, che il server verifica e che il processo
-          // principale allega al momento dell'invio; un identificativo
-          // generato in questa pagina sarebbe autodichiarato, e chi attacca ne
-          // scriverebbe un altro a ogni invio. Un campo vuoto che si porta
-          // dietro il nome è l'invito a riempirlo (#584).
+          // Nessun identificativo del mittente da qui, neanche vuoto: il main allega il token
+          // dell'installazione, che il server verifica (#585). Uno locale sarebbe autodichiarato.
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,
@@ -640,37 +1532,16 @@
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  // Etichetta breve (≤4 parole) per descrivere un'azione utente.
-  // Preferenza: testo dell'elemento → aria-label → tag.
-  function describeElementBriefly(el) {
-    if (!el) return '';
-    const raw = (
-      el.getAttribute?.('aria-label')
-      || (el.innerText || el.textContent || '').trim()
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.tagName.toLowerCase()
-    ).replace(/\s+/g, ' ').trim();
-    if (!raw) return el.tagName.toLowerCase();
-    const words = raw.split(' ');
-    return words.slice(0, 4).join(' ');
-  }
-
-  // ---------- Parsing risposta AI ----------
-
-  function parseAssistantOutput(text) {
-    const fallback = { display: (text || '').trim(), highlight: null, choices: [], status: 'done', collapse: false };
+  function parseAssistantOutput(text, finishReason = null) {
+    // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
+    const salvato = globalThis.SN_CHAT_ERRORS?.testoDaInvolucro?.(text, ['text'], finishReason) ?? null;
+    const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
-    const trimmed = text.trim();
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start < 0 || end <= start) return fallback;
     try {
-      const obj = JSON.parse(trimmed.slice(start, end + 1));
-      if (!obj || typeof obj !== 'object') return fallback;
-      // Output speciale: richiesta di ricerca web. Bypass del flusso normale,
-      // viene processata in submit() prima di rendere la risposta in chat.
+      const obj = globalThis.SN_CHAT_ERRORS?.involucroIntero?.(text) ?? null;
+      if (!obj) return fallback;
+      // Richiesta di ricerca web: scavalca il flusso normale, la processa submit() prima di
+      // rendere la risposta in chat.
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
@@ -692,7 +1563,7 @@
       // Output speciale: comando della shell di Filo (icone della barra in alto).
       // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
       if (obj.action === 'shell' && typeof obj.command === 'string') {
-        const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize', 'sidebar', 'sidebar_close', 'sidebar_lock', 'sidebar_unlock'];
         const cmd = obj.command.trim().toLowerCase();
         if (allowed.includes(cmd)) {
           return {
@@ -703,11 +1574,7 @@
           };
         }
       }
-      // Output speciale: azione tipizzata di Filo (le stesse che la chat della
-      // dashboard può emettere — es. inviare un feedback agli sviluppatori). È
-      // ciò che l'utente farebbe col menu tasto destro. Non la eseguiamo qui:
-      // passa per il registro dei livelli di sicurezza nel main (e, se serve,
-      // per il popup di conferma) — vedi submit().
+      // Non si esegue qui: passa dal registro dei livelli di sicurezza nel main (vedi submit()).
       if (obj.action === 'filo' && obj.filo && typeof obj.filo === 'object'
         && typeof obj.filo.type === 'string' && obj.filo.type.trim()) {
         return {
@@ -717,14 +1584,9 @@
           status: obj.status === 'continue' ? 'continue' : 'done',
         };
       }
-      // Output speciale: azione SULLA PAGINA (le stesse del menu tasto destro su
-      // testo/immagine/link: copia, taglia, cerca sul web, leggi ad alta voce,
-      // copia/salva/cerca immagine, copia/salva/condividi/apri link). Non sono
-      // azioni del main (vivono in src/content/actions.js + tts.js): le esegue
-      // direttamente la sidebar via runPageAction(), col popup di conferma di
-      // Filo quando l'azione esce verso l'esterno. Vedi PROMPTS.help().
+      // La esegue la pagina (src/content/aiutoPagina.js), con runPageAction(), più sotto.
       if (obj.action === 'page' && obj.page && typeof obj.page === 'object'
-        && typeof obj.page.op === 'string' && PAGE_ACTIONS[obj.page.op]) {
+        && typeof obj.page.op === 'string' && Object.prototype.hasOwnProperty.call(azioniDiPagina(), obj.page.op)) {
         return {
           kind: 'page_action',
           page: obj.page,
@@ -746,7 +1608,6 @@
           note: typeof obj.highlight.note === 'string' ? obj.highlight.note.trim() : '',
         };
       }
-      // choices: filtra voci valide, max 5
       let choices = [];
       if (Array.isArray(obj.choices)) {
         choices = obj.choices
@@ -759,6 +1620,10 @@
       const file = (Array.isArray(obj.file) ? obj.file : [obj.file])
         .map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
         .filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
+      // Le correzioni di «Valuta» (#1449), tutte: quante ne propone il modello lo decide la lunghezza della risposta.
+      const correzioni = (Array.isArray(obj.correzioni) ? obj.correzioni : [])
+        .filter((c) => c && typeof c.prima === 'string' && c.prima && typeof c.dopo === 'string' && c.prima !== c.dopo)
+        .map((c) => ({ prima: c.prima, dopo: c.dopo, perche: typeof c.perche === 'string' ? c.perche.trim() : '' }));
       return {
         display: typeof obj.text === 'string' ? obj.text : '',
         highlight,
@@ -766,22 +1631,17 @@
         status,
         collapse: collapseFlag,
         file,
+        correzioni,
+        // Le azioni sul documento dell'Editor (#1433): le applica la pagina, se ne ha uno.
+        formatta: Array.isArray(obj.formatta) ? obj.formatta.slice(0, 50) : null,
       };
     } catch (_) {
       return fallback;
     }
   }
 
-  // ---------- Azioni tipizzate di Filo (parità col menu tasto destro) ----------
-  //
-  // L'agente "Aiuto" può attivare le azioni che l'utente farebbe col tasto
-  // destro — a partire dall'invio di un feedback agli sviluppatori. Queste
-  // azioni NON vengono eseguite localmente: passano per executeFiloAction nel
-  // main, che consulta il registro statico dei livelli di sicurezza
-  // (src/shared/actionLevels.js) e, per i livelli ≥ 2, ci rimanda una
-  // spiegazione da mostrare nel popup di conferma di Filo (SN_CONFIRM_UI), lo
-  // STESSO usato dalla chat della dashboard. Così la sidebar non è un canale
-  // privilegiato: stesso registro, stesse conferme, stesse regole.
+  // Le azioni tipizzate non si eseguono qui: passano da executeFiloAction nel main, che
+  // consulta il registro dei livelli. La sidebar non è un canale privilegiato.
 
   // Etichetta breve per la riga di log in chat (cosa Filo ha fatto/sta facendo).
   function filoActionLabel(action) {
@@ -869,6 +1729,8 @@
   const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
     + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
     + 'a nessun livello. Non riproporlo in un\'altra forma';
+  const NOTA_ALTRO_DOCUMENTO = 'l\'utente ha aperto un altro documento: i messaggi di prima parlavano di quello di prima, '
+    + 'il documento allegato da qui in poi è quello nuovo';
   function notaFermata(frase) {
     logFermata(frase);
     history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
@@ -881,10 +1743,10 @@
       return;
     }
     fermataDetta = true;
-    setTimeout(() => submit({
+    prossimoPasso({
       userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
-      preActionUrl: location.href,
-    }), 50);
+      preActionUrl: urlPrimaDelPasso(),
+    }, 50, epoca);
   }
 
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
@@ -894,12 +1756,15 @@
   }
 
   // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  // Senza una risposta della porta il testo non esce (#1505): un errore vale come fermato.
+  const CAMPO_SENZA_PORTA = 'non ho scritto nel campo: il controllo dei dati in uscita non ha funzionato, e senza quel controllo non lascio uscire niente';
   async function campoFermato(testo) {
     if (!String(testo || '').trim()) return '';
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
-      return r && r.blocca ? String(r.frase || '') : '';
-    } catch (_) { return ''; }
+      if (!r || r.ok !== true) return CAMPO_SENZA_PORTA;
+      return r.blocca ? String(r.frase || CAMPO_SENZA_PORTA) : '';
+    } catch (_) { return CAMPO_SENZA_PORTA; }
   }
 
   async function runFiloAction(action, { etichetta = '' } = {}) {
@@ -918,19 +1783,22 @@
       return false;
     }
 
-    // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
-    // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
-    // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
+    // Livello ≥ 2: il main non ha eseguito e manda la spiegazione per il popup; solo dopo l'OK
+    // l'azione riparte, riclassificata di nuovo nel main.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '', avviso: res.avviso || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti, avviso: res.avviso || '' };
       let ok = false;
       try {
         ok = Ui
           ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : global.confirm(opts.text);
       } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      if (!ok) {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_RIFIUTATA, action })).catch(() => {}); } catch (_) {}
+        appendActionLog(`${label}: annullata`);
+        return false;
+      }
       let c = null;
       try {
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
@@ -1007,6 +1875,7 @@
     const esito = !r || !r.ok
       ? `ricerca fra i documenti ${r && r.annullata ? 'annullata' : 'non riuscita'}`
       : (r.cartellaMancante ? `cartella non trovata: ${breve(r.cartellaMancante, 80)}`
+        : r.cartellaDiRete ? `cartella su un altro computer, non ci cerco: ${breve(r.cartellaDiRete, 80)}`
         : `${esitoDocumenti(r)} fra i tuoi documenti «${breve(p.cosa, 60)}»${r.fermata ? ', fermata da te' : ''}`);
     const fatta = riga || appendActionLog('');
     if (fatta) {
@@ -1103,192 +1972,44 @@
   // suo perché, come nel diario della chat: «non riuscita» e basta non dice cosa
   // cambiare (#592).
   function esitoAzione(label, done, r) {
-    if (done) return `${label}: fatto`;
     const o = r && r.output;
-    const perche = o && o.rifiuto && typeof o.error === 'string' ? o.error.trim() : '';
+    // Una preferenza cambiata si dice col suo nome e il valore («Filo spento su docs.google.com», #843).
+    if (done) return o && typeof o.etichetta === 'string' && o.etichetta.trim() ? o.etichetta.trim() : `${label}: fatto`;
+    const perche = o && (o.rifiuto || o.invariato) && typeof o.error === 'string' ? o.error.trim() : '';
     return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
   //
-  // L'agente "Aiuto" può eseguire le stesse azioni del menu contestuale su
-  // testo/immagine/link. A differenza delle azioni tipizzate di Filo (sopra),
-  // queste vivono nel content script (SN_ACTIONS in src/content/actions.js,
-  // SN_TTS in tts.js) e operano sull'elemento o sulla selezione corrente. Ognuna
-  // dichiara solo il suo COSTO: se parte, chiede o no lo decide il main con la
-  // stessa regola del dispatch (#530, MSG.FILO_DECIDI_PAGINA). Uscire verso
-  // l'esterno (cercare, condividere) costa 2; il resto resta sul computer e costa 1.
-  //
-  // SN_ACTIONS/SN_TTS sono caricati DOPO sidebar.js (vedi i preload), quindi li
-  // risolviamo al volo dentro la funzione, non al top dell'IIFE.
-  const PAGE_ACTIONS = {
-    // testo / selezione
-    copy:         { target: 'text',  costo: 1, label: 'copia testo' },
-    cut:          { target: 'text',  costo: 1, label: 'taglia testo' },
-    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web', viaFilo: true },
-    read_aloud:   { target: 'text',  costo: 1, label: 'leggi ad alta voce' },
-    stop_reading: { target: 'none',  costo: 1, label: 'ferma la lettura' },
-    edit_text:    { target: 'text',  costo: 1, label: 'modifica testo' },
-    // immagini
-    copy_image:      { target: 'image', costo: 1, label: 'copia immagine' },
-    save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
-    copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
-    search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web', viaFilo: true },
-    // `viaFilo`: passa da NAVIGA, che il dispatch decide da sé (una ricerca porta `cerca` e costa 2 anche lì).
-    // Chiedere anche qui farebbe due domande per la stessa uscita.
-    open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
-    copy_link:  { target: 'link', costo: 1, label: 'copia link' },
-    save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
-    share_link: { target: 'link', costo: 2, label: 'condividi link' },
-  };
-
-  // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
-  function resolveActionText(page) {
-    const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
-    if (provided) return provided;
-    try { return (window.getSelection?.()?.toString() || '').trim(); } catch (_) { return ''; }
-  }
-
-  // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
-  function resolveImageEl(page) {
-    const sel = String(page.selector ?? page.css ?? '').trim();
-    if (sel) {
-      try {
-        const el = document.querySelector(sel);
-        if (el) return el.tagName === 'IMG' ? el : el.querySelector('img');
-      } catch (_) {}
-    }
-    const wanted = String(page.src ?? page.url ?? page.href ?? '').trim();
-    const imgs = Array.from(document.images || []);
-    if (wanted) {
-      const hit = imgs.find((im) => (im.currentSrc || im.src || '') === wanted)
-        || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
-      if (hit) return hit;
-    }
-    // Fallback: l'immagine visibile più grande (di norma l'immagine "principale").
-    let best = null; let bestArea = 0;
-    for (const im of imgs) {
-      const r = im.getBoundingClientRect();
-      const area = r.width * r.height;
-      if (area > bestArea && r.width > 32 && r.height > 32) { best = im; bestArea = area; }
-    }
-    return best;
-  }
-
-  // Link bersaglio: per selettore (anche su un figlio del link), per URL.
-  function resolveLinkEl(page) {
-    const sel = String(page.selector ?? page.css ?? '').trim();
-    if (sel) {
-      try {
-        const el = document.querySelector(sel);
-        const a = el && (el.tagName === 'A' ? el : (el.closest?.('a[href]') || el.querySelector?.('a[href]')));
-        if (a && a.href) return a;
-      } catch (_) {}
-    }
-    const wanted = String(page.url ?? page.href ?? '').trim();
-    if (wanted) {
-      const links = Array.from(document.querySelectorAll('a[href]'));
-      const hit = links.find((a) => a.href === wanted) || links.find((a) => a.href.includes(wanted));
-      if (hit) return hit;
-    }
-    return null;
-  }
-
+  // Le stesse azioni del menu contestuale su testo, immagini e link: le fa la pagina (src/content/aiutoPagina.js), che
+  // dice com'è andata in una riga; quelle che escono passando da Filo (cercare, aprire un link) le fa da qui
+  // runFiloAction, con la sua conferma e la sua porta delle uscite.
   async function runPageAction(page) {
-    const spec = PAGE_ACTIONS[page.op];
-    if (!spec) return false;
-    const Actions = global.SN_ACTIONS;
-    const Tts = global.SN_TTS;
-    const label = spec.label;
-
-    // Risolvi il bersaglio in anticipo: se manca, niente popup né esecuzione.
-    let text = '';
-    let imgEl = null;
-    let linkEl = null;
-    if (spec.target === 'text') {
-      text = resolveActionText(page);
-      if (!text && page.op !== 'edit_text') {
-        appendActionLog(`${label}: nessun testo selezionato`);
-        return false;
-      }
-    } else if (spec.target === 'image') {
-      imgEl = resolveImageEl(page);
-      if (!imgEl) { appendActionLog(`${label}: immagine non trovata`); return false; }
-    } else if (spec.target === 'link') {
-      linkEl = resolveLinkEl(page);
-      const fallbackUrl = String(page.url ?? page.href ?? '').trim();
-      if (!linkEl && !(page.op === 'open_link' && fallbackUrl)) {
-        appendActionLog(`${label}: link non trovato`);
-        return false;
-      }
-    }
-
-    // Senza risposta dal main si chiede: il caso prudente.
-    if (!spec.viaFilo) {
-      let d = null;
-      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
-      const risposta = d && d.ok ? d.risposta : 'chiede';
-      if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
-      if (risposta !== 'si') {
-        const Ui = global.SN_CONFIRM_UI;
-        let detail = '';
-        if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
-        else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
-        else if (linkEl) detail = linkEl.href || '';
-        const perche = d && d.perche ? `\n\n${d.perche}` : '';
-        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}` };
-        let ok = false;
-        try {
-          ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
-        } catch (_) { ok = false; }
-        if (!ok) { appendActionLog(`${label}: annullata`); return false; }
-      }
-    }
-
-    try {
-      switch (page.op) {
-        case 'copy': Actions?.copyToClipboard(text); break;
-        case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text), cerca: text }, { etichetta: label });
-        case 'read_aloud': await Tts?.readAloud(text); break;
-        case 'stop_reading': Tts?.stopReading(); break;
-        case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
-        case 'copy_image': await Actions?.copyImage(imgEl); break;
-        case 'save_image': Actions?.downloadImage(imgEl); break;
-        case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': return await runFiloAction({
-          type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine',
-        }, { etichetta: label });
-        case 'open_link': {
-          // "Apri in nuova scheda" è un'azione di sistema già registrata: la
-          // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
-          const url = (linkEl && linkEl.href) || String(page.url ?? page.href ?? '').trim();
-          return await runFiloAction({ type: 'NAVIGA', url });
-        }
-        case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
-        case 'save_link': await Actions?.saveLink(linkEl); break;
-        case 'share_link': await Actions?.shareLink(linkEl); break;
-        default: appendActionLog(`${label}: non riuscita`); return false;
-      }
-    } catch (_) {
-      appendActionLog(`${label}: non riuscita`);
-      return false;
-    }
-    appendActionLog(`${label}: fatto`);
-    return true;
+    const r = await Pagina.azione(page);
+    if (!r) { appendActionLog(`${(azioniDiPagina()[page && page.op] || {}).label || 'azione'}: non riuscita`); return false; }
+    if (r.filo && r.filo.action) return runFiloAction(r.filo.action, { etichetta: String(r.filo.etichetta || '') });
+    if (r.nonTrovato && session) session.nonTrovati += 1;
+    if (r.riga) appendActionLog(String(r.riga));
+    return !!r.ok;
   }
 
   // ---------- Submit / loop ----------
 
-  function buildPayload(userMessage, userAction, esterno) {
-    const screenshot = null; // riempito dopo
-    const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
-    const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
+  function buildPayload(userMessage, userAction, esterno, letta) {
+    const qui = paginaOra();
     // history per l'AI: solo {role, content}, niente metadati UI.
-    const aiHistory = history.map(({ role, content }) => ({ role, content }));
+    const aiHistory = history.map(({ role, content, immagini, schede }) => ({
+      ...(immagini && immagini.length
+        ? { role, content: [
+          { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
+          ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
+        ] }
+        : { role, content }),
+      ...(role === 'user' && schede && schede.length ? { schede } : {}),
+    }));
     return {
-      url: location.href,
-      title: document.title,
+      url: letta.url || qui.url,
+      title: letta.titolo ?? qui.titolo,
       userMessage: userMessage || undefined,
       userAction: userAction || undefined,
       // #593 — il contenuto esterno viaggia SEPARATO dalla nota di sistema, e
@@ -1297,115 +2018,50 @@
       // terzi diventa prompt resta uno solo.
       esterno: esterno || undefined,
       history: aiHistory,
-      screenshot,
-      outline,
-      viewport,
+      screenshot: letta.screenshot || undefined,
+      fotoMancante: (!letta.screenshot && letta.fotoMancante) || undefined,
+      outline: letta.outline || '',
+      viewport: letta.viewport || null,
+      origineImmagini: letta.origineImmagini || undefined,
     };
   }
 
-  // #711 — «questa foto è fatta con l'AI?» chiesto qui deve avere la stessa lettura del
-  // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
-  // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
-  const MAX_IMMAGINI_ORIGINE = 12;
-  // Un'immagine che non arriva non deve tenere ferma la risposta: conta come non letta.
-  const ATTESA_ORIGINE_MS = 3000;
-  // Un'immagine letta resta letta: le domande dopo non la riscaricano.
-  const origineLetta = new Map();
-  function immaginiVisibili() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const viste = new Set();
-    const out = [];
-    for (const im of Array.from(document.images || [])) {
-      if (root && root.contains(im)) continue;
-      const src = im.currentSrc || im.src;
-      if (!src || viste.has(src) || !im.complete || !im.naturalWidth) continue;
-      const r = im.getBoundingClientRect();
-      if (r.width < 48 || r.height < 48) continue;
-      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
-      viste.add(src);
-      out.push({ im, src, r, area: r.width * r.height });
-    }
-    return out.sort((a, b) => b.area - a.area);
-  }
-  async function origineImmaginiVisibili() {
-    const Actions = global.SN_ACTIONS;
-    if (!Actions?.leggiOrigine || !Actions?.scaricaImmagine) return null;
-    const tutte = immaginiVisibili();
-    if (!tutte.length) return null;
-    const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
-      try {
-        let lettura = origineLetta.get(src);
-        if (!lettura) {
-          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
-          lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
-          if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
-          origineLetta.set(src, lettura);
-        }
-        const p = await Promise.race([
-          lettura,
-          new Promise((ok) => setTimeout(() => ok(null), ATTESA_ORIGINE_MS)),
-        ]);
-        if (!p || !p.ok) return null;
-        return {
-          n: i + 1,
-          alt: String(im.alt || im.title || '').slice(0, 120),
-          larghezza: Math.round(r.width),
-          altezza: Math.round(r.height),
-          frase: p.frase || '',
-        };
-      } catch (_) { return null; }
-    }));
-    const lette = esiti.filter(Boolean);
-    return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
+  // Quello che si sa della pagina sotto dopo una lettura: indirizzo e titolo, per il filo e per il passo dopo.
+  function ricordaPagina(letta) {
+    if (!nelloStrato || !letta || typeof letta.url !== 'string' || !letta.url) return;
+    paginaNota = { url: letta.url, titolo: String(letta.titolo || '') };
   }
 
-  async function captureScreenshot() {
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
-    } catch (_) {}
-    return null;
-  }
-
-  // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per
-  // SPA che cambiano contenuto/URL in modo asincrono. Esce quando l'URL
-  // cambia E il DOM smette di mutare per `quietMs`, oppure dopo `maxMs`.
-  function waitForPageSettle({ initialUrl, minMs = 250, quietMs = 350, maxMs = 2500 } = {}) {
-    return new Promise((resolve) => {
-      const start = Date.now();
-      let lastMutation = Date.now();
-      let urlChanged = !initialUrl || location.href !== initialUrl;
-
-      const observer = new MutationObserver(() => {
-        lastMutation = Date.now();
-        if (!urlChanged && location.href !== initialUrl) urlChanged = true;
-      });
-      try {
-        observer.observe(document.documentElement, {
-          childList: true, subtree: true, attributes: true, characterData: true,
-        });
-      } catch (_) {}
-
-      const tick = () => {
-        const now = Date.now();
-        const elapsed = now - start;
-        const sinceMutation = now - lastMutation;
-        const ready = document.readyState === 'complete';
-        // Condizione di uscita: minimo tempo trascorso, DOM quieto da quietMs,
-        // ready, e (URL cambiato oppure abbiamo aspettato almeno metà del max).
-        const longEnough = elapsed >= minMs;
-        const quiet = sinceMutation >= quietMs;
-        const enoughEvidence = urlChanged || elapsed >= maxMs / 2;
-        if ((longEnough && quiet && ready && enoughEvidence) || elapsed >= maxMs) {
-          observer.disconnect();
-          resolve();
-          return;
-        }
-        setTimeout(tick, 80);
-      };
-      tick();
+  // Il passo che non parte resta nella cronologia con la fermata, così il modello sa a che punto era anche se l'utente
+  // poi scrive altro; «Continua» sta nel documento del sito, e lo preme solo un gesto vero (#592.6).
+  function fermaPassiDaSolo(nota, dati, dopoDocumenti) {
+    if (continuaAperto) return;
+    const fermo = `Poi Filo ti ha fermato: avevi fatto ${MAX_PASSI_DA_SOLO} passi da solo di fila senza che l'utente toccasse niente, `
+      + 'e il passo dopo parte solo se te lo chiede lui';
+    const prima = String(nota || '').replace(/[\s.]+$/, '');
+    history.push({
+      role: 'user',
+      kind: 'action',
+      content: PROMPTS.turnoAutomaticoAiuto({ nota: prima ? `${prima}. ${fermo}` : fermo, dati, perCronologia: true }),
     });
+    const riga = appendActionLog('');
+    if (!riga) return;
+    riga.classList.add('sn-sidebar-log-intera', 'sn-sidebar-log-passi');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-log-ferma';
+    btn.textContent = 'Continua';
+    btn.title = `Altri ${MAX_PASSI_DA_SOLO} passi`;
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e) || btn.disabled) return;
+      btn.disabled = true;
+      if (continuaAperto === btn) continuaAperto = null;
+      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: urlPrimaDelPasso(), daGesto: true, dopoDocumenti });
+    });
+    riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
+    continuaAperto = btn;
+    rispostaArrivata();
+    expand({ ai: true });
   }
 
   // submit({ userMessage }) — invio iniziale o domanda dell'utente
@@ -1414,48 +2070,239 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false } = {}) {
-    if (!root) return;
-    const wasCollapsed = collapsed;
-    // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
-    // (dopo un click sul target) mantieni lo stato attuale: evita che il box
-    // si riapra mentre il modello sta elaborando.
-    if (userMessage) expand({ ai: false });
+  // Fermare (#578.1) e il pannello tolto dalla pagina (#1049.1) passano da qui: l'epoca cresce, i passi in coda non
+  // partono, la chiamata in volo si interrompe nel main e la sua risposta, se arriva lo stesso, non si usa.
+  let epoca = 0;
+  const turniVivi = new Map();
+  const passiInCoda = new Set();
+  function lavora() { return turniVivi.size > 0 || passiInCoda.size > 0; }
+  function fermaLavoro() {
+    epoca += 1;
+    for (const t of passiInCoda) clearTimeout(t);
+    passiInCoda.clear();
+    const vivi = [...turniVivi.values()];
+    turniVivi.clear();
+    for (const v of vivi) {
+      if (v.turno) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_FERMA, turno: v.turno }).catch(() => {}); } catch (_) {} }
+      try { v.attesa?.ferma(); } catch (_) {}
+    }
+    // Una lettura dei documenti nuovi si ferma come col suo «Ferma»: la ricerca risponde e il turno la lascia cadere.
+    if (letturaDocumenti) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_DOCUMENTI_FERMA }).catch(() => {}); } catch (_) {} }
+    aggiornaTasto();
+  }
+  // Un passo che l'Aiuto fa da solo parte poco dopo il turno che l'ha chiesto, e solo se nel frattempo nessuno l'ha fermato.
+  function prossimoPasso(op, ms, mia) {
+    if (mia !== epoca) return;
+    const t = setTimeout(() => { passiInCoda.delete(t); submit(op); }, ms);
+    passiInCoda.add(t);
+    aggiornaTasto();
+  }
+  // Dopo un'attesa il turno prosegue solo se è ancora suo; il pannello che la pagina ha tolto chiude la sessione.
+  function finito(mia) {
+    if (mia !== epoca) return true;
+    if (apertoQui()) return false;
+    staccato();
+    return true;
+  }
+  function staccato() {
+    if (session && lavora()) session.chiusaPrima = true;
+    close({ davvero: true });
+  }
+  function fermaDallUtente() {
+    if (!lavora()) return;
+    if (session) { session.esito = 'chiusa_prima'; segnaSessione(); }
+    fermaLavoro();
+    appendActionLog(global.SN_CHAT_ERRORS.FERMATO_PRIMA)?.classList.add('sn-sidebar-log-fermato');
+    // Il modello lo ritrova alla domanda dopo: quello che si era fermato non lo riprende da solo.
+    history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATO, perCronologia: true }) });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+  const NOTA_FERMATO = 'l\'utente ha fermato il lavoro prima della risposta: i passi rimasti non sono partiti. Non riprenderli se non te lo chiede lui';
+  // Il quadrato compare sotto il dito che ha appena mandato: il secondo colpo di un doppio clic non lo preme.
+  const quadratoAppena = (b) => Date.now() - Number((b && b.dataset.comparso) || 0) < global.SN_CONST.PAUSA_QUADRATO_MS;
+  function aggiornaTasto() {
+    const b = root && root.querySelector('.sn-sidebar-input button[type="submit"]');
+    if (!b) return;
+    const modo = lavora() ? 'ferma' : 'invia';
+    if (b.dataset.modo === modo) return;
+    b.dataset.modo = modo;
+    if (modo === 'ferma') {
+      b.dataset.comparso = String(Date.now());
+      b.style.setProperty('--sn-pausa-quadrato', `${global.SN_CONST.PAUSA_QUADRATO_MS}ms`);
+    }
+    b.textContent = modo === 'ferma' ? '' : '↵';
+    b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
+    b.title = modo === 'ferma' ? 'Ferma' : I18n.t('popup_send');
+  }
+  // Il tasto destro sul quadrato e sull'attesa che lavora: «Ferma», subito, come nella home (letto da content.js).
+  function vociAttesa(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!el || !root || !root.contains(el) || !lavora()) return [];
+    const attesa = el.closest('.sn-sidebar-attesa');
+    const quadrato = el.closest('.sn-sidebar-input button[type="submit"]');
+    if (!quadrato && !(attesa && !['fatto', 'fermato'].includes(attesa.dataset.fase))) return [];
+    return [{ type: 'item', label: 'Ferma', onClick: () => fermaDallUtente() }];
+  }
+  global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+  if (!global.SN_VOCI_PAGINA.includes(vociAttesa)) global.SN_VOCI_PAGINA.push(vociAttesa);
+  if (!global.SN_VOCI_PAGINA.includes(vociMessaggio)) global.SN_VOCI_PAGINA.push(vociMessaggio);
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
+      for (const v of turniVivi.values()) if (v.turno === msg.turno) v.attesa?.ragiona(String(msg.testo || ''));
+    });
+  } catch (_) {}
 
-    if (userMessage) {
+  // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
+  // solo, chiuso, non partono. Un pannello che la pagina ha tolto è chiuso anche per loro (#1049.1).
+  async function submit(op = {}) {
+    if (root && !apertoQui()) { staccato(); return; }
+    if (!root || (nascosto && !op.userMessage)) { aggiornaTasto(); return; }
+    const mia = epoca;
+    const chiave = {};
+    const vivo = { turno: '', attesa: null };
+    turniVivi.set(chiave, vivo);
+    inVolo += 1;
+    aggiornaTasto();
+    try { await turno(op, mia, vivo); } finally {
+      inVolo -= 1;
+      turniVivi.delete(chiave);
+      aggiornaTasto();
+      segnaSessione();
+      // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
+      if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
+    }
+  }
+
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], schede = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
+    if (!root) return;
+    const passo = (op, ms) => prossimoPasso(op, ms, mia);
+    // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
+    // al modello col suo contenuto; nella bolla resta il titolo.
+    const userMessage = [scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : ''), testoRiferimenti(riferimenti)].filter(Boolean).join('\n\n');
+    // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
+    if (userMessage || daGesto) {
+      passiDaSolo = 0;
+      if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
+      spegniSeguito();
+    } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
+      if (session) session.esito = 'tetto_passi';
+      fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
+      return;
+    } else if (session) {
+      session.passiDaSolo += 1;
+    }
+    if (session) session.esito = null;
+    const wasCollapsed = collapsed;
+    // Si espande solo se l'utente ha scritto: sui proseguimenti automatici il box non deve
+    // riaprirsi mentre il modello elabora.
+    if (userMessage || valuta) expand({ ai: false });
+
+    // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
+    const testoCampo = valuta || (userMessage ? await testoCambiato() : null);
+    if (finito(mia)) return;
+    // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
+    // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
+    const appPagina = appDellaPagina();
+    let letto = null;
+    try { letto = appPagina ? appPagina.documento() : null; } catch (_) { letto = null; }
+    if (letto && letto.id) {
+      if (docConversazione && letto.id !== docConversazione) {
+        history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_ALTRO_DOCUMENTO, perCronologia: true }) });
+      }
+      docConversazione = letto.id;
+    }
+    if (userMessage || valuta) {
       fermataDetta = false;
-      appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
+      const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
+      // «Continua» chiede il seguito con parole di Filo, non dell'utente: niente bolla sua (#1302).
+      const seguito = daScelta && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
+      if (!seguito) {
+        const elBolla = appendChatMessage('user', bolla, { nelFilo: false });
+        if (elBolla && schede.length && !valuta) global.SN_SCHEDE_IN_CHAT?.nellaBolla(elBolla, bolla, schede, global.SN_SCHEDE_IN_CHAT.azioni());
+        immaginiNellaBolla(elBolla, immagini, riferimenti);
+        // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
+        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'), valuta ? [] : schede);
+      }
+      // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
+      if (testoCampo === null) {
+        history.push({
+          role: 'user', content: userMessage, kind: 'real',
+          ...(daScelta ? { daScelta: true } : {}),
+          ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+          // Le schede lasciate restano col turno: i messaggi dopo ne riportano la pagina, come nella home (#2085).
+          ...(schede.length && !valuta ? { schede } : {}),
+        });
+      }
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
-      if (session) session.rawUserMessages.push(userMessage);
+      if (session && scritto) session.rawUserMessages.push(scritto);
+    }
+    if (testoCampo !== null) {
+      esterno = { ...(esterno || {}), testoDaValutare: { testo: testoCampo } };
+      const tetto = global.SN_CONST.VALUTA_MAX_CARATTERI;
+      if (testoCampo.length > tetto) {
+        appendActionLog(I18n.t('help_valuta_lungo', tetto.toLocaleString('it-IT', { useGrouping: true })))?.classList.add('sn-sidebar-log-intera');
+      }
     }
 
-    const thinking = appendThinking();
+    const attesa = creaAttesa();
+    vivo.attesa = attesa;
     let assistantEl = null;
 
-    // Per i proseguimenti automatici dopo un'azione utente, aspetta che la
-    // pagina si sia aggiornata prima di catturare lo screenshot (SPA, ecc.):
-    // senza questa attesa l'AI vede ancora la vecchia pagina e chiede di
-    // ripetere il click.
-    if (userAction) {
-      await waitForPageSettle({ initialUrl: preActionUrl || location.href });
+    // Sui proseguimenti automatici si aspetta la pagina aggiornata prima dello screenshot:
+    // senza, l'AI vede quella vecchia e chiede di ripetere il click.
+    attesa?.azione('Leggo la pagina');
+    const letta = (await Pagina.leggi({ attendi: !!userAction, daUrl: preActionUrl || '', origine: !!userMessage }).catch(() => null)) || {};
+    if (finito(mia)) return;
+    attesa?.azione('');
+    ricordaPagina(letta);
+    const payload = buildPayload(userMessage, userAction, esterno, letta);
+    if (valutazione) payload.valuta = true;
+    // #2085 — le schede lasciate nel messaggio: le legge il main, con la cornice delle pagine lette.
+    if (schede.length && userMessage) payload.schede = schede;
+    // Il testo del campo entra nella cronologia dopo il payload: questo turno lo porta una volta sola, nel messaggio che parte.
+    if (testoCampo !== null) {
+      history.push({
+        role: 'user', kind: 'real', ...(daScelta ? { daScelta: true } : {}),
+        content: PROMPTS.richiestaValuta({ testo: testoCampo, domanda: userMessage }),
+        ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+      });
+      if (valutazione) valutazione.mandato = testoCampo;
     }
-    const [screenshot, origineImmagini] = await Promise.all([
-      captureScreenshot(),
-      userMessage ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
-    ]);
-    const payload = buildPayload(userMessage, userAction, esterno);
-    payload.screenshot = screenshot || undefined;
-    payload.origineImmagini = origineImmagini || undefined;
+    const conDocumento = () => {
+      if (letto) payload.documento = { titolo: letto.titolo, testo: letto.testo, avviso: letto.avviso || '' };
+    };
+    conDocumento();
 
+    // Il turno ha un nome che il main riconosce: gli manda il ragionamento in diretta e lo interrompe al quadrato.
+    vivo.turno = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
     try {
-      const res = await chrome.runtime.sendMessage({
+      const chiedi = () => chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        turno: vivo.turno,
         diceRipiego: true,
+        conSeguito: true,
+        // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
+        // «Valuta» è una richiesta dell'utente come un messaggio scritto.
+        ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
       });
+      let res = await chiedi();
+      if (finito(mia)) return;
+      // Un modello dalla finestra più stretta rifiuta il documento intero: si rimanda più corto, e lo si dice sotto.
+      for (let giro = 0; giro < 3 && letto && !res?.ok; giro++) {
+        let corto = null;
+        try { corto = appPagina.documento(letto, res, JSON.stringify({ ...payload, screenshot: undefined }).length); } catch (_) { corto = null; }
+        if (!corto) break;
+        letto = corto;
+        conDocumento();
+        res = await chiedi();
+        if (finito(mia)) return;
+      }
+      vivo.turno = '';
+      if (typeof res?.ragionamento === 'string') attesa?.ragiona(res.ragionamento, { intero: true });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
       if (!res?.ok) {
@@ -1474,19 +2321,24 @@
       } else {
         ripiegoDetto = false;
       }
-      const parsed = parseAssistantOutput(res.text);
+      const parsed = parseAssistantOutput(res.text, res.finishReason);
+      // Una ricerca chiesta dal modello è un turno a metà: il seguito lo dice il turno dopo.
+      if (session) {
+        session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
+        session.dopoPasso = false;
+      }
 
-      // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
-      // mostra il log in chat, poi rilancia un turno con i risultati come
-      // nota di sistema così l'AI può produrre il JSON normale.
+      // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
+      // di sistema, così l'AI può produrre il JSON normale.
       if (parsed.kind === 'web_search') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
+          attesa?.fine();
           appendActionLog('ricerca web: limite raggiunto, ignorata');
-          setTimeout(() => submit({
+          try { Popup?.conta?.({ misura: 'ricerca-web-tetto' }); } catch (_) {}
+          passo({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
-            preActionUrl: location.href,
-          }), 50);
+            preActionUrl: urlPrimaDelPasso(),
+          }, 50);
           return;
         }
         if (session) session.webSearchCount += 1;
@@ -1501,8 +2353,11 @@
         // di Filo — e i risultati viaggiano a parte, per essere imbustati.
         let ricercaWeb = null;
         let esitoVuoto = '';
+        attesa?.azione('Cerco sul web');
         try {
           const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          if (finito(mia)) return;
+          attesa?.fine();
           // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
           // riga né la nota ripetono la domanda.
           if (r && r.blocked === 'segreto') {
@@ -1517,6 +2372,8 @@
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
+          if (finito(mia)) return;
+          attesa?.fine();
           esitoVuoto = 'la ricerca web che avevi chiesto è fallita per un errore di rete';
         }
         const note = ricercaWeb
@@ -1527,18 +2384,18 @@
         // La query la scrive il modello, spesso ricopiando la pagina: anche qui
         // niente a capo e niente marcature.
         history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${Esterno.perCanaleSistema(parsed.query)}")` });
-        setTimeout(() => submit({
+        passo({
           userAction: note,
           esterno: ricercaWeb ? { ricercaWeb } : null,
-          preActionUrl: location.href,
-        }), 50);
+          preActionUrl: urlPrimaDelPasso(),
+        }, 50);
         return;
       }
 
       // Caso speciale: un documento dell'utente (#947.3). La ricerca la fa il main; il turno dopo il modello ha i
       // candidati e ne indica uno col numero.
       if (parsed.kind === 'documenti') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -1546,15 +2403,18 @@
         history.push({ role: 'assistant', content: `(ho chiesto di cercare fra i documenti dell'utente: "${Esterno.perCanaleSistema(parsed.cosa)}")` });
         if (session && session.documentiCount >= MAX_DOCUMENTI_PER_SESSIONE) {
           appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
-          setTimeout(() => submit({
+          passo({
             userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
-            preActionUrl: location.href,
-          }), 50);
+            preActionUrl: urlPrimaDelPasso(),
+          }, 50);
           return;
         }
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
+        if (finito(mia)) return;
         if (!r || !r.ok) {
+          // Rifiutata dalla persona: l'ha fermato lei prima che finisse; non riuscita: un errore.
+          if (session) session.esito = r && r.annullata ? 'chiusa_prima' : 'errore';
           if (r && r.annullata) {
             history.push({
               role: 'user',
@@ -1566,6 +2426,7 @@
           diciRipiego();
           return;
         }
+        if (session) session.documentiLetti += 1;
         documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
         // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
         const perCronologia = {
@@ -1574,25 +2435,23 @@
           indice: r.indice || null,
           fermata: !!r.fermata,
           cartellaMancante: r.cartellaMancante || '',
+          cartellaDiRete: r.cartellaDiRete || '',
         };
-        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
+        passo({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }, 50);
         return;
       }
 
-      // Caso speciale: l'AI vuole azionare un comando rapido della barra di Filo
-      // (le icone in alto: home, impostazioni, app, account, schermo intero,
-      // riduci a icona). Lo eseguiamo in autonomia, come per reveal/hover, senza
-      // chiedere il click all'utente: i bottoni vivono nella shell, non nella
-      // pagina, quindi l'utente non potrebbe "cliccarli" nel flusso normale.
+      // I bottoni della barra vivono nella shell, non nella pagina: l'utente non potrebbe
+      // cliccarli, quindi li eseguiamo noi.
       if (parsed.kind === 'shell') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         const human = {
           home: 'home', settings: 'impostazioni', apps: 'app',
           account: 'account', fullscreen: 'schermo intero', minimize: 'riduci a icona',
         }[parsed.command] || parsed.command;
         let okShell = false;
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.SHELL_ACTION, command: parsed.command });
+          const r = await chrome.runtime.sendMessage({ type: MSG.SHELL_ACTION, command: parsed.command, assistente: true });
           okShell = !!(r && r.ok);
         } catch (_) {}
         appendActionLog(okShell ? `comando Filo: ${human}` : `comando Filo non riuscito: ${human}`);
@@ -1603,13 +2462,11 @@
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
         }
-        // Le azioni shell non modificano il DOM della pagina che l'agente vede
-        // (o la sostituiscono del tutto, come "home"): di norma chiudono il turno.
-        // Proseguiamo solo se l'AI chiede status:"continue" su un comando che
-        // NON ha cambiato pagina, così può concatenare più passi.
+        // Le azioni shell non cambiano il DOM che l'agente vede, o sostituiscono la pagina: si
+        // prosegue solo su status «continue» e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
@@ -1617,13 +2474,8 @@
         return;
       }
 
-      // Caso speciale: azione tipizzata di Filo (es. inviare un feedback agli
-      // sviluppatori) — la stessa cosa che l'utente farebbe dal menu tasto
-      // destro. La eseguiamo passando per il registro dei livelli di sicurezza
-      // del main e, quando serve, per il popup di conferma di Filo (lo STESSO
-      // della chat dashboard): nessun canale privilegiato per la sidebar.
       if (parsed.kind === 'filo_action') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -1634,10 +2486,8 @@
         return;
       }
 
-      // Caso speciale: azione SULLA PAGINA (copia/cerca/leggi/immagine/link) —
-      // le stesse del menu tasto destro, eseguite dal content script.
       if (parsed.kind === 'page_action') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -1645,9 +2495,9 @@
         const ok = await runPageAction(parsed.page);
         // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
-        if (parsed.status === 'continue' && ok) {
+        if (parsed.status === 'continue' && ok && !(azioniDiPagina()[parsed.page.op] || {}).chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
@@ -1655,15 +2505,45 @@
         return;
       }
 
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      attesa?.fine();
+      // Nell'Editor il modello cambia la formattazione del documento: la fa la pagina, col suo punto di ripristino e
+      // l'«Annulla», anche a pannello chiuso a metà turno: è la modifica chiesta, non un segno sulla pagina.
+      // Era chiesta per il documento letto alla partenza: se nel frattempo ne è aperto un altro, quello non si tocca.
+      const conFormati = !!(appPagina && typeof appPagina.applica === 'function' && parsed.formatta && parsed.formatta.length);
+      let toccati = 0;
+      if (conFormati) {
+        try { toccati = appPagina.applica(parsed.formatta, (letto && letto.id) || ''); } catch (_) { toccati = 0; }
+        if (toccati === null) parsed.display = `Nel frattempo hai aperto un altro documento: la modifica era per «${(letto && letto.titolo) || 'il documento di prima'}», e non l'ho fatta. Tornaci e chiedimelo di nuovo.`;
+        else if (!toccati) parsed.display = 'Non ho trovato testo a cui applicare la formattazione.';
+        else if (!parsed.display) parsed.display = 'Fatto.';
+      }
+      // Per i contatori (#1465), come contava la chat dell'Editor che c'era prima.
+      if (appPagina && typeof appPagina.conta === 'function' && letto && toccati !== null) {
+        const conta = (campi) => { try { appPagina.conta({ oltreTetto: !!letto.tagliato, ...campi }); } catch (_) {} };
+        if (scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) conta({ continua: true });
+        conta(!conFormati ? { formati: 0 } : toccati ? { formati: toccati } : { nonTrovato: true });
+      }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      // Fermata prima che il testo cominciasse: la bolla resta sospesa e la riga sotto dice perché (#1302).
+      // Il seguito di una risposta fermata dentro un blocco di codice lo riapre, o si leggerebbe come testo (#1302).
+      if (parsed.display && scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) {
+        const prima = [...history].reverse().find((m) => m && m.role === 'assistant');
+        parsed.display = globalThis.SN_CHAT_ERRORS.seguitoNelRecinto(prima ? String(prima.content || '') : '', parsed.display);
+      }
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : (interrotta ? '…' : '(risposta vuota)')));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
+      // Quanta parte di un documento troppo lungo ha letto, sotto la risposta (#1475).
+      if (letto && letto.tagliato && letto.nota) appendActionLog(letto.nota);
+      if (interrotta) appendActionLog(interrotta);
+      if (interrotta && !(parsed.choices && parsed.choices.length)) {
+        parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];
+      }
 
-      // Aggiorna la storia AI
       if (userAction && !userMessage) {
         history.push({
           role: 'user',
@@ -1674,28 +2554,37 @@
           kind: 'action',
         });
       }
-      history.push({ role: 'assistant', content: parsed.display || res.text });
+      // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
+      const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
+      if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
+      // Fermata prima del testo: al «Continua» il modello ritrova la nota, non un turno vuoto che un host rifiuta.
+      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text || interrotta) });
 
-      // Choices: bottoni sotto al messaggio dell'assistente
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);
       }
       // Dopo le scelte: inserito subito sotto il messaggio, il documento resta sopra di loro.
       mostraFile(assistantEl, daMostrare);
+      // Le correzioni stanno subito sotto il parere, sopra documento e scelte.
+      if (conCorrezioni) await mostraCorrezioni(assistantEl, parsed.correzioni, valutazione);
 
-      // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
-      // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
-      // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
-      Highlight.clear();
-      if (parsed.highlight) {
+      // Il tooltip usa SOLO highlight.note, non il testo della chat, per non duplicare il
+      // messaggio; per i fill il riquadro resta comunque (valore + Accetta).
+      evidenziato = null;
+      togliNotaPasso();
+      passoQui = 0;
+      await Pagina.pulisci({}).catch(() => null);
+      if (finito(mia)) return;
+      // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
+      if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
-          // Auto-action: la eseguiamo noi senza coinvolgere l'utente.
-          // Validazione e whitelist sono dentro Highlight.autoAction.
-          const result = Highlight.autoAction(parsed.highlight.selector, act);
-          const targetLabel = result.target ? describeElementBriefly(result.target) : '';
+          // Eseguita da noi, senza l'utente: validazione e whitelist stanno in
+          // Highlight.autoAction, nella pagina.
+          const result = (await Pagina.auto({ selector: parsed.highlight.selector, act }).catch(() => null))
+            || { ok: false, reason: 'pagina non raggiungibile', etichetta: '' };
+          const targetLabel = String(result.etichetta || '');
           if (result.ok) {
-            // Traccia lo step per la telemetria a fine sessione.
             if (session) session.executedSteps.push({
               selector: parsed.highlight.selector,
               action: act,
@@ -1713,47 +2602,47 @@
               const aiNote = act === 'reveal'
                 ? 'ho eseguito reveal sull\'elemento qui sotto: la sezione è ora aperta. Outline e screenshot sono aggiornati'
                 : 'ho eseguito hover sull\'elemento qui sotto: il menu è ora aperto. Outline e screenshot sono aggiornati';
-              setTimeout(() => submit({
+              passo({
                 userAction: aiNote,
                 esterno: { elementoPagina: { etichetta: targetLabel, selettore: parsed.highlight.selector } },
-                preActionUrl: location.href,
-              }), 150);
+                preActionUrl: urlPrimaDelPasso(),
+              }, 150);
             }
           } else {
-            // Reveal rifiutato (whitelist) o target mancante: chiediamo
-            // all'AI di correggersi senza fare nulla sulla pagina.
+            // Reveal rifiutato dalla whitelist o bersaglio mancante:
+            // si chiede all'AI di correggersi senza toccare la pagina.
             const aiNote = act === 'reveal'
               ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
+            if (session && result.reason === 'selector-not-found') session.nonTrovati += 1;
             if (parsed.status === 'continue') {
-              setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 50);
+              passo({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }, 50);
             }
           }
         } else {
-          const onAct = parsed.status === 'continue'
-            ? () => onUserAction(parsed.highlight)
-            : null;
           // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
           const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (finito(mia)) return;
           if (fermo) {
             fermata(fermo);
             parsed.highlight = null;
           } else {
-            Highlight.show(parsed.highlight.selector, {
-              note: parsed.highlight.note || '',
-              action: parsed.highlight.action,
-              value: parsed.highlight.value,
-              onAction: onAct,
-            });
+            // Il gesto dell'utente sul passo torna con il suo id: uno vecchio, dopo un passo nuovo, non conta.
+            const h = { ...parsed.highlight, id: ++passiIndicati, segui: parsed.status === 'continue' };
+            evidenziato = h.segui ? h : null;
+            mostraNotaPasso(h);
+            const mostrato = await Pagina.evidenzia({
+              id: h.id, selector: h.selector, note: h.note || '', action: h.action, value: h.value, segui: h.segui,
+            }).catch(() => null);
+            if (!(mostrato && mostrato.ok) && passoQui === h.id) { togliNotaPasso(); passoQui = 0; }
+            if (mostrato && mostrato.ok === false && session) session.nonTrovati += 1;
           }
         }
       }
 
-      // Decisione collapse: se l'AI ha specificato, usa il suo valore. Altrimenti:
-      //   - ci sono choices → tieni aperta (l'utente deve poter cliccare)
-      //   - c'è un highlight click silenzioso (no note, no choices) → collapse
-      //   - altrimenti resta aperta
+      // Collapse: se l'AI ha deciso vale il suo valore; altrimenti le choices vanno cliccate e
+      // la chat resta aperta, un highlight silenzioso collassa, negli altri casi resta aperta.
       const isAutoHighlight = !!(parsed.highlight
         && (parsed.highlight.action === 'reveal' || parsed.highlight.action === 'hover'));
       let shouldCollapse;
@@ -1791,10 +2680,12 @@
         }
       }
     } catch (err) {
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      // Fermato o staccato nel frattempo: l'errore è quasi sempre l'interruzione stessa, e non è di nessuno.
+      if (finito(mia)) return;
+      if (session) { session.esito = 'errore'; session.dopoPasso = false; }
+      attesa?.fine();
       const raw = err?.message || String(err);
-      // #360 — anche qui la chat non è un log: il messaggio grezzo ("fetch
-      // failed", "OpenRouter 400: …") non dice niente all'utente. Stessa
+      // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
       // traduzione della chat della home e di quella dei mazzi.
       const CE = globalThis.SN_CHAT_ERRORS;
       const errText = /context invalidated/i.test(raw)
@@ -1802,21 +2693,33 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText, { nelFilo: false });
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La bolla d'errore la legge chi ha chiesto: si conta il tipo, mai la frase (#1461).
+      try { global.SN_POPUP?.conta?.({ misura: 'errore-modello', code: String((err && (err.code || err.errorCode)) || ''), status: Number(err && err.status) || 0 }); } catch (_) {}
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
       mostraRimedio(assistantEl, err);
+      // Rifiutata una richiesta con immagini in cronologia: restando, ogni domanda dopo fallirebbe uguale.
+      if (RIFIUTO.has(Number(err && err.status))) {
+        const tolte = togliImmaginiDallaStoria();
+        if (tolte) Popup?.showToast?.(Allegati.fraseImmaginiTolte(tolte));
+      }
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });
     }
   }
 
-  // L'utente ha eseguito l'azione che l'AI aveva indicato (click sul target
-  // o accept di un fill). Logghiamo l'azione e chiediamo il passo successivo.
-  function onUserAction(highlight) {
-    if (!root) return;
-    const el = (() => { try { return document.querySelector(highlight.selector); } catch (_) { return null; } })();
-    const label = describeElementBriefly(el);
+  // L'utente ha eseguito l'azione che l'AI aveva indicato (click sul target o accept di un fill): lo dice la pagina,
+  // col nome dell'elemento e l'indirizzo di prima del clic, e la cornice l'ha già tolta. Si chiede il passo successivo.
+  let passiIndicati = 0;
+  let evidenziato = null;
+  function suAzioneUtente(ev) {
+    const highlight = evidenziato;
+    if (!root || !highlight || !ev || Number(ev.id) !== highlight.id) return;
+    evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
+    const label = String(ev.etichetta || '');
     let logText, aiNote;
     if (highlight.action === 'fill') {
       logText = label ? `testo inserito in ${label}` : 'testo inserito';
@@ -1827,41 +2730,70 @@
       // nella nota. Prima entrava fra parentesi dentro «(Sistema: …)».
       aiNote = 'l\'utente ha cliccato sull\'elemento che avevi indicato, descritto qui sotto';
     }
-    // Telemetria: traccia lo step eseguito. Niente value (anche se è un fill):
-    // i contenuti dei campi possono essere sensibili.
+    if (session) { session.passiCliccati += 1; session.dopoPasso = true; segnaSessione(); }
+    // Telemetria: niente value, anche per un fill — il contenuto dei campi può essere sensibile.
     if (session) session.executedSteps.push({
       selector: highlight.selector,
       action: highlight.action,
       retracted: false,
     });
     appendActionLog(logText);
-    Highlight.clear();
-    // Dopo un click utente "vero" il menu hover-forced non serve più: il
-    // browser gestirà gli hover successivi naturalmente.
-    try { Highlight.clearForceHover?.(); } catch (_) {}
-
-    // Cattura l'URL PRIMA del click così waitForPageSettle può rilevare un
-    // cambio di route (SPA o navigazione classica) e aspettare che la pagina
-    // sia effettivamente cambiata prima di fare lo screenshot.
-    const preActionUrl = location.href;
+    // URL catturato PRIMA del click, così la pagina vede il cambio di route e aspetta quella nuova prima della foto.
     submit({
       userAction: aiNote,
       esterno: { elementoPagina: { etichetta: label, selettore: highlight.selector } },
-      preActionUrl,
+      preActionUrl: String(ev.daUrl || ''),
+      daGesto: true,
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto };
+  global.SN_SIDEBAR = {
+    open, close: chiudi, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori, valuta, rilascio,
+    suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+    // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
+    accoglieRilascio: () => chiuso() !== 'sito',
+    contiene: (n) => !!(root && n && root.contains(n)),
+    suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
+    dalloStrato, dallaPagina, chiediDaPagina,
+  };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
+  const P = () => global.SN_AIUTO_PAGINA;
   global.__filoSidebarTest = {
     runFiloAction, filoActionLabel,
     runPageAction, parseAssistantOutput,
-    resolveImageEl, resolveLinkEl, resolveActionText,
+    resolveImageEl: (p) => P().resolveImageEl(p),
+    resolveLinkEl: (p) => P().resolveLinkEl(p),
+    resolveActionText: (p) => P().resolveActionText(p),
     // Il riquadrino «Ha funzionato?»: da lì il percorso finisce in una raccolta
     // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
     // `percorsoRaccoglibile`, ed è quella la porta che vale.
     renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
+    // Le anteprime stanno in un'ombra chiusa: cosa c'è nella casella, e dove sta la × di una per un clic vero.
+    allegati: () => allegati.immagini.map((im) => ({ nome: im.nome, byte: im.dataUrl.length })),
+    riferimenti: () => allegati.riferimenti.map((r) => ({ titolo: r.titolo, testo: r.testo })),
+    // Il gettone i-esimo nella casella: dove sta, e se il riquadro col contenuto è aperto (all'hover o al fuoco).
+    gettoneRiferimento: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const v = o && o.querySelectorAll('.rif')[i];
+      if (!v) return null;
+      const r = v.getBoundingClientRect();
+      const a = v.querySelector('.anteprima');
+      return { x: r.x + 12, y: r.y + r.height / 2, aperta: getComputedStyle(a).display !== 'none', testo: a.textContent, grassetto: getComputedStyle(v.querySelector('b')).fontWeight };
+    },
+    riferimentiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
+      .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? Array.from(o.querySelectorAll('.rif b')).map((b) => b.textContent) : []; }),
+    puntoTogli: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const b = o && o.querySelectorAll('.togli')[i];
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    },
+    immaginiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
+      .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? o.querySelectorAll('img').length : 0; }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -17,7 +17,7 @@ const C = globalThis.SN_CONST;
 const FM = globalThis.SN_FILO_MEMORY;
 const K = C.STORAGE_KEYS;
 
-const REGOLE = new Set(['contenuto', 'stato', 'spesa', 'pagine', 'sveglie']);
+const REGOLE = new Set(['contenuto', 'stato', 'spesa', 'pagine', 'appunti', 'download', 'sveglie']);
 
 test('sentinella: ogni chiave di STORAGE_KEYS dice se si importa e come', () => {
   const senza = Object.keys(K).filter((n) => !REGOLE.has(REGOLE_IMPORT[n]));
@@ -137,4 +137,85 @@ test('pagine salvate: una per indirizzo, dalla più recente, e quelle oltre il t
   const largo = mergeImportedData({ [K.SAVED_PAGES]: qui }, { [K.SAVED_PAGES]: backup }, { tettoPagine: 1000 });
   assert.equal(largo.stats.pagineFuori, 0);
   assert.equal(largo.merged[K.SAVED_PAGES].length, 5);
+});
+
+// #1256 — gli appunti del backup non stanno in fondo, dove la prima copia taglia: l'unione rispetta il tetto subito.
+test('appunti copiati: 50 di qui più 20 del backup ne tengono 50, i più recenti, e la conferma sa quanti escono', () => {
+  require(join(ROOT, 'src', 'shared', 'clipboardHistory.js'));
+  const voce = (chi, i, ts) => ({ type: 'text', text: `${chi} ${i}`, ts });
+  const qui = Array.from({ length: 50 }, (_, i) => voce('qui', i, 2000 - i));
+  const backup = [
+    ...Array.from({ length: 20 }, (_, i) => voce('backup', i, 3000 - i)),
+    { type: 'text', text: '  qui   0 ', ts: 5000 }, // gemella di una voce di qui: non entra due volte
+  ];
+  const { merged, stats } = mergeImportedData({ [K.CLIPBOARD_HISTORY]: qui }, { [K.CLIPBOARD_HISTORY]: backup });
+  const lista = merged[K.CLIPBOARD_HISTORY];
+  assert.equal(lista.length, C.CLIPBOARD_HISTORY_MAX);
+  assert.deepEqual(lista.slice(0, 20).map((x) => x.text), backup.slice(0, 20).map((x) => x.text), 'i più recenti in cima');
+  assert.equal(lista.filter((x) => globalThis.SN_CLIPBOARD.chiave(x) === 't:qui 0').length, 1, 'nessuna gemella');
+  assert.equal(stats.appuntiFuori, 20);
+  assert.equal(stats.appuntiMieFuori, 20, 'escono i 20 più vecchi di qui, e la conferma lo dice');
+  for (const x of lista) assert.ok(Number.isFinite(x.ts));
+
+  // Una copia dopo l'importazione toglie solo l'ultimo: quello che la conferma ha promesso resta.
+  const dopoCopia = [{ type: 'text', text: 'nuova', ts: 9000 }, ...lista].slice(0, C.CLIPBOARD_HISTORY_MAX);
+  for (const x of backup.slice(0, 20)) assert.ok(dopoCopia.some((y) => y.text === x.text), `${x.text} c'è ancora`);
+
+  const pochi = mergeImportedData({ [K.CLIPBOARD_HISTORY]: qui.slice(0, 10) }, { [K.CLIPBOARD_HISTORY]: backup });
+  assert.equal(pochi.merged[K.CLIPBOARD_HISTORY].length, 30);
+  assert.equal(pochi.stats.appuntiFuori, 0);
+});
+
+test('download: l\'unione tiene il tetto dell\'elenco, i più recenti, e conta quelli che restano fuori', () => {
+  const dl = (id, giorno) => ({ id, filename: `${id}.pdf`, state: 'completed', startedAt: `2026-10-${String(giorno).padStart(2, '0')}T10:00:00.000Z` });
+  const qui = [dl('q3', 9), dl('q1', 1)];
+  const backup = [dl('b2', 5), dl('q3', 9), dl('b0', 2)];
+  const { merged, stats } = mergeImportedData({ [K.DOWNLOADS]: qui }, { [K.DOWNLOADS]: backup }, { tettoDownload: 3 });
+  assert.deepEqual(merged[K.DOWNLOADS].map((d) => d.id), ['q3', 'b2', 'b0']);
+  assert.equal(stats.downloadFuori, 1);
+  assert.equal(stats.downloadMieFuori, 1);
+  const largo = mergeImportedData({ [K.DOWNLOADS]: qui }, { [K.DOWNLOADS]: backup }, { tettoDownload: 200 });
+  assert.equal(largo.merged[K.DOWNLOADS].length, 4);
+  assert.equal(largo.stats.downloadFuori, 0);
+});
+
+// #1256, regola del freno (#1050): un backup non alza il tetto di spesa mensile; quello più largo lo offre la conferma.
+test('tetto di spesa: resta il più stretto fra qui e il backup, e quello più largo del backup si offre', () => {
+  const S = K.SETTINGS;
+  const caso = (qui, backup) => mergeImportedData(qui === undefined ? {} : { [S]: qui }, { [S]: backup });
+
+  const senzaTetto = caso({ monthlyLimitEur: 5, theme: 'light' }, { monthlyLimitEur: 0, theme: 'dark' });
+  assert.equal(senzaTetto.merged[S].monthlyLimitEur, 5, 'un backup senza tetto non toglie quello di qui');
+  assert.equal(senzaTetto.merged[S].theme, 'dark', 'il resto delle impostazioni arriva come sempre');
+  assert.deepEqual(senzaTetto.stats.tettoSpesa, { tenuto: 5, backup: 0 });
+
+  const piuAltoNelBackup = caso({ monthlyLimitEur: 5 }, { monthlyLimitEur: 20 });
+  assert.equal(piuAltoNelBackup.merged[S].monthlyLimitEur, 5);
+  assert.deepEqual(piuAltoNelBackup.stats.tettoSpesa, { tenuto: 5, backup: 20 });
+
+  const piuStrettoNelBackup = caso({ monthlyLimitEur: 20 }, { monthlyLimitEur: 3 });
+  assert.equal(piuStrettoNelBackup.merged[S].monthlyLimitEur, 3);
+  assert.equal(piuStrettoNelBackup.stats.tettoSpesa, null, 'niente da offrire: vale già il più stretto');
+  assert.deepEqual(piuStrettoNelBackup.stats.tettoSceso, { prima: 20, dopo: 3 }, 'il tetto che scende la conferma lo dice coi numeri');
+
+  const quiSenzaTetto = caso({ monthlyLimitEur: 0 }, { monthlyLimitEur: 8 });
+  assert.equal(quiSenzaTetto.merged[S].monthlyLimitEur, 8);
+  assert.deepEqual(quiSenzaTetto.stats.tettoSceso, { prima: 0, dopo: 8 });
+  assert.equal(caso({ monthlyLimitEur: 5 }, { monthlyLimitEur: 5 }).stats.tettoSceso, null, 'uguale: niente da dire');
+  assert.equal(senzaTetto.stats.tettoSceso, null);
+
+  // Il computer nuovo: le impostazioni non hanno ancora il tetto, che vale quello di serie.
+  const nuovo = caso(undefined, { monthlyLimitEur: 50, theme: 'dark' });
+  assert.equal(nuovo.merged[S].monthlyLimitEur, C.DEFAULT_SETTINGS.monthlyLimitEur);
+  assert.deepEqual(nuovo.stats.tettoSpesa, { tenuto: C.DEFAULT_SETTINGS.monthlyLimitEur, backup: 50 });
+  const nuovoConImpostazioni = caso({ theme: 'light' }, { monthlyLimitEur: 0 });
+  assert.equal(nuovoConImpostazioni.merged[S].monthlyLimitEur, C.DEFAULT_SETTINGS.monthlyLimitEur);
+
+  const rovinato = caso({ monthlyLimitEur: 5 }, { monthlyLimitEur: 'tanto' });
+  assert.equal(rovinato.merged[S].monthlyLimitEur, 5);
+  assert.equal(rovinato.stats.tettoSpesa, null);
+
+  const senzaVoce = caso({ monthlyLimitEur: 5 }, { theme: 'dark' });
+  assert.equal(senzaVoce.merged[S].monthlyLimitEur, 5);
+  assert.equal(senzaVoce.stats.tettoSpesa, null);
 });

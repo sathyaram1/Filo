@@ -71,11 +71,15 @@ test('A — mentre ragiona scorre la trama e un clic la apre; a fine lavoro il r
       'Quindi soppeso le possibili risposte una per una.',
       'Infine scelgo la formulazione più chiara e utile.',
     ];
+    // La risposta parte quando la prova ha finito di guardare il ragionamento in corso: sotto carico 3,6 s non
+    // bastavano ai suoi clic (#1321).
+    const guardato = new Promise((r) => { globalThis.__rispondi = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
       for (const t of thoughts) {
         try { onReasoning && onReasoning(t + ' '); } catch (_) {}
-        await new Promise((r) => setTimeout(r, 900));
+        await new Promise((r) => setTimeout(r, 300));
       }
+      await guardato;
       const text = JSON.stringify({
         text: 'Ecco la risposta finale.',
         actions: [{ type: 'TIMER', seconds: 300, label: 'Pasta' }],
@@ -111,6 +115,7 @@ test('A — mentre ragiona scorre la trama e un clic la apre; a fine lavoro il r
   await page.screenshot({ path: 'tests/agent/.out/attivita-ragiona-aperto.png' });
   await trama.click();
   await expect(corpo).toBeHidden();
+  await app.evaluate(() => globalThis.__rispondi());
 
   // Lavoro finito: il filo è avvolto nel riassunto con la durata; il blocco resta.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la risposta finale.' })).toBeVisible({ timeout: 8_000 });
@@ -155,8 +160,10 @@ test('B — senza ragionamento del modello: nessuna scritta, solo il filo che pe
   await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider2 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    // L'attesa dura finché la prova l'ha guardata, non 2,5 s che sotto carico finivano prima dei suoi controlli.
+    const guardata = new Promise((r) => { globalThis.__rispondi2 = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
-      await new Promise((r) => setTimeout(r, 2500));
+      await guardata;
       const text = JSON.stringify({ text: 'Risposta senza reasoning.', actions: [] });
       try { onDelta && onDelta(text); } catch (_) {}
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
@@ -174,6 +181,7 @@ test('B — senza ragionamento del modello: nessuna scritta, solo il filo che pe
   await page.waitForTimeout(1_100);
   await expect(activity).toHaveText('');
   await page.screenshot({ path: 'tests/agent/.out/attivita-attesa.png' });
+  await app.evaluate(() => globalThis.__rispondi2());
 
   // Risposta arrivata senza ragionamento né azioni: il blocco non lascia niente.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta senza reasoning.' })).toBeVisible({ timeout: 6_000 });

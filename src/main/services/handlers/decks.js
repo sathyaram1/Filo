@@ -1,7 +1,5 @@
-// Handler di dominio: deck builder Commander (DECK-BUILDER-SPEC.md).
-// CRUD dei mazzi su storage locale (deckStore). La logica di modello (versione
-// che incrementa a ogni edit, invarianti) è in SN_DECKS: la pagina applica le
-// funzioni di modello e manda qui il mazzo intero da persistere (DECKS_UPDATE).
+// Deck builder Commander: CRUD dei mazzi su storage locale.
+// La logica di modello (versione, invarianti) sta in SN_DECKS: qui arriva il mazzo intero.
 
 module.exports = function register(on, ctx) {
   const { MSG, handleAIRequest, broadcastToFiloPages } = ctx;
@@ -80,14 +78,16 @@ module.exports = function register(on, ctx) {
     return copy ? { ok: true, deck: copy } : { ok: false, error: 'not_found' };
   });
 
-  // ── Parere LLM carta-vs-mazzo (§6) ─────────────────────────────────────────
-  // { deckId, cardIds, compute?, refresh? } →
-  // { ok, opinions: { cardId → { text, versione, stale } } }.
-  // compute=false: solo cache, MAI una chiamata LLM (per mostrare lo stato).
-  // compute=true: calcola i mancanti/stantii in UN batch; refresh=true ricalcola
-  // anche i freschi (il refresh on-demand di §6.2). Le carte possono anche NON
-  // essere nel mazzo (candidati dai risultati di ricerca: il parere è proprio
-  // "questa carta serve a questo mazzo?").
+  // Una carta chiesta e tornata senza parere porta il perché: la pagina lo mostra e non la richiede da sola, che
+  // coi crediti finiti o un modello che salta la carta era una raffica di chiamate (#1344.1).
+  const SENZA_DATI = { error: 'non ho i dati della carta: Scryfall, l\'archivio delle carte, non ha risposto. Riprova tra poco.' };
+  const senzaParere = () => ({
+    error: `il modello ha risposto senza il parere di questa carta. Riprova, o scegli un altro modello per «Mazzi — parere su una carta» ${globalThis.SN_CHAT_ERRORS.DOVE_ALTRO_MODELLO}.`,
+    code: 'ALTRO_MODELLO',
+  });
+
+  // compute=false: solo cache, MAI una chiamata LLM; compute=true calcola i mancanti in un
+  // batch; refresh=true rifà anche i freschi. Le carte possono non essere nel mazzo.
   on(MSG.DECKS_OPINION, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.deckId || ''));
@@ -102,9 +102,22 @@ module.exports = function register(on, ctx) {
       const r = await Opinions.computeOpinions({
         deck, cards, cardIds: ids, mode: msg?.refresh ? 'force' : 'missing', handleAIRequest,
       });
-      return { ok: true, opinions: r.opinions };
+      const mancanti = {};
+      for (const id of ids) if (!r.opinions[id]) mancanti[id] = cards[id] ? senzaParere() : SENZA_DATI;
+      return { ok: true, opinions: r.opinions, ...(Object.keys(mancanti).length ? { mancanti } : {}) };
     } catch (e) {
-      return { ok: false, error: e?.message || 'parere non disponibile' };
+      // La frase per chi legge, e quello che serve alla pagina per il tasto della pagina dove si rimedia (#663).
+      const CE = globalThis.SN_CHAT_ERRORS;
+      const W = globalThis.SN_WALLET;
+      return {
+        ok: false,
+        error: (CE ? CE.friendly(e) : '') || 'parere non disponibile',
+        ...(e && e.code ? { code: e.code } : {}),
+        ...(W && W.keyRefusalOf && W.keyRefusalOf(e) ? { keyRefused: true } : {}),
+        ...(e && e.reason === 'crediti' ? { reason: 'crediti' } : {}),
+        ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
+        ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
+      };
     }
   });
 };

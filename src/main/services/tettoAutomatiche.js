@@ -8,7 +8,7 @@ const FINESTRA_MS = 60 * 1000;
 const GRUPPI = Object.freeze({
   explain: 'spiegazioni',
   spellcheck_semantic: 'correttore',
-  spellcheck_word: 'correttore',
+  spellcheck_context: 'correttore',
 });
 const TETTI = Object.freeze({ spiegazioni: 120, correttore: 300 });
 

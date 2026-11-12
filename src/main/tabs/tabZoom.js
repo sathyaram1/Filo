@@ -4,6 +4,28 @@
 
 const { clipboard } = require('electron');
 require('../../shared/zoomPagina');
+const { staRegistrandoTasti } = require('../shortcuts');
+const Strade = require('../services/contatoriStrade');
+
+// Ctrl +/-/0 per la pagina `wc`, da dove arriva il tasto: la pagina stessa o un riquadro di Filo sopra di lei
+// (#1509.1). true = preso.
+function zoomDaTasto(wc, input) {
+  const Z = globalThis.SN_ZOOM;
+  const verso = Z && input && input.type === 'keyDown' ? Z.tastoZoom(input) : null;
+  if (!verso) return false;
+  try { wc.send('filo:zoom-key', verso); } catch (_) {}
+  if (!input.isAutoRepeat) Strade.misura('azione', globalThis.SN_CONTATORI_STRADE?.ZOOM[verso] || '', 'scorciatoia', { incognito: Strade.incognitoDi(wc) });
+  return true;
+}
+
+// Ctrl+rotella che Chromium segnala per la pagina `wc` (o per un riquadro di Filo sopra di lei). Non sulle pagine di
+// Filo, dove l'editor sceglie da sé.
+function rotellaZoom(wc, dir) {
+  let url = '';
+  try { url = wc.getURL(); } catch (_) {}
+  if (/^filo:/i.test(url)) return;
+  try { wc.send('filo:zoom-rotella', dir === 'in' ? 'in' : 'out'); } catch (_) {}
+}
 
 function installZoom(wc) {
   const Z = globalThis.SN_ZOOM;
@@ -14,11 +36,9 @@ function installZoom(wc) {
   // Col campo della percentuale aperto, anche le cifre: il fuoco non conta.
   let campo = false;
   wc.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown') return;
-    const verso = Z.tastoZoom(input);
-    if (verso) {
+    if (input.type !== 'keyDown' || staRegistrandoTasti(wc)) return;
+    if (zoomDaTasto(wc, input)) {
       event.preventDefault();
-      try { wc.send('filo:zoom-key', verso); } catch (_) {}
       return;
     }
     const perCampo = campo ? Z.tastoPerCampo(input) : null;
@@ -49,13 +69,8 @@ function installZoom(wc) {
   // Ctrl+rotella che nessuno ha preso (un riquadro senza il nostro preload, un
   // ascoltatore spento da un documento riscritto). Chromium lo segnala qui anche
   // quando il preload l'ha già preso: decide lui se è un'eco (#686.1: ogni scatto
-  // valeva due passi). Non sulle pagine di Filo, dove l'editor sceglie da sé.
-  wc.on('zoom-changed', (_e, dir) => {
-    let url = '';
-    try { url = wc.getURL(); } catch (_) {}
-    if (/^filo:/i.test(url)) return;
-    try { wc.send('filo:zoom-rotella', dir === 'in' ? 'in' : 'out'); } catch (_) {}
-  });
+  // valeva due passi).
+  wc.on('zoom-changed', (_e, dir) => rotellaZoom(wc, dir));
 
   if (!wc.ipc || typeof wc.ipc.on !== 'function') return;
   let modalita = false;
@@ -86,4 +101,4 @@ function installZoom(wc) {
   wc.on('did-navigate', () => { modalita = false; campo = false; });
 }
 
-module.exports = { installZoom };
+module.exports = { installZoom, zoomDaTasto, rotellaZoom };

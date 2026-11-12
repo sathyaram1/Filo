@@ -7,7 +7,11 @@
 
   const path = require('node:path');
   const { creaDeposito } = require('./depositoAggiunte');
+  const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
+  const Copie = require('./copieIcone');
+  // Chi l'ha chiusa (#884): la regola sta in cercaSchedeChiuse.js.
+  const { motivoDi } = require('./cercaSchedeChiuse');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
   const CHIAVE_VECCHIA = global.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
@@ -40,6 +44,16 @@
     ascoltatori.add(fn);
     return () => ascoltatori.delete(fn);
   }
+  // E ogni scheda che ne esce (cancellata, dimenticata, archivio svuotato): `null` = tutte. Chi tiene una copia
+  // delle schede chiuse (la pila di Ctrl+Shift+T) la dimentica con loro.
+  const uscite = new Set();
+  function uscita(ids) {
+    for (const fn of uscite) { try { fn(ids); } catch (_) {} }
+  }
+  function suUscite(fn) {
+    uscite.add(fn);
+    return () => uscite.delete(fn);
+  }
 
   // L'incognito non vede l'archivio e non ci scrive (la stessa garanzia che storage.json dà alle sue chiavi di navigazione).
   // Per questo si apre solo da fuori: la migrazione deve leggere storage.json vero, non la vista vuota dell'incognito.
@@ -49,6 +63,7 @@
         const d = creaDeposito({ cartella: cartella(), meseDi });
         await d.carica();
         await migra(d);
+        await iconeLocali(d);
         return d;
       })();
       apertura.catch(() => { apertura = null; });
@@ -76,41 +91,97 @@
     await chrome.storage.local.remove(CHIAVE_VECCHIA);
   }
 
+  // L'icona di una scheda archiviata è la copia che Filo tiene (#1273): l'indirizzo delle voci di prima passa in
+  // `faviconDaChiedere` (iconeVecchie.js), tranne per una scheda passata dal proxy; un data: URL diventa una copia.
+  async function iconaLocale(t) {
+    const f = typeof t.favicon === 'string' ? t.favicon : '';
+    if (!f || Copie.eCopia(f)) return t;
+    if (/^data:/i.test(f)) return { ...t, favicon: await Copie.conserva(f) };
+    const daChiedere = !t.proxy && /^https?:\/\//i.test(f) ? f : '';
+    const { faviconDaChiedere, ...resto } = t;
+    return { ...resto, favicon: '', ...(daChiedere ? { faviconDaChiedere: daChiedere } : {}) };
+  }
+
+  async function iconeLocali(d) {
+    const nuove = new Map();
+    for (const t of d.tutti()) {
+      const n = await iconaLocale(t);
+      if (n !== t) nuove.set(t.id, n);
+    }
+    if (nuove.size) d.riscrivi((t) => nuove.get(t.id) || t);
+  }
+
   async function list() {
     if (Disco.inIncognito()) return [];
     return (await apri()).tutti();
   }
 
+  // La voce più recente di una pagina chiusa con questo indirizzo intero, o null: chi la riapre per indirizzo (la home,
+  // la chat) la riapre com'era e la conta fra le riaperte (#1467).
+  async function ultimaPer(url) {
+    if (typeof url !== 'string' || !url) return null;
+    let ultima = null;
+    for (const t of await list()) {
+      if (!t || t.url !== url || t.urlTagliato) continue;
+      if (!ultima || (Date.parse(t.closedAt) || 0) > (Date.parse(ultima.closedAt) || 0)) ultima = t;
+    }
+    return ultima;
+  }
+
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
+  // Indirizzi e titolo li sceglie il sito: oltre la misura si tagliano e la voce lo segna (un indirizzo a metà non si riapre).
   async function archive(meta) {
     if (!meta || typeof meta.url !== 'string' || !meta.url || Disco.inIncognito()) return null;
+    const u = taglia(meta.url, MISURA.url);
+    const t = taglia(meta.title || meta.url, MISURA.titolo);
+    const insieme = (Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : []).map((x) => taglia(x, MISURA.url));
+    const insiemeTagliati = insieme.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+    const prova = { url: u.testo, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
+    if (dimenticate.some((r) => coperta(prova, r))) return null;
     const d = await apri();
+    // `meta.favicon`: il data: URL che la scheda ha scaricato con la sua sessione (col proxy, se ce l'aveva).
+    const favicon = await Copie.conserva(meta.favicon);
     const entry = {
       id: uuid(),
-      url: meta.url,
-      title: meta.title || meta.url,
-      favicon: meta.favicon || '',
+      url: u.testo,
+      title: t.testo,
+      ...(u.tagliato ? { urlTagliato: true } : {}),
+      ...(t.tagliato ? { titleTagliato: true } : {}),
+      favicon,
       // Colore identità del sito (§1.2): serve all'ordine cromatico in archivio.
       identityColor: meta.identityColor || null,
       openedAt: meta.openedAt || null,
       closedAt: meta.closedAt || new Date().toISOString(),
       // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
+      // Chiusa dalla pagina stessa o da un crash: né la persona né la pulizia (i contatori delle riaperte, #1467).
+      ...(meta.chiusaDaSola === true ? { chiusaDaSola: true } : {}),
+      motivo: motivoDi(meta),
+      // Il giro della pulizia che l'ha archiviata: 'idle' (inattività), 'reopen' (riapertura), 'manual', 'chat'.
+      ...(meta.giro && /^[a-z]{1,12}$/.test(String(meta.giro)) ? { giro: String(meta.giro) } : {}),
+      // L'ultima volta che ha suonato (#1397): «rimettimi la musica» la riapre anche chiusa.
+      ...(Date.parse(meta.audioAt) > 0 ? { audioAt: new Date(Date.parse(meta.audioAt)).toISOString() } : {}),
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
-      coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
+      coOpenUrls: insieme.map((x) => x.testo),
+      ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
-      // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
-      // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
-      // la tab rinasce proxata sulla stessa location.
+      // Proxy alla chiusura: riaprendo dalla cronologia la tab rinasce sulla stessa location.
       proxy: meta.proxy && meta.proxy.country
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
     };
     const r = d.aggiungi(entry);
     if (r) entrate([r]);
+    // Senza copia (chiusa prima che l'icona arrivasse) la si chiede una volta, se la scheda non passava da un proxy.
+    if (r && !r.favicon && !r.proxy) riordinaIcone();
     return r;
+  }
+
+  const Vecchie = () => require('./iconeVecchie');
+  function riordinaIcone() {
+    try { Vecchie().pianifica(); } catch (_) {}
   }
 
   // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer, per non
@@ -130,12 +201,21 @@
   function togli(d, ids) {
     const via = new Set(ids);
     const urlVia = new Set();
-    for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); }
+    const icone = [];
+    for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); if (t) icone.push(t.favicon); }
     for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
-    return d.togli([...via], (t) => {
+    uscita([...via]);
+    const tolte = d.togli([...via], (t) => {
       if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
-      return { ...t, coOpenUrls: t.coOpenUrls.filter((u) => !urlVia.has(u)) };
+      const tagliati = new Set(Array.isArray(t.coOpenUrlsTagliati) ? t.coOpenUrlsTagliati : []);
+      const resta = t.coOpenUrls.map((u, i) => ({ u, tagliato: tagliati.has(i) })).filter((x) => !urlVia.has(x.u));
+      const { coOpenUrlsTagliati: _prima, ...senza } = t;
+      const segni = resta.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+      return { ...senza, coOpenUrls: resta.map((x) => x.u), ...(segni.length ? { coOpenUrlsTagliati: segni } : {}) };
     });
+    // L'icona se ne va con la scheda, se nessun'altra voce la usa.
+    Copie.togliSeOrfane(icone);
+    return tolte;
   }
 
   async function remove(id) {
@@ -145,7 +225,7 @@
     return d.tutti();
   }
 
-  // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
+  // Cancellazione multipla (§5 pulizia retroattiva).
   async function removeMany(ids) {
     if (Disco.inIncognito()) return { removed: 0, remaining: 0 };
     const d = await apri();
@@ -153,9 +233,43 @@
     return { removed, remaining: d.numero() };
   }
 
+  // Le pagine tolte dal filo se ne vanno anche da qui, o la ricerca nel filo le ritroverebbe (#869): conta una scheda
+  // aperta nel periodo, sul sito detto, e con quell'indirizzo se ne è dato uno (una visita tolta da sola).
+  function regolaDimenticate({ da = null, a = null, sito = null, url = null } = {}, { finoA = Infinity } = {}) {
+    const t0 = da != null ? Date.parse(da) : -Infinity;
+    const t1 = Math.min(a != null ? Date.parse(a) : Infinity, finoA);
+    return { t0, t1, sito, url };
+  }
+  function coperta(t, r) {
+    const E = global.SN_FILO_EVENTI;
+    if (!t || !t.url || (r.url && t.url !== r.url)) return false;
+    if (r.sito && !(E && E.delSito(t.url, r.sito))) return false;
+    const chiusa = Date.parse(t.closedAt);
+    const aperta = Date.parse(t.openedAt);
+    const fine = Number.isFinite(chiusa) ? chiusa : Infinity;
+    const inizio = Number.isFinite(aperta) ? aperta : (r.url ? -Infinity : fine);
+    return inizio <= r.t1 && fine >= r.t0;
+  }
+  // Una scheda ancora aperta quando le sue pagine si tolgono entra qui solo alla chiusura: la regola resta per lei, ma
+  // solo per le schede aperte prima di adesso (una visita di dopo non è stata tolta). Vale finché Filo resta aperto.
+  const dimenticate = [];
+
+  async function dimenticaPagine(periodo = {}) {
+    if (Disco.inIncognito()) return 0;
+    dimenticate.push(regolaDimenticate(periodo, { finoA: Date.now() }));
+    const r = regolaDimenticate(periodo);
+    const d = await apri();
+    const ids = d.tutti().filter((t) => coperta(t, r)).map((t) => t.id);
+    return ids.length ? togli(d, ids) : 0;
+  }
+
   async function clear() {
     if (Disco.inIncognito()) return [];
-    (await apri()).svuota();
+    const d = await apri();
+    const icone = d.tutti().map((t) => t.favicon);
+    d.svuota();
+    uscita(null);
+    Copie.togliSeOrfane(icone);
     return [];
   }
 
@@ -164,14 +278,36 @@
   async function importa(voci) {
     if (Disco.inIncognito() || !Array.isArray(voci)) return 0;
     const d = await apri();
-    const pronte = voci
-      .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
-      .map((t) => (typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
-    return entrate(d.aggiungiMolti(pronte, { inCoda: true })).length;
+    const pronte = [];
+    for (const t of voci) {
+      if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+      pronte.push(await iconaLocale(typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
+    }
+    const entrati = entrate(d.aggiungiMolti(pronte, { inCoda: true }));
+    if (entrati.some((t) => !t.favicon && !t.proxy)) riordinaIcone();
+    return entrati.length;
   }
 
+  // `esiti`: id → { prima, a }, come in SN_SAVED_PAGES.aggiornaIcone. Una riscrittura sola: l'indirizzo chiesto non resta nei file.
+  async function aggiornaIcone(esiti) {
+    if (Disco.inIncognito()) return 0;
+    const d = await apri();
+    let cambiate = 0;
+    d.riscrivi((t) => {
+      const e = esiti.get(t.id);
+      if (!e || Vecchie().statoIcona(t) !== e.prima) return t;
+      cambiate++;
+      const { faviconDaChiedere, iconaMancante, ...resto } = t;
+      const esito = Vecchie().esitoIcona(t, e.a);
+      return { ...resto, favicon: esito.favicon, ...(esito.iconaMancante ? { iconaMancante: true } : {}) };
+    });
+    return cambiate;
+  }
+
+  Copie.usaCopie('schede-archiviate', async () => (Disco.inIncognito() ? [] : (await apri()).tutti().map((t) => t.favicon)));
+
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, clear, importa,
-    suEntrate, cartella,
+    list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
+    suEntrate, suUscite, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

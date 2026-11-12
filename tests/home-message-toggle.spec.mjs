@@ -1,5 +1,5 @@
-// Feedback alpha #5: poter disattivare dalle Preferenze il commento proattivo
-// di Filo al centro della home (newtab). Il toggle è `showHomeMessage`.
+// Feedback alpha #5, poi #869: dalle Preferenze si spegne il messaggio con cui Filo scrive per primo nella home quando
+// succede qualcosa (un timer, un download, un avviso, l'inizio della giornata). Il toggle è `showHomeMessage`.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -25,28 +25,45 @@ async function setShowHomeMessage(page, value) {
   }), value);
 }
 
-test('di default il commento centrale è visibile (#5)', async ({ app, shell }) => {
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#homeMessage')).toBeVisible({ timeout: 8_000 });
+async function modelloDellaHome(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__home_calls = 0;
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      if (JSON.stringify(messages).includes('preparare la dashboard')) globalThis.__home_calls += 1;
+      return { text: JSON.stringify({ message: 'Il timer è suonato.', suggestions: [] }), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+}
+
+const parla = (app) => app.evaluate(async () => {
+  await globalThis.SN_FILO_PARLA.giro({ subito: [{ tipo: 'timer', testo: 'timer «pasta»' }] });
+  return { chiamate: globalThis.__home_calls, scritti: (await globalThis.SN_IL_FILO.chats()).flatMap((c) => c.messages.filter((m) => m.spontaneo)).length };
 });
 
-test('disattivando il toggle il commento sparisce subito e resta nascosto nelle nuove schede (#5)', async ({ app, shell, openTab }) => {
+test('acceso di serie: quando suona un timer Filo lo scrive nella home (#869)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
-  await expect(page.locator('#homeMessage')).toBeVisible({ timeout: 8_000 });
+  await modelloDellaHome(app);
+  expect(await parla(app)).toEqual({ chiamate: 1, scritti: 1 });
+  await expect(page.locator('.dash-bubble-filo[data-spontaneo="1"]')).toHaveText('Il timer è suonato.');
+});
 
-  // Disattiva: il broadcast SETTINGS_UPDATED deve nascondere il commento live.
+test('spento: Filo non scrive per primo e non chiama il modello; riacceso torna a farlo (#5, #869)', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await modelloDellaHome(app);
   await setShowHomeMessage(page, false);
-  await expect(page.locator('#homeMessage')).toBeHidden({ timeout: 8_000 });
-
-  // La preferenza è persistita: una nuova scheda nasce senza commento.
-  const page2 = await openTab('filo://newtab/');
-  await expect(page2.locator('#homeMessage')).toBeHidden({ timeout: 8_000 });
-
-  // Riattivando torna visibile.
-  await setShowHomeMessage(page2, true);
-  await expect(page2.locator('#homeMessage')).toBeVisible({ timeout: 8_000 });
+  expect(await parla(app)).toEqual({ chiamate: 0, scritti: 0 });
+  await expect(page.locator('.dash-bubble-filo[data-spontaneo="1"]')).toHaveCount(0);
+  await setShowHomeMessage(page, true);
+  expect(await parla(app)).toEqual({ chiamate: 1, scritti: 1 });
 });
 
 test('la pagina Preferenze espone il toggle e ne riflette lo stato (#5)', async ({ openTab }) => {

@@ -167,6 +167,201 @@ test('rinomina confermata a vuoto dalla docbar: il titolo automatico arriva lo s
   await expect(page.locator('#docTitle')).toHaveText('Il giardino in primavera', { timeout: 8000 });
 });
 
+// #1570 — il titolo non scritto a mano segue il contenuto, e un documento non prende mai titolo o riassunto dal
+// testo di un altro. La finta risponde in base al testo che riceve; con `__trattieni` la memoria aspetta, così il
+// cambio di documento cade proprio fra l'inizio della richiesta e la lettura del testo.
+async function stubPerTesto(page) {
+  await page.evaluate(() => {
+    const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
+    const orig = window.chrome.runtime.sendMessage.bind(window.chrome.runtime);
+    window.__aiCalls = [];
+    window.__inAttesa = [];
+    window.__trattieni = false;
+    const argomento = (t) => (/montagna/.test(t) ? 'La montagna' : /giardino/.test(t) ? 'Il giardino' : 'Niente');
+    const rispondi = (msg, cb, r) => {
+      if (typeof cb === 'function') { cb(r); return undefined; }
+      return Promise.resolve(r);
+    };
+    window.chrome.runtime.sendMessage = (msg, cb) => {
+      if (msg && msg.type === MSG.AI_REQUEST) {
+        const [sys, user] = msg.payload.messages.map((m) => m.content);
+        const tema = argomento(user);
+        const tipo = /TITOLO: </.test(sys) ? 'entrambi' : /TITOLO/.test(sys) ? 'titolo' : 'riassunto';
+        window.__aiCalls.push({ tipo, tema, action: msg.action });
+        const text = tipo === 'entrambi' ? `TITOLO: ${tema}\nRIASSUNTO: Testo su ${tema}.`
+          : tipo === 'titolo' ? tema : `Testo su ${tema}.`;
+        return rispondi(msg, cb, { ok: true, text });
+      }
+      if (msg && msg.type === MSG.FILO_GET_MEMORY) {
+        const r = { ok: true, memory: { PROFILO: '', PREFERENZE: '' } };
+        if (!window.__trattieni) return rispondi(msg, cb, r);
+        return new Promise((ok) => window.__inAttesa.push(() => { if (typeof cb === 'function') cb(r); ok(r); }));
+      }
+      return orig(msg, cb);
+    };
+  });
+}
+
+function testoSu(parola, n) {
+  const base = [parola, 'con', 'molte', 'cose', 'da', 'dire', 'sul', 'tema', 'del', 'giorno'];
+  return Array.from({ length: n }, (_, i) => base[i % base.length]).join(' ');
+}
+
+async function scrivi(page, testo) {
+  await page.evaluate((t) => {
+    const d = document.getElementById('doc');
+    d.innerHTML = '<p>' + t + '</p>';
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  }, testo);
+}
+
+async function documenti(page) {
+  return page.evaluate(() => {
+    const c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+    return c.files.map((f) => ({ id: f.id, titolo: f.meta.title, riassunto: f.meta.summary || '', testo: JSON.stringify(f.content) }));
+  });
+}
+
+async function nuovaPagina(openTab) {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(async () => {
+    localStorage.removeItem('filo.editor.collection');
+    try { await chrome.storage.local.remove('filo.editor.collection'); } catch (_) {}
+  });
+  await page.reload();
+  await page.waitForSelector('#doc');
+  await stubPerTesto(page);
+  return page;
+}
+
+test('il titolo automatico segue il contenuto: cambiato l\'argomento, cambia, nella chiamata del riassunto', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  await scrivi(page, testoSu('giardino', 120));
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino', { timeout: 8000 });
+
+  await scrivi(page, testoSu('montagna', 220));
+  await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
+  const [d] = await documenti(page);
+  expect(d.riassunto).toBe('Testo su La montagna.');
+  // Nessuna chiamata in più: il primo titolo, poi titolo e riassunto insieme.
+  expect(await page.evaluate(() => window.__aiCalls.map((c) => `${c.tipo}:${c.tema}`))).toEqual(['titolo:Il giardino', 'entrambi:La montagna']);
+});
+
+test('un titolo scritto a mano non cambia quando il testo cambia', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await page.locator('.ed-doc-title-input').fill('Appunti di viaggio');
+  await page.locator('.ed-doc-title-input').press('Enter');
+
+  await scrivi(page, testoSu('giardino', 120));
+  await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
+  await scrivi(page, testoSu('montagna', 220));
+  await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su La montagna.');
+  await expect(page.locator('#docTitle')).toHaveText('Appunti di viaggio');
+  expect(await page.evaluate(() => window.__aiCalls.map((c) => c.tipo))).toEqual(['riassunto', 'riassunto']);
+});
+
+test('un documento nuovo non prende titolo o riassunto dal testo di quello aperto prima', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  await scrivi(page, testoSu('giardino', 120));
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino', { timeout: 8000 });
+
+  // Documento nuovo; mentre il suo titolo aspetta, si torna su quello di prima.
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await page.evaluate(() => { window.__trattieni = true; });
+  await scrivi(page, testoSu('montagna', 120));
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(1);
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item:not(.active)').first().click();
+  await expect(page.locator('#doc')).toContainText('giardino');
+  await page.evaluate(() => { window.__trattieni = false; window.__inAttesa.splice(0).forEach((f) => f()); });
+  await expect.poll(async () => (await documenti(page)).map((d) => d.titolo).sort()).toEqual(['Il giardino', 'La montagna']);
+  let docs = await documenti(page);
+  expect(docs.find((d) => d.testo.includes('montagna')).titolo).toBe('La montagna');
+
+  // Lo stesso per il riassunto chiesto a mano: a metà si apre un documento nuovo, vuoto.
+  await page.evaluate(() => { window.__trattieni = true; });
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rigenera riassunto', { exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(1);
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await page.evaluate(() => { window.__trattieni = false; window.__inAttesa.splice(0).forEach((f) => f()); });
+  await expect.poll(async () => (await documenti(page)).find((d) => d.testo.includes('giardino')).riassunto).toBe('Testo su Il giardino.');
+  docs = await documenti(page);
+  expect(docs.filter((d) => !d.testo.includes('giardino') && !d.testo.includes('montagna')).map((d) => d.riassunto)).toEqual(['']);
+  expect(await page.evaluate(() => window.__aiCalls.filter((c) => c.tema === 'Niente').length)).toBe(0);
+});
+
+// #1697 — riscritto su un altro argomento con le stesse parole di numero, il titolo segue lo stesso.
+test('riscritto su un altro argomento a parità di parole, il titolo automatico cambia', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  const su = (v, n) => Array.from({ length: n }, (_, i) => v[i % v.length]).join(' ');
+  await scrivi(page, su(['giardino', 'fiori', 'rose', 'prato', 'siepe', 'erba'], 150));
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino', { timeout: 8000 });
+  await scrivi(page, su(['montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'valle'], 150));
+  await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
+  expect((await documenti(page))[0].riassunto).toBe('Testo su La montagna.');
+  expect(await page.evaluate(() => window.__aiCalls.at(-1).tipo)).toBe('entrambi');
+});
+
+// #1697 — il titolo in volo di un documento non toglie il suo al documento nuovo, e uno scritto a mano mentre il
+// titolo automatico è in volo resta quello.
+test('il titolo in volo di un altro documento non salta quello del documento nuovo', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  await page.evaluate(() => { window.__trattieni = true; });
+  await scrivi(page, testoSu('giardino', 120));
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(1);
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await scrivi(page, testoSu('montagna', 120));
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(2);
+  await page.evaluate(() => { window.__trattieni = false; window.__inAttesa.splice(0).forEach((f) => f()); });
+  await expect.poll(async () => (await documenti(page)).map((d) => d.titolo).sort()).toEqual(['Il giardino', 'La montagna']);
+});
+
+test('un nome scritto a mano mentre il titolo automatico è in volo resta, anche con quello del riassunto', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await nuovaPagina(openTab);
+  const rinomina = async (nome) => {
+    await page.click('#docSwitch', { button: 'right' });
+    await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+    await page.locator('.ed-doc-title-input').fill(nome);
+    await page.locator('.ed-doc-title-input').press('Enter');
+  };
+  const libera = () => page.evaluate(() => { window.__trattieni = false; window.__inAttesa.splice(0).forEach((f) => f()); });
+
+  await page.evaluate(() => { window.__trattieni = true; });
+  await scrivi(page, testoSu('giardino', 120));
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(1);
+  await rinomina('Il mio orto');
+  await libera();
+  await expect.poll(() => page.evaluate(() => window.__aiCalls.length)).toBe(1);
+  await expect(page.locator('#docTitle')).toHaveText('Il mio orto');
+
+  // Un documento col titolo di Filo: il nome a mano arriva mentre titolo e riassunto viaggiano insieme.
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await scrivi(page, testoSu('giardino', 120));
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino', { timeout: 8000 });
+  await page.evaluate(() => { window.__trattieni = true; });
+  await scrivi(page, testoSu('montagna', 220));
+  await expect.poll(() => page.evaluate(() => window.__inAttesa.length), { timeout: 20_000 }).toBe(1);
+  await rinomina('Gite');
+  await libera();
+  await expect.poll(async () => (await documenti(page)).find((d) => d.testo.includes('montagna')).riassunto, { timeout: 10_000 }).toBe('Testo su La montagna.');
+  await expect(page.locator('#docTitle')).toHaveText('Gite');
+  expect(await page.evaluate(() => window.__aiCalls.at(-1).tipo)).toBe('entrambi');
+});
+
 // Il contrappeso: un nome VERO deve continuare a bloccare l'auto-titolo.
 test('un nome dato davvero blocca il titolo automatico', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');

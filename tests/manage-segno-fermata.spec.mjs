@@ -158,3 +158,42 @@ test('pagina dei feedback: anche lì il rombo di chi chiede lavoro locale è azz
   expect(await colore(titolo('Ha domande'))).toBe(VERDE);
   await page.locator('.fb-card', { hasText: 'Va finito in locale' }).screenshot({ path: 'tests/.shots/rombo-locale-feedback.png' });
 });
+
+// #1241: un worker caduto su un guasto lo rimandava in locale, e l'owner leggeva una richiesta di lavoro locale.
+const GUASTO = {
+  ...base, _id: 'fb-gua', seq: 807, name: 'Fermo sul clone', text: 'g', clientId: 'routine:residuo',
+  status: 'design', statusReason: 'guasto', pipeline: giudici('aligned'),
+  notes: "Report.\n\n--- Aggiornamento dell'agente del 16/10/26, 12:58 ---\nGuasto, non lavoro locale: guasto: filo-security. Domanda D-9.",
+};
+
+test('fermo per un guasto: in lista e nel dettaglio si legge guasto, non lavoro locale né giudici', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [GUASTO, LOCALE]);
+
+  await expect(segno(page, 'Fermo sul clone')).toHaveAttribute('data-forma', 'rombo');
+  await expect(segno(page, 'Fermo sul clone')).toHaveAttribute('title', /guasto/i);
+  expect(await segno(page, 'Fermo sul clone').getAttribute('title')).not.toMatch(/locale|giudici/i);
+  expect(await colore(segno(page, 'Fermo sul clone'))).toBe(VERDE);
+
+  await page.evaluate((id) => window.__mgTest.openDetail(id), GUASTO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('fermo per un guasto');
+  await expect(corpo).toContainText('stanno nella domanda');
+  await expect(corpo).not.toContainText('questione di design');
+
+  // Il rombo del dettaglio dice la stessa cosa del segno in lista, e quale domanda aprire.
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await expect(rombo).toHaveAttribute('title', /guasto/i);
+  await rombo.click();
+  await expect(corpo).not.toContainText('Nessuna segnalazione');
+  await expect(corpo).toContainText('D-9');
+
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    await page.locator('#mgList').screenshot({ path: `tests/.shots/rombo-guasto-lista-${tema}.png` });
+  }
+  await page.screenshot({ path: 'tests/.shots/rombo-guasto-pagina.png' });
+});

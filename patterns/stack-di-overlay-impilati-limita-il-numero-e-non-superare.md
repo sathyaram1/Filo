@@ -9,12 +9,15 @@ schede su siti in blacklist) lo fa crescere all'infinito: le card più vecchie
 finiscono **fuori dal viewport** insieme al loro tasto di chiusura, diventando
 irraggiungibili.
 
-- **Tetto al numero** di card vive contemporaneamente: quando ne arriva una che
-  sfora, rimuovi subito la più vecchia (non aspettare il suo timeout). Tieni le
-  **più recenti** (le più rilevanti in una raffica). In una raffica estrema le
-  azioni delle notifiche più vecchie (es. «Apri comunque») si perdono: è un
-  compromesso accettabile — l'utente può rifare l'azione, e il contrario
-  (schermo coperto, X fuori campo) è peggio.
+- **Tetto al numero** di card a schermo contemporaneamente, e **mai un taglio
+  silenzioso** (#1477): quelle oltre il tetto non si buttano. Nella pila della
+  barra a schermo restano le **più recenti**; le più vecchie aspettano fuori
+  vista, col tempo fermo (non sono ancora state viste: il loro tempo parte intero
+  quando entrano), dietro un «+N» in cima alla pila che le mostra tutte. Aperta,
+  la pila ha «Riduci» e «Chiudi tutti» (lo stesso dal tasto destro sul «+N» e su
+  una carta), perché una raffica di avvisi che restano non si chiude a uno a uno.
+  Chiusa una carta, entra la più recente di quelle che aspettano; un avviso
+  `unica` rinnovato mentre aspetta è la notizia più fresca e torna in fondo.
 - **Tetto all'altezza:** `max-height: calc(100vh - margini)` + `overflow-y:auto`
   come rete di sicurezza per finestre molto basse, dove anche il piccolo gruppo
   non entrerebbe. Quando c'è overflow, tieni in vista la card più recente
@@ -46,11 +49,11 @@ irraggiungibili.
   DOM), una cede il posto all'altra: le pile della pagina, e ogni riquadro di
   Filo in quell'angolo, salgono dell'altezza di quella della barra (#588.5,
   sentinella `tests/unit/angoloAvvisiBarra.test.mjs`).
-- **Non tutti gli avvisi sono sfrattabili.** Il tetto butta via i più vecchi, ma
-  un avviso che porta **l'unico comando** per una cosa in corso (fermare una
-  registrazione, raggiungere la lista dove è appena finita una pagina) va marcato
-  come non sfrattabile: perderlo non è "un messaggio in meno", è una funzione che
-  sparisce a metà.
+- **Dove il tetto sfratta ancora** (le pile dentro la pagina e nell'editor, che
+  buttano le più vecchie), un avviso che porta **l'unico comando** per una cosa in
+  corso (fermare una registrazione, raggiungere la lista dove è appena finita una
+  pagina) va marcato come non sfrattabile: perderlo non è "un messaggio in meno",
+  è una funzione che sparisce a metà.
 - **⚠️ `overflow` + animazione d'ingresso = falso overflow, e uno `scroll`
   parassita.** Se le card entrano con `transform: translateY(Npx)`, quello sposto
   allarga l'area scrollabile del contenitore: `scrollHeight > clientHeight`
@@ -72,12 +75,13 @@ irraggiungibili.
   attorno resta della pagina). Una pila nuova prende tempi e hover da
   `SN_AVVISI` (`src/shared/avvisiTempo.js`), mai da un `setTimeout` suo:
   sentinella `tests/unit/avvisiTempo.test.mjs`.
-- **Dove:** il modello è `NOTIFS` (`enforceCap`) in `src/renderer/shell.js`; a
+- **Dove:** il modello è `NOTIFS` (`disponi`) in `src/renderer/shell.js`; a
   schermo la pila la disegna la vista sopra la pagina
   (`src/main/avvisiSopraPagina.js`, `src/renderer/avvisi.{html,js,css}`), alta al
   massimo quanto l'area della pagina, e dentro si scorre
   ([la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)).
-  Test `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).
+  Test `tests/notifications.spec.mjs` (la raffica non straripa, resta chiudibile e
+  nessun avviso oltre il tetto si perde).
   Stesso pattern nell'editor: `showEditorToast`/`.ed-toasts` in
   `src/pages/editor/editor.{js,css}`, test `tests/editor-trash.spec.mjs`.
   Lato **pagina visitata** (content script): `mountToast`/`unmountToast` +

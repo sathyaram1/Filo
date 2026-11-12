@@ -15,14 +15,15 @@ const A = globalThis.SN_CONST.AUTOMATION;
 test('l\'intervallo delle sessioni è suo, non quello dei bilanci', () => {
   assert.equal(A.MAX_SESSIONS_MIN, 1, 'zero sarebbe un interruttore master di nascosto');
   assert.equal(A.MAX_SESSIONS_MAX, 20);
-  assert.equal(A.MAX_SESSIONS_DEFAULT, 1);
+  assert.equal(A.MAX_SESSIONS_DEFAULT, 20, 'lo stesso del server (policy.MAX_SESSIONS_DEFAULT): il freno, non il lavoro');
   assert.notEqual(A.MAX_SESSIONS_MIN, A.CAP_MIN, 'i bilanci partono da 0, le sessioni no');
   assert.notEqual(A.MAX_SESSIONS_MAX, A.CAP_MAX);
 });
 
 test('un documento senza i campi vale come il comportamento di oggi', () => {
   assert.deepEqual(RS.leggiDoc({}), {
-    maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false,
+    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, riservatiOff: false, riservatiTetto: 20,
+    unitWindows: 'toccati',
   });
   assert.deepEqual(RS.leggiDoc(null), RS.leggiDoc({}));
   assert.deepEqual(RS.leggiDoc(undefined), RS.leggiDoc({}));
@@ -30,13 +31,17 @@ test('un documento senza i campi vale come il comportamento di oggi', () => {
 
 test('il documento si legge com\'è, e un valore storto non fa esplodere la pagina', () => {
   assert.deepEqual(RS.leggiDoc({
-    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false,
-  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false });
+    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, riservatiOff: true, riservatiTetto: 3,
+  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, riservatiOff: true, riservatiTetto: 3, unitWindows: 'toccati' });
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: true }).manutentoreAcceso, true);
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: 'sì' }).manutentoreAcceso, false, 'solo un vero booleano lo accende');
+  assert.deepEqual(RS.valida({ manutentoreAcceso: true }), { ok: true, valori: { manutentoreAcceso: true } });
+  assert.equal(RS.valida({ manutentoreAcceso: 'sì' }).ok, false);
   // Firestore rende gli interi come stringhe: «5» è cinque, non un guasto.
   assert.equal(RS.leggiDoc({ maxSessions: '5' }).maxSessions, 5);
   assert.equal(RS.leggiDoc({ maxSessions: 99 }).maxSessions, 20, 'in lettura si riporta nell\'intervallo');
   assert.equal(RS.leggiDoc({ maxSessions: 0 }).maxSessions, 1);
-  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 1);
+  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 20, 'come il server: un valore storto vale il predefinito');
   assert.equal(RS.leggiDoc({ priorityAccount: 'C' }).priorityAccount, '');
   assert.equal(RS.leggiDoc({ accountAOff: 'sì' }).accountAOff, false, 'solo un vero booleano esclude');
 });
@@ -102,4 +107,98 @@ test('escluso il prioritario, si sa quale account resta (verifica giro 1)', () =
   assert.equal(RS.prioritarioIgnorato({}), '');
   // Esclusi tutti e due non «resta» nessuno: lo dice l'altro avviso.
   assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A', accountAOff: true, accountBOff: true }), '');
+});
+
+// ── Le pause in corso, a parole (#996) ─────────────────────────────────────
+const ORA = new Date(2026, 9, 17, 10, 0).getTime();
+const ORE = 60 * 60 * 1000;
+
+test('una pausa per un rifiuto dice fino a quando e perché, col messaggio di claude.ai', () => {
+  const p = RS.pausaInParole('Account B', { finoMs: ORA + 3 * ORE, perche: 'http_429', dettaglio: 'Daily routine run limit reached', strikes: 1, oggi: 16 }, ORA);
+  assert.equal(p.testo, 'Account B in pausa fino alle 13:00: troppe accensioni per claude.ai (HTTP 429). «Daily routine run limit reached»');
+  assert.match(p.dettaglio, /raddoppia a ogni rifiuto di fila, fino a un giorno/);
+  assert.match(p.dettaglio, /Accensioni di oggi su quell'account: 16\./);
+});
+
+test('il motivo per ogni esito: crediti, token, rete, giro nato morto, codici sconosciuti', () => {
+  assert.equal(RS.motivoPausa('http_402'), 'crediti finiti (HTTP 402)');
+  assert.equal(RS.motivoPausa('http_401'), 'claude.ai rifiuta il token di accensione (HTTP 401)');
+  assert.equal(RS.motivoPausa('network'), 'claude.ai non raggiungibile');
+  assert.equal(RS.motivoPausa('dead_round'), 'accesa, ma la sessione non è partita');
+  assert.equal(RS.motivoPausa('http_418'), 'claude.ai ha rifiutato l\'accensione (HTTP 418)');
+  assert.equal(RS.motivoPausa('http_503'), 'claude.ai in errore (HTTP 503)');
+  assert.equal(RS.motivoPausa(undefined), 'accensione non riuscita');
+  assert.equal(RS.motivoPausa('<b>x</b>'), 'accensione non riuscita', 'un esito sconosciuto non arriva sullo schermo');
+});
+
+test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga', () => {
+  const sera = new Date(2026, 9, 17, 22, 0).getTime();
+  assert.match(RS.pausaInParole('Account A', { finoMs: sera + 12 * ORE, perche: 'dead_round', strikes: 3 }, sera).testo,
+    /^Account A in pausa fino a domani alle 10:00: accesa, ma la sessione non è partita\.$/);
+  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + 50 * ORE, perche: 'network' }, ORA).testo, /fino al 19 ottobre alle 12:00/);
+  // Giri nati morti: claude.ai non ha rifiutato niente, e l'hover non lo dice.
+  const morti = RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 3 }, ORA).dettaglio;
+  assert.match(morti, /^3 accensioni di fila senza sessione/);
+  assert.doesNotMatch(morti, /rifiut/i);
+  assert.doesNotMatch(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 1 }, ORA).dettaglio, /rifiut/i);
+  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'http_429', strikes: 3 }, ORA).dettaglio, /^3 rifiuti di fila/);
+  assert.equal(RS.pausaInParole('Account A', { finoMs: ORA - 1, perche: 'http_429' }, ORA), null);
+  assert.equal(RS.pausaInParole('Account A', null, ORA), null);
+  assert.equal(RS.pausaInParole('Account A', { finoMs: 'domani' }, ORA), null);
+  // La routine server senza account noto non inventa un conto del giorno.
+  assert.doesNotMatch(RS.pausaInParole('La routine server', { finoMs: ORA + ORE, perche: 'http_429', account: '', oggi: 0 }, ORA).dettaglio, /Accensioni di oggi/);
+  assert.match(RS.pausaInParole('La routine server (account B)', { finoMs: ORA + ORE, perche: 'http_429', account: 'B', oggi: 4 }, ORA).dettaglio, /oggi su quell'account: 4/);
+});
+
+test('gli unit su Windows al cancello (#2225): tre scelte, i toccati senza il campo, e il workflow le capisce tutte', async () => {
+  assert.ok(RS.CHIAVI.includes('unitWindows'), 'il main la inoltra e la rilegge');
+  assert.deepEqual([...RS.UNIT_WINDOWS], ['toccati', 'tutti', 'spento']);
+  for (const m of RS.UNIT_WINDOWS) {
+    assert.equal(RS.leggiDoc({ unitWindows: m }).unitWindows, m);
+    assert.deepEqual(RS.valida({ unitWindows: m }), { ok: true, valori: { unitWindows: m } });
+  }
+  for (const storto of ['', 'TUTTI', 'tutti ', 1, true, '<b>spento</b>']) {
+    assert.equal(RS.leggiDoc({ unitWindows: storto }).unitWindows, 'toccati', String(storto));
+    const r = RS.valida({ unitWindows: storto });
+    assert.equal(r.ok, false, String(storto));
+    assert.match(r.testo, /^Unit su Windows: vale «toccati», «tutti», «spento»\. Non salvato\.$/);
+  }
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync(new URL('../../.github/workflows/unit-fusione.yml', import.meta.url), 'utf8');
+  assert.match(wf, /if: github\.event\.client_payload\.windows != 'spento'/, '«spento» toglie la parte Windows');
+  const { modoUnit } = await import('../../scripts/unit-fusione-azione.mjs');
+  assert.equal(modoUnit('tutti'), 'tutti');
+  assert.equal(modoUnit('toccati'), 'toccati');
+});
+
+test('la routine riservati (#2069): spenta solo con un vero booleano, e un tetto intero da 1 al massimo', () => {
+  assert.ok(RS.CHIAVI.includes('riservatiOff') && RS.CHIAVI.includes('riservatiTetto'), 'il main li inoltra e li rilegge');
+  assert.ok(!RS.CHIAVI.some((k) => /reteAperta/.test(k)), 'la rete aperta non ha più posto in Gestione');
+  assert.equal(RS.leggiDoc({ riservatiOff: 'sì' }).riservatiOff, false);
+  assert.equal(RS.leggiDoc({ riservatiTetto: '4' }).riservatiTetto, 4);
+  assert.equal(RS.leggiDoc({ riservatiTetto: 0 }).riservatiTetto, 20, 'senza un tetto scritto vale quello comune');
+  assert.equal(RS.leggiDoc({ riservatiTetto: 99 }).riservatiTetto, 20);
+  assert.deepEqual(RS.valida({ riservatiOff: true, riservatiTetto: '2' }), { ok: true, valori: { riservatiOff: true, riservatiTetto: 2 } });
+  for (const storto of [0, 21, 1.5, '', '   ', 'due', '<b>3</b>']) {
+    const r = RS.valida({ riservatiTetto: storto });
+    assert.equal(r.ok, false, String(storto));
+    assert.match(r.testo, /riservati: ci vuole un numero intero da 1 a 20\. Non salvato\./);
+  }
+  assert.equal(RS.valida({ riservatiOff: 'true' }).ok, false);
+});
+
+test('lo stato della routine riservati in una riga: cosa ha deciso il pacemaker e quante volte l’ha accesa oggi', () => {
+  assert.equal(RS.statoRiservati(undefined), '', 'il pacemaker non ne ha ancora scritto niente');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 1 }), 'Accesa una volta oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 3 }), 'Accesa 3 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_no_routine_id', oggi: 0 }), 'Ferma: manca l’id della routine su claude.ai; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_off', oggi: 0 }), 'Spenta: si usa la routine normale; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'no_riservati_work', oggi: 2 }), 'Nessun compito per lei; accesa 2 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'motivo_nuovo' }), 'Ferma: stato non leggibile; mai accesa oggi.');
+  // La sua pausa conta le accensioni sue, non quelle dell'account.
+  const ora = Date.parse('2026-11-01T10:00:00Z');
+  const p = RS.pausaInParole('La routine riservati dell’account A', { finoMs: ora + 3600000, perche: 'http_402', strikes: 1, account: 'A', oggi: 2 }, ora, { contoDi: 'routine' });
+  assert.match(p.testo, /^La routine riservati dell’account A in pausa fino alle .*crediti finiti/);
+  assert.match(p.dettaglio, /Accensioni di oggi di questa routine: 2\./);
+  assert.doesNotMatch(p.dettaglio, /quell'account/);
 });

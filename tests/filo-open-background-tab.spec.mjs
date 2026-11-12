@@ -219,9 +219,7 @@ test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccab
   // La stessa scena del feedback, dentro bolle vere: Filo cerca sul web e poi
   // apre il risultato in secondo piano.
   await page.evaluate(() => {
-    // Vista conversazione (la home lascia il posto alle bolle appena si scrive).
-    document.getElementById('homeView').hidden = true;
-    document.getElementById('threadView').hidden = false;
+    // Il centro della home è già il filo (#869): le bolle vanno lì.
     const bubbles = document.getElementById('bubbles');
     const mk = (cls, text) => {
       const d = document.createElement('div');

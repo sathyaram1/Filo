@@ -100,6 +100,15 @@ function esegui(riga) {
     else fs.writeFileSync(path.resolve(testo.slice(i + 1).trim()), testo.slice(0, i) + '\\r\\n');
     livello = 0; return;
   }
+  // Un programma per nome: prima la cartella di lavoro, salvo NoDefaultCurrentDirectoryInExePath, poi il PATH.
+  // Qui il «programma» è un .bat che stampa il suo testo.
+  const nome = r.split(/\\s/)[0] + '.bat';
+  const cartelle = (process.env.NoDefaultCurrentDirectoryInExePath === undefined ? [process.cwd()] : [])
+    .concat(String(process.env.PATH || '').split(path.delimiter).filter(Boolean));
+  for (const d of cartelle) {
+    const p = path.join(d, nome);
+    if (fs.existsSync(p)) { process.stdout.write(fs.readFileSync(p, 'utf8')); livello = 0; return; }
+  }
   process.stderr.write("'" + r.split(/\\s/)[0] + "' non è riconosciuto come comando interno o esterno.\\r\\n");
   livello = 9009;
 }
@@ -121,16 +130,17 @@ async function conCmdFinto(fn) {
   writeFileSync(join(dir, 'taskkill'), '#!/bin/sh\nkill -9 "$2" 2>/dev/null\nexit 0\n');
   chmodSync(join(dir, 'taskkill'), 0o755);
   const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
-  const prima = { PATH: process.env.PATH, ComSpec: process.env.ComSpec };
+  const prima = { PATH: process.env.PATH, ComSpec: process.env.ComSpec, NoDefaultCurrentDirectoryInExePath: process.env.NoDefaultCurrentDirectoryInExePath };
   process.env.PATH = `${dir}:${prima.PATH}`;
   process.env.ComSpec = join(dir, 'cmd.js');
+  // Il contenitore che lancia le prove può averla già: la deve mettere Filo, non chi gira i test.
+  delete process.env.NoDefaultCurrentDirectoryInExePath;
   Object.defineProperty(process, 'platform', { ...piattaforma, value: 'win32' });
   try {
     return await fn();
   } finally {
     Object.defineProperty(process, 'platform', piattaforma);
-    process.env.PATH = prima.PATH;
-    if (prima.ComSpec === undefined) delete process.env.ComSpec; else process.env.ComSpec = prima.ComSpec;
+    for (const [k, v] of Object.entries(prima)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 }
 
@@ -159,6 +169,75 @@ test('con l\'eco spento cmd non mostra il prompt: il terminale della dashboard r
   }));
   assert.equal(uscita.code, 0);
   assert.equal(uscita.testo.trim(), 'ciao');
+});
+
+// ─────────── la cartella di lavoro non entra nella ricerca dei programmi (#2312) ───────────
+// Dopo un `cd` in un archivio estratto, il `whoami` del modello deve essere quello del sistema, non quello dell'archivio.
+
+test('con cmd il `whoami` del modello in una cartella con un whoami suo avvia quello del sistema', SOLO_FUORI, async () => {
+  const archivio = join(TMP, 'archivio-estratto');
+  mkdirSync(archivio, { recursive: true });
+  writeFileSync(join(archivio, 'whoami.bat'), 'ARCHIVIO\n');
+  mkdirSync(join(TMP, 'cmd-finto'), { recursive: true });
+  writeFileSync(join(TMP, 'cmd-finto', 'whoami.bat'), 'utente-vero\n');
+  const out = await conCmdFinto(() => T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA }));
+  assert.equal(out.code, 0, out.stderr);
+  assert.equal(out.stdout.trim(), 'utente-vero', 'è partito il programma dell\'archivio');
+  assert.equal(out.cwd, archivio, 'il comando deve restare nella cartella dove il modello è entrato');
+});
+
+// Chi gira le prove può averla già nel suo ambiente: lì la prova passerebbe anche senza Filo.
+async function senzaLaVariabile(fn) {
+  const prima = process.env.NoDefaultCurrentDirectoryInExePath;
+  delete process.env.NoDefaultCurrentDirectoryInExePath;
+  try { return await fn(); } finally {
+    if (prima !== undefined) process.env.NoDefaultCurrentDirectoryInExePath = prima;
+  }
+}
+
+test('la cartella di lavoro esce dalla ricerca per ogni comando del modello su Windows, e la variabile vince sulle sue copie', () => senzaLaVariabile(async () => {
+  await suWindowsConSessioneFinta((cb) => cb.onExit({ code: 0, cwd: TMP }), async (visto) => {
+    await T.runCommand('where git', { shell: 'cmd', cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
+    assert.equal(visto.opzioni.env.NoDefaultCurrentDirectoryInExePath, '1');
+    const env = T.ambienteDelModello({ PATH: 'p', nodefaultcurrentdirectoryinexepath: '', FILO_DEFAULT_OPENROUTER_KEY: 'x' });
+    assert.deepEqual(env, { PATH: 'p', NoDefaultCurrentDirectoryInExePath: '1' });
+  });
+}));
+
+// Senza saperlo il modello scrive `gradlew build` come si fa in cmd: l'utente conferma, fallisce, e conferma di nuovo.
+test('il modello su Windows sa che un programma della cartella di lavoro si chiama con .\\, anche in cmd', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const computer = globalThis.SN_CONST.PROMPTS.filoChatComputer('win32');
+  assert.match(computer, /`\.\\[^`]*`[^.]*cmd/);
+  assert.doesNotMatch(globalThis.SN_CONST.PROMPTS.filoChatComputer('darwin'), /\.\\/);
+});
+
+test('il terminale dove scrive l\'utente resta il cmd di sempre: un programma della cartella parte per nome', SOLO_FUORI, async () => {
+  const qui = join(TMP, 'cartella-utente');
+  mkdirSync(qui, { recursive: true });
+  writeFileSync(join(qui, 'avvia.bat'), 'suo\n');
+  const uscita = await conCmdFinto(() => new Promise((resolve, reject) => {
+    const sessione = S.createSession({ shell: 'cmd', cwd: qui });
+    let testo = '';
+    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, ATTESA);
+    sessione.exec('avvia', {
+      onData: ({ chunk }) => { testo += chunk; },
+      onExit: ({ code }) => { clearTimeout(scade); sessione.kill(); resolve({ testo, code }); },
+      onError: ({ message }) => { clearTimeout(scade); reject(new Error(message)); },
+    });
+  }));
+  assert.equal(uscita.testo.trim(), 'suo', 'il programma della cartella non è partito');
+  assert.equal(uscita.code, 0);
+});
+
+test('con cmd vero un whoami.bat nella cartella non prende il posto di whoami', { skip: process.platform !== 'win32' && 'cmd esiste solo su Windows' }, async () => {
+  const archivio = join(TMP, 'archivio-vero');
+  mkdirSync(archivio, { recursive: true });
+  writeFileSync(join(archivio, 'whoami.bat'), '@echo ARCHIVIO\r\n');
+  const out = await senzaLaVariabile(() => T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA }));
+  assert.equal(out.code, 0, out.stderr);
+  assert.doesNotMatch(out.stdout, /ARCHIVIO/);
+  assert.ok(out.stdout.trim(), 'whoami del sistema non ha risposto');
 });
 
 // ─────────── il giro vero: cmd su Windows, la stessa sessione con sh altrove ───────────

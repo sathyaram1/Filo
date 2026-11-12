@@ -166,7 +166,7 @@ test('CLI --record-fixed: con modifiche non salvate respinge PRIMA del server, c
       FILO_ROUTINE_API: 'http://127.0.0.1:9',
     };
     const REPORT = 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo. Lasciato stare il menu sotto i 300 pixel, fuori dal giro.';
-    const lancia = () => spawnSync(process.execPath, [DISPATCH, '--record-fixed', 'ID1', REPORT], { env, encoding: 'utf8', cwd: sandbox });
+    const lancia = () => spawnSync(process.execPath, [DISPATCH, '--record-fixed', 'ID1', REPORT, '--motivo', 'ripresa'], { env, encoding: 'utf8', cwd: sandbox });
 
     writeFileSync(resolve(sandbox, 'a.txt'), 'base\nfix\n', 'utf8');
     const sporco = lancia();

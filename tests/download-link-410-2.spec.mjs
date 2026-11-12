@@ -18,6 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Un finto "PDF": basta che sia un file con byte noti servito come allegato.
 const FILE = Buffer.from('%PDF-1.4\n% finto pdf #410.2\n' + 'y'.repeat(1024));
@@ -46,7 +47,7 @@ test('clic destro su un link a un file → "Salva file" scarica e registra il fi
 
     // 1) Sul link a un FILE la voce compare.
     await page.locator('#file').click({ button: 'right' });
-    const save = page.locator('.sn-menu button', { hasText: 'Salva file' });
+    const save = menuDi(page).locator('.sn-menu button', { hasText: 'Salva file' });
     await expect(save).toBeVisible();
 
     // 2) Sceglierla scarica il file: byte giusti su disco…
@@ -74,10 +75,10 @@ test('clic destro su un link a un file → "Salva file" scarica e registra il fi
 
     // 3) Sul link a una PAGINA la voce NON compare (scaricherebbe l'HTML).
     await page.locator('#pagina').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
-    await expect(page.locator('.sn-menu button', { hasText: 'Salva file' })).toHaveCount(0);
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu button', { hasText: 'Salva file' })).toHaveCount(0);
     // …ma le altre azioni sul link ci sono ancora (il menu non si è impoverito).
-    await expect(page.locator('.sn-menu button', { hasText: 'Copia URL' })).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu button', { hasText: 'Copia URL' })).toBeVisible();
   } finally {
     try { fileServer.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => fileServer.close(r));

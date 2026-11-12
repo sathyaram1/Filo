@@ -65,6 +65,8 @@ percorso_json 'file_path|notebook_path'; HOOK_FILE=$REPLY
 percorso_json cwd; HOOK_CWD=$REPLY
 percorso_json transcript_path; HOOK_TRANSCRIPT=$REPLY
 campo_json session_id; HOOK_SESSION=$REPLY
+# Il pre-push dichiara la spinta col biglietto della sessione (#1362): a un hook la sessione la dice stdin.
+[ -n "$HOOK_SESSION" ] && export CLAUDE_CODE_SESSION_ID="$HOOK_SESSION"
 minuscolo() {
   if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then eval 'REPLY=${1,,}'; else REPLY=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]'); fi
   while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done
@@ -169,6 +171,12 @@ is_spedibile() {
   [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
 }
 
+# Il biglietto della cartella e' finito (rilasciato, o il battito ha risposto che e' morto): il ramo puo' gia' essere
+# di un altro worker, e spedirci sopra gli cambia la storia sotto i piedi (#1480, D-90). Lo segna routine-ticket.mjs.
+biglietto_finito() {
+  [ -f "$1/.claude/routine-ticket.json" ] && grep -q '"morto"' "$1/.claude/routine-ticket.json" 2>/dev/null
+}
+
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
 #
 # Fino al 2026-08-07 questo hook distingueva "lavoro di una routine, da
@@ -179,16 +187,14 @@ is_spedibile() {
 # lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
 # sicurezza — che nel frattempo esaminava un gemello abbandonato.
 #
-# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
-# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Si arriva al ramo principale solo attraverso
-# scripts/merge-gate.mjs.
-#
-# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
-# marcatura, nella storia il lavoro di una routine e quello di una sessione
-# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+# Ora al ramo principale non pubblica niente, mai (piu' sotto). La routine si
+# riconosce per dire nella storia da dove arriva un commit (l'autore): e' la
+# domanda di isRoutineInstance (scripts/lib/routine-role.mjs), nella forma che
+# non costa un processo. L'export di FILO_ROUTINE non arriva al gancio, che
+# Claude Code lancia col suo ambiente (#1966): vale il biglietto che dispatch
+# scrive nella cartella.
 is_routine_session() {
-  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+  { [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]; } || [ -f "$CARTELLA/.claude/routine-ticket.json" ]
 }
 
 # I prefissi restano come RETE, non più come regola primaria: proteggono anche
@@ -231,12 +237,19 @@ spedisci_ramo() {
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
-      # --force-if-includes: il lease da solo si fida del ref remoto che questa
-      # copia conosce, e dopo un `git fetch` quel ref e' gia' il commit
-      # dell'altro: il lease combacia e il rinvio lo sovrascrive (verifica del
-      # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
-      # passato dalla storia locale di questo ramo.
-      esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      # Il lease col valore atteso di lease-atteso.mjs, stessa regola del rilascio (#1776). Senza node resta
+      # --force-if-includes: in un clone appena nato rifiuta sempre, ma non calpesta nessuno.
+      local regola="$dove/scripts/lib/lease-atteso.mjs" atteso
+      [ -f "$regola" ] || regola="$HOOK_SCRIPTS/lib/lease-atteso.mjs"
+      if [ -f "$regola" ] && command -v node >/dev/null 2>&1; then
+        if ! atteso=$(node "$regola" "$dove" "$ramo" 2>/dev/null); then
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e il rinvio con --force-with-lease non parte: su origin '$ramo' e' a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su questo ramo?)"
+          return 1
+        fi
+        esito2=$(git push --force-with-lease="refs/heads/$ramo:$atteso" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      else
+        esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      fi
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
@@ -264,11 +277,12 @@ controllo_copie() {
   [ -f "$controllo" ] && command -v node >/dev/null 2>&1 && printf '%s' "$controllo"
 }
 # Vero se fra i nomi letti (separati da NUL) c'e' qualcosa che non e' codice o immagine: solo allora si paga node.
+# Un .md si legge: una copia incollata in una nota e' una copia (#1360).
 forse_dati() {
   local f
   while IFS= read -r -d '' f; do
     case "$f" in
-      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.md|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
+      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
       *) return 0 ;;
     esac
   done
@@ -385,7 +399,7 @@ salva_cartella() {
   # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
   # sessione viene interrotta di colpo — ma al ramo principale ci si arriva UNA
   # VOLTA, a lavoro finito: `npm run finish` in locale (controlli + fusione),
-  # scripts/merge-gate.mjs per le routine.
+  # il server stesso per le routine, dopo verifica e controllo di sicurezza.
   #
   # Perche': una versione viene costruita e distribuita agli utenti ogni 6 ore
   # prendendo il ramo principale COSI' COM'E'. Pubblicando a ogni modifica, quella
@@ -409,7 +423,9 @@ salva_cartella() {
   #
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
-  if is_spedibile "$BRANCH"; then
+  if is_spedibile "$BRANCH" && biglietto_finito "$wt"; then
+    segnala_avviso "$wt" "il biglietto di questo lavoro e' finito (rilasciato, o morto per il battito): ho committato in locale ma NON spedisco '$BRANCH', che adesso puo' essere di un altro worker. Se stai ancora lavorando fermati: questo lavoro non si consegna piu'."
+  elif is_spedibile "$BRANCH"; then
     if COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
       [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
       spedisci_ramo "$BRANCH" "$wt" || true
@@ -427,7 +443,7 @@ salva_cartella "$CARTELLA"
 # principale. Ci si arriva solo da:
 #
 #   - `npm run finish`            (locale: controlli, poi si chiede la fusione)
-#   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
+#   - il server                   (routine: dopo verifica, controllo di sicurezza e unit sulla fusione)
 #
 # La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
 # provenienze nella storia, ma appenderci la sicurezza rimetterebbe la
@@ -455,7 +471,7 @@ salva_cartella "$CARTELLA"
 # consumo del battito (#1156).
 TICKET_FILE="$CARTELLA/.claude/routine-ticket.json"
 BEAT_STAMP="$CARTELLA/.claude/routine-beat-hook.stamp"
-if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
+if [ -f "$TICKET_FILE" ] && ! biglietto_finito "$CARTELLA" && command -v node >/dev/null 2>&1; then
   now_s=$(date +%s)
   last_s=$(date -r "$BEAT_STAMP" +%s 2>/dev/null || echo 0)
   if [ $((now_s - last_s)) -ge 300 ]; then
@@ -496,6 +512,9 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
+  # In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+  is_routine_session && [ -s "$FALLIMENTI_FILE" ] \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: il salvataggio riprova al prossimo file che modifichi e il rilascio lo rispedisce da se'. Non spingere a mano: in cloud il controllo dei permessi lo ferma. Se anche il rilascio non riesce a spedirlo, e' un guasto da dichiarare."
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."

@@ -1,10 +1,10 @@
-// consegna-file.mjs — i pezzi grossi del payload di dispatch e le immagini escono dalla stampa e vanno,
-// interi, in file fuori dal repo. Non tronca mai: la stampa cita il percorso assoluto.
+// consegna-file.mjs — i pezzi grossi del payload di dispatch, le immagini e, se non basta, il testo del ruolo escono
+// dalla stampa e vanno, interi, in file fuori dal repo. Non tronca mai: la stampa cita il percorso assoluto.
 // Regole e prove: tests/unit/consegnaFile.test.mjs.
 
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { bmpInPng } from './bmp-png.mjs';
 
@@ -13,6 +13,9 @@ export const PAYLOAD_IN_STAMPA_MAX = 8000;
 // Oltre 30.000 caratteri l'uscita di un comando finisce in un file d'appoggio dell'harness; il margine è
 // per le righe di stderr che arrivano insieme.
 export const STAMPA_MAX = 28000;
+// Sopra questo tetto, a payload già scaricato, la stampa con due righe di stderr finirebbe nel file dell'harness, dove
+// il ruolo è una riga JSON che non si legge per intero: lì esce il testo del ruolo, intero, in un file suo.
+export const STAMPA_TETTO = 29500;
 // Sotto questa taglia un pezzo resta in stampa: spostarlo costa una lettura e non libera niente.
 const PEZZO_MIN = 1000;
 
@@ -20,6 +23,25 @@ const PEZZO_MIN = 1000;
 export function cartellaConsegna(root, base = tmpdir()) {
   const h = createHash('sha256').update(resolve(String(root || '.'))).digest('hex').slice(0, 12);
   return join(base, `filo-consegna-${h}`);
+}
+
+// Il ruolo sta nella cartella della consegna: la consegna dopo lo cancella insieme ai pezzi del payload.
+export function fileRuolo(root, base) {
+  return join(cartellaConsegna(root, base), '00-ruolo.md');
+}
+
+export function scriviRuolo(file, testo) {
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, testo, { encoding: 'utf8', mode: 0o600 });
+  return file;
+}
+
+// Al posto del ruolo, in stampa: il suo titolo e dove sta tutto il resto.
+export function rimandoAlRuolo(testo, file) {
+  const t = String(testo || '');
+  const titolo = (t.split('\n').find((r) => r.trim()) || '').trim();
+  return `${titolo}\n\nIl testo intero del tuo ruolo (${t.length} caratteri) non sta in questa stampa: è nel file ${file}. `
+    + 'Leggilo tutto, senza intervalli di righe, prima di fare qualunque altra cosa: sono le tue istruzioni, come se fossero scritte qui.';
 }
 
 // Il server riconosce il tipo dai primi byte (contratto #900); l'estensione fa aprire il file come immagine.

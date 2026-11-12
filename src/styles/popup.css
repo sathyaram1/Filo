@@ -21,7 +21,7 @@
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   box-shadow: var(--sn-shadow);
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
   backdrop-filter: blur(4px);
 }
 
@@ -93,7 +93,8 @@
   max-width: 100%;
   word-wrap: break-word;
 }
-.sn-msg-assistant { justify-content: flex-start; }
+/* In colonna: sotto la risposta c'è la riga dei suoi comandi (Copia). */
+.sn-msg-assistant { flex-direction: column; align-items: flex-start; }
 .sn-msg-assistant .sn-msg-text {
   background: transparent;
   color: var(--sn-fg);
@@ -122,9 +123,123 @@
   border-radius: 999px;
   color: var(--sn-fg);
   font-size: 12px;
-  transition: background 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
+/* Nell'avviso e nel menu --sn-hover è già il fondo sotto il puntatore: il tasto prende l'accento, come le voci. */
+.sn-toast .sn-msg-rimedio:hover,
+.sn-menu .sn-msg-rimedio:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
+.sn-toast .sn-msg-rimedio { margin-top: 8px; }
+/* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
+.sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
+
+/* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
+/* L'etichetta di un tasto sta dopo tutta la riga (Copia, Rispondi): non copre il tasto vicino (#2096). */
+.sn-msg-azioni {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  margin: 2px 0 0 -4px;
+}
+.sn-msg-tasto {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-msg-tasto:hover { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-msg-tasto:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-msg-tasto:active svg { transform: scale(0.92); }
+.sn-msg-tasto.sn-copiato { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato { color: var(--sn-error); }
+.sn-msg-tasto svg { display: block; }
+.sn-msg-azioni:has(.sn-copiato, .sn-non-copiato) .sn-msg-tasto:not(.sn-copiato):not(.sn-non-copiato)::after { opacity: 0; visibility: hidden; }
+/* L'etichetta sta a destra, fuori dal flusso: comparendo non sposta niente, e il corpo che scorre non la taglia. */
+.sn-msg-tasto::after {
+  content: attr(data-etichetta);
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity calc(100ms * var(--sn-motion, 1)) ease, visibility 0s linear calc(100ms * var(--sn-motion, 1));
+}
+.sn-msg-tasto:hover::after,
+.sn-msg-tasto:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: calc(250ms * var(--sn-motion, 1));
+}
+/* L'esito si legge subito, senza aspettare il passaggio del mouse. */
+.sn-msg-tasto.sn-copiato::after,
+.sn-msg-tasto.sn-non-copiato::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.sn-msg-tasto.sn-copiato::after { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato::after { color: var(--sn-error); }
+
+/* #2096 — Copia e Rispondi sotto i messaggi delle chat (src/shared/azioniMessaggio.js): la barra è assoluta e lo spazio
+   lo tiene `.sn-con-azioni-msg` sul messaggio, così comparendo non sposta niente. */
+.sn-con-azioni-msg, .sn-msg.sn-con-azioni-msg { position: relative; margin-bottom: 26px; }
+.sn-azioni-msg {
+  position: absolute; left: 0; top: 100%;
+  display: flex; align-items: center; gap: 2px;
+  padding-top: 2px;
+  white-space: nowrap; font-style: normal; user-select: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s linear calc(0.14s * var(--sn-motion, 1));
+}
+.sn-azioni-msg.sn-azioni-msg-destra { left: auto; right: 0; }
+:hover > .sn-azioni-msg,
+.sn-azioni-msg:focus-within {
+  opacity: 1; visibility: visible;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s;
+}
+.sn-azioni-msg-tasto {
+  all: unset;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 22px; border-radius: 6px;
+  color: var(--sn-muted); cursor: pointer;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease, color calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-azioni-msg-tasto:hover, .sn-azioni-msg-tasto:focus-visible {
+  background: color-mix(in srgb, var(--sn-fg) 9%, transparent); color: var(--sn-fg);
+}
+.sn-azioni-msg-tasto svg { display: block; transition: transform calc(0.1s * var(--sn-motion, 1)) ease; }
+.sn-azioni-msg-tasto:active svg { transform: scale(0.9); }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok { color: var(--sn-success); }
+.sn-azioni-msg-tasto.sn-azioni-msg-no { color: var(--sn-error); }
+/* L'etichetta dopo i tasti (prima, se stanno a destra), nella stessa riga: non copre il tasto vicino. */
+.sn-azioni-msg-tasto::after {
+  content: attr(data-etichetta);
+  position: absolute; left: calc(100% + 4px); top: calc(50% + 1px); transform: translateY(-50%);
+  font-size: 11px; line-height: 1; color: var(--sn-muted); pointer-events: none;
+  opacity: 0; transition: opacity calc(0.1s * var(--sn-motion, 1)) ease;
+}
+.sn-azioni-msg-destra .sn-azioni-msg-tasto::after { left: auto; right: calc(100% + 4px); }
+.sn-azioni-msg-tasto:hover::after, .sn-azioni-msg-tasto:focus-visible::after { opacity: 1; transition-delay: calc(0.25s * var(--sn-motion, 1)); }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok::after, .sn-azioni-msg-tasto.sn-azioni-msg-no::after { opacity: 1; transition-delay: 0s; }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok::after { color: var(--sn-success); }
+.sn-azioni-msg-tasto.sn-azioni-msg-no::after { color: var(--sn-error); }
+.sn-azioni-msg:has(.sn-azioni-msg-ok, .sn-azioni-msg-no) .sn-azioni-msg-tasto:not(.sn-azioni-msg-ok):not(.sn-azioni-msg-no)::after { opacity: 0; }
 
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }
@@ -208,13 +323,18 @@
   /* Un textarea ha una larghezza naturale tutta sua: senza questo, in un riquadro stretto spinge
      fuori il tasto di invio, che è proprio quello che deve restare. */
   min-width: 0;
+  /* Detto qui perché sulle pagine di Filo la casella sta nel loro documento, che dice border-box a tutto: senza,
+     cambiava altezza da una pagina all'altra e una riga non ci stava (#853.1). Alta quanto l'invio: 18 + 2×5 + 2×1. */
+  box-sizing: border-box;
   resize: none;
   border: 1px solid var(--sn-border);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   font-family: var(--sn-font);
   font-size: 13px;
-  line-height: 1.4;
+  /* In px interi: l'altezza che la casella si dà scrivendo nasce da scrollHeight, che arrotonda, e con 18,2px
+     la riga usciva di un soffio e accendeva la barra. */
+  line-height: 18px;
   color: var(--sn-fg);
   background: var(--sn-bg);
   outline: none !important;
@@ -222,7 +342,14 @@
   max-height: 120px;
   min-height: 30px;
 }
-.sn-popup-input::placeholder { color: var(--sn-muted); opacity: 1; }
+/* Il suggerimento sta su una riga: a capo dentro una casella alta una riga si taglia e accende la barra. */
+.sn-popup-input::placeholder {
+  color: var(--sn-muted);
+  opacity: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Alcune pagine ospite applicano un focus ring blu a tutti gli elementi, e i nostri input sono veri
    nodi del DOM ospite: lo ereditavano. Da qui l'!important. */
 .sn-popup-input:focus {
@@ -270,6 +397,8 @@
 /* Con `pointer-events: none` la scrollbar non si potrebbe afferrare: li
    riattiviamo solo quando lo stack scorre davvero. */
 .sn-toasts.scrolling { pointer-events: auto; padding-right: 4px; }
+/* Col menu del tasto destro aperto la pila scende sotto il suo piano (2147483646). */
+.sn-toasts.sn-toasts-sotto-menu { z-index: 2147483645; }
 .sn-toasts::-webkit-scrollbar { width: 6px; }
 .sn-toasts::-webkit-scrollbar-track { background: transparent; }
 .sn-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
@@ -291,7 +420,7 @@
   box-shadow: var(--sn-shadow);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease, background 150ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, background calc(150ms * var(--sn-motion, 1)) ease;
   pointer-events: none;
 }
 
@@ -331,7 +460,7 @@
   height: 8px;
   border-radius: 50%;
   background: #e02b2b;
-  animation: sn-dictate-pulse 1.2s ease-in-out infinite;
+  animation: sn-dictate-pulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 .sn-dictate-pill:hover { border-color: var(--sn-accent); }
 .sn-dictate-pill-live {
@@ -371,7 +500,7 @@
   gap: 10px;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease, border-color 120ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-save-confirm.sn-save-confirm-visible { opacity: 1; transform: translateY(0); }
 .sn-save-confirm:hover,

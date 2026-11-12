@@ -3,7 +3,9 @@
 // Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNellaBarra, puntatoreCheSegue } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { nelloStrato } from './helpers/riquadri.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -42,10 +44,10 @@ test('barra aperta: rotella, tasto destro, doppio clic e clic nel margine dell\'
 
   // Il tasto destro nel vuoto è quello della pagina: si apre il menu di Filo sulla pagina.
   await nelVuoto(app, clic(x, 300, 'right'));
-  await expect(p.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 5000 });
   await comandaBarra(app, 'chiudi');
   await p.keyboard.press('Escape');
-  await expect(p.locator('.sn-menu')).toBeHidden();
+  await expect(menuDi(p).locator('.sn-menu')).toBeHidden();
   await comandaBarra(app, 'tasto');
   await pannelloFermo(barra);
 
@@ -148,10 +150,10 @@ test('sopra l\'avviso del sito pericoloso il vuoto della barra e degli avvisi è
   expect(await page.evaluate(() => window.__g)).toEqual({ giu: 0, clic: 0, rotella: 0 });
 });
 
-// Le icone della pagina portate nella barra agirebbero sulla pagina nascosta, e quello che mostrano resterebbe
+// Le icone della pagina nella barra agirebbero sulla pagina nascosta, e quello che mostrano resterebbe
 // dietro l'avviso: spente finché l'avviso copre la scheda, riaccese quando l'utente conferma.
 test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono spente; dopo la conferma tornano', async ({ app, shell }) => {
-  await mettiNelMenu(app, ['qrCode', 'saveForLater'], 'bar');
+  await mettiNellaBarra(app, ['qrCode', 'saveForLater']);
   const { page, avviso } = await apriSegnalata(app, shell);
   const barra = await barraPage(app);
   const qr = barra.locator('#nav .ico[data-id="qrCode"]');
@@ -183,6 +185,27 @@ test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 5000 });
 });
 
+// L'Aiuto starebbe sotto l'avviso: l'icona della barra fa quello che fanno Alt+H e la voce sulla scheda (#1432).
+test('sopra l\'avviso del sito pericoloso l\'icona Aiuto fa la domanda a Filo su quel sito', async ({ app, shell }) => {
+  const { page } = await apriSegnalata(app, shell);
+  const barra = await barraPage(app);
+  const help = barra.locator('#nav .ico[data-id="help"]');
+  await expect(help).toHaveAttribute('aria-disabled', 'false');
+  await expect(help).toHaveAttribute('aria-label', 'Aiuto');
+  const schede = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    return { n: tm.tabs.length, url: tm.tabs.find((t) => t.id === tm.activeId).url };
+  });
+  const prima = (await schede()).n;
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await help.click();
+  await expect.poll(async () => (await schede()).n, { timeout: 8000 }).toBe(prima + 1);
+  expect((await schede()).url).toMatch(/^filo:\/\/newtab\//);
+  expect(await page.locator('.sn-sidebar').count()).toBe(0);
+  expect(await nelloStrato(app, page, () => document.querySelectorAll('.sn-sidebar').length) || 0, 'Aiuto aperto sotto l\'avviso').toBe(0);
+});
+
 // Il puntatore sull'avviso conta come quello sulla pagina: un clic chiude la barra, uscendoci sopra si chiude.
 test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, e il puntatore che ci va sopra pure', async ({ app, shell }) => {
   await apriSegnalata(app, shell);
@@ -196,7 +219,9 @@ test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, 
   await sullAvviso([{ type: 'mouseMove', x: 700, y: 500 }, ...clic(700, 500)]);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(false);
 
-  await comandaBarra(app, 'spinta');
+  await puntatoreCheSegue(app);
+  await barra.mouse.move(0, 300);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('spinta');
   await pannelloFermo(barra);
   for (let i = 0; i < 10; i++) { await sullAvviso([{ type: 'mouseMove', x: 600 + i * 10, y: 400 }]); await barra.waitForTimeout(150); }
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 4000 }).toBe(false);

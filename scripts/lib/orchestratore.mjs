@@ -3,6 +3,7 @@
 // Regole: tests/unit/orchestratore.test.mjs.
 
 import { createRequire } from 'node:module';
+import { codiceNuovo, inBusta } from './busta.mjs';
 
 // Le regole del giro come le legge verify-local: moduli condivisi che si registrano su globalThis.
 const require = createRequire(import.meta.url);
@@ -29,9 +30,12 @@ export const OPZIONI_BASE = Object.freeze({
   tieniWorktree: false,
 });
 
-// I file del repo pubblico che il server incorpora al deploy (filo-security/functions/tools/bake-shared.js).
+// I file del repo pubblico che il server incorpora al deploy: gli stessi di FONTI_PUBBLICHE in
+// filo-security/functions/src/l5/fontiBake.js (il confronto gira nelle prove del server a ogni sua spinta).
 export const INCORPORATI_DAL_SERVER = Object.freeze([
-  'src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'filo_filosofia.txt',
+  'src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
+  'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js',
+  'src/shared/feedbackAttese.js', 'src/shared/schede.js',
 ]);
 export const FILE_REGOLE = Object.freeze(['firestore.rules', 'storage.rules', 'firestore.indexes.json']);
 
@@ -105,6 +109,20 @@ export function slugDi(num) { return `lavoro-${num}`; }
 export function ramoDi(p) { return `claude/${p.slug}`; }
 // verify-local start prende per opzione o percorso un testo che comincia con un trattino o una barra.
 export const richiestaArg = (r) => String(r || '').replace(/^[\s\-‐-―−/\\]+/, '');
+
+/**
+ * La richiesta per verify-local start. Quella scritta dall'owner con --richiesta passa com'è; quella letta dal feedback
+ * è il testo di chi l'ha mandato e va in busta (#1514): chi verifica la vede come un dato, non come la voce dell'owner. PURA.
+ */
+export function richiestaPerLaVerifica(p) {
+  if (p.richiestaDa === 'owner') return richiestaArg(p.richiesta);
+  return inBusta('Testo della segnalazione', p.richiesta, codiceNuovo(p.richiesta));
+}
+
+/** Gli argomenti del primo start: la richiesta, e se l'ha scritta l'owner verify-local lo sa (richiestaDellOwner). PURA. */
+export function argomentiDiStart(p) {
+  return [richiestaPerLaVerifica(p), ...(p.richiestaDa === 'owner' ? ['--richiesta-owner'] : []), '--feedback', String(p.num)];
+}
 const primaRiga = (t) => String(t || '').split('\n')[0];
 // Il lavoratore ha finito e ha lasciato solo file: tolti quelli, si riparte dalla verifica. Il testo riconosce anche le fermate scritte prima del segno.
 const MOTIVO_SPORCO = 'il lavoratore ha lasciato modifiche non salvate';
@@ -116,7 +134,8 @@ export function nuovaPratica({ num, slug, richiesta = '', file = [], ora = '' })
   const s = String(slug || slugDi(n)).trim();
   if (!/^[a-z0-9][a-z0-9._-]*$/i.test(s)) throw new Error(`nome del ramo non valido: ${s} (lettere, cifre, . _ -)`);
   return {
-    num: n, slug: s, richiesta: String(richiesta || '').trim(), file: (Array.isArray(file) ? file : []).filter(Boolean),
+    num: n, slug: s, richiesta: String(richiesta || '').trim(), richiestaDa: String(richiesta || '').trim() ? 'owner' : '',
+    file: (Array.isArray(file) ? file : []).filter(Boolean),
     fase: 'in-coda', compito: 'lavoro', giri: 0, giriTotali: 0, tentativi: {}, costo: 0, istanze: [],
     fermo: null, risposta: '', avvisi: [], derivatiAperti: [], fusa: { app: false, server: false, deploy: false },
     aggiornato: ora,
@@ -220,8 +239,10 @@ export function derivatiDaAprire(p, derived) {
     const titolo = g.tipo === 'rimasti' && g.findings.length > 1
       ? `Rilievi rimasti del lavoro locale #${p.num}`
       : (prima.length > 90 ? `${prima.slice(0, 89)}…` : prima);
+    // Un 2 col «?» si corregge con l'opzione consigliata: il feedback porta la domanda, non un rilievo lasciato lì (#1202).
+    const applicata = g.tipo === 'decisione' && g.findings[0].inCorrezione === true;
     const testo = [
-      `Rilievo messo da parte nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.`,
+      `${applicata ? 'Domanda su un rilievo corretto con l’opzione consigliata' : 'Rilievo messo da parte'} nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.${applicata ? ' Se scegli diversamente, questo feedback cambia il codice già fuso.' : ''}`,
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');
@@ -325,6 +346,8 @@ export function riprendi(p, risposta) {
   if (f.attesaApprovazione) { q.fase = 'chiusura'; q.risposta = r; return q; }
   if (q.fusa && (q.fusa.app || q.fusa.server)) { q.fase = 'chiusura'; return q; }
   if (f.dove === 'chiusura' && !r) { q.fase = 'chiusura'; return q; }
+  // Fermo prima del worktree (pratica rifiutata, richiesta non letta): si rifà la preparazione, controllo compreso.
+  if (f.dove === 'in-coda') { q.fase = 'in-coda'; return q; }
   if (f.correzione) { q.compito = 'correzione'; q.risposta = r; q.fase = 'lavoro'; return q; }
   if (!r && f.dove === 'lavoro' && (f.lavoroFinito || String(f.motivo || '').startsWith(MOTIVO_SPORCO))) { q.compito = 'lavoro'; q.fase = 'verifica'; return q; }
   if (r) { q.compito = 'decisione'; q.risposta = r; q.fase = 'lavoro'; return q; }
@@ -381,9 +404,11 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
  *   esegui(cmd, args, { cwd, input, timeoutMs }) → { code, stdout, out },   // out = stdout + stderr
  *   claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) → { ok, testo, costo, errore },
  *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out },
+ *   pubblicaGitHub() / regoleGitHub() → deploy.yml / regole.yml su main di filo-security (in dubbio false),
  *   carico() → { cpu, liberaGB }, dormi(ms), log(riga), ora() → ISO,
  *   percorsi: { radice, wt(slug), serverRadice ('' se manca), wtServer(slug), note, regole },
  *   fs: { esiste(p), collega(verso, link), scollega(link) }, annota(feedbackId, testo), richiestaDi(num),
+ *   praticaDi(num) → { ok, motivo, fiducia } (praticaPerLaSessione: il motivo è già il rifiuto da stampare),
  * }
  */
 export function creaMotore(dep, opzioni = {}) {
@@ -393,7 +418,7 @@ export function creaMotore(dep, opzioni = {}) {
 
   const salva = (p) => { p.aggiornato = dep.ora(); dep.store.salvaPratica(p); };
   const git = (cwd, ...args) => dep.esegui('git', args, { cwd });
-  const node = (cwd, args, timeoutMs) => dep.esegui('node', args, { cwd, timeoutMs });
+  const node = (cwd, args, timeoutMs, env) => dep.esegui('node', args, Object.assign({ cwd, timeoutMs }, env ? { env } : {}));
   const numero = (r) => (r.code === 0 ? Number(String(r.out).trim()) || 0 : 0);
 
   function ferma(p, motivo, domanda = '', altro = {}) {
@@ -419,10 +444,28 @@ export function creaMotore(dep, opzioni = {}) {
     while (!caricoBasta(await dep.carico(), opz, perChiusura)) await dep.dormi(opz.pausaMs);
   };
 
+  // Di chi è la pratica, prima di worktree e istanze (#1514): la stessa regola di verify-local start --feedback, che
+  // arrivava al primo giro, a lavoratore già partito. Un rifiuto ferma la pratica. → null se si lavora.
+  async function controlla(p) {
+    let r;
+    try { r = await dep.praticaDi(p.num); } catch (e) { r = { ok: false, motivo: `pratica non controllata: ${String((e && e.message) || e)}` }; }
+    if (!r || !r.ok) {
+      p.fiducia = undefined;
+      return ferma(p, `la pratica #${p.num} non si lavora in locale, niente worktree né istanze:\n${(r && r.motivo) || 'esito del controllo non letto'}`);
+    }
+    p.fiducia = r.fiducia === 'fidato' ? 'fidato' : 'non_fidato';
+    return null;
+  }
+
   async function prepara(p) {
     const wt = P.wt(p.slug);
+    const no = await controlla(p);
+    if (no) return no;
     // Una richiesta di soli spazi arriverebbe vuota a lavoratore e verifica (#1027): vale quella del feedback.
-    if (!String(p.richiesta || '').trim()) p.richiesta = String(await dep.richiestaDi(p.num) || '').trim();
+    if (!String(p.richiesta || '').trim()) {
+      p.richiesta = String(await dep.richiestaDi(p.num) || '').trim();
+      p.richiestaDa = 'feedback';
+    }
     if (!p.richiesta) return ferma(p, `richiesta del feedback #${p.num} non letta (npm run feedback:leggi): niente worktree né ramo creati`);
     await git(P.radice, 'fetch', 'origin', 'main');
     if (!dep.fs.esiste(wt)) {
@@ -475,6 +518,11 @@ export function creaMotore(dep, opzioni = {}) {
 
   async function lavora(p) {
     const wtApp = P.wt(p.slug);
+    // Una pratica partita prima del controllo in prepara lo fa qui, prima della sua prima istanza.
+    if (!p.fiducia) {
+      const no = await controlla(p);
+      if (no) return no;
+    }
     const fp = p.fermoPrima || {};
     // Il compito lo decide lo stato del ramo, non chi stava girando quando il lavoro si è fermato.
     const sospesi = p.compito === 'riallinea' ? '' : rilieviSospesi(dep.verifica(wtApp));
@@ -528,7 +576,7 @@ export function creaMotore(dep, opzioni = {}) {
     const wt = P.wt(p.slug);
     if ((await preStart(p, wt)) === 'riallinea') return riallinea(p, 'il merge di origin/main va in conflitto');
     const primo = !((dep.verifica(wt) || {}).entry || {}).request;
-    const args = ['scripts/verify-local.mjs', 'start', ...(primo ? [richiestaArg(p.richiesta), '--feedback', String(p.num)] : [])];
+    const args = ['scripts/verify-local.mjs', 'start', ...(primo ? argomentiDiStart(p) : [])];
     let s;
     for (let t = 0; ; t += 1) {
       s = await node(wt, args);
@@ -628,27 +676,45 @@ export function creaMotore(dep, opzioni = {}) {
     }
     chiusure += 1;
     try {
-      // Server su main, poi l'app (che chiude la pratica), poi il deploy che incorpora il main pubblico appena fuso.
-      if (nSrv && !p.fusa.server) {
-        await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
-        const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
-        dep.log(`#${p.num} server:fondi`);
-        const r = await conRitenta(p, () => node(wt, args, 60 * 60_000), 'server:fondi');
-        if (r.code !== 0) return ferma(p, `server:fondi non ha fuso:\n${coda(r.out)}`);
-        p.fusa.server = true;
-        salva(p);
-      }
+      // Prima l'app (finish), poi il server, che chiude la pratica: la pubblicazione, da GitHub o dal PC, incorpora main
+      // di Filo che ha già la parte dell'app (#1222), come dal cancello.
+      const serverDaFondere = nSrv && !p.fusa.server;
+      if (serverDaFondere) await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
       if (nApp && !p.fusa.app) {
+        // L'app va su main solo se il server la può seguire: un ramo che non contiene main del server server:fondi lo rifiuta.
+        if (serverDaFondere && /^claude\//.test(ramoDi(p))
+          && (await git(P.serverRadice, 'merge-base', '--is-ancestor', 'refs/remotes/origin/main', `refs/heads/${ramoDi(p)}`)).code !== 0) {
+          return ferma(p, `il ramo ${ramoDi(p)} del server non contiene main di filo-security, e server:fondi non lo fonderebbe: l’app non è andata su main. Nel worktree del server git merge origin/main, prove, push; poi npm run orchestra -- riprendi ${p.num}`);
+        }
         dep.log(`#${p.num} finish`);
         const e = await fondiApp(p, wt);
         if (e !== 'ok' || p.fase !== 'chiusura') return e;
         p.fusa.app = true;
         salva(p);
       }
+      if (serverDaFondere) {
+        const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
+        dep.log(`#${p.num} server:fondi`);
+        // Le prove del server leggono il ramo del lavoro, con la parte dell'app, come la suite di GitHub.
+        const env = Object.assign({}, process.env, { FILO_PUBLIC_REPO: wt });
+        const r = await conRitenta(p, () => node(wt, args, 60 * 60_000, env), 'server:fondi');
+        if (r.code !== 0) return ferma(p, `${nApp ? 'la parte dell’app è già su main di Filo, il server no: ' : ''}server:fondi non ha fuso:\n${coda(r.out)}`);
+        p.fusa.server = true;
+        p.serverDopoApp = true;
+        salva(p);
+      }
       if (serveDeploy(p, p.fileApp) && !p.fusa.deploy) {
-        dep.log(`#${p.num} server:pubblica`);
-        const r = await conRitenta(p, () => dep.pubblica(), 'server:pubblica');
-        if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
+        // Con deploy.yml su main la spinta del server l'ha già pubblicata GitHub, e dopo l'app incorpora anche i suoi file:
+        // un deploy dal PC correrebbe insieme al suo. Resta al PC un'app che cambia file incorporati senza una spinta dopo.
+        const incorpora = (p.fileApp || []).some((f) => INCORPORATI_DAL_SERVER.includes(f));
+        if (p.fusa.server && (!incorpora || p.serverDopoApp) && dep.pubblicaGitHub && await dep.pubblicaGitHub()) {
+          dep.log(`#${p.num} il server lo pubblica GitHub (deploy.yml): niente server:pubblica dal PC`);
+          p.avvisi.push('server: lo pubblica GitHub (deploy.yml su main di filo-security); se la corsa è rossa, npm run server:pubblica da filo-security/functions');
+        } else {
+          dep.log(`#${p.num} server:pubblica`);
+          const r = await conRitenta(p, () => dep.pubblica(), 'server:pubblica');
+          if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
+        }
         p.fusa.deploy = true;
         salva(p);
       }
@@ -656,7 +722,10 @@ export function creaMotore(dep, opzioni = {}) {
       chiusure -= 1;
     }
     if (toccaRegole(p.fileApp) && !p.avvisi.some((a) => a.startsWith('regole'))) {
-      p.avvisi.push('regole cambiate: npm run regole:pubblica dal checkout principale su main, a Filo chiuso');
+      // Con regole.yml su main di filo-security le pubblica GitHub ogni ora: al PC resta la strada per averle subito.
+      p.avvisi.push(dep.regoleGitHub && await dep.regoleGitHub()
+        ? 'regole cambiate: le pubblica GitHub entro un’ora (regole.yml su main di filo-security); per averle subito, o se la corsa è rossa, npm run regole:pubblica dal checkout principale su main, a Filo chiuso'
+        : 'regole cambiate: npm run regole:pubblica dal checkout principale su main, a Filo chiuso');
     }
     await apriDerivati(p);
     if (!opz.tieniWorktree) await pulisci(p);

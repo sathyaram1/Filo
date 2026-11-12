@@ -120,5 +120,13 @@
     return true;
   }
 
-  global.SN_NOMI_FILE = { MAX_BASE, scomponi, tipoDi, pulisci, nomeLibero, nomeSenzaSenso, nomeVisibile };
+  // Un percorso sul disco di questo computer (assoluto, con ~ o con la lettera del disco), non un indirizzo web. Due
+  // separatori in testa (`\\host`, `//host`, `\\?\UNC`) o `\??\` portano a un altro computer: non sono un file da qui (#1499).
+  function percorsoLocale(p) {
+    const s = String(p || '').trim();
+    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && /^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s)
+      && !/^(?:[\\/]{2}|[\\/]\?\?[\\/])/.test(s);
+  }
+
+  global.SN_NOMI_FILE = { MAX_BASE, scomponi, tipoDi, pulisci, nomeLibero, nomeSenzaSenso, nomeVisibile, percorsoLocale };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

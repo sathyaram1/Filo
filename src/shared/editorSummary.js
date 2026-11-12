@@ -1,44 +1,63 @@
-// Riassunto per file dell'editor (#379.5): logica pura per (a) estrarre il testo
-// di un file serializzato, (b) decidere QUANDO (ri)generare il suo riassunto, e
-// (c) costruire l'elenco {titolo, riassunto} di tutti i file che entra nel
-// contesto di Filo al posto del testo integrale.
-//
-// PERCHÉ ESISTE
-//   Filo deve poter "vedere" i file dell'editor senza pagarne il testo intero a
-//   ogni risposta. Ogni file porta un riassunto di un paio di righe (generato
-//   dall'AV, mantenuto aggiornato quando il file cambia in modo significativo);
-//   nel contesto entra SOLO il riassunto di ogni file, e Filo — se serve — chiede
-//   il contenuto completo di un singolo file on-demand (azione LEGGI_FILE).
-//
-// LOGICA PURA
-//   Nessun DOM, nessuno storage: opera sugli oggetti-file serializzati
-//   (meta/content, lo stesso schema di editorStore.js) e ritorna valori. Così è
-//   unit-testabile senza aprire Electron (vedi tests/unit/editorSummary.test.mjs).
-//   La generazione vera (chiamata AI) vive nel renderer dell'editor; la lettura
-//   della collezione dal main vive in services/editorFiles.js.
+// Il testo dei file dell'editor per i modelli: il riassunto per file che entra nel contesto di Filo al posto del testo
+// intero (#379.5), quando rifarlo, e quanto del documento leggono chat, titolo e riassunto (#1475). Logica pura, niente
+// DOM né storage; prove in tests/unit/editorSummary.test.mjs.
 
 (function (global) {
   'use strict';
 
-  // Soglia minima di parole prima di generare un riassunto AI: sotto questa il
-  // testo È già la sua sintesi, quindi buildContextFiles usa un estratto grezzo
-  // (nessuna chiamata sprecata su file cortissimi).
+  // Sotto questa soglia il testo È già la sua sintesi: basta un estratto, niente chiamata.
   const MIN_WORDS = 60;
-  // "Cambiamento significativo": rigenera quando le parole differiscono dallo
-  // stato di quando fu generato il riassunto di almeno ABS parole OPPURE almeno
-  // RATIO in proporzione (il più permissivo dei due), così un file corto che
-  // cambia molto e uno lungo che cambia poco sono entrambi coperti senza
-  // rigenerare a ogni battitura.
+  // Si rigenera quando le parole differiscono di almeno ABS OPPURE di almeno RATIO:
+  // il più permissivo dei due copre sia un file corto sia uno lungo, senza rigenerare sempre.
   const CHANGE_ABS = 40;
   const CHANGE_RATIO = 0.4;
-  // Lunghezza massima del riassunto che iniettiamo per file (taglio difensivo).
+  // Taglio difensivo sul riassunto iniettato.
   const MAX_SUMMARY = 400;
-  // Lunghezza dell'estratto grezzo usato come ripiego finché non c'è un riassunto.
+  // Ripiego finché non c'è un riassunto.
   const EXCERPT_LEN = 200;
 
-  // Estrae il testo semplice da un content serializzato dell'editor (albero
-  // PM-like: doc → paragraph/heading/blockquote/list… → text). I blocchi sono
-  // separati da newline. Robusto a nodi mancanti o forme inattese.
+  // Quanto del documento leggono i modelli dell'Editor (#1475): i 100.000 token del contesto di serie della chat di Filo,
+  // che stanno anche in un modello da 128.000 insieme al tetto della risposta. Oltre si taglia, e lo si dice a tutti e due.
+  const TESTO_AL_MODELLO_MAX = 350000;
+
+  function testoAlModello(testo, max = TESTO_AL_MODELLO_MAX) {
+    const t = String(testo == null ? '' : testo).trim();
+    if (t.length <= max) return { testo: t, letti: t.length, totale: t.length, tagliato: false };
+    let n = max;
+    const ultimo = t.charCodeAt(n - 1);
+    if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
+    return { testo: t.slice(0, n), letti: n, totale: t.length, tagliato: true };
+  }
+
+  // Un modello dalla finestra più stretta del tetto rifiuta il documento: si rilegge più corto, misurato sul rifiuto con
+  // la regola della chat di Filo. null se non è quel rifiuto, o se quello che resterebbe è troppo poco per servire.
+  const RILETTO_MIN = 2000;
+  function rilettoDopoRifiuto(testo, letto, rifiuto, caratteri) {
+    const FC = global.SN_FILO_CONTESTO;
+    const misure = FC && letto && letto.letti ? FC.troppoLungo(rifiuto) : null;
+    if (!misure) return null;
+    const token = FC.tettoDopoRifiuto({ ...misure, caratteri, caratteriTratto: letto.letti });
+    const max = Math.floor((token || 0) * FC.CARATTERI_PER_TOKEN);
+    if (max < RILETTO_MIN || max >= letto.letti) return null;
+    return testoAlModello(testo, max);
+  }
+
+  const numero = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+
+  // Per chi scrive, sotto la risposta o nell'avviso; `perCosa` dice quale lavoro ha letto solo l'inizio.
+  function notaTaglio(letto, perCosa = '') {
+    if (!letto || !letto.tagliato) return '';
+    return `Il documento è lungo: ${perCosa ? `${perCosa} ` : ''}ho letto i primi ${numero(letto.letti)} caratteri su ${numero(letto.totale)}.`;
+  }
+
+  // Per il modello, davanti al testo: sa che il resto esiste e non lo inventa.
+  function avvisoTaglio(letto) {
+    if (!letto || !letto.tagliato) return '';
+    return `(Il documento è più lungo: qui ci sono i primi ${numero(letto.letti)} caratteri su ${numero(letto.totale)}. Il resto non lo vedi: se la richiesta lo riguarda, dillo.)`;
+  }
+
+  // Albero PM-like (doc → paragraph/heading/list… → text), blocchi separati da newline.
+  // Robusto a nodi mancanti o forme inattese.
   function plainText(content) {
     const root = content && content.content ? content : (content && content.meta ? content.content : content);
     if (!root || !Array.isArray(root.content)) return '';
@@ -56,7 +75,6 @@
     return out.replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  // Testo semplice di un FILE serializzato (comodo per il main).
   function fileText(file) {
     if (!file) return '';
     return plainText(file.content);
@@ -72,36 +90,83 @@
     return countWords(fileText(file));
   }
 
-  // Il riassunto memorizzato è "fresco" rispetto al contenuto attuale?
-  //  - nessun riassunto → non fresco.
-  //  - c'è un riassunto ma manca la firma → consideralo fresco (non rigenerare a
-  //    vuoto un riassunto scritto/mantenuto altrove).
-  //  - c'è firma → confronta le parole di allora con quelle di adesso.
+  // Nessun riassunto → non fresco.
+  // Riassunto senza firma → fresco: non si rigenera ciò che è mantenuto altrove.
   function isSummaryFresh(file, currentWords) {
     const meta = (file && file.meta) || {};
     if (!meta.summary) return false;
     const sig = meta.summarySig;
     if (sig == null || typeof sig.words !== 'number') return true;
-    const now = Number.isFinite(currentWords) ? currentWords : fileWords(file);
-    const delta = Math.abs(now - sig.words);
-    const threshold = Math.max(CHANGE_ABS, Math.round(CHANGE_RATIO * sig.words));
-    return delta < threshold;
+    return pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file));
   }
 
-  // Va (ri)generato ORA il riassunto AI del file?
-  //   true se il file ha abbastanza testo (≥ MIN_WORDS) e il riassunto manca o
-  //   è stantìo. Sotto MIN_WORDS non vale la chiamata (ci pensa l'estratto).
+  function pocoCambiato(sig, now) {
+    const threshold = Math.max(CHANGE_ABS, Math.round(CHANGE_RATIO * sig.words));
+    return Math.abs(now - sig.words) < threshold;
+  }
+
+  // Un riassunto fermato dal tetto rifatto sullo stesso testo si ferma uguale, e si paga ogni volta (#1302):
+  // si riprova solo quando il file è cambiato quanto basta per meritarne uno nuovo.
+  function fallitoSuQuestoTesto(file, words) {
+    const sig = file && file.meta && file.meta.summaryFailSig;
+    return Boolean(sig && typeof sig.words === 'number' && pocoCambiato(sig, words));
+  }
+
   function needsSummary(file, opts) {
     const o = opts || {};
     const minWords = Number.isFinite(o.minWords) ? o.minWords : MIN_WORDS;
     const words = fileWords(file);
     if (words < minWords) return false;
-    return !isSummaryFresh(file, words);
+    return !isSummaryFresh(file, words) && !fallitoSuQuestoTesto(file, words);
   }
 
-  // Firma da salvare quando si genera un riassunto (per il confronto futuro).
+  // Firma da salvare insieme al riassunto, per il confronto futuro.
   function makeSig(file) {
-    return { words: fileWords(file), at: Date.now() };
+    return { words: fileWords(file), at: Date.now(), parole: impronta(fileText(file)) };
+  }
+
+  // Le parole che dicono di cosa parla il testo: le più frequenti fra quelle di almeno quattro lettere.
+  const IMPRONTA_MAX = 60;
+  const paroleDi = (testo) => String(testo || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || [];
+  function impronta(testo) {
+    const conta = new Map();
+    for (const p of paroleDi(testo)) conta.set(p, (conta.get(p) || 0) + 1);
+    return [...conta].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, IMPRONTA_MAX).map(([p]) => p);
+  }
+
+  // Riscritto su un altro argomento con lo stesso numero di parole (#1697): di quelle di prima ne resta meno di metà.
+  // Si cercano nel testo intero, così aggiungere non conta mai come cambiare.
+  function argomentoCambiato(sig, testo) {
+    const prima = sig && Array.isArray(sig.parole) ? sig.parole : [];
+    if (prima.length < 3) return false;
+    const ora = new Set(paroleDi(testo));
+    return prima.filter((p) => ora.has(p)).length / prima.length < 0.5;
+  }
+
+  // Un titolo che l'utente non ha scritto segue il contenuto (#1570): con la stessa soglia del riassunto, o quando
+  // l'argomento cambia, e nella sua stessa chiamata. Quello scritto a mano non cambia mai da solo; il primo lo dà il
+  // tiro a 100 parole.
+  function titoloDaRifare(file, currentWords) {
+    const meta = (file && file.meta) || {};
+    if (meta.titleManual || !meta.titleAuto) return false;
+    const sig = meta.titleSig;
+    if (sig == null || typeof sig.words !== 'number') return true;
+    return !pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file))
+      || argomentoCambiato(sig, fileText(file));
+  }
+
+  // La risposta della chiamata unica: «TITOLO: …» e «RIASSUNTO: …». Senza etichette è tutta riassunto, e il titolo resta.
+  function titoloERiassunto(raw) {
+    const testo = String(raw == null ? '' : raw);
+    const parti = { prima: [], titolo: [], riassunto: [] };
+    let dove = 'prima';
+    for (const riga of testo.split(/\r?\n/)) {
+      const m = riga.match(/^\s*[*_#]*\s*(titolo|riassunto)\s*[*_]*\s*[:\-–—]\s*[*_]*\s*(.*)$/i);
+      if (m) { dove = m[1].toLowerCase(); parti[dove].push(m[2]); } else parti[dove].push(riga);
+    }
+    if (dove === 'prima') return { titolo: '', riassunto: testo.trim() };
+    const unisci = (righe) => righe.join('\n').replace(/[*_]+$/, '').trim();
+    return { titolo: unisci(parti.titolo).split('\n')[0].trim(), riassunto: unisci(parti.riassunto) };
   }
 
   function clip(s, n) {
@@ -109,8 +174,6 @@
     return t.length > n ? t.slice(0, n).trim() + '…' : t;
   }
 
-  // Un "riassunto per il contesto" per un singolo file: il riassunto AI se c'è,
-  // altrimenti un estratto grezzo del testo (ripiego), altrimenti "(vuoto)".
   function summaryFor(file) {
     const meta = (file && file.meta) || {};
     if (meta.summary && String(meta.summary).trim()) {
@@ -121,8 +184,7 @@
     return { text: '(vuoto)', source: 'empty' };
   }
 
-  // Elenco {id, title, summary, source} di TUTTI i file di una collezione: è ciò
-  // che entra nel contesto di Filo (riassunti, non testo integrale).
+  // È questo che entra nel contesto di Filo: riassunti, non testo integrale.
   function buildContextFiles(collection) {
     const files = (collection && Array.isArray(collection.files)) ? collection.files : [];
     return files.map((f) => {
@@ -158,6 +220,11 @@
     CHANGE_ABS,
     CHANGE_RATIO,
     MAX_SUMMARY,
+    TESTO_AL_MODELLO_MAX,
+    testoAlModello,
+    rilettoDopoRifiuto,
+    notaTaglio,
+    avvisoTaglio,
     plainText,
     fileText,
     countWords,
@@ -165,6 +232,8 @@
     isSummaryFresh,
     needsSummary,
     makeSig,
+    titoloDaRifare,
+    titoloERiassunto,
     summaryFor,
     buildContextFiles,
     renderForPrompt,

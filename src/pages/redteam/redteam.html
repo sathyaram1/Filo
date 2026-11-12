@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="redteam.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
@@ -17,7 +18,11 @@
 </head>
 <body>
   <main class="sn-page">
-    <h1>Red Team</h1>
+    <header class="rt-head">
+      <h1>Red Team</h1>
+      <!-- Per tutti (#991): dal tasto destro l'attacco lo invia solo chi ha un codice. -->
+      <button type="button" class="sn-btn rt-attack-btn" id="attackBtn"><span class="rt-attack-icon" aria-hidden="true"></span>Invia un attacco</button>
+    </header>
 
     <nav class="rt-tabs" id="tabs" role="tablist">
       <button type="button" class="rt-tab rt-tab--active" data-tab="stats" role="tab">Statistiche</button>
@@ -40,6 +45,7 @@
           <label for="redeemHandle">Nome in classifica (handle)</label>
           <input type="text" id="redeemHandle" maxlength="32" placeholder="come comparirai in leaderboard" autocomplete="off" />
           <button type="submit" class="sn-btn" id="redeemBtn">Verifica codice</button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="redeemLascia" hidden>Lascia stare</button>
           <p class="rt-redeem-hint sn-muted" id="signinHint" hidden>Premi “Verifica codice” per accedere col tuo account e riscattare il codice.</p>
           <p class="rt-redeem-msg" id="redeemMsg" role="status" hidden></p>
         </form>

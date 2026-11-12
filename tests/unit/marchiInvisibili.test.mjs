@@ -5,10 +5,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { letturaIsolata } from '../helpers/letturaIsolata.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
@@ -180,10 +184,23 @@ test('la frase e la nota per il modello presentano il marchio come dichiarazione
 
 process.env.NODE_ENV = 'test';
 const F = require('../../src/main/services/firmatariC2pa.js');
-const isolata = require('../../src/main/services/provenienzaIsolata.js');
-// Il thread di lettura non tiene vivo il processo: senza un intervallo vero la prova finirebbe prima della risposta.
-const vivo = setInterval(() => {}, 60_000);
-test.after(() => clearInterval(vivo));
+const isolata = letturaIsolata();
+
+// #1231: cercato alla prima lettura, il pacchetto mancante faceva cadere una prova a metà e il file restava appeso.
+test('il pacchetto del thread si cerca al caricamento: se manca, chi importa il modulo cade subito col suo nome', () => {
+  const casa = cartellaTemporanea('filo-senza-jpeg-');
+  try {
+    const copia = join(casa, 'provenienzaIsolata.js');
+    copyFileSync(join(import.meta.dirname, '..', '..', 'src', 'main', 'services', 'provenienzaIsolata.js'), copia);
+    const env = { ...process.env };
+    delete env.NODE_PATH;
+    const r = spawnSync(process.execPath, ['-e', `require(${JSON.stringify(copia)})`], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.status, 0, 'il modulo si è caricato senza il suo pacchetto');
+    assert.match(r.stderr, /Cannot find module 'jpeg-js\/lib\/decoder\.js'/);
+  } finally {
+    togliCartella(casa);
+  }
+});
 
 test('nel thread recintato il marchio si legge, anche dentro un JPEG', async () => {
   assert.equal((await isolata.cercaMarchi(fixture('marchio-flux.jpg'))).marchio, 'flux');

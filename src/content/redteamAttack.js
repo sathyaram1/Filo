@@ -1,18 +1,6 @@
-// Pannello "Invia attacco" del canale Red-team (spec §8.1).
-// Aperto dalla voce di menu tasto destro omonima, da QUALSIASI pagina. Modella
-// la sua UX sul flusso feedback (src/content/feedback.js): un overlay con un box
-// trascinabile, sopra un velo leggero della pagina.
-//
-// Due campi SEPARATI (spec §8.1):
-//   1. Testo dell'attacco — il prompt che tenta di ingannare i giudici.
-//   2. Descrizione — spiega cosa fa l'attacco; va al giudice di validità, NON
-//      ai 4 giudici del panel.
-// Più un bottone d'invio che mostra il costo (50 crediti). Se l'utente non è
-// loggato → invito ad accedere; se i crediti non bastano → bottone disabilitato
-// con messaggio.
-//
-// Il backend NON è ancora deployato: MSG.REDTEAM_SUBMIT torna { status:'error' }
-// dal vivo → il pannello mostra un messaggio amichevole e NON crasha mai.
+// Pannello «Invia attacco» del canale Red-team (spec §8.1): dal tasto destro (chi ha un codice) e dalla pagina Red Team.
+// Due campi separati: l'attacco va ai 4 giudici, la descrizione solo al giudice di validità.
+// Il backend può mancare: un REDTEAM_SUBMIT in errore diventa un messaggio, non un crash.
 
 (function (global) {
   'use strict';
@@ -21,7 +9,6 @@
   const Popup = global.SN_POPUP;
   const Icons = global.SN_ICONS || {};
 
-  const COST = 50; // crediti per tentativo (spec §8.1 / §11). Non rimborsabili.
   // Le bozze restano al sito dove sono nate, come quella del feedback (#1071).
   const bozza = (nome) => (global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza(nome) : null);
   const DRAFT_ATTACK_KEY = bozza('sn_redteam_attack_draft');
@@ -29,6 +16,8 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal pannello (#1096).
+  let pulizia = null;
 
   function icon(name, size) {
     try { return typeof Icons[name] === 'function' ? Icons[name](size) : ''; }
@@ -37,6 +26,9 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
@@ -44,19 +36,32 @@
     activeRoot = null;
   }
 
-  // Traduce lo status di REDTEAM_SUBMIT in un messaggio chiaro per l'utente.
-  // Esposta (e pura) per i test: vedi tests/redteam-attack.spec.mjs.
-  function submitStatusMessage(res) {
+  const cifra = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+
+  // «alle 14:00», «domani alle 9:00»: quando il server dice che si libera un posto. Senza un'ora valida, «più tardi».
+  function quando(ms, oraMs) {
+    if (!Number.isFinite(ms) || ms <= 0) return 'più tardi';
+    const d = new Date(ms);
+    const ora = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const oggi = new Date(Number.isFinite(oraMs) ? oraMs : Date.now());
+    return d.toDateString() === oggi.toDateString() ? `alle ${ora}` : `domani alle ${ora}`;
+  }
+
+  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs). `oraMs` solo per i test.
+  function submitStatusMessage(res, oraMs) {
     const r = res || {};
     switch (r.status) {
       case 'ok':
         return { ok: true, text: 'Attacco inviato! Apro i risultati…' };
-      case 'insufficient_credits': {
-        const have = Number.isFinite(r.have) ? r.have : null;
-        const needed = Number.isFinite(r.needed) ? r.needed : COST;
-        const detail = have != null ? ` (hai ${have}, ne servono ${needed})` : '';
-        return { ok: false, text: `Crediti insufficienti${detail}.` };
+      case 'too_long': {
+        const chi = r.campo === 'description' ? 'La descrizione è lunga' : 'Il testo dell’attacco è lungo';
+        return { ok: false, campo: r.campo === 'description' ? 'description' : 'attackText',
+          text: `${chi} ${cifra(r.length)} caratteri: il massimo è ${cifra(r.max)}. Accorcialo e rinvia.` };
       }
+      case 'limit_user':
+        return { ok: false, text: `Hai già fatto ${cifra(r.limit)} tentativi nelle ultime 24 ore, il massimo per account. Il prossimo si libera ${quando(r.riprovaDopo, oraMs)}.` };
+      case 'limit_global':
+        return { ok: false, text: `Il Red Team ha ricevuto tutti i tentativi che può giudicare in un giorno. Riprova ${quando(r.riprovaDopo, oraMs)}.` };
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
       case 'paused':
@@ -72,13 +77,19 @@
     }
   }
 
+  // Su un sito il pannello sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
   function open() {
+    if (activeRoot) return;
+    if (global.SN_RIQUADRI_SOPRA?.apri('redteam', {}, apriQui)) return;
+    apriQui();
+  }
+
+  function apriQui() {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-rt-overlay';
     global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    // Box trascinabile, due campi separati + bottone d'invio col costo.
     root.innerHTML = `
       <div class="sn-rt-modal" role="dialog" aria-modal="true" aria-label="Invia attacco red-team">
         <div class="sn-rt-drag" title="Trascina per spostare il box"><span class="sn-rt-grip"></span></div>
@@ -87,6 +98,7 @@
             <span class="sn-rt-head-icon">${icon('redteam', 18)}</span>
             <span class="sn-rt-head-title">Invia un attacco</span>
           </div>
+          <p class="sn-rt-avviso" hidden>Senza un codice Red Team il risultato non lo vedi.</p>
           <label class="sn-rt-field">
             <span class="sn-rt-label">Testo dell’attacco</span>
             <textarea class="sn-rt-attack" rows="4" placeholder="Il prompt che prova a ingannare i giudici di sicurezza."></textarea>
@@ -105,7 +117,8 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
-    Popup?.attachZoomCompensation?.(root);
+    // La compensazione zoom ascolta window e visualViewport: senza staccarla ogni apertura resta in memoria (#1096).
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-rt-modal');
@@ -115,14 +128,14 @@
     const statusEl = root.querySelector('.sn-rt-status');
     const sendBtn = root.querySelector('.sn-rt-send');
     const cancelBtn = root.querySelector('.sn-rt-cancel');
+    const avvisoEl = root.querySelector('.sn-rt-avviso');
 
     let signedIn = false;
-    let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
+    // Chi non ha un codice (#991) legge prima che il risultato non lo vede. null = non ancora saputo.
+    let verificato = null;
 
     function sendLabel() {
-      // Mostra SEMPRE il costo (spec §8.1, punto 3).
-      if (!signedIn) return 'Accedi per inviare';
-      return `Invia attacco · ${COST} cr`;
+      return signedIn ? 'Invia attacco' : 'Accedi per inviare';
     }
 
     function setStatus(text, kind) {
@@ -131,17 +144,11 @@
       statusEl.classList.toggle('sn-rt-status--ok', kind === 'ok');
     }
 
-    // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
+    // Abilita/disabilita il bottone d'invio in base a stato login e testo.
     // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
     function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
-      if (signedIn && balance != null && balance < COST) {
-        sendBtn.disabled = true;
-        setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
-        return;
-      }
       // Non loggato: il bottone resta cliccabile ma porta al login.
       if (!signedIn) {
         sendBtn.disabled = false;
@@ -151,8 +158,12 @@
       if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
-    // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
+    // Bozze persistenti: sopravvivono a chiusura e riapertura.
     let saveTimer = null;
+    pulizia = () => {
+      try { if (typeof staccaZoom === 'function') staccaZoom(); } catch (_) {}
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); }
+    };
     function saveDraft() {
       if (!DRAFT_ATTACK_KEY) return;
       try {
@@ -168,7 +179,7 @@
     }
     const onInput = () => {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
       refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
@@ -182,30 +193,49 @@
       }).catch(() => {});
     } catch (_) {}
 
-    // ---- stato auth + saldo crediti ----
-    (async function loadAuthAndBalance() {
+    (async function loadVerificato() {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
+        if (r && r.ok && typeof r.verificato === 'boolean') verificato = r.verificato;
+      } catch (_) {}
+      if (activeRoot === root) avvisoEl.hidden = verificato !== false;
+    })();
+
+    (async function loadAuth() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      if (signedIn) {
-        try {
-          const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-          if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-        } catch (_) {}
-      }
       if (activeRoot === root) refreshSendState();
     })();
 
-    // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
+    // L'esito dell'accesso cambia il pannello aperto (#810.15) e un fallimento dice il perché (#678.5). Sopra un sito
+    // l'accesso passa solo col clic che l'ha chiesto (#1132).
+    async function accedi() {
+      setStatus('Completa l’accesso nella pagina di Google che si è aperta.');
+      let r = null;
+      try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN_CLIC }); } catch (_) { r = null; }
+      if (activeRoot !== root) return;
+      if (r && r.ok && (r.signedIn || r.profile)) {
+        signedIn = true;
+        setStatus('');
+        refreshSendState();
+        if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
+        return;
+      }
+      setStatus((r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.', 'err');
+    }
+
+    // ---- invio: parte solo dal clic dell'utente (#1071) ----
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      // Un accesso fatto altrove (menu del Profilo, un'altra scheda) col pannello aperto vale qui: si chiede adesso (#1351).
       if (!signedIn) {
-        // Invito a loggarsi: prova ad aprire il flusso login del main; se non
-        // c'è, almeno spiega cosa fare.
-        setStatus('Accedi al tuo account per inviare un attacco.', 'err');
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-        return;
+        try { const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }); signedIn = !!(a && a.signedIn); } catch (_) {}
+        if (activeRoot !== root) return;
+        if (!signedIn) { accedi(); return; }
+        refreshSendState();
+        if (sendBtn.disabled) return;
       }
       const attackText = attackEl.value.trim();
       const description = descEl.value.trim();
@@ -223,7 +253,21 @@
         res = { status: 'error' };
       }
       const msg = submitStatusMessage(res);
+      if (msg.ok && res && res.attemptId && verificato === false) {
+        // Senza codice non c'è una pagina del risultato da aprire: il pannello resta, pronto per un altro.
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        clearDraft();
+        attackEl.value = '';
+        descEl.value = '';
+        cancelBtn.disabled = false;
+        refreshSendState();
+        setStatus('Attacco inviato.', 'ok');
+        return;
+      }
       if (msg.ok && res && res.attemptId) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
         clearDraft();
         setStatus(msg.text, 'ok');
         // Naviga alla pagina red-team sul tentativo: lì parte la rivelazione live.
@@ -232,22 +276,24 @@
         close();
         return;
       }
-      // Non ok: mostra il messaggio, riabilita.
       setStatus(msg.text, 'err');
-      if (msg.needLogin) {
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-      }
       cancelBtn.disabled = false;
       sendBtn.disabled = false;
+      if (msg.needLogin) {
+        signedIn = false;
+        refreshSendState();
+        accedi();
+        return;
+      }
       refreshSendState();
+      // Il testo troppo lungo resta lì, col cursore dentro, per accorciarlo.
+      if (msg.campo) { try { (msg.campo === 'description' ? descEl : attackEl).focus(); } catch (_) {} }
     });
 
     cancelBtn.addEventListener('click', () => close());
 
-    // Esc chiude.
     root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-    // ---- posizione iniziale + trascinamento (come feedback.js) ----
     function centerModal() {
       const w = modal.offsetWidth || 520;
       modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';

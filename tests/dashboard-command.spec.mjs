@@ -380,8 +380,8 @@ test.describe('focus dopo invio comando', () => {
     await page.locator('#input').fill('/help');
     await page.locator('#input').press('Enter');
 
-    // /help scrive una bolla di aiuto…
-    await expect(page.locator('.dash-bubble-filo')).toContainText('lista comandi', { timeout: 8_000 });
+    // /help scrive una bolla di aiuto (in fondo al filo, dopo quello che c'era: #869)…
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'lista comandi' })).toBeVisible({ timeout: 8_000 });
     // …e il cursore resta nella barra.
     await expect.poll(() => inputIsFocused(page), { timeout: 4_000 }).toBe(true);
   });
@@ -438,8 +438,8 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await submit(page, '/set timer abc');
     // Nessun timer creato.
     await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(0);
-    // Filo risponde con l'uso corretto nel thread.
-    await expect(page.locator('.dash-bubble')).toContainText(/set timer/i, { timeout: 8_000 });
+    // Filo risponde con l'uso corretto in fondo al filo, dopo gli scambi delle prove prima (#869).
+    await expect(page.locator('#bubbles .dash-bubble-filo').last()).toContainText(/Non ho capito la durata "abc"/, { timeout: 8_000 });
   });
 
   test('"/set timer" con durata malformata coi due punti non crea timer', async () => {
@@ -489,12 +489,8 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     expect(info.incognito).toBe(true);
   });
 
-  test('terminale: un "/comando" in verifica è già rosso (niente flicker a neutro)', async () => {
-    const page = await openTab(NEWTAB);
-    const input = page.locator('#input');
-    await expect(input).toBeVisible({ timeout: 8_000 });
-
-    // Attiva la modalità terminale via broadcast impostazioni.
+  // Il controllo "esiste?" finto risponde quando lo dice la prova: così si guarda il colore MENTRE è in corso.
+  async function terminaleConWhichAComando(page) {
     await app.evaluate(async ({ webContents }) => {
       for (const wc of webContents.getAllWebContents()) {
         let url = '';
@@ -508,17 +504,79 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
       }
     });
     await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.isEnabled()), { timeout: 8_000 }).toBe(true);
-
-    // Digita un comando non ancora verificato e leggi la classe SUBITO dopo il
-    // gestore 'input' (sincrono), PRIMA che parta il controllo "esiste?" con
-    // debounce. Senza il fix lo stato 'pending' non riceveva colore (neutro):
-    // il rosso sarebbe comparso solo ~250ms dopo, da cui il flicker.
-    const cls = await page.evaluate(() => {
-      const i = document.getElementById('input');
-      i.value = '/zzqzx';
-      i.dispatchEvent(new Event('input', { bubbles: true }));
-      return i.className; // letto in modo sincrono
+    await page.evaluate(() => {
+      const W = { chiamate: [] };
+      window.__which = W;
+      window.filo.shellWhich = ({ command }) => new Promise((rispondi) => W.chiamate.push({ command, rispondi }));
     });
-    expect(cls).toMatch(/is-cmd-unknown/);
+  }
+  const chiamateWhich = (page, command) => page.evaluate(
+    (c) => window.__which.chiamate.filter((x) => x.command === c).length, command,
+  );
+  const rispondiWhich = (page, command, exists) => page.evaluate(({ c, exists }) => {
+    const chiamata = window.__which.chiamate.find((x) => x.command === c && !x.fatta);
+    chiamata.fatta = true;
+    chiamata.rispondi({ ok: true, exists });
+  }, { c: command, exists });
+  // La classe letta subito dopo il gestore 'input' (sincrono), prima che parta il controllo con debounce.
+  const scriviELeggi = (page, value) => page.evaluate((v) => {
+    const i = document.getElementById('input');
+    i.value = v;
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+    return i.className;
+  }, value);
+
+  test('terminale: durante il controllo un "/comando" tiene il colore che aveva, rosso solo dopo un «non esiste»', async () => {
+    const page = await openTab(NEWTAB);
+    const input = page.locator('#input');
+    await expect(input).toBeVisible({ timeout: 8_000 });
+    await terminaleConWhichAComando(page);
+
+    // Un comando appena scritto non è rosso finché il controllo non risponde (#1176).
+    expect(await scriviELeggi(page, '/zzqzx')).not.toMatch(/is-cmd-unknown/);
+    await expect.poll(() => chiamateWhich(page, 'zzqzx'), { timeout: 8_000 }).toBe(1);
+    await expect(input).not.toHaveClass(/is-cmd-unknown/);
+    await rispondiWhich(page, 'zzqzx', false);
+    await expect(input).toHaveClass(/is-cmd-unknown/);
+
+    // Aggiungendo caratteri il rosso resta mentre si ricontrolla: niente lampeggio a neutro a ogni tasto.
+    expect(await scriviELeggi(page, '/zzqzxy')).toMatch(/is-cmd-unknown/);
+    await expect.poll(() => chiamateWhich(page, 'zzqzxy'), { timeout: 8_000 }).toBe(1);
+    await expect(input).toHaveClass(/is-cmd-unknown/);
+    await rispondiWhich(page, 'zzqzxy', true);
+    await expect(input).toHaveClass(/is-cmd-shell/);
+    await expect(input).not.toHaveClass(/is-cmd-unknown/);
+  });
+
+  test('terminale: un controllo scaduto lascia il comando senza colore, e più tardi si riprova (#1176)', async () => {
+    const page = await openTab(NEWTAB);
+    const input = page.locator('#input');
+    await expect(input).toBeVisible({ timeout: 8_000 });
+    await terminaleConWhichAComando(page);
+
+    // Si parte da un rosso certo, così il «non rosso» di dopo non è quello di un input mai colorato.
+    await scriviELeggi(page, '/zzqzw');
+    await expect.poll(() => chiamateWhich(page, 'zzqzw'), { timeout: 8_000 }).toBe(1);
+    await rispondiWhich(page, 'zzqzw', false);
+    await expect(input).toHaveClass(/is-cmd-unknown/);
+
+    // `exists: null` è la risposta del main quando il controllo scade (macchina carica).
+    await scriviELeggi(page, '/firebase deploy');
+    await expect.poll(() => chiamateWhich(page, 'firebase'), { timeout: 8_000 }).toBe(1);
+    await rispondiWhich(page, 'firebase', null);
+    await expect(input).not.toHaveClass(/is-cmd-unknown/);
+    await expect(input).not.toHaveClass(/is-cmd-shell/);
+
+    // Continuando a scrivere resta neutro, e un controllo appena scaduto non si rilancia a ogni tasto.
+    expect(await scriviELeggi(page, '/firebase deploy --only hosting')).not.toMatch(/is-cmd-unknown/);
+    expect(await page.evaluate(() => window.SN_DASH_COMANDI.classifyInput('/firebase deploy --only hosting'))).toBe('incerto');
+
+    // Più tardi (macchina scarica) la battitura dopo lo richiede, e la risposta certa colora.
+    await page.evaluate(() => { const vero = Date.now.bind(Date); Date.now = () => vero() + 10 * 60_000; });
+    expect(await scriviELeggi(page, '/firebase deploy --only')).not.toMatch(/is-cmd-unknown/);
+    await expect.poll(() => chiamateWhich(page, 'firebase'), { timeout: 8_000 }).toBe(2);
+    await expect(input).not.toHaveClass(/is-cmd-unknown/);
+    await rispondiWhich(page, 'firebase', true);
+    await expect(input).toHaveClass(/is-cmd-shell/);
   });
 });

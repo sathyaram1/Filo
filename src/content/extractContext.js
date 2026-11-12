@@ -3,9 +3,6 @@
 (function (global) {
   'use strict';
 
-  // Verifica se un text node ha tutti gli antenati visibili.
-  // Filtra display:none, visibility:hidden, aria-hidden, sr-only (1x1 clipped),
-  // <script>/<style>.
   function isTextNodeVisible(textNode) {
     let el = textNode.parentElement;
     while (el) {
@@ -23,8 +20,8 @@
     return true;
   }
 
-  // Estrae il testo "visibile" della selezione corrente, ignorando i text node
-  // dentro elementi nascosti via CSS o aria-hidden.
+  // Testo VISIBILE della selezione: i text node dentro elementi nascosti via CSS o aria-hidden non
+  // contano.
   function getRenderedSelectionText(sel) {
     sel = sel || window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return '';
@@ -36,7 +33,6 @@
     let out = '';
     let node;
     while ((node = walker.nextNode())) {
-      // Salta text node fuori dalla range (prima di start o dopo end)
       const nr = document.createRange();
       nr.selectNode(node);
       if (range.compareBoundaryPoints(Range.END_TO_START, nr) >= 0) continue;
@@ -55,11 +51,8 @@
     return out;
   }
 
-  // Una selezione "ha davvero del testo"? Non ci si può fidare del solo
-  // isCollapsed: per una selezione DENTRO uno shadow root Chromium riporta
-  // isCollapsed=true (anchor/focus ri-targettizzati all'host del componente)
-  // pur avendo una range con testo dentro il root. Guardiamo quindi anche la
-  // range vera e il testo.
+  // Il solo isCollapsed non basta: dentro uno shadow root Chromium lo riporta true anche
+  // con del testo selezionato, quindi si guardano anche la range vera e il testo.
   function selectionHasText(sel) {
     if (!sel || !sel.rangeCount) return false;
     if (!sel.isCollapsed) return true;
@@ -68,11 +61,8 @@
     return false;
   }
 
-  // La selezione "giusta" per un dato bersaglio. window.getSelection() NON espone
-  // il testo selezionato dentro uno shadow root (i "componenti" web dei siti
-  // moderni): lì la selezione vive nel root del componente, esposta da
-  // shadowRoot.getSelection() (Chromium). Se il documento non ha una selezione
-  // utile, risaliamo dai root shadow che contengono il bersaglio.
+  // window.getSelection() non vede dentro uno shadow root: lì la selezione sta nel root
+  // del componente, e senza una selezione utile si risale dai root che contengono il target.
   function selectionForTarget(target) {
     const docSel = window.getSelection();
     if (selectionHasText(docSel)) return docSel;
@@ -97,7 +87,6 @@
   function getSelectionWithSentence(target) {
     const sel = selectionForTarget(target);
     if (!selectionHasText(sel)) return null;
-    // Solo testo VISIBILE (filtra sr-only, aria-hidden, display:none ecc.)
     const rendered = getRenderedSelectionText(sel).replace(/\s+/g, ' ').trim();
     const fallback = sel.toString().trim();
     const text = rendered || fallback;
@@ -113,7 +102,6 @@
       if (fullText) {
         const idx = fullText.indexOf(text);
         if (idx >= 0) {
-          // Espandi a confini di frase: . ? ! o inizio/fine
           const before = fullText.slice(0, idx);
           const after = fullText.slice(idx + text.length);
           const startMatch = before.match(/[.!?\n][^.!?\n]*$/);
@@ -129,11 +117,23 @@
       }
     } catch (_) {}
 
-    return { selection: text, sentence };
+    const s = segretezza(target);
+    return s.segreto ? { selection: text, sentence: text, ...s } : { selection: text, sentence };
   }
 
-  // Estrazione del testo principale via euristiche semplici (no Readability per ridurre bundle).
-  // Strategia: prendi <article>, <main>, oppure il blocco <body> filtrando nav/footer/aside.
+  // Una selezione dentro un campo segreto resta all'utente: si copia e si taglia, ma non va a nessun modello (#810.7).
+  // Se il campo la mostra coperta (una password) a schermo ci sono pallini: lì, come nel menu del sistema, non si taglia
+  // e non si copia (#1434.2). `campo`: l'elemento, quando chi chiede lo ha già.
+  function segretezza(target, campo = null) {
+    let el = campo || target?.closest?.('input, textarea') || document.activeElement;
+    for (let i = 0; !campo && el?.shadowRoot?.activeElement && i < 8; i++) el = el.shadowRoot.activeElement;
+    if (!el || !/^(INPUT|TEXTAREA)$/.test(el.tagName) || !campoSegreto(el)) return { segreto: false, coperto: false };
+    return { segreto: true, coperto: Segreti.copertoAschermo(el) };
+  }
+  const selezioneSegreta = (target) => segretezza(target).segreto;
+
+  // Euristiche semplici invece di Readability, per non gonfiare il bundle: <article>, <main>,
+  // oppure il body filtrando nav, footer e aside.
   function extractMainTextNodes() {
     const candidates = ['article', 'main', '[role="main"]'];
     let root = null;
@@ -148,7 +148,6 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
       acceptNode(el) {
         if (SKIP.has(el.tagName)) return NodeFilter.FILTER_REJECT;
-        // ignora elementi nascosti
         const cs = window.getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -160,9 +159,8 @@
     let cur = walker.currentNode;
     while (cur) {
       if (TEXT_TAGS.has(cur.tagName)) {
-        // Aggiungi solo i blocchi "foglia" (senza altri TEXT_TAG annidati).
-        // Es: <blockquote><p>...</p></blockquote> → salta <blockquote>, prendi <p>.
-        // Evita doppia traduzione e rimpiazzi che si sovrascrivono.
+        // Solo i blocchi foglia, senza altri TEXT_TAG annidati: evita doppie traduzioni e rimpiazzi
+        // che si sovrascrivono.
         if (!cur.querySelector(TEXT_TAGS_SELECTOR)) {
           const txt = (cur.innerText || '').trim();
           if (txt.length > 20) nodes.push({ el: cur, text: txt });
@@ -173,29 +171,11 @@
     return nodes;
   }
 
-  // ---------------------------------------------------------------------------
-  // Blocchi traducibili — "traduci la pagina" vuol dire TUTTA la pagina.
-  //
-  // extractMainTextNodes() sopra serve a capire di cosa parla la pagina (excerpt
-  // per il categorizer): lì ha senso restringersi all'articolo e ai tag di prosa.
-  // Per la traduzione la regola opposta è quella giusta: qualsiasi elemento che
-  // contiene testo VISIBILE va tradotto, indipendentemente dal tag con cui il
-  // sito lo ha scritto (titoli dentro <header>, sommari e didascalie dentro
-  // <div>/<span>, riquadri "Leggi anche" dentro <aside>, voci di menu, bottoni).
-  //
-  // Unità = elemento che ha almeno un text node come figlio DIRETTO. Così ogni
-  // pezzo di testo appartiene a una sola unità (niente doppie traduzioni) e i
-  // testi annidati dentro elementi inline (tipicamente i link) diventano a loro
-  // volta unità, invece di restare intoccati come segnaposto.
-  // ---------------------------------------------------------------------------
+  // «Traduci la pagina» vuol dire TUTTA la pagina: qualsiasi elemento con testo VISIBILE,
+  // comunque il sito l'abbia scritto. Unità = elemento con un text node figlio DIRETTO.
 
-  // Sottoalberi che non si traducono mai: o non contengono prosa (script, media,
-  // grafica) o il testo è codice/valore e tradurlo lo romperebbe.
-  // NB: SELECT e OPTGROUP NON sono qui: il loro testo proprio è vuoto (non
-  // rischiano di diventare blocchi) ma bisogna poterci scendere dentro per
-  // arrivare alle OPTION, le cui etichette si leggono sullo schermo. DATALIST
-  // invece resta fuori: le sue voci sono valori che finiscono dentro il campo,
-  // non etichette da leggere.
+  // Sottoalberi mai traducibili: niente prosa, o testo che è codice o valore e tradurlo lo
+  // romperebbe. SELECT non c'è perché si scende fino alle OPTION; DATALIST sì.
   const TRANSLATE_SKIP_TAGS = new Set([
     'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
     'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
@@ -227,23 +207,14 @@
     TEXTAREA: ['placeholder'],
     IMG: ['alt'],
     AREA: ['alt'],
-    // Una voce di menu a tendina si traduce SCRIVENDO l'etichetta, mai
-    // sostituendone il testo: il testo di una <option> senza `value` è proprio
-    // ciò che il modulo invia. Con `label` presente il browser mostra
-    // l'etichetta e continua a inviare il valore di prima.
+    // Una voce a tendina si traduce scrivendo `label`, mai il testo: quello di una <option>
+    // senza `value` è proprio ciò che il modulo invia.
     OPTION: ['label'],
     OPTGROUP: ['label'],
   };
 
-  // Le scritte sui BOTTONI dei moduli: su <input type="button|reset|submit"> la
-  // scritta che si legge è `value`, non il contenuto. La riga di confine resta
-  // la stessa — si traduce ciò che l'utente LEGGE, mai ciò che il sito RIMANDA
-  // INDIETRO — e fra gli input passa esattamente qui: il valore di un bottone
-  // entra nei dati del modulo solo se il bottone ha un `name` (e solo per i
-  // bottoni che inviano). Uno che azzera il modulo o che apre qualcosa nella
-  // pagina non rimanda niente: la sua etichetta si traduce come quella di una
-  // voce di menu a tendina. `type="image"` resta fuori: lì la scritta visibile
-  // è `alt`, già tradotto, e `value` non si legge da nessuna parte.
+  // Sui bottoni dei moduli la scritta è `value`: si traduce solo se il bottone non rimanda
+  // niente (niente `name`, o non è di quelli che inviano). `type=image` usa `alt`.
   function inputValueIsLabel(el) {
     const type = String(el.getAttribute('type') || '').toLowerCase();
     if (type === 'button' || type === 'reset') return true;
@@ -260,17 +231,8 @@
     return null;
   }
 
-  // Attributi da tradurre di QUESTO elemento, già ripuliti; null se non ce ne
-  // sono (il caso della stragrande maggioranza degli elementi: si esce subito).
-  //
-  // `canMirror` — l'elemento è uno di quelli in cui SCENDIAMO, quindi il suo
-  // testo verrà tradotto. Serve a riconoscere l'ETICHETTA GEMELLA: il
-  // suggerimento del mouse uguale al testo del link, l'etichetta di
-  // accessibilità uguale alla scritta sul bottone. È la norma, non un caso
-  // raro — sulla home di un giornale sono decine di frasi — e mandare al
-  // modello due volte la stessa frase la fa pagare due volte senza cambiare
-  // niente sullo schermo. Quelle si segnano `mirror`: non si spediscono, si
-  // copiano dalla traduzione del testo che l'elemento mostra già.
+  // `canMirror`: l'elemento è uno di quelli in cui SCENDIAMO, quindi il suo testo verrà
+  // tradotto — l'etichetta gemella si copia da lì invece di pagarla due volte.
   function attrTargetsOf(el, canMirror) {
     if (!el.getAttribute) return null;
     const tag = (el.tagName || '').toUpperCase();
@@ -301,44 +263,25 @@
     try { return String(el.textContent || '').replace(/\s+/g, ' ').trim(); } catch (_) { return ''; }
   }
 
-  // Namespace HTML: solo gli elementi qui dentro sono "testo di pagina". Tutto
-  // ciò che sta in un altro namespace (SVG, MathML e qualsiasi foreign content)
-  // NON è prosa da tradurre — il suo <style>, le sue etichette <text> e le sue
-  // istruzioni interne romperebbero l'illustrazione/formula se rimpiazzate.
+  // Solo il namespace HTML è «testo di pagina»: in SVG e MathML rimpiazzare i testi
+  // interni romperebbe l'illustrazione o la formula.
   const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
-  // La UI che Filo inietta nella pagina (menu, avvisi, popup, barra laterale):
-  // non è contenuto del sito e non va tradotta — è già nella lingua dell'utente.
-  // La riconosce dal MARCHIO che i moduli le mettono addosso quando la creano
-  // (SN_FILO_UI.mark), mai dal nome. Il nome lo sceglie anche il sito: prima
-  // bastava una classe che cominciasse per "sn-" — come le chiama ogni portale
-  // costruito con ServiceNow — o un id che cominciasse per "filo-" perché un
-  // riquadro del sito restasse in lingua originale sotto un avviso che
-  // dichiarava la pagina tradotta (#407).
+  // La UI che Filo inietta si riconosce dal MARCHIO (SN_FILO_UI.mark), mai dal nome: una
+  // classe «sn-» la usa anche il sito, e lì restava un riquadro non tradotto (#407).
   function isFiloOwnUi(el) {
     const UI = global.SN_FILO_UI;
     return !!(UI && UI.is(el));
   }
 
-  // Due motivi diversi di saltare un sottoalbero, e la differenza conta:
-  //  - `'tag'` → "qui dentro non c'è prosa" (uno script, un video, un campo di
-  //    testo). Il CONTENUTO non si tocca, ma l'elemento può esporre etichette
-  //    da leggere (il grigio di un campo, il suggerimento di un bottone): quelle
-  //    si traducono lo stesso.
-  //  - `'hard'` → "qui non si tocca niente", nemmeno le etichette: testo scritto
-  //    dall'utente, `translate="no"`, la UI di Filo.
-  //  - `'hidden'` → nascosto ADESSO, ma non per sempre. Non si traduce (l'utente
-  //    non lo vede, e potrebbe non aprirlo mai), però si segna: vedi
-  //    isVisibilityHidden.
+  // 'tag': niente prosa dentro, ma le etichette esposte si traducono lo stesso. 'hard': non
+  // si tocca niente. 'hidden': nascosto adesso, non per sempre — si segna e basta.
   function skipSubtreeForTranslation(el) {
-    // Barriera 1 — tag noti non-prosa. Confronto INSENSIBILE al maiuscolo/minuscolo:
-    // gli elementi dentro un SVG/MathML inline espongono tagName in minuscolo
-    // (es. 'svg', 'style', 'text'), quindi un confronto secco contro 'SVG'/'STYLE'
-    // non farebbe mai presa e il loro contenuto finirebbe tradotto.
+    // Confronto INSENSIBILE al maiuscolo: dentro SVG o MathML inline tagName è minuscolo, e
+    // un confronto secco non farebbe mai presa.
     if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return 'tag';
-    // Barriera 2 — qualsiasi elemento fuori dal namespace HTML (SVG, MathML,
-    // foreign content futuro): non è testo di pagina. Ferma l'intero sottoalbero
-    // anche se un domani comparisse un tag radice non previsto nella lista sopra.
+    // Tutto ciò che sta fuori dal namespace HTML si ferma qui, anche un tag radice non
+    // previsto nella lista sopra.
     if (el.namespaceURI && el.namespaceURI !== HTML_NS) return 'tag';
     const hard = hardSkipForTranslation(el);
     if (hard === 'hidden' || hard === 'visibility') return hard;
@@ -362,9 +305,10 @@
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
   // Il sito sceglie COME ripiegare una sezione, e da quella scelta non possono
   // dipendere né il comportamento né il conto dell'utente (#505).
-  function isVisibilityHidden(el) {
+  // Il segno per i lettori di schermo (aria-hidden) non entra: non dice niente su cosa vede chi guarda (#503.3).
+  // `ovunque`: trasparente vale nascosto dovunque stia, così il giudizio non dipende dallo scorrimento (#503.3).
+  function isVisibilityHidden(el, ovunque) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
-    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     // Prima dello stile: su una pagina di domande frequenti la risposta è quasi sempre questa, e chiedere lo stile
     // di migliaia di elementi per scoprirlo si sente all'apertura del menu.
     if (isInsideClosedDisclosure(el)) return true;
@@ -378,7 +322,7 @@
     // deve saperlo per scendere lo stesso, invece di lasciare in inglese del testo che si vede (#505).
     if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return 'visibility';
     if (isFlattened(el)) return true;
-    if (isTransparentOnScreen(el, cs)) return true;
+    if (ovunque ? isFullyTransparent(cs) : isTransparentOnScreen(el, cs)) return true;
     if (isPushedOutOfPage(el, cs)) return true;
     if (isClippedAwayByPath(el, cs)) return true;
     return isClippedToNothing(el, cs);
@@ -519,31 +463,25 @@
     } catch (_) { return window; }
   }
 
-  // Un riquadro incorporato SENZA indirizzo proprio: `about:blank` o `srcdoc`,
-  // riempito dalla pagina che lo ospita (i riquadri pubblicitari e parecchi
-  // widget nascono così). Dentro questi documenti il preload non entra, quindi
-  // non c'è nessun Filo a cui passare parola: il testo lo prende chi ospita,
-  // che è della stessa origine e ci arriva. Un riquadro con un indirizzo vero
-  // NON si apre da qui — ha il suo content script e traduce da sé, e leggerlo
-  // anche da fuori vorrebbe dire pagare due volte lo stesso testo.
+  // Riquadro senza indirizzo proprio, riempito da chi lo ospita: lì il preload non entra e
+  // il testo si legge da qui. Uno con un indirizzo vero ha il suo content script.
   function inlineFrameBody(el) {
-    // Prima riga senza allocazioni: questa funzione la chiede anche chi cammina
-    // su tutti gli elementi della pagina, e lì un `toUpperCase()` a testa si
-    // sente.
+    // Prima riga senza allocazioni: questa funzione la chiede anche chi cammina su tutti gli
+    // elementi della pagina, e lì un `toUpperCase()` a testa si sente.
     const tag = el && el.tagName;
     if (tag !== 'IFRAME' && tag !== 'FRAME' && tag !== 'iframe' && tag !== 'frame') return null;
+    // Uno in arrivo è vuoto per ora, e toccato perderebbe il Filo che lo leggerà da dentro (#1560).
+    const R = global.SN_RIQUADRI_IN_ARRIVO;
     try {
-      const win = el.contentWindow;
+      const win = R && R.finestra(el);
       if (!win || win.location.protocol !== 'about:') return null;
-      const doc = el.contentDocument;
+      const doc = R.documento(el);
       return (doc && doc.body) || null;
     } catch (_) { return null; }   // altra origine: da qui non si legge
   }
 
-  // Un pezzo di pagina segnato come nascosto che ADESSO si vede, con del testo
-  // ancora da tradurre dentro. È la domanda che si fa il menu del tasto destro,
-  // quindi deve costare poco: la lista è corta per costruzione (MAX_HIDDEN) e
-  // la maggior parte degli elementi esce alla prima riga.
+  // La chiede il menu del tasto destro, che deve aprirsi subito: la lista è corta per
+  // costruzione (MAX_HIDDEN) e quasi tutti escono alla prima riga.
   function hasRevealedText(list) {
     for (const voce of (list || [])) {
       try {
@@ -572,41 +510,8 @@
     return out.replace(/\s+/g, ' ').trim();
   }
 
-  // Un "componente chiuso" (#439): il sito costruisce un pezzo di pagina dentro
-  // un contenitore che ha deciso di NON aprire a nessuno script (shadow root in
-  // modalità closed). Il suo testo non è leggibile — né da Filo né da qualsiasi
-  // altro codice della pagina — quindi non si può tradurre. Quello che si può
-  // fare è ACCORGERSENE, così l'avviso finale resta onesto ("tradotta solo in
-  // parte") invece di dichiarare finito un lavoro monco.
-  //
-  // Riconoscerlo senza falsi allarmi. Un avviso "tradotta solo in parte" che
-  // scatta a vuoto manda l'utente a cercare del testo in lingua originale che
-  // non esiste, e brucia la credibilità dell'avviso quando è vero: qui servono
-  // PROVE, non prudenza. Tre, tutte necessarie:
-  //
-  //  1. il sito ha davvero REGISTRATO quel componente (`:defined`). Il registro
-  //     dei componenti della pagina non si può interrogare da qui (è un altro
-  //     mondo JS), ma `:defined` è uno stato dell'elemento nel DOM, e il DOM è
-  //     lo stesso: risponde per la pagina, non per noi. È ciò che scarta i
-  //     separatori e gli spaziatori col trattino nel nome disegnati solo in CSS
-  //     — che nessuno ha mai registrato;
-  //  2. il rettangolo è grande abbastanza da starci del testo;
-  //  3. qualcosa è DISEGNATO lì dentro e noi non lo raggiungiamo. Il segnale è
-  //     il punto d'inserimento del cursore: sopra un elemento davvero vuoto
-  //     cade sull'elemento stesso, sopra un componente chiuso viene rimbalzato
-  //     fuori, perché il testo su cui cadrebbe sta in un albero che non ci
-  //     appartiene.
-  //
-  // La prova del punto si può fare solo dove il cursore arriva: dentro lo
-  // schermo, e su un elemento che i clic non attraversano. Fuori di lì la
-  // risposta è "non lo so" — e "non lo so" NON è "è un componente chiuso".
-  // Trattarlo come tale rovesciava la bugia della segnalazione: su qualsiasi
-  // pagina più lunga di una schermata basta uno spaziatore col trattino nel
-  // nome sotto il bordo dello schermo, o una decorazione trasparente ai clic
-  // (è così che i siti disegnano quasi tutte le icone), e una pagina tradotta
-  // per intero si chiudeva con "restano nella lingua originale". L'utente va a
-  // cercare dell'inglese che non c'è, e la volta che l'avviso dice il vero non
-  // ci crede più. Dove non si può guardare non si accusa: si tace.
+  // Un «componente chiuso» (#439) non si traduce, ma accorgersene tiene onesto l'avviso
+  // finale. Serve una PROVA: registrato, grande abbastanza, e il cursore rimbalzato fuori.
   const CLOSED_MIN_W = 40;
   const CLOSED_MIN_H = 16;
 
@@ -635,16 +540,8 @@
       const w = x1 - x0;
       const h = y1 - y0;
       let seen = 'unknown';
-      // Tre punti invece di uno: basta che UNO cada nel vuoto perché lì dentro
-      // non ci sia niente di nascosto, mentre un pezzo di UI sovrapposto o un
-      // bordo arrotondato rovinerebbero il punto singolo.
-      //
-      // E tre righe invece di una, ma solo se la prima non ha risposto: una
-      // barra fissa che taglia l'elemento a metà lasciava "non lo so", e "non
-      // lo so" adesso vuol dire nessun avviso. Le righe in più si pagano
-      // soltanto lì — dove la prima riga decide (quasi sempre) restano tre
-      // interrogazioni come prima — e non possono ribaltare una risposta
-      // certa: si fermano appena ne arriva una.
+      // Tre punti invece di uno: basta che UNO cada nel vuoto per dire che lì dentro non c'è
+      // niente. Non possono ribaltare una risposta certa: si fermano alla prima.
       for (const y of [y0 + h / 2, y0 + h * 0.25, y0 + h * 0.75]) {
         for (const x of [x0 + w / 2, x0 + w * 0.25, x0 + w * 0.75]) {
           const r = probePoint(el, x, y);
@@ -897,10 +794,11 @@
 
   // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
-  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
+  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo. Trasparente sì,
+  // dovunque stia: il conto dell'avviso non può cambiare con lo scorrimento (#503.2, #503.3).
   function isHiddenFromUser(el) {
     try {
-      if (isVisibilityHidden(el)) return true;
+      if (isVisibilityHidden(el, true)) return true;
       if (el.ownerDocument === document) {
         const r = el.getBoundingClientRect();
         if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
@@ -910,31 +808,67 @@
       let cur = parentOrHost(el);
       for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
         // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
-        if (isVisibilityHidden(cur) === true) return true;
+        if (isVisibilityHidden(cur, true) === true) return true;
         cur = parentOrHost(cur);
       }
       return false;
     } catch (_) { return false; }
   }
 
-  function isClosedComponent(el) {
+  // Cosa c'è nell'albero chiuso di `el`, per la sonda (preload/ombre-chiuse.js): 'testo', 'incorporati' (riquadri di cui
+  // da lì non si legge niente), 'vuoto', o null se non lo conosce. La sonda annulla la domanda il cui sì è vero; la
+  // domanda esce dai componenti aperti, se no da lì non arriverebbe.
+  function ombraChiusa(el) {
+    const nome = global.SN_OMBRE_CHIUSE;
+    if (!nome) return null;
+    const si = (suffisso) => !el.dispatchEvent(new CustomEvent(nome + suffisso, { cancelable: true, composed: true }));
+    try {
+      if (si('')) return 'vuoto';
+      if (si('t')) return 'testo';
+      if (si('r')) return 'incorporati';
+    } catch (_) {}
+    return null;
+  }
+
+  // Il <details> chiuso più esterno che contiene `el`, attraverso i componenti aperti; null se nessuno.
+  function fisarmonicaChiusaAttorno(el) {
+    let trovata = null;
+    for (let cur = parentOrHost(el), hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; cur = parentOrHost(cur), hops++) {
+      if (cur.tagName === 'DETAILS' && !cur.open) trovata = cur;
+    }
+    return trovata;
+  }
+
+  // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
+  function isClosedComponent(el, fuoriConto) {
+    if (fuoriConto) return false;
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
-    // La prova del punto d'inserimento si fa sul documento della pagina: su un
-    // elemento che vive dentro un riquadro incorporato misurerebbe le
-    // coordinate sbagliate, e un avviso "una parte è rimasta fuori" che scatta
-    // a vuoto è peggio di nessun avviso.
+    // La prova del cursore si fa sul documento della pagina: dentro un riquadro misurerebbe
+    // coordinate sbagliate, e un avviso che scatta a vuoto è peggio di nessun avviso.
     if (el.ownerDocument !== document) return false;
     if (el.shadowRoot) return false;                 // aperto: lo attraversiamo
     if (el.children.length) return false;            // ha contenuto raggiungibile
     if ((el.textContent || '').trim()) return false;
     try {
       if (el.matches && !el.matches(':defined')) return false;
+      // Una decorazione non conta mai: la sonda nel mondo della pagina lo sa (#472).
+      const dentro = ombraChiusa(el);
+      if (dentro === 'vuoto') return false;
+      // Testo chiuso in una fisarmonica del browser: è la sezione che la pagina dichiara da aprire, e aprendola il
+      // testo sarebbe in inglese. Gli altri modi di nascondere li usano anche gli spazi pubblicitari (#503): lì no.
+      if (dentro === 'testo') {
+        const sezione = fisarmonicaChiusaAttorno(el);
+        if (sezione) return !isInvisibleToUser(sezione) && isReachableByUser(sezione, sezione.getBoundingClientRect());
+      }
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
       if (!isReachableByUser(el, r)) return false;
-      // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
+      // Testo, o un riquadro di cui da fuori non si legge niente: quel che la sonda sa vince sulla prova del punto, che
+      // vede solo lo schermo di adesso, così l'avviso non cambia con lo scorrimento (#1290).
+      if (dentro) return true;
+      // Dove la sonda non sa, serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
       // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
       // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
       // invece di "solo in parte". Tacere su un pezzo che forse non esiste
@@ -971,7 +905,8 @@
   const MAX_HIDDEN = 5000;
 
   // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
-  function pushKids(el, stack, shadowRoots) {
+  // `nascosti` segna i figli come parte di una sezione nascosta.
+  function pushKids(el, stack, shadowRoots, nascosti) {
     const kids = [];
     const shadow = el.shadowRoot;
     if (shadow) {
@@ -979,17 +914,29 @@
       for (const c of shadow.children) kids.push(c);
     }
     for (const c of el.children) kids.push(c);
-    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    for (let i = kids.length - 1; i >= 0; i--) {
+      if (nascosti) nascosti.add(kids[i]);
+      stack.push(kids[i]);
+    }
   }
 
-  function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
+  // Le due scelte per le sezioni nascoste (D61), i valori di constants.js: TRADUCI le prende tutte, segnate `nascosto`
+  // perché partano dopo quel che si vede; RIMANDA le lascia in `hidden`, e il menu offre di tradurle quando si aprono.
+  const NASCOSTE = global.SN_CONST.NASCOSTE_TRADUZIONE;
+
+  function extractTranslatableBlocks({ maxBlocks = 2000, nascoste = NASCOSTE.RIMANDA, fuoriConto = false } = {}) {
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
+    const tutto = nascoste === NASCOSTE.TRADUCI;
+    const dentroNascosto = new WeakSet();
+    // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
+    const visti = [];
+    const vistiAttr = [];
+    const nascostiTesto = [];
+    const nascostiAttr = [];
     const out = [];
-    // Gli alberi separati dei componenti aperti incontrati per strada. Chi
-    // sorveglia il testo che arriva DOPO ne ha bisogno: una MutationObserver
-    // sul documento non vede dentro un componente, e sui siti a componenti è
-    // proprio lì che il contenuto cambia.
+    // Gli alberi dei componenti aperti servono a chi sorveglia il testo che arriva DOPO: una
+    // MutationObserver sul documento non vede lì dentro.
     const shadowRoots = [];
     // Documenti dei riquadri senza indirizzo in cui siamo entrati (#407): come
     // gli alberi dei componenti aperti, vanno sorvegliati a parte.
@@ -1008,24 +955,20 @@
     const sottoInvisibile = new WeakSet();
     let unreachable = 0;
     let truncated = 0;
-    const room = () => out.length + attrs.length < maxBlocks;
-    const takeAttrs = (el, checkHard) => {
-      // `checkHard` distingue anche i due mondi per l'etichetta gemella: qui
-      // arrivano gli elementi in cui NON si scende (un campo, un'immagine, una
-      // voce di menu a tendina), il cui testo non verrà tradotto — da lì non
-      // c'è niente da copiare.
+    const takeAttrs = (el, checkHard, nascosto) => {
+      // Qui arrivano gli elementi in cui NON si scende: il loro testo non verrà tradotto, e da
+      // lì non c'è nessuna etichetta gemella da copiare.
       const targets = attrTargetsOf(el, !checkHard);
       if (!targets) return;
-      // Solo se c'è davvero un'etichetta vale la pena pagare le barriere dure
-      // (fra cui getComputedStyle): la stragrande maggioranza degli elementi
-      // saltati è uno <script> o un pezzo di SVG, e esce alla riga sopra.
+      // Le barriere dure (fra cui getComputedStyle) si pagano solo se un'etichetta c'è davvero:
+      // quasi tutti gli elementi saltati escono alla riga sopra.
       if (checkHard && hardSkipForTranslation(el)) return;
       for (const t of targets) {
         // Le gemelle non consumano il tetto del giro e non contano come
         // "rimasto fuori": non sono lavoro da spedire, sono una copia.
         if (t.mirror) { if (mirrors.length < maxBlocks) mirrors.push(t); continue; }
-        if (room()) attrs.push(t);
-        else truncated++;
+        if (nascosto) t.nascosto = true;
+        (nascosto ? nascostiAttr : vistiAttr).push(t);
       }
     };
     // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
@@ -1033,13 +976,15 @@
     const stack = [root];
     while (stack.length) {
       const el = stack.pop();
-      // La radice non passa dal filtro: un <body translate="no"> o nascosto in
-      // partenza spegnerebbe la traduzione dell'intera pagina, che prima invece
-      // partiva. Il filtro vale — come prima — da lì in giù.
+      let nascosto = dentroNascosto.has(el);
+      // La radice non passa dal filtro: un <body> translate=no o nascosto spegnerebbe tutta la
+      // pagina. Il filtro vale da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
+      // Si traduce tutto: la sezione nascosta si legge come il resto, solo dopo.
+      if (tutto && (skip === 'hidden' || skip === 'visibility')) nascosto = true;
       // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
       // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
-      if (skip === 'visibility') {
+      else if (skip === 'visibility') {
         const p = el.parentElement;
         if (!(p && sottoInvisibile.has(p)) && hidden.length < MAX_HIDDEN
             && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
@@ -1047,20 +992,17 @@
         pushKids(el, stack, shadowRoots);
         continue;
       }
-      if (skip) {
-        // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue
-        // etichette (placeholder di un campo, suggerimento di un bottone,
-        // voce di un menu a tendina) si leggono sullo schermo e si traducono —
-        // a meno che valga una barriera dura, che qui non è ancora stata
-        // controllata perché il tag l'ha preceduta.
+      else if (skip) {
+        // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue etichette si leggono
+        // sullo schermo e si traducono, salvo una barriera dura.
         if (skip === 'tag') {
-          takeAttrs(el, true);
-          // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun
-          // Filo a cui passare parola, e il testo si legge da qui (#407).
-          // Nascosto o vietato dalle barriere dure resta fuori come gli altri.
+          takeAttrs(el, true, nascosto);
+          // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo a cui passare
+          // parola, e il testo si legge da qui (#407).
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
             if (inner) {
+              if (nascosto) dentroNascosto.add(inner);
               stack.push(inner);
               // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
               // pagina deve tenere d'occhio pure questo documento.
@@ -1068,45 +1010,50 @@
             }
           }
         }
-        // Ripiegato, in secondo piano, chiuso: si segna e si va avanti. Il
-        // testo c'è già, l'utente non lo vede — tradurlo adesso vorrebbe dire
-        // pagarlo per una sezione che magari non aprirà mai.
+        // Ripiegato o chiuso: si segna e si va avanti. Tradurlo adesso vorrebbe dire pagarlo per
+        // una sezione che l'utente magari non aprirà mai.
         else if (skip === 'hidden' && hidden.length < MAX_HIDDEN
                  && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
         continue;
       }
-      takeAttrs(el, false);
-      // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
-      // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
-      // i blocchi annidati che una traduzione interrotta a metà non ha ancora
-      // toccato — nessuna ripresa potrebbe più completarli.
+      takeAttrs(el, false, nascosto);
+      // Già tradotto: si salta l'elemento ma si scende lo stesso nei figli (#408), o i blocchi
+      // annidati lasciati da una traduzione interrotta resterebbero irraggiungibili.
       if (!(el.dataset && el.dataset.snTranslated)) {
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
           // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
           // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
-          if (isOwnTextHidden(el)) {
+          const proprioNascosto = isOwnTextHidden(el);
+          if (proprioNascosto && !tutto) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
-          } else if (room()) out.push({ el, text: txt });
-          else truncated++;
+          } else if (nascosto || proprioNascosto) nascostiTesto.push({ el, text: txt, nascosto: true });
+          else visti.push({ el, text: txt });
         }
       }
-      if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
-      pushKids(el, stack, shadowRoots);
+      if (isClosedComponent(el, fuoriConto) && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
     }
+    let posto = maxBlocks;
+    const prendi = (da, a) => {
+      for (const x of da) {
+        if (posto > 0) { a.push(x); posto--; } else truncated++;
+      }
+    };
+    prendi(visti, out);
+    prendi(vistiAttr, attrs);
+    prendi(nascostiTesto, out);
+    prendi(nascostiAttr, attrs);
     return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }
 
-  // Tutti gli elementi già tradotti, componenti isolati compresi: una
-  // querySelectorAll sul documento si ferma al confine del componente e
-  // lascerebbe fuori (dal conteggio e dal ripristino) proprio i blocchi che
-  // #439 ha reso traducibili.
+  // Anche i componenti isolati: una querySelectorAll sul documento si ferma al loro
+  // confine, e quei blocchi resterebbero fuori dal conto e dal ripristino (#439).
   function findTranslatedElements() {
     const out = [];
-    // Etichette già tradotte (attributi): non sono elementi da ripristinare
-    // come i blocchi, ma vanno CONTATE — altrimenti la ripresa dice "tradotti
-    // 10 su 12" su una pagina dove ne mancano davvero due.
+    // Le etichette tradotte vanno CONTATE anche se non si ripristinano come i blocchi, o la
+    // ripresa dice «10 su 12» dove ne mancano davvero due.
     let attrCount = 0;
     const roots = [document];
     while (roots.length) {
@@ -1148,14 +1095,8 @@
     return acc.slice(0, maxChars);
   }
 
-  // ---------------------------------------------------------------------------
-  // Outline interattivo della pagina per l'agente "Aiuto".
-  // Restituisce una stringa compatta che elenca elementi rilevanti (interattivi
-  // o landmark) con: stato (visibile/fuori-viewport/collassato), tag, testo,
-  // selettore stabile (id, aria-label, testo univoco, oppure path posizionale).
-  // L'agente vision riceve così sia lo screenshot della viewport sia un quadro
-  // completo della pagina, anche fuori scroll o dentro <details> chiusi.
-  // ---------------------------------------------------------------------------
+  // Outline per l'agente «Aiuto»: con lo screenshot della viewport ha anche ciò che sta
+  // fuori scroll o dentro <details> chiusi.
 
   const OUTLINE_INTERACTIVE_SELECTOR = [
     'a[href]', 'button', 'summary', 'select', 'textarea',
@@ -1201,9 +1142,8 @@
     return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   }
 
-  // Costruisce un selettore stabile per un elemento. Preferenza:
-  // 1) #id (se id semplice e univoco), 2) tag[aria-label="..."], 3) tag con
-  // name/data-testid univoci, 4) percorso :nth-of-type fino a 4 livelli.
+  // Selettore stabile, in ordine di preferenza: #id semplice e univoco, tag[aria-label], tag con
+  // name o data-testid univoci, infine un percorso :nth-of-type fino a 4 livelli.
   function buildSelector(el) {
     if (!el || el.nodeType !== 1) return '';
     if (el.id && /^[a-zA-Z][\w-]*$/.test(el.id)) {
@@ -1222,7 +1162,6 @@
       const s = tryAttr(attr);
       if (s) return s;
     }
-    // Path posizionale, max 5 livelli
     const parts = [];
     let cur = el;
     let depth = 0;
@@ -1247,20 +1186,29 @@
     return parts.join(' > ');
   }
 
-  function shortText(el) {
-    const txt = (el.getAttribute?.('aria-label')
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.innerText
-      || el.textContent
-      || '').replace(/\s+/g, ' ').trim();
-    return txt.slice(0, 80);
+  // Le regole dei campi segreti stanno in src/shared/campiSegreti.js, le stesse che il main porta nei riquadri.
+  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t), { ricorda: true });
+  const { campoSegreto, etichettaCollegata, etichettaVicina } = Segreti;
+  const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
+
+  // Come chiamare un elemento descrivendolo al modello o nel registro delle azioni. Il valore di un campo
+  // serve solo quando non ha nessun nome, nemmeno il testo scritto subito prima, e mai se è segreto.
+  function nomeElemento(el) {
+    if (!el || el.nodeType !== 1) return '';
+    const campo = CAMPO_CON_VALORE.test(el.tagName);
+    const nome = el.getAttribute?.('aria-label') || el.getAttribute?.('alt') || etichettaCollegata(el)
+      || el.getAttribute?.('placeholder') || (campo ? etichettaVicina(el) : '') || '';
+    const valore = campo && !campoSegreto(el) ? el.value : '';
+    const testo = nome || valore || (el.tagName === 'INPUT' ? '' : (el.innerText || el.textContent || ''));
+    return String(testo).replace(/\s+/g, ' ').trim();
   }
 
-  // Espande <details> e [aria-expanded="false"] sull'antenato per portare
-  // l'elemento in stato "raggiungibile". Pensato per accompagnare lo scroll
-  // verso un elemento indicato dall'agente.
+  function shortText(el) {
+    return nomeElemento(el).slice(0, 80);
+  }
+
+  // Espande <details> e [aria-expanded=false] sull'antenato per rendere l'elemento
+  // raggiungibile: accompagna lo scroll verso un elemento indicato dall'agente.
   function expandAncestors(el) {
     let cur = el.parentElement;
     let changed = false;
@@ -1273,14 +1221,8 @@
     return changed;
   }
 
-  // Annotazioni utili per l'agente "Aiuto":
-  // - ⤤ hover  : elemento che probabilmente nasconde un menu aprendolo on-hover
-  //              (ha aria-haspopup, oppure il suo sibling/descendant è un menu
-  //              CSS :hover-driven non rilevabile in modo affidabile, quindi
-  //              ci limitiamo all'attributo esplicito).
-  // - ⊕ reveal : elemento che l'agente può "rivelare" in autonomia, perché
-  //              è un disclosure pattern canonico (details chiuso, oppure
-  //              [aria-expanded=false][aria-controls] non-form, non-link).
+  // ⤤ hover: solo dall'attributo esplicito, i menu CSS non si rilevano in modo affidabile.
+  // ⊕ reveal: disclosure canonico, che l'agente può aprire da solo.
   function revealHint(el) {
     if (!el) return '';
     if (el.tagName === 'DETAILS' && !el.open) return ' ⊕reveal';
@@ -1293,23 +1235,17 @@
     }
     return '';
   }
-  // Heuristica "questo elemento apre un menu on-hover":
-  // 1) aria-haspopup esplicito (segnale forte)
-  // 2) ha un sibling o descendant che è un contenitore-menu (role=menu/listbox,
-  //    classi *menu*/*dropdown*/*popover*/*flyout*) attualmente nascosto via
-  //    CSS (display:none/visibility:hidden/opacity 0). Questo cattura i menu
-  //    CSS :hover-driven senza attributi ARIA, tipici di header/profilo.
+  // Anche i menu guidati da :hover senza ARIA: un contenitore-menu vicino nascosto via CSS
+  // vale come aria-haspopup.
   function hasHiddenMenuRelative(el) {
     if (!el) return false;
     const MENU_SEL = '[role="menu"],[role="listbox"],[class*="dropdown" i],[class*="menu" i],[class*="popover" i],[class*="flyout" i],[class*="submenu" i]';
     const candidates = [];
     try {
-      // Sibling immediati (pattern: <button>trigger</button><ul.menu>...</ul>)
       const parent = el.parentElement;
       if (parent) {
         Array.from(parent.children).forEach((c) => { if (c !== el && c.matches?.(MENU_SEL)) candidates.push(c); });
       }
-      // Descendant diretti (pattern: <div.trigger><ul.menu>...</ul></div>)
       el.querySelectorAll?.(MENU_SEL)?.forEach((c) => candidates.push(c));
     } catch (_) {}
     for (const c of candidates) {
@@ -1354,12 +1290,10 @@
     let chars = 0;
     for (const el of all) {
       if (out.length >= maxItems || chars >= maxChars) break;
-      // Salta script/style/elementi nascosti permanentemente per CSS
       if (isHiddenByCss(el)) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) {
-        // Elementi 0x0 (es. voci di menu hover non aperto, sr-only): teniamoli
-        // se hanno una label semantica (testo, aria-label, alt, placeholder),
+        // Elementi 0×0 (voci di menu non aperto, sr-only) si tengono se hanno una label semantica:
         // così l'agente li vede e può proporre un hover sul trigger.
         const txt = shortText(el);
         if (!txt) continue;
@@ -1402,6 +1336,7 @@
     getRenderedSelectionText,
     extractMainTextNodes,
     extractTranslatableBlocks,
+    NASCOSTE,
     findTranslatedElements,
     hasRevealedText,
     inlineFrameBody,
@@ -1411,6 +1346,12 @@
     pageMeta,
     pageExcerpt,
     extractInteractiveOutline,
+    nomeElemento,
+    campoSegreto,
+    selezioneSegreta,
+    segretezza,
+    // La foto per un modello la copre il main (services/fotoDellaPagina.js), che legge da qui i campi che ricordano.
+    segreti: Segreti,
     viewportInfo,
     expandAncestors,
     canRevealElement,

@@ -42,9 +42,8 @@ module.exports = function register(on, ctx) {
   // da solo al primo avvio continuava a dire «Per attivare Filo serve un
   // codice d'invito», col primo suggerimento che portava a riscattare un
   // invito già riscattato. Qui la home si rifà e si spinge alle pagine aperte.
-  // Senza chiave il messaggio si ricostruisce sul posto e non costa niente;
-  // con la chiave il ricalcolo passa dal solito giro in background, che si
-  // annuncia da sé quando è pronto, e qui non si spinge una cache vecchia.
+  // Senza chiave la frase si ricostruisce sul posto e non costa niente; con la
+  // chiave la home la toglie da sé (FILO_READY_CHANGED) e il modello non parte (#869).
   async function rinfrescaHome() {
     try {
       const r = await ctx.handleFiloGenerateDashboard({ openTabsCount: 0 });
@@ -53,14 +52,12 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
   }
 
-  // Ultimi parametri del server (euro per credito, cambio, quota): servono a
-  // scalare i crediti nelle righe del registro e a comporre i messaggi.
+  // Ultimi parametri del server: servono a scalare i crediti nelle righe del registro e a
+  // comporre i messaggi.
   let lastServer = null;
 
-  // ── Callable ──────────────────────────────────────────────────────────────
-  // `asOwner`: le funzioni riservate all'owner vogliono il token dell'account
-  // Google (è lì che sta l'email nella allowlist admin); tutto il resto usa
-  // l'identità dell'installazione.
+  // `asOwner`: le funzioni riservate vogliono il token Google, dov'è l'email in allowlist;
+  // tutto il resto usa l'identità dell'installazione.
   async function callable(name, data = {}, { asOwner = false } = {}) {
     const idToken = asOwner ? await auth.getIdToken() : await identity.getIdToken();
     if (!idToken) throw new Error(asOwner ? 'not_signed_in' : 'no_identity');
@@ -80,10 +77,8 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta
-  // dall'utente), 'personal' (creata dal server), 'factory' (incastonata,
-  // solo installazioni vecchie), 'none'. Lo legge la pagina Crediti e lo
-  // usano i test.
+  // Da dove viene la chiave che parte davvero: 'own' dell'utente, 'personal' dal server,
+  // 'factory' incastonata, 'none'.
   async function keySource() {
     try {
       const s = await ctx.getEffectiveSettings();
@@ -237,13 +232,22 @@ module.exports = function register(on, ctx) {
   // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
   // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
   let ultimaLettura = null; // { at, state }
+  // Vale la lettura partita per ultima: una partita prima e finita dopo (un server lento) non prende il posto della
+  // nuova, né in memoria né su disco, e non passa per fresca (#1353).
+  let letturePartite = 0;
+  let letturaValida = 0;
   async function readState() {
-    const state = await leggiStato();
+    const mia = ++letturePartite;
+    const state = await leggiStato(() => mia > letturaValida);
+    if (mia <= letturaValida) return state;
+    letturaValida = mia;
     ultimaLettura = { at: Date.now(), state };
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.dopoLettura(state); } catch (_) {}
     return state;
   }
-  async function leggiStato() {
+  async function leggiStato(piuNuova = () => true) {
     const own = await ownKey();
+    await loadQueue().catch(() => {});
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
       usingOwnKey: Boolean(own), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
@@ -265,8 +269,7 @@ module.exports = function register(on, ctx) {
       out.identity.unreadable = e && e.code === 'identity_unreadable';
       out.identity.unreachable = e && e.code === 'servizio_non_raggiungibile';
       out.identity.offline = e && e.code === 'offline';
-      // Offline (o identità che non si rinnova) con la chiave personale qui:
-      // l'ultimo stato letto vale anche adesso. Il campo dell'invito e il
+      // Offline con la chiave personale qui: vale l'ultimo stato letto — il campo dell'invito e un
       // saldo locale a chi ha già il portafoglio sarebbero due bugie.
       const cached = out.hasPersonalKey && !out.identity.lost ? walletStore.lastServer() : null;
       if (cached && cached.hasWallet) out.server = { ...cached, stale: true, cached: true };
@@ -274,7 +277,7 @@ module.exports = function register(on, ctx) {
     }
     try {
       out.server = await callable('walletState');
-      if (out.server && out.server.hasWallet) {
+      if (out.server && out.server.hasWallet && piuNuova()) {
         lastServer = out.server;
         if (!out.pseudonym && out.server.pseudonym && out.hasPersonalKey) {
           walletStore.save({ ...walletStore.load(), pseudonym: out.server.pseudonym });
@@ -282,11 +285,10 @@ module.exports = function register(on, ctx) {
         }
         if (out.hasPersonalKey) walletStore.saveLastServer({ ...out.server, readAt: new Date().toISOString() });
       }
+      out.chiaveStaccata = chiaveStaccata(out);
     } catch (e) {
       out.error = /callable \w+ 5\d\d|fetch failed|ENOTFOUND|ECONN/i.test(String(e?.message || e)) ? 'not_reachable' : String(e?.message || e);
-      // Server muto ma chiave personale qui: si mostra l'ultimo stato letto,
-      // dichiarato vecchio. Il campo dell'invito e il saldo locale a chi ha
-      // già il portafoglio sarebbero due bugie.
+      // Server muto ma chiave personale qui: si mostra l'ultimo stato letto, dichiarato vecchio.
       const cached = out.hasPersonalKey ? walletStore.lastServer() : null;
       if (cached && cached.hasWallet) {
         out.server = { ...cached, stale: true, cached: true };
@@ -294,6 +296,14 @@ module.exports = function register(on, ctx) {
       }
     }
     return out;
+  }
+
+  // La chiave personale qui non è del portafoglio che il server lega a questa identità (#1601): ogni riga
+  // del registro firmata con lo pseudonimo locale la regola la rifiuta, e la pagina Crediti lo dice.
+  function chiaveStaccata({ hasPersonalKey, pseudonym, server }) {
+    if (!hasPersonalKey || !server) return '';
+    if (!server.hasWallet) return server.configured === false ? '' : 'senza_portafoglio';
+    return server.pseudonym && pseudonym && server.pseudonym !== pseudonym ? 'altro_pseudonimo' : '';
   }
 
   // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
@@ -304,50 +314,34 @@ module.exports = function register(on, ctx) {
     } catch (_) { return false; }
   }
 
-  // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
-  // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
-  // da un turno di chat, e una lettura più vecchia di un minuto si rifà
-  // (aspettandola al più poco: poi vale l'ultima nota, dichiarata tale).
-  const CHAT_VALIDO_MS = 60 * 1000;
-  const CHAT_ATTESA_MS = 2500;
+  // Gli invii col portafoglio di questa sessione (#1077): il premio d'invio ha
+  // un tetto al giorno e arriva dopo i giudici, quindi l'ultimo stato letto
+  // non li conta ancora tutti. Ritorna la frase da dire se il tetto è pieno.
+  let inviiSessione = [];
+  function notaInvio(id) {
+    const now = Date.now();
+    let stato = lastServer;
+    if (!stato) { try { stato = walletStore.lastServer(); } catch (_) { stato = null; } }
+    const oggi = new Date(now).toISOString().slice(0, 10);
+    inviiSessione = inviiSessione.filter((x) => new Date(x.at).toISOString().slice(0, 10) === oggi);
+    const esito = W.premioInvio({ grants: stato && stato.grants, perDay: stato && stato.sentRewardsPerDay, invii: inviiSessione, now });
+    // Oltre mille invii in un giorno il tetto è pieno comunque: la lista non cresce senza fine.
+    inviiSessione = [...inviiSessione, { id: String(id || '').slice(0, 200), at: now }].slice(-1000);
+    return esito.esaurito ? W.premioInvioEsauritoTesto(esito.perDay) : '';
+  }
+
+  // Il saldo che la chat dice (#816): quello della pagina Crediti, mai aspettato (#1353; regola in SN_WALLET.saldoPerChat).
+  // `fresco`: la domanda viene da un turno di chat, e una lettura più vecchia di un minuto si rifà in sottofondo.
+  const rilettore = W.rilettoreSaldo({ leggi: () => readState(), ultima: () => ultimaLettura });
+  function rileggiSaldo() {
+    if (haPortafoglio()) rilettore.rileggi();
+  }
   async function saldoPerChat({ fresco = false } = {}) {
     if (!haPortafoglio()) return null;
-    let st = ultimaLettura ? ultimaLettura.state : null;
-    let lettaIl = ultimaLettura ? ultimaLettura.at : null;
-    let muto = false; // la lettura di adesso non è arrivata in tempo
-    if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
-      const letta = await Promise.race([
-        readState().catch(() => null),
-        new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
-      ]);
-      if (letta) { st = letta; lettaIl = Date.now(); } else muto = true;
-    }
-    if (st && st.identity && st.identity.lost) return null;
-    if (st && st.server && st.server.hasWallet === false) return null;
-    let server = st && st.server && st.server.hasWallet ? st.server : null;
-    if (!server) {
-      const disco = walletStore.lastServer() || lastServer;
-      if (!disco || !disco.hasWallet) return { balance: null };
-      server = { ...disco, cached: muto || Boolean(st) };
-      lettaIl = Date.parse(String(disco.readAt || '')) || null;
-    }
-    const b = server.balance || {};
-    // Perché non è il saldo di adesso: il server dei crediti muto, il servizio
-    // dei modelli che non ha detto il consumo (come la pagina), o una lettura
-    // solo vecchia, che la home usa senza chiederne un'altra.
-    const lastKnown = server.cached || muto ? 'server'
-      : server.stale ? 'models'
-        : !lettaIl || Date.now() - lettaIl > CHAT_VALIDO_MS ? 'old' : '';
-    const readAt = server.cached ? server.readAt
-      : server.stale ? server.usageReadAt
-        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
-    return {
-      balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
-      dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
-      lastKnown, readAt: readAt || null,
-      usingOwnKey: Boolean(st && st.usingOwnKey),
-      keyMissing: Boolean(st && st.hasPersonalKey === false),
-    };
+    if (fresco) rilettore.rileggi();
+    let disco = null;
+    try { disco = walletStore.lastServer() || lastServer; } catch (_) { disco = lastServer; }
+    return W.saldoPerChat({ lettura: ultimaLettura, disco });
   }
 
   // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
@@ -360,6 +354,9 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
+
+  // Chi scrive nella chat manderà presto un turno: il saldo si rilegge adesso, così all'invio è pronto (#1353).
+  on(MSG.WALLET_SALDO_PREPARA, filoOnly(async () => { rileggiSaldo(); return { ok: true }; }));
 
   // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
   // zittire per dieci minuti un avviso che ripete una frase.
@@ -394,16 +391,17 @@ module.exports = function register(on, ctx) {
     if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
     walletStore.metteDaParte();
+    const righeTolte = await svuotaCodaPerRicominciare();
     lastServer = null;
     ultimaLettura = null;
+    letturaValida = letturePartite;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
-    return { ok: true, state: await readState() };
+    return { ok: true, righeTolte, state: await readState() };
   }));
 
-  // L'identità dell'installazione non si crea (provider anonimo spento su
-  // Firebase, rete assente): è un problema diverso da «il server dei crediti
-  // non risponde», e il messaggio deve dirlo, non mandare a guardare la rete.
+  // L'identità dell'installazione che non si crea è un problema diverso da «il server non
+  // risponde»: il messaggio deve dirlo, invece di mandare a guardare la rete.
   async function identityProblem() {
     try { await identity.getIdToken(); return null; } catch (e) {
       return `Non riesco a preparare l'identità di questa installazione: ${String(e?.message || e)}.`;
@@ -416,7 +414,13 @@ module.exports = function register(on, ctx) {
   // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
   // La lettura è lineare (#664): qui gira nel main, e un conto lento ferma
   // tutte le schede.
+  // L'esito di ogni riscatto, da qualunque strada, lo contano i contatori del servizio (#1472): lo status, mai il codice.
   async function doRedeem(rawCode) {
+    const out = await riscatta(rawCode);
+    require('../contatoriServizio').misura('invito', (out && out.status) || 'internal');
+    return out;
+  }
+  async function riscatta(rawCode) {
     const codes = W.codesFromInput(rawCode || '');
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
@@ -424,6 +428,8 @@ module.exports = function register(on, ctx) {
     // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
     // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
     const localCredits = 0;
+    // Chi lo vedeva come saldo deve sentire dove va (#1353): si guarda prima che la chiave personale arrivi.
+    const conteggioLocale = W.conteggioLocaleInVista({ hasWallet: Boolean(lastServer && lastServer.hasWallet), keySource: await keySource() });
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
@@ -441,15 +447,19 @@ module.exports = function register(on, ctx) {
     if (status === 'invalid_code' && codes.length > daProvare.length) {
       return { ok: false, status, message: W.tooManyCodesMessage(codes.length, daProvare.length) };
     }
-    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
+    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status, r) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
+    try { await globalThis.SN_AVVISO_CREDITI_MAIN?.ricordaIngresso(r.entryCredits != null ? r.entryCredits : r.credits); } catch (_) {}
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
     // la home si rifà: da adesso Filo risponde.
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     const state = await readState();
-    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
+    return {
+      ok: true, status, message: W.redeemOkMessage({ ...r, conteggioLocale }), conteggioLocale,
+      credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state,
+    };
   }
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
@@ -488,10 +498,11 @@ module.exports = function register(on, ctx) {
   // CHIEDE anche, con WALLET_NOTICE_PENDING: l'avviso è scritto in locale e
   // chiederlo non costa un giro dal server, a differenza dello stato del
   // portafoglio.
-  async function setNotice(kind, text) {
-    const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
+  // `invitesLocked`: entrato senza Google collegato, quindi senza inviti da dare (#1120): la home non li promette.
+  async function setNotice(kind, text, { invitesLocked = null } = {}) {
+    const rec = { kind, text: String(text || ''), invitesLocked: invitesLocked || null, at: new Date().toISOString(), seenHome: false, seenCredits: false };
     await inFilaAvviso(async () => { try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {} });
-    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text, invitesLocked: rec.invitesLocked } }); } catch (_) {}
     return rec;
   }
 
@@ -534,7 +545,7 @@ module.exports = function register(on, ctx) {
       const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
       if (!r || visto) return null;
       if (msg && msg.claim) await segnaVisto(where);
-      return { kind: r.kind, text: r.text };
+      return { kind: r.kind, text: r.text, invitesLocked: r.invitesLocked || null };
     });
     return { ok: true, notice };
   }));
@@ -586,7 +597,10 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(r.code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
+    } else if (out && out.status === 'network_cap') {
+      // L'invito resta in attesa e si riprova al prossimo avvio, ma chi l'ha scaricato apposta deve sapere perché non è entrato.
+      await setNotice('failed', out.message);
     }
     return out;
   }
@@ -604,12 +618,13 @@ module.exports = function register(on, ctx) {
   async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
+      require('../contatoriServizio').misura('invito', 'already_in');
       return { ok: false, status: 'already_in', message: rec.text };
     }
     const out = await doRedeem(code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
     } else {
       await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
     }
@@ -622,7 +637,13 @@ module.exports = function register(on, ctx) {
   function portaDentroInvito(code, win) {
     // Il portafoglio è dell'installazione: da una finestra incognito si scrive sul disco lo stesso.
     Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
-    try { win?._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    // Una finestra appena nata (avvio, o rinata da fuori) riapre ancora le sue schede: Crediti dopo, o finisce dietro (#2191).
+    let pronta;
+    try { pronta = require('../../window').quandoPronta(win); } catch (_) { pronta = Promise.resolve(win ? {} : null); }
+    Promise.resolve(pronta).then((ok) => {
+      if (!ok || !win || win.isDestroyed()) return;
+      try { win._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    }).catch(() => {});
   }
 
   // Un collegamento d'invito cliccato davvero in una pagina, o «Riscatta
@@ -645,13 +666,105 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: String(e?.message || e) + rete };
     }
   });
-  on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
+  // La vista fa leggere al server tutti i portafogli: chi non la vuole fresca (home, controllo da solo) si accontenta di
+  // una lettura di meno di un quarto d'ora o di quella in volo; la pagina dell'owner rilegge sempre. Ogni lettura
+  // riuscita rifà gli avvisi della home (#855), che così non costano letture loro; una partita prima e arrivata dopo
+  // un'altra non la scavalca.
+  const VISTA_VALE_MS = 15 * 60 * 1000;
+  let vistaLetta = null;
+  let vistaInVolo = null;
+  let voli = 0;
+  let ultimoVolo = 0;
+  function vistaOwner({ fresca = false } = {}) {
+    if (!fresca && vistaLetta && Date.now() - vistaLetta.at < VISTA_VALE_MS) return Promise.resolve(vistaLetta.overview);
+    if (!fresca && vistaInVolo) return vistaInVolo;
+    const n = ++voli;
+    const volo = callable('walletOverview', {}, { asOwner: true }).then((overview) => {
+      if (overview && typeof overview === 'object' && n > ultimoVolo) {
+        ultimoVolo = n;
+        vistaLetta = { at: Date.now(), overview };
+        rifaiAvvisiOwner(overview);
+      }
+      return overview;
+    });
+    vistaInVolo = volo;
+    volo.finally(() => { if (vistaInVolo === volo) vistaInVolo = null; }).catch(() => {});
+    return volo;
+  }
+  on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await vistaOwner({ fresca: true }) })));
+
+  // Gli avvisi all'owner fra le notifiche della home (#855). Una carta per caso; quali marcatori sono già stati detti
+  // sta su disco, così una situazione che resta quella non si ridice a ogni avvio. Il portafoglio è dell'installazione:
+  // anche una lettura partita da una finestra incognito scrive sul disco.
+  const AVVISI_DETTI_KEY = 'walletOwnerAvvisiDetti';
+  const CONTROLLO_OGNI_MS = 6 * 60 * 60 * 1000;
+  let filaAvvisi = Promise.resolve();
+  function rifaiAvvisiOwner(overview) {
+    filaAvvisi = filaAvvisi.then(() => Disco.runNormale(() => scriviAvvisiOwner(overview))).catch((e) => {
+      console.warn('[wallet] avvisi dell’owner non scritti', String(e?.message || e));
+    });
+    return filaAvvisi;
+  }
+  async function scriviAvvisiOwner(overview) {
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.addNotification) return;
+    let detti = [];
+    try { detti = await globalThis.SN_STORAGE.getRaw(AVVISI_DETTI_KEY, []); } catch (_) {}
+    const esito = await W.applicaAvvisiOwner(FiloMem, detti, overview);
+    await globalThis.SN_STORAGE.setRaw(AVVISI_DETTI_KEY, esito.detti);
+    if (esito.cambiato) ctx.broadcastLiveUpdate();
+  }
+  // Il controllo da solo: all'avvio e ogni sei ore, solo sulla copia dell'owner. Un server muto non scrive niente.
+  async function controllaAvvisiOwner() {
+    if (!ctx.isAdmin()) return 'non_owner';
+    try { await vistaOwner(); } catch (e) {
+      console.warn('[wallet] avvisi dell’owner: vista non arrivata', String(e?.message || e));
+      return 'non_letta';
+    }
+    await filaAvvisi;
+    return 'fatto';
+  }
+  setTimeout(() => { controllaAvvisiOwner().catch(() => {}); }, 6000).unref?.();
+  setInterval(() => { controllaAvvisiOwner().catch(() => {}); }, CONTROLLO_OGNI_MS).unref?.();
+
+  // L'allarme del conto all'avvio (#820). Ogni home che si apre lo chiede, e gli allarmi già detti stanno su disco,
+  // così una situazione che resta quella non si ridice a ogni avvio.
+  const ALLARMI_DETTI_KEY = 'walletOwnerAllarmiDetti';
+  let filaAllarmi = Promise.resolve();
+  async function leggiContoOwner() {
+    return W.contoOwner(await vistaOwner());
+  }
+  on(MSG.WALLET_OWNER_ALARM_PENDING, filoOnly(async () => {
+    if (!ctx.isAdmin()) return { ok: true, alarm: null };
+    const turno = filaAllarmi.then(async () => {
+      let conto = null;
+      try { conto = await leggiContoOwner(); } catch (e) {
+        console.warn('[wallet] allarme del conto: vista non arrivata', String(e?.message || e));
+        return null;
+      }
+      let detti = [];
+      try { detti = await globalThis.SN_STORAGE.getRaw(ALLARMI_DETTI_KEY, []); } catch (_) {}
+      const esito = W.allarmiDaDire(detti, conto);
+      try { await globalThis.SN_STORAGE.setRaw(ALLARMI_DETTI_KEY, esito.detti); } catch (_) {}
+      if (!esito.dire.length) return null;
+      const title = esito.dire.some((a) => a.kind === 'vivi_oltre_conto')
+        ? 'Il conto OpenRouter non regge'
+        : 'Il tetto dei regali supera il conto OpenRouter';
+      return { title, text: esito.dire.map((a) => a.testo).join('\n\n') };
+    });
+    filaAllarmi = turno.catch(() => {});
+    const alarm = await turno;
+    // Gli avvisi nati dalla stessa lettura sono già fra le notifiche quando la home ha la risposta.
+    await filaAvvisi;
+    return { ok: true, alarm };
+  }));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
     // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
     if (result && result.ok) {
       ultimaLettura = null;
+      vistaLetta = null;
       try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     }
     return { result };
@@ -666,6 +779,12 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWNER_USER_DETAIL, ownerOnly(async (msg) => ({
     detail: await callable('walletUserDetail', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true }),
   })));
+  on(MSG.WALLET_OWNER_OFF_POLICY_SEEN, ownerOnly(async (msg) => {
+    const shown = Array.isArray(msg && msg.shown) ? msg.shown : [];
+    const result = await callable('walletAckOffPolicy', { pseudonym: String((msg && msg.pseudonym) || ''), shown }, { asOwner: true });
+    vistaLetta = null;
+    return { result };
+  }));
 
   // Le manopole dei crediti (#652). Non passano da una callable: `config/credits`
   // è un documento che l'account admin scrive direttamente, come già fa per i
@@ -678,6 +797,7 @@ module.exports = function register(on, ctx) {
     // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
     // pagina deve rileggere, e la chat anche.
     ultimaLettura = null;
+    vistaLetta = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { knobs };
   }));
@@ -685,10 +805,10 @@ module.exports = function register(on, ctx) {
   // ── Registro d'uso ────────────────────────────────────────────────────────
   // Le righe si accodano e si scrivono a gruppi (una commit Firestore ogni
   // pochi secondi): una chat con strumenti fa più chiamate al turno, e una
-  // scrittura per chiamata sarebbe rumore. Se la scrittura fallisce si
-  // ritenta al giro dopo; la coda non cresce oltre un tetto largo, e oltre si
-  // perde il più vecchio dicendolo nel log (una riga persa la trova la
-  // riconciliazione, non è un segreto).
+  // scrittura per chiamata sarebbe rumore. Un guasto passeggero si ritenta al
+  // giro dopo; una riga che il server rifiuta esce dalla coda (#1601). Ogni
+  // riga che esce senza arrivare, anche oltre il tetto largo della coda, si
+  // conta per motivo (`scarta`).
   //
   // La coda sta anche su disco (#629): le righe ancora da scrivere alla
   // chiusura di Filo ripartono all'avvio dopo, invece di sparire con il
@@ -698,23 +818,91 @@ module.exports = function register(on, ctx) {
   const queue = [];
   const QUEUE_CAP = 2000;
   const QUEUE_KEY = 'walletUsageQueue';
+  // Il conto delle righe scartate sta su disco: lo scarto avviene di solito appena dopo l'avvio, e chi apre Crediti
+  // dopo un riavvio deve trovarlo ancora (#1601).
+  const SCARTI_KEY = 'walletUsageLog';
   let flushTimer = null;
   let flushing = false;
-  let queueLoaded = false;
-  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null };
+  let caricamentoCoda = null;
+  let scartiLetti = false;
+  // Cresce a ogni «Ricomincia»: un invio partito prima non rimette in coda le righe dell'identità di prima.
+  let generazioneCoda = 0;
+  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null, discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null };
 
   function usageLogStatus() {
-    return { pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt };
+    const discarded = Object.values(log.discardedBy).reduce((s, n) => s + n, 0);
+    return {
+      pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt,
+      discarded, discardedBy: { ...log.discardedBy }, lastDiscardReason: log.lastDiscardReason, lastDiscardAt: log.lastDiscardAt,
+    };
   }
 
-  async function loadQueue() {
-    if (queueLoaded) return;
-    queueLoaded = true;
+  // Nessuna riga esce dalla coda senza dirlo: conta per motivo, la pagina Crediti lo mostra.
+  function scarta(n, motivo, dettaglio = '') {
+    if (!n) return;
+    log.discardedBy[motivo] = (log.discardedBy[motivo] || 0) + n;
+    log.lastDiscardReason = dettaglio || motivo;
+    log.lastDiscardAt = new Date().toISOString();
+    console.warn(`[wallet] registro d'uso: ${n} righe tolte dalla coda (${motivo})${dettaglio ? `: ${dettaglio}` : ''}`);
+    if (scartiLetti) salvaScarti();
+  }
+
+  function salvaScarti() {
+    const { discardedBy, lastDiscardReason, lastDiscardAt } = log;
+    const dato = Object.keys(discardedBy).length ? { discardedBy: { ...discardedBy }, lastDiscardReason, lastDiscardAt } : null;
+    try { Promise.resolve(globalThis.SN_STORAGE.setRaw(SCARTI_KEY, dato)).catch(() => {}); } catch (_) {}
+  }
+
+  // Si sommano a quelli scartati prima della lettura, che altrimenti la lettura cancellerebbe.
+  async function leggiScarti() {
+    let dato = null;
+    try { dato = await globalThis.SN_STORAGE.getRaw(SCARTI_KEY, null); } catch (_) {}
+    const prima = Object.keys(log.discardedBy).length > 0;
+    if (dato && dato.discardedBy && typeof dato.discardedBy === 'object') {
+      for (const [m, v] of Object.entries(dato.discardedBy)) {
+        const n = Math.max(0, Math.floor(Number(v) || 0));
+        if (n) log.discardedBy[m] = (log.discardedBy[m] || 0) + n;
+      }
+      if (!log.lastDiscardAt) {
+        log.lastDiscardReason = String(dato.lastDiscardReason || '');
+        log.lastDiscardAt = dato.lastDiscardAt || null;
+      }
+    }
+    scartiLetti = true;
+    if (prima) salvaScarti();
+  }
+
+  function tagliaCoda() {
+    if (queue.length <= QUEUE_CAP) return;
+    scarta(queue.length - QUEUE_CAP, 'coda_piena', `oltre ${QUEUE_CAP} righe, le più vecchie`);
+    queue.splice(0, queue.length - QUEUE_CAP);
+  }
+
+  // Le righe firmate con lo pseudonimo di un'altra identità la regola non le prende mai. Senza pseudonimo
+  // attuale (portafoglio che non si legge adesso) non si giudica: decide il server.
+  function togliAltreIdentita() {
+    const mio = walletStore.pseudonym();
+    if (!mio) return;
+    const prima = queue.length;
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].pseudonym !== mio) queue.splice(i, 1);
+    scarta(prima - queue.length, 'altra_identita');
+  }
+
+  // Chi arriva mentre la lettura è in corso la aspetta: la pagina Crediti non deve vedere coda e conto ancora vuoti.
+  function loadQueue() {
+    if (!caricamentoCoda) caricamentoCoda = caricaCoda();
+    return caricamentoCoda;
+  }
+
+  async function caricaCoda() {
+    await leggiScarti();
     try {
       const saved = await globalThis.SN_STORAGE.getRaw(QUEUE_KEY, null);
       if (Array.isArray(saved) && saved.length) {
         queue.unshift(...saved.filter((r) => r && r.pseudonym));
-        if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+        togliAltreIdentita();
+        tagliaCoda();
+        if (queue.length !== saved.length) await saveQueue();
         if (queue.length) scheduleFlush(5000);
       }
     } catch (_) {}
@@ -724,45 +912,80 @@ module.exports = function register(on, ctx) {
     try { await globalThis.SN_STORAGE.setRaw(QUEUE_KEY, queue.length ? queue.slice() : null); } catch (_) {}
   }
 
+  async function commitRighe(righe) {
+    const idToken = await identity.getIdToken();
+    const writes = righe.map((row) => ({
+      update: {
+        name: `${FB.rest.FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/wallet-usage/${newId()}`,
+        fields: Object.fromEntries(Object.entries(row).map(([k, v]) => [k, FB.toFsValue(v)])),
+      },
+      currentDocument: { exists: false },
+    }));
+    const res = await fetch(`${FB.rest.FIRESTORE_BASE}:commit?key=${FB.rest.API_KEY}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    });
+    if (res.ok) return { ok: true };
+    const testo = await res.text().catch(() => '');
+    const motivo = `wallet-usage commit ${res.status}: ${testo.slice(0, 200)}`;
+    if (W.rifiutoDellaRigaUso(res.status, testo)) return { ok: false, motivo };
+    throw new Error(motivo);
+  }
+
   async function flush() {
     flushTimer = null;
     if (flushing || !queue.length || !FB?.rest) return;
     flushing = true;
+    const generazione = generazioneCoda;
+    togliAltreIdentita();
     const batch = queue.splice(0, 200);
     try {
-      const idToken = await identity.getIdToken();
-      const writes = batch.map((row) => ({
-        update: {
-          name: `${FB.rest.FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/wallet-usage/${newId()}`,
-          fields: Object.fromEntries(Object.entries(row).map(([k, v]) => [k, FB.toFsValue(v)])),
-        },
-        currentDocument: { exists: false },
-      }));
-      const res = await fetch(`${FB.rest.FIRESTORE_BASE}:commit?key=${FB.rest.API_KEY}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ writes }),
-      });
-      if (!res.ok) throw new Error(`wallet-usage commit ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-      log.written += batch.length;
-      log.lastWriteAt = new Date().toISOString();
-      log.lastError = '';
-      log.lastErrorAt = null;
-    } catch (e) {
-      log.lastError = String(e?.message || e);
-      log.lastErrorAt = new Date().toISOString();
-      console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
-      queue.unshift(...batch);
-      if (queue.length > QUEUE_CAP) {
-        console.warn(`[wallet] registro d'uso: coda oltre ${QUEUE_CAP} righe, scarto le più vecchie`);
-        queue.splice(0, queue.length - QUEUE_CAP);
+      if (!batch.length) return;
+      const esito = await W.scriviIsolando(batch, commitRighe);
+      if (esito.scritte.length) {
+        log.written += esito.scritte.length;
+        log.lastWriteAt = new Date().toISOString();
       }
-      scheduleFlush(30000);
+      if (esito.rifiutate.length) scarta(esito.rifiutate.length, 'rifiutata', esito.rifiutate[esito.rifiutate.length - 1].motivo);
+      if (!esito.errore) {
+        log.lastError = '';
+        log.lastErrorAt = null;
+        return;
+      }
+      ritenta(esito.errore, esito.rimaste, generazione);
+    } catch (e) {
+      // Prima di ogni invio (scriviIsolando non lancia): il lotto torna intero.
+      ritenta(e, batch, generazione);
     } finally {
       flushing = false;
       await saveQueue();
       if (queue.length && !flushTimer) scheduleFlush(5000);
     }
+  }
+
+  function ritenta(errore, rimaste, generazione) {
+    log.lastError = String(errore?.message || errore);
+    log.lastErrorAt = new Date().toISOString();
+    if (generazione !== generazioneCoda) {
+      scarta(rimaste.length, 'ricomincia');
+      return;
+    }
+    console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
+    queue.unshift(...rimaste);
+    tagliaCoda();
+    scheduleFlush(30000);
+  }
+
+  // «Ricomincia con un nuovo invito»: le righe in coda sono del portafoglio che si lascia, e nessuna passerebbe più.
+  async function svuotaCodaPerRicominciare() {
+    await loadQueue();
+    generazioneCoda += 1;
+    const n = queue.length;
+    queue.length = 0;
+    scarta(n, 'ricomincia');
+    await saveQueue();
+    return n;
   }
 
   function scheduleFlush(ms) {
@@ -797,8 +1020,9 @@ module.exports = function register(on, ctx) {
       credits: W.creditsForUsd(costUsd, { eurPerCredit: fx.eurPerCredit, eurUsd: fx.eurUsd }),
     });
     if (!row) return;
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.registraConsumo({ action, credits: row.credits, usage }); } catch (_) {}
     queue.push(row);
-    if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    tagliaCoda();
     await saveQueue();
     scheduleFlush(3000);
   }
@@ -847,15 +1071,28 @@ module.exports = function register(on, ctx) {
     const now = Date.now();
     if (now - lastNoticeAt < 10 * 60 * 1000) return;
     lastNoticeAt = now;
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000 }); } catch (_) {}
+    // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
+    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
+    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:crediti_finiti'); } catch (_) {}
+    require('../contatoriServizio').misura('avviso', 'finiti', 'mostrato');
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
+  // La tariffa dei crediti dell'ultimo stato letto (euro per credito, cambio): le stime di costo (#819) scalano con
+  // la stessa del registro d'uso. Mai letta: valgono i valori di ripiego di SN_WALLET.creditsPerUsd.
+  function tariffaCrediti() {
+    let b = lastServer && lastServer.balance;
+    if (!b) { try { const disco = walletStore.lastServer(); b = disco && disco.balance; } catch (_) { b = null; } }
+    return { eurPerCredit: b && b.eurPerCredit, eurUsd: b && b.eurUsd };
+  }
+
   globalThis.SN_WALLET_MAIN = {
-    recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    recordUsage, outOfCreditsNotice, flush, readState, keySource, tariffaCrediti,
     // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
     // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
-    haPortafoglio, saldoPerChat,
+    haPortafoglio, saldoPerChat, notaInvio,
+    // L'avviso prima che i crediti finiscano (#818) legge l'ultimo stato senza chiederne uno nuovo.
+    ultimaLettura: () => ultimaLettura,
     redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi
@@ -864,12 +1101,23 @@ module.exports = function register(on, ctx) {
     // L'invito che arriva da fuori (#651): main.js porta dentro il
     // collegamento filo://invito/<codice>, l'avvio l'invito in attesa.
     redeemFromInvite, tryPendingInvite, portaDentroInvito,
+    // Il controllo che all'avvio e ogni sei ore scrive gli avvisi all'owner (#855): lo chiamano anche gli spec.
+    controllaAvvisiOwner,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
     senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
+    // …e il riavvio per la coda del registro: la si rilegge dal disco come all'avvio.
+    rileggiCodaPerTest: async () => {
+      if (process.env.NODE_ENV !== 'test') return;
+      queue.length = 0;
+      Object.assign(log, { discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null });
+      scartiLetti = false;
+      caricamentoCoda = null;
+      await loadQueue();
+    },
   };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la

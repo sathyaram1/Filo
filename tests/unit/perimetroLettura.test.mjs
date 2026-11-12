@@ -162,6 +162,17 @@ test('ESEGUI_COMANDO: il registro usa il perimetro iniettato dal main e lo spieg
   assert.doesNotMatch(AL.describe(ok), /Perché/);
 });
 
+test('#1994 — ESEGUI_COMANDO: git con --output non parte da solo; blame --contents misura il file che stampa', () => {
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git log -1 --format=x --output=/home/mario/.bashrc', _perimetro: LINUX }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'uniq a.txt b.txt', _perimetro: LINUX }), 2);
+  for (const cmd of ['git blame --contents=/etc/passwd -- a.txt', 'git blame --contents /etc/passwd -- a.txt',
+    'git blame --contents ~/.ssh/id_rsa -- a.txt', 'git blame --cont=/etc/passwd -- a.txt']) {
+    assert.equal(lvl(cmd, LINUX), 2, cmd);
+  }
+  assert.equal(lvl('git blame --contents note.txt -- a.txt', LINUX), 1);
+  assert.equal(lvl('git blame a.txt', LINUX), 1);
+});
+
 test('LEGGI_DOCUMENTO: stesso perimetro del terminale', () => {
   const doc = (percorso, ctx = LINUX) => AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso, _perimetro: ctx });
   assert.equal(doc('~/Scaricati/estratto.pdf'), 0);
@@ -203,6 +214,102 @@ test('#587 giro 11 — scritture equivalenti del percorso non aggirano il perime
   assert.equal(lvl('Get-Content Documenti\\a.txt,AppData\\Roaming\\Filo\\storage.json', WIN), 2);
   assert.equal(lvl('Get-ChildItem Documenti,env:', WIN), 2);
   assert.equal(lvl('Get-Content rel,finale.txt', WIN), 1);
+});
+
+// #1511 — sh e bash decodificano `$'…'` e tolgono i backslash: il perimetro misura il percorso che vede la shell.
+test('#1511 — il perimetro legge `$\'…\'` e i backslash come sh e bash', () => {
+  const nascosto = /legge un file nascosto o di configurazione/;
+  const det = (cmd, ctx) => C.classifyDetail(cmd, ctx);
+  const punti = ['\\x2e', '\\056', '\\u002e'];
+  for (const ctx of [LINUX, MAC, { ...LINUX, shell: 'sh' }, { ...MAC, shell: 'bash' }]) {
+    for (const prog of ['cat', 'head']) {
+      for (const pre of ['~/', './']) {
+        for (const p of punti) {
+          const cmd = `${prog} ${pre}$'${p}ssh/config'`;
+          assert.equal(det(cmd, ctx).level, 2, cmd);
+          assert.match(det(cmd, ctx).motivo, nascosto, cmd);
+        }
+        // Il punto scritto da solo nell'escape, col resto del nome fuori dalle virgolette.
+        assert.equal(lvl(`${prog} ${pre}$'\\x2e'aws/credentials`, ctx), 2);
+        // Il backslash fuori dalle virgolette sparisce: `.\ssh` è `.ssh`.
+        assert.equal(lvl(`${prog} ${pre}.\\ssh/config`, ctx), 2);
+      }
+    }
+  }
+  // Library su Mac, con una lettera scritta come escape o dopo un backslash.
+  assert.equal(lvl("cat $'Libr\\x61ry/Application Support/Filo/storage.json'", MAC), 2);
+  assert.equal(lvl("cat ~/$'\\x4c'ibrary/Keychains/login.keychain-db", MAC), 2);
+  assert.equal(lvl('cat ~/Lib\\rary/Keychains/login.keychain-db', MAC), 2);
+  // Un ottale oltre 377 vale il suo byte basso, come in bash: `\456` è il punto.
+  assert.equal(lvl("cat ~/$'\\456ssh/config'", LINUX), 2);
+  // `\'` dentro `$'…'` non chiude la stringa: il percorso dopo è un argomento a sé.
+  assert.equal(lvl("cat a$'\\''b /etc/passwd", LINUX), 2);
+  // Un apice o una virgoletta col backslash davanti non apre niente.
+  assert.equal(lvl('cat a\\"x /etc/passwd \\"', LINUX), 2);
+
+  // Il popup che l'utente vede prima della lettura.
+  const a = { type: 'ESEGUI_COMANDO', comando: "cat ~/$'\\x2essh/id_rsa'", _perimetro: LINUX, _cwd: '~' };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto o di configurazione/);
+  assert.equal(AL.costoFor({ ...a, comando: 'cat ~/.\\ssh/id_rsa' }), 2);
+
+  // Escape sconosciuti, NUL e byte che non sono UTF-8: il percorso non si sa.
+  for (const cmd of ["cat $'\\qnota.txt'", "cat ~/$'\\x00'nota.txt", "cat $'\\xffnota.txt'", "cat $'\\xnota.txt'",
+    "cat $'\\unota.txt'", "cat $'\\U110000'", "cat $'\\ud800'", "cat $'nota.txt"]) {
+    const d = det(cmd, LINUX);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /non si sa prima quali file leggerà/, cmd);
+  }
+
+  // Le stesse scritture per un file visibile restano libere.
+  assert.equal(lvl("cat $'nota\\x20di\\x20spesa.txt'", LINUX), 1);
+  assert.equal(lvl("cat ~/$'Documenti/nota\\040di spesa.txt'", MAC), 1);
+  assert.equal(lvl("cat $'\\u00e8 tutto.txt'", LINUX), 1);
+  assert.equal(lvl("cat $'\\xc3\\xa8 tutto.txt'", LINUX), 1);
+  assert.equal(lvl('cat nota\\ di\\ spesa.txt', LINUX), 1);
+  assert.equal(lvl('cat "Documenti/nota \\"vecchia\\".txt"', LINUX), 1);
+  assert.equal(lvl("echo $'\\xff'", LINUX), 1, 'echo stampa e basta');
+  assert.equal(lvl("grep $'ciao\\tmondo' note.txt", LINUX), 1);
+  assert.equal(lvl('cat $"nota di spesa.txt"', LINUX), 1);
+  assert.equal(lvl("echo '$HOME'", LINUX), 1);
+  assert.equal(lvl("echo $'$HOME'", LINUX), 1, 'dentro `$\'…\'` il `$` non si espande');
+});
+
+test('#1511 — git, cd e le altre shell misurano gli stessi percorsi', () => {
+  // git apre i file di `--no-index` come cat: stessa lettura degli argomenti.
+  for (const cmd of ["git diff --no-index $'.ssh/config' a.txt", "git diff --no-index ~/$'\\x2essh'/config a.txt",
+    'git diff --no-index ~/.\\ssh/config a.txt', 'git diff --no-index $".ssh/config" a.txt']) {
+    assert.equal(lvl(cmd, LINUX), 2, cmd);
+  }
+  assert.equal(lvl('git diff --no-index "Documenti/a b.txt" Documenti/c.txt', LINUX), 1);
+  assert.equal(lvl('git diff', LINUX), 1);
+  // Un `cd` scritto così porta dove porta la shell; uno che non si decodifica rende ignota la cartella.
+  assert.equal(lvl("cd ~/$'\\x2essh' && cat config", LINUX), 2);
+  assert.equal(lvl('cd ~/.\\ssh && cat config', LINUX), 2);
+  assert.equal(lvl("cd $'\\xff' && ls", LINUX), 2);
+  assert.equal(lvl("cd $'Documenti' && cat nota.txt", LINUX), 1);
+  // bash su Windows decodifica come altrove; PowerShell e cmd no: lì `\` separa le cartelle.
+  assert.equal(lvl("cat ~/$'\\x2essh'/config", { ...WIN, shell: 'bash' }), 2);
+  assert.equal(lvl('Get-Content .\\Documenti\\a.txt', WIN), 1);
+  assert.equal(lvl('Get-Content .\\Documenti\\a.txt', { ...WIN, shell: 'powershell' }), 1);
+  assert.equal(lvl('type Documenti\\a.txt', { ...WIN, shell: 'cmd' }), 1);
+  assert.equal(lvl('Get-Content AppData\\Roaming\\Filo\\storage.json', { ...WIN, shell: 'powershell' }), 2);
+});
+
+test('#1511 — dove sh può essere dash, `\\\'` dentro `$\'…\'` chiude la stringa: anche quella lettura chiede', () => {
+  // dash: `cat '$a\' .ssh/id_rsa` legge la chiave; bash vede un nome solo. Vale il più severo dei due.
+  for (const ctx of [LINUX, MAC, { ...LINUX, shell: 'sh' }]) {
+    for (const cmd of ["cat $'a\\' .ssh/id_rsa #'", "head $'x\\' .ssh/id_rsa ''", "grep $'a\\' .netrc #'",
+      "head -n $'1\\' .ssh/id_rsa #'", "cat $'a\\c\\' .ssh/id_rsa #'"]) {
+      assert.equal(lvl(cmd, ctx), 2, `${cmd} ${JSON.stringify(ctx)}`);
+    }
+  }
+  // Con bash scelta apposta la lettura è una sola.
+  assert.equal(lvl("cat $'a\\' .ssh/id_rsa #'", { ...LINUX, shell: 'bash' }), 1);
+  assert.equal(lvl("cat $'it\\'s.txt'", LINUX), 1);
+  // `\c\` è 0x1c e la barra dopo resta un separatore, come in bash: la cartella nascosta si vede.
+  assert.equal(lvl("cat ~/$'\\c\\/.ssh/config'", { ...LINUX, shell: 'bash' }), 2);
+  assert.equal(lvl("cat $'\\c\\\\nota.txt'", { ...LINUX, shell: 'bash' }), 1);
 });
 
 // #1072 — un percorso di rete (UNC, `\\?\UNC\`, `//server`) fa aprire a Windows una connessione verso
@@ -323,9 +430,11 @@ test('#1072 — il testo cercato non si apre: due barre nel modello non sono ret
     assert.doesNotMatch(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
   for (const cmd of ['grep TODO //evil/x/app.js', 'grep -f //evil/x/p a.txt', 'grep "//TODO" //evil/x/a.js', 'findstr /d:\\\\evil\\x a *.txt',
-    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'git --git-dir=\\\\evil\\x\\.git log', 'echo \\\\evil\\x | ls']) {
+    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'echo \\\\evil\\x | ls']) {
     assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
+  // Git portato su un altro repository non passa dalla sonda delle impostazioni (#2292): conferma piena.
+  assert.equal(lvl('git --git-dir=\\\\evil\\x\\.git log', WIN), 3);
 });
 
 test('#1072 — stampare un testo con due barre non apre niente; usato da un altro comando (tubo, gruppo) sì', () => {
@@ -406,7 +515,8 @@ test('#1072.4 — in una cwd di rete un nome dato a git, dal tubo o da un gruppo
 test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK', () => {
   const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log -- segreto'];
-  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+  // `where` legge solo come where.exe di cmd (#2292).
+  for (const ctx of [{ ...WIN, shell: 'cmd', cwd: '\\\\host\\x' }, { ...WIN, shell: 'cmd', cwd: 'Z:\\', reti: ['Z:'] }]) {
     assert.equal(C.classifyDetail('ls segreto', ctx).level, 2, `ls in ${ctx.cwd}`);
     for (const cmd of NOMI) {
       const d = C.classifyDetail(cmd, ctx);
@@ -417,7 +527,7 @@ test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK
   // Gli stessi comandi in una cartella del disco restano liberi.
   for (const cmd of ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'where node',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log']) {
-    assert.equal(lvl(cmd, WIN), 1, cmd);
+    assert.equal(lvl(cmd, { ...WIN, shell: 'cmd' }), 1, cmd);
   }
 });
 

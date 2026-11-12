@@ -56,6 +56,19 @@ test('barra: coi numeri uguali la lettura tiene l ora della prima volta che la s
     assert.equal(f.sessioni['sess-a'].lettura.letturaAtMs, NOW);
     assert.equal(f.ultima.letturaAtMs, NOW);
     assert.equal(f.sessioni['sess-a'].vistaAtMs, NOW + 2 * 3600e3, 'la barra è girata, e il battito lo vede');
+    // Al rinnovo delle cinque ore la barra rigira coi numeri della settimana e senza le cinque ore (#1179).
+    const senza5h = JSON.parse(JSON.stringify(STDIN));
+    delete senza5h.rate_limits.five_hour;
+    barra(JSON.stringify(senza5h), Object.assign({}, opts, { nowMs: NOW + 2.5 * 3600e3 }));
+    f = JSON.parse(readFileSync(quotaFile(home), 'utf8'));
+    assert.equal(f.ultima.letturaAtMs, NOW, 'la settimana è quella già vista');
+    assert.equal(f.ultima.pct5h, undefined);
+    // Le cinque ore di una finestra nuova sono una lettura nuova.
+    const nuove5h = JSON.parse(JSON.stringify(STDIN));
+    nuove5h.rate_limits.five_hour = { used_percentage: 3, resets_at: 1760040000 };
+    barra(JSON.stringify(nuove5h), Object.assign({}, opts, { nowMs: NOW + 2.6 * 3600e3 }));
+    f = JSON.parse(readFileSync(quotaFile(home), 'utf8'));
+    assert.equal(f.ultima.letturaAtMs, NOW + 2.6 * 3600e3);
     // Numeri cambiati: lettura nuova, con la sua ora.
     const cambiati = JSON.parse(JSON.stringify(STDIN));
     cambiati.rate_limits.seven_day.used_percentage = 62;

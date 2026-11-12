@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, posix } from 'node:path';
 
@@ -26,11 +26,29 @@ const DIFFERENZE = {
     'src/content/cookieBanners.js': 'banner dei cookie da nascondere: le pagine interne non ne hanno',
     'src/content/adSkip.js': 'pubblicità dei video da saltare: le pagine interne non ne hanno',
     'src/content/riquadroRotto.js': 'riquadri di altri siti rotti dai cookie: le pagine interne non ne hanno',
+    'src/shared/campoAccesso.js': 'campi di accesso dei siti a cui proporre l\'email: le pagine interne sono di Filo',
+    'src/content/propostaEmail.js': 'l\'email dell\'account proposta nei campi di accesso: niente proposte sulle pagine di Filo',
+    'src/shared/testoDeiCampi.js': 'il testo scritto nei campi dei siti che non si perde: si conserva solo su http e https',
+    'src/content/testoDeiCampi.js': 'il testo scritto nei campi dei siti che non si perde: si conserva solo su http e https',
+    'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/riquadriSopraLaScheda.js': 'i riquadri nello strato sopra la scheda: sulle pagine di Filo restano nella pagina',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
+    'src/shared/trascinoInterno.js': 'i trascinamenti interni partono e si accettano solo sulle pagine di Filo: sui siti il riferimento entra come testo',
   },
 };
+
+// Lo strato dei riquadri sopra un sito (#1509.1) carica l'elenco delle pagine interne, tranne ciò che descrive la scheda,
+// e in coda chi lo comanda.
+const FUORI_DALLO_STRATO = {
+  'src/shared/tabColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
+  'src/content/pageColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
+  'tests/fixtures/testModels.js': 'modelli di prova delle pagine interne',
+  'src/shared/trascinoInterno.js': 'l’Aiuto nello strato serve un sito: lì un riferimento trascinato entra come testo',
+};
+const SOLO_NELLO_STRATO = ['src/content/stratoRiquadri.js'];
 
 const BASI = {
   SHARED_DIR: 'src/shared', CONTENT_DIR: 'src/content',
@@ -49,7 +67,7 @@ function corpoFunzione(src, nome) {
 // diventa un percorso dalla radice del repo.
 function elencoScript(corpo) {
   const out = [];
-  const re = /(?:require|safe)\(path\.join\((\w+)((?:,\s*'[^']*')+)\)\)/g;
+  const re = /(?:require|safe)\(path\.join\((\w+)((?:,\s*'[^']*')+)\)(?:,\s*'\w+')?\)/g;
   for (const m of corpo.matchAll(re)) {
     const base = BASI[m[1]];
     assert.ok(base, `base sconosciuta ${m[1]}`);
@@ -69,6 +87,7 @@ const pageSrc = leggi('src', 'preload', 'page-preload.js');
 const internalSrc = leggi('src', 'preload', 'internal-preload.js');
 const web = elencoScript(corpoFunzione(pageSrc, 'loadScripts'));
 const interne = elencoScript(corpoFunzione(internalSrc, 'loadContentScripts'));
+const strato = elencoScript(corpoFunzione(leggi('src', 'preload', 'riquadri-preload.js'), 'loadContentScripts'));
 
 test('i due elenchi si leggono davvero', () => {
   for (const [nome, elenco] of [['page-preload', web], ['internal-preload', interne]]) {
@@ -87,6 +106,13 @@ test('pagine web e pagine interne caricano gli stessi content script nello stess
     + 'nello stesso punto, oppure in DIFFERENZE col suo perché');
 });
 
+test('lo strato dei riquadri carica gli script delle pagine interne, senza quelli che descrivono la scheda', () => {
+  assert.deepEqual(strato, [...interne.filter((f) => !Object.hasOwn(FUORI_DALLO_STRATO, f)), ...SOLO_NELLO_STRATO],
+    'riquadri-preload.js diverge da internal-preload.js: un file va in tutti e due, nello stesso punto, '
+    + 'oppure in FUORI_DALLO_STRATO col suo perché');
+  for (const f of Object.keys(FUORI_DALLO_STRATO)) assert.ok(interne.includes(f), `${f} non è più nelle pagine interne: toglilo da FUORI_DALLO_STRATO`);
+});
+
 test('le differenze ammesse sono ancora differenze vere', () => {
   for (const f of Object.keys(DIFFERENZE.soloPagineWeb)) {
     assert.ok(web.includes(f), `${f} non è più in page-preload.js: toglilo da DIFFERENZE`);
@@ -99,7 +125,7 @@ test('le differenze ammesse sono ancora differenze vere', () => {
 });
 
 test('ogni script elencato esiste: il caricamento ne ingoia l\'assenza', () => {
-  for (const f of new Set([...web, ...interne])) {
+  for (const f of new Set([...web, ...interne, ...strato])) {
     assert.ok(existsSync(join(ROOT, f)), `${f} è elencato in un preload ma non esiste`);
   }
 });
@@ -118,4 +144,55 @@ test('il main inietta sui siti gli stessi fogli di stile del preload', () => {
   assert.ok(m, 'CONTENT_STYLE_FILES non trovato in tabs.js');
   const dalMain = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   assert.deepEqual(dalMain, elencoStili(pageSrc));
+});
+
+// #1093 — un modulo che una pagina interna carica coi suoi <script> il preload lo salta se il suo nome c'è già: senza il
+// nome nella chiamata si compila due volte, e uno con stato (i18n, voceChat) riparte da capo. Le viste dello strato
+// (menu, riquadri) hanno un preload loro.
+const PAGINE_SENZA_INTERNAL_PRELOAD = new Set(['menu', 'riquadri']);
+
+function globaliDelPreloadInterno() {
+  const out = new Map();
+  const corpo = corpoFunzione(internalSrc, 'loadContentScripts');
+  for (const m of corpo.matchAll(/safe\(path\.join\((\w+)((?:,\s*'[^']*')+)\)(?:,\s*'(\w+)')?\)/g)) {
+    const pezzi = [...m[2].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+    out.set(posix.normalize(posix.join(BASI[m[1]], ...pezzi)), m[3] || '');
+  }
+  return out;
+}
+
+function scriptDellaPagina(html) {
+  const out = [];
+  for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
+    const u = m[1];
+    if (u.startsWith('filo://shared/')) out.push(`src/shared/${u.slice('filo://shared/'.length)}`);
+    else if (u.startsWith('filo://src/')) out.push(`src/${u.slice('filo://src/'.length)}`);
+  }
+  return out;
+}
+
+test('nessuna pagina interna compila due volte un modulo condiviso', () => {
+  const globali = globaliDelPreloadInterno();
+  assert.ok(globali.size >= 30, 'elenco del preload interno non letto');
+  const doppi = [];
+  for (const dir of readdirSync(join(ROOT, 'src', 'pages'))) {
+    if (PAGINE_SENZA_INTERNAL_PRELOAD.has(dir)) continue;
+    let files = [];
+    try { files = readdirSync(join(ROOT, 'src', 'pages', dir)).filter((f) => f.endsWith('.html')); } catch (_) { continue; }
+    for (const f of files) {
+      for (const s of scriptDellaPagina(leggi('src', 'pages', dir, f))) {
+        if (globali.has(s) && !globali.get(s)) doppi.push(`${dir}/${f}: ${s}`);
+      }
+    }
+  }
+  assert.deepEqual(doppi, [], 'moduli caricati dalla pagina e di nuovo dal preload: dai a safe() il nome che registrano');
+});
+
+test('il nome dato a safe() è l’ultimo che il modulo registra', () => {
+  for (const [file, nome] of globaliDelPreloadInterno()) {
+    if (!nome) continue;
+    const nomi = [...leggi(file).matchAll(/\bglobal(?:This)?\.(SN_[A-Z0-9_]+)\s*=(?!=)/g)].map((m) => m[1]);
+    assert.ok(nomi.includes(nome), `${file} non registra ${nome}`);
+    assert.equal(nomi.at(-1), nome, `${file}: il nome da guardare è l'ultimo registrato (${nomi.at(-1)}), così c'è solo a modulo finito`);
+  }
 });

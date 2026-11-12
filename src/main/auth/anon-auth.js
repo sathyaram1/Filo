@@ -1,29 +1,6 @@
-// Identità dell'installazione: un account Firebase ANONIMO per copia di Filo
-// (feedback #598).
-//
-// PERCHÉ
-//   La chiave OpenRouter personale e i crediti appartengono all'installazione,
-//   non a un account Google: Filo deve funzionare senza login. Firebase dà a
-//   ogni installazione un uid anonimo; il server ci costruisce sopra lo
-//   pseudonimo (hash dell'uid con un sale che sta solo lì) e il portafoglio.
-//
-// COME
-//   Al primo bisogno si chiama `accounts:signUp` senza email né password: torna
-//   un uid, un idToken e un refreshToken. Si conserva SOLO il refreshToken,
-//   cifrato con safeStorage (stesso schema di token-store.js) in un file suo.
-//   Il resto (idToken, uid) si ricava dal refresh.
-//
-// LOGIN GOOGLE
-//   Quando l'utente fa il login con Google, google-auth.js prova a COLLEGARE
-//   l'account Google a questa identità (signInWithIdp con l'idToken anonimo):
-//   così l'uid resta lo stesso e portafoglio e crediti seguono l'account. Se il
-//   collegamento non è possibile (account Google già legato a un'altra
-//   installazione) il login avviene comunque, con due identità distinte: il
-//   portafoglio resta su questa. È il caso di chi installa Filo su un secondo
-//   computer: lì dovrà riscattare un invito suo.
-//
-// Nessun require('electron') a livello di modulo: gli unit test lo caricano
-// fuori da Electron. Endpoint sovrascrivibili via env per i test.
+// Identità dell'installazione: un account Firebase anonimo per copia di Filo (#598).
+// Crediti e chiave personale stanno su quell'uid, non sul login Google, che vi si collega.
+// Si conserva solo il refreshToken, cifrato con safeStorage; il resto si ricava dal refresh.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -38,12 +15,18 @@ const SECURE_TOKEN_ENDPOINT = process.env.FILO_SECURE_TOKEN_ENDPOINT || cfg.secu
 
 let session = null; // { refreshToken, idToken, idTokenExp, uid }
 let inflight = null;
-// L'identità è stata annullata sul server (rinnovo rifiutato): non se ne crea
-// un'altra in silenzio, perché il portafoglio è legato a quella. Chi legge lo
-// stato lo dice all'utente; ricominciare è una scelta sua (resetIdentity).
+// Identità annullata sul server: non se ne crea un'altra in silenzio, il portafoglio è
+// legato a quella. Ricominciare è una scelta dell'utente (resetIdentity).
 let lost = false;
 // Il file c'è ma non si è lasciato leggere né spostare: un'identità nuova scritta sopra perderebbe il portafoglio (#1087).
 let fileIntoccabile = false;
+// «identity_unreadable» si ripete a ogni richiesta: i contatori del servizio (#1472) lo contano una volta per avvio.
+let illeggibileContata = false;
+
+// Un guasto dell'identità, per nome: lo contano i contatori del servizio (#1472). Mai un token o un uid.
+function contaGuasto(evento) {
+  try { require('../services/contatoriServizio').misura('identita', evento); } catch (_) {}
+}
 
 function erroreIdentita(code) {
   const err = new Error(code === 'identity_lost'
@@ -81,6 +64,7 @@ function persist() {
     return true;
   } catch (e) {
     console.error('[identity] salvataggio fallito:', e?.message || e);
+    contaGuasto('salvataggio_fallito');
     return false;
   }
 }
@@ -115,6 +99,7 @@ function load() {
     if (dati) return dati;
     console.warn('[identity] file illeggibile, lo metto da parte');
     if (!guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro())) fileIntoccabile = true;
+    else contaGuasto('illeggibile_da_parte');
     return null;
   }
   if (!walletStore.suDisco()) return null;
@@ -147,8 +132,12 @@ async function signUpAnonymous() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ returnSecureToken: true }),
     });
-  } catch (e) { throw humanNetworkError(e); }
+  } catch (e) {
+    contaGuasto('registrazione_fallita');
+    throw humanNetworkError(e);
+  }
   if (!res.ok) {
+    contaGuasto('registrazione_fallita');
     const text = await res.text().catch(() => '');
     const err = new Error(/ADMIN_ONLY_OPERATION/.test(text)
       ? 'identità anonima non abilitata sul server (Firebase → Authentication → Anonymous)'
@@ -184,6 +173,7 @@ async function refresh() {
     const testo = await res.text().catch(() => '');
     if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
     lost = true;
+    contaGuasto('identity_lost');
     throw erroreIdentita('identity_lost');
   }
   const j = await res.json();
@@ -194,9 +184,8 @@ async function refresh() {
   return session.idToken;
 }
 
-// L'idToken dell'installazione, creando l'identità se non c'è ancora. Una sola
-// chiamata in volo alla volta: dieci chiamanti all'avvio non devono creare
-// dieci account.
+// L'idToken dell'installazione, creandola se manca. Una sola chiamata in volo alla volta:
+// dieci chiamanti all'avvio non devono creare dieci account.
 async function getIdToken() {
   if (session?.idToken && Date.now() < session.idTokenExp) return session.idToken;
   if (lost) throw erroreIdentita('identity_lost');
@@ -204,7 +193,10 @@ async function getIdToken() {
   // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco. Fuori dalla
   // corsa in volo: un errore sincrono lì dentro lascerebbe `inflight` fermo su un rifiuto per sempre.
   if (!session?.refreshToken && walletStore.suDisco()) restore();
-  if (isUnreadable()) throw erroreIdentita('identity_unreadable');
+  if (isUnreadable()) {
+    if (!illeggibileContata) { illeggibileContata = true; contaGuasto('identity_unreadable'); }
+    throw erroreIdentita('identity_unreadable');
+  }
   inflight = (async () => {
     try {
       if (session?.refreshToken) return await refresh();
@@ -227,7 +219,7 @@ function _expireToken() { if (session) { session.idToken = null; session.idToken
 // Ricomincia da zero: scelta confermata dall'utente dopo che l'identità è persa o illeggibile.
 // Il file resta accanto; la prossima richiesta crea un'identità nuova.
 function resetIdentity() {
-  session = null; lost = false; inflight = null; fileIntoccabile = false;
+  session = null; lost = false; inflight = null; fileIntoccabile = false; illeggibileContata = false;
   try { guasti.metteDaParte(filePath(), 'prev'); } catch (_) {}
 }
 

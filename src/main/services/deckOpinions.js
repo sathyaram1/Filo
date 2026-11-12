@@ -1,17 +1,6 @@
-// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7) —
-// parte I/O, main process. La logica pura (staleness, parsing, piano di
-// tagging con cache) è in SN_DECK_OPINIONS (src/shared/deckOpinions.js).
-//
-// Cache (§6.2, §13.3):
-//   - pareri:   STORAGE_KEYS.DECK_OPINIONS  { deckId → { cardId → { text, versione, at } } }
-//               un parere per (carta, mazzo); si SOSTITUISCE al ricalcolo, non
-//               si cancella quando diventa stantio (resta visibile marcato).
-//   - tag:      STORAGE_KEYS.DECK_TAG_CACHE { cardId → { tag → bool } }
-//               SOLO tag context-free: permanente e condivisa fra i mazzi.
-//
-// Economia (§6.3): mai chiamate spontanee — si calcola solo ciò che il
-// chiamante chiede (hover col modulo attivo, aggiunta al mazzo, batch
-// esplicito). Il batch è UNA chiamata LLM per tutte le carte richieste.
+// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), parte I/O.
+// La logica pura (staleness, parsing, piano di tagging) sta in SN_DECK_OPINIONS.
+// Economia §6.3: mai chiamate spontanee, e un batch è UNA sola chiamata LLM.
 
 (function (global) {
   'use strict';
@@ -22,17 +11,24 @@
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
 
-  // Tetto di carte per batch: un mazzo Commander è ≤100; oltre è un errore del
-  // chiamante, non un caso d'uso.
+  // Un mazzo Commander è ≤100 carte: oltre il tetto è un errore del chiamante.
   const MAX_BATCH = 120;
   // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
   const FILTER_BATCH = 50;
   const FILTER_PARALLEL = 8;
-  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
+  // Errori che riprovare non cura: configurazione, e un lotto tagliato, o rifiutato dal router per il tetto o un parametro.
+  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY', 'LIMIT_REACHED', 'RISPOSTA_TAGLIATA', 'TETTO_RISPOSTA', 'PARAMETRI_HOST']);
   // Un «troppe richieste» o un servizio sovraccarico si aspetta, con meno lotti insieme. Quando un lotto finisce
-  // queste attese (15 s in tutto) il servizio è giù davvero, e gli altri non aspettano più.
+  // queste attese (15 s in tutto, contando anche quelle che ogni chiamata fa già da sé) il servizio è giù davvero,
+  // e gli altri non aspettano più.
   const BUSY_WAITS_MS = [1000, 2000, 4000, 8000];
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const BUSY_TOTAL_MS = BUSY_WAITS_MS.reduce((a, b) => a + b, 0);
+  // Un'attesa che finisce prima se la ricerca ha già deciso che il servizio è giù.
+  const sleepFinoA = (ms, signal) => new Promise((r) => {
+    if (signal && signal.aborted) { r(); return; }
+    const t = setTimeout(r, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true });
+  });
 
   // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
   // economica; senza tetto ogni ricerca lasciava decine di KB nel file di Filo, per sempre.
@@ -80,7 +76,7 @@
     return { text: entry.text, versione: entry.versione, stale: P.isStale(entry, deck) };
   }
 
-  // Pareri già in cache per gli id dati (mai LLM). { cardId → {text, versione, stale} }.
+  // Solo cache, mai LLM.
   async function getOpinions(deck, cardIds) {
     const all = await readOpinions();
     const byDeck = all[deck.id] || {};
@@ -123,14 +119,8 @@
     }).join('\n');
   }
 
-  // Calcola (o ricalcola) i pareri per gli id dati. UNA chiamata LLM per i
-  // soli id da (ri)fare secondo `mode`:
-  //   'missing' (default) — solo i pareri ASSENTI: uno stantio resta com'è,
-  //                         visibile e marcato (§6.2: refresh mai automatico);
-  //   'stale'             — assenti + stantii (il "batch completo su
-  //                         richiesta": "valuta il mazzo");
-  //   'force'             — tutti (refresh esplicito della singola carta).
-  // Ritorna { opinions: { cardId → {text, versione, stale} }, sintesi, computed }.
+  // mode: 'missing' solo i pareri assenti (uno stantio resta com'è, §6.2: il refresh non è mai
+  // automatico); 'stale' assenti e stantii; 'force' tutti, refresh esplicito di una carta.
   async function computeOpinions({ deck, cards, cardIds, mode = 'missing', wantSintesi = false, handleAIRequest }) {
     const ids = [...new Set((cardIds || []).map(String).filter((id) => cards[id]))].slice(0, MAX_BATCH);
     const all = await readOpinions();
@@ -158,6 +148,9 @@
         action: ACTIONS.DECKS_OPINION,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
+        // «Aggiorna» e «Riprova» chiedono un parere nuovo: la risposta di prima, magari senza la carta, tornerebbe uguale.
+        noCache: mode === 'force',
       });
       const parsed = P.parseOpinionBatch(r.text);
       sintesi = parsed.sintesi;
@@ -174,8 +167,7 @@
     return { opinions: out, sintesi, computed: need.length };
   }
 
-  // Il mazzo è stato eliminato: via anche i suoi pareri (la cache tag resta:
-  // è per carta, cross-mazzo).
+  // Mazzo eliminato: via anche i suoi pareri. La cache tag resta, è per carta e cross-mazzo.
   async function dropDeck(deckId) {
     const all = await readOpinions();
     if (!all[deckId]) return;
@@ -183,9 +175,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.DECK_OPINIONS]: all });
   }
 
-  // Auto-tag (§7): giudica carta-per-tag col modello economico, riusando la
-  // cache (carta, tag) per i tag context-free. Ritorna il mazzo con i tag
-  // applicati (NON salvato: il chiamante persiste) + conteggi per la reply.
+  // Auto-tag (§7): ritorna il mazzo coi tag applicati ma NON salvato, persiste il chiamante.
   async function autoTag({ deck, cards, tags, handleAIRequest }) {
     const norm = (tags || []).map(P.normTag).filter(Boolean);
     if (!norm.length || !deck.carte.length) {
@@ -207,9 +197,9 @@
         action: ACTIONS.DECKS_AUTOTAG,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
       });
       const raw = P.parseTagBatch(r.text);
-      // Solo id davvero richiesti e solo tag davvero richiesti.
       for (const [id, ts] of Object.entries(raw)) {
         if (!plan.judgeIds.includes(id)) continue;
         judged[id] = ts.filter((t) => norm.includes(t));
@@ -261,14 +251,22 @@
     let next = 0;
     let limit = Math.min(FILTER_PARALLEL, batches.length);
     let pauseUntil = 0;
-    let serviceDown = false;
+    let serviceDown = null;
+    // Deciso che il servizio è giù, i lotti rimasti non chiamano più e quelli in volo smettono di aspettare (#1302):
+    // le loro carte restano «non controllate», con lo stesso errore.
+    const giu = new AbortController();
+    const chiedi = (args) => handleAIRequest({ ...args, signal: giu.signal });
     const judgeWithWaits = async (i) => {
+      const inizio = Date.now();
       for (let wait = 0; ; wait += 1) {
         const pause = pauseUntil - Date.now();
-        if (pause > 0) await sleep(pause);
-        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
+        if (pause > 0 && !serviceDown) await sleepFinoA(pause, giu.signal);
+        if (serviceDown) return serviceDown;
+        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest: chiedi, signal: giu.signal });
+        if (serviceDown) return r.keep ? r : serviceDown;
         if (!r.busy) return r;
-        if (serviceDown || wait >= BUSY_WAITS_MS.length) { serviceDown = true; return r; }
+        const finite = wait >= BUSY_WAITS_MS.length || Date.now() - inizio + BUSY_WAITS_MS[wait] > BUSY_TOTAL_MS;
+        if (finite) { serviceDown = r; giu.abort(); return r; }
         limit = Math.max(1, Math.ceil(limit / 2));
         pauseUntil = Math.max(pauseUntil, Date.now() + BUSY_WAITS_MS[wait]);
       }
@@ -312,7 +310,7 @@
   // Un lotto al giudice. Una risposta illeggibile si richiede una volta (le risposte del giudice non passano dalla
   // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando, e un
   // servizio occupato torna `busy` a chi sa aspettare.
-  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
+  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest, signal = null }) {
     const sys = PROMPTS.decksSearchFilter({
       criterion,
       context,
@@ -325,14 +323,17 @@
           action: ACTIONS.DECKS_SEARCH_FILTER,
           payload: { messages: [{ role: 'user', content: sys }] },
           origin: 'filo://decks',
+          intera: true,
         });
         const keep = P.parseSearchKeep(r && r.text, ids);
         if (keep) return { keep };
         error = Object.assign(new Error('risposta del filtro illeggibile'), {
-          userText: 'il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» in Modelli predefiniti.',
+          userText: `il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» ${globalThis.SN_CHAT_ERRORS.DOVE_ALTRO_MODELLO}.`,
+          code: 'ALTRO_MODELLO',
         });
       } catch (e) {
         if (isBusy(e)) return { error: e, busy: true };
+        if (signal && signal.aborted) return { error: e, busy: true };
         error = e;
         if (e && CONFIG_ERRORS.has(e.code)) break;
       }

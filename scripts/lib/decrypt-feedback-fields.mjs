@@ -1,5 +1,5 @@
 // Decifra i campi FENC1: dei feedback e i loro allegati per gli script dell'owner (l'app ha la sua copia in auth.js).
-// La chiave privata la cerca in FILO_FEEDBACK_PRIVKEY e poi in tests/agent/.env (gitignorato); non la scrive mai.
+// La chiave privata la cerca in FILO_FEEDBACK_PRIVKEY e poi in tests/agent/.env (gitignorato, una volta per corsa); non la scrive mai.
 
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
@@ -60,9 +60,17 @@ function privKeyFromEnvFile(envFile) {
   return null;
 }
 
+// Il ripiego sul disco si cerca una volta per corsa, anche quando non trova niente:
+// cercato a ogni feedback costava un git per feedback, minuti su una lista (#1175).
+let chiaveSulDisco;
+
 function readPrivKey() {
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
+  if (chiaveSulDisco === undefined) chiaveSulDisco = privKeyFromDisk();
+  return chiaveSulDisco;
+}
 
+function privKeyFromDisk() {
   const local = privKeyFromEnvFile(join(REPO_ROOT, 'tests', 'agent', '.env'));
   if (local) return local;
 
@@ -162,6 +170,23 @@ export async function decryptFeedbackFields(fb, privKey) {
     }
   }
   return out;
+}
+
+/**
+ * Un campo cifrato che contiene JSON (la scheda di un feedback, #1785), in chiaro e già letto: null se manca, non si
+ * apre o non è JSON. Senza chiave null: chi chiama lo dice, non inventa.
+ */
+export async function decryptJsonField(v, privKey) {
+  if (typeof v !== 'string' || !v) return null;
+  loadCrypto();
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+  try {
+    if (!C || !C.isEncrypted(v)) return JSON.parse(v);
+    const priv = privKey || readPrivKey();
+    return priv ? JSON.parse(await C.decrypt(v, priv)) : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /**

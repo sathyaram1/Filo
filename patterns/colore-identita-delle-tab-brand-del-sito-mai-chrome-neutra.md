@@ -25,7 +25,7 @@ ma il suo brand è il rosso del favicon → la sua scheda non attiva è rossa.
   sbagliata). I favicon same-origin (come YouTube) funzionano.
 - **Dove:** campionamento in `src/content/pageColor.js` (catena `compute()`);
   applicazione nella shell in `src/renderer/shell.js` (`render`). Prove: `tests/unit/tabColor.test.mjs`,
-  `tests/tab-colors.spec.mjs`, `tests/tab-archive.spec.mjs`.
+  `tests/tab-colors.spec.mjs`.
 - **Parametri regolabili (6):** l'estrazione e il blend sono governati da sei
   parametri (`soglia_saturazione`, `peso_centralita`, `bucket_tinta`,
   `saturazione_tab`, `luminosita_tab`, `opacita_tab`). La **fonte di verità** di
@@ -55,9 +55,9 @@ ma il suo brand è il rosso del favicon → la sua scheda non attiva è rossa.
   ripiego su nero o bianco); l'hover va verso il polo del tema lontano
   dall'inchiostro, così non abbassa mai il contrasto. L'accento e il grigio
   morbido sparirebbero su una tinta viva.
-- **Una regola, due posti:** la Cronologia (`src/pages/archive/archive.js`)
-  colora le chip con le stesse funzioni, sul neutro della chip; niente copie
-  locali della formula.
+- **Una regola, un posto:** chi colora una scheda fuori dalla fila (un
+  elenco, una chip) usa le stesse funzioni di `src/shared/tabColor.js`;
+  niente copie locali della formula.
 - **Due strade per cambiarli (parità di cammini):** (1) **a voce in chat** — il
   setter `colore_tab` in `src/shared/preferences.js` mappa richieste verbali
   ("più vivaci"/"più neutre"/"nessuno"/"più preciso"/"predefinito") su preset

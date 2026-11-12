@@ -45,13 +45,6 @@ test('una pagina http di conferma aperta in una scheda arriva al sito una volta 
   }
 });
 
-test('Sicurezza non mostra l\'interruttore della finestra isolata, che oggi non comanda niente', async ({ openTab }) => {
-  const page = await openTab('filo://security/');
-  await page.waitForSelector('#sec-safebrowse', { timeout: 8_000 });
-  await expect(page.locator('#sec-safebrowse-llm')).toBeVisible();
-  await expect(page.locator('#sec-safebrowse-sandbox')).toBeHidden();
-});
-
 test('in incognito una pagina http con la password ha il suo avviso, senza giudizio del modello né seconda visita', async ({ app, shell }) => {
   const t = {};
   const sito = await sitoCheConta(t);

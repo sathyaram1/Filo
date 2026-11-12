@@ -1,6 +1,6 @@
 ---
 name: routine-worker
-description: Worker delle routine di Filo per verifica, correzione, riallineamento ed esplorazione: diventa il ruolo che dispatch gli stampa. Opus a sforzo high (decisione owner 2026-10-02: a xhigh trovava quasi gli stessi rilievi a costo doppio).
+description: Worker delle routine di Filo per verifica, correzione e riallineamento: diventa il ruolo che dispatch gli stampa. Opus a sforzo high (decisione owner 2026-10-02: a xhigh trovava quasi gli stessi rilievi a costo doppio).
 model: opus
 effort: high
 hooks:
@@ -25,3 +25,7 @@ di ritorno non viene letto: chiudi con la sola parola FATTO.
 
 I file nati da shell (non da Edit/Write) si salvano al tuo Edit/Write successivo
 o al rilascio del biglietto, non prima.
+
+I tuoi comandi li lanci come dice il ruolo, quelli lunghi in sottofondo, anche
+se il prompt dice altro: il «primo piano» vale per il tuo lancio, non per i tuoi
+comandi.

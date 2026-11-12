@@ -148,25 +148,45 @@ function dimentica(parent, ids) {
   if (s.voluta && ids.includes(s.voluta.id)) nascondi(parent);
 }
 
+// La carta in vista per i contatori della finestra (#1470): lo stato della foto quando compare, l'esito e la sosta.
+function contaUscita(parent, s, esito) {
+  const m = s && s.misura;
+  if (!m) return;
+  s.misura = null;
+  require('./services/contatoriFinestra').misura('anteprima', m.stato, esito, Date.now() - m.t0, { incognito: !!parent._filoIncognito });
+}
+// «vecchia»: c'è una foto, ma la scheda ne aspetta una più nuova.
+function statoFoto(tabs, tab) {
+  if (!tabs.anteprime.get(tab.id)) return 'assente';
+  return tabs.anteprime.tieneSveglia(tab) ? 'vecchia' : 'pronta';
+}
+
 // dati: { id, titolo, x, y, misura, tema } con x/y nella shell (bordo sinistro e fondo della scheda).
 function mostra(parent, dati) {
   const tabs = parent && parent._filoTabs;
   if (!tabs || !dati) return false;
   const id = testo(dati.id);
   const tab = tabs.tabs.find((t) => t.id === id);
-  if (!tab) { nascondi(parent); return false; }
+  // Il gettone di una scheda chiusa (#2085): titolo e sito, e l'ultima foto se la finestra l'ha ancora.
+  const chiusa = !tab && dati.chiusa && typeof dati.chiusa === 'object' ? dati.chiusa : null;
+  if (!tab && !chiusa) { nascondi(parent); return false; }
   const s = finestra(parent);
   if (!s) return false;
+  if (chiusa) return mostraChiusa(parent, s, id, dati, chiusa);
+  if (s.misura && s.misura.id !== id) contaUscita(parent, s, 'via');
   // Il numero non riparte mai: una misura in ritardo non deve combaciare con una carta nuova.
   const n = ++s.giri;
   s.voluta = { n, id, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
   // Col menu del tasto destro aperto la carta aspetta che si chiuda: gli finirebbe sotto, mezza coperta.
   if (menuAperto(parent)) {
+    contaUscita(parent, s, 'via');
     if (s.win.isVisible()) { invia(s, 'anteprima:nascondi', {}); s.win.hide(); }
     dopoIlMenu(parent, s);
     return true;
   }
   const davanti = id === tabs.activeId;
+  // Della scheda davanti non serve la foto: la sua carta non si conta.
+  if (!davanti && !s.misura) s.misura = { id, t0: Date.now(), stato: statoFoto(tabs, tab) };
   invia(s, 'anteprima:mostra', {
     n,
     id,
@@ -174,6 +194,26 @@ function mostra(parent, dati) {
     indirizzo: indirizzoDi(tab.url),
     // Della scheda davanti la pagina si vede già: la carta dice solo cos'è.
     immagine: !davanti && !!tabs.anteprime.get(id),
+    larghezza: larghezzaDi(dati.misura),
+    margine: MARGINE,
+    tema: temaPulito(dati.tema),
+    scuro: nativeTheme.shouldUseDarkColors,
+  });
+  return true;
+}
+
+function mostraChiusa(parent, s, id, dati, chiusa) {
+  if (s.misura) contaUscita(parent, s, 'via');
+  const n = ++s.giri;
+  s.voluta = { n, id: `chiusa:${id}`, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
+  const foto = id ? parent._filoTabs.anteprime.chiusa(id) : null;
+  if (foto) invia(s, 'anteprima:immagine', { id: s.voluta.id, src: foto.src, w: foto.w, h: foto.h });
+  invia(s, 'anteprima:mostra', {
+    n,
+    id: s.voluta.id,
+    titolo: testo(chiusa.titolo) || testo(chiusa.url),
+    indirizzo: indirizzoDi(chiusa.url),
+    immagine: !!foto,
     larghezza: larghezzaDi(dati.misura),
     margine: MARGINE,
     tema: temaPulito(dati.tema),
@@ -191,8 +231,9 @@ function dopoIlMenu(parent, s) {
   });
 }
 
-function nascondi(parent) {
+function nascondi(parent, { clic = false } = {}) {
   const s = parent ? stati.get(parent) : null;
+  contaUscita(parent, s, clic ? 'clic_sulla_scheda' : 'via');
   if (!s || !s.voluta) return;
   s.voluta = null;
   // La carta si svuota prima di sparire: chi la rivede dopo non trova per un istante la scheda di prima.

@@ -34,25 +34,20 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 
-// Tetto sul TESTO restituito. Allineato al documento di trasparenza (16k):
-// abbastanza per un estratto conto o un contratto intero, poco abbastanza da non
-// far esplodere il prompt. Oltre il tetto si tronca e lo si DICHIARA.
+// Tetto sul testo restituito: un contratto intero ci sta, il prompt non esplode.
+// Oltre il tetto si tronca, e il troncamento si DICHIARA.
 const MAX_TEXT_CHARS = 16000;
 
-// Tetto sul FILE, prima ancora di aprirlo: un PDF da mezzo giga bloccherebbe il
-// processo main per minuti. 25 MB coprono qualunque bolletta o contratto reale.
+// Tetto sul FILE prima di aprirlo: un PDF da mezzo giga bloccherebbe il main per minuti.
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-// Estensioni di testo semplice: si leggono così come sono. Ci sono anche i
-// formati "di dati" (csv, json, xml…) perché è esattamente ciò che l'utente si
-// scarica dalla banca quando non prende il PDF.
+// Anche i formati di dati (csv, json, xml): è ciò che si scarica dalla banca senza il PDF.
 const TEXT_EXT = new Set([
   '.txt', '.md', '.markdown', '.csv', '.tsv', '.log', '.json', '.xml',
   '.yml', '.yaml', '.ini', '.cfg', '.conf', '.env', '.srt', '.vtt', '.tex',
 ]);
 
-// Formati che NON sappiamo leggere, con la spiegazione da dare all'utente:
-// meglio dire "è un'immagine" che "formato non supportato".
+// Con la spiegazione per l'utente: meglio «è un'immagine» che «formato non supportato».
 const KNOWN_BINARY = {
   '.jpg': 'è un\'immagine', '.jpeg': 'è un\'immagine', '.png': 'è un\'immagine',
   '.gif': 'è un\'immagine', '.bmp': 'è un\'immagine', '.webp': 'è un\'immagine',
@@ -85,19 +80,43 @@ const KNOWN_BINARY = {
  * di verifica). Senza cartella nota si ripiega sulla home, che è da dove il
  * terminale parte, mai sulla cartella del programma.
  */
-function normalizePath(input, base) {
-  let p = String(input == null ? '' : input).trim();
+function normalizePath(input, base, { path: P = path, casa = os.homedir() } = {}) {
+  // Gli LLM incartano volentieri i percorsi tra virgolette o apici: la pulizia è quella del perimetro.
+  let p = classificatore().pulisciPercorso(input);
   if (!p) return '';
-  // Gli LLM incartano volentieri i percorsi tra virgolette o apici.
-  if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith('\'') && p.endsWith('\''))) {
-    p = p.slice(1, -1).trim();
-  }
-  if (p === '~') p = os.homedir();
-  else if (p.startsWith('~/') || p.startsWith('~\\')) p = path.join(os.homedir(), p.slice(2));
+  if (p === '~') p = casa;
+  else if (p.startsWith('~/') || p.startsWith('~\\')) p = P.join(casa, p.slice(2));
   if (!p) return '';
-  if (path.isAbsolute(p)) return path.resolve(p);
+  if (P.isAbsolute(p)) return P.resolve(p);
   const dove = String(base || '').trim();
-  return path.resolve(path.isAbsolute(dove) ? dove : os.homedir(), p);
+  return P.resolve(P.isAbsolute(dove) ? dove : casa, p);
+}
+
+function classificatore() {
+  return globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
+}
+
+// Il percorso porta a un altro computer della rete: anche un solo stat fa presentare Windows a quel computer con
+// l'identità dell'utente, quindi chi tocca il disco lo chiede PRIMA, per il percorso scritto e per quello risolto (#1499).
+function percorsoDiRete(percorso, { win = process.platform === 'win32', reti = null } = {}) {
+  const C = classificatore();
+  const p = C.pulisciPercorso(percorso);
+  if (!p) return false;
+  const lettere = reti ? reti(p) : require('./shell').unitaDiRete(p, { win });
+  return C.diRete(p, { win, reti: lettere });
+}
+
+/**
+ * Il file di un bottone della chat o di un'azione sul file: assoluto o con ~, risolto. '' se non è un percorso di
+ * questo tipo, null se porta a un altro computer (nessun accesso al disco).
+ */
+function percorsoDelFile(v, { win = process.platform === 'win32', casa = os.homedir(), reti = null } = {}) {
+  const P = win ? path.win32 : path.posix;
+  const p = classificatore().pulisciPercorso(typeof v === 'string' ? v : '');
+  if (!p || (!P.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
+  const full = normalizePath(p, '', { path: P, casa });
+  if (!full) return '';
+  return percorsoDiRete(p, { win, reti }) || percorsoDiRete(full, { win, reti }) ? null : full;
 }
 
 // ── Quando il nome è QUASI giusto ────────────────────────────────────────────
@@ -353,12 +372,8 @@ function kindFromExtension(filePath) {
   return 'unknown';
 }
 
-/**
- * Un buffer contiene testo o è roba binaria? Serve per i file senza estensione
- * nota (un `.eml`, un `.bak`, un file di configurazione senza estensione): invece
- * di rifiutarli in blocco guardiamo cosa c'è dentro. PURA.
- * Criterio: nessun byte NUL e pochissimi byte di controllo nel primo tratto.
- */
+// Per i file senza estensione nota (.eml, .bak) si guarda dentro invece di rifiutarli. PURA.
+// Criterio: nessun byte NUL e pochissimi byte di controllo nel primo tratto.
 function looksLikeText(buf) {
   if (!buf || !buf.length) return true; // un file vuoto è testo vuoto, non binario
   // Un file a due byte per carattere è pieno di byte nulli per costruzione: il
@@ -679,7 +694,6 @@ function decodeText(buf) {
   return decodeTextDettaglio(buf).text;
 }
 
-/** Taglia al tetto dichiarando il troncamento. PURA. */
 function capText(text, max = MAX_TEXT_CHARS) {
   const s = String(text == null ? '' : text);
   if (s.length <= max) return { text: s, truncated: false };
@@ -695,7 +709,8 @@ function capText(text, max = MAX_TEXT_CHARS) {
   return { text: s.slice(0, n), truncated: true };
 }
 
-/** Estrae il testo da un PDF con unpdf (pdf.js). Ritorna { text, pages }. */
+// unpdf è pdf.js senza visualizzatore, canvas e font: stessa qualità su encoding strani e
+// font CID, a 2,4 MB invece di 34 e senza dipendenze transitive.
 async function extractPdf(buf) {
   const { getDocumentProxy, extractText } = require('unpdf');
   const pdf = await getDocumentProxy(new Uint8Array(buf));
@@ -805,20 +820,16 @@ async function readDocument(input, { cwd } = {}) {
     }
     base.pages = out.pages;
     const text = String(out.text || '').trim();
-    // `trim()` toglie anche gli spazi unificatori: un PDF di sole immagini
-    // restituisce spesso spazi e a capo, e se non resta nulla testo estraibile non ce n'è.
+    // Un PDF di sole immagini restituisce spazi e a capo: dopo il trim non resta niente.
     if (!text) {
-      // PDF senza testo estraibile: è una scansione o una foto. Risposta onesta,
-      // niente OCR (per ora) e soprattutto niente contenuto inventato.
+      // PDF scansionato: risposta onesta, niente OCR e soprattutto niente contenuto inventato.
       return { ...base, ok: true, kind: 'pdf', empty: true, text: '' };
     }
     const capped = capText(text);
     return { ...base, ok: true, kind: 'pdf', text: capped.text, truncated: capped.truncated };
   }
 
-  // Testo semplice. Estensione non nota → decidiamo dal contenuto invece di
-  // rifiutare in blocco: un `.eml`, un `.bak` o un file senza estensione sono
-  // spesso testo perfettamente leggibile.
+  // Estensione non nota: decide il contenuto, non il rifiuto in blocco (vedi looksLikeText).
   if (kind === 'unknown' && !looksLikeText(buf)) {
     return { ...base, error: 'unsupported', detail: 'è un file binario, non testo' };
   }
@@ -860,6 +871,8 @@ module.exports = {
   readDocument,
   // esportati per gli unit test e per chi formatta l'osservazione
   normalizePath,
+  percorsoDiRete,
+  percorsoDelFile,
   chiaveTollerante,
   nomiCombaciano,
   risolviTollerante,
@@ -877,6 +890,7 @@ module.exports = {
   RUMORE_TOLLERATO,
   QUOTA_NON_TESTO,
   capText,
+  extractPdf,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
 };

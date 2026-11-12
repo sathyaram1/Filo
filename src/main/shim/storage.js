@@ -8,61 +8,133 @@ const path = require('node:path');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const Disco = require('../services/scritturaAtomica');
 
-// === Cifratura a riposo delle chiavi API ===========================
-// Le chiavi API dei provider AI (settings.apiKeys) sono un segreto: a riposo NON
-// devono stare in chiaro nel storage.json (qualsiasi altro processo dell'utente,
-// un backup o un altro utente del FS potrebbe leggerle). Le cifriamo con
-// `safeStorage` di Electron (DPAPI su Windows, Keychain su macOS, libsecret su
-// Linux) — la stessa difesa già usata per i token di sessione (auth/token-store).
-// In MEMORIA (STATE.data) restano in chiaro: chi legge i settings (getSettings)
-// non cambia. La cifratura tocca solo il blob serializzato su disco.
-//
-// Compatibilità: un storage.json vecchio (apiKeys in chiaro) viene letto e, alla
-// prima scrittura, riscritto cifrato — migrazione trasparente. Se la cifratura
-// OS non è disponibile (es. Linux headless senza keyring), si ricade sul
-// comportamento precedente (apiKeys in chiaro) senza perdere dati.
+// I segreti dell'utente (SN_CONST.percorsiSegreti) a riposo si cifrano con `safeStorage` dell'OS, in memoria restano in
+// chiaro: le chiavi API in apiKeysEnc, gli altri in un blob solo (#905.1). Senza keyring si ricade sul chiaro.
 const ENC_PREFIX = 'safeStorage:v1:';
+
+function costanti() {
+  if (!globalThis.SN_CONST) require('../../shared/constants.js');
+  return globalThis.SN_CONST;
+}
 
 function canEncrypt() {
   try { return safeStorage.isEncryptionAvailable(); } catch (_) { return false; }
 }
 
-// L'ultima cifratura fatta: chiavi uguali non si ricifrano a ogni scrittura (#1089), e il file non cambia.
-let ultimaCifratura = { chiaro: null, blob: null };
+// L'ultima cifratura fatta per campo: segreti uguali non si ricifrano a ogni scrittura (#1089), e il file non cambia.
+const ultimaCifratura = new Map();
+function cifra(campo, chiaro) {
+  const u = ultimaCifratura.get(campo);
+  if (u && u.chiaro === chiaro) return ENC_PREFIX + u.blob;
+  const blob = safeStorage.encryptString(chiaro).toString('base64');
+  ultimaCifratura.set(campo, { chiaro, blob });
+  return ENC_PREFIX + blob;
+}
+function decifra(campo, valore) {
+  const blob = valore.slice(ENC_PREFIX.length);
+  const dato = JSON.parse(safeStorage.decryptString(Buffer.from(blob, 'base64')));
+  ultimaCifratura.set(campo, { chiaro: JSON.stringify(dato), blob });
+  return dato;
+}
 
-// Le impostazioni come vanno su disco: settings.apiKeys (in chiaro, in memoria) diventa
-// settings.apiKeysEnc (base64 del blob cifrato). Non muta `s`.
+// Gli esiti del disco per i contatori anonimi (#1466): solo nomi dell'elenco chiuso (SN_CONTATORI.EVENTI_STORAGE), mai
+// una chiave, un percorso o un messaggio. Li ritira src/main/services/contatori.js, che a contatori spenti li butta.
+const CONTI = new Map();
+let dimensione = null;
+let cifraturaContata = false;
+function contaDisco(cosa, dato) {
+  try {
+    const C = globalThis.SN_CONTATORI;
+    if (!C) return;
+    const da = { lettura: C.eventoLettura, salvataggio: C.eventoSalvataggio, flush: C.eventoFlush }[cosa];
+    const evento = da ? da(dato) : cosa;
+    if (C.EVENTI_STORAGE.includes(evento)) CONTI.set(evento, (CONTI.get(evento) || 0) + 1);
+  } catch (_) {}
+}
+
+const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+const NOMI_VIETATI = new Set(['__proto__', 'constructor', 'prototype']);
+const leggi = (o, percorso) => percorso.reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
+
+// I segreti fuori da apiKeys, come coppie [percorso, valore]: sono quelli che vanno in CAMPO_SEGRETI_CIFRATI.
+function altriSegreti(s) {
+  return costanti().percorsiSegreti(s).filter((p) => p[0] !== 'apiKeys')
+    .map((p) => [p, leggi(s, p)]).filter(([, v]) => pieno(v));
+}
+
+// Una copia di `s` col campo in fondo a `percorso` tolto (valore undefined) o messo: si copia solo la strada.
+function conCampo(s, percorso, valore) {
+  const radice = { ...s };
+  let o = radice;
+  for (const k of percorso.slice(0, -1)) {
+    o[k] = o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) ? { ...o[k] } : {};
+    o = o[k];
+  }
+  const ultimo = percorso[percorso.length - 1];
+  if (valore === undefined) delete o[ultimo];
+  else o[ultimo] = valore;
+  return radice;
+}
+
+// Le impostazioni come vanno su disco: apiKeys diventa apiKeysEnc, gli altri segreti escono dal loro posto e vanno
+// cifrati in CAMPO_SEGRETI_CIFRATI. Non muta `s`.
 function impostazioniPerDisco(s) {
   try {
-    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
-    if (!canEncrypt()) return s; // niente keyring OS → resta com'era (no perdita dati)
-    const chiaro = JSON.stringify(s.apiKeys);
-    if (chiaro !== ultimaCifratura.chiaro) {
-      ultimaCifratura = { chiaro, blob: safeStorage.encryptString(chiaro).toString('base64') };
+    if (!s || typeof s !== 'object') return s;
+    const chiavi = s.apiKeys && typeof s.apiKeys === 'object' ? s.apiKeys : null;
+    const altri = altriSegreti(s);
+    if (!chiavi && !altri.length) return s;
+    if (!canEncrypt()) { // niente keyring OS → resta com'era (no perdita dati), e l'utente lo sa
+      if (costanti().haSegreti(s)) chiaviInChiaro();
+      // Prima di `ready` il portachiavi risulta assente anche dove c'è: si conta solo dopo, una volta per sessione.
+      if (!cifraturaContata && typeof app.isReady === 'function' && app.isReady()) { cifraturaContata = true; contaDisco('cifratura_assente'); }
+      return s;
     }
-    return { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + ultimaCifratura.blob };
+    let out = chiavi ? { ...s, apiKeys: undefined, apiKeysEnc: cifra('apiKeys', JSON.stringify(chiavi)) } : s;
+    if (altri.length) {
+      for (const [p] of altri) out = conCampo(out, p, undefined);
+      const campo = costanti().CAMPO_SEGRETI_CIFRATI;
+      out[campo] = cifra(campo, JSON.stringify(altri));
+    }
+    return out;
   } catch (_) { return s; }
 }
 
-// Inverso di impostazioniPerDisco: al load ripristina settings.apiKeys in chiaro in
-// memoria a partire dal blob cifrato, e rimuove il campo apiKeysEnc.
+// Inverso di impostazioniPerDisco. Un blob illeggibile (cifrato da un altro utente o un'altra chiave OS) resta com'è e
+// l'utente reinserisce i segreti, come in token-store; un valore scritto in chiaro dopo il blob vince su di lui.
 function deserializeFromDisk(data) {
-  try {
-    const s = data && data.settings;
-    if (!s || typeof s !== 'object' || typeof s.apiKeysEnc !== 'string') return data;
-    if (!s.apiKeysEnc.startsWith(ENC_PREFIX) || !canEncrypt()) return data;
-    const blob = s.apiKeysEnc.slice(ENC_PREFIX.length);
-    const chiaro = safeStorage.decryptString(Buffer.from(blob, 'base64'));
-    const apiKeys = JSON.parse(chiaro);
-    ultimaCifratura = { chiaro: JSON.stringify(apiKeys), blob };
-    const ns = { ...s, apiKeys };
-    delete ns.apiKeysEnc;
-    return { ...data, settings: ns };
-  } catch (_) {
-    // Blob illeggibile (cifrato con un'altra chiave OS / altro utente): lascia
-    // i settings senza apiKeys (l'utente le re-inserisce), come fa token-store.
-    return data;
+  const s = data && data.settings;
+  if (!s || typeof s !== 'object' || !canEncrypt()) return data;
+  let ns = s;
+  if (typeof s.apiKeysEnc === 'string' && s.apiKeysEnc.startsWith(ENC_PREFIX)) {
+    try {
+      ns = { ...ns, apiKeys: decifra('apiKeys', s.apiKeysEnc) };
+      delete ns.apiKeysEnc;
+    } catch (_) {}
   }
+  const campo = costanti().CAMPO_SEGRETI_CIFRATI;
+  if (typeof s[campo] === 'string' && s[campo].startsWith(ENC_PREFIX)) {
+    try {
+      const coppie = decifra(campo, s[campo]);
+      ns = { ...ns };
+      delete ns[campo];
+      for (const [p, v] of Array.isArray(coppie) ? coppie : []) {
+        const valido = Array.isArray(p) && p.length > 1 && p.every((k) => typeof k === 'string' && !NOMI_VIETATI.has(k));
+        if (!valido || !pieno(v)) continue;
+        if (!pieno(leggi(ns, p))) ns = conCampo(ns, p, v);
+      }
+    } catch (_) {}
+  }
+  return ns === s ? data : { ...data, settings: ns };
+}
+
+// Un file scritto senza portachiavi, o da un Filo che cifrava solo le chiavi API, ha segreti in chiaro: col
+// portachiavi presente si riscrive subito, non alla prossima modifica delle impostazioni.
+function segretiInChiaroSulDisco(dati) {
+  try {
+    const s = dati && dati.settings;
+    return canEncrypt() && costanti().campiSegreti(s).some(([o, k]) => pieno(o[k]));
+  } catch (_) { return false; }
 }
 
 const STATE = {
@@ -119,22 +191,16 @@ function staccata(k, v) {
 // vengono dirottate su un overlay in RAM.
 const als = new AsyncLocalStorage();
 
-// Overlay in memoria: ciò che l'incognito scrive vive solo qui, finché la
-// sessione incognito è aperta. resetIncognito() lo azzera alla chiusura
-// dell'ultima finestra incognito.
+// Ciò che l'incognito scrive vive solo qui, finché la sessione incognito è aperta.
 const INCOGNITO = {
   data: {},               // { key: value } scritti durante la sessione incognito
   tombstones: new Set(),  // chiavi rimosse: mascherano l'eventuale valore su disco
 };
 
-// Allowlist FAIL-CLOSED: SOLO queste chiavi sono leggibili dal disco in
-// incognito (config/impostazioni che l'utente si aspetta di ereditare: modelli,
-// tema, blocklist, dizionario, autocorrezione, layout icone). QUALSIASI altra
-// chiave — comprese quelle aggiunte in futuro — è invisibile dal disco in
-// incognito: la finestra parte "vuota" e ciò che scrive resta in RAM.
-// Vedi STORAGE_KEYS in src/shared/constants.js.
+// Allowlist FAIL-CLOSED: dal disco l'incognito legge SOLO queste chiavi di configurazione.
+// Qualunque altra, comprese quelle future, è invisibile: la finestra parte vuota.
 const INCOGNITO_READABLE = new Set([
-  'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
+  'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_correttore_imparato', 'sn_icon_layout',
   // La disposizione delle carte della home (#870): come le icone, la scelta dell'utente vale anche in incognito.
   'filo_carte_home',
 ]);
@@ -148,8 +214,7 @@ function inIncognito() {
   return !!(s && s.incognito);
 }
 
-// Esegue fn in un contesto incognito. Ritorna ciò che fn ritorna (anche una
-// Promise: AsyncLocalStorage propaga il contesto attraverso la catena async).
+// Il contesto si propaga anche attraverso la catena async, non solo fino al primo await.
 function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
 }
@@ -172,11 +237,8 @@ function resetIncognito() {
   INCOGNITO.tombstones = new Set();
 }
 
-// Risolve la lettura di UNA chiave nella vista incognito:
-//   1) scritta in questa sessione  → valore dall'overlay
-//   2) rimossa in questa sessione  → undefined (maschera il disco)
-//   3) chiave di config in allowlist → valore dal disco (ereditato)
-//   4) altrimenti (memoria/navigazione) → undefined (invisibile)
+// In incognito una chiave si legge dall'overlay, o è mascherata da un tombstone; dal disco
+// arrivano solo le chiavi di configurazione in allowlist, il resto è invisibile.
 function incognitoReadKey(k) {
   if (INCOGNITO_SHARED.has(k)) return STATE.data[k];
   if (k in INCOGNITO.data) return INCOGNITO.data[k];
@@ -187,8 +249,7 @@ function incognitoReadKey(k) {
 
 function filePath() {
   if (!STATE.filePath) {
-    // FILO_USER_DATA override per i test: ogni run mette un tempdir isolato
-    // così non si tocca lo storage reale dell'utente.
+    // FILO_USER_DATA isola i test: mai lo storage reale dell'utente.
     const root = process.env.FILO_USER_DATA || app.getPath('userData');
     STATE.filePath = path.join(root, 'storage.json');
   }
@@ -206,13 +267,36 @@ function loadIfNeeded() {
 const CHIAVE_LETTURA = 'dati-letti';
 const CHIAVE_SALVATAGGIO = 'dati-non-salvati';
 
-function avvisa(testo, chiave, durataSec = 0) {
+function avvisa(testo, chiave, durataSec = 0, detto, errore = '') {
   STATE.avvisi.push({ testo, chiave });
   try {
     const A = require('../services/avvisoFinestra');
-    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec });
-    else A.avvisoQuandoPronta(testo, { chiave });
+    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec, errore, tipo: errore || 'dati_avviso' });
+    else A.avvisoQuandoPronta(testo, { chiave, detto, errore, tipo: errore || 'dati_avviso' });
   } catch (_) {}
+}
+
+// Senza portachiavi i segreti vanno sul disco in chiaro: lo si dice una volta per installazione (#905), contata solo se
+// una finestra l'ha mostrato. Il segno sta nello storage, così «Cancella tutto» lo porta via.
+const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
+let inChiaroInCorso = false;
+
+function testoChiaviInChiaro() {
+  const base = 'Filo non trova un portachiavi di sistema, quindi salva in chiaro nella sua cartella dei dati le chiavi e le password che gli hai dato. Chi può aprire i tuoi file può leggerle.';
+  let backend = '';
+  try { backend = safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = require('../portachiavi').consiglioPortachiavi({ platform: process.platform, backend, perChe: 'Per cifrarle' });
+  return consiglio ? `${base} ${consiglio}` : base;
+}
+
+function chiaviInChiaro() {
+  // Prima di `ready` il portachiavi risulta assente anche dove c'è.
+  if (inChiaroInCorso || STATE.data[CHIAVE_IN_CHIARO] || (typeof app.isReady === 'function' && !app.isReady())) return;
+  inChiaroInCorso = true;
+  // Fuori dal giro di serializzazione in corso, e sul disco anche se la scrittura era partita da un incognito.
+  setImmediate(() => avvisa(testoChiaviInChiaro(), 'chiavi-in-chiaro', 0, () => {
+    runNormale(() => set({ [CHIAVE_IN_CHIARO]: Date.now() })).catch(() => {});
+  }));
 }
 
 function quando(ms) {
@@ -276,12 +360,13 @@ async function leggiFile() {
     buf = await Disco.leggi(target);
   } catch (err) {
     console.warn('[Filo storage] read failed:', err.message);
+    contaDisco('lettura', 'illeggibile');
     STATE.solaMemoria = true;
     const copia = await leggiCopia(target);
     STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
     STATE.loaded = true;
     avviaVerifica();
-    avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA);
+    avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA, 0, null, 'dati_illeggibili');
     return;
   }
   STATE.pulizia = Disco.togliTemporanei(target).catch(() => {});
@@ -290,17 +375,21 @@ async function leggiFile() {
     // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
     // comincia l'intervista appena c'è un modello e la chat della prova ci scrive dentro (#663.6).
     if (process.env.FILO_TEST_ACCOLTO === '1') STATE.data = { filo_onboarding: { done: true } };
+    contaDisco('lettura', 'vuoto');
     STATE.loaded = true;
     avviaVerifica();
     return;
   }
+  dimensione = buf.length;
   const testo = Disco.togliBom(buf.toString('utf8'));
   const dati = interpreta(testo);
   if (dati) {
+    contaDisco('lettura', 'ok');
     STATE.data = deserializeFromDisk(dati);
     STATE.loaded = true;
     avviaVerifica();
     scriviCopia(testo);
+    if (segretiInChiaroSulDisco(dati)) { STATE.sporche.add('settings'); scheduleFlush(); }
     return;
   }
   let daParte = null;
@@ -309,12 +398,13 @@ async function leggiFile() {
   }
   if (!daParte) STATE.solaMemoria = true;
   const copia = await leggiCopia(target);
+  contaDisco('lettura', !daParte ? 'non_spostato_sola_memoria' : copia ? 'rovinato_con_copia' : 'rovinato_senza_copia');
   STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
   STATE.loaded = true;
   avviaVerifica();
   // Senza storage.json un arresto adesso farebbe ripartire vuoto il prossimo avvio, che non guarda la copia.
   if (daParte && copia) scheduleFlush();
-  avvisa(testoRovinato(daParte, copia), CHIAVE_LETTURA);
+  avvisa(testoRovinato(daParte, copia), CHIAVE_LETTURA, 0, null, 'dati_illeggibili');
 }
 
 // La copia di riserva segue il file con un minuto di ritardo al più: ferma all'avvio terrebbe sul disco, per tutta
@@ -355,10 +445,8 @@ async function flush() {
   return STATE.flushChain;
 }
 
-// Forza subito una scrittura su disco, senza aspettare il debounce. Ritorna la
-// catena, quindi due chiamate ravvicinate si accodano invece di accavallarsi:
-// è proprio l'invariante che protegge dal guasto descritto sopra, ed è ciò che
-// il test verifica chiamandola due volte di fila senza attendere la prima.
+// Scrive subito, senza aspettare il debounce. Ritorna la catena: due chiamate ravvicinate
+// si accodano invece di accavallarsi.
 function flushNow() {
   if (STATE.flushTimer) { clearTimeout(STATE.flushTimer); STATE.flushTimer = null; }
   return flush();
@@ -404,6 +492,7 @@ function serializzaChiave(k) {
   } catch (err) {
     // Un valore che non si serializza tiene nel file la sua ultima forma buona e non ferma le altre chiavi.
     console.error('[Filo storage] chiave non serializzabile:', k, err.message);
+    contaDisco('chiave_non_serializzabile');
     STATE.sporche.delete(k);
     return;
   }
@@ -436,6 +525,7 @@ function verificaMutazioni() {
     try { t = JSON.stringify(STATE.data[k]); } catch (_) { continue; }
     if (t === STATE.testi.get(k)) continue;
     cambiate.push(k);
+    contaDisco('cambiato_senza_set');
     STATE.sporche.add(k);
     if (!STATE.avvisate.has(k)) {
       STATE.avvisate.add(k);
@@ -461,16 +551,22 @@ async function doFlush() {
   STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
   if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   const mia = ++STATE.generazione;
+  const t0 = Date.now();
   try {
     const txt = testoDelFile();
     const scritta = await Disco.scrivi(target, txt, { primaDiRinominare: () => STATE.genSuDisco < mia });
-    if (scritta) STATE.genSuDisco = mia;
+    if (scritta) {
+      STATE.genSuDisco = mia;
+      dimensione = Buffer.byteLength(txt);
+      contaDisco('flush', Date.now() - t0);
+    }
     salvataggioRiuscito();
     copiaPiuTardi();
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
     // Il file non ha l'ultima versione: la prossima set non va scartata come «già scritta».
     STATE.testi.clear();
+    contaDisco('salvataggio', err);
     salvataggioFallito(err);
   } finally {
     STATE.flushInFlight -= 1;
@@ -490,7 +586,7 @@ function salvataggioFallito(err) {
   STATE.ultimoErrore = { code: (err && err.code) || '', message: String((err && err.message) || err), at: Date.now() };
   if (!STATE.avvisatoSalvataggio) {
     STATE.avvisatoSalvataggio = true;
-    avvisa(testoNonSalvato(err), CHIAVE_SALVATAGGIO);
+    avvisa(testoNonSalvato(err), CHIAVE_SALVATAGGIO, 0, null, 'dati_non_salvati');
   }
   STATE.ritentaMs = Math.min(Math.max(STATE.ritentaMs * 2, 10_000), 5 * 60_000);
   if (!STATE.ritentaTimer) {
@@ -504,7 +600,27 @@ function salvataggioRiuscito() {
   STATE.ultimoErrore = null;
   STATE.ritentaMs = 0;
   if (STATE.ritentaTimer) { clearTimeout(STATE.ritentaTimer); STATE.ritentaTimer = null; }
+  if (eraFallito) contaDisco('salvataggio_tornato');
   if (eraFallito && STATE.avvisatoSalvataggio) avvisa('I tuoi dati sono di nuovo salvati.', CHIAVE_SALVATAGGIO, 6);
+}
+
+/** Gli esiti del disco da quando li si è ritirati l'ultima volta, rinomine riprovate comprese; poi si azzerano. */
+function contiDisco() {
+  const out = Object.fromEntries(CONTI);
+  CONTI.clear();
+  try {
+    const C = globalThis.SN_CONTATORI;
+    for (const [codice, n] of Object.entries(Disco.ritentiRinomina())) {
+      const evento = C ? C.eventoRinomina(codice) : '';
+      if (evento) out[evento] = (out[evento] || 0) + n;
+    }
+  } catch (_) {}
+  return out;
+}
+
+/** I byte del file com'era all'ultima lettura o scrittura; null prima della prima. */
+function dimensioneDisco() {
+  return dimensione;
 }
 
 /** Per le prove e per chi deve dire all'utente se i suoi dati arrivano sul disco. */
@@ -618,8 +734,8 @@ async function remove(keys) {
   await loadIfNeeded();
   let list = Array.isArray(keys) ? keys : [keys];
   if (inIncognito()) {
-    // Rimuove dall'overlay e mette un tombstone: una lettura successiva torna
-    // undefined anche se la chiave esiste su disco (finestre normali intatte).
+    // Tombstone: la lettura successiva torna undefined anche se la chiave esiste su disco,
+    // e il disco delle finestre normali resta intatto.
     for (const k of list) {
       if (INCOGNITO_SHARED.has(k)) continue;
       delete INCOGNITO.data[k];
@@ -714,10 +830,8 @@ function flushSync() {
   } catch (e) { console.warn('[Filo storage] copia di riserva non scritta alla chiusura:', e?.message || e); }
 }
 
-// Scrittura sincrona best-effort: aggiorna lo stato in memoria e scrive subito
-// su disco. Usata sul path di chiusura (before-quit), dove non possiamo
-// aspettare il debounce né i microtask del set() async. Assume STATE già
-// caricato (vero a runtime, dopo il boot).
+// Scrittura sincrona per il cammino di chiusura (before-quit), dove non si può aspettare il
+// debounce né i microtask di set(). Assume STATE già caricato, vero dopo il boot.
 function setSync(obj) {
   try {
     if (!STATE.loaded) return;
@@ -739,6 +853,8 @@ module.exports = {
   maxFlushOverlap,
   verificaMutazioni,
   statoDisco,
+  contiDisco,
+  dimensioneDisco,
   setSync,
   runIncognito,
   runNormale,
@@ -747,11 +863,8 @@ module.exports = {
   inIncognito,
 };
 
-// Hook per i test (Playwright): app.evaluate gira nel main process ma in un
-// contesto dove `require` non è disponibile, quindi i test non possono caricare
-// questo modulo per pilotare runIncognito/resetIncognito. Sotto NODE_ENV=test
-// (impostato dal fixture) esponiamo l'API su globalThis. In produzione il ramo
-// non viene mai preso, quindi nessuna superficie extra.
+// app.evaluate gira nel main ma senza `require`, quindi i test non potrebbero pilotare
+// l'incognito: sotto NODE_ENV=test l'API si espone su globalThis, in produzione mai.
 if (process.env.NODE_ENV === 'test') {
   globalThis.__filoStorage = module.exports;
 }

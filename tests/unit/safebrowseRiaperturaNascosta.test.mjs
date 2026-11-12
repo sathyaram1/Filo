@@ -36,6 +36,7 @@ function finestra({ incognito = false } = {}) {
   schede._siteAllowedIn = () => false;
   const pagina = { url: '' };
   const campo = { executeJavaScript: async () => ({ hasPassword: true, shownPassword: true, hasPayment: false, shownPayment: false }) };
+  campo.top = campo;
   const wc = { getURL: () => pagina.url, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
   const tab = { id: 1, view: { webContents: wc } };
   schede.tabs = [tab];
@@ -105,39 +106,43 @@ test('una finestra normale dopo una in incognito ha il suo giudizio', async () =
   assert.equal(conta.llm.length, 1);
 });
 
-// Il main verifica le pagine solo da _sbAnalizza, che aggiunge l'incognito; e nessuna pagina aperta si dice «da aprire».
-test('ogni verifica di una pagina passa dalla porta che conosce l\'incognito', () => {
+// Il main verifica le pagine solo da _sbAnalizza, e i link prima del clic solo da _sbPreverifica: tutte e due
+// aggiungono l'incognito. Nessuna pagina aperta si dice «da aprire».
+test('ogni verifica di una pagina o di un link passa dalla porta che conosce l\'incognito', () => {
   const file = (dir) => readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
     return statSync(p).isDirectory() ? file(p) : (/\.js$/.test(n) ? [p] : []);
   });
-  const chiamate = [];
+  const chiamate = { analyze: [], preverifica: [] };
   const daAprire = [];
   for (const p of file(join(ROOT, 'src'))) {
     const rel = relative(ROOT, p).replace(/\\/g, '/');
     if (rel.startsWith('src/main/services/safebrowse/')) continue;
     const s = readFileSync(p, 'utf8');
-    for (const m of s.matchAll(/\.analyze\(/g)) chiamate.push(`${rel}:${s.slice(0, m.index).split('\n').length}`);
+    for (const k of Object.keys(chiamate)) {
+      for (const m of s.matchAll(new RegExp(`\\.${k}\\(`, 'g'))) chiamate[k].push(`${rel}:${s.slice(0, m.index).split('\n').length}`);
+    }
     if (/daAprire\s*:/.test(s)) daAprire.push(rel);
   }
-  const porta = chiamate.filter((c) => c.startsWith('src/main/tabs/tabSafebrowse.js:'));
-  assert.equal(porta.length, 1, `una sola chiamata, in _sbAnalizza: ${porta.join(', ')}`);
-  assert.deepEqual(chiamate.filter((c) => !porta.includes(c)), [],
-    'una verifica nuova passa da _sbAnalizza, o l\'incognito non la ferma');
-  assert.deepEqual(daAprire, [], 'chi prova un link prima che si apra aggiorna transparency/privacy.md («Gli altri servizi» e punti deboli), rimette in vista l\'interruttore della finestra isolata (prova sotto), poi questa lista');
+  for (const [k, dove] of Object.entries(chiamate)) {
+    const porta = dove.filter((c) => c.startsWith('src/main/tabs/tabSafebrowse.js:'));
+    assert.equal(porta.length, 1, `una sola chiamata a ${k}, nella sua porta: ${porta.join(', ')}`);
+    assert.deepEqual(dove.filter((c) => !porta.includes(c)), [],
+      `una verifica nuova passa dalla porta di ${k}, o l'incognito non la ferma`);
+  }
+  assert.deepEqual(daAprire, [], 'un link prima del clic passa da preverifica (#966), che sa quando aprire la finestra nascosta');
 });
 
-// Finché nessuna funzione prova un link prima che si apra, l'interruttore non comanda niente: non si mostra in
-// Sicurezza e, chiesto a Filo, non promette una protezione che non c'è.
-test('l\'interruttore della finestra isolata non promette di seguire prima i link sospetti', () => {
+// La finestra nascosta apre i link accorciati su cui il puntatore si ferma (#966): l'interruttore comanda qualcosa, si
+// vede in Sicurezza e, chiesto a Filo, dice cosa fa.
+test('l\'interruttore della finestra isolata si vede e parla dei link accorciati', () => {
   const html = readFileSync(join(ROOT, 'src/pages/security/security.html'), 'utf8');
   const riga = html.match(/<div[^>]*id="sec-safebrowse-sandbox-row"[^>]*>/);
-  assert.ok(riga && /\shidden[\s>]/.test(riga[0]), 'la riga dell\'interruttore resta nascosta');
-  const css = readFileSync(join(ROOT, 'src/styles/pages.css'), 'utf8');
-  assert.match(css, /\.sn-page \.sn-toggle-row\[hidden\]\s*\{\s*display:\s*none/, 'hidden vince sul display della riga');
-  const PROMESSA = /(li apre prima|segue prima|segue dove portano|fa aprire quei link direttamente)/i;
+  assert.ok(riga && !/\shidden[\s>]/.test(riga[0]), 'la riga dell\'interruttore è in vista');
   const src = readFileSync(join(ROOT, 'src/shared/preferences.js'), 'utf8');
   const i = src.indexOf("percorso: 'security.safeBrowse.sandbox'");
   assert.ok(i > 0, 'la voce della chat c\'è ancora: il valore resta leggibile e modificabile');
-  assert.doesNotMatch(src.slice(i, src.indexOf('}),', i)), PROMESSA);
+  const voce = src.slice(i, src.indexOf('}),', i));
+  assert.match(voce, /link accorciat/);
+  assert.doesNotMatch(voce, /nessuna funzione|non cambia niente/);
 });

@@ -13,25 +13,25 @@ Il pattern stabilito qui (chat come colonna che produce oggetti manipolabili acc
 | Schermata | Stato alpha | Contenuto |
 |-----------|-------------|-----------|
 | **Mazzi** | Completa | Libreria: entry point, griglia dei mazzi |
-| **Builder** | Completa | Editing di un mazzo (layout a 3 colonne, §2) |
+| **Builder** | Completa | Editing di un mazzo (due colonne più il pannello di destra, §2) |
 | **Partita** | **Stub** | Placeholder + routing predisposto (direzione in §12) |
 
 Navigazione: Mazzi è la home dell'app; click su un mazzo → Builder. Il routing a tre schermate va predisposto subito anche se Partita è vuota.
 
 ---
 
-## 2. Builder — Layout a tre colonne fisse
+## 2. Builder — Due colonne e il pannello di destra
 
-**Nessun ridimensionamento automatico** (né su hover né su click): il resize automatico crea bersagli mobili. Tre colonne a larghezza fissa:
+**Nessun ridimensionamento automatico** (né su hover né su click): il resize automatico crea bersagli mobili. Due colonne a larghezza fissa, e a destra il pannello dell'app (§5):
 
 | Colonna | Larghezza | Contenuto |
 |---------|-----------|-----------|
 | Sinistra — **Chat / Risultati** | Media (più stretta di una chat standard: qui scorrono liste, non prosa lunga) | Chat unificata con l'agente + risultati ricerca |
 | Centro — **Mazzo** | La più stretta (~300px: nome troncato + costo mana) | Elenco carte con gruppi collassabili |
-| Destra — **Detail / Statistiche** | Il resto | Tre stati: statistiche / preview / carosello (§5) |
+| Destra — **Pannello di destra** | Quella del pannello delle app | Gli elementi del Deck builder: statistiche, preview, carosello, moduli del detail (§5) |
 
-- **Divisori trascinabili a mano**, posizione persistita. È l'unico resize ammesso: deliberato, mai automatico.
-- La carta Magic è portrait (~63:88): si renderizza nella larghezza corrente del pannello destro, qualunque essa sia. Il pinning (carosello) cambia il contenuto, mai la geometria.
+- **Divisori trascinabili a mano** fra Chat e Mazzo, posizione persistita. È l'unico resize ammesso: deliberato, mai automatico.
+- La carta Magic è portrait (~63:88): si renderizza nella larghezza del pannello. Il pinning (carosello) cambia il contenuto, mai la geometria.
 
 ---
 
@@ -83,13 +83,33 @@ Mentre Filo prepara una risposta il campo di scrittura mostra da quanto si aspet
 
 ---
 
-## 5. Pannello destro — tre stati
+## 5. Pannello destro — il pannello dell'app
 
-Le statistiche sono lo **stato di riposo**; il pannello non si ridimensiona mai, cambia solo contenuto.
+Il pannello destro del Builder è il **pannello di destra delle app di Filo** (#1433), lo stesso dell'Editor: regole e
+trappole in `patterns/globale-nella-barra-contestuale-nel-tasto-destro.md` (sezione «A destra, il pannello dell'app»),
+codice in `src/shared/pannelloDestro.js` (pagina), `src/main/bordoDestro.js` (bordo) e `src/shared/pannelliApp.js`
+(catalogo). Cosa ne segue per il Builder:
+
+- **Si apre come ogni pannello delle app**: sosta sul bordo destro (fuori dalla fila delle schede), clic sulla striscia
+  accanto alla barra di scorrimento, Ctrl+\ (Cmd+\ su Mac), a parole. Si chiude uscendo, con Esc, con un clic fuori.
+- **Il lucchetto** è quello di tutte le app: bloccato resta aperto e le due colonne si stringono (`--pd-spinta`);
+  sbloccato si apre sopra le colonne senza spostarle. Chi costruisce mazzi lavorerà quasi sempre col pannello bloccato:
+  è la terza colonna di prima, con in più la possibilità di chiuderla.
+- **Il Builder dichiara il suo catalogo** in `src/shared/pannelliApp.js` (`CATALOGHI.mazzi`), con gli elementi di
+  partenza; dal «+» l'utente aggiunge, toglie e riordina gli altri, anche col tasto destro e a parole (azione
+  `PANNELLO_APP`). Elementi di partenza: **Statistiche** (§9) e **Detail** (preview e carosello, §5.1–5.3). Nel
+  catalogo: i moduli del detail (§5.2) come elementi a sé, il budget (§9.2), il calcolatore di probabilità (§9.3).
+- **La preview apre il pannello**: hover su una riga carta, se il pannello è chiuso e sbloccato, lo apre sopra le
+  colonne (motivo dell'app, non sosta) e lo richiude dopo il linger; bloccato aggiorna il Detail sul posto.
+- **Il Parere di Filo** (§6) arrivato a pannello chiuso accende la striscia e passa al main con la fonte `app`
+  (`MSG.RISPOSTA_IN_ATTESA`), come l'Aiuto.
+
+Dentro l'elemento Detail le statistiche restano lo **stato di riposo**; il Detail non si ridimensiona mai, cambia solo
+contenuto.
 
 | Stato | Trigger | Contenuto |
 |-------|---------|-----------|
-| **Statistiche** | Default; ritorno automatico | §8 |
+| **Statistiche** | Default; ritorno automatico | §9 |
 | **Preview** | Hover su una riga carta (ovunque) | Carta + contesto (§5.2) |
 | **Carosello** | Click su una riga carta | Pinnato: flusso di triage (§5.3) |
 
@@ -108,7 +128,7 @@ Immagini: caricate solo all'hover; cache locale delle immagini Scryfall; nel car
 
 Sopra: immagine della carta. Sotto, riga di contesto: **prezzo** (Cardmarket EUR via Scryfall), tag già assegnati, indicatore "già nel mazzo".
 
-Poi un **box modulare** (slot): tasto destro sul box → "modifica" → scelta del modulo, secondo il sistema moduli esistente di Filo. Moduli alpha (2-3 + default):
+Poi gli **elementi del detail**, che sono elementi del pannello (§5): dal «+» se ne aggiungono, tolgono e riordinano, anche col tasto destro e a parole. Elementi alpha (2-3 + default):
 
 1. **Mini mana curve** con evidenziato dove cadrebbe la carta ("mi fixa la curva?" ha risposta visiva senza uscire dal detail).
 2. **Prezzo + dati** (prezzo, ristampe, legalità).

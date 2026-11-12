@@ -10,6 +10,7 @@
 //     (controllo che il test non sia un falso positivo dovuto ad altro)
 
 import { test, expect } from './fixtures/electron.mjs';
+import { guardiaAccesa } from './helpers/guardia.mjs';
 import { menuAperto } from './helpers/barra.mjs';
 
 test('default settings: security.protectIpLeak e blockPopups sono ON', async ({ openTab }) => {
@@ -222,7 +223,7 @@ test('popup blocker: i popup di login (OAuth) chiesti col clic restano finestre 
   // gira mai lì dentro — l'esenzione anti-fingerprint per i login (o qualunque
   // altra cosa in quel preload) resterebbe morta anche col popup consentito.
   // `data-filo-ready` lo mette page-preload.js a fine avvio dei content script;
-  // `window.__filoFpGuard` lo installa la guardia anti-fingerprint SOLO se il
+  // la guardia anti-fingerprint (rumore sul canvas) si installa SOLO se il
   // preload ha girato E la pagina non è esentata — qui l'URL è un host
   // qualunque (non un provider di identità noto), quindi in modalità
   // anti-fingerprint di default (livello 1) la guardia deve installarsi.
@@ -232,7 +233,7 @@ test('popup blocker: i popup di login (OAuth) chiesti col clic restano finestre 
     null,
     { timeout: 8_000 },
   );
-  const fpGuardInstalled = await popupWin.evaluate(() => window.__filoFpGuard === true);
+  const fpGuardInstalled = await popupWin.evaluate(guardiaAccesa);
   expect(fpGuardInstalled, 'il preload (e con lui la logica anti-fingerprint) deve girare anche dentro il popup di login').toBe(true);
 });
 

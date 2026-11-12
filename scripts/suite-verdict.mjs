@@ -18,7 +18,12 @@
 //   un rosso: è già il compito dei retry assorbirlo. Gli «skipped» non contano.
 //   Gli errori FUORI dai casi (json.errors) sono rossi anche loro, con una
 //   eccezione: un «Worker teardown timeout» in una corsa senza altri rossi
-//   nuovi è un avviso, non un rosso (vedi classificaErroriGlobali).
+//   nuovi è un avviso, non un rosso (vedi classificaErroriGlobali). Il tetto di
+//   tempo di Playwright scaduto è UN rosso, `suite:tetto`: i casi non girati
+//   non sono verdi.
+//   In GitHub la suite gira divisa in parti (suite.yml): con --parti/--esiti
+//   una parte senza il suo esito è un rosso `suite:non-partita`, e i rossi
+//   delle altre si elencano lo stesso.
 //
 // COME SI COPRE UN ROSSO
 //   Una voce di contenitore.specs con `spec` e `caso` copre QUEL caso (`caso`
@@ -31,13 +36,14 @@
 // CODICI D'USCITA
 //   0  nessun rosso nuovo (verde, o solo rossi noti)
 //   1  almeno un rosso nuovo: l'elenco sta nel file di --out e a schermo
-//   2  il JSON manca, non si legge o non contiene casi: la suite NON è
-//      partita, e questo non è un verde (un cancello che non gira non è un
-//      cancello aperto)
+//   2  il JSON manca, non si legge o non contiene casi, o una parte non ha
+//      lasciato l'esito: la suite NON è arrivata in fondo, e questo non è un
+//      verde (un cancello che non gira non è un cancello aperto)
 //
 // USO
 //   node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>]
 //                                  [--rossi <rossi-noti.json>] [--chiavi <file>]
+//                                  [--parti <N> --esiti <cartella>]
 //
 //   --chiavi scrive le chiavi dell'allarme (scripts/build-alarm.mjs), una per
 //   riga: cosa è rotto, perché il server non apra un doppione per lo stesso guasto.
@@ -45,7 +51,7 @@
 //   Come si produce il JSON (Playwright ≥ 1.49):
 //   PLAYWRIGHT_JSON_OUTPUT_NAME=suite.json npx playwright test --reporter=list,json
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -111,6 +117,7 @@ export function raccogliCasi(json) {
           titolo,
           titoloCompleto: [...corniceQui, titolo].join(' › '),
           stato: statoFinale(t),
+          nonGirato: !Array.isArray(t?.results) || t.results.length === 0,
         });
       }
     }
@@ -271,8 +278,10 @@ export function verdetto(json, noti) {
       else v.nuovi.push(c);
     }
   }
-  const errori = Array.isArray(json?.errors) ? json.errors : [];
-  const globali = classificaErroriGlobali(errori, v.nuovi.length > 0);
+  const tutti = Array.isArray(json?.errors) ? json.errors : [];
+  const tetto = tutti.filter((e) => eTettoDellaCorsa(primaRiga(e)));
+  const errori = tutti.filter((e) => !tetto.includes(e));
+  const globali = classificaErroriGlobali(errori, v.nuovi.length > 0 || tetto.length > 0);
   // Stesso ordine e stessa scelta di classificaErroriGlobali, ma errore per errore: tre teardown con la stessa prima
   // riga possono venire da tre worker diversi.
   const eTeardown = (e) => /^Worker teardown timeout/i.test(primaRiga(e));
@@ -285,8 +294,37 @@ export function verdetto(json, noti) {
       ...(strascico ? { strascicoDi: `tests/${strascico.spec}.spec.mjs:${strascico.riga}` } : {}),
     });
   }
+  if (tetto.length) {
+    const nonGirati = casi.filter((c) => c.nonGirato).length;
+    const titolo = `la suite ha passato il suo tetto di tempo (${primaRiga(tetto[0])}): ${nonGirati} casi non sono girati, e il loro esito non si sa`;
+    v.nuovi.push({ spec: FUORI_DAI_CASI, titolo, titoloCompleto: titolo, file: '', tetto: true });
+  }
   v.avvisi = globali.avvisi;
   return v;
+}
+
+/** Il tetto della corsa intera scaduto (`--global-timeout`), coi testi delle versioni di Playwright. PURA. */
+export function eTettoDellaCorsa(riga) {
+  return /^Timed out waiting \S+ for the (?:entire test run|(?:teardown for )?test suite to run)/i.test(String(riga || ''));
+}
+
+/** Il file dell'esito che la parte `k` lascia (PLAYWRIGHT_BLOB_OUTPUT_NAME in suite.yml). PURA. */
+export function nomeEsitoParte(k) {
+  return `parte-${k}.zip`;
+}
+
+/** Le parti, da 1 a `n`, il cui esito non sta fra i file `nomi`. PURA. */
+export function partiSenzaEsito(n, nomi) {
+  const ci = new Set(Array.isArray(nomi) ? nomi : []);
+  return Array.from({ length: Math.max(0, Number(n) || 0) }, (_, i) => i + 1).filter((k) => !ci.has(nomeEsitoParte(k)));
+}
+
+/** Un rosso per ogni parte senza esito: i suoi casi non sono stati provati, e il silenzio sembrerebbe un verde. PURA. */
+export function rossiDellePartiMancanti(mancanti, n) {
+  return (Array.isArray(mancanti) ? mancanti : []).map((k) => {
+    const titolo = `parte ${k} di ${n} della suite senza esito: non è partita, o è stata fermata al tetto del passo (di norma un Electron rimasto appeso); i suoi casi non sono stati provati`;
+    return { spec: FUORI_DAI_CASI, titolo, titoloCompleto: titolo, file: '', parteMancante: k };
+  });
 }
 
 /**
@@ -294,6 +332,7 @@ export function verdetto(json, noti) {
  * «errore fuori dai casi: <testo>» per un rosso senza caso. PURA.
  */
 export function rigaRosso(c) {
+  if (c.tetto || c.parteMancante) return c.titolo;
   if (c.spec === FUORI_DAI_CASI) {
     return `errore fuori dai casi: ${c.titolo}${c.strascicoDi ? ` (strascico di ${c.strascicoDi}, non un guasto a sé)` : ''}`;
   }
@@ -302,6 +341,8 @@ export function rigaRosso(c) {
 
 /** La chiave dell'allarme quando la suite non è partita o non ha lasciato un esito. */
 export const CHIAVE_NON_PARTITA = 'suite:non-partita';
+/** La chiave della suite fermata dal suo tetto di tempo: non è un'installazione rotta, è la suite troppo lunga o appesa. */
+export const CHIAVE_TETTO = 'suite:tetto';
 
 /**
  * Le chiavi dell'allarme per i rossi nuovi: `suite:tests/<spec>.spec.mjs` per
@@ -315,8 +356,9 @@ export function chiaviDelVerdetto(v) {
   const chiavi = [];
   for (const c of nuovi) {
     if (c.strascicoDi) continue;
-    const k = c.spec !== FUORI_DAI_CASI ? `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`
-      : c.file ? chiaveDelFile(c.file) : 'suite:fuori-dai-casi';
+    const k = c.tetto ? CHIAVE_TETTO : c.parteMancante ? CHIAVE_NON_PARTITA
+      : c.spec !== FUORI_DAI_CASI ? `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`
+        : c.file ? chiaveDelFile(c.file) : 'suite:fuori-dai-casi';
     if (!chiavi.includes(k)) chiavi.push(k);
   }
   // Un rosso nuovo c'è: l'allarme vuole una chiave, e «non partita» direbbe il falso.
@@ -354,23 +396,29 @@ export function testoRiassunto(v) {
 
 /** Le opzioni della riga di comando. PURA. */
 export function leggiArgomenti(argv) {
-  const out = { file: '', out: '', rossi: '', chiavi: '' };
+  const out = { file: '', out: '', rossi: '', chiavi: '', parti: 0, esiti: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--out' || a === '--rossi' || a === '--chiavi') {
+    if (a === '--parti') {
+      const n = Number(argv[i + 1]);
+      if (!Number.isInteger(n) || n < 1) throw new Error('--parti vuole il numero delle parti della suite');
+      out.parti = n;
+      i += 1;
+    } else if (a === '--out' || a === '--rossi' || a === '--chiavi' || a === '--esiti') {
       const k = a.slice(2);
       const val = argv[i + 1];
       if (!val || val.startsWith('--')) throw new Error(`${a} vuole un percorso`);
       out[k] = val;
       i += 1;
     } else if (a.startsWith('--')) {
-      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file>`);
+      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file> --parti <N> --esiti <cartella>`);
     } else if (!out.file) {
       out.file = a;
     } else {
       throw new Error(`Argomento di troppo: ${a}`);
     }
   }
+  if (Boolean(out.parti) !== Boolean(out.esiti)) throw new Error('--parti e --esiti vanno insieme: quante parti, e dove stanno i loro esiti');
   return out;
 }
 
@@ -385,58 +433,67 @@ function scriviChiavi(opt, chiavi) {
 }
 
 async function main() {
+  const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--parti <N> --esiti <cartella>]';
   let opt;
   try {
     opt = leggiArgomenti(process.argv.slice(2));
   } catch (e) {
     console.error(String(e.message || e));
-    console.error('Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>] [--rossi <rossi-noti.json>] [--chiavi <file>]');
+    console.error(USO);
     process.exit(2);
   }
   if (!opt.file) {
-    console.error('Manca il JSON dei risultati. Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>]');
+    console.error(`Manca il JSON dei risultati. ${USO}`);
     process.exit(2);
   }
+  const cartellaEsiti = opt.esiti ? resolve(opt.esiti) : '';
+  const parti = opt.parti
+    ? rossiDellePartiMancanti(partiSenzaEsito(opt.parti, existsSync(cartellaEsiti) ? readdirSync(cartellaEsiti) : []), opt.parti)
+    : [];
+  // Senza un verdetto sui casi, le parti mancanti sono l'unica cosa che si sa: si dicono, e finiscono nel file dei nuovi.
+  const fermo = (messaggio, chiavi) => {
+    console.error(messaggio);
+    for (const c of parti) console.error(`  ✗ ${rigaRosso(c)}`);
+    if (opt.out && parti.length) writeFileSync(resolve(opt.out), `${parti.map(rigaRosso).join('\n')}\n`, 'utf8');
+    scriviChiavi(opt, parti.length && !chiavi.includes(CHIAVE_NON_PARTITA) ? [...chiavi, CHIAVE_NON_PARTITA] : chiavi);
+    process.exit(2);
+  };
   const fileJson = resolve(opt.file);
   if (!existsSync(fileJson)) {
-    console.error(`La suite NON è partita: il JSON dei risultati non c'è (${fileJson}). Non è un verde.`);
-    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
-    process.exit(2);
+    fermo(parti.length === opt.parti && opt.parti
+      ? `Nessuna delle ${opt.parti} parti della suite ha lasciato l'esito, e il JSON dei risultati non c'è (${fileJson}). Non è un verde.`
+      : `La suite NON è partita: il JSON dei risultati non c'è (${fileJson}). Non è un verde.`, [CHIAVE_NON_PARTITA]);
   }
   let json;
   try {
     json = JSON.parse(readFileSync(fileJson, 'utf8'));
   } catch (e) {
-    console.error(`La suite NON ha lasciato un esito leggibile (${fileJson}): ${String(e.message || e)}. Non è un verde.`);
-    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
-    process.exit(2);
+    fermo(`La suite NON ha lasciato un esito leggibile (${fileJson}): ${String(e.message || e)}. Non è un verde.`, [CHIAVE_NON_PARTITA]);
   }
   let noti;
   const fileNoti = opt.rossi ? resolve(opt.rossi) : resolve(ROOT, 'tests', 'rossi-noti.json');
   try {
     noti = leggiNoti(fileNoti);
   } catch (e) {
-    console.error(`L'elenco dei rossi noti non si legge (${fileNoti}): ${String(e.message || e)}.`);
-    scriviChiavi(opt, ['suite:rossi-noti']);
-    process.exit(2);
+    fermo(`L'elenco dei rossi noti non si legge (${fileNoti}): ${String(e.message || e)}.`, ['suite:rossi-noti']);
   }
 
   const v = verdetto(json, noti);
   if (v.totale === 0) {
-    console.error('La suite NON ha eseguito nessun caso: non è un verde.');
-    for (const e of Array.isArray(json.errors) ? json.errors : []) console.error(`  errore: ${primaRiga(e)}`);
-    scriviChiavi(opt, chiaviSenzaCasi(json.errors));
-    process.exit(2);
+    const errori = Array.isArray(json.errors) ? json.errors : [];
+    fermo(['La suite NON ha eseguito nessun caso: non è un verde.', ...errori.map((e) => `  errore: ${primaRiga(e)}`)].join('\n'),
+      chiaviSenzaCasi(json.errors));
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
   // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
+  v.nuovi.unshift(...parti);
   console.log(testoRiassunto(v));
   if (opt.out) {
     const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
   scriviChiavi(opt, chiaviDelVerdetto(v));
-  process.exit(v.nuovi.length ? 1 : 0);
+  process.exit(parti.length ? 2 : v.nuovi.length ? 1 : 0);
 }
 
 const eseguitoDirettamente = process.argv[1]

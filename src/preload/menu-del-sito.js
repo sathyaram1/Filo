@@ -3,6 +3,8 @@
 // La chiamano il ponte del tasto destro (page-preload.js) e content.js. Regole: patterns/menu-contestuale-se-filo-sostituisce-il-menu-nativo.md.
 'use strict';
 
+const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
+
 // Un menu nasce dove si è cliccato (spigolo sul cursore, o rovesciato contro il bordo): dentro questa distanza è suo.
 const VICINO_PX = 32;
 // Un menu caricato al primo uso (Docs) arriva tardi; oltre, la pagina il tasto l'ha solo annullato.
@@ -28,16 +30,7 @@ function sorgenteSonda(nome) {
   var tipiDi = new WeakMap();
   var TIPI_GENERICO = 8;
   var DOC = typeof document !== 'undefined' ? document : null;
-  var mascherate = new WeakMap();
-  function maschera(fn, orig, name) {
-    var m = fn;
-    try {
-      m = ({ [name]() { return fn.apply(this, arguments); } })[name];
-      Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
-      mascherate.set(m, 'function ' + name + '() { [native code] }');
-    } catch (e) {}
-    return m;
-  }
+  ${SEMBRA_NATIVA}
   function fase(o) { return (o === true || (o && typeof o === 'object' && o.capture)) ? 2 : 1; }
   function togli(t, f, o) {
     var m = ascolti.get(t);
@@ -75,10 +68,7 @@ function sorgenteSonda(nome) {
       try { if (tipo === 'contextmenu') togli(this == null ? window : this, f, o); } catch (e) {}
       return oRem.apply(this, arguments);
     }, oRem, 'removeEventListener');
-    var FP = Function.prototype, oStr = FP.toString;
-    FP.toString = maschera(function toString() {
-      return (typeof this === 'function' && mascherate.get(this)) || oStr.apply(this, arguments);
-    }, oStr, 'toString');
+    mascheraToString();
   } catch (e) {}
 
   function chiavi(nodo) { try { return Object.keys(nodo); } catch (e) { return []; } }
@@ -173,7 +163,8 @@ function copiaDelClic(e) {
 }
 
 function crea({ webFrame, riserva = () => {}, finestra = globalThis.window, nome = null } = {}) {
-  const segreto = nome || `x${require('node:crypto').randomBytes(12).toString('hex')}`;
+  // Web Crypto, non node:crypto: nella sandbox del preload Node non c'è (#834).
+  const segreto = nome || `x${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
   try { webFrame.executeJavaScript(sorgenteSonda(segreto), false).catch(() => {}); } catch (_) {}
   const doc = () => finestra.document;
 

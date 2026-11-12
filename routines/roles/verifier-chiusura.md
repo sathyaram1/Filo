@@ -41,4 +41,10 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
 
 <!-- includi: _criteri-verifica.md -->
 
+Sul diff della correzione, che qui leggi, ti fai anche le due domande che nel
+giro pieno fa la lettura del diff (conta le prove con `--base <commit di
+partenza>`):
+
+<!-- includi: _criteri-struttura.md -->
+
 <!-- includi: _critica-e-livelli.md -->

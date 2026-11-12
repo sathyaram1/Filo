@@ -10,9 +10,9 @@ import { leggiArgomenti, leggiDomandaJson, soloDaFilo, messaggioErrore, formatta
 const DOMANDA = {
   titolo: 'Archiviare il doppione?', priorita: 'importante', contesto: 'Due feedback uguali.',
   opzioni: [
-    { testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } },
-    { testo: 'Approva come locale', azione: { tipo: 'approva_locale', feedbackId: 'f1' } },
-    { testo: 'Spegni le routine', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } },
+    { testo: 'Archivia', pro: 'Un lavoro in meno.', contro: 'Si perde la nota.', azione: { tipo: 'archivia', feedbackId: 'f1' } },
+    { testo: 'Riprendi', pro: 'La nota resta.', contro: 'Un giro in più.', azione: { tipo: 'riprendi', feedbackId: 'f1' } },
+    { testo: 'Spegni le routine', pro: 'Niente spesa.', contro: 'Si ferma tutto.', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } },
   ],
   consiglio: { opzione: 0, perche: 'è un doppione' },
 };
@@ -33,6 +33,7 @@ function finto(risposte = {}) {
     },
     consegna: async (t, domanda) => { consegne.push({ t, domanda }); return risposte.consegna || { outcome: 'ok', id: 'D-7', num: 'D-7' }; },
     biglietto: async () => risposte.biglietto || '',
+    credenziale: async () => risposte.credenziale || { tipo: 'admin' },
     bigliettoLocale: async () => risposte.bigliettoLocale || '',
     sporca: async (cosa, motivi) => { sporcate.push({ cosa, motivi }); ordine.push('sporca'); return 'Biglietto della sessione sporcato.'; },
     leggiFile: (p) => { if (!(p in (risposte.file || {}))) throw Object.assign(new Error('no'), { code: 'ENOENT' }); return risposte.file[p]; },
@@ -81,10 +82,10 @@ test('chiedi: senza biglietto va a ownerDomande, col biglietto delle routine pas
 });
 
 test('rispondi: un’azione di consenso o da fare una per una non parte da una sessione', async () => {
-  assert.equal(soloDaFilo({ tipo: 'approva_locale', feedbackId: 'f1' }), true);
+  assert.equal(soloDaFilo({ tipo: 'approva_locale', feedbackId: 'f1' }), true, 'un tipo che non c’è più non parte da qui');
   assert.equal(soloDaFilo({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }), true);
   assert.equal(soloDaFilo({ tipo: 'archivia', feedbackId: 'f1' }), false);
-  for (const scelta of ['2', '3']) {
+  for (const scelta of ['3']) {
     const f = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA }, riferimenti: {} } });
     assert.equal(await esegui(['rispondi', 'D-3', '--scelta', scelta], f.io), 1);
     assert.deepEqual(f.chiamate.map((c) => c.op), ['mostra'], 'rispondi non è stato chiamato');
@@ -93,6 +94,56 @@ test('rispondi: un’azione di consenso o da fare una per una non parte da una s
   const ok = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA } }, rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true } } });
   assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1'], ok.io), 0);
   assert.deepEqual(ok.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0, sessione: true });
+});
+
+test('rispondi a parole (#1598): al server non parte una scelta, e lo script dice che non è partita nessuna azione', async () => {
+  const parole = finto({ rispondi: { ok: true, domanda: { stato: 'in_lavorazione' }, esito: { ok: true } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ne parliamo domani'], parole.io), 0);
+  assert.deepEqual(parole.chiamate, [{ op: 'rispondi', id: 'D-96', testo: 'ne parliamo domani', sessione: true }]);
+  assert.match(parole.out.join('\n'), /^OK: D-96 è in_lavorazione; risposta a parole, nessuna azione applicata\.$/);
+  assert.equal(parole.err.length, 0);
+
+  // Su un'attesa le parole di una sessione lasciano la domanda aperta: lo script dice come si sceglie ancora.
+  const aperta = finto({ rispondi: { ok: true, domanda: { stato: 'aperta' }, esito: { ok: true, azione: null } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ci penso'], aperta.io), 0);
+  assert.match(aperta.out.join('\n'), /OK: D-96 è aperta; risposta a parole, nessuna azione applicata\.\nLe opzioni restano da scegliere: node scripts\/domanda\.mjs rispondi D-96 --scelta N \(queste parole arrivano a chi riprende il lavoro\)\./);
+
+  // Il difetto visto: senza scelta il server riprende lo stesso il lavoro. Lo script non lo nasconde.
+  const riprende = finto({ rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f553' } }, riferimenti: { f553: { num: '#553.2' } } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ne parliamo domani'], riprende.io), 0);
+  assert.match(riprende.out.join('\n'), /applicata: Riprendi #553\.2 con questa scelta/);
+  assert.match(riprende.err.join('\n'), /ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato Riprendi #553\.2/);
+
+  for (const vuoto of [['--testo', '   '], ['--testo', '-']]) {
+    const f = finto({ stdin: ' \n' });
+    assert.equal(await esegui(['rispondi', 'D-96', ...vuoto], f.io), 1, vuoto.join(' '));
+    assert.equal(f.chiamate.length, 0, 'una risposta vuota non parte');
+    assert.match(f.err.join('\n'), /vuoto/);
+  }
+});
+
+test('rispondi con la scelta: l’azione applicata si legge col pulsante che le corrisponde, senza avvisi', async () => {
+  const f = finto({
+    mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA }, riferimenti: { f1: { num: '#902' } } },
+    rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true, azione: { tipo: 'archivia', feedbackId: 'f1' } } },
+  });
+  assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1', '--testo', 'doppione'], f.io), 0);
+  assert.deepEqual(f.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0, testo: 'doppione', sessione: true });
+  assert.match(f.out.join('\n'), /^OK: D-3 è chiusa; applicata: Archivia #902\.$/);
+  assert.equal(f.err.length, 0);
+
+  const ko = finto({
+    mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA } },
+    rispondi: { ok: true, domanda: { stato: 'aperta' }, esito: { ok: false, errore: 'feedback_assente', azione: { tipo: 'archivia', feedbackId: 'f1' } } },
+  });
+  assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1'], ko.io), 0);
+  assert.match(ko.out.join('\n'), /non applicata: l'azione «archivia» \(feedback_assente\)/);
+});
+
+test('l’uso e «mostra» dicono che senza scelta la risposta resta parole', () => {
+  assert.match(leggiArgomenti(['boh']).errore, /il testo da solo resta parole e non applica niente/);
+  const testo = formattaDomanda({ id: 'D-9', stato: 'aperta', titolo: 't', opzioni: DOMANDA.opzioni }, {}, { quando: () => 'ora' });
+  assert.match(testo, /--scelta N \[--testo "…"\] \| --testo "…" \(senza --scelta solo parole: nessuna azione\)/);
 });
 
 test('rispondi, consiglio, archivia e riapri dicono al server che scrive una sessione, col suo biglietto', async () => {
@@ -121,7 +172,7 @@ test('rispondi, consiglio, archivia e riapri dicono al server che scrive una ses
 test('consiglio: le domande col consiglio di consenso restano fuori, le altre partono', async () => {
   const domande = {
     'D-1': { id: 'D-1', ...DOMANDA },
-    'D-2': { id: 'D-2', ...DOMANDA, consiglio: { opzione: 1, perche: 'x' } },
+    'D-2': { id: 'D-2', ...DOMANDA, consiglio: { opzione: 2, perche: 'x' } },
   };
   const f = finto({
     mostra: (d) => ({ ok: true, domanda: domande[d.id] }),
@@ -131,6 +182,26 @@ test('consiglio: le domande col consiglio di consenso restano fuori, le altre pa
   assert.deepEqual(f.chiamate.at(-1), { op: 'consiglio', ids: ['D-1'], sessione: true });
   assert.match(f.err.join('\n'), /D-2: il consiglio vale solo dalla finestra di Filo/);
   assert.match(f.out.join('\n'), /D-1: fatto, Archivia #8/);
+});
+
+// #1790.1: in blocco ogni esito si dice come nella risposta singola; una ripresa accodata non è «fatto».
+test('consiglio: una ripresa accodata si dice accodata, col numero e lo stato del lavoro', async () => {
+  const riprendi = { opzioni: [{ testo: 'Riprendi', azione: { tipo: 'riprendi', feedbackId: 'f1' } }], consiglio: { opzione: 0, perche: 'x' } };
+  const f = finto({
+    mostra: (d) => ({ ok: true, domanda: { id: d.id, ...riprendi }, riferimenti: { f1: { num: '#1482' } } }),
+    consiglio: { ok: true, esiti: [
+      { id: 'D-1', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' }, accodata: true, statoLavoro: 'todo' } },
+      { id: 'D-2', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' }, accodata: true, statoLavoro: 'design', aspetta: ['D-7'] } },
+      { id: 'D-3', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' } } },
+    ] },
+  });
+  assert.equal(await esegui(['consiglio', 'D-1', 'D-2', 'D-3'], f.io), 0);
+  const out = f.out.join('\n');
+  assert.match(out, /D-1: accodata: Riprendi #1482 con questa scelta \(#1482 non era fermo: è todo, la decisione resta accodata per il giro dopo\)/);
+  assert.match(out, /D-2: accodata: Riprendi #1482 con questa scelta \(#1482 resta fermo anche su D-7, e riparte con la risposta a quella\)/);
+  assert.match(out, /D-3: applicata: Riprendi #1482 con questa scelta/);
+  assert.doesNotMatch(out, /fatto/);
+  assert.equal(f.err.length, 0);
 });
 
 test('mostra: i testi degli agenti escono coi caratteri di controllo resi visibili, il pulsante dai dati', () => {
@@ -221,76 +292,4 @@ test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
   const m = motivoNonFidate(tanti);
   assert.match(m, /^testo di 400 domande non fidate \(D-1, .*D-10, …\)$/);
   assert.ok(`elenco delle domande: ${m}`.length <= 300);
-});
-
-test('cerca (#1154): col biglietto delle routine passa dal canale, da una sessione va a ownerDomande e si sporca sui non fidati', async () => {
-  assert.deepEqual(leggiArgomenti(['cerca', 'crediti', 'client']), { cmd: 'cerca', testo: 'crediti client' });
-  assert.deepEqual(leggiArgomenti(['cerca']), { cmd: 'cerca', testo: '' });
-  assert.match(leggiArgomenti(['cerca', 'x'.repeat(400)]).errore, /400 caratteri, il massimo è 300/);
-
-  const voci = [
-    { id: 'D-3', titolo: 'Crediti', gruppo: 'crediti', principio: 'Zero fiducia nei crediti dichiarati dal client.', fiducia: 'fidato', daRivedere: false },
-    { id: 'D-8', titolo: 'Altro', gruppo: '', principio: 'Riga\u001b[2Jcon controllo', fiducia: 'non_fidato', daRivedere: true },
-  ];
-  const routine = finto({ biglietto: 'biglietto-routine' });
-  const canale = [];
-  routine.io.cercaCanale = async (t, testo) => { canale.push({ t, testo }); return { outcome: 'ok', reply: { voci, totale: 2, altre: 0 } }; };
-  assert.equal(await esegui(['cerca', 'crediti'], routine.io), 0);
-  assert.deepEqual(canale, [{ t: 'biglietto-routine', testo: 'crediti' }]);
-  assert.equal(routine.chiamate.length, 0, 'le routine non hanno le credenziali del proprietario');
-  const stampa = routine.out.join('\n');
-  assert.match(stampa, /D-3 {2}«Zero fiducia nei crediti dichiarati dal client\.»/);
-  assert.match(stampa, /DA RIVEDERE/);
-  assert.ok(!stampa.includes('\u001b'), 'i caratteri di controllo escono visibili');
-  assert.match(stampa, /si cita col suo numero/);
-
-  const rifiuto = finto({ biglietto: 'b' });
-  rifiuto.io.cercaCanale = async () => ({ outcome: 'refused', reason: 'intento_sconosciuto' });
-  assert.equal(await esegui(['cerca', 'crediti'], rifiuto.io), 1);
-  assert.match(rifiuto.err.join('\n'), /RIFIUTATO dal server: intento_sconosciuto/);
-  const giu = finto({ biglietto: 'b' });
-  giu.io.cercaCanale = async () => ({ outcome: 'fault', reason: 'http_503' });
-  assert.equal(await esegui(['cerca', 'crediti'], giu.io), 3);
-
-  const sessione = finto({ cerca: { ok: true, voci, totale: 2, altre: 0 } });
-  assert.equal(await esegui(['cerca', 'crediti'], sessione.io), 0);
-  assert.deepEqual(sessione.chiamate[0], { op: 'cerca', testo: 'crediti' });
-  assert.equal(sessione.sporcate.length, 1);
-  assert.match(sessione.sporcate[0].motivi[0], /D-8/);
-  assert.deepEqual(sessione.ordine, ['sporca', 'scrivi'], 'si sporca prima di stampare');
-
-  const vuoto = finto({ cerca: { ok: true, voci: [], totale: 0, altre: 0 } });
-  await esegui(['cerca', 'zebra'], vuoto.io);
-  assert.match(vuoto.out.join('\n'), /Nessun principio risponde a «zebra»/);
-  assert.equal(vuoto.sporcate.length, 0);
-  const tutto = finto({ cerca: { ok: true, voci: [], totale: 0, altre: 0 } });
-  await esegui(['cerca'], tutto.io);
-  assert.match(tutto.out.join('\n'), /Il registro è vuoto/);
-  const oltre = finto({ cerca: { ok: true, voci: [voci[0]], totale: 41, altre: 40 } });
-  await esegui(['cerca', 'crediti'], oltre.io);
-  assert.match(oltre.out.join('\n'), /Ce ne sono altri 40 meno pertinenti/);
-});
-
-test('mostra ed elenco (#1154): principio, riapertura, superata e assorbite si leggono', () => {
-  const s = formattaDomanda({
-    id: 'D-21', stato: 'aperta', priorita: 'importante', fiducia: 'fidato', titolo: 'T',
-    riaperta: { il: 5000, esitoPrima: { tipo: 'principio', principio: 'D-3', automatica: true } },
-    assorbite: ['D-31', 'D-32'],
-  }, {}, { quando: () => 'ieri' });
-  assert.match(s, /Riaperta dall'owner il ieri: la risposta automatica col principio di D-3 non andava/);
-  assert.match(s, /Assorbe: D-31, D-32/);
-  const c = formattaDomanda({
-    id: 'D-3', stato: 'chiusa', priorita: 'importante', fiducia: 'fidato', titolo: 'T',
-    principio: { testo: 'Zero fiducia nel client.', fiducia: 'fidato', daRivedere: { il: 1, da: 'D-21' } },
-  }, {}, { quando: () => 'ieri' });
-  assert.match(c, /Principio \(fidata · da rivedere: l'owner ha riaperto D-21\)\n {2}Zero fiducia nel client\./);
-  const a = formattaDomanda({
-    id: 'D-20', stato: 'chiusa', priorita: 'importante', titolo: 'T',
-    esito: { ok: true, automatica: true, tipo: 'principio', principio: 'D-3', testoPrincipio: 'Zero fiducia.', scelta: 0, azione: { tipo: 'compito' } },
-  }, {}, { quando: () => 'ieri' });
-  assert.match(a, /risposta automatica col principio di D-3: «Zero fiducia\.»/);
-  const sup = formattaDomanda({ id: 'D-31', stato: 'superata', assorbitaDa: 'D-30', titolo: 'T' }, {}, { quando: () => 'ieri' });
-  assert.match(sup, /Superata: è un caso di D-30/);
-  const e = formattaElenco([{ id: 'D-31', titolo: 'x', priorita: 'importante', stato: 'superata', assorbitaDa: 'D-30', fiducia: 'fidato' }]);
-  assert.match(e, /\[superata → D-30 · fidata\]/);
 });

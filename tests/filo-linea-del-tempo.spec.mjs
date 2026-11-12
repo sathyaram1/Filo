@@ -86,16 +86,18 @@ const CHAT_VECCHIE = [
   },
 ];
 
-test('dopo l’aggiornamento le chat di prima si riaprono dalla Cronologia e Filo le ritrova, coi messaggi interi', async () => {
+test('dopo l’aggiornamento le chat di prima sono nel filo della home e Filo le ritrova, coi messaggi interi', async () => {
   test.setTimeout(90_000);
   const userData = cartellaTemporanea('filo-866-mig-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ filo_chats: CHAT_VECCHIE }), 'utf8');
   const { app, shell } = await avvia(userData);
   try {
-    const page = await paginaInterna(app, shell, 'filo://archive/archive.html');
+    const page = await paginaInterna(app, shell, 'filo://quaderno/quaderno.html');
     const elenco = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chats_list' }));
     expect(elenco.chats.map((c) => [c.id, c.messageCount])).toEqual([['chat-coscienza', 3], ['chat-sveglia', 2]]);
-    await expect(page.locator('.arc-chat', { hasText: 'La coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
+    const casa = await paginaInterna(app, shell, 'filo://newtab/');
+    await casa.locator('#cercaInput').fill('coscienza emergente');
+    await expect(casa.locator('.dash-cerca-msg', { hasText: 'Secondo te la coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
 
     const riaperta = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chat_get', id: 'chat-coscienza' }));
     expect(riaperta.chat.messages[2].text).toBe(LUNGO);
@@ -211,7 +213,7 @@ test('con 50.000 eventi nel filo un messaggio di 20.000 caratteri si salva inter
   }
 });
 
-test('cancellare una chat dalla Cronologia la toglie dal file; «cancella le pagine dell’ultima ora» toglie quelle e nessun’altra', async ({ app, openTab, testServer }) => {
+test('togliere una chat dal filo (tasto destro su una sua bolla) la toglie dal file; «cancella le pagine dell’ultima ora» toglie quelle e nessun’altra', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   await configura(app);
@@ -225,13 +227,16 @@ test('cancellare una chat dalla Cronologia la toglie dal file; «cancella le pag
   await openTab(recente);
   await expect.poll(() => leggiFilo(userData).includes('Pagina di adesso'), { timeout: 20_000 }).toBe(true);
 
-  const page = await openTab('filo://archive/archive.html');
-  const riga = page.locator('.arc-chat', { hasText: 'Barocco ZXQ' });
-  await expect(riga).toBeVisible({ timeout: 10_000 });
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
-  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Elimina la chat');
+  const page = await openTab('filo://newtab/');
+  const bolla = page.locator('.dash-bubble[data-chat="chat-da-cancellare"]', { hasText: 'Barocco ZXQ' });
+  await expect(bolla).toBeVisible({ timeout: 10_000 });
+  await bolla.evaluate((el) => {
+    const v = (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).find((x) => x.label === 'Togli la conversazione dal filo');
+    v.onClick();
+  });
+  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Togliere la conversazione dal filo?');
   await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
+  await expect(page.locator('.dash-bubble', { hasText: 'Barocco ZXQ' })).toHaveCount(0);
   await expect.poll(() => leggiFilo(userData).includes('Barocco ZXQ'), { timeout: 10_000 }).toBe(false);
   expect(leggiFilo(userData)).toContain('Parliamo di Epicuro');
 
@@ -433,7 +438,9 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
   });
   const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }));
   expect(chiesta.needsConfirm).toBe(2);
-  expect(chiesta.describe).toContain('le 2 pagine visitate su youtube.com di sempre');
+  // Il sito sta nel suo riquadro (#592.7): la frase lo annuncia, il riquadro lo porta da solo.
+  expect(chiesta.describe).toContain('le 2 pagine visitate di sempre di questo sito:');
+  expect(chiesta.parti).toContainEqual({ citazione: 'youtube.com', nuda: true });
   const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { confirmed: true }));
   expect(fatta.output.cancellate).toBe(2);
   const testo = leggiFilo(userData);
@@ -445,15 +452,16 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
 test('una pagina che riscrive il proprio indirizzo (una mappa spostata) resta una pagina visitata', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
-  const page = await openTab(testServer.html('<!doctype html><title>Mappa</title><p>mappa</p>'));
+  const page = await openTab(testServer.html('<!doctype html><title>Mappa</title><p>mappa</p>'
+    + '<a id="altro" href="/altro-video" onclick="history.pushState(null,\'\',\'/altro-video\');document.title=\'Altro video\';return false">altro</a>'));
   const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione');
   await expect.poll(() => visite().length, { timeout: 20_000 }).toBe(1);
   for (let i = 0; i < 20; i++) {
     await page.evaluate((k) => history.replaceState(null, '', location.pathname + '?@41.9,12.' + k + ',15z'), i);
     await page.waitForTimeout(80);
   }
-  // Una pagina nuova dentro la stessa (pushState, come un video dopo l'altro) resta invece una visita in più.
-  await page.evaluate(() => { history.pushState(null, '', '/altro-video'); document.title = 'Altro video'; });
+  // Una pagina nuova dentro la stessa scelta dall'utente (pushState, come un video dopo l'altro) è una visita in più.
+  await page.locator('#altro').click();
   await expect.poll(() => visite().length, { timeout: 10_000 }).toBe(2);
   await page.waitForTimeout(1000);
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
@@ -495,13 +503,11 @@ test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un c
   await openTab(testServer.html('<!doctype html><title>Caricamento…</title><p>app</p><script>setTimeout(()=>{document.title="Ordine 1234 confermato"},700)</script>'));
   await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Ordine 1234 confermato', 'Posta in arrivo (3)']);
 
-  const page = await openTab(testServer.html('<!doctype html><title>Home video</title><p>x</p>'));
+  const page = await openTab(testServer.html('<!doctype html><title>Home video</title><p>x</p><a id="video" href="/video/42">video</a><script>'
+    + 'document.getElementById("video").onclick=()=>{history.pushState(null,"","/video/42");document.title="Caricamento…";'
+    + 'setTimeout(()=>{document.title="Orche al tramonto - Video"},600);return false};</script>'));
   await expect.poll(async () => (await titoli()).includes('Home video'), { timeout: 20_000 }).toBe(true);
-  await page.evaluate(() => {
-    history.pushState(null, '', '/video/42');
-    document.title = 'Caricamento…';
-    setTimeout(() => { document.title = 'Orche al tramonto - Video'; }, 600);
-  });
+  await page.locator('#video').click();
   await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Home video', 'Orche al tramonto - Video', 'Ordine 1234 confermato', 'Posta in arrivo (3)']);
   // Il titolo nuovo è una riga in coda, e riletto dal file vale quello.
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
@@ -516,7 +522,7 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   await app.evaluate(async () => { await globalThis.SN_CLOSE_FILO_CHAT('chat-privata'); await globalThis.SN_CLOSE_FILO_CHAT('chat-da-tenere'); });
   const voci = () => app.evaluate(async () => (await globalThis.SN_HISTORY.list()).length);
   const prima = await voci();
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://archive/archive.html' }));
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://quaderno/quaderno.html' }));
   const dove = await app.evaluate(async () => {
     const tutto = await globalThis.chrome.storage.local.get(null);
     const cronologia = await globalThis.SN_HISTORY.list();
@@ -542,4 +548,103 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   expect(dove.tenuto).not.toContain('filo_raw_log');
   expect(dove.segnate).toBeGreaterThan(0);
   expect(await voci()).toBe(prima);
+});
+
+// #1525 — una pagina lasciata aperta che cambia indirizzo da sola non riempie il filo: senza un gesto i cambi restano
+// una visita; un clic vero nella pagina seguito da un cambio è una pagina che l'utente ha scelto.
+test('una pagina che cambia indirizzo in ciclo senza input lascia al più 30 visite; un clic vero seguito da un cambio ne aggiunge una', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const url = testServer.html('<!doctype html><title>Giostra</title><p>giostra</p>'
+    + '<a id="scegli" href="/scelta" style="display:block;padding:20px">scegli</a><script>'
+    + 'let i=0;window.giro=setInterval(()=>{i++;history.pushState(null,"","/giro/"+i);document.title="Giro "+i},40);'
+    + 'document.getElementById("scegli").onclick=()=>{clearInterval(window.giro);history.pushState(null,"","/scelta");document.title="Scelta";return false};'
+    + '</script>');
+  const origine = new URL(url).origin;
+  const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione' && e.url.startsWith(origine));
+  const page = await openTab(url);
+  // Più di due finestre del gesto: centinaia di cambi d'indirizzo che nessuno ha chiesto.
+  await page.waitForTimeout(11_000);
+  const giri = await page.evaluate(() => Number(location.pathname.split('/').pop()) || 0);
+  expect(giri).toBeGreaterThan(100);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  const prima = visite().length;
+  expect(prima).toBeGreaterThanOrEqual(1);
+  expect(prima).toBeLessThanOrEqual(30);
+  await page.locator('#scegli').click();
+  await expect.poll(() => visite().map((e) => new URL(e.url).pathname).at(-1), { timeout: 10_000 }).toBe('/scelta');
+  await page.waitForTimeout(1000);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(visite().length).toBe(prima + 1);
+});
+
+// #1525 — in privacy ogni salto fra siti ricrea la vista della scheda: il freno è della scheda e non riparte da zero.
+test('in privacy una pagina che salta da sola fra due siti lascia al più 30 visite dopo la prima', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings', settings: { security: { cookies: { mode: 'privacy', trustedSites: [] } } },
+  }));
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .some((w) => w._filoTabs && w._filoTabs.cookieMode === 'privacy')), { timeout: 5000 }).toBe(true);
+  const url = testServer.html('<!doctype html><title>Salto</title><p>salto</p><script>'
+    + 'const n=Number(new URLSearchParams(location.search).get("n")||0);document.title="Salto "+n;'
+    + `setTimeout(()=>{location.href=(location.hostname==="127.0.0.1"?${JSON.stringify(testServer.originPubblico)}:${JSON.stringify(testServer.origin)})+location.pathname+"?n="+(n+1)},250);`
+    + '</script>');
+  const percorso = new URL(url).pathname;
+  await openTab(url);
+  await new Promise((r) => setTimeout(r, 25_000));
+  const salti = await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = w._filoTabs && w._filoTabs.tabs.find((x) => /[?&]n=/.test(x.url || ''));
+      if (t) return Number(new URL(t.url).searchParams.get('n')) || 0;
+    }
+    return 0;
+  });
+  expect(salti).toBeGreaterThan(40);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  const visite = eventi(userData).filter((e) => e.tipo === 'navigazione' && new URL(e.url).pathname === percorso);
+  // La prima, aperta da Filo, più trenta senza gesto: come quando la vista resta la stessa.
+  expect(visite.length).toBeGreaterThanOrEqual(30);
+  expect(visite.length).toBeLessThanOrEqual(31);
+});
+
+// #1525 — sopra 256 MB il filo si fa notare una volta per avvio, e l'avviso porta dove le pagine si cancellano per periodo.
+test('il filo pesante si fa notare, e l’avviso porta alla cancellazione delle pagine per periodo', async ({ app, shell, avvisi }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Il filo vero, con la misura del file finta: scrivere 256 MB in una prova costerebbe più di tutto il resto.
+  await app.evaluate(async () => {
+    const rq = process.mainModule.require;
+    const path = rq('path');
+    const fsp = rq('node:fs/promises');
+    const { creaFilo } = rq(path.join(rq('electron').app.getAppPath(), 'src', 'main', 'services', 'ilFilo.js'));
+    const cartella = path.join(process.env.FILO_USER_DATA, 'filo-pesante');
+    const file = path.join(cartella, 'eventi.jsonl');
+    await creaFilo({ cartella }).registraVisita({ url: 'https://pesante.example/', titolo: 'Pesante' });
+    const stat = fsp.stat;
+    fsp.stat = async (p, ...resto) => {
+      const s = await stat.call(fsp, p, ...resto);
+      return String(p) === file ? { ...s, size: 300 * 1024 * 1024 } : s;
+    };
+    try {
+      const f = creaFilo({ cartella });
+      await f.pagine();
+      await new Promise((r) => setTimeout(r, 200));
+    } finally { fsp.stat = stat; }
+  });
+  const vista = await avvisi();
+  const notifica = vista.locator('.shell-notif', { hasText: 'occupano 300 MB sul disco' });
+  await expect(notifica).toBeVisible({ timeout: 10_000 });
+  await vista.screenshot({ path: 'tests/.shots/1525/avviso-filo-pesante.png' });
+  await notifica.locator('.shell-notif-action', { hasText: 'Cancella pagine' }).click();
+  let sicurezza = null;
+  await expect.poll(() => {
+    sicurezza = app.windows().find((w) => w.url().startsWith('filo://security/security.html'));
+    return Boolean(sicurezza);
+  }, { timeout: 10_000 }).toBe(true);
+  await sicurezza.waitForLoadState('domcontentloaded');
+  await expect(sicurezza.locator('#sec-visite-ora')).toBeFocused({ timeout: 10_000 });
+  await expect(sicurezza.locator('#sec-visite')).toBeInViewport();
+  await sicurezza.screenshot({ path: 'tests/.shots/1525/sicurezza-pagine.png' });
 });

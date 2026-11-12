@@ -52,29 +52,33 @@ html, body {
    `display: inline-flex` lo sovrascrivono: qui gli si ridà la priorità. */
 [hidden] { display: none !important; }
 
-/* Alta esattamente la finestra in tutti e due gli stati: scorrono le colonne e il filo, mai la pagina. */
+/* Alta esattamente la finestra in tutti e due gli stati: scorrono le colonne e il filo, mai la pagina.
+   La prima riga esiste solo a destra, per Impostazioni e Profilo: sinistra e filo partono dall'alto (#1491). */
 .dash {
+  --dash-gap: 24px;
+  --dash-lato: 40px;
+  --dash-colonna: 260px;
   position: relative;
   height: calc(100vh / var(--sn-zoom, 1));
   display: grid;
-  grid-template-columns: 260px 1fr 260px;
-  grid-template-rows: 1fr auto;
-  gap: 24px;
-  padding: 40px 40px 28px;
+  grid-template-columns: var(--dash-colonna) 1fr var(--dash-colonna);
+  grid-template-rows: auto 1fr auto;
+  column-gap: var(--dash-gap);
+  padding: 12px var(--dash-lato) 28px;
   box-sizing: border-box;
 }
 
 @media (max-width: 980px) {
-  .dash { grid-template-columns: 200px 1fr 200px; padding: 28px 20px 20px; gap: 16px; }
+  .dash { --dash-gap: 16px; --dash-lato: 20px; --dash-colonna: 200px; padding-bottom: 20px; }
 }
 /* Le colonne non si nascondono: le carte (un timer che suona) servono anche nella finestra più stretta. */
 @media (max-width: 720px) {
-  .dash { grid-template-columns: 170px 1fr 170px; padding: 24px 12px 16px; gap: 12px; }
+  .dash { --dash-gap: 12px; --dash-lato: 12px; --dash-colonna: 170px; padding-bottom: 16px; }
 }
 
 .dash-left {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / -1;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
@@ -110,13 +114,13 @@ html, body {
   font-size: 13px;
   line-height: 1.4;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+  transition: border-color calc(0.18s * var(--sn-motion, 1)) ease, box-shadow calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease, opacity calc(0.18s * var(--sn-motion, 1)) ease;
   cursor: pointer;
 }
 .dash-carta:hover,
 .dash-carta:focus-visible {
   border-color: var(--dash-line-strong);
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--dash-ink) 7%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--dash-ink) min(100%, 7% * var(--sn-ombra, 1)), transparent);
 }
 .dash-carta:focus-visible { border-color: var(--dash-accent); }
 .dash-carta.presa { opacity: 0.4; }
@@ -124,7 +128,7 @@ html, body {
 .dash-carta.sopra-dopo { box-shadow: 0 3px 0 -1px var(--dash-accent); }
 .dash-carta[data-suona="1"] {
   border-color: var(--dash-accent);
-  animation: dash-ring-pulse 1s ease-in-out infinite;
+  animation: dash-ring-pulse calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 @keyframes dash-ring-pulse {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
@@ -159,7 +163,7 @@ html, body {
   background: linear-gradient(to right, transparent, var(--dash-card) 16px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.18s ease;
+  transition: opacity calc(0.18s * var(--sn-motion, 1)) ease;
 }
 .dash-carta:hover .dash-carta-mani,
 .dash-carta:focus-within .dash-carta-mani { opacity: 1; pointer-events: auto; }
@@ -171,7 +175,7 @@ html, body {
   color: var(--dash-ink-mute);
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease, color calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dash-carta-filo { font-size: 11px; padding: 2px 7px; border-radius: 7px; }
 .dash-carta-togli {
@@ -222,11 +226,11 @@ html, body {
   height: 100%;
   width: 0;
   background: var(--dash-accent);
-  transition: width 0.6s linear;
+  transition: width calc(0.6s * var(--sn-motion, 1)) linear;
 }
 .dash-carta-avanza.indeterminato > i {
   width: 30%;
-  animation: dash-avanza-vai 1.4s ease-in-out infinite;
+  animation: dash-avanza-vai calc(1.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 @keyframes dash-avanza-vai {
   from { transform: translateX(-100%); }
@@ -256,7 +260,7 @@ html, body {
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background calc(0.18s * var(--sn-motion, 1)) ease, color calc(0.18s * var(--sn-motion, 1)) ease;
 }
 .dash-carta-voce:hover,
 .dash-carta-voce:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
@@ -286,7 +290,7 @@ html, body {
   border-radius: var(--dash-radius-pill);
   padding: 3px 11px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  transition: background calc(0.18s * var(--sn-motion, 1)) ease, color calc(0.18s * var(--sn-motion, 1)) ease, border-color calc(0.18s * var(--sn-motion, 1)) ease;
 }
 .dash-pastiglia:hover { border-color: var(--dash-ink); color: var(--dash-ink); }
 .dash-pastiglia.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: var(--dash-paper); }
@@ -301,7 +305,7 @@ html, body {
   border-radius: var(--dash-radius-pill);
   padding: 3px 11px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  transition: background calc(0.18s * var(--sn-motion, 1)) ease, color calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dash-carta-az:hover { background: var(--dash-ink); color: var(--dash-paper); }
 .dash-carta-az:active { transform: scale(0.95); }
@@ -311,7 +315,7 @@ html, body {
 .dash-carta-az.secondaria:hover { background: var(--dash-line); color: var(--dash-ink); }
 
 /* «altro»: le app senza carta e le carte tolte, da cui si rimettono. */
-.dash-altro { flex: none; padding: 4px 2px 2px; border-radius: var(--dash-radius); transition: background 0.18s ease; }
+.dash-altro { flex: none; padding: 4px 2px 2px; border-radius: var(--dash-radius); transition: background calc(0.18s * var(--sn-motion, 1)) ease; }
 .dash-altro.bersaglio { background: var(--dash-line); }
 .dash-altro-tit {
   padding: 0 4px 4px;
@@ -337,7 +341,7 @@ html, body {
   font-family: inherit;
   font-size: 10.5px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  transition: background calc(0.18s * var(--sn-motion, 1)) ease, color calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dash-altro-app:hover,
 .dash-altro-app:focus-visible { background: var(--dash-line); color: var(--dash-ink); transform: translateY(-1px); outline: none; }
@@ -360,7 +364,7 @@ html, body {
   line-height: 18px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.18s ease, transform 0.12s ease;
+  transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dash-altro-cella:hover .dash-altro-rimetti,
 .dash-altro-cella:focus-within .dash-altro-rimetti { opacity: 1; }
@@ -376,7 +380,7 @@ html, body {
   background: var(--dash-card);
   border: 1px solid var(--dash-line-strong);
   border-radius: 12px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) 18%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 18% * var(--sn-ombra, 1)), transparent);
 }
 .dash-menu-voce {
   display: block;
@@ -393,10 +397,11 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: background 0.12s ease, padding-left 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
+/* All'hover cambia solo il fondo: il testo che scivola fa sembrare la voce un'altra (#2096). */
 .dash-menu-voce:hover,
-.dash-menu-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-menu-voce:focus-visible { background: var(--dash-line); outline: none; }
 .dash-menu-sep { height: 1px; margin: 4px 6px; background: var(--dash-line); }
 
 .dash-flash {
@@ -416,7 +421,7 @@ html, body {
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, 6px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease;
 }
 .dash-flash.vista { opacity: 1; transform: translate(-50%, 0); }
 
@@ -426,24 +431,15 @@ html, body {
 
 .dash-center {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 1 / span 2;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
   min-width: 0;
   min-height: 0;
 }
-.dash-home {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  height: 100%;
-  padding: 40px 0;
-}
-/* Riga sopra il messaggio della home dopo un'accoglienza chiusa a metà: il segno «già accolto» è
+/* Riga in fondo al filo dopo un'accoglienza chiusa a metà: il segno «già accolto» è
    definitivo, e questa riga è l'unico posto in cui l'utente può accorgersene e tornare indietro. */
 .dash-onb-notice {
   display: flex;
@@ -459,7 +455,7 @@ html, body {
   font-size: 13px;
   line-height: 1.4;
   opacity: 0.75;
-  transition: opacity 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-onb-notice:hover { opacity: 1; }
 .dash-onb-notice-text { text-align: center; }
@@ -474,36 +470,177 @@ html, body {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-onb-notice button:hover { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
-.dash-home-msg {
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1.35;
-  text-align: center;
+/* Senza un modello Filo non può scrivere: la frase che dice perché sta in fondo al filo, con la sua voce. */
+.dash-senza-modello {
+  align-self: flex-start;
+  max-width: 86%;
+  margin: 6px 8px 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--dash-line);
+  border-radius: 16px;
+  background: var(--dash-card);
   color: var(--dash-ink);
-  max-width: 640px;
-  margin: 0;
-  letter-spacing: -0.01em;
+  font-size: 14.5px;
+  line-height: 1.5;
 }
-.dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
+.dash-thread > .dash-onb-notice { align-self: center; margin: 6px 0; }
+/* L'intervista rifatta rimasta aperta altrove si ricorda sulla home, non in fondo a un'altra conversazione. */
+body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
+
+/* ── La coda del filo (#869) ── */
+/* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
+.dash-cerca { flex: none; display: flex; justify-content: center; padding: 10px 8px 0; position: relative; z-index: 6; }
+.dash-cerca-campo {
+  display: flex; align-items: center; gap: 8px; width: min(320px, 100%);
+  padding: 5px 12px; border: 1px solid transparent; border-radius: var(--dash-radius-pill);
+  color: var(--dash-ink-mute); cursor: text;
+  transition: border-color calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, width calc(0.2s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-campo:hover { background: var(--dash-line); }
+.dash-cerca-campo:focus-within { width: min(460px, 100%); background: var(--dash-card); border-color: var(--dash-line-strong); color: var(--dash-ink-soft); }
+.dash-cerca-lente { display: inline-flex; flex: none; }
+.dash-cerca-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font: inherit; font-size: 13px; color: var(--dash-ink);
+}
+.dash-cerca-input::placeholder { color: var(--dash-ink-mute); }
+.dash-cerca-input::-webkit-search-cancel-button { display: none; }
+.dash-cerca-risultati {
+  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100% - 16px)); max-height: min(60vh, 520px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px; padding: 6px;
+  background: var(--dash-card); border: 1px solid var(--dash-line-strong); border-radius: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 16% * var(--sn-ombra, 1)), transparent);
+  scrollbar-width: thin;
+}
+.dash-cerca-voce {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
+  font: inherit; cursor: pointer;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); outline: none; }
+.dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
+.dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-cerca-gruppo { border-top: 1px solid var(--dash-line); margin-top: 4px; }
+.dash-cerca-gruppo:first-child { border-top: none; margin-top: 0; }
+/* La ricerca per significato fra le schede chiuse parte a richiesta: la sua riga resta più quieta dei risultati. */
+.dash-cerca-significato .dash-cerca-titolo { color: var(--dash-ink-soft); }
+.dash-cerca-significato:disabled { cursor: progress; opacity: 0.7; }
+
+/* Risalire il filo: carica il pezzo prima; all'inizio lo dice e si spegne. */
+.dash-risali { display: flex; justify-content: center; padding: 0 0 4px; }
+.dash-risali-btn {
+  font: inherit; font-size: 11.5px; color: var(--dash-ink-mute); background: transparent;
+  border: 1px solid transparent; border-radius: var(--dash-radius-pill); padding: 4px 14px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease, border-color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-risali-btn:hover { background: var(--dash-line); color: var(--dash-ink); border-color: var(--dash-line-strong); }
+.dash-risali-btn:disabled { cursor: default; opacity: 0.55; }
+.dash-risali-btn:disabled:hover { background: transparent; border-color: transparent; color: var(--dash-ink-mute); }
+
+/* Il segno del giorno, e i giorni prima di oggi sbiaditi: tornano pieni sotto il mouse. */
+.dash-giorno {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0 0;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dash-ink-mute);
+}
+.dash-giorno::before, .dash-giorno::after { content: ""; flex: 1; height: 1px; background: var(--dash-line); }
+.dash-vecchio { opacity: var(--dash-vecchio-opacita, 0.52); transition: opacity calc(0.3s * var(--sn-motion, 1)) ease; }
+.dash-vecchio:hover, .dash-vecchio:focus-within { opacity: 1; }
+.dash-giorno.dash-vecchio { opacity: 1; }
+
+/* Il dispositivo d'origine quando non è questo. */
+.dash-altrove { font-size: 11px; color: var(--dash-ink-mute); margin-top: -10px; padding: 0 12px; }
+.dash-altrove-user { align-self: flex-end; }
+.dash-altrove-filo { align-self: flex-start; }
+
+/* Le righe sottili: un cambio fatto dall'interfaccia, le pagine visitate ripiegate. */
+.dash-cambio, .dash-pagine-testa {
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio { align-self: stretch; }
+/* Le righe sottili di fila stanno strette come le righe di un registro (#1490): lo spazio pieno resta intorno alle bolle. */
+:is(.dash-cambio, .dash-pagine) + :is(.dash-cambio, .dash-pagine) { margin-top: calc(2px - var(--dash-filo-gap, 14px)); }
+.dash-cambio:hover, .dash-pagine-testa:hover, .dash-pagine-testa:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
+.dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
+.dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
+.dash-cambio-testo, .dash-pagine-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cambio-stato { flex: none; font-style: italic; }
+.dash-cambio.dash-cambi-annullato .dash-cambio-testo { text-decoration: line-through; text-decoration-color: var(--dash-line-strong); }
+.dash-cambio-annulla {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  opacity: 0; transition: opacity calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio:hover .dash-cambio-annulla, .dash-cambio-annulla:focus-visible { opacity: 1; }
+.dash-cambio-annulla:hover { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+/* Da tastiera il filo si percorre bolla per bolla (#1295): si vede quale ha il fuoco. */
+.dash-bubble[data-chat]:focus { outline: none; }
+.dash-bubble[data-chat]:focus-visible { outline: 2px solid rgba(var(--sn-accent-rgb), 0.55); outline-offset: 2px; }
+/* Al posto di una conversazione appena nascosta (#1295): una riga sottile che la rimette. */
+.dash-nascosta {
+  display: flex; align-items: center; gap: 8px; align-self: stretch; min-width: 0;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta[hidden] { display: none; }
+.dash-nascosta:hover, .dash-nascosta:focus-within { background: var(--dash-line); }
+.dash-nascosta-ico { display: inline-flex; flex: none; }
+.dash-nascosta-rimetti {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta-rimetti:hover, .dash-nascosta-rimetti:focus-visible { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+.dash-pagine { align-self: stretch; display: flex; flex-direction: column; }
+.dash-pagine-testa { border: none; background: transparent; font-family: inherit; cursor: pointer; text-align: left; }
+.dash-pagine-aperte .dash-pagine-testa { color: var(--dash-ink-soft); }
+.dash-pagine-elenco { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px 30px; }
+.dash-pagina {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 3px 8px; border-radius: 8px;
+  font-size: 12px; color: var(--dash-ink-soft); text-decoration: none;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-pagina:hover, .dash-pagina:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-pagina-titolo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-pagina-sito { flex: none; font-size: 11px; color: var(--dash-ink-mute); }
+
+/* Il punto del filo dove porta una ricerca o una carta: un attimo di luce, poi niente. */
+.dash-trovato { animation: dash-trovato calc(1.6s * var(--sn-motion, 1)) ease; }
+@keyframes dash-trovato {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
 
 
 .dash-thread {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 .dash-bubbles {
+  --dash-filo-gap: 14px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 40px 8px 8px;
+  gap: var(--dash-filo-gap);
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. Il margine
+     dell'ultima bolla più questo fondo tengono i suoi tasti (27px): nemmeno lì compare la barra di scorrimento. */
+  padding: 40px 8px calc(14px + var(--dash-vuoto, 0px));
+  /* Il posto della barra di scorrimento è tenuto: comparendo non stringe la chat (#2096). */
+  scrollbar-gutter: stable;
 }
 
 .dash-bubble {
@@ -520,6 +657,15 @@ html, body {
   background: var(--dash-ink);
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
+  transition: background calc(0.25s * var(--sn-motion, 1)) ease, color calc(0.25s * var(--sn-motion, 1)) ease;
+}
+/* #1296 — il seguito scritto mentre Filo lavora, in attesa: un foglietto tratteggiato non ancora consegnato, che si
+   riempie d'inchiostro quando Filo lo legge. */
+.dash-bubble-user.dash-bubble-attesa {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  outline: 1.5px dashed var(--dash-ink-mute);
+  outline-offset: -1.5px;
 }
 /* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
    (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
@@ -530,7 +676,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   background: var(--dash-accent); color: var(--dash-paper);
   border: 2px solid var(--dash-paper); cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-cambi-segno svg { stroke-width: 3; }
 .dash-cambi-segno:hover, .dash-cambi-segno:focus-visible { transform: scale(1.12); outline: none; }
@@ -542,10 +688,10 @@ html, body {
   background: var(--dash-ink); color: var(--dash-paper);
   border-radius: 12px; padding: 6px 8px 6px 12px;
   font-size: 12px; line-height: 1.35; white-space: normal; user-select: none;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
   opacity: 0; visibility: hidden; transform: translateY(4px);
   /* Si chiude con un attimo di ritardo: dal segno alla pastiglia il mouse attraversa la bolla. */
-  transition: opacity 0.15s ease 0.35s, transform 0.15s ease 0.35s, visibility 0s linear 0.5s;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease calc(0.35s * var(--sn-motion, 1)), transform calc(0.15s * var(--sn-motion, 1)) ease calc(0.35s * var(--sn-motion, 1)), visibility 0s linear calc(0.5s * var(--sn-motion, 1));
 }
 /* Il ponte fra la bolla e la pastiglia: andandoci col mouse non si chiude. */
 .dash-cambi-pop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
@@ -558,10 +704,11 @@ html, body {
 .dash-cambi-pop:has(:focus-visible),
 .dash-bubble-cambi.dash-cambi-aperto .dash-cambi-pop {
   opacity: 1; visibility: visible; transform: none;
-  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease, visibility 0s;
 }
 .dash-cambi-riga { display: flex; align-items: center; gap: 9px; }
-.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Un cambio di tante voci insieme (tutte le impostazioni di serie) scorre dentro la pastiglia, che resta nello schermo. */
+.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: min(40vh, 240px); overflow-y: auto; }
 .dash-cambi-annullato .dash-cambi-frase { text-decoration: line-through; opacity: 0.6; }
 .dash-cambi-stato { flex: none; opacity: 0.6; font-size: 11px; }
 .dash-activity-row.dash-cambi-annullato > span:nth-child(2) { text-decoration: line-through; opacity: 0.6; }
@@ -569,7 +716,7 @@ html, body {
   flex: none; font: inherit; font-size: 11.5px; cursor: pointer;
   border: 1px solid currentColor; background: transparent; color: inherit;
   border-radius: 13px; padding: 1px 9px; opacity: 0.8;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease, border-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-cambi-annulla:hover, .dash-cambi-annulla:focus-visible {
   opacity: 1; background: var(--dash-paper); color: var(--dash-ink); border-color: var(--dash-paper); outline: none;
@@ -589,7 +736,8 @@ html, body {
    pre-wrap, che renderebbe letterali gli a-capo fra i blocchi. */
 .dash-bubble-md { white-space: normal; }
 .dash-bubble-md p { margin: 0 0 8px 0; }
-.dash-bubble-md p:last-child { margin-bottom: 0; }
+/* I tasti del messaggio stanno in fondo alla bolla ma fuori dal testo: l'ultimo paragrafo resta l'ultimo (#2096). */
+.dash-bubble-md p:last-child, .dash-bubble-md p:has(+ :is(.dash-msg-azioni, .sn-azioni-msg):last-child) { margin-bottom: 0; }
 .dash-bubble-md h3, .dash-bubble-md h4, .dash-bubble-md h5, .dash-bubble-md h6 {
   margin: 10px 0 4px 0; font-weight: 600; font-size: 1em;
 }
@@ -624,9 +772,141 @@ html, body {
   vertical-align: text-bottom;
   background: currentColor;
   opacity: 0.55;
-  animation: dash-caret-blink 1s steps(1) infinite;
+  animation: dash-caret-blink calc(1s * var(--sn-motion, 1)) steps(1) infinite;
 }
 @keyframes dash-caret-blink { 50% { opacity: 0; } }
+
+/* #1620 — Copia e Rispondi sotto una risposta di Filo. Lo spazio c'è sempre, i tasti compaiono al passaggio del mouse:
+   così non spostano niente e non coprono la riga sotto. */
+.dash-bubbles > .dash-bubble-filo:not(.dash-bubble-streaming):not(.dash-bubble-pending):not(.dash-bubble-actions-only) {
+  position: relative;
+  margin-bottom: 14px;
+}
+.dash-bubbles > .dash-bubble-filo:not(.dash-bubble-streaming):not(.dash-bubble-pending):not(.dash-bubble-actions-only) + .dash-altrove-filo { margin-top: -2px; }
+/* #2096 — anche il messaggio dell'utente ha i suoi tasti, sotto e allineati a destra, nello spazio tenuto come sopra. */
+.dash-bubbles > .dash-bubble-user:not(.dash-bubble-attesa) {
+  position: relative;
+  margin-bottom: 14px;
+}
+.dash-bubble-user > .dash-msg-azioni { left: auto; right: 4px; }
+/* Il segno dei cambi sta sul bordo in basso a destra: i tasti gli lasciano il posto. */
+.dash-bubble-cambi:not(.dash-cambi-vuoto) > .dash-msg-azioni { right: 34px; }
+.dash-bubble-user > .dash-msg-azioni .dash-msg-azione::after { left: auto; right: calc(100% + 4px); }
+.dash-msg-azioni {
+  position: absolute; left: 4px; top: 100%;
+  display: flex; align-items: center; gap: 2px;
+  /* Il bordo alto tocca la bolla: dal testo ai tasti il mouse non esce mai dalla bolla. */
+  padding-top: 3px;
+  white-space: nowrap; font-style: normal; user-select: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s linear calc(0.14s * var(--sn-motion, 1));
+}
+.dash-bubble-filo:hover > .dash-msg-azioni,
+.dash-bubble-user:hover > .dash-msg-azioni,
+.dash-msg-azioni:focus-within {
+  opacity: 1; visibility: visible;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s;
+}
+.dash-msg-azione {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 24px; padding: 0;
+  border: none; border-radius: 7px; background: transparent;
+  color: var(--dash-ink-mute); cursor: pointer;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
+}
+.dash-msg-azione:hover, .dash-msg-azione:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+/* Si scala l'icona, non il tasto: un tasto trasformato si porterebbe dietro l'etichetta, che salta (#2096). */
+.dash-msg-azione svg { display: block; transition: transform calc(0.1s * var(--sn-motion, 1)) ease; }
+.dash-msg-azione:active svg { transform: scale(0.9); }
+.dash-msg-azione.dash-copiato { color: var(--dash-green); }
+.dash-msg-azione.dash-non-copiato { color: var(--dash-accent); }
+/* L'etichetta compare dopo i tasti, nella stessa riga: due tasti vicini non si coprono il nome a vicenda. */
+.dash-msg-azione::after {
+  content: attr(data-etichetta);
+  position: absolute; left: calc(100% + 4px); top: calc(50% + 1.5px); transform: translateY(-50%);
+  font-size: 11.5px; line-height: 1; color: var(--dash-ink-soft); pointer-events: none;
+  opacity: 0; transition: opacity calc(0.1s * var(--sn-motion, 1)) ease;
+}
+.dash-msg-azione:hover::after, .dash-msg-azione:focus-visible::after { opacity: 1; transition-delay: calc(0.25s * var(--sn-motion, 1)); }
+.dash-msg-azione.dash-copiato::after, .dash-msg-azione.dash-non-copiato::after { opacity: 1; transition-delay: 0s; }
+.dash-msg-azione.dash-copiato::after { color: var(--dash-green); }
+.dash-msg-azione.dash-non-copiato::after { color: var(--dash-accent); }
+.dash-msg-azioni:has(.dash-copiato, .dash-non-copiato) .dash-msg-azione:not(.dash-copiato):not(.dash-non-copiato)::after { opacity: 0; }
+
+/* La risposta citata in testa alla bolla dell'utente, come nelle app di messaggi: una striscia, chi l'ha scritta, due
+   righe. Il testo sta negli attributi: la bolla resta fatta delle sole parole dell'utente. */
+.dash-bubble-user { --dash-citata-chi: var(--dash-accent-2); }
+[data-sn-theme="dark"] .dash-bubble-user { --dash-citata-chi: var(--dash-accent); }
+.dash-citata {
+  display: block;
+  margin: -4px -8px 8px;
+  padding: 6px 12px 7px 14px;
+  border-radius: 10px;
+  background:
+    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
+    color-mix(in srgb, var(--dash-paper) 13%, transparent);
+  white-space: normal;
+  cursor: pointer;
+  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
+}
+.dash-citata:hover, .dash-citata:focus-visible {
+  background:
+    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
+    color-mix(in srgb, var(--dash-paper) 22%, transparent);
+  outline: none;
+}
+.dash-citata::before {
+  content: attr(data-chi);
+  display: block;
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  color: var(--dash-citata-chi);
+}
+.dash-citata::after {
+  content: attr(data-testo);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
+  opacity: 0.78;
+}
+.dash-citata.dash-citata-manca { cursor: default; }
+.dash-citata.dash-citata-manca::after { font-style: italic; }
+
+/* La stessa citazione sopra il campo, finché il messaggio non parte. */
+.dash-citazione {
+  flex-basis: 100%;
+  display: flex; align-items: center; gap: 4px;
+  min-width: 0;
+}
+.dash-citazione[hidden] { display: none; }
+.dash-citazione-vai {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 6px 12px 7px 15px;
+  border: none; border-radius: 20px 12px 12px 20px;
+  background:
+    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
+    var(--dash-line);
+  font: inherit; text-align: left; color: var(--dash-ink-soft); cursor: pointer;
+  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
+}
+.dash-citazione-vai:hover, .dash-citazione-vai:focus-visible {
+  background:
+    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
+    var(--dash-line-strong);
+  outline: none;
+}
+.dash-citazione-chi { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--dash-accent); }
+.dash-citazione-testo {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
+}
+.dash-citazione-togli {
+  flex: none; width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: transparent;
+  color: var(--dash-ink-mute); cursor: pointer;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
+}
+.dash-citazione-togli:hover, .dash-citazione-togli:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
 @media (prefers-reduced-motion: reduce) {
   .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
 }
@@ -683,8 +963,8 @@ html, body {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease, color 160ms ease,
-    padding-left var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1);
+  transition: max-height calc(var(--dash-filo-gomitolo) * var(--sn-motion, 1)) cubic-bezier(.4, 0, .2, 1), opacity calc(300ms * var(--sn-motion, 1)) ease, color calc(160ms * var(--sn-motion, 1)) ease,
+    padding-left calc(var(--dash-filo-gomitolo) * var(--sn-motion, 1)) cubic-bezier(.4, 0, .2, 1);
 }
 .dash-activity[data-testa] .dash-activity-head { max-height: 26px; opacity: 1; }
 .dash-activity[data-filo="gomitolo"] .dash-activity-head { padding-left: calc(26px + var(--dash-gomitolo-spazio, 0px)); }
@@ -703,13 +983,13 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease;
+  transition: max-height calc(var(--dash-filo-gomitolo) * var(--sn-motion, 1)) cubic-bezier(.4, 0, .2, 1), opacity calc(300ms * var(--sn-motion, 1)) ease;
 }
 /* In attesa il filo penzola da solo: gli serve un po' di posto. */
 .dash-activity[data-phase="wait"] .dash-activity-body { min-height: 22px; }
 
 /* Una sezione: un pensiero e le azioni che ne sono nate. */
-.dash-activity-seg { display: flex; flex-direction: column; min-width: 0; animation: dash-seg-entra 320ms ease-out; }
+.dash-activity-seg { display: flex; flex-direction: column; min-width: 0; animation: dash-seg-entra calc(320ms * var(--sn-motion, 1)) ease-out; }
 @keyframes dash-seg-entra { from { opacity: 0; transform: translateY(-4px); } }
 .dash-activity-seg-head {
   display: flex;
@@ -726,7 +1006,7 @@ html, body {
   text-align: left;
   cursor: pointer;
   border-radius: 6px;
-  transition: color 160ms ease;
+  transition: color calc(160ms * var(--sn-motion, 1)) ease;
 }
 .dash-activity-seg-head:hover,
 .dash-activity-seg-aperta > .dash-activity-seg-head,
@@ -809,7 +1089,7 @@ html, body {
   border-radius: 7px;
   transform: translate(-50%, -125%);
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity calc(140ms * var(--sn-motion, 1)) ease;
 }
 .dash-filo-hint.dash-filo-hint-vis { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
@@ -843,6 +1123,10 @@ html, body {
 .dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove[hidden] { display: none; }
+/* Il nome dato da Filo: più piano del nome vero, e senza spazio cede tutto lui. Il fattore è enorme
+   perché con uno piccolo al nome vero tocca una frazione di pixel, e già i puntini. */
+.dash-file-btn-etichetta { opacity: 0.8; min-width: 0; flex-shrink: 100000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-btn-etichetta[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
    lì anche quando il modello non risponde. */
 .dash-skip-row {
@@ -862,7 +1146,7 @@ html, body {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: opacity 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-skip-onboarding:hover { opacity: 1; }
 /* Accanto al «Riprova» della bolla d'errore è un bottone come gli altri: lì
@@ -900,7 +1184,7 @@ html, body {
   justify-content: center;
   text-decoration: none;
   opacity: 0.85;
-  transition: opacity 0.12s;
+  transition: opacity calc(0.12s * var(--sn-motion, 1));
 }
 .dash-action-link:hover { opacity: 1; }
 .dash-action-btn-primary {
@@ -921,6 +1205,11 @@ html, body {
   height: 16px;
   border-radius: 4px;
 }
+/* #845 — le pagine salvate che la risposta nomina stanno fra gli altri bottoni; una già aperta e tolta dalla lista
+   resta per riaprirla, più tenue. Si trascinano, quindi niente selezione. */
+.dash-salvate { display: contents; }
+.dash-salvata-btn { max-width: 100%; user-select: none; text-align: left; }
+.dash-salvata-aperta { opacity: 0.6; }
 /* #162 — bolla che contiene SOLO azioni (Filo ha solo eseguito, niente testo):
    margini stretti, niente padding di testo che lascerebbe una "scatola vuota". */
 .dash-bubble.dash-bubble-actions-only {
@@ -968,7 +1257,7 @@ html, body {
   color: var(--dash-ink-soft);
 }
 .dash-stile-accoglienza-testo { min-width: 0; overflow-wrap: anywhere; }
-.dash-stile-accoglienza .dash-action-btn { padding: 3px 10px; font-size: 12.5px; transition: background 0.15s ease, color 0.15s ease; }
+.dash-stile-accoglienza .dash-action-btn { padding: 3px 10px; font-size: 12.5px; transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease; }
 /* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
 .dash-cmd-primavolta {
   flex-basis: 100%;
@@ -980,7 +1269,7 @@ html, body {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: color 0.15s ease;
+  transition: color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-cmd-primavolta a:hover { color: var(--dash-accent); }
 /* Riga di comando: scatola QUADRATA col colore della bolla utente, così si distingue a colpo d'occhio
@@ -1031,6 +1320,7 @@ html, body {
   border-radius: 8px;
 }
 /* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
+.dash-cmd-blocked-btn { margin-top: 8px; }
 .dash-delete-panel {
   flex: 1 1 100%;
   min-width: 0;
@@ -1042,6 +1332,19 @@ html, body {
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
 .dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* La richiesta scritta dal modello, su un foglietto suo come il testo altrui nei popup di conferma (#592.7):
+   il filo a sinistra è per metà colore del testo, così un accento spento non lo spegne. */
+.dash-delete-query {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
+  border-radius: 6px;
+}
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
   content: '';
@@ -1055,7 +1358,7 @@ html, body {
   border: 2px solid currentColor;
   border-top-color: transparent;
   opacity: 0.7;
-  animation: dash-activity-spin 0.9s linear infinite;
+  animation: dash-activity-spin calc(0.9s * var(--sn-motion, 1)) linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-delete-note[data-cerco="1"]::before { animation: none; border-top-color: currentColor; }
@@ -1076,7 +1379,7 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background-color 0.15s ease;
+  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-delete-list li:hover { background: color-mix(in srgb, #c0392b 10%, transparent); }
 .dash-delete-list label { cursor: pointer; }
@@ -1102,7 +1405,7 @@ html, body {
   color: var(--dash-ink);
   border: 1px solid var(--dash-line);
   border-radius: 14px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, calc(0.28 * var(--sn-ombra, 1)));
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -1148,6 +1451,28 @@ html, body {
   border: 1px solid var(--dash-line);
   flex-shrink: 0;
 }
+.sn-refine-sample-ombra { background: var(--dash-card); border-radius: 8px; }
+/* Il pallino va avanti e indietro alla durata vera: si vede quanto sono lente le animazioni. */
+.sn-refine-sample-track {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dash-line);
+}
+.sn-refine-sample-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sn-accent, var(--dash-accent));
+  animation: sn-refine-va calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite alternate;
+}
+@keyframes sn-refine-va { to { left: calc(100% - 10px); } }
+@media (prefers-reduced-motion: reduce) { .sn-refine-sample-dot { animation: none; } }
 .sn-refine-control { display: flex; }
 .sn-refine-input { width: 100%; font-family: inherit; }
 .sn-refine-color { height: 42px; padding: 2px; cursor: pointer; }
@@ -1177,7 +1502,7 @@ html, body {
 
 .dash-right {
   grid-column: 3;
-  grid-row: 1 / span 2;
+  grid-row: 2 / span 2;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
@@ -1206,6 +1531,25 @@ html, body {
   padding: 8px 0 4px 14px;
   background: var(--dash-paper);
 }
+/* Su una finestra bassa la colonna scorre sotto l'orologio: quello che resta sotto sfuma invece di uscire tagliato a
+   metà, e la sfumatura c'è solo finché sotto c'è altro (senza scorrimento la timeline è spenta e l'opacità resta 0). */
+.dash-sistema::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--dash-paper) 85%);
+  pointer-events: none;
+  opacity: 0;
+  animation: dash-sotto-c-e-altro linear both;
+  animation-timeline: scroll(nearest block);
+}
+@keyframes dash-sotto-c-e-altro {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .dash-sis-icone {
   display: flex;
   flex-wrap: wrap;
@@ -1228,7 +1572,7 @@ html, body {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   user-select: none;
-  transition: background 0.12s, color 0.12s;
+  transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
 }
 .dash-sis-voce:hover,
 .dash-sis-voce:focus-visible {
@@ -1325,10 +1669,10 @@ html, body {
   border: 2px solid var(--sn-border);
   border-top-color: var(--sn-accent);
   border-radius: 50%;
-  animation: sn-rinomina-gira 0.8s linear infinite;
+  animation: sn-rinomina-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
 }
 .dash-sis-attesa .dash-sis-rotella { margin-right: 0; }
-@media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: 2.4s; } }
+@media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: calc(2.4s * var(--sn-motion, 1)); } }
 .dash-sis-box .sn-select-option.dash-sis-occupato { color: var(--sn-muted); cursor: progress; }
 .dash-sis-box .sn-select-option.dash-sis-attuale { font-weight: 600; }
 .dash-sis-box .sn-select-option.dash-sis-attuale[aria-disabled="true"] { color: var(--sn-fg); cursor: default; }
@@ -1343,6 +1687,8 @@ html, body {
 }
 .dash-sis-errore[hidden] { display: none; }
 .dash-sis-errore .dash-sis-come { margin-top: 2px; color: var(--sn-muted); }
+/* #2096 — un dispositivo fra i preferiti: in cima all'elenco, con la sua stellina dopo il nome. */
+.dash-sis-box .sn-select-option.dash-sis-preferito::after { content: '★'; margin-left: 6px; color: var(--dash-accent); font-size: 0.85em; }
 .dash-sis-apri {
   margin-top: 6px;
   padding: 4px 10px;
@@ -1352,7 +1698,7 @@ html, body {
   color: var(--sn-fg);
   font: inherit;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background calc(0.12s * var(--sn-motion, 1));
 }
 .dash-sis-apri:hover,
 .dash-sis-apri:focus-visible { background: rgba(var(--sn-accent-rgb), 0.18); outline: none; }
@@ -1364,20 +1710,32 @@ html, body {
 
 .dash-input-wrap {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
-  padding: 6px;
+  /* Padding uguale sui quattro lati e una riga del campo alta quanto i tasti (36px): i tasti stanno al centro
+     della pastiglia, concentrici al suo bordo tondo, e con più righe restano sull'ultima (#1489). */
+  padding: 8px;
   background: var(--dash-card);
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
-  margin: 0 auto;
-  width: 100%;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
+  /* Centrato fino a 720px; a destra lascia libera la pila degli avvisi della barra, che il main misura in
+     --filo-avvisi-barra-larga dal bordo della scheda: senza, una carta lunga copre l'invio (#1551). */
+  --dash-centro: max(0px, (100% - 720px) / 2);
+  margin: var(--dash-gap) max(var(--dash-centro), var(--filo-avvisi-barra-larga, 0px) / var(--sn-zoom, 1) - var(--dash-lato) - var(--dash-colonna) - var(--dash-gap)) 0 var(--dash-centro);
   max-width: 720px;
+  /* Senza, il minimo del suo contenuto (la textarea) vince sul margine e sotto gli 840px l'invio torna coperto. */
+  min-width: 0;
   box-sizing: border-box;
+}
+/* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
+.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease, margin-right calc(0.2s * var(--sn-motion, 1)) ease; }
+.dash-input-wrap.dash-input-bersaglio {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb), 0.18);
 }
 .dash-input {
   flex: 1;
@@ -1385,7 +1743,7 @@ html, body {
   border: none;
   background: transparent;
   outline: none;
-  padding: 10px 14px;
+  padding: 7.5px 12px;
   font-size: 15px;
   line-height: 1.4;
   color: var(--dash-ink);
@@ -1398,7 +1756,8 @@ html, body {
   /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
   box-sizing: border-box;
 }
-.dash-input::placeholder { color: var(--dash-ink-mute); }
+/* Su una riga anche nel campo stretto (avvisi accanto): a capo farebbe scorrere il campo vuoto. */
+.dash-input::placeholder { color: var(--dash-ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-send {
   width: 36px;
   height: 36px;
@@ -1416,8 +1775,13 @@ html, body {
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
-.dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform 160ms ease, opacity 160ms ease; }
+.dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende in quel tempo
+   vero, che la pagina gli scrive in --dash-pausa-quadrato (PAUSA_QUADRATO). Non è un token estetico. */
+.dash-send.dash-stop:not([disabled]) { animation: dash-stop-arma var(--dash-pausa-quadrato, 500ms) ease-in; }
+@keyframes dash-stop-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-send.dash-stop:not([disabled]) { animation-timing-function: step-end; } }
 
 .dash-img-preview {
   position: relative;
@@ -1462,7 +1826,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 6px 10px 2px;
+  padding: 4px 8px 2px;
 }
 .dash-img-previews .dash-img-preview { position: relative; padding: 0; }
 .dash-img-previews .dash-img-preview img {
@@ -1484,7 +1848,7 @@ html, body {
   color: var(--dash-ink);
   font-size: 13px;
   cursor: default;
-  transition: background 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dash-file-chip:hover,
 .dash-file-chip:focus-visible { background: rgba(var(--sn-accent-rgb), 0.12); outline: none; }
@@ -1503,6 +1867,9 @@ html, body {
 /* La scelta dell'autonomia nell'intervista (#1188): i livelli come pillole con le tacche di una carica, piene fino
    al livello; sotto, la frase del livello su cui si passa (o di quello scelto). */
 .dash-autonomia-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+/* La scelta dei contatori nell'intervista (#1461): Sì e No, con le pillole dell'autonomia. */
+.dash-contatori-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.dash-contatori-voci { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livelli { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livello {
   display: inline-flex;
@@ -1517,7 +1884,7 @@ html, body {
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, border-color calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-autonomia-livello:hover, .dash-autonomia-livello:focus-visible { background: var(--dash-line); border-color: var(--dash-ink-mute); outline: none; }
 .dash-autonomia-livello.scelto { border-color: var(--dash-ink); background: var(--dash-ink); color: var(--dash-paper); }
@@ -1537,7 +1904,7 @@ html, body {
 
 .dash-dir {
   flex-basis: 100%;
-  padding: 2px 14px 0;
+  padding: 2px 12px 0;
   font-size: 11.5px;
   color: var(--dash-ink-mute);
   font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
@@ -1560,6 +1927,8 @@ html, body {
   border-radius: 3px;
 }
 .dash-term-prompt { color: var(--dash-accent-2); font-weight: 700; }
+/* Col tema scuro la bolla del comando è chiara: la sabbia ci spariva sopra, la terracotta si legge. */
+[data-sn-theme="dark"] .dash-term-cmd .dash-term-prompt { color: var(--dash-accent); }
 
 /* Bolla output: monospace, scrollabile, con i controlli sotto. Anche la
    risposta del terminale è QUADRATA, in coppia con la riga di comando. */
@@ -1634,7 +2003,7 @@ html, body {
   height: 1em;
   background: var(--dash-line);
   border-radius: 4px;
-  animation: dash-pulse 1.4s ease-in-out infinite;
+  animation: dash-pulse calc(1.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 @keyframes dash-pulse {
   0%, 100% { opacity: 0.5; }
@@ -1642,12 +2011,13 @@ html, body {
 }
 
 /* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
-   pagina e non una barra a sé. */
+   pagina e non una barra a sé. Stanno in cima alla colonna destra e non le scorrono via. */
 .dash-controls {
-  position: fixed;
-  top: 10px;
-  right: 16px;
-  z-index: 50;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  /* In riga con «Cerca nel filo»: il disegno parte all'altezza delle carte di sinistra. */
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1664,7 +2034,7 @@ html, body {
   background: transparent;
   color: var(--dash-ink-soft);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
   -webkit-app-region: no-drag;
 }
 .dash-ctrl:hover {
@@ -1691,7 +2061,7 @@ html, body {
   justify-content: center;
   padding: 24px;
   background: rgba(20, 16, 12, 0.42);
-  animation: dash-recap-fade 0.18s ease-out;
+  animation: dash-recap-fade calc(0.18s * var(--sn-motion, 1)) ease-out;
 }
 @keyframes dash-recap-fade { from { opacity: 0; } to { opacity: 1; } }
 .dash-recap-box {
@@ -1704,8 +2074,8 @@ html, body {
   color: var(--dash-ink);
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius);
-  box-shadow: 0 18px 48px rgba(20, 16, 12, 0.28);
-  animation: dash-recap-pop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+  box-shadow: 0 18px 48px rgba(20, 16, 12, calc(0.28 * var(--sn-ombra, 1)));
+  animation: dash-recap-pop calc(0.2s * var(--sn-motion, 1)) cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes dash-recap-pop {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
@@ -1827,6 +2197,13 @@ html, body {
   color: #fff;
 }
 .dash-recap-done:hover { opacity: 0.9; }
+.dash-recap-tutte {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.dash-recap-tutte:hover { background: var(--dash-line); color: var(--dash-ink); }
 @media (prefers-reduced-motion: reduce) {
   .dash-recap-overlay, .dash-recap-box { animation: none; }
 }
@@ -1897,6 +2274,34 @@ html, body {
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
+/* #884 — il riassunto di una scheda chiusa la cui pagina non c'è più: un foglietto tenuto da parte, non un errore. */
+.dash-riassunto-chiusa {
+  align-self: stretch;
+  margin: 2px 12px 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--dash-accent-2);
+  border-radius: 0 8px 8px 0;
+  background: var(--dash-card);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.dash-riassunto-chiusa-titolo { font-size: 13.5px; font-weight: 600; color: var(--dash-ink-soft); overflow-wrap: anywhere; }
+.dash-riassunto-chiusa-quando { font-size: 12px; color: var(--dash-ink-mute); }
+.dash-riassunto-chiusa-testo { font-size: 13px; line-height: 1.5; color: var(--dash-ink-soft); white-space: pre-line; overflow-wrap: anywhere; }
+/* #818 — l'avviso dei crediti: la frase e sotto i rimedi, uno per riga col suo pulsante a destra. */
+.dash-crediti-avviso .sn-crediti-rimedi { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dash-crediti-avviso .sn-crediti-rimedio {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 8px; border-top: 1px solid var(--dash-line);
+}
+.dash-crediti-avviso .sn-crediti-rimedio-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-crediti-avviso .sn-crediti-rimedio-cifra { font-size: 12.5px; color: var(--dash-ink-soft); }
+.dash-crediti-avviso .sn-crediti-rimedio-dettaglio { font-size: 12px; color: var(--dash-ink-mute); }
+.dash-crediti-avviso .sn-crediti-rimedio-esito { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-crediti-avviso .sn-crediti-rimedio-btn { flex-shrink: 0; transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease; }
+.dash-crediti-avviso .sn-crediti-rimedio[data-applicato="1"] .sn-crediti-rimedio-testo { color: var(--dash-ink-soft); }
+
+/* La riga che dice una risposta interrotta: stessa voce delle note, dentro la bolla. */
+.dash-bubble-interrotta { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
 
 /* Le conversazioni delle altre app (#974): un nodo nel filo, al centro perché non le ha dette né l'utente né la
    chat di qui. Ripiegate sono una riga sola; aperte, lo scambio in piccolo sotto. */
@@ -1932,7 +2337,7 @@ html, body {
   font-size: 13px;
   line-height: 20px;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+  transition: color calc(160ms * var(--sn-motion, 1)) ease, background calc(160ms * var(--sn-motion, 1)) ease, border-color calc(160ms * var(--sn-motion, 1)) ease;
 }
 .dash-riga-app-testa:hover,
 .dash-riga-app-testa:focus-visible { color: var(--dash-ink-soft); background: var(--dash-card); border-color: var(--dash-line-strong); }
@@ -1986,7 +2391,7 @@ html, body {
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background calc(160ms * var(--sn-motion, 1)) ease, color calc(160ms * var(--sn-motion, 1)) ease;
 }
 .dash-riga-app-vai:hover,
 .dash-riga-app-vai:focus-visible { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }

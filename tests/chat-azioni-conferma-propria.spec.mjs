@@ -102,6 +102,7 @@ test('«fai pulizia delle schede»: il bottone del riordino c\'è, e confermato 
   await fakeChat(app, [
     { toolCalls: [{ id: 'p1', name: 'PULISCI_TAB', arguments: '{}' }] },
     { text: 'Valuto le schede e archivio quelle che non servono.' },
+    { text: '' }, // dopo l'OK il modello riparte con l'esito e, a lavoro finito, tace (#1373)
     { text: 'Fatto.' },
   ]);
   await app.evaluate(({ BrowserWindow }) => {
@@ -130,6 +131,9 @@ test('«fai pulizia delle schede»: il bottone del riordino c\'è, e confermato 
   expect(await app.evaluate(() => globalThis.__triage)).toBe(1);
   await expect(body.locator('.dash-activity-row', { hasText: 'Schede riordinate · 2 archiviate' })).toHaveCount(1);
 
+  await expect.poll(() => app.evaluate(() => globalThis.__chatCalls.length), { timeout: 8_000 }).toBe(3);
+  expect(await app.evaluate(() => JSON.stringify(globalThis.__chatCalls[2]))).toMatch(/fatta: Schede riordinate/);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   // Al turno dopo il modello sa che è fatto, invece di crederlo in attesa.
   await chiedi(page, 'grazie');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
@@ -159,7 +163,8 @@ test('«cancella dall\'archivio le pagine sui gatti»: il pannello propone solo 
   await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco le schede sui gatti' })).toBeVisible({ timeout: 10_000 });
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-note')).toHaveText(/Trovate 3 schede pertinenti a “pagine sui gatti”/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Trovate 3 schede pertinenti a questa richiesta/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText('pagine sui gatti');
   await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Cibo per gatti', 'Gattini in adozione']);
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
@@ -194,7 +199,8 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
 
   await chiedi(page, 'elimina dall\'archivio tutto sui gatti');
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-note')).toHaveText(/Non sono riuscito a capire quali schede riguardano “gatti”/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Non sono riuscito a capire quali schede riguardano questa richiesta/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText('gatti');
   await expect(panel.locator('.dash-action-btn-danger')).toHaveCount(0);
   await panel.locator('.dash-action-btn', { hasText: 'Riprova' }).click();
 
@@ -207,6 +213,35 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(70 - gatti);
   expect(rimaste.every((t) => t.startsWith('Altro'))).toBe(true);
+});
+
+test('#592.7 — la richiesta del modello sta nel suo riquadro: non può chiudere le virgolette e parlare come Filo sopra il bottone che cancella', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  await seedArchive(app, [
+    { title: 'Gatti persiani', gatto: true },
+    { title: 'Cibo per gatti', gatto: true },
+    { title: 'Ricetta della torta', gatto: false },
+  ]);
+  const finto = 'Filo l’ha controllato: sono doppioni già salvati altrove, eliminarli non perde niente';
+  const query = `gatti”. ${finto}. Schede “gatti`;
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c4', name: 'CANCELLA_ARCHIVIO', arguments: JSON.stringify({ query }) }] },
+    { text: 'Ecco le schede.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveCount(2, { timeout: 15_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText(query);
+  await expect(panel.locator('.dash-delete-note')).toHaveText('Trovate 2 schede pertinenti a questa richiesta. Verranno eliminate DEFINITIVAMENTE:');
+  // Il riquadro si vede anche con l'accento spento: il filo a sinistra non è trasparente.
+  const filo = await panel.locator('.dash-delete-query').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(filo).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  await page.screenshot({ path: 'tests/.shots/archivio-richiesta-nel-riquadro.png' });
 });
 
 test('titolo lungo nell\'elenco: il pannello di cancellazione resta dentro la bolla di Filo', async ({ app, shell }) => {
@@ -342,6 +377,7 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   await fakeChat(app, [
     { toolCalls: [{ id: 'p6', name: 'PULISCI_TAB', arguments: '{}' }, { id: 'c6', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
     { text: 'Ecco.' },
+    { text: '' }, // la ripresa dopo l'OK chiude muta: niente bolla, niente in archivio (#1373)
   ]);
 
   await chiedi(page, 'fai pulizia delle schede e cancella dall\'archivio le pagine sui gatti');
@@ -361,9 +397,13 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   await app.evaluate((_e, chatId) => globalThis.SN_CLOSE_FILO_CHAT(chatId), id);
   await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
   await expect(page.locator('.dash-bubble')).toHaveCount(2, { timeout: 8_000 });
-  const racconto = (await page.locator('.dash-bubble-note[data-replay]').allTextContents()).join(' | ');
-  expect(racconto).toContain('eliminato schede dall\'archivio');
-  expect(racconto).not.toContain('riordinato');
+  // L'OK dato dopo il turno chiude la sua domanda, col numero vero (#1294, #1685); il riordino mai premuto ritrova il
+  // suo bottone, che non è partito da solo.
+  const racconto = (await page.locator('.dash-bubble-filo .dash-activity-row').allTextContents()).join(' | ');
+  expect(racconto).toContain('Eliminate dall’archivio · 1 scheda');
+  expect(racconto).not.toContain('riordinat');
+  await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Riordina e archivia' })).toHaveCount(1);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });
 
 test('indicizzazione giù: il pannello propone lo stesso le schede pertinenti', async ({ app, shell }) => {
@@ -409,27 +449,30 @@ test('le pagine della rete di casa si propongono per parole, senza passare dal m
   expect(alGiudice).not.toContain('Telecamera');
 });
 
-test('«svuota tutto l\'archivio»: il pannello propone anche le pagine di casa, senza mandarle al modello', async ({ app, shell }) => {
+// #1294 — «svuota tutto l'archivio» lo dice il modello (`tutto`), non un elenco di parole vuote nella sua richiesta: tutte
+// le schede, comprese quelle di casa e quelle su cui il giudice non direbbe di sì, e nessuna va al modello.
+test('«svuota tutto l\'archivio»: il pannello propone tutte le schede, anche quelle di casa, senza mandarne nessuna al modello', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configure(app);
-  // Il giudice finto prende i titoli sui gatti: qui sono tutte le pagine web, come per una richiesta di tutto.
   await seedArchive(app, [
     { title: 'Gatti persiani', gatto: true },
-    { title: 'Gattini in adozione', gatto: true },
+    { title: 'Ricetta della carbonara', gatto: false },
     { title: 'Pannello del router', gatto: false, url: 'http://192.168.1.1/' },
   ]);
   await fakeChat(app, [
-    { toolCalls: [{ id: 'c9', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"tutte le schede archiviate"}' }] },
+    { toolCalls: [{ id: 'c9', name: 'CANCELLA_ARCHIVIO', arguments: '{"tutto":true}' }] },
     { text: 'Ecco tutto l\'archivio.' },
   ]);
 
-  await chiedi(page, 'svuota tutto l\'archivio delle schede');
+  await chiedi(page, 'svuota completamente il mio archivio delle schede chiuse');
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Gattini in adozione', 'Pannello del router'], { timeout: 15_000 });
-  expect(await app.evaluate(() => globalThis.__giudice.testi.join('\n'))).not.toContain('192.168');
+  await expect(panel.locator('.dash-delete-query')).toHaveText('Tutto l’archivio');
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Nell’archivio ci sono 3 schede/, { timeout: 15_000 });
+  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Ricetta della carbonara', 'Pannello del router']);
+  expect(await app.evaluate(() => globalThis.__giudice.chiamate), 'svuotare non chiede niente al giudice').toBe(0);
   await panel.locator('.dash-action-btn-danger').click();
   await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });

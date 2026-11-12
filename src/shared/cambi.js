@@ -1,5 +1,5 @@
 // I cambi di stato come eventi del filo (#867): il nome di ogni impostazione, il confronto fra due
-// scritture, la frase in parole, la fusione dei passi di un cursore e cosa scrivere per annullare.
+// scritture, la frase in parole, la fusione dei ritocchi ripetuti e cosa scrivere per annullare.
 // Logica pura: chi osserva le scritture è src/main/services/registroCambi.js; regole in tests/unit/cambi.test.mjs.
 
 (function (global) {
@@ -11,6 +11,8 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
+  const ATTIVE = sino('attive', 'spente');
+  const ATTIVI = sino('accesi', 'spenti');
   // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
   const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
   const numero = (v) => {
@@ -35,11 +37,25 @@
     return l && l !== k ? l : 'una funzione';
   }
   const NOMI_CHIAVI = { openrouter: 'OpenRouter', tavily: 'Tavily' };
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
+  function nomeAzioneFilo(k) {
+    const T = tastiDiFilo();
+    const azione = T && T.AZIONI_FILO ? T.AZIONI_FILO.find((x) => x.id === k) : null;
+    return azione ? azione.nome : 'un\'azione di Filo';
+  }
+  function scorciatoiaLeggibile(v) {
+    const T = tastiDiFilo();
+    return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
+  }
 
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
-    showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
+    'filoParla.downloadOgniMin': { nome: 'ritmo dei messaggi sui download', valore: (v) => global.SN_CONST.nomeRitmoDownload(v), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
@@ -49,8 +65,13 @@
     timerRingtone: { nome: 'suoneria del timer', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     timerRingtoneVolume: { nome: 'volume della suoneria del timer', valore: (v) => `${numero(v)}%`, livello: 1 },
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
+    'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
+    'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
+    'testoDeiCampi.attivo': { nome: 'testo dei campi che non si perde', valore: ATTIVO, livello: 1 },
+    'testoDeiCampi.giorni': { nome: 'durata del testo dei campi', valore: (v) => (Number(v) === 1 ? '1 giorno' : `${numero(v)} giorni`), livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
@@ -72,35 +93,91 @@
       valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
+    'contestoFilo.cache': {
+      nome: 'durata della cache della chat',
+      valore: (v) => (v === '1h' ? 'un\'ora' : (v === '5m' ? '5 minuti' : 'come i predefiniti')),
+      livello: 2,
+    },
+    ...Object.fromEntries([
+      ['conversazioni', 'della chat e delle conversazioni'],
+      ['testi', 'di traduzioni, riscritture e riassunti'],
+      ['brevi', 'brevi (spiegazioni, titoli, correttore)'],
+    ].map(([f, di]) => [`lunghezzaRisposte.${f}`, {
+      nome: `lunghezza massima delle risposte ${di}`,
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      livello: 2,
+    }])),
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.schede': { nome: 'schede dal bordo alto a schermo intero', valore: sino('compaiono', 'restano nascoste'), livello: 1 },
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
+    'barraLaterale.bloccata': { nome: 'barra laterale bloccata aperta', valore: sino('bloccata', 'sopra la pagina'), livello: 1 },
+    'pannelloDestro.spinta': { nome: 'apertura del pannello degli strumenti dal bordo destro', valore: ATTIVA, livello: 1 },
+    'pannelloDestro.striscia': { nome: 'striscia del pannello degli strumenti', valore: sino('visibile', 'nascosta'), livello: 1 },
+    'pannelloDestro.attesaMs': { nome: 'attesa sul bordo prima che il pannello degli strumenti si apra', valore: millisecondi, livello: 1 },
+    'pannelloDestro.uscitaMs': { nome: 'tempo prima che il pannello degli strumenti si chiuda', valore: millisecondi, livello: 1 },
+    'pannelloDestro.bloccato': { nome: 'pannello degli strumenti bloccato aperto', valore: sino('bloccato', 'sopra la pagina'), livello: 1 },
+    'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
+    'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'feedbackRilettura.enabled': { nome: 'rilettura del feedback prima dell\'invio', valore: ATTIVA, livello: 1 },
+    'traduzionePagina.nascoste': {
+      nome: 'traduzione delle sezioni chiuse di una pagina',
+      valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },
+      livello: 1,
+    },
+    'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
+    'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
+    'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
+    'avvisoCrediti.giorni': { nome: 'giorni dell\'avviso dei crediti', valore: numero, livello: 1 },
+    'avvisoCrediti.percento': { nome: 'percentuale dell\'avviso dei crediti', valore: (v) => `${numero(v)}%`, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
-    'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
-    'featureFlags.help': { nome: 'barra dell\'Aiuto', valore: ATTIVA, livello: 1 },
-    'featureFlags.categorize': { nome: 'categorizzazione automatica', valore: ATTIVA, livello: 1 },
-    blocklist: { nome: 'domini dove Filo non interviene', elenco: true, livello: 2 },
+    'featureFlags.spellcheck': { nome: 'errori del correttore', valore: ATTIVI, livello: 1 },
+    'featureFlags.spellcheckContext': { nome: 'suggerimenti del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.modelloErrori': { nome: 'controllo degli errori col modello', valore: ATTIVO, livello: 1 },
+    'correttore.ripetizioni': { nome: 'parole ripetute segnate dal correttore', valore: sino('segnate', 'non segnate'), livello: 1 },
+    'correttore.pausaRapidoMs': { nome: 'pausa prima del controllo degli errori', valore: millisecondi, livello: 1 },
+    'correttore.ogniRapidoMs': { nome: 'controllo degli errori mentre si scrive senza pause', valore: millisecondi, livello: 1 },
+    'correttore.pausaRagionatoMs': { nome: 'pausa prima del controllo dei suggerimenti', valore: millisecondi, livello: 1 },
+    'correttore.automatica': { nome: 'correzione automatica a fine parola', valore: ATTIVA, livello: 1 },
+    'correttore.accettiPerImparare': { nome: 'volte che una correzione scelta serve per diventare automatica', valore: numero, livello: 1 },
+    'correttore.annulliPerImparare': { nome: 'volte che una correzione annullata serve per non tornare più', valore: numero, livello: 1 },
+    'correttore.riscrittePerImparare': { nome: 'volte che una parola scritta uguale serve per non essere più segnata', valore: numero, livello: 1 },
+    'correttore.segnaposti': { nome: 'segnaposto del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.segnapostiWeb': { nome: 'ricerca sul web per i segnaposto', valore: ATTIVA, livello: 1 },
+    'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
+    'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
+    blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
     'menuDelSito.siti': { nome: 'siti dove il tasto destro apre il menu del sito', elenco: true, livello: 1 },
+    bluetoothPreferiti: { nome: 'dispositivi Bluetooth preferiti', elenco: true, livello: 1 },
     'documenti.cartelle': { nome: 'cartelle dove Filo cerca i documenti', elenco: true, livello: 2 },
     provider: { nome: 'fornitore dei modelli', valori: { openrouter: 'OpenRouter' }, livello: 2 },
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
+    ownKeyAllProviders: { nome: 'fornitori esclusi con la tua chiave', valore: sino('usati', 'esclusi'), livello: 2 },
+    ordineHost: { nome: 'host dei modelli', valori: { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' }, livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
+    'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },
+    'modelliScelti.*': { nome: (k) => `modello scelto da te per «${etichettaFunzione(k)}»`, valore: (v) => v || 'quello predefinito', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
     monthlyLimitEur: {
       nome: 'limite di spesa mensile',
       valore: (v) => `${Number(v).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2 })} €`,
       livello: 2,
+    },
+    'costoModelli.soglia': {
+      nome: 'avviso sui modelli costosi',
+      valore: (v) => (Number(v) > 0 ? `oltre ${Number(v).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 1 })} volte il predefinito` : 'mai'),
+      livello: 1,
     },
     'security.protectIpLeak': { nome: 'protezione dell\'IP locale (WebRTC)', valore: ATTIVA, livello: 2 },
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
@@ -109,6 +186,7 @@
     'security.safeBrowse.networkSignals': { nome: 'controlli di rete sui siti', valore: sino('attivi', 'spenti'), livello: 2 },
     'security.safeBrowse.llmJudge': { nome: 'giudizio AI sui siti sospetti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.sandbox': { nome: 'link sospetti in una finestra isolata', valore: sino('sì', 'no'), livello: 2 },
+    'security.safeBrowse.trustedSites': { nome: 'siti di cui ti fidi', elenco: true, livello: 2 },
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.cookies.trustedSites': { nome: 'siti fidati dove resti connesso', elenco: true, livello: 2 },
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
@@ -118,6 +196,7 @@
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },
+    'security.youtubeAds.enabled': { nome: 'blocca le pubblicità di YouTube', valore: ATTIVO, livello: 1 },
     'security.siteBlock.enabled': { nome: 'blocco dei siti in blacklist', valore: ATTIVO, livello: 2 },
     'security.siteBlock.useAdblockLists': { nome: 'liste pubbliche come blacklist', valore: sino('in uso', 'spente'), livello: 2 },
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
@@ -144,6 +223,7 @@
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
+    migrazione: 'un valore di serie che cambia con un aggiornamento non l\'ha scelto nessuno: un file di dati vecchio lo riceve come chi installa adesso',
     'timer:suona': 'un timer o una sveglia che arriva all\'ora e suona è il tempo che passa, non un cambio di qualcuno',
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
@@ -219,14 +299,17 @@
   // `normalizza`: lo stesso di getSettings (default fusi), così una chiave assente non sembra tolta.
   function cambiImpostazioni(primaGrezze, dopoGrezze, normalizza) {
     const n = typeof normalizza === 'function' ? normalizza : (x) => x || {};
+    const dopo = n(dopoGrezze);
+    // Coi modelli predefiniti accesi quelli scelti funzione per funzione non valgono: si dicono in una riga (#1619).
+    const coperti = !dopo || dopo.useDefaultModels !== false;
     const out = [];
-    for (const c of foglie(n(primaGrezze), n(dopoGrezze), '', [])) {
+    for (const c of foglie(n(primaGrezze), dopo, '', [])) {
       if (esclusa(c.chiave)) continue;
       const v = voce(c.chiave);
       if (v && v.segreto) {
         out.push({ chiave: c.chiave, segreto: true, vuotoPrima: !c.prima, vuotoDopo: !c.dopo });
       } else {
-        out.push(c);
+        out.push(coperti && c.chiave.startsWith('models.') ? { ...c, coperto: true } : c);
       }
     }
     return out;
@@ -276,6 +359,42 @@
       if (!uguale(nucleo(ra), nucleo(rb))) out.push({ chiave: `proxy:${dom}`, prima: ra, dopo: rb });
     }
     return out;
+  }
+
+  // La disposizione delle icone della barra e della fila del tasto destro (#867.1, #1434): un cambio per icona spostata,
+  // con dov'era e dove è finita.
+  function cambiIcone(prima, dopo, { mossa = null } = {}) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    if (!D) return [];
+    const a = D.migra(prima).layout;
+    const b = D.migra(dopo).layout;
+    return D.spostate(a, b, { mossa }).map((id) => ({ chiave: `icona:${id}`, prima: D.posizione(a, id), dopo: D.posizione(b, id) }));
+  }
+  const iconaDi = (c) => String((c && c.chiave) || '').slice(6);
+
+  // Le icone rimesse com'erano sulla disposizione di adesso, una alla volta e dall'ultima: quelle spostate dopo
+  // restano dove sono.
+  function annulloIcone(evento, attuale) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    let l = D.migra(attuale).layout;
+    for (const c of ((evento && evento.cambi) || []).slice().reverse()) {
+      const posa = D.posaPer(l, iconaDi(c), c.prima);
+      l = (posa && D.applicaPosa(l, posa)) || l;
+    }
+    return l;
+  }
+
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]], finder? (Mac) }, `come` l'ordine chiesto.
+  const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+  function fraseOrdineDesktop(come) {
+    const c = come || {};
+    const verso = c.verso === 'colonne' ? 'a colonne' : 'a righe';
+    return `${ORDINI_DESKTOP.get(c.ordine) || 'in ordine'}${c.alContrario ? ' al contrario' : ''}, ${verso}${c.cartellePrima ? ', cartelle prima' : ''}`;
+  }
+  function spostateSulDesktop(c) {
+    const voci = (d) => (d && Array.isArray(d.voci) ? d.voci : []);
+    const prima = new Map(voci(c.prima).map((v) => [v[0], `${v[1]},${v[2]}`]));
+    return voci(c.dopo).filter((v) => prima.has(v[0]) && prima.get(v[0]) !== `${v[1]},${v[2]}`).length;
   }
 
   // ── Le frasi ────────────────────────────────────────────────────────────────
@@ -352,6 +471,26 @@
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
       return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
     }
+    if (k.startsWith('icona:')) {
+      const D = global.SN_DISPOSIZIONE_ICONE;
+      const id = iconaDi(c);
+      const nome = `icona «${D && D.nome ? D.nome(id) : id}»`;
+      const zona = (p) => (D && D.nomeZona ? D.nomeZona(p && p.zona) : { nome: 'barra laterale', in: 'nella' });
+      const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
+      if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
+        return `${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+      }
+      return `${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`;
+    }
+    if (k === 'desktop') {
+      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      const n = spostateSulDesktop(c);
+      const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
+      const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
+      const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
+      if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      return `icone del desktop: ${parti.join(', ')}`;
+    }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
@@ -380,7 +519,15 @@
 
   // Le frasi di un evento, una per cambio: chi le mostra sceglie quante.
   function frasi(evento) {
-    return (evento && Array.isArray(evento.cambi) ? evento.cambi : []).map(fraseCambio);
+    const cambi = evento && Array.isArray(evento.cambi) ? evento.cambi : [];
+    const out = cambi.filter((c) => !(c && c.coperto)).map(fraseCambio);
+    const coperti = cambi.filter((c) => c && c.coperto);
+    if (coperti.length) {
+      const tolti = coperti.every((c) => !c.dopo);
+      const quanti = coperti.length === 1 ? 'una funzione' : `${coperti.length} funzioni`;
+      out.push(`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`);
+    }
+    return out;
   }
   function frase(evento, max = 3) {
     const f = frasi(evento);
@@ -398,7 +545,10 @@
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
     'menu-scheda': 'dal menu della scheda',
+    'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
+    barra: 'dalla barra laterale',
+    'tasto-destro': 'dal menu del tasto destro',
   };
   function provenienza(evento) {
     const e = evento || {};
@@ -413,8 +563,10 @@
     }
   }
 
-  // ── Fusione: un cursore trascinato è UN cambio ─────────────────────────────
-  const FINESTRA_FUSIONE_MS = 4000;
+  // ── Fusione: ritocchi ripetuti della stessa cosa sono UN cambio ────────────
+  // Non solo i passi di un cursore: anche chi cerca il valore giusto a più riprese (lo zoom 125 → 114 → 87 → 100) ha
+  // fatto un cambio solo, «125% → 100%» (#1490). La finestra si misura dall'ultimo ritocco.
+  const FINESTRA_FUSIONE_MS = 2 * 60 * 1000;
   const FONDIBILI = new Set(['interfaccia', 'pagina', 'filo']);
   function fondibile(ultimo, nuovo) {
     if (!ultimo || !nuovo || ultimo.annulla || nuovo.annulla) return false;
@@ -458,7 +610,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:') || k === 'desktop') continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
@@ -574,7 +726,24 @@
     return { righe, tolti: lista.length - scelti.length };
   }
 
+  // I cambi che combaciano con una ricerca della chat (CERCA_CHAT), dal più recente, coi tre passi delle conversazioni
+  // (src/shared/chatArchive.js): «cambio tema scuro» trova il tema messo ieri come «tema scuro» (#868.1).
+  function cercaPerChat(eventi, query, { max = 6 } = {}) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query), query).length) return { cambi: [], termini: [], allargata: false };
+    const lista = Array.isArray(eventi) ? eventi : [];
+    const candidati = [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const e = lista[i];
+      const f = e && e.id ? frase(e) : '';
+      if (f) candidati.push({ id: e.id, frase: f, date: e.agg || e.ts, testo: `${f} ${frasi(e).join(' ')}` });
+    }
+    const { results, termini, allargata } = CA.searchWide(candidati, query, { testo: (c) => c.testo, limit: max });
+    return { cambi: results.map((c) => ({ id: c.id, frase: c.frase, date: c.date })), termini, allargata };
+  }
+
   global.SN_CAMBI = {
+    cercaPerChat,
     VOCI,
     ESCLUSIONI,
     FINESTRA_FUSIONE_MS,
@@ -585,6 +754,8 @@
     cambiImpostazioni,
     cambiTimer,
     cambiRegoleProxy,
+    cambiIcone,
+    iconaDi,
     fraseCambio,
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
@@ -598,6 +769,8 @@
     annulloImpostazioni,
     annulloTimer,
     annulloRegoleProxy,
+    annulloIcone,
+    fraseOrdineDesktop,
     righePerModello,
     nomePaese,
   };

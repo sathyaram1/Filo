@@ -160,5 +160,5 @@ if (!isInstalled()) {
   process.exit(1);
 }
 
-log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root) i test si lanciano con node scripts/lancia-electron.mjs <comando>, che mette davanti ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a con la base di display del worker.`);
+log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root, senza schermo) npx playwright test si accende da solo lo schermo virtuale con la sandbox spenta; gli altri comandi che aprono Electron si lanciano con node scripts/lancia-electron.mjs <comando>.`);
 process.exit(0);

@@ -1,43 +1,44 @@
-// Dashboard Filo (new tab). Controller UI.
-//
-// Stati visibili:
-//   - "home"   → messaggio centrale proattivo
-//   - "thread" → conversazione in corso (bolle)
-// Ai lati, in tutti e due gli stati, le carte (#870): le disegna dashboard-carte.js.
-//
-// Ogni nuova query dalla home apre un nuovo thread (vedi spec sezione 2.1).
-// Niente persistenza cross-tab del thread: ad ogni nuovo new-tab si riparte
-// dalla home. Il "raw log" tiene memoria delle interazioni lato background.
+// Dashboard Filo (new tab): chat e turni. Il centro è la coda del filo (#869, dashboard-coda.js e dashboard-cerca.js):
+// aprire una scheda o tornare alla home non apre né chiude una chat. Ai lati le carte (#870, dashboard-carte.js).
+// Regole: patterns/la-home-e-la-coda-del-filo.md.
 
 (function () {
   'use strict';
 
   const { MSG } = self.SN_MSG;
 
-  // ===== DOM =====
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   const homeMessageEl = $('homeMessage');
-  const homeView = $('homeView');
   const threadView = $('threadView');
   const bubblesEl = $('bubbles');
   const accadeEl = $('accade');
   const inputForm = $('inputForm');
   const inputEl = $('input');
+  // #2085 — sul gettone di una scheda: la carta dell'anteprima, e il clic che la porta davanti (o la riapre).
+  const azioniGettone = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.azioni() : {};
   const sendBtn = $('sendBtn');
   const stopBtn = $('stopBtn');
   const GLIFO_INVIO = sendBtn.innerHTML;
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
+  // Dopo l'OK il modello riparte sempre (#1373): l'esito glielo accoda il main, e a lavoro finito il silenzio va bene.
+  const DOPO_OK = '[L\'utente ha risposto alla tua richiesta di conferma qui sopra: com\'è andata è scritto sotto. Se la sua '
+    + 'richiesta ha altri passi, continua con quelli che mancano. Se è già compiuta non scrivere niente, o al massimo una riga.]';
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) riprende dalla parola dove si è interrotta.
+  const CONTINUA_RISPOSTA = globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO_HOME;
   const dashDir = $('dashDir');
 
-  // ===== Stato locale =====
+  // Stato locale
   let suggestions = [];
-  let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
+  // Quando sono stati scritti i suggerimenti a schermo: l'età che i contatori leggono a un clic (#1467).
+  let suggerimentiDel = null;
+  // Scritti da un modello: senza, la carta mostra le pagine salvate e la strada per sceglierne uno, che non si contano.
+  let suggerimentiDelModello = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
@@ -45,6 +46,8 @@
   // si chiude (ritorno alla home, chat nuova), e il messaggio dopo ne apre una.
   let chatId = null;
   let sending = false;
+  // L'utente ha scritto in questa scheda: da qui in poi c'è una conversazione da non interrompere (l'accoglienza aspetta).
+  let scrittoQui = false;
   // Il turno che sta lavorando adesso (#578): il quadrato lo ferma. `ripresa`: l'ultimo turno è stato fermato e il
   // tasto d'invio offre di riprenderlo finché l'utente non scrive altro. `tasto`: il «Continua» nella bolla di un
   // turno finito senza risposta (#557), che se ne va quando l'offerta finisce.
@@ -58,13 +61,23 @@
     }
     ripresa = null;
   };
-  // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
-  let chiusuraInCorso = null;
+  // I turni fermati la cui azione in volo non è ancora tornata dal main, per conversazione: il turno dopo della stessa
+  // conversazione aspetta l'esito, così non rifà l'azione (#578); un'altra conversazione non c'entra (#1296).
+  const chiusure = new Map();
+  const chiusuraDi = (chat) => (chat ? chiusure.get(chat) || null : null);
+  // I seguiti scritti mentre Filo lavora (#1296), in ordine: { id, c: la composizione, bolla, turno }. `turno`: affidato
+  // al turno in corso, che lo legge al suo passo dopo; gli altri partono a turno finito.
+  const seguiti = [];
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
   // quadrato spento, non «riprendi».
   const PAUSA_RIPRESA = 700;
   let fermatoAlle = 0;
   const appenaFermato = () => Date.now() - fermatoAlle < PAUSA_RIPRESA;
+  // Lo stesso al contrario (SN_CONST.PAUSA_QUADRATO_MS). Il «Ferma» del menu vale subito.
+  // L'istante della comparsa sta sul tasto (`data-comparso`): lì lo leggono le prove, e il CSS lo accende in quel tempo.
+  const PAUSA_QUADRATO = globalThis.SN_CONST.PAUSA_QUADRATO_MS;
+  const quadratoAppena = () => Date.now() - Number(stopBtn.dataset.comparso || 0) < PAUSA_QUADRATO;
+  stopBtn.style.setProperty('--dash-pausa-quadrato', `${PAUSA_QUADRATO}ms`);
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
@@ -72,6 +85,18 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // #892.5 — le righe che il campo ha avuto da fuori: svuotato e riportato con Annulla, un testo incollato lo resta.
+  // Si tengono le impronte, non i testi; un'impronta uguale per caso chiede di più, mai di meno.
+  const righeDaFuori = new Set();
+  const impronta = (s) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return `${s.length}:${h >>> 0}`;
+  };
+  const ricordaDaFuori = (s) => {
+    righeDaFuori.add(impronta(s));
+    if (righeDaFuori.size > 2000) righeDaFuori.delete(righeDaFuori.values().next().value);
+  };
   // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
   let testoIncollato = null;
   const percorsiImmagini = new Map();
@@ -102,28 +127,88 @@
 
   Att.init({
     send,
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url) => iconaDelSito(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
     sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
-    archiviaAzione: (type, cambi) => {
-      const id = chatDellaRiga();
+    // L'azione confermata dopo il turno entra nel filo con la sua chat, e se ne va con lei (#1561).
+    chatAttuale: () => chatId || '',
+    // `chat`: la conversazione dove è nato il bottone (#1294); `voce`: com'è andata, per la chat riaperta.
+    archiviaAzione: (type, cambi, a, { chat = '', voce = null } = {}) => {
+      const id = chat || chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
+      const riuscita = !voce || (voce.type !== 'FERMATA' && window.SN_ESITO.conta(voce.esito));
+      // Di una finestra guardata resta il nome e basta (#778).
+      const guardata = riuscita && type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
+      if (id) {
+        try {
+          send({
+            type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: riuscita ? [type] : [],
+            ...(voce ? { esiti: [voce] } : {}), ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}),
+          }).then(() => Coda.allinea()).catch(() => {});
+        } catch (_) {}
+      }
+    },
+    // #778, #1373 — dopo l'OK la richiesta riprende da sola: un turno interno, come «Riprendi». Solo nella conversazione
+    // dove è nato il bottone, se è ancora quella di questa scheda.
+    // Un OK dato mentre Filo sta rispondendo riprende a turno finito (#1685).
+    prosegui: (chat = '', voci = []) => {
+      if (chat && chat !== chatId) return;
+      const tutte = [...(ripresaInAttesa ? ripresaInAttesa.voci : []), ...(Array.isArray(voci) ? voci : [])];
+      if (sending) { ripresaInAttesa = { chat, voci: tutte }; return; }
+      ripresaInAttesa = null;
+      riprendiDopoOk(tutte);
     },
   });
+  let ripresaInAttesa = null;
+  function riprendiDopoOk(voci) {
+    sending = true;
+    aggiornaTasto();
+    threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
+    runTurnAndContinue({ userMessage: DOPO_OK, internal: true, dopoOk: voci }).catch(() => {});
+  }
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
   const Cambi = self.SN_DASH_CAMBI;
   Cambi.init({ send });
   // Le conversazioni delle altre app, righe ripiegate del filo a schermo (#974).
   const Righe = self.SN_DASH_RIGHE;
   Righe.init({
-    send, bubblesEl, homeEl: $('righeApp'), inThread: () => body.dataset.state === 'thread', chatId: () => chatId,
+    // Le righe stanno sempre nel filo al centro (#869).
+    send, bubblesEl, homeEl: $('righeApp'), inThread: () => true, chatId: () => chatId,
   });
+  // Copia e Rispondi sotto le risposte di Filo, Copia, Modifica e Cita sotto i messaggi dell'utente, e la citazione nel
+  // campo e nella bolla che parte (#1620, #2096).
+  const Rispondi = self.SN_DASH_RISPONDI;
+  Rispondi.init({
+    send, bubblesEl, inputEl, formEl: inputForm, anteprimaEl: $('citazione'),
+    contaCopia: (n) => contaCopia(n),
+    vaiA: (o) => Coda.vaiA(o),
+    modificabile: (b) => composizioni.has(b),
+    modifica: (b) => modificaMessaggio(b),
+  });
+  // La coda del filo al centro (#869) e il campo per cercarci dentro.
+  const Coda = self.SN_DASH_CODA;
+  const lasciateConRighe = new Set();
+  Coda.init({
+    send,
+    bubblesEl,
+    rendiMessaggi: (lista, dove) => rendiMessaggi(lista, dove),
+    setBubbleText: (el, t) => setBubbleText(el, t, true),
+    // Il testo com'è arrivato, prima della formattazione: è quello che il filo ha, e da lì riconosce la bolla.
+    scritto: (el) => Rispondi.scritto(el),
+    righe: Righe,
+    chatId: () => chatId,
+    chatLasciata: (c) => lasciateConRighe.has(c),
+    occupata: () => sending || Accoglienza.isActive(),
+    conversa: () => body.dataset.state === 'thread',
+  });
+  const Cerca = self.SN_DASH_CERCA;
+  Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -147,7 +232,13 @@
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }); } catch (_) {}
+    // Una chat che la scheda ha già lasciato: la riga è tardiva, e la bolla già a schermo è la sua (#1295).
+    const tardiva = !!chat && chat !== chatId;
+    if (tardiva) lasciateConRighe.add(chat);
+    try {
+      send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}), ...(tardiva ? { tardiva: true } : {}) })
+        .then(() => Coda.allinea()).catch(() => {});
+    } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -155,7 +246,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
-  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS, bozza: () => !!($('input')?.value || '').trim() });
   Term.init({
     dashDir,
     inputEl,
@@ -171,7 +262,7 @@
     bubblesEl,
     inputEl,
     makeBubble: (o) => makeBubble(o),
-    goHome: () => goHome(),
+    goHome: (o) => goHome(o),
     goThread: () => goThread(),
     autoGrowInput: () => autoGrowInput(),
     refreshLive: () => refreshLive(),
@@ -181,7 +272,18 @@
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
+    runShellCommand: (command, chat, opzioni) => Term.runShellCommand(command, chat, opzioni),
+    // Un comando a cui la persona ha detto no torna com'era, incollato compreso; quello che intanto ha scritto resta.
+    rimettiNellaBarra: (testo, incollato) => {
+      if (inputEl.value.trim()) return;
+      inputEl.value = testo;
+      testoDaFuori = !!incollato;
+      if (incollato) ricordaDaFuori(testo);
+      autoGrowInput();
+      Comandi.updateInputClass();
+      inputEl.focus();
+      inputEl.setSelectionRange(testo.length, testo.length);
+    },
   });
   Accoglienza.init({
     $,
@@ -189,10 +291,10 @@
     bubblesEl,
     threadView,
     inputEl,
-    homeMessageEl,
     makeBubble: (o) => makeBubble(o),
     stepTrace: (text) => Att.stepTrace(text),
-    goHome: () => goHome(),
+    // L'accoglienza ha ridisegnato il centro: finita, il filo si rilegge e lei ne è il primo tratto (#869).
+    goHome: () => goHome({ ricarica: true }),
     goThread: () => goThread(),
     resetHistory: (onbState) => {
       threadHistory = [];
@@ -208,12 +310,12 @@
       threadHistory.push({ role: 'filo', text: '', actions: [], interrotto: true, fermato: true });
       const nota = document.createElement('div');
       nota.className = 'dash-bubble-note dash-bubble-fermato';
-      nota.textContent = 'Fermato prima della risposta.';
+      nota.textContent = globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
       bubblesEl.appendChild(nota);
       ripresa = { nota, blocco: null };
       aggiornaTasto();
     },
-    isSending: () => sending || !!chiusuraInCorso,
+    isSending: () => sending || chiusure.size > 0,
     // La conversazione dell'intervista è già quella a schermo: stessi messaggi, nello stesso ordine.
     giaAschermo: (state) => {
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
@@ -221,19 +323,31 @@
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
       // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
       // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
-      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
-      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      // Un'intervista rifatta da capo ha un'altra targa: si ridisegna anche se comincia uguale, così la scheda rimasta
+      // aperta su quella di prima si lega alla nuova e le sue risposte contano (#1297).
+      if (chatIdOnboarding(state) !== chatId) return false;
       return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
-    isHomeMessageVisible: () => showHomeMessage,
+    // Niente da interrompere: in questa scheda l'utente non ha scritto e non ha davanti una conversazione (riaperta,
+    // o continuata da un'altra scheda), che l'intervista cancellerebbe dallo schermo (#1297).
+    nienteInCorso: () => !scrittoQui && !sending && body.dataset.state !== 'thread'
+      && threadHistory.every((m) => m.spontaneo),
+    // La scheda ha davanti una conversazione aperta: «Riprendiamola» non la sostituisce con l'intervista (#1297). La
+    // home no: è il filo, che si rilegge intero quando l'intervista finisce.
+    chatInCorso: () => sending || body.dataset.state === 'thread',
+    // Filo può rispondere: la frase su perché non poteva se ne va, e coi suggerimenti la carta dei Crediti (#869: senza
+    // modello chiamato, la home li rilegge e basta).
+    allApertura: () => { mostraSenzaModello(''); loadDashboard().catch(() => {}); },
+    // Solo le bolle: nel filo ci sono anche i segni dei giorni e le righe delle azioni (#869).
     soloRisposteSenzaCrediti: () => {
-      const bolle = [...bubblesEl.children];
+      const bolle = [...bubblesEl.querySelectorAll('.dash-bubble')];
       return bolle.some((b) => b.dataset.senzaCrediti === '1')
         && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
     },
-    setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
+    // Arrivano col messaggio appena scritto: la loro età parte da adesso.
+    setSuggestions: (list) => { suggestions = list; suggerimentiDel = new Date().toISOString(); suggerimentiDelModello = true; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
@@ -248,12 +362,14 @@
     tieniEl: $('tieni'),
     altroEl: $('altro'),
     refreshLive: () => refreshLive(),
-    onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
+    onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
-    chatCorrente: () => chatId,
+    // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
+    // scheda nuova (#869), lì non lo mostra.
+    chatCorrente: () => (sending ? chatId : null),
   });
   // ===== Helpers messaggi =====
   function send(msg) {
@@ -307,90 +423,118 @@
   // classificazione (titolo breve + conversazione/comando). Non si aspetta la
   // risposta — chi è appena tornato alla home non deve stare fermo mentre un
   // modello legge la chat di prima.
-  function closeCurrentChat() {
+  // `fine`: la chiude l'utente apposta, e le schede nuove non la continuano; una scheda che se ne va no.
+  // `via`: come è finita, per i contatori anonimi (#1463): «home» se la scheda passa a un'altra conversazione, «uscita» se se ne va.
+  function closeCurrentChat({ fine = false, via = fine ? 'chat_nuova' : 'uscita' } = {}) {
     if (!chatId) return;
     const id = chatId;
     chatId = null;
-    try { send({ type: MSG.FILO_CHAT_CLOSE, id }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_CLOSE, id, fine: fine || undefined, via }); } catch (_) {}
   }
 
   // ===== Stato UI =====
-  function goHome() {
-    // Tornare alla home CHIUDE la chat: è il gesto che la finisce, insieme a
-    // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
-    // perché da qui in poi la conversazione non esiste più in questa pagina.
-    closeCurrentChat();
-    Term.nuovaChat(false);
+  // Il centro è sempre il filo (#869): «home» vuol dire tornare in fondo, col campo pronto. `ricarica`: la vista è stata
+  // ridisegnata da altri (l'accoglienza che finisce) e il filo si rilegge da capo.
+  function goHome({ ricarica = false, nuova = false } = {}) {
+    if (nuova && !ricarica) {
+      closeCurrentChat({ fine: true });
+      Term.nuovaChat(false);
+      threadHistory = [];
+      chiudiRipresa();
+      aggiornaTasto();
+    }
+    if (ricarica) {
+      Term.nuovaChat(false);
+      chatId = null;
+      threadHistory = [];
+      bubblesEl.innerHTML = '';
+      chiudiRipresa();
+      aggiornaTasto();
+      caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e));
+    } else {
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    }
     body.dataset.state = 'home';
-    homeView.hidden = false;
-    threadView.hidden = true;
-    threadHistory = [];
-    bubblesEl.innerHTML = '';
-    inputEl.value = '';
-    chiudiRipresa();
-    aggiornaTasto();
-    autoGrowInput();
+    // Ridisegnata da altri (l'accoglienza che finisce) la vista cambia, la casella no: dentro può esserci un seguito
+    // tornato lì perché il turno ha chiuso l'accoglienza (#1296), o quello che l'utente scriveva intanto.
+    if (!ricarica) {
+      inputEl.value = '';
+      autoGrowInput();
+    }
     inputEl.focus();
-    Righe.aggiorna().catch(() => {});
   }
 
+  // I bottoni sotto una risposta che chiudono la conversazione (spunta dell'appunto, «Chiudi la conversazione»): tornare
+  // alla home da solo non la chiude più (#869).
+  function chiudiConversazione() { goHome({ nuova: true }); }
+
+  // `thread`: in questa scheda c'è una conversazione in corso (un messaggio, l'accoglienza, una chat riaperta); `home`:
+  // c'è solo il filo. Il centro è lo stesso.
   function goThread() {
-    const entra = body.dataset.state !== 'thread';
     body.dataset.state = 'thread';
-    homeView.hidden = true;
-    threadView.hidden = false;
-    if (entra) Righe.aggiorna().catch(() => {});
   }
 
-  // #525 — riapertura di una chat archiviata (filo://archive → clic su una
-  // chat, oppure un link con ?chat=<id>). La conversazione torna per intero e
-  // si continua a scrivere DENTRO la stessa chat: i messaggi nuovi si
-  // accodano a quelli di prima, non aprono una chat gemella.
-  //
-  // Quello che NON torna sono i bottoni delle azioni: un'azione in attesa di
-  // conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
-  // Al loro posto resta la riga che racconta cosa Filo aveva fatto.
+  // La coda del filo all'apertura: la conversazione che una scheda nuova continua la riprende anche lo storico, così il
+  // turno dopo è nella stessa chat (#869).
+  async function caricaFilo() {
+    const corrente = await Coda.carica();
+    // Una conversazione presa solo dall'annuncio di Filo (arrivato prima della coda) si adotta lo stesso: lo storico che
+    // il turno dopo manda deve avere anche i messaggi di prima.
+    const soloAnnunci = chatId === corrente && threadHistory.every((m) => m.spontaneo);
+    if (corrente && (!chatId || soloAnnunci) && !Accoglienza.isActive()) await adotta(corrente).catch(() => false);
+    return corrente;
+  }
+
+  // #525 — riapertura di una chat archiviata (Cronologia, un link con ?chat=<id>, una carta della home): il filo va a
+  // quel punto, e si continua a scrivere DENTRO la stessa chat. Tornano i bottoni che la chat salvata sa ridisegnare
+  // (file, evento proposto, conferma rimasta senza risposta, #1294): il popup però non si riapre da solo.
   function chatIdFromUrl() {
     try { return new URLSearchParams(self.location.search).get('chat') || null; }
     catch (_) { return null; }
   }
 
-  async function reopenChat(id, { chiudiPrima = false } = {}) {
-    const r = await send({ type: MSG.FILO_CHAT_GET, id });
-    const chat = r && r.ok && r.chat;
-    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
-    // Da una carta della home (#870): la conversazione a schermo si chiude come col ritorno alla home.
-    if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
-    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) si guarda aperta nel filo, non si continua da qui:
-    // quello che si scrive dopo apre una conversazione nuova della home, con quella riga davanti.
-    if (chat.app) {
-      if (chatId) { closeCurrentChat(); Term.nuovaChat(false); }
-      chatId = null;
-      threadHistory = [];
-      chiudiRipresa();
-      aggiornaTasto();
-      bubblesEl.innerHTML = '';
-      goThread();
-      const vista = await Righe.mostraSola(chat);
-      inputEl.focus();
-      return vista;
-    }
-    chatId = chat.id;
-    threadHistory = [];
-    chiudiRipresa();
-    aggiornaTasto();
-    bubblesEl.innerHTML = '';
-    goThread();
+  // #872 — il quaderno delle memorie porta qui, al messaggio da cui una nota è nata (?evento=<id>): il filo ci va e lo
+  // illumina, senza riprendere quella conversazione.
+  function eventoFromUrl() {
+    try { return new URLSearchParams(self.location.search).get('evento') || null; }
+    catch (_) { return null; }
+  }
+
+  async function vaiAlEvento(id) {
+    const r = await send({ type: MSG.FILO_DOVE, id });
+    const d = r && r.ok ? r.dove : null;
+    if (!d || d.tipo !== 'messaggio') return false;
+    const trovato = await Coda.vaiA({ chat: d.chat, i: d.i, app: !!d.app, ts: d.ts });
+    if (trovato) goThread();
+    return trovato;
+  }
+
+  // Le bolle di una serie di messaggi del filo, com'erano: testo, immagini (quelle ancora in memoria), le righe delle
+  // azioni e il segno dei cambi. `storia`, se c'è, riceve lo storico che il turno dopo manda al main.
+  function rendiMessaggi(messaggi, dove, { storia = null } = {}) {
     let bollaUtente = null;
-    for (const m of chat.messages) {
+    for (const m of messaggi) {
+      const nodi = [];
+      const metti = (n) => { dove.appendChild(n); nodi.push(n); };
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
+      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
+      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
+      // #1294 — com'è andata ogni azione: le righe e i bottoni dei file stanno nella bolla, come nella risposta in diretta.
+      const esiti = !isUser && Array.isArray(m.esiti) ? m.esiti.filter((v) => !(v && v.type === 'VEDI_SCHERMO' && guardate.length)) : [];
+      // Un OK dato dopo il turno non è una risposta nuova: una riga discreta sotto, come nel diario.
+      const dopo = !!m.confermaDopo;
+      const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti, { chat: m.chat || '' }) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
-      if (text.trim() || fotoViste.length) {
+      if (text.trim() || fotoViste.length || archiviati.righe) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
-        if (m.ts) b.dataset.ts = m.ts;
+        if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
+          window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
+        }
+        if (archiviati.righe) b.appendChild(archiviati.righe);
+        if (m.spontaneo) b.dataset.spontaneo = '1';
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
           img.src = src;
@@ -398,16 +542,20 @@
           attachImageLightbox(img, src);
           b.insertBefore(img, b.childNodes[i] || null);
         });
-        bubblesEl.appendChild(b);
+        if (isUser && m.rispostaA) Rispondi.citaIn(b, Rispondi.dalFilo(m.rispostaA));
+        if (isUser) composizioni.set(b, composizioneDalFilo(m, fotoViste));
+        metti(b);
         if (isUser) bollaUtente = b;
       }
       // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
-      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
-      // Le immagini incollate non stanno nell'archivio (sono data URL da
-      // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
-      // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
-      // capisce più di cosa si parlasse — un taglio silenzioso su quello che
-      // aveva mandato lui.
+      // In un frammento non ancora a schermo il segno aspetta: il suo stato lo legge solo da una bolla nella pagina.
+      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) {
+        const b = bollaUtente;
+        const ids = m.cambi;
+        if (dove.isConnected) Cambi.segna(b, ids); else queueMicrotask(() => Cambi.segna(b, ids));
+      }
+      // Le immagini incollate non stanno nell'archivio (sono data URL da centinaia di KB l'una), ma il loro NUMERO sì:
+      // senza, chi rilegge trova «cosa vedi in questo grafico?» riferito al nulla.
       const quante = Number(m.images) || 0;
       const perse = Math.max(0, quante - fotoViste.length);
       if (perse > 0) {
@@ -418,32 +566,111 @@
         nota.textContent = perse === 1
           ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
           : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
-        bubblesEl.appendChild(nota);
+        metti(nota);
       }
-      if (!isUser && types.length) {
+      if (archiviati.nota) {
+        metti(archiviati.nota);
+      } else if (dopo) {
+        for (const v of esiti) {
+          const riga = window.SN_ESITO.rigaDellaVoce(v);
+          if (!riga) continue;
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.dataset.replay = '1';
+          nota.textContent = `${riga.icona} ${riga.testo}`;
+          metti(nota);
+        }
+      } else if (!isUser && types.length && !m.esiti) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
         note.dataset.replay = '1';
         note.textContent = Att.summarizeActivity(types, false);
-        bubblesEl.appendChild(note);
+        metti(note);
       }
-      // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
-      const fuori = isUser ? {} : {
-        ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
-        ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
-        ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
-      };
-      threadHistory.push(isUser
-        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
+      for (const nome of guardate) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
+        metti(nota);
+      }
+      if (m.altrove && nodi.length) {
+        const nota = document.createElement('div');
+        nota.className = `dash-altrove dash-altrove-${isUser ? 'user' : 'filo'}`;
+        nota.textContent = 'da un altro dispositivo';
+        metti(nota);
+      }
+      for (const n of nodi) {
+        if (m.ts) n.dataset.ts = m.ts;
+        if (m.chat) n.dataset.chat = m.chat;
+      }
+      if (m.key && nodi[0]) nodi[0].dataset.key = m.key;
+      if (storia) storia.push(rigaDiStoria(m, { quante, guardate, types, esiti: Array.isArray(m.esiti) ? m.esiti : [] }));
     }
+  }
+
+  // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
+  function rigaDiStoria(m, { quante, guardate, types, esiti = [] }) {
+    const text = String(m.text || '');
+    if (m.role === 'user') {
+      return {
+        role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
+        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
+      };
+    }
+    return {
+      role: 'filo', text,
+      ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+      ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
+      ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
+      ...(m.spontaneo ? { spontaneo: true } : {}),
+      ...(esiti.length ? { esiti } : {}),
+      ...(m.confermaDopo ? { confermaDopo: true } : {}),
+      actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
+        ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
+    };
+  }
+
+  // La conversazione che da qui si continua: lo storico per il turno dopo, il terminale com'era. Le bolle le ha già la coda.
+  async function adotta(id) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || chat.app || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    chatId = chat.id;
+    threadHistory = chat.messages.map((m) => rigaDiStoria(m, {
+      quante: Number(m.images) || 0,
+      guardate: m.role !== 'user' && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [],
+      types: Array.isArray(m.actions) ? m.actions : [],
+      esiti: m.role !== 'user' && Array.isArray(m.esiti) ? m.esiti : [],
+    }));
+    chiudiRipresa();
+    aggiornaTasto();
     Term.nuovaChat(chat.messages.some((m) => (
       (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
       || (m.role === 'user' && /^\//.test(String(m.text || '').trim()) && Comandi.classifyInput(String(m.text)) !== 'filo')
     )));
-    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    return true;
+  }
+
+  // Una conversazione riaperta: il filo va al suo punto e, se è della home e si vuole riprenderla (`riprendi`), da qui
+  // si continua lei.
+  async function reopenChat(id, { riprendi = true } = {}) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    const trovata = await Coda.vaiA({ chat: chat.id, app: !!chat.app, ts: chat.messages[0].ts, i: 0 });
+    if (trovata || riprendi) goThread();
+    if (chat.app) {
+      if (!trovata) await Righe.mostraSola(chat);
+      inputEl.focus();
+      return true;
+    }
+    if (!trovata && !riprendi) return false;
+    if (riprendi && chatId !== chat.id) {
+      if (chatId) closeCurrentChat({ via: 'home' });
+      await adotta(chat.id);
+    }
     inputEl.focus();
-    Righe.aggiorna({ riposa: true }).catch(() => {});
     return true;
   }
 
@@ -453,25 +680,23 @@
   async function apriNelFilo({ chat = null, testo = '', esterno = '' } = {}) {
     if (Accoglienza.isActive()) return 'accoglienza';
     if (sending) return 'risponde';
-    if (chat && chat === chatId && body.dataset.state === 'thread') { inputEl.focus(); return true; }
-    if (chat && chat !== chatId) {
+    if (chat) {
+      // Se un'altra scheda la sta vivendo (un turno che lavora lì), si va là; se no il filo va al suo punto, qui (#869).
       const r = await send({ type: MSG.FILO_CHAT_FOCUS, id: chat });
       if (r && r.portato) return true;
-      if (await reopenChat(chat, { chiudiPrima: true }).catch(() => false)) return true;
+      if (chat === chatId) { goHome(); return true; }
+      if (await reopenChat(chat, { riprendi: false }).catch(() => false)) return true;
     }
     if (!testo) return false;
     // La stessa carta aperta due volte non ripete la frase: è già l'ultima cosa che Filo ha detto qui.
     const ultimo = threadHistory[threadHistory.length - 1];
-    if (body.dataset.state === 'thread' && ultimo && ultimo.role === 'filo' && ultimo.text === testo) {
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
-      inputEl.focus();
-      return true;
-    }
+    if (ultimo && ultimo.role === 'filo' && ultimo.text === testo) { goHome(); return true; }
     const DA_FUORI = { download: 'dal nome di un file scaricato' };
     archiviaRiga(testo, 'filo', null, esterno);
     threadHistory.push({ role: 'filo', text: testo, actions: [], ...(DA_FUORI[esterno] ? { esterno: DA_FUORI[esterno] } : {}) });
     goThread();
     bubblesEl.appendChild(makeBubble({ role: 'filo', text: testo }));
+    Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
     return true;
@@ -487,9 +712,6 @@
   }
 
   // ===== Suggerimenti =====
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
   // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
   // suggerimento della home no, l'ha scritto un modello.
   function paroleUtente() {
@@ -510,12 +732,13 @@
     return '';
   }
   async function apriProposta(url, vicino = null, chiedi = '') {
-    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
+    const proposta = self.SN_MARKDOWN ? self.SN_MARKDOWN.scrittoDaUnModello(vicino) : !!(vicino && vicino.closest && vicino.closest('[data-filo-verdetti]'));
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url), proposta };
     let r = null;
     try { r = await send(msg); } catch (_) {}
     if (r && r.conferma) {
       const Ui = window.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : window.confirm(String(r.conferma));
       if (!ok) return;
       try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
@@ -538,6 +761,8 @@
     if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
+    // Una pagina chiusa nel filo si riapre com'era, dalla sua voce d'archivio: ci pensa il suo clic.
+    if (e.type === 'click' && a.classList.contains('dash-pagina')) return;
     e.preventDefault();
     e.stopPropagation();
     apriProposta(a.href, a);
@@ -550,13 +775,26 @@
     ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
   }, true);
 
-  function faviconUrl(rawUrl) {
-    if (!rawUrl) return '';
+  // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
+  // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  // `soloCopie`: l'indirizzo al clic chiede l'OK, quindi l'icona non contatta il sito prima (#848).
+  const iconeSiti = new Map();
+  function iconaDelSito(rawUrl, { soloCopie = false } = {}) {
+    let host = '';
     try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
-    } catch (_) { return ''; }
+      const u = new URL(String(rawUrl || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
+    } catch (_) {}
+    if (!host) return Promise.resolve('');
+    const chiave = `${soloCopie ? 'c' : 'r'}|${host}`;
+    if (!iconeSiti.has(chiave)) {
+      const dimentica = () => { iconeSiti.delete(chiave); return ''; };
+      iconeSiti.set(chiave, send({ type: MSG.ICONA_SITO, url: String(rawUrl), soloCopie }).then((r) => {
+        const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
+        return dato || dimentica();
+      }, dimentica));
+    }
+    return iconeSiti.get(chiave);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
@@ -564,21 +802,42 @@
     Carte.setSuggerimenti(suggestions, { pronti });
   }
 
-  async function onSuggestionClick(s, vicino = null) {
+  // `posizione`: il posto del suggerimento nella carta, da 1. Si conta col tipo dell'azione e l'età dei suggerimenti
+  // (#1467), mai il testo né l'indirizzo.
+  async function onSuggestionClick(s, vicino = null, posizione = null) {
     if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
+    const del = Date.parse(suggerimentiDel || '');
+    if (suggerimentiDelModello) {
+      Promise.resolve(send({
+        type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione: Number(posizione) || null,
+        etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
+      })).catch(() => {});
+    }
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
-      Att.riordinaSchede();
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
+      // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
+      const testo = vicino && vicino.querySelector('.dash-carta-voce-testo');
+      const prima = testo ? testo.textContent : '';
+      if (vicino) vicino.disabled = true;
+      if (testo) testo.textContent = 'Riordino in corso…';
+      const e = await Att.riordinaSchede();
+      if (e.annullato) {
+        if (testo) testo.textContent = prima;
+        if (vicino) vicino.disabled = false;
+        return;
+      }
+      if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
+      if (!e.ok && vicino) { vicino.disabled = false; vicino.title = `${e.motivo} Puoi riprovare.`; }
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
     // in chat come suo, non come parole dell'utente né come comando con la barra.
     // Una pagina di Filo non è un'uscita: la porta delle uscite la rifiuterebbe e il clic non farebbe niente.
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
-      send({ type: MSG.OPEN_URL, url: a.url });
+      send({ type: MSG.OPEN_URL, url: a.url, via: 'chat' });
     } else if (type === 'NAVIGA' && a.url) {
       apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
@@ -611,13 +870,14 @@
     }
   }
 
-  // Mostra/nasconde il commento centrale di Filo (Preferenze → "Commento nella
-  // home"). I suggerimenti nella colonna sinistra restano comunque visibili.
-  function applyHomeMessageVisibility() {
-    homeMessageEl.hidden = !showHomeMessage;
+  // ===== Suggerimenti, e la frase quando Filo non ha un modello =====
+  // Aprendosi la home non chiama il modello (#869): i suggerimenti sono quelli dell'ultima volta che Filo ha scritto.
+  // Senza un modello servibile la frase che dice perché, con la strada ai Crediti, sta in fondo al filo.
+  function mostraSenzaModello(testo) {
+    homeMessageEl.textContent = testo || '';
+    homeMessageEl.hidden = !testo;
   }
 
-  // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
   // Un ricalcolo spinto dal main mentre la richiesta è in volo è più nuovo della sua risposta, e uno arrivato
   // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
   let giroDashboard = 0;
@@ -625,29 +885,35 @@
   async function loadDashboard({ force = false } = {}) {
     const giro = ++giroDashboard;
     renderSuggestions({ pronti: false });
-    if (showHomeMessage) {
-      homeMessageEl.classList.add('dash-home-msg-loading');
-      homeMessageEl.textContent = '…';
-    }
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
     if (giro !== giroDashboard) return;
-    homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.textContent = (r?.ok && r.message) || 'Filo è in ascolto.';
+    mostraSenzaModello(r?.ok && r.senzaChiave ? r.message : '');
     if (!force && spinteDashboard) { renderSuggestions(); return; }
     suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
+    suggerimentiDel = r?.ok ? r.ts || null : null;
+    suggerimentiDelModello = Boolean(r?.ok && !r.senzaChiave);
     renderSuggestions();
   }
 
-  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
-  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
-  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
-  // che altrimenti continua a spiegare un silenzio finito (#663).
+  // Come loadDashboard, ma la home è già a schermo: niente passaggio dal vuoto, cambia solo se il main ha di meglio.
+  async function aggiornaDashboardInSilenzio() {
+    const giro = giroDashboard;
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
+    if (giro !== giroDashboard || !r?.ok) return;
+    mostraSenzaModello(r.senzaChiave ? r.message : '');
+    const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
+    if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
+    suggestions = nuovi;
+    suggerimentiDel = r.ts || null;
+    suggerimentiDelModello = !r.senzaChiave;
+    renderSuggestions();
+  }
+
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è ciò che l'utente aspetta al primo avvio;
+  // se resta chiusa si rifà almeno la frase in fondo, che altrimenti continua a spiegare un silenzio finito (#663).
   async function risvegliaHome() {
     await Accoglienza.maybeOpenOnboardingLater();
-    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
-    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
-    // rifà il messaggio nel giro in background, invece di far aspettare
-    // l'utente davanti a una chiamata al modello.
+    if (Accoglienza.isActive()) return;
     await loadDashboard();
   }
 
@@ -655,6 +921,8 @@
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
+    // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
+    if (role !== 'user') div.dataset.filoVerdetti = '1';
     if (pending) div.classList.add('dash-bubble-pending');
     // L'ora la usa chi mette al loro posto nel tempo le righe delle altre app (dashboard-righe.js).
     div.dataset.ts = new Date().toISOString();
@@ -666,22 +934,23 @@
     return div;
   }
 
-  // #418 — scrive il testo in una bolla. Per le risposte di Filo (markdown=true)
-  // rende la formattazione leggera condivisa (grassetto, corsivo, codice,
-  // elenchi, LINK). Per tutto il resto (testo utente, righe di sistema) resta
-  // testo letterale. I link aperti sono già filtrati da SN_MARKDOWN: nessuno
-  // punta alle pagine interne dell'app.
+  // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
+  // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   function setBubbleText(el, text, markdown) {
+    Rispondi.ricorda(el, text);
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
+      // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
+      const ultimo = el.lastElementChild;
+      if (ultimo && self.SN_CHAT_ERRORS?.eFraseInterrotta?.(ultimo.textContent)) ultimo.classList.add('dash-bubble-interrotta');
     } else {
       el.textContent = text || '';
     }
   }
 
-  // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
-  // SCHEDA (come qualsiasi altro link) invece di navigare via la pagina interna.
+  // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
+  // pagina interna.
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
@@ -689,7 +958,7 @@
     if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    send({ type: MSG.OPEN_URL, url });
+    send({ type: MSG.OPEN_URL, url, via: 'chat' });
   });
 
   // ===== Invio messaggio =====
@@ -704,7 +973,16 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    LEGGI_PAGINA: 'Leggo una pagina…',
+    VEDI_SCHERMO: 'Guardo lo schermo…',
     CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
+    CERCA_SALVATE: 'Cerco fra le pagine salvate…',
+    APRI_SALVATA: 'Apro la pagina salvata…',
+    SCHEDE_CHIUSE: 'Cerco fra le schede chiuse…',
+    RIAPRI_SCHEDA: 'Riapro la scheda…',
+    RIPRENDI_AUDIO: 'Faccio ripartire la musica…',
+    PAUSA_AUDIO: 'Metto in pausa…',
+    MOSTRA_SCHEDA: 'Ti porto sulla scheda…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -720,11 +998,17 @@
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
     RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
+    ELIMINA_FILE: 'Guardo i file da togliere…',
     CARTA_HOME: 'Sistemo le carte della home…',
     VOLUME: 'Cambio il volume…',
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
+    ORDINA_DESKTOP: 'Sistemo le icone del desktop…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
+    RIMEDIO_CREDITI: 'Guardo i crediti…',
+    PULSANTE_PREFERENZE: 'Uso le Preferenze…',
+    CHIUDI_SCHEDE: 'Chiudo le schede…',
+    ACCOUNT: 'Sistemo l\'accesso…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -750,6 +1034,15 @@
   // Toglie l'ultima voce SOLO se è davvero quel messaggio: dopo un tentativo
   // interrotto in fondo c'è la traccia di cosa Filo aveva già fatto, e quella
   // deve arrivare al modello.
+  // La chat di adesso è stata nascosta o cancellata (da qui, a parole o altrove): la scheda non se ne porta dietro niente,
+  // né la targa né la memoria dei messaggi, che al turno dopo tornerebbero al modello e nel registro delle richieste (#1295).
+  function lasciaLaChat() {
+    // Lasciata mentre qui si rispondeva: le bolle a schermo sono le sue, il filo non le ridisegna (#1685).
+    if (chatId) lasciateConRighe.add(chatId);
+    chatId = null;
+    threadHistory = [];
+  }
+
   function historyWithout(userMessage) {
     const h = threadHistory.slice();
     const last = h[h.length - 1];
@@ -757,17 +1050,17 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, activity = null }) {
+  // `composizione`: quello che l'utente aveva nella casella, per rimetterlo com'era se il messaggio non può partire.
+  async function runFiloTurn({ userMessage, images = [], internal = false, dopoOk = null, daModello = false, daFuori = false, rispostaA = null, activity = null, composizione = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
     const ownsActivity = !activity;
-    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
-    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
-    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // il blocco resta in attesa finché non parte il testo.
+    // Reasoning VERO in diretta: sottoscrizione filtrata per reqId che il main usa per pushare i
+    // thought summary. Se il modello non ragiona non arriva nulla.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const turno = { reqId: reasoningReqId, fermato: false, attivita: pending };
+    // `fase`: cosa la persona vede del turno quando lo ferma (#1463): niente ancora, le azioni, o la risposta che scorre.
+    const turno = { reqId: reasoningReqId, fermato: false, attivita: pending, fase: 'prima_del_testo' };
     turno.fermata = new Promise((ok) => { turno.ferma = ok; });
     turnoVivo = turno;
     aggiornaTasto();
@@ -777,13 +1070,8 @@
         if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
       });
     }
-    // #420 — RISPOSTA in diretta: la bolla di Filo si riempie mentre il modello
-    // scrive, invece di comparire tutta insieme a fine turno. Il main estrae il
-    // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
-    // fallback provider). La bolla NON si crea finché non arriva il PRIMO
-    // carattere: una risposta di sola azione (apri un link, testo vuoto) non
-    // lascia una bolla vuota che poi si riempie. Quando il testo inizia, il
-    // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
+    // #420 — la bolla si riempie mentre il modello scrive e NON nasce prima del primo carattere:
+    // una risposta di sola azione non lascia una bolla vuota. Il ragionamento si richiude da sé.
     let streamBubble = null;
     let streamedText = '';
     // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
@@ -797,6 +1085,7 @@
       if (!streamBubble) {
         streamBubble = document.createElement('div');
         streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        streamBubble.dataset.filoVerdetti = '1';
         bubblesEl.appendChild(streamBubble);
       }
       return streamBubble;
@@ -816,6 +1105,7 @@
           return;
         }
         if (!data.delta || turno.fermato) return;
+        turno.fase = 'durante_testo';
         if (!giroIniziato) {
           giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
@@ -827,12 +1117,8 @@
         followBottomIfNear();
       });
     }
-    // Le AZIONI in diretta (tool calling nativo): il modello ne nomina una →
-    // la riga in testa lo dice subito; il main la esegue → la riga vera entra
-    // nel blocco con l'esito; un giro con azioni si chiude → il testo scritto
-    // in quel giro era una nota di lavoro, non la risposta: finisce nel blocco
-    // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
-    // raccontate qui non si ripetono a fine turno (renderActions).
+    // Azioni in diretta: il modello ne nomina una → la riga in testa lo dice; il main la esegue
+    // → la riga vera con l'esito. Gli id già raccontati qui non si ripetono a fine turno.
     const shown = new Set();
     // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
     const chiudiGiro = (data) => {
@@ -847,11 +1133,18 @@
         streamBubble = null;
       }
     };
+    // La risposta del main può arrivare prima degli ultimi eventi in diretta (viaggiano su code diverse): la diretta si
+    // chiude sul segno di fine, che il main manda dietro all'ultimo evento (#1321).
+    let fineDellaDiretta = () => {};
+    const direttaFinita = new Promise((ok) => { fineDellaDiretta = ok; });
     let offAction = null;
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
-        if (data.kind === 'start') {
+        if (['start', 'progress', 'done', 'round'].includes(data.kind) && !turno.fermato) turno.fase = 'durante_azioni';
+        if (data.kind === 'fine') {
+          fineDellaDiretta();
+        } else if (data.kind === 'start') {
           pending.working(startLabelFor(data.type), String(data.callId || ''));
         } else if (data.kind === 'progress') {
           pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
@@ -870,23 +1163,29 @@
           streamedText = '';
           giroIniziato = false;
           pending.fineGiro();
+        } else if (data.kind === 'seguito') {
+          seguitoLetto(String(data.id || ''));
         }
       });
     }
-    // Un turno fermato può avere ancora un'azione in volo: il seguito parte quando è finita, così ne conosce l'esito.
-    while (chiusuraInCorso && !turno.fermato) await Promise.race([chiusuraInCorso, turno.fermata]);
+    // Un turno fermato può avere ancora un'azione in volo: il seguito della stessa conversazione parte quando è finita,
+    // così ne conosce l'esito. Una conversazione nuova, o un'altra riaperta, non aspetta.
+    while (chiusuraDi(chatId) && !turno.fermato) await Promise.race([chiusuraDi(chatId), turno.fermata]);
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
-      // Tutta la conversazione TRANNE il messaggio che stiamo mandando adesso
-      // (viaggia a parte, in `userMessage`). Non «l'ultima voce e basta»: dopo
-      // un turno interrotto in fondo c'è quello che Filo aveva già fatto, e
-      // buttarlo via faceva ripartire il «Riprova» senza saperlo.
+      // Tutta la conversazione TRANNE il messaggio che parte adesso, non «l'ultima voce e basta»:
+      // dopo un turno interrotto in fondo c'è quello che Filo aveva già fatto, e buttarlo si paga.
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      ...(internal && Array.isArray(dopoOk) ? { dopoOk } : {}),
       ...(daModello ? { daModello: true } : {}),
       ...(daFuori ? { daFuori: true } : {}),
+      // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
+      ...(rispostaA ? { rispostaA } : {}),
+      // #2085 — le schede lasciate nel campo: il main ne legge le pagine.
+      ...(composizione && composizione.schede && composizione.schede.length ? { schede: composizione.schede } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -894,9 +1193,14 @@
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
     }
-    const inviato = turno.fermato ? Promise.resolve({ ok: true, stopped: true, actions: [] }) : send(msg);
+    const inviato = turno.fermato
+      ? Promise.resolve({ ok: true, stopped: true, actions: [] })
+      : send(msg).then((r) => (r && r.diretta && offAction ? direttaFinita.then(() => r) : r));
+    if (!turno.fermato) for (const s of seguiti) if (s.turno !== turno) affidaAlTurno(s, turno);
     const fineDiretta = (r) => {
       if (turnoVivo === turno) turnoVivo = null;
+      // Il main dice quali seguiti ha letto anche a fine turno: vale se l'annuncio in diretta non è arrivato.
+      for (const id of (Array.isArray(r?.seguitiLetti) ? r.seguitiLetti : [])) seguitoLetto(String(id));
       pending.fineDiretta();
       // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
       for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
@@ -911,8 +1215,9 @@
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
       const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
-      const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
-      return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura };
+      turno.voce = chiusa.entry;
+      const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown, chat: msg.chatId }); });
+      return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
     }
     fineDiretta(r);
     if (!r?.ok) {
@@ -923,7 +1228,7 @@
       if (rispostaPrima && streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         setBubbleText(streamBubble, rispostaPrima, true);
-        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: goHome, activity: pending, shown });
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown, chat: msg.chatId });
         streamBubble = null;
       }
       pending.endTurn();
@@ -934,8 +1239,7 @@
       if (rispostaPrima || (Array.isArray(r?.actions) && r.actions.length)) {
         threadHistory.push({ role: 'filo', text: rispostaPrima, actions: Array.isArray(r?.actions) ? r.actions : [], interrotto: true });
       }
-      // Un turno fallito non deve lasciare a schermo il testo parziale di un
-      // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
+      // Un turno fallito non lascia a schermo il testo parziale del tentativo.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
       // Chi non ha crediti scrive alla chat l'invito che ha ricevuto: lo riscatta lei, invece di mandarlo a ricopiarlo (#664).
       const invito = r?.code === 'NO_API_KEY' && !internal && !daModello ? await riscattaDallaChat(userMessage) : null;
@@ -952,11 +1256,10 @@
       row.className = 'dash-bubble-actions';
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'dash-action-btn dash-action-btn-primary';
+      retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
-      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
-      row.appendChild(retry);
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(dopoOk ? { dopoOk } : {}), ...(rispostaA ? { rispostaA } : {}), composizione }));
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
@@ -969,18 +1272,39 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
-      if (pagina) {
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason, reason: r?.reason }) : null;
+      // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
+      // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
+      // #1596 — finestra piena anche dopo i tagli: lo stesso messaggio, qui, sbatte di nuovo contro lo stesso limite; in
+      // una chat nuova no. Il messaggio torna nella casella com'era, davanti alla bozza, da accorciare o mandare; una
+      // volta sola, o un secondo clic lo raddoppia.
+      if (r?.code === 'CONTESTO_PIENO' && !internal && !daModello) {
+        const nuova = document.createElement('button');
+        nuova.type = 'button';
+        nuova.className = 'dash-action-btn dash-action-btn-primary';
+        nuova.textContent = 'Chat nuova';
+        nuova.title = 'Ricomincia in una chat nuova col messaggio già scritto';
+        nuova.addEventListener('click', () => {
+          if (nuova.disabled) return;
+          nuova.disabled = true;
+          const bozza = inputEl.value;
+          chiudiConversazione();
+          inputEl.value = bozza;
+          rimettiNellaCasella([composizione || { scritto: String(userMessage || ''), immagini: images, file: [], percorsi: new Map() }]);
+        });
+        row.appendChild(nuova);
+      } else if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
-        via.className = 'dash-action-btn';
+        via.className = 'dash-action-btn dash-action-btn-primary';
         via.textContent = pagina.label;
-        via.title = pagina.dove === 'opzioni'
-          ? 'Scegli il modello per questa funzione'
-          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
+      } else {
+        retry.classList.add('dash-action-btn-primary');
       }
+      row.appendChild(retry);
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
@@ -990,18 +1314,15 @@
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
-      // La risposta finale (r.text) è autorevole: riconcilia la bolla in
-      // streaming con essa (recupera l'eventuale coda non ancora emessa). Se non
-      // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
-      // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
+      // La risposta finale (r.text) è autorevole: riconcilia la bolla in streaming. Senza testo ma
+      // con azioni la bolla non esiste e si cade nel ramo «solo azioni».
       let filoBubble;
       // La nota che il main ha fatto diventare risposta esce dal blocco: la frase sta nella bolla e basta.
       if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
-          // #418 — a fine turno il testo grezzo dello streaming diventa la
-          // risposta formattata (grassetto, corsivo, elenchi, link cliccabili).
+          // #418 — a fine turno il testo grezzo dello streaming diventa la risposta formattata.
           setBubbleText(streamBubble, r.text, true);
           filoBubble = streamBubble;
         } else {
@@ -1019,7 +1340,7 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      Att.renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending, shown });
+      Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown, chat: msg.chatId });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
@@ -1073,47 +1394,108 @@
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   async function submitMessage(text, { daModello = false } = {}) {
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
-    sending = true;
-    // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
-    chiudiRipresa();
-    aggiornaTasto();
-    const imagesToSend = pendingImages.slice();
-    const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
+    await inviaComposto(prendiComposizione(text), { daModello });
+  }
+  // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
+  // rimetterlo nella barra com'era (un seguito che non parte, #1296).
+  const DOMANDA_SOLO_IMMAGINI = 'Descrivi questa immagine.';
+  const domandaDi = (c) => c.text || DOMANDA_SOLO_IMMAGINI;
+  function prendiComposizione(text) {
+    // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
+    const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
+    const incollato = testoDaFuori;
+    const immagini = pendingImages.slice();
+    const file = pendingFiles.slice();
+    const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
+    const daFuori = incollato || immagini.length > 0 || file.length > 0;
     testoDaFuori = false;
-    const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
+    const righeFile = [...file.map((f) => f.percorso), ...immagini.map((d) => percorsi.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
-    if (righeFile.length) text = [text || (imagesToSend.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
+    if (righeFile.length) text = [text || (immagini.length ? DOMANDA_SOLO_IMMAGINI : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    // Prima query dalla home → entra in stato thread.
-    if (body.dataset.state !== 'thread') goThread();
-
-    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
-    const domanda = text || 'Descrivi questa immagine.';
-    threadHistory.push({
-      role: 'user', text: domanda,
-      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
-      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
-    });
-    const userBubble = makeBubble({ role: 'user', text: text || '' });
+    const citata = Rispondi.prendi();
+    const schede = Gettoni ? Gettoni.schede() : [];
+    if (Gettoni) Gettoni.svuota();
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata, schede };
+  }
+  function bollaUtente(c) {
+    const userBubble = makeBubble({ role: 'user', text: c.text });
+    if (c.schede && c.schede.length) window.SN_SCHEDE_IN_CHAT.nellaBolla(userBubble, c.text, c.schede, azioniGettone);
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
-    imagesToSend.forEach((src, i) => {
+    c.immagini.forEach((src, i) => {
       const img = document.createElement('img');
       img.src = src;
       img.className = 'dash-bubble-img';
       attachImageLightbox(img, src);
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
-    bubblesEl.appendChild(userBubble);
+    if (c.citata) Rispondi.citaIn(userBubble, c.citata);
+    composizioni.set(userBubble, c);
+    return userBubble;
+  }
+  // Quello che un messaggio dell'utente aveva nel campo quando è partito: «Modifica» lo rimette lì (#2096).
+  const composizioni = new WeakMap();
+  // Un messaggio riletto dal filo: i file stanno nel testo come righe «File: …» in coda, le foto ancora in memoria a parte.
+  function composizioneDalFilo(m, foto) {
+    const righe = String(m.text || '').split('\n');
+    const file = [];
+    while (righe.length && /^File: \S/.test(righe[righe.length - 1])) {
+      const p = righe.pop().slice(6).trim();
+      // Il percorso di una foto che torna già come immagine non diventa anche un documento.
+      if (!(foto.length && /\.(png|jpe?g|gif|webp|bmp)$/i.test(p))) file.unshift({ percorso: p, nome: nomeDaPercorso(p) });
+    }
+    let scritto = righe.join('\n');
+    if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
+    const c = Rispondi.dalFilo(m.rispostaA);
+    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+  }
+  // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
+  let rimesso = null;
+  function modificaMessaggio(b) {
+    const c = composizioni.get(b);
+    if (!c) return false;
+    const testo = String(c.scritto || '').trim();
+    const gia = (rimesso && rimesso.bolla === b && inputEl.value === rimesso.valore) || (!!testo && inputEl.value.includes(testo));
+    if (gia) { inputEl.focus(); return true; }
+    rimettiNellaCasella([c]);
+    rimesso = { bolla: b, valore: inputEl.value };
+    return true;
+  }
+  // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
+  async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
+    sending = true;
+    scrittoQui = true;
+    Comandi.lasciaNonRisolto();
+    Coda.fineRisali();
+    // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
+    chiudiRipresa();
+    aggiornaTasto();
+    // Prima query dalla home → entra in stato thread.
+    if (body.dataset.state !== 'thread') goThread();
 
-    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = domandaDi(c);
+    const rispostaA = Rispondi.perIlMain(c.citata);
+    const nelloStorico = Rispondi.perLoStorico(c.citata);
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(c.immagini.length ? { images: c.immagini.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
+      ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
+      ...(c.schede && c.schede.length ? { schede: c.schede } : {}),
+    });
+    if (!bolla) bubblesEl.appendChild(bollaUtente(c));
+    Coda.segnaGiorni();
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+
+    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}), composizione: c });
   }
 
-  // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
-  // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
-  // riprovare deve comportarsi ESATTAMENTE come inviare.
+  // Condiviso fra il primo invio e il «Riprova»: riprovare deve comportarsi come inviare.
   async function runTurnAndContinue(args) {
     // Un blocco di attività per tutta la sequenza (#521): i turni automatici
     // sono passi dello stesso lavoro, non risposte diverse.
@@ -1123,8 +1505,9 @@
     const r = await runFiloTurn({ ...args, activity });
     if (r && r._chiusura) {
       const propria = r._chiusura.catch(() => {}).then(() => { activity.finish(); refreshLive().catch(() => {}); });
-      const fine = Promise.all([chiusuraInCorso, propria]).then(() => { if (chiusuraInCorso === fine) chiusuraInCorso = null; });
-      chiusuraInCorso = fine;
+      const chat = r._chat;
+      const fine = Promise.all([chiusuraDi(chat), propria]).then(() => { if (chiusure.get(chat) === fine) chiusure.delete(chat); });
+      chiusure.set(chat, fine);
     } else {
       activity.finish({ failed: !r?.ok });
     }
@@ -1132,7 +1515,9 @@
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
-    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) offriContinua(r._bubble, activity.el);
+    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) {
+      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true, motivo: String(r.senzaRisposta.motivo || '') });
+    }
     aggiornaTasto();
     inputEl.focus();
 
@@ -1143,15 +1528,28 @@
 
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
     refreshLive().catch(() => {});
+    // Le pagine che il turno ha aperto e i cambi fatti altrove entrano nel filo a schermo; i messaggi del turno ci sono già.
+    Coda.allinea().catch(() => {});
+    // Un turno fermato, fallito o che ha chiuso l'accoglienza non manda da solo i seguiti: tornano nella casella.
+    if (seguiti.length) {
+      if (r?.ok && !r.stopped && !r.onboardingClosed) partiSeguito().catch(() => {});
+      else rimettiSeguiti().catch(() => {});
+    }
+    // L'OK arrivato durante il turno: se l'utente ha scritto (un seguito) o fermato, l'esito lo legge col suo messaggio.
+    const attesa = ripresaInAttesa;
+    ripresaInAttesa = null;
+    if (attesa && attesa.voci.length && r?.ok && !r.stopped && !sending && !seguiti.length && (!attesa.chat || attesa.chat === chatId)) {
+      riprendiDopoOk(attesa.voci);
+    }
     return r;
   }
 
-  // #360 — "Riprova" dalla bolla d'errore: rimanda lo stesso messaggio senza
-  // farlo riscrivere. La bolla d'errore sparisce (il tentativo è ricominciato) e
-  // lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
+  // #360 — «Riprova»: rimanda lo stesso messaggio senza farlo riscrivere. La bolla d'errore
+  // sparisce e lo storico è già a posto: un turno fallito non ci ha lasciato niente.
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
+    contaReazione('riprova');
     chiudiRipresa();
     aggiornaTasto();
     try { errBubble.remove(); } catch (_) {}
@@ -1169,10 +1567,11 @@
       sendBtn.dataset.modo = modo;
       sendBtn.innerHTML = modo === 'riprendi' ? GLIFO_RIPRENDI : GLIFO_INVIO;
       sendBtn.setAttribute('aria-label', modo === 'riprendi' ? 'Riprendi' : 'Invia');
-      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : '';
+      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : 'Invia';
     }
     sendBtn.disabled = quadrato;
     sendBtn.hidden = quadrato;
+    if (quadrato && stopBtn.hidden) stopBtn.dataset.comparso = String(Date.now());
     stopBtn.hidden = !quadrato;
     stopBtn.disabled = !turnoVivo || turnoVivo.fermato;
   }
@@ -1181,6 +1580,7 @@
     const t = turnoVivo;
     if (!t || t.fermato) return;
     t.fermato = true;
+    contaReazione(`ferma_${t.fase}`);
     fermatoAlle = Date.now();
     setTimeout(aggiornaTasto, PAUSA_RIPRESA + 20);
     t.attivita.taglia();
@@ -1188,7 +1588,7 @@
     aggiornaTasto();
     send({ type: MSG.FILO_CHAT_STOP, reqId: t.reqId }).catch(() => {});
   }
-  stopBtn.addEventListener('click', () => { fermaTurno(); inputEl.focus(); });
+  stopBtn.addEventListener('click', () => { if (!quadratoAppena()) fermaTurno(); inputEl.focus(); });
   aggiornaTasto();
   // Il tasto destro sul blocco che lavora e sul tasto d'invio (letto da src/content/content.js): le stesse cose dei
   // tasti, negli stessi momenti. Su un blocco finito, srotolare e riavvolgere come col clic sul gomitolo.
@@ -1209,11 +1609,38 @@
   }
   self.SN_VOCI_PAGINA = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
   if (!self.SN_VOCI_PAGINA.includes(vociAttesa)) self.SN_VOCI_PAGINA.push(vociAttesa);
+  // Il testo copiato da una bolla (#1463), con la tastiera, il Copia del sistema o quello del tasto destro: si conta il
+  // ruolo della bolla dove comincia la selezione, mai cosa c'è dentro né cosa va negli appunti.
+  function ruoloDellaBolla(nodo) {
+    const el = nodo && nodo.nodeType === 1 ? nodo : (nodo && nodo.parentElement) || null;
+    if (!el || !bubblesEl.contains(el)) return '';
+    if (el.closest('.dash-activity')) return 'attivita';
+    const bolla = el.closest('.dash-bubble');
+    if (!bolla) return '';
+    return bolla.classList.contains('dash-bubble-user') ? 'utente' : 'risposta';
+  }
+  function contaCopia(...nodi) {
+    const ruolo = nodi.map(ruoloDellaBolla).find(Boolean);
+    if (!ruolo) return;
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'copia', ruolo })).catch(() => {}); } catch (_) {}
+  }
+  document.addEventListener('copy', () => {
+    const sel = document.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    contaCopia(r.startContainer, r.endContainer);
+  });
+  document.addEventListener('filo-copia', (e) => {
+    const sel = document.getSelection();
+    const r = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    contaCopia(...(r ? [r.startContainer, r.endContainer] : []), e.target);
+  });
   // Riprendere non riesegue niente: le azioni già fatte stanno nello storico come tali, e il modello le vede.
   async function riprendi() {
     if (sending || !ripresa) return;
     const { nota } = ripresa;
     const testo = ripresa.messaggio || RIPRENDI;
+    contaReazione(ripresa.reazione || 'riprendi');
     chiudiRipresa();
     sending = true;
     aggiornaTasto();
@@ -1223,7 +1650,7 @@
   }
   // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
   // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
-  function offriContinua(bolla, blocco) {
+  function offriContinua(bolla, blocco, { interrotta = false, motivo = '' } = {}) {
     let riga = bolla.querySelector('.dash-bubble-actions');
     if (!riga) {
       riga = document.createElement('div');
@@ -1234,11 +1661,175 @@
     tasto.type = 'button';
     tasto.className = 'dash-action-btn dash-action-btn-primary dash-continua';
     tasto.textContent = 'Continua';
-    tasto.title = 'Riprendi da dove si era fermato';
+    tasto.title = interrotta ? 'Continua la risposta da dove si è interrotta' : 'Riprendi da dove si era fermato';
     tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
     riga.appendChild(tasto);
-    ripresa = { nota: null, blocco, tasto, messaggio: CONTINUA };
+    ripresa = {
+      nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA,
+      reazione: `continua_${motivo || (interrotta ? 'tagliato' : 'tetto_giri')}`,
+    };
   }
+  // Fermare, riprendere, riprovare e scrivere mentre Filo lavora dicono che la risposta non andava (#1463): solo il nome.
+  function contaReazione(voce) {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'reazione', voce })).catch(() => {}); } catch (_) {}
+  }
+
+  // ===== Il seguito scritto mentre Filo lavora (#1296) =====
+  // Con qualcosa nella casella Invio vuol dire «manda», anche mentre Filo lavora: il lavoro continua, il seguito compare
+  // subito in attesa e il turno lo legge al suo passo dopo; se non ne ha, parte appena il turno finisce. A casella vuota
+  // Invio resta lo stop. Racconto: patterns/il-filo-dell-attesa.md.
+  function accodaSeguito() {
+    const c = prendiComposizione(inputEl.value.trim());
+    const t = turnoVivo;
+    const s = { id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, c, bolla: bollaUtente(c), turno: null };
+    contaReazione('seguito_scritto');
+    s.bolla.classList.add('dash-bubble-attesa');
+    s.bolla.title = 'In attesa';
+    scrittoQui = true;
+    seguiti.push(s);
+    bubblesEl.appendChild(s.bolla);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    riarmaQuadrato();
+    serbaSeguito(s);
+    affidaAlTurno(s, t);
+  }
+  // Un seguito in attesa sembra già mandato (#1296.1): il main lo serba finché parte, torna nella casella o il turno lo
+  // legge. Ricaricata, questa scheda lo riprende (`riprendiSeguitiOrfani`); chiusa, resta nella conversazione.
+  const PAGINA = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 9)}`;
+  function serbaSeguito(s) {
+    const { c } = s;
+    let citata = null;
+    try { citata = c.citata ? JSON.parse(JSON.stringify(c.citata)) : null; } catch (_) { citata = null; }
+    // `text` è la domanda come partirebbe, `rispostaA` la citazione come la legge il main: a scheda chiusa la scrive lui.
+    const composizione = {
+      text: domandaDi(c), rispostaA: Rispondi.perIlMain(c.citata), scritto: c.scritto, immagini: c.immagini.slice(), file: c.file.map((f) => ({ percorso: f.percorso, nome: f.nome })),
+      percorsi: [...c.percorsi.entries()], incollato: !!c.incollato, daFuori: !!c.daFuori, citata,
+    };
+    send({ type: MSG.FILO_CHAT_SEGUITO, id: s.id, serba: { chatId, pagina: PAGINA, composizione } }).catch(() => {});
+  }
+  async function riprendiSeguitiOrfani() {
+    const r = await send({ type: MSG.FILO_CHAT_SEGUITO, orfani: true, pagina: PAGINA });
+    const lista = Array.isArray(r?.seguiti) ? r.seguiti : [];
+    rimettiNellaCasella(lista.filter((c) => c && typeof c === 'object').map((c) => ({
+      scritto: String(c.scritto || ''),
+      immagini: Array.isArray(c.immagini) ? c.immagini.filter((d) => typeof d === 'string') : [],
+      file: Array.isArray(c.file) ? c.file.filter((f) => f && typeof f.percorso === 'string') : [],
+      percorsi: new Map(Array.isArray(c.percorsi) ? c.percorsi.filter((x) => Array.isArray(x) && x.length === 2) : []),
+      incollato: !!c.incollato,
+      citata: c.citata || null,
+    })));
+  }
+  // Mandare un seguito è un invio come il primo: la stessa pausa del quadrato, o il secondo Invio di un doppio colpo
+  // trova la casella vuota e ferma il lavoro che il seguito doveva solo affiancare.
+  function riarmaQuadrato() {
+    stopBtn.dataset.comparso = String(Date.now());
+    stopBtn.style.animation = 'none';
+    void stopBtn.offsetWidth;
+    stopBtn.style.animation = '';
+  }
+  // Nel turno entrano solo parole battute qui: un allegato, un testo incollato, una risposta citata o un comando con la
+  // barra partono a turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la
+  // aspetta. Un seguito che il turno di prima non ha preso lo offre anche il turno dopo, appena parte.
+  function affidaAlTurno(s, t) {
+    const { c } = s;
+    // Con una scheda lasciata nel testo parte da sé a turno finito: il passo dopo del turno non ne leggerebbe la pagina.
+    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || (c.schede && c.schede.length)
+      || c.text.startsWith('/') || Accoglienza.isActive()) return;
+    s.turno = t;
+    send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
+      .then((r) => { if (!(r && r.accolto) && s.turno === t) s.turno = null; })
+      .catch(() => { if (s.turno === t) s.turno = null; });
+  }
+  // Il turno l'ha letto: da qui è un messaggio come gli altri, nello storico prima della risposta che lo legge.
+  function seguitoLetto(id) {
+    const i = seguiti.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    const [s] = seguiti.splice(i, 1);
+    s.bolla.classList.remove('dash-bubble-attesa');
+    s.bolla.removeAttribute('title');
+    const voce = { role: 'user', text: s.c.text };
+    const k = s.turno && s.turno.voce ? threadHistory.indexOf(s.turno.voce) : -1;
+    if (k >= 0) threadHistory.splice(k, 0, voce);
+    else threadHistory.push(voce);
+  }
+  // A turno finito il primo seguito parte dalla strada di sempre; un comando con la barra fa la sua cosa e basta.
+  async function partiSeguito() {
+    const s = seguiti.shift();
+    if (!s) return;
+    send({ type: MSG.FILO_CHAT_SEGUITO, id: s.id, togli: true }).catch(() => {});
+    s.bolla.classList.remove('dash-bubble-attesa');
+    s.bolla.removeAttribute('title');
+    let bolla = s.bolla.isConnected ? s.bolla : null;
+    if (!s.c.immagini.length && !s.c.file.length && s.c.text.startsWith('/')) {
+      if (bolla) bolla.remove();
+      bolla = null;
+      // Il comando svuota la casella: quello che l'utente sta scrivendo intanto resta suo.
+      const bozza = inputEl.value;
+      const fatto = await comandoLocale(s.c.text, { incollato: !!s.c.incollato });
+      if (bozza && inputEl.value !== bozza) {
+        inputEl.value = inputEl.value ? `${inputEl.value}\n${bozza}` : bozza;
+        autoGrowInput(); Comandi.updateInputClass();
+      }
+      if (fatto) { if (seguiti.length && !sending) await partiSeguito(); return; }
+    }
+    await inviaComposto(s.c, { bolla });
+  }
+  // Un seguito che non parte torna nella casella com'era, prima di quello che l'utente sta scrivendo. Quello affidato al
+  // turno si ritira dal main; se il modello l'ha già letto resta un messaggio della conversazione.
+  async function rimettiSeguiti(lista = seguiti.slice()) {
+    const tornati = [];
+    for (const s of lista) {
+      const r = await send({ type: MSG.FILO_CHAT_SEGUITO, ...(s.turno ? { reqId: s.turno.reqId } : {}), id: s.id, togli: true }).catch(() => null);
+      if (s.turno && r && r.letto) { seguitoLetto(s.id); continue; }
+      const i = seguiti.indexOf(s);
+      if (i < 0) continue;
+      seguiti.splice(i, 1);
+      s.bolla.remove();
+      tornati.push(s.c);
+    }
+    rimettiNellaCasella(tornati);
+  }
+  // Una composizione che non è partita torna nella casella com'era: i testi scritti prima della bozza, che resta, poi
+  // immagini, documenti e citazione. Vale per il seguito che non parte (#1296) e per «Chat nuova» (#1596).
+  function rimettiNellaCasella(tornati) {
+    if (!tornati.length) return;
+    const testi = tornati.map((c) => String(c.scritto || '').trim()).filter(Boolean);
+    const bozza = inputEl.value.trim() ? [inputEl.value] : [];
+    inputEl.value = [...testi, ...bozza].join('\n');
+    if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
+    // Gli allegati della bozza, come il suo testo, vanno dopo quelli che tornano.
+    const bozzaImmagini = pendingImages.map((d) => [d, percorsiImmagini.get(d)]);
+    const bozzaFile = pendingFiles.map((f) => f.percorso);
+    clearImagePreviews();
+    for (const c of tornati) {
+      for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
+      for (const f of c.file) addPendingFile(f.percorso);
+    }
+    for (const [d, p] of bozzaImmagini) addPendingImage(d, p);
+    for (const p of bozzaFile) addPendingFile(p);
+    // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
+    const citata = tornati.find((c) => c.citata);
+    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
+    autoGrowInput();
+    Comandi.updateInputClass();
+    aggiornaTasto();
+    inputEl.focus();
+  }
+  // Un seguito in attesa resta in fondo: quello che il turno aggiunge intanto (la risposta, una riga) gli va sopra.
+  new MutationObserver((mutazioni) => {
+    if (!seguiti.length) return;
+    const altro = mutazioni.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && !n.classList.contains('dash-bubble-attesa')));
+    if (!altro) return;
+    for (const s of seguiti) if (s.bolla.parentNode === bubblesEl) bubblesEl.appendChild(s.bolla);
+  }).observe(bubblesEl, { childList: true });
+  // Il tasto destro sul seguito in attesa: riprenderlo prima che parta.
+  function vociSeguito(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const bolla = el && el.closest('.dash-bubble-attesa');
+    const s = bolla && seguiti.find((x) => x.bolla === bolla);
+    return s ? [{ type: 'item', label: 'Rimetti nella casella', onClick: () => { rimettiSeguiti([s]).catch(() => {}); } }] : [];
+  }
+  if (!self.SN_VOCI_PAGINA.includes(vociSeguito)) self.SN_VOCI_PAGINA.push(vociSeguito);
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
   function apriTurnoFermato({ pending, streamBubble, streamedText }) {
@@ -1258,12 +1849,12 @@
     }
     const nota = document.createElement('div');
     nota.className = 'dash-bubble-note dash-bubble-fermato';
-    nota.textContent = parziale ? 'Fermato a metà della risposta.' : 'Fermato prima della risposta.';
+    nota.textContent = parziale ? 'Fermato a metà della risposta.' : globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
     bubblesEl.appendChild(nota);
     return { entry, host, nota, parziale };
   }
   // Il main ha finito il turno fermato: le azioni fatte restano (righe e bottoni) e lo storico le sa.
-  function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown }) {
+  function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown, chat = '' }) {
     const azioni = Array.isArray(r?.actions) ? r.actions : [];
     entry.actions = azioni;
     // La risposta era già finita quando è arrivato lo stop: c'è, e lo schermo non dice il contrario.
@@ -1278,7 +1869,7 @@
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
     // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
-    Att.renderActions(host, azioni, { onAck: goHome, autoConfirm: false, activity: pending, shown });
+    Att.renderActions(host, azioni, { onAck: chiudiConversazione, autoConfirm: false, activity: pending, shown, chat });
     if (host.querySelector('.dash-bubble-actions')) host.hidden = false;
     else if (!parziale && host.hidden) host.remove();
     Term.applyCommandCwd(azioni);
@@ -1327,8 +1918,7 @@
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
-      // Retrocompatibilità: la prima anteprima conserva l'id storico #imgPreview
-      // (usato dall'implementazione mono-immagine precedente e dai test esistenti).
+      // La prima anteprima conserva l'id #imgPreview: lo usano i test.
       if (idx === 0) wrap.id = 'imgPreview';
       const img = document.createElement('img');
       img.src = dataUrl;
@@ -1339,6 +1929,7 @@
       rm.className = 'dash-img-remove';
       rm.textContent = '×';
       rm.setAttribute('aria-label', 'Rimuovi immagine');
+      rm.title = 'Togli';
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
         percorsiImmagini.delete(dataUrl);
@@ -1348,6 +1939,7 @@
       wrap.appendChild(rm);
       if (percorsiImmagini.has(dataUrl)) {
         wrap.title = percorsiImmagini.get(dataUrl);
+        img.title = `Ingrandisci\n${percorsiImmagini.get(dataUrl)}`;
         conMenuFile(img, () => ({
           percorso: percorsiImmagini.get(dataUrl),
           togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
@@ -1397,12 +1989,38 @@
     percorsiImmagini.clear();
     renderImagePreviews();
   }
+  // Quello che non entra lo si dice, in un avviso per gesto (#1298).
+  const nonEntrate = { grandi: 0, rotte: 0 };
+  let avvisoInArrivo = false;
+  function avvisaNonEntrate(tipo, n = 1) {
+    nonEntrate[tipo] += n;
+    if (avvisoInArrivo) return;
+    avvisoInArrivo = true;
+    setTimeout(() => {
+      const A = self.SN_CONST.ALLEGATI_CHAT;
+      const frasi = [];
+      if (nonEntrate.grandi) frasi.push(A.fraseTroppoGrandi(nonEntrate.grandi));
+      if (nonEntrate.rotte) frasi.push(A.fraseIlleggibili(nonEntrate.rotte));
+      nonEntrate.grandi = 0;
+      nonEntrate.rotte = 0;
+      avvisoInArrivo = false;
+      try { window.SN_POPUP?.showToast?.(frasi.join(' ')); } catch (_) {}
+    }, 250);
+  }
+  // Oltre il tetto un'immagine dal disco entra come file col suo percorso; senza percorso, o in un formato che il
+  // modello non legge, si ridisegna come nell'Aiuto (#1623). In fila, così le anteprime tengono l'ordine del gesto.
+  let immaginiInFila = Promise.resolve();
   function handleImageFile(file, percorso = '') {
-    if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
-    const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result, percorso);
-    reader.readAsDataURL(file);
+    if (!file || !String(file.type || '').startsWith('image/')) return;
+    const A = self.SN_CONST.ALLEGATI_CHAT;
+    if (file.size > A.tettoImmagineByte && percorso) { addPendingFile(percorso); return; }
+    if (file.size > A.tettoLetturaByte) { avvisaNonEntrate('grandi'); return; }
+    const pronta = Promise.resolve(window.SN_IMMAGINI_CHAT?.perLaChat(file)).catch(() => '');
+    immaginiInFila = immaginiInFila.then(() => pronta).then((url) => {
+      if (url) addPendingImage(url, percorso);
+      else if (percorso) addPendingFile(percorso);
+      else avvisaNonEntrate('rotte');
+    });
   }
   // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
   function handleDroppedFile(file) {
@@ -1425,30 +2043,41 @@
     }
     if (found) e.preventDefault();
   });
-  // Accetta immagini incollate da "Incolla → cronologia" del menu Filo
-  // (Ctrl+V passa dal listener 'paste' qui sopra; il menu invece dispatcha
-  // questo evento custom — vedi pasteHistoryEntry in content.js).
+  // Immagini da «Incolla → cronologia» del menu Filo: Ctrl+V passa dal listener 'paste' qui
+  // sopra, il menu dispatcha invece questo evento custom.
   inputForm.addEventListener('filo:paste-image', (e) => {
     if (e.detail?.blob) {
       e.preventDefault();
       handleImageFile(e.detail.blob);
     }
   });
-  inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
-  // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
-  // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
-  // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
-  inputForm.addEventListener('drop', (e) => {
-    e.preventDefault();
-    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
-    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
-    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
-    const files = e.dataTransfer?.files;
-    if (files && files.length) {
-      for (const f of files) handleDroppedFile(f);
-      return;
+  // #2085 — una scheda lasciata sul campo diventa un gettone in linea col testo.
+  const Gettoni = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.campo(inputEl, azioniGettone) : null;
+  if (Gettoni && window.SN_SCHEDA_TRASCINATA) {
+    window.SN_SCHEDA_TRASCINATA.registraChat(inputForm, (s) => {
+      if (Accoglienza.isActive()) return false;
+      const ok = Gettoni.aggiungi(s);
+      if (ok) autoGrowInput();
+      return ok;
+    });
+  }
+  // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
+  // dal disco. Torna se c'erano file.
+  // I content script delle pagine di Filo arrivano dopo questo file: il modulo si chiede al momento.
+  const daChat = (dt) => !!self.SN_TRASCINO_INTERNO?.porta(dt, 'file');
+  function fileNelCampo(dt) {
+    if (daChat(dt)) {
+      const { aVista, dati } = self.SN_TRASCINO_INTERNO.arriva(dt, 'file');
+      // Un percorso che il main non riconosce l'ha scritto altri (una pagina web): entra come testo, a vista.
+      dati.then((p) => { if (typeof p === 'string' && p) { addPendingFile(p); inputEl.focus(); } else testoNelCampo(aVista); });
+      return true;
     }
-    const testo = e.dataTransfer?.getData('text/plain') || '';
+    if (!dt?.files || !dt.files.length) return false;
+    for (const f of dt.files) handleDroppedFile(f);
+    inputEl.focus();
+    return true;
+  }
+  function testoNelCampo(testo) {
     if (!testo) return;
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
@@ -1460,9 +2089,44 @@
     autoGrowInput();
     Comandi.updateInputClass();
     Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
+  }
+  // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
+  const contaNellaChat = (dt, usato) => {
+    const ev = self.SN_GESTI && self.SN_GESTI.rilascio(dt, 'chat_home', usato);
+    if (ev) send({ type: MSG.CONTATORI_EVENTO, ...ev });
+  };
+  // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
+  // si vede dove andrà a finire.
+  const portaFile = (dt) => Array.from(dt?.types || []).includes('Files') || daChat(dt);
+  const spegniBersaglio = () => inputForm.classList.remove('dash-input-bersaglio');
+  document.addEventListener('dragover', (e) => {
+    if (!portaFile(e.dataTransfer)) return;
+    inputForm.classList.add('dash-input-bersaglio');
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) spegniBersaglio(); });
+  document.addEventListener('dragend', spegniBersaglio);
+  document.addEventListener('drop', (e) => {
+    spegniBersaglio();
+    if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
+    e.preventDefault();
+    if (fileNelCampo(e.dataTransfer)) contaNellaChat(e.dataTransfer, true);
+  });
+  inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
+  // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
+  // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
+  // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
+  inputForm.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
+    const testo = e.dataTransfer?.getData('text/plain') || '';
+    contaNellaChat(e.dataTransfer, !!testo);
+    testoNelCampo(testo);
   });
 
-  // ===== Lightbox: click su un'immagine per ingrandirla =====
+  // Lightbox: click su un'immagine per ingrandirla
   let lightboxEl = null;
   function ensureLightbox() {
     if (lightboxEl) return lightboxEl;
@@ -1489,6 +2153,7 @@
   }
   function attachImageLightbox(img, src) {
     img.style.cursor = 'zoom-in';
+    img.title = 'Ingrandisci';
     img.addEventListener('click', (e) => {
       e.stopPropagation();
       openLightbox(src);
@@ -1503,10 +2168,21 @@
 
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (sending) return;
+    // Mentre Filo lavora l'invio non ha tasto (c'è il quadrato): arriva qui solo dal microfono, e fa quello di Invio.
+    if (sending) {
+      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+      return;
+    }
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
     if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
+    if (await comandoLocale(text, { incollato: testoDaFuori })) { if (!inputEl.value) testoDaFuori = false; return; }
+    submitMessage(text);
+  });
+  // Quello che la barra fa da sé, senza il modello: vero se l'ha fatto.
+  async function comandoLocale(text, { incollato = false } = {}) {
+    Comandi.lasciaNonRisolto();
+    Coda.fineRisali();
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1514,39 +2190,65 @@
     if (text.startsWith('/') && Comandi.isSiteToken(text)) {
       const host = Comandi.siteHostOf(text);
       const resolves = host ? await Comandi.ensureSiteResolved(host) : true;
-      if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return; }
+      if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return true; }
     }
-    if (Comandi.handleSlashCommand(text)) return;
-    submitMessage(text);
-  });
+    const fatto = await Comandi.handleSlashCommand(text, { incollato });
+    // Chi la chiama, se non è un comando, la manda al modello: un «/qualcosa» che non è niente parte così (#1473).
+    if (!fatto && text.startsWith('/')) Comandi.contaComando('sconosciuto_inviato');
+    return fatto;
+  }
 
-  // Invio = manda il messaggio; Shift+Invio = a capo. Il campo è una textarea
-  // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
-  // `isComposing` evita di mandare a metà di una composizione IME.
+  // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a
+  // capo. `isComposing` evita di mandare a metà di una composizione IME.
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       // Invio tenuto premuto è un colpo solo: la ripetizione non ferma e poi riprende, né rimanda.
       if (e.repeat) return;
-      // Mentre Filo lavora Invio è il quadrato: stesso posto per «fai» e per «smetti».
-      if (sending) { fermaTurno(); return; }
+      // Mentre Filo lavora, con qualcosa nella casella Invio manda un seguito (#1296); a casella vuota è il quadrato.
+      if (sending) {
+        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+        else if (!quadratoAppena()) fermaTurno();
+        return;
+      }
       inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'));
     }
   });
 
-  // La textarea parte a una riga e cresce mentre si va a capo (fino al max-height
-  // del CSS, poi scrolla). Va richiamata anche quando svuotiamo il campo da codice.
+  // La textarea parte a una riga e cresce (fino al max-height del CSS). Va richiamata anche
+  // quando si svuota il campo da codice.
   function autoGrowInput() {
     inputEl.style.height = 'auto';
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
+  // Il campo cambia larghezza anche senza che si scriva (finestra, pila degli avvisi accanto): le righe vanno ricontate.
+  let larghezzaCampo = 0;
+  new ResizeObserver(() => {
+    const w = inputEl.clientWidth;
+    if (w === larghezzaCampo) return;
+    larghezzaCampo = w;
+    if (inputEl.value) autoGrowInput();
+  }).observe(inputEl);
+
+  // Chi entra nel campo o ci scrive manderà presto un turno: il saldo dei crediti si rilegge adesso, così il turno
+  // non lo aspetta (#1353). Il main non rilegge una lettura di meno di un minuto.
+  let saldoChiestoAlle = 0;
+  function preparaSaldo() {
+    const adesso = Date.now();
+    if (adesso - saldoChiestoAlle < 20 * 1000) return;
+    saldoChiestoAlle = adesso;
+    send({ type: MSG.WALLET_SALDO_PREPARA });
+  }
+  inputEl.addEventListener('focus', () => { Sistema.scrive({ entra: true }); preparaSaldo(); });
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', (e) => {
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
-    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+    else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && righeDaFuori.has(impronta(inputEl.value))) testoDaFuori = true;
+    if (testoDaFuori && inputEl.value) ricordaDaFuori(inputEl.value);
+    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {
       const incollato = typeof e.data === 'string' ? e.data : testoIncollato;
@@ -1556,35 +2258,143 @@
   });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
-  // La scorciatoia vale in tutta la home, che è la sua chat.
+  // La scorciatoia vale in tutta la home, che è la sua chat. Mentre Filo lavora parte come seguito (#1296): non aspetta.
   window.SN_VOCE_CHAT?.collega({
     campo: inputEl, contenitore: inputForm, prima: sendBtn, ambito: document,
     invia: () => (inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'))),
-    occupato: () => sending,
   });
 
   // ===== Bridge cambio stato live dal background =====
+  // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
+  // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
+  // Un rimedio applicato altrove (pagina Crediti, o chiesto a parole) cambia anche i pulsanti sotto l'avviso in chat;
+  // la frase dell'ultimo clic resta sotto il suo rimedio anche dopo il riallineamento.
+  let rimediInChat = null;
+  let esitoInChat = null;
+  const opzRimediInChat = {
+    invia: send, classeBottone: 'dash-action-btn',
+    apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
+    onEsito: (id, frase) => { esitoInChat = frase ? { id, frase } : null; },
+  };
+  async function riallineaRimediInChat() {
+    if (!rimediInChat || !rimediInChat.isConnected) { rimediInChat = null; return; }
+    let st = null;
+    try { st = await send({ type: MSG.CREDITS_WARNING_STATE }); } catch (_) { st = null; }
+    if (!st || !st.ok || !st.mostra || !st.avviso || !rimediInChat) return;
+    // Senza la frase le soglie non dicono più niente e lo stato porta solo i rimedi applicati: gli altri in chat restano.
+    if (!st.avviso.testo) {
+      const applicati = new Map(st.avviso.rimedi.map((x) => [x.id, x]));
+      const correnti = Array.from(rimediInChat.children).map((li) => li._rimedio).filter(Boolean);
+      st.avviso = { rimedi: correnti.map((x) => applicati.get(x.id) || x) };
+    }
+    window.SN_CREDITI_AVVISO_UI.aggiorna(rimediInChat, { avviso: st.avviso, esito: esitoInChat, ...opzRimediInChat });
+  }
+
+  async function avvisoCrediti(id) {
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    let r = null;
+    try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.avviso) return;
+    const chat = chatId;
+    const fine = Date.now() + 10 * 60 * 1000;
+    while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
+    // Nel filo va l'avviso intero, rimedi compresi: a una risposta a parole Filo sa cosa ha proposto.
+    const perFilo = r.avviso.perFilo || r.avviso.testo;
+    archiviaRiga(perFilo, 'filo', chat);
+    // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
+    if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+    const bolla = makeBubble({ role: 'filo', text: r.avviso.testo });
+    bolla.classList.add('dash-crediti-avviso');
+    const elenco = window.SN_CREDITI_AVVISO_UI.elenco({ avviso: r.avviso, ...opzRimediInChat });
+    bolla.appendChild(elenco);
+    rimediInChat = elenco;
+    esitoInChat = null;
+    bubblesEl.appendChild(bolla);
+    threadHistory.push({ role: 'filo', text: perFilo });
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
+  // Filo ha scritto di sua iniziativa (#869): il suo turno in fondo al filo, o al posto del suo messaggio di prima.
+  function filoParla(msg) {
+    if (Accoglienza.isActive()) return;
+    const voce = { k: 'msg', key: `m:${msg.chat}:${msg.i}`, chat: msg.chat, role: 'filo', text: String(msg.testo || ''), ts: msg.ts, spontaneo: true };
+    Coda.metti(voce);
+    if (!chatId && !sending) chatId = msg.chat;
+    if (msg.chat !== chatId) return;
+    const ultimo = threadHistory[threadHistory.length - 1];
+    // La conversazione adottata dal disco lo porta già, se l'ha letta dopo che il main l'ha scritto.
+    if (ultimo && ultimo.role === 'filo' && ultimo.text === voce.text) return;
+    if (msg.fuso && ultimo && ultimo.spontaneo) ultimo.text = voce.text;
+    else threadHistory.push({ role: 'filo', text: voce.text, actions: [], spontaneo: true });
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+    if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
+      avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.CHAT_ALLEGA && msg.dove === 'casa') {
+      // Le immagini lasciate sulla fila delle schede o sulla barra (#1623), già lette dal main.
+      for (const im of Array.isArray(msg.immagini) ? msg.immagini : []) {
+        if (im && /^data:image\//i.test(String(im.dataUrl || ''))) {
+          handleImageFile(window.SN_IMMAGINI_CHAT?.blobDa(im.dataUrl), typeof im.percorso === 'string' ? im.percorso : '');
+        }
+      }
+      for (const p of Array.isArray(msg.file) ? msg.file : []) if (typeof p === 'string') addPendingFile(p);
+      if (Number(msg.grandi) > 0) avvisaNonEntrate('grandi', Math.floor(Number(msg.grandi)));
+      inputEl.focus();
+    } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.ICONA_SCHEDA) {
+      Att.iconaDellaScheda(msg.sito, msg.dato);
     } else if (msg?.type === MSG.SISTEMA_AGGIORNATO) {
       Sistema.aggiornato(msg.stato);
+    } else if (msg?.type === MSG.FILO_PARLA && msg.chat) {
+      filoParla(msg);
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.rimessa) {
+      Coda.rimettiChat(msg.rimessa).catch(() => {});
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.nascosta) {
+      // #1295 — nascosta da qui, da un'altra scheda o a parole: esce dalla vista, e se è quella in corso il messaggio dopo ne apre una nuova.
+      Coda.nascostaAltrove(msg.nascosta);
+      if (msg.nascosta === chatId) {
+        lasciaLaChat();
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          const riga = [...bubblesEl.querySelectorAll('.dash-nascosta')].some((n) => n.dataset.nascosta === msg.nascosta);
+          nota.textContent = `Questa conversazione è nascosta: la rimetti ${riga ? 'da «Rimetti» qui sopra' : 'cercandola nel filo'}. Quello che scrivi da adesso apre una chat nuova.`;
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.finita) {
+      // #1443.2 — chiusa apposta in un'altra home: qui non si continua, il messaggio dopo ne apre una nuova.
+      if (msg.finita === chatId) {
+        lasciaLaChat();
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = 'Questa conversazione è stata chiusa in un\'altra scheda. Quello che scrivi da adesso apre una chat nuova.';
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
-      // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
+      Coda.togliChat(msg.cancellata);
+      // #525 — qualcuno ha tolto dal filo (un'altra scheda, la chat) la conversazione che
       // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
       // rinascere con la stessa targa e i messaggi di prima persi: l'opposto
       // di quello che l'utente ha chiesto. Da qui in poi è una chat nuova — e
       // lo diciamo, perché una cosa cancellata altrove non deve succedere di
       // nascosto.
       if (msg.cancellata === chatId) {
-        chatId = null;
+        lasciaLaChat();
         if (body.dataset.state === 'thread') {
           const nota = document.createElement('div');
           nota.className = 'dash-bubble-note';
-          nota.textContent = 'Questa conversazione è stata cancellata dalla Cronologia. Quello che scrivi da adesso apre una chat nuova.';
+          nota.textContent = 'Questa conversazione è stata tolta dal filo. Quello che scrivi da adesso apre una chat nuova.';
           bubblesEl.appendChild(nota);
           bubblesEl.scrollTop = bubblesEl.scrollHeight;
         }
@@ -1603,11 +2413,11 @@
       if (Accoglienza.isActive()) return; // l'intervista è ancora a schermo
       giroDashboard++;
       spinteDashboard++;
-      if (showHomeMessage) {
-        homeMessageEl.classList.remove('dash-home-msg-loading');
-        homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
-      }
+      // La frase arriva solo senza un modello (handlers/wallet.js): con un modello se ne va.
+      mostraSenzaModello(msg.message || '');
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
+      suggerimentiDel = msg.ts || null;
+      suggerimentiDelModello = !(msg.senzaChiave || msg.message);
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
       // che lo aspettava parte qui, non alla prossima scheda.
@@ -1615,12 +2425,9 @@
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
-      if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
-        showHomeMessage = msg.settings.showHomeMessage;
-        applyHomeMessageVisibility();
-      }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
+      if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -1630,6 +2437,7 @@
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
     } else if (msg?.type === MSG.CREDITS_CHANGED) {
+      if (msg.avvisoCrediti) riallineaRimediInChat().catch(() => {});
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
@@ -1679,7 +2487,11 @@
       btn.addEventListener('click', () => {
         if (typeof it.action === 'function') it.action();
         else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else send({ type: MSG.SHELL_ACTION, command: it.command });
+        else {
+          // Il menu della shell si apre sotto l'icona, ovunque la metta la colonna destra (#1491).
+          const r = btn.getBoundingClientRect();
+          send({ type: MSG.SHELL_ACTION, command: it.command, anchor: { x: r.left, y: r.bottom } });
+        }
       });
       host.appendChild(btn);
       if (it.command === 'account') accountCtrlBtn = btn;
@@ -1687,21 +2499,20 @@
     refreshAccountControl();
   }
 
-  // L'icona profilo mostra la foto Google quando sei loggato (come faceva la
-  // vecchia barra in alto), con fallback all'icona utente se la foto non carica
-  // o se sei sloggato. Lo stato auth vive nel main: lo interroghiamo e ci
-  // iscriviamo a `auth_changed` per aggiornarla dal vivo a login/logout.
+  // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
+  // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
     if (!accountCtrlBtn) return;
     const ICONS = self.SN_ICONS || {};
     const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
-    if (profile && profile.picture) {
+    // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
+    if (profile && /^filo:\/\/icone\//.test(profile.picture || '')) {
       const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
       const img = document.createElement('img');
       img.className = 'account-avatar';
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
-      // Se la foto Google non carica (CSP/rete) ripieghiamo sull'icona utente.
+      // Se la copia non si legge ripieghiamo sull'icona utente.
       img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
       img.src = profile.picture;
       accountCtrlBtn.replaceChildren(img);
@@ -1725,9 +2536,8 @@
     }
   }
 
-  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
-  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
-  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
+  // Le fusioni in attesa del via libera dell'owner NON compaiono qui: la
+  // decisione vive in Gestione (scelta owner 2026-08-26), dove stanno le altre.
 
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
@@ -1741,14 +2551,12 @@
     let recap;
     try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return false; }
     if (!recap || !recap.ok) return false;
-    // Nessuna versione vista prima (il main l'ha appena marcata: primo avvio) o
-    // nessuna nota da mostrare → niente popup.
+    // Nessuna versione vista prima (primo avvio) o nessuna nota da mostrare → niente popup.
     if (!recap.lastSeen || !Array.isArray(recap.notes) || !recap.notes.length) return false;
     renderUpdateRecap(recap, onClose);
     return true;
   }
 
-  // Testo del recap per la condivisione/copia.
   function buildRecapText({ lastSeen, current, features, fixes }) {
     const lines = [`Filo ${lastSeen} → ${current}`];
     if (features.length) { lines.push('', 'Novità:'); for (const f of features) lines.push(`• ${f}`); }
@@ -1790,9 +2598,20 @@
     } catch (_) {}
   }
 
+  // La X dei riquadri Novità e Feedback risolto: una sola, così il suo nome e il suo fumetto non si perdono in una copia.
+  function crocettaDelRiquadro(close) {
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-recap-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.title = 'Chiudi';
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    return xBtn;
+  }
+
   function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
-    // Aggrega le voci di tutte le versioni saltate (notes è già ordinato dalla
-    // più recente): tutte le novità in un blocco, tutte le correzioni nell'altro.
+    // notes è già ordinato dalla più recente: novità in un blocco, correzioni nell'altro.
     const features = [];
     const fixes = [];
     for (const n of notes) {
@@ -1816,8 +2635,7 @@
       settled = true;
       document.removeEventListener('keydown', onKey, true);
       overlay.remove();
-      // Salva la versione corrente come "vista": il recap non riapparirà fino al
-      // prossimo update.
+      // Salva la versione corrente come «vista»: il recap non riapparirà fino al prossimo update.
       send({ type: MSG.MARK_UPDATE_SEEN });
       if (typeof onClose === 'function') { try { onClose(); } catch (_) {} }
     }
@@ -1827,7 +2645,6 @@
     document.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
 
-    // Header: "vecchia → nuova".
     const header = document.createElement('div');
     header.className = 'dash-recap-header';
     const title = document.createElement('div');
@@ -1843,13 +2660,7 @@
     header.append(title, ver);
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body';
@@ -1892,7 +2703,18 @@
     doneBtn.className = 'dash-recap-btn dash-recap-done';
     doneBtn.textContent = 'Fatto';
     doneBtn.addEventListener('click', close);
-    footer.append(shareBtn, doneBtn);
+    // Il recap dice solo cosa è arrivato adesso: le versioni di prima stanno nella pagina Novità.
+    const tutteBtn = document.createElement('button');
+    tutteBtn.type = 'button';
+    tutteBtn.className = 'dash-recap-btn dash-recap-tutte';
+    tutteBtn.id = 'recapTutte';
+    tutteBtn.textContent = 'Tutte le novità';
+    tutteBtn.title = 'Le novità di tutte le versioni, da cercare';
+    tutteBtn.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://novita/novita.html' });
+      close();
+    });
+    footer.append(shareBtn, tutteBtn, doneBtn);
     box.appendChild(footer);
 
     document.body.appendChild(overlay);
@@ -1915,7 +2737,13 @@
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
-      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      text: entrato
+        ? (n.invitesLocked === 'need_google'
+          ? `${n.text} Li trovi nella pagina Crediti, dove colleghi Google per avere anche inviti da dare.`
+          : (n.invitesLocked
+            ? `${n.text} Li trovi nella pagina Crediti.`
+            : `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.`))
+        : n.text,
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
@@ -1925,9 +2753,52 @@
   // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
   // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
   // visibile, poi lo chiede al main, che lo dà a una sola.
-  function quandoVisibile() {
-    if (document.visibilityState !== 'hidden') return Promise.resolve();
-    return new Promise((ok) => {
+  // La home pronta per la scheda nuova (#1128) è caricata ma nessuno la guarda, e `document.hidden` in una scheda non
+  // cambia mai: lo sa dal main, e quello che va fatto davanti all'utente aspetta che diventi una scheda. Le home che
+  // sono già schede restano come prima.
+  let inRiserva = null;
+  const attesiConsegna = [];
+  function nonPiuRiserva() {
+    const era = inRiserva === true;
+    inRiserva = false;
+    for (const ok of attesiConsegna.splice(0)) ok();
+    if (era) allaComparsa();
+  }
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => !!(r && r.riserva), () => false).then((si) => {
+    if (inRiserva !== null) return;
+    if (si) inRiserva = true;
+    else nonPiuRiserva();
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
+  });
+  // I contatori contano una home quando la persona la vede la prima volta, non quando si carica (#1467): la home pronta
+  // dietro e quelle di una sessione riaperta rimaste dietro si contano arrivando davanti, con lo stato di quel momento.
+  // Si guarda da subito, perché una scheda resta davanti anche solo un attimo; si conta quando `init` sa che è la home.
+  let homeVista = false;
+  let contaHomeQuandoVista = null;
+  function segnaHomeVista() {
+    if (homeVista) return;
+    homeVista = true;
+    if (contaHomeQuandoVista) contaHomeQuandoVista();
+  }
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista) segnaHomeVista();
+  });
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => { if (!r || (r.inVista && !r.riserva)) segnaHomeVista(); }, () => segnaHomeVista());
+  function contaQuandoVista() {
+    let contata = false;
+    contaHomeQuandoVista = () => {
+      if (contata) return;
+      contata = true;
+      Promise.resolve(send({ type: MSG.FILO_HOME_VISTA })).catch(() => {});
+    };
+    if (homeVista) contaHomeQuandoVista();
+  }
+  async function quandoVisibile() {
+    if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
+    if (document.visibilityState !== 'hidden') return;
+    await new Promise((ok) => {
       const guarda = () => {
         if (document.visibilityState === 'hidden') return;
         document.removeEventListener('visibilitychange', guarda);
@@ -1947,6 +2818,34 @@
       text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
       okLabel: 'Evviva!',
     });
+  }
+  // Il conto OpenRouter che non regge i crediti vivi o il tetto (#820): l'owner lo sa all'avvio senza aprire la sua
+  // pagina. Per chi non è owner il main risponde null senza chiedere niente al server.
+  function finoAChiusura(id) {
+    return new Promise((ok) => {
+      if (!document.getElementById(id)) { ok(); return; }
+      const obs = new MutationObserver(() => { if (!document.getElementById(id)) { obs.disconnect(); ok(); } });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+  // Si scioglie quando questa home ha avuto risposta sull'allarme del conto: gli spec la aspettano prima di cambiare chi è owner.
+  let fineAllarmeOwner = () => {};
+  const allarmeOwnerChiesto = new Promise((ok) => { fineAllarmeOwner = ok; });
+  async function chiediAllarmeOwner() {
+    await quandoVisibile();
+    // Recap e ringraziamento non tengono la coda fino alla chiusura: si aspetta che se ne vadano, mai sopra di loro.
+    await ricompenseAvvio;
+    await finoAChiusura('recapOverlay');
+    await finoAChiusura('thanksOverlay');
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    fineAllarmeOwner();
+    const a = r && r.ok && r.alarm;
+    if (!a || !window.SN_CONFIRM_UI?.confirm) return;
+    const apri = await window.SN_CONFIRM_UI.confirm({
+      title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
+    });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://manage/manage.html#utenti' });
   }
   async function chiediBenvenuto() {
     await quandoVisibile();
@@ -1985,7 +2884,9 @@
     try {
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      if (reduce) return;
+      // Token `motion`: moltiplica le durate; a 0 il volo non parte, come col movimento ridotto del sistema.
+      const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
+      if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
@@ -2005,7 +2906,7 @@
 
       const coinSvg = (self.SN_ICONS?.credits?.(22)) || '●';
       const count = Math.min(9, Math.max(5, Math.round(n / 40) + 4));
-      let maxEnd = 1000;
+      let maxEnd = 1000 * k;
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.innerHTML = coinSvg;
@@ -2019,8 +2920,8 @@
         const sy = oy + (Math.random() - 0.5) * 80;
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 80;
         const my = Math.min(sy, ty) - 50 - Math.random() * 50;
-        const delay = i * 45;
-        const dur = 700 + i * 50 + Math.random() * 140;
+        const delay = i * 45 * k;
+        const dur = (700 + i * 50 + Math.random() * 140) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         try {
           c.animate([
@@ -2059,7 +2960,6 @@
     document.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
 
-    // Header: ringraziamento + totale crediti guadagnati.
     const header = document.createElement('div');
     header.className = 'dash-recap-header dash-thanks-header';
     const title = document.createElement('div');
@@ -2079,13 +2979,7 @@
     }
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body dash-thanks-body';
@@ -2144,13 +3038,14 @@
   // all'avvio successivo (main.js → sweepPendingChats), che chiude e classifica
   // le chat rimaste appese.
   self.addEventListener('pagehide', () => {
+    try { Comandi.lasciaNonRisolto(); Coda.fineRisali(); } catch (_) {}
     try {
       // Mentre l'intervista di benvenuto è in corso la scheda che sparisce non
       // chiude niente: l'intervista riprende dov'era alla prossima apertura, e
       // chiuderla qui vorrebbe dire pagare un titolo e un tipo a ogni
       // ricaricamento per una conversazione che non è finita.
       if (Accoglienza.isActive()) return;
-      closeCurrentChat();
+      closeCurrentChat({ via: 'uscita' });
     } catch (_) {}
   });
 
@@ -2173,17 +3068,27 @@
     }
   }
 
+  // La home pronta (#1128) arriva davanti con quello che gli annunci le hanno portato: rilegge solo ciò che una home
+  // nuova chiede aprendosi e che nessun annuncio porta.
+  function allaComparsa() {
+    richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
+    if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
+    else {
+      aggiornaDashboardInSilenzio().catch(() => {});
+      // Arrivata davanti è una home che si apre: l'ultimo messaggio in cima (#1487).
+      Coda.allinea({ daAltrove: true }).catch(() => {}).then(() => Coda.daCapo());
+    }
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
-      showHomeMessage = settings?.showHomeMessage !== false;
       Sistema.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
     } catch (_) {}
-    applyHomeMessageVisibility();
     if (Term.isEnabled()) await Term.initCwd();
     Term.applyTerminalMode();
     // #524 — intervista di benvenuto aperta (primo avvio, o ripresa a metà, o
@@ -2196,23 +3101,23 @@
     // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
     // finita, e durante l'intervista in archivio non c'è ancora niente.
     const reopenId = onbState ? null : chatIdFromUrl();
-    // Carico in parallelo dashboard cache e live state per non sequenziare.
+    const eventoId = onbState ? null : eventoFromUrl();
+    if (!onbState) contaQuandoVista();
+    // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
-      (onbState || reopenId) ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
+      onbState ? Promise.resolve() : caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e)),
     ]);
-    // Una chat che non c'è più (cancellata da un'altra scheda) non deve
-    // lasciare una pagina vuota: si ricade sulla home normale.
-    if (reopenId) {
-      const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
-      if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
-    }
-    if (body.dataset.state !== 'thread') Righe.aggiorna().catch(() => {});
+    // Una chat che non c'è più (cancellata da un'altra scheda) lascia il filo com'è.
+    if (reopenId) await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
+    if (eventoId) await vaiAlEvento(eventoId).catch((e) => { console.warn('[Filo] salto al punto del filo', e); return false; });
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
     richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
+    riprendiSeguitiOrfani().catch((e) => console.warn('[Filo] seguiti della pagina di prima', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
@@ -2228,21 +3133,23 @@
     inCodaPopup(chiediBenvenuto);
     if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
+      // Recap e ringraziamento non li prende la home pronta per la scheda nuova: si consumerebbero dove nessuno li guarda.
+      await quandoVisibile();
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
     });
+    inCodaPopup(chiediAllarmeOwner);
   })();
 
-  // Hook per i test Playwright (stesso pattern di __filoEditorFormat
-  // nell'editor): permette di renderizzare azioni come farebbe una bolla di
-  // chat senza dover pilotare l'LLM.
+  // Hook per i test Playwright: rende azioni come farebbe una bolla di chat, senza l'LLM.
   window.__filoDashActions = {
     renderActions: Att.renderActions,
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,
     ricompenseAvvio: () => ricompenseAvvio,
+    allarmeOwnerChiesto: () => allarmeOwnerChiesto,
   };
 })();

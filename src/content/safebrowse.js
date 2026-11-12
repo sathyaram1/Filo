@@ -18,7 +18,7 @@
   try { hintsOf = require('./safebrowseHints.js').pageHints; } catch (_) {}
   function pageHints() {
     try { if (hintsOf) return hintsOf(document); } catch (_) {}
-    return { hasPassword: false, hasPayment: false, shownPassword: false, shownPayment: false };
+    return { hasPassword: false, hasPayment: false, shownPassword: false, shownPayment: false, insecureForm: false };
   }
 
   // Un campo password o carta a schermo rende delicato il sito (#1004): uno solo nascosto nel codice no. Si dice una volta.
@@ -30,22 +30,23 @@
   }
 
   let level = 'safe';
-  let sentHints = { shownPassword: false, shownPayment: false };
+  let sentHints = { shownPassword: false, shownPayment: false, insecureForm: false };
   function requestVerdict() {
     const hints = pageHints();
     sentHints = hints;
     campiMostrati(hints);
-    send({ type: T_GET, url: location.href, hasPassword: hints.shownPassword, hasPayment: hints.shownPayment }, (r) => {
+    send({ type: T_GET, url: location.href, hasPassword: hints.shownPassword, hasPayment: hints.shownPayment, insecureForm: hints.insecureForm }, (r) => {
       if (r && r.ok) level = r.level || 'safe';
     });
   }
 
-  // Un campo password o di carta alza la gravità: va chiesto appena compare, non quando la pagina dice di aver finito.
+  // Un campo password o di carta, o il suo modulo che li manda in chiaro, alza la gravità: va chiesto appena compare,
+  // non quando la pagina dice di aver finito.
   function hintsGrew() {
-    if (sentHints.shownPassword && sentHints.shownPayment && campiDetti) return;
+    if (sentHints.shownPassword && sentHints.shownPayment && sentHints.insecureForm && campiDetti) return;
     const h = pageHints();
     campiMostrati(h);
-    if ((h.shownPassword && !sentHints.shownPassword) || (h.shownPayment && !sentHints.shownPayment)) requestVerdict();
+    if (['shownPassword', 'shownPayment', 'insecureForm'].some((k) => h[k] && !sentHints[k])) requestVerdict();
   }
 
   // Finché il parser lavora i campi sensibili si guardano a ogni pezzo di pagina (al più ogni 200 ms).

@@ -219,26 +219,32 @@ test('nessuna scorciatoia guarda solo il tasto di Windows', () => {
 });
 
 test('le scorciatoie di Filo non rubano il tasto degli accenti su Mac', () => {
-  // Alt+E/T/S/H valgono con Filo davanti (#838). Su Mac Alt è il tasto Opzione,
-  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo:
-  // prenderselo toglierebbe l'accento acuto a chi scrive in italiano.
-  const src = stripComments(readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8'));
-  assert.match(src, /darwin/,
-    'shortcuts.js non distingue più il Mac: le scorciatoie tornerebbero a essere Opzione+lettera');
-  const { acceleratorePerPiattaforma, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
-  const vero = process.platform;
+  // Le quattro valgono con Filo davanti (#838) e sui tasti scelti (#842). Su Mac Alt è il tasto Opzione,
+  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo: una scelta senza Ctrl si preme
+  // con Control+Opzione, e l'etichetta lo dice. Il tasto e il suo nome li decide SN_TASTI.
+  const { comandoDaTasto, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
+  const T = globalThis.SN_TASTI;
+  const premi = (lettera, mods) => ({ type: 'keyDown', key: lettera, code: `Key${lettera.toUpperCase()}`,
+    alt: false, control: false, meta: false, shift: false, ...mods });
+  const prova = () => {
+    for (const a of T.AZIONI_FILO) {
+      const accel = T.scorciatoiaFilo(a.id);
+      if (!/^Alt\+[A-Z]$/.test(accel)) continue;
+      const l = accel.slice(-1).toLowerCase();
+      assert.equal(comandoDaTasto(premi(l, { alt: true }), 'darwin'), null, `su Mac ${accel} resta Opzione+lettera: mangia gli accenti`);
+      assert.equal(comandoDaTasto(premi(l, { alt: true, control: true }), 'darwin'), a.id);
+      assert.equal(T.etichettaFilo(accel, 'darwin'), `Ctrl+${accel}`);
+      assert.equal(comandoDaTasto(premi(l, { alt: true }), 'win32'), a.id, `su Windows ${accel} non deve cambiare`);
+    }
+  };
+  assert.equal(Object.keys(COMMANDS).length, 4);
   try {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
-    for (const accel of Object.keys(COMMANDS)) {
-      assert.notEqual(acceleratorePerPiattaforma(accel), accel,
-        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti a chi scrive in Filo`);
-    }
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    for (const accel of Object.keys(COMMANDS)) {
-      assert.equal(acceleratorePerPiattaforma(accel), accel, `su Windows ${accel} non deve cambiare`);
-    }
+    prova();
+    T.usaScorciatoieFilo({ 'translate-selection': 'Alt+K' });
+    assert.equal(T.scorciatoiaFilo('translate-selection'), 'Alt+K');
+    prova();
   } finally {
-    Object.defineProperty(process, 'platform', { value: vero, configurable: true });
+    T.usaScorciatoieFilo({});
   }
 });
 
@@ -420,6 +426,46 @@ test('quello che la scritta promette è quello che i tasti fanno', () => {
   }
 });
 
+test('Ctrl+Tab e Ctrl+Shift+Tab: la scheda dopo e quella prima, in tondo, su Mac col Control vero (#590.14)', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+  const tab = (mods) => ({ key: 'Tab', code: 'Tab', ...mods });
+
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 0, 3), 1);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 2, 3), 0, 'dall\'ultima si torna alla prima');
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, shiftKey: true }), 0, 3), 2, 'dalla prima all\'ultima');
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, shiftKey: true }), 2, 3), 1);
+  // La forma del main process (`before-input-event`).
+  assert.equal(T.indiceSchedaVicina({ key: 'Tab', control: true }, 1, 3), 2);
+  assert.equal(T.indiceSchedaVicina({ key: 'Tab', control: true, shift: true }, 1, 3), 0);
+  // Cmd+Tab è il cambio di app del Mac, Win+Tab la vista attività di Windows, Ctrl+Alt+Tab il cambio finestra:
+  // nessuno dei tre è di Filo. Tab da solo resta alla pagina.
+  assert.equal(T.indiceSchedaVicina(tab({ metaKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, metaKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, altKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({}), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina({ key: 'a', code: 'KeyA', ctrlKey: true }, 0, 3), null);
+  // Una scheda sola: resta lei. Nessuna scheda: niente.
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 0, 1), 0);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), -1, 0), null);
+
+  // Su Mac «Ctrl» nelle etichette è il tasto Control: riscriverlo in Cmd+Tab nominerebbe il cambio di app.
+  assert.equal(T.etichettaSchedaVicina('dopo'), 'Ctrl+Tab');
+  assert.equal(T.etichettaSchedaVicina('prima'), 'Ctrl+Shift+Tab');
+  // Chi sceglie una scorciatoia se lo vede rifiutare: Filo lo prende prima della pagina.
+  for (const p of ['win32', 'darwin', 'linux']) {
+    assert.ok(T.riservato('Ctrl+Tab', p) || T.delSistema('Ctrl+Tab', p), `Ctrl+Tab resta libero da scegliere su ${p}`);
+  }
+  assert.equal(T.chiLaPrende('Ctrl+Tab', 'win32'), 'porta alla scheda successiva');
+  assert.equal(T.chiLaPrende('Ctrl+Shift+Tab', 'linux'), 'porta alla scheda precedente');
+  for (const rel of ['src/main/tabs.js', 'src/renderer/shell.js']) {
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /indiceSchedaVicina\(/,
+      `${rel} non ascolta Ctrl+Tab: col fuoco lì il tasto non cambia scheda`);
+  }
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8'), /etichettaSchedaVicina\(/,
+    'l\'elenco delle scorciatoie non mostra Ctrl+Tab');
+});
+
 test('il manifesto delle capacità non nomina un tasto solo per Windows', () => {
   // È la fonte unica di cosa Filo sa fare, ed è un file solo per tutti i
   // sistemi: ogni volta che nomina un tasto deve dire anche la forma Mac,
@@ -512,8 +558,9 @@ test('l\'assistente sa su che computer sta girando', () => {
   require(join(ROOT, 'src', 'shared', 'constants.js'));
   const C = globalThis.SN_CONST;
 
-  const mac = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'darwin' });
-  const win = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'win32' });
+  // Il sistema sta nel CONTESTO dell'utente: la parte fissa è uguale per tutti (SPEC-CONTESTO § La richiesta).
+  const mac = C.PROMPTS.filoChatComputer('darwin');
+  const win = C.PROMPTS.filoChatComputer('win32');
 
   assert.ok(mac.includes('macOS'), 'su Mac il prompt non dice che sistema è');
   assert.ok(!mac.includes('C:\\'), 'su Mac il prompt mostra ancora un percorso di Windows come esempio');
@@ -524,8 +571,10 @@ test('l\'assistente sa su che computer sta girando', () => {
   assert.ok(win.includes('C:\\'), 'su Windows l\'esempio di percorso è sparito');
 
   // Un `platform` sconosciuto non deve lasciare il modello senza istruzioni.
-  const ignoto = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'plan9' });
+  const ignoto = C.PROMPTS.filoChatComputer('plan9');
   assert.ok(ignoto.includes("IL COMPUTER DELL'UTENTE"), 'un sistema sconosciuto lascia il prompt monco');
+  // E la parte fissa non ne dice niente: due utenti su sistemi diversi la condividono byte per byte.
+  assert.ok(!C.PROMPTS.filoChatStatic().includes("IL COMPUTER DELL'UTENTE"));
 });
 
 test('il sistema arriva al prompt dal main process', () => {
@@ -556,6 +605,7 @@ test('il sistema arriva al prompt dal main process', () => {
 // il difetto. Perciò qui non ci può essere un role, ci deve essere un click.
 const TASTI_DI_FILO = {
   'CommandOrControl+T': 'nuova scheda',
+  'CommandOrControl+Shift+T': 'riapri l\'ultima scheda chiusa (#1476)',
   'CommandOrControl+W': 'chiudi la SCHEDA (il role "close" chiuderebbe la finestra con dentro tutte le altre)',
   'CommandOrControl+R': 'ricarica la pagina (il role "reload" ricaricherebbe la fila delle schede)',
   'CommandOrControl+L': 'vai a scrivere un indirizzo',
@@ -573,6 +623,15 @@ const TASTI_DI_FILO = {
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
   'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
+  'Ctrl+Alt+Shift+B': 'tiene aperta la barra laterale accanto alla pagina, o la sblocca (#1431)',
+  'Cmd+Alt+Shift+B': 'tiene aperta la barra laterale accanto alla pagina, o la sblocca (la forma del Mac)',
+  // Il pannello degli strumenti delle app (#1433): lo ascolta la scheda (src/main/bordoDestro.js), e la barra lo scrive
+  // senza prenderselo, così sui siti il tasto resta loro.
+  'Ctrl+\\': 'apre e chiude il pannello degli strumenti delle app di Filo',
+  'Cmd+\\': 'apre e chiude il pannello degli strumenti delle app di Filo (la forma del Mac)',
+  // Lo schermo intero ha il tasto abituale di ogni sistema (src/shared/tasti.js), e Filo lo ascolta ovunque.
+  F11: 'mette e toglie lo schermo intero',
+  'Ctrl+Cmd+F': 'mette e toglie lo schermo intero (la forma del Mac: F11 lì è del sistema)',
 };
 
 // I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.
@@ -752,7 +811,9 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
     .map((v) => v.role);
   assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
 
+  // Una voce che scrive il tasto senza registrarlo (registerAccelerator: false) non se lo prende.
   const scoperti = vociDellaBarra('darwin')
+    .filter((v) => v.registerAccelerator !== false)
     .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
@@ -792,8 +853,58 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
 
   // E l'Editor, che è l'unico posto dove l'utente si assegna una scorciatoia,
   // deve chiedere qui invece di accettarla e non farla partire mai.
-  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.riservato\(/,
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.rifiutoScritta\(/,
     'l\'Editor salva ancora scorciatoie che non arriveranno mai al modulo');
+});
+
+test('lo schermo intero ha il tasto di ogni sistema, e chi sceglie una scorciatoia lo trova preso (#858)', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+  // F11 su Windows, Control+Cmd+F su Mac: due tasti diversi, non una riscrittura.
+  assert.equal(T.etichettaSchermoIntero('win32'), 'F11');
+  assert.equal(T.etichettaSchermoIntero('darwin'), 'Ctrl+Cmd+F');
+  assert.equal(T.riservato('F11', 'win32'), true, 'F11 lo prende Filo: un modulo dell\'Editor non partirebbe mai');
+  for (const scritta of ['Ctrl+Cmd+F', 'Control+Command+F', 'Cmd+Ctrl+F', 'ctrl + cmd + f']) {
+    assert.equal(T.riservato(scritta, 'darwin'), true, `${scritta} su Mac è lo schermo intero`);
+  }
+  assert.equal(T.rifiutoScritta('Ctrl+Cmd+F', 'darwin')?.cosa, 'mette e toglie lo schermo intero');
+  // Cmd tratta come Ctrl non deve inghiottire il Control: Cmd+F resta libero, e su Mac F11 è del sistema.
+  for (const libera of ['Cmd+F', 'Ctrl+F', 'F11']) {
+    assert.equal(T.riservato(libera, 'darwin'), false, `${libera} su Mac non è lo schermo intero`);
+  }
+  assert.equal(T.riservato('Ctrl+Cmd+F', 'win32'), false);
+  // Il nome scritto su Mac tiene i due tasti, invece di diventare «Cmd+F».
+  assert.equal(T.etichetta('Ctrl+Cmd+F', 'darwin'), 'Ctrl+Cmd+F');
+  assert.equal(T.etichettaScritta('Control+Command+F', 'darwin'), 'Ctrl+Cmd+F');
+
+  // Il tasto che parte è quello che si legge, nelle due forme dell'evento (DOM e before-input-event).
+  const premi = (mods, code, key) => ({ type: 'keyDown', code, key, ...mods });
+  assert.equal(T.comandoSchermoIntero(premi({ control: true, meta: true }, 'KeyF', 'f'), 'darwin'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ ctrlKey: true, metaKey: true }, 'KeyF', 'f'), 'darwin'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ meta: true }, 'KeyF', 'f'), 'darwin'), false, 'Cmd+F è la ricerca');
+  assert.equal(T.comandoSchermoIntero(premi({ control: true }, 'KeyF', 'f'), 'darwin'), false);
+  assert.equal(T.comandoSchermoIntero(premi({}, 'F11', 'F11'), 'darwin'), false);
+  assert.equal(T.comandoSchermoIntero(premi({}, 'F11', 'F11'), 'win32'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ control: true, meta: true }, 'KeyF', 'f'), 'win32'), false);
+
+  // Una scorciatoia di un modulo con Control e Cmd insieme parte con tutti e due, non con Cmd soltanto.
+  assert.equal(T.combacia({ ctrlKey: true, metaKey: true, code: 'KeyG', key: 'g' }, 'Ctrl+Cmd+G'), true);
+  assert.equal(T.combacia({ metaKey: true, code: 'KeyG', key: 'g' }, 'Ctrl+Cmd+G'), false);
+  assert.equal(T.combacia({ ctrlKey: true, metaKey: true, code: 'KeyG', key: 'g' }, 'Cmd+G'), false);
+  assert.equal(T.combacia({ metaKey: true, code: 'KeyG', key: 'g' }, 'Cmd+G'), true);
+
+  // La barra dei menu mostra il tasto del sistema su cui gira.
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const voce = (p) => template(p).flatMap((m) => m.submenu || []).find((v) => v.label === 'Schermo intero');
+  assert.equal(voce('darwin').accelerator, 'Ctrl+Cmd+F');
+  assert.equal(voce('win32').accelerator, 'F11');
+  assert.equal(voce('win32').registerAccelerator, false, 'su Windows il tasto lo ascolta Filo, non la barra invisibile');
+
+  // E lo dicono, con il tasto di ogni sistema, il manifesto e l'elenco delle scorciatoie di Opzioni → Altro.
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const testo = globalThis.SN_CAPABILITIES.get('fullscreen').invoke;
+  for (const forma of ['F11', 'Ctrl+Cmd+F']) assert.ok(testo.includes(forma), `il manifesto non dice ${forma}`);
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8'), /etichettaSchermoIntero\(\)/);
 });
 
 test('quello che si legge sul salto di scheda è quello che succede', () => {
@@ -919,6 +1030,15 @@ test('su Mac Filo dice perché legge Documenti, Scrivania e Download', () => {
   }
 });
 
+// Le icone della Scrivania (#1617) le sposta il Finder, comandato da osascript: senza la frase macOS nega gli Apple
+// Events senza chiedere, e l'utente non trova Filo da accendere in Privacy → Automazione.
+test('su Mac Filo dice perché comanda il Finder', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const info = (pkg.build && pkg.build.mac && pkg.build.mac.extendInfo) || {};
+  assert.ok(typeof info.NSAppleEventsUsageDescription === 'string' && /Finder/.test(info.NSAppleEventsUsageDescription),
+    'manca NSAppleEventsUsageDescription in build.mac.extendInfo');
+});
+
 // Su Mac chiudere l'ultima finestra NON spegne Filo: resta nel Dock. Suono e
 // pulsante che ferma vivono in una finestra, quindi senza garantirne una il
 // timer scade vivo e muto e la notifica non porta da nessuna parte. È il caso
@@ -938,4 +1058,25 @@ test('una scadenza che suona si fa garantire una finestra che la vede', () => {
     window, /function assicuraFinestraNormale/,
     'la garanzia vive in un posto solo, accanto a chi le finestre le crea',
   );
+});
+
+// #778 — guardare le finestre delle altre app vuole il permesso «Registrazione schermo»: senza, macOS dà immagini nere.
+// Filo lo dice e apre il pannello giusto, e le sue finestre le fotografa da sé, senza permesso.
+test('su Mac guardare lo schermo senza permesso apre il pannello giusto invece di dare un\'immagine nera', async () => {
+  const Schermo = require(join(ROOT, 'src', 'main', 'services', 'schermo.js'));
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  assert.match(C.uriImpostazioni(Schermo.PANNELLO_MAC), /^x-apple\.systempreferences:com\.apple\.preference\.security\?Privacy_ScreenCapture$/);
+  const conti = { fonti: 0, pannello: 0 };
+  const S = Schermo.crea({
+    sistema: {
+      piattaforma: () => 'darwin', wayland: () => false, permessoMac: () => 'denied',
+      chiediPermessoMac: async () => {}, apriPannello: async () => { conti.pannello += 1; },
+      fonti: async () => { conti.fonti += 1; return []; },
+      finestreFilo: () => [], maniglieFilo: () => [], schermi: () => ({}), delicata: async () => '',
+    },
+  });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO', finestra: 'Word' }, { settings: { schermo: { guarda: true } }, chiave: 't' });
+  assert.equal(r.esito.output.permesso, 'mac');
+  assert.equal(conti.pannello, 1);
+  assert.equal(conti.fonti, 0, 'senza permesso non si chiede la cattura al sistema');
 });

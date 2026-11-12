@@ -59,6 +59,9 @@ const PORTE_784 = {
   redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
   redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
   redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  // #1592 — gli interruttori di Bacheca e Deck builder: aprirli da un sito li mostrerebbe a tutti.
+  inPausaLettura: ['IN_PAUSA_GET', { nome: 'bacheca' }],
+  inPausaScrittura: ['IN_PAUSA_SET', { nome: 'mazzi', openToAll: true }],
   provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
   catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
   elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
@@ -79,8 +82,10 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
       // cambiamento: la porta più golosa di tutte per un sito visitato.
       giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
-      // L'«Annulla» del toast della segnalazione automatica: scrive `ignored` col token di chi è dentro (#784.3).
+      // L'avviso della segnalazione automatica: Annulla scrive `ignored` col token di chi è dentro (#784.3), la
+      // chiusura la fa partire (#784.6).
       annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
+      partenzaSegnalazioneAutomatica: { type: MSG.AUTO_FEEDBACK_PARTI, id: 'fb-uno' },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
@@ -132,7 +137,7 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       continue;
     }
     // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
-    if (porta === 'annullaSegnalazioneAutomatica') {
+    if (porta === 'annullaSegnalazioneAutomatica' || porta === 'partenzaSegnalazioneAutomatica') {
       expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
       expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
       continue;
@@ -168,6 +173,9 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       domandaRiapri: { type: MSG.DOMANDA_RIAPRI, id: 'D-1' },
       segnaFidato: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1' },
       togliFiducia: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1', fidato: false },
+      compitiElenco: { type: MSG.COMPITI_ELENCO },
+      compitoCrea: { type: MSG.COMPITO_CREA, compito: { titolo: 'x', urgenza: 5 } },
+      compitoAnnulla: { type: MSG.COMPITO_ANNULLA, id: 'C-1' },
       // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
       ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
       ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
@@ -385,7 +393,9 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
 
-test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9)', async ({ app, shell }) => {
+// #1132 — la richiesta d'accesso apre una pagina nel browser dell'utente: una pagina web non ci arriva. Il pannello del
+// red-team sopra un sito passa dalla porta legata al clic vero, e anche lì al sito torna solo l'esito (#810.9).
+test('una pagina web non arriva alla richiesta d\'accesso; col clic vero il pannello sì, senza sapere chi è entrato', async ({ app, shell }) => {
   void shell;
 
   const out = await app.evaluate(async (_electron, mittenti) => {
@@ -393,28 +403,49 @@ test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9
     const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
     const ga = M._cache[k].exports;
     const profilo = { email: 'chi-usa-filo@example.com', name: 'Chi Usa Filo' };
-    ga.signIn = async () => profilo;
+    let richieste = 0;
+    ga.signIn = async () => { richieste++; return profilo; };
     ga.isSignedIn = () => true;
     ga.isRemembered = () => true;
     ga.getProfile = () => profilo;
     const MSG = globalThis.SN_MSG.MSG;
-    const accedi = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNIN }, m);
+    const chiedi = async (tipo, m) => {
+      const prima = richieste;
+      const r = await globalThis.SN_HANDLE_MESSAGE({ type: tipo }, m);
+      return { r, aperto: richieste > prima };
+    };
+    // Un clic vero dell'utente su quella scheda, come lo segna il main a ogni input.
+    const conClic = (m) => ({ ...m, wc: { _filoGestoAlle: Date.now() } });
     return {
-      sito: await accedi(mittenti.sito),
-      sitoConScheda: await accedi(mittenti.sitoConScheda),
-      filo: await accedi(mittenti.filo),
+      sito: await chiedi(MSG.AUTH_SIGNIN, mittenti.sito),
+      sitoConScheda: await chiedi(MSG.AUTH_SIGNIN, mittenti.sitoConScheda),
+      sitoConClic: await chiedi(MSG.AUTH_SIGNIN, conClic(mittenti.sitoConScheda)),
+      clicSenzaGesto: await chiedi(MSG.AUTH_SIGNIN_CLIC, mittenti.sitoConScheda),
+      clicVecchio: await chiedi(MSG.AUTH_SIGNIN_CLIC, { ...mittenti.sitoConScheda, wc: { _filoGestoAlle: Date.now() - 60_000 } }),
+      clicVero: await chiedi(MSG.AUTH_SIGNIN_CLIC, conClic(mittenti.sitoConScheda)),
+      filo: await chiedi(MSG.AUTH_SIGNIN, mittenti.filo),
     };
   }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
 
-  for (const provenienza of ['sito', 'sitoConScheda']) {
-    const r = out[provenienza];
-    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
-    expect(r.signedIn).toBe(true);
-    expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
-    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  for (const provenienza of ['sito', 'sitoConScheda', 'sitoConClic']) {
+    const { r, aperto } = out[provenienza];
+    expect(aperto, `${provenienza}: una pagina web ha aperto l'accesso`).toBe(false);
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe('forbidden');
   }
-  expect(out.filo.ok).toBe(true);
-  expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
+  for (const provenienza of ['clicSenzaGesto', 'clicVecchio']) {
+    const { r, aperto } = out[provenienza];
+    expect(aperto, `${provenienza}: senza un clic vero l'accesso non si apre`).toBe(false);
+    expect(r.ok).toBe(false);
+  }
+  expect(out.clicVero.aperto).toBe(true);
+  expect(out.clicVero.r.ok).toBe(true);
+  expect(out.clicVero.r.signedIn).toBe(true);
+  expect(JSON.stringify(out.clicVero.r), 'l\'email di chi usa Filo è arrivata al sito').not.toContain('chi-usa-filo@example.com');
+  expect(Object.keys(out.clicVero.r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  expect(out.filo.aperto).toBe(true);
+  expect(out.filo.r.ok).toBe(true);
+  expect(out.filo.r.profile && out.filo.r.profile.email).toBe('chi-usa-filo@example.com');
 });
 
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
@@ -472,7 +503,7 @@ test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dall
       for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
     }
     const rimaste = (await A.list()).map((x) => x.title);
-    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://quaderno/quaderno.html' });
     return { res, rimaste, daFilo };
   }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
 

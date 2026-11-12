@@ -12,6 +12,7 @@
 // crediti ci sono).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { paginaDelloStrato } from './helpers/riquadri.mjs';
 
 test.use({ accoglienzaFatta: false });
 
@@ -72,25 +73,120 @@ test('il fornitore dichiarato non esiste più ma i modelli hanno la chiave: l’
     .toContainText('Ciao, sono Filo', { timeout: 10_000 });
 });
 
+// La vista della scheda davanti, chiesta al main. Cercarla per esclusione fra le pagine note non regge: la prima home
+// può non esserci ancora quando le si conta, e la si scambia per quella nuova (#1343.3).
+function vistaDavanti(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.id;
+  });
+}
+
+// La Page di Playwright della vista `wcId`: il main le scrive un segno a caricamento finito, e la si cerca per quello.
+async function paginaDellaVista(app, wcId) {
+  let trovata = null;
+  await expect.poll(async () => {
+    await app.evaluate(({ webContents }, id) => webContents.fromId(id).executeJavaScript(`window.__filoVista = ${id}; true`), wcId);
+    for (const w of app.windows()) {
+      try { if (await w.evaluate(() => window.__filoVista || 0) === wcId) { trovata = w; return true; } } catch (_) {}
+    }
+    return false;
+  }, { timeout: 15_000, message: `nessuna pagina per la vista ${wcId}` }).toBe(true);
+  return trovata;
+}
+
+// La scheda nuova chiede «Filo è pronto?» una volta sola, aprendosi (#1120.1): la configurazione finta si mette a giro
+// d'avvio della home finito, e la scheda si apre quando il main, alla stessa domanda, risponde già sì.
+async function configuraPrimaDellaScheda(app) {
+  const prima = await newtabPage(app);
+  await expect(prima.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+  await configCondivisa(app, { provider: 'gemini' });
+  await stubProviders(app);
+  await expect.poll(() => prima.evaluate(async () => {
+    const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_ONBOARDING, peek: true });
+    return Boolean(r && r.ready);
+  }), { timeout: 10_000, message: 'la configurazione finta non è arrivata al main' }).toBe(true);
+}
+
+// Il «+» della barra, come fa l'utente: la scheda che arriva davanti, diversa da quella di prima.
+async function apriSchedaNuova(app, shell) {
+  const vecchia = await vistaDavanti(app);
+  await shell.locator('#tab-new').click();
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+  let nuova = vecchia;
+  await expect.poll(async () => (nuova = await vistaDavanti(app)), { timeout: 10_000 }).not.toBe(vecchia);
+  const page = await paginaDellaVista(app, nuova);
+  // Il segno può cadere nel documento vuoto che precede la home: l'indirizzo si aspetta, non si legge una volta sola.
+  await expect(page).toHaveURL('filo://newtab/', { timeout: 10_000 });
+  return page;
+}
+
 test('lo stesso vale aprendo una scheda nuova, senza ricaricare niente', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await configCondivisa(app, { provider: 'gemini' });
-  await stubProviders(app);
-  const prima = new Set(app.windows());
-  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/newtab.html'));
-  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+  await configuraPrimaDellaScheda(app);
+  const page = await apriSchedaNuova(app, shell);
 
-  const deadline = Date.now() + 10_000;
-  let page = null;
-  while (Date.now() < deadline && !page) {
-    page = app.windows().find((w) => !prima.has(w) && w.url().startsWith('filo://newtab'));
-    if (!page) await new Promise((r) => setTimeout(r, 100));
-  }
-  if (!page) throw new Error('la scheda nuova non è comparsa');
-  await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
 });
+
+// Fuori dalle prove la scheda nuova è la home già caricata e nascosta (#1128), pronta da PRIMA che la chiave
+// arrivasse: è la strada di ogni utente, e la home che consegna non deve essere rimasta al cartello dell'invito.
+test.describe('con la home già pronta per la scheda nuova', () => {
+  test.use({ riservaNuovaScheda: true });
+
+  test('la scheda nuova si presenta anche se era pronta da prima della chiave', async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const riserva = () => app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+      const wc = tm.riserva && tm.riserva.webContents();
+      return wc && wc.getURL() === 'filo://newtab/' && !wc.isLoading() ? wc.id : 0;
+    });
+    let pronta = 0;
+    await expect.poll(async () => (pronta = await riserva()), { timeout: 20_000 }).toBeGreaterThan(0);
+    const inAttesa = await paginaDellaVista(app, pronta);
+    await expect(inAttesa.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+
+    // La chiave arriva come la mette l'utente nelle Opzioni, non scritta di nascosto nell'archivio.
+    await app.evaluate(() => {
+      const Defaults = globalThis.__filoDefaults;
+      const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+      globalThis.__filoDefaultsGet = origGet;
+      Defaults.get = () => ({ ...origGet(), provider: 'gemini' });
+    });
+    await stubProviders(app);
+    const prima = await paginaDellaVista(app, await vistaDavanti(app));
+    await prima.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: 'k-test' } } });
+    });
+    await expect(prima.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    const page = await apriSchedaNuova(app, shell);
+    expect(page).toBe(inAttesa);
+
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await expect(page.locator('.dash-bubble-filo').first())
+      .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+  });
+});
+
+// La pagina si prende dalla scheda aperta, non per indirizzo: per indirizzo si trovava anche la home della prima
+// scheda, e la prova passava senza guardare quella nuova (#830.4). «newtab.html» è come si scrivono le altre pagine.
+for (const indirizzo of ['filo://newtab/', 'filo://newtab/newtab.html']) {
+  test(`lo stesso vale aprendo una scheda nuova su ${indirizzo}, senza ricaricare niente`, async ({ app, shell, openTab }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configuraPrimaDellaScheda(app);
+    const page = await openTab(indirizzo);
+    await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await expect(page.locator('.dash-bubble-filo').first())
+      .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+  });
+}
 
 test('arrivati i crediti, l’accoglienza parte sulla home già aperta', async ({ app, shell }) => {
   test.setTimeout(90_000);
@@ -522,8 +618,7 @@ test('scelto il modello che la home chiedeva, la home smette di chiederlo', asyn
 const PAGINA_QUALUNQUE = '<!doctype html><meta charset="utf-8"><title>Una pagina</title><p>Contenuto.</p>';
 
 // L'Aiuto si apre col comando di pagina, lo stesso che gli mandano il menu del
-// tasto destro e la scorciatoia: su una pagina esterna i moduli di Filo vivono
-// nel mondo isolato del preload e da fuori non si chiamano.
+// tasto destro e la scorciatoia; su una pagina esterna nasce nello strato sopra la scheda (#1509.3).
 async function apriAiuto(app, page) {
   await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -535,9 +630,11 @@ async function apriAiuto(app, page) {
       }
     }
   });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
-  await page.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await paginaDelloStrato(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  return aiuto;
 }
 
 test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', async ({ app, openTab, testServer }) => {
@@ -546,9 +643,9 @@ test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', asyn
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, openWeightsOnly: false });
   });
   const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
-  await apriAiuto(app, page);
+  const aiuto = await apriAiuto(app, page);
 
-  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  const bolla = aiuto.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
   await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
@@ -570,9 +667,9 @@ test('con «solo modelli a pesi aperti» che esclude tutto, l’Aiuto su una pag
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
   });
   const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
-  await apriAiuto(app, page);
+  const aiuto = await apriAiuto(app, page);
 
-  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  const bolla = aiuto.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla).toContainText(/pesi aperti/i, { timeout: 15_000 });
   await expect(bolla).not.toContainText(/qualcosa è andato storto/i);

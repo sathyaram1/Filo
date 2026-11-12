@@ -34,3 +34,28 @@ test('la parola d’ordine nuova sta da sola sulla sua riga, senza spazi intorno
     }
   } finally { togliCartella(dir); }
 });
+
+// #2011: la chiave del manutentore e quella owner-non-fidato non vanno nel prompt di una routine, che le darebbe a ogni
+// lavoratore: lo strumento dice cosa aprono e dove stanno.
+test('manutentore e owner-non-fidato: la parola sta sulla sua riga e lo strumento dice cosa apre, non «il prompt della routine»', async () => {
+  const dir = cartellaTemporanea('filo-chiavi-classi-');
+  try {
+    const finto = join(dir, 'finto.mjs');
+    writeFileSync(finto, `globalThis.fetch = async (url, init) => {
+  if (!String(url).includes('routineKeys')) return new Response(JSON.stringify({ id_token: 'idt', expires_in: '3600', user_id: 'u' }), { status: 200 });
+  const d = JSON.parse(String(init.body)).data;
+  return new Response(JSON.stringify({ result: { ok: true, slug: d.slug, scope: d.scope, passphrase: 'parola-finta-456' } }), { status: 200 });
+};
+`);
+    for (const [potere, dice] of [['manutentore', /ordini/], ['owner-non-fidato', /domande per te[\s\S]*Gestione → Domande[\s\S]*recap del mattino/]]) {
+      const r = await new Promise((ok) => {
+        execFile(process.execPath, [`--import=${pathToFileURL(finto).href}`, join(ROOT, 'scripts', 'routine-keys.mjs'), 'crea', 'telefono', potere, 'x'],
+          { env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto' } }, (err, so, se) => ok({ code: err ? (err.code ?? 1) : 0, out: so, err: se }));
+      });
+      assert.equal(r.code, 0, r.err);
+      assert.equal(r.out.split('\n').find((l) => l.includes('parola-finta-456')), 'parola-finta-456', potere);
+      assert.match(r.out, dice, potere);
+      assert.doesNotMatch(r.out, /PROMPT della routine schedulata|che account claude\.ai/, `${potere}: non è la parola di una routine`);
+    }
+  } finally { togliCartella(dir); }
+});

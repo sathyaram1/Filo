@@ -11,6 +11,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readdirSync, existsSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // MP4 minimo (non riproducibile, ma serve solo come "file" da scaricare/linkare).
 const MP4 = Buffer.from('AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQ==', 'base64');
@@ -58,7 +59,7 @@ function pageHtml(videoSrc) {
 
 async function openMenuOn(page, selector) {
   await page.locator(selector).click({ button: 'right', position: { x: 20, y: 20 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
@@ -115,7 +116,7 @@ test('la velocità si cambia davvero (clic accelera, il sotto-menu sceglie il va
   menu = await openMenuOn(page, '#v');
   await expect(menu.getByText('Velocità 1,25×')).toBeVisible();
   await menu.locator('.sn-menu-split-arrow').first().hover();
-  const sub = page.locator('.sn-menu-sub');
+  const sub = menuDi(page).locator('.sn-menu-sub');
   await expect(sub).toBeVisible();
   await sub.locator('button', { hasText: '0,5×' }).first().click();
   await expect.poll(() => page.evaluate(() => document.getElementById('v').playbackRate)).toBe(0.5);

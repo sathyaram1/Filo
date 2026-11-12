@@ -1,15 +1,19 @@
 // #974 — Le conversazioni dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate: nella home
 // compare la riga col numero di messaggi e il nome, aperta mostra lo scambio, e la chat della home la trova cercando
 // (al modello arriva la riga, non lo scambio). Senza il #974 nessuna di queste conversazioni arrivava al filo.
+// La chat dell'Editor è l'Aiuto aperto sul documento (#1433): la sua riga resta dell'Editor, col nome del documento.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello, chiedi } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = 'tests/.shots';
 
-// Modelli finti per le tre app (non in streaming, tranne i Mazzi che passano dal ragionamento): niente rete.
+// Modelli finti per le app (non in streaming, tranne i Mazzi che passano dal ragionamento): niente rete.
 async function prepara(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
@@ -17,7 +21,7 @@ async function prepara(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: {
-        [C.ACTIONS.EDITOR_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash',
+        [C.ACTIONS.HELP]: 'deepseek-flash',
         [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
@@ -30,9 +34,11 @@ async function prepara(app) {
       const ultimo = String((messages[messages.length - 1] || {}).content || '');
       if (tutto.includes('preparare la dashboard')) return fatto('{"message":"","suggestions":[]}');
       if (/CARTE CANDIDATE/.test(ultimo)) return fatto(JSON.stringify({ keep: (ultimo.match(/^\d+(?=\. )/gm) || []).map(Number) }));
-      if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: 'Il pulsante Iscriviti è in alto a destra.', status: 'done' }));
+      if (sistema.includes('# Protocollo di risposta')) {
+        const nellEditor = sistema.includes('Il documento aperto nell\'Editor');
+        return fatto(JSON.stringify({ text: nellEditor ? 'Il capitolo sui licheni va accorciato di metà.' : 'Il pulsante Iscriviti è in alto a destra.', status: 'done' }));
+      }
       if (sistema.includes('deck builder per Magic')) return fatto(JSON.stringify({ reply: 'Per questo mazzo servono più pescate.' }));
-      if (sistema.includes('assistente di scrittura dentro un editor')) return fatto('Il capitolo sui licheni va accorciato di metà.');
       return fatto('{}');
     };
     P.completeWithFallback = async (o) => risposta(o);
@@ -52,7 +58,7 @@ async function attiva(shell, prefisso) {
   }, prefisso);
 }
 
-async function chatDellEditor(openTab, titolo, domanda) {
+async function chatDellEditor(app, openTab, titolo, domanda) {
   const editor = await openTab('filo://editor/editor.html');
   await editor.waitForSelector('#doc');
   await editor.click('#docSwitch');
@@ -60,25 +66,25 @@ async function chatDellEditor(openTab, titolo, domanda) {
   await editor.locator('.ed-doc-item-input').fill(titolo);
   await editor.locator('.ed-doc-item-input').press('Enter');
   await expect(editor.locator('#docTitle')).toHaveText(titolo);
-  await editor.keyboard.press('Escape');
-  await editor.locator('.ed-switch-icon').nth(1).click();
-  const chat = editor.locator('.ed-module[data-type="chat"]');
-  await chat.locator('[data-chat="input"]').fill(domanda);
-  await chat.locator('[data-chat="send"]').click();
-  await expect(chat.locator('.ed-chat-msg.assistant', { hasText: 'licheni va accorciato' })).toBeVisible({ timeout: 10_000 });
+  // Il menu dei documenti si richiude dal suo bottone, come l'ha aperto.
+  await editor.click('#docSwitch');
+  await expect(editor.locator('#docPop')).toBeHidden();
+  await apriAiuto(app, editor);
+  await chiediAllAiuto(editor, domanda);
+  await expect(editor.locator('.sn-sidebar-msg-assistant', { hasText: 'licheni va accorciato' })).toBeVisible({ timeout: 10_000 });
   return editor;
 }
 
 const righeFilo = (app) => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).filter((c) => c.app));
 
-test('un messaggio nella chat dell’Editor: nella home la riga ripiegata col numero e il documento, aperta mostra lo scambio', async ({ app, shell, openTab }) => {
+test('un messaggio all’Aiuto dell’Editor: nella home la riga ripiegata col numero e il documento, aperta mostra lo scambio', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
+  await chatDellEditor(app, openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
   await attiva(shell, 'filo://newtab');
 
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi");
   await expect(riga.locator('.dash-riga-app-testa')).toHaveAttribute('title', 'Mostra lo scambio');
@@ -130,7 +136,7 @@ test('la conversazione di un mazzo: la riga col nome del mazzo, e svuotando la c
   await expect(mazzi.locator('.dk-msg-bot').last()).toContainText('servono più pescate', { timeout: 15_000 });
 
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText('2 messaggi nei Mazzi su Niv-Mizzet, Parun', { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click();
   await expect(riga.locator('.dash-riga-app-msg-user')).toHaveText('che ne pensi del mazzo?');
@@ -147,18 +153,21 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
   await prepara(app);
   const casa = await home(app);
   const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3).
+  let aiuto = null;
   const apri = async () => {
     const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
     await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-    await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+    aiuto = await paginaDellAiuto(app, sito);
+    await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
   };
   await apri();
-  await sito.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('Iscriviti è in alto', { timeout: 10_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('Iscriviti è in alto', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
-  const righe = casa.locator('#righeApp .dash-riga-app');
+  const righe = casa.locator('#bubbles .dash-riga-app');
   await expect(righe).toHaveCount(1, { timeout: 10_000 });
   await expect(righe.first().locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Aiuto su 127.0.0.1");
   await righe.first().locator('.dash-riga-app-testa').click();
@@ -170,11 +179,11 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
 
   // Chiusa e riaperta, l'Aiuto comincia un'altra conversazione: una riga sua.
   await attiva(shell, 'http://127.0.0.1');
-  await sito.locator('.sn-sidebar-close').click();
-  await expect(sito.locator('.sn-sidebar')).toHaveCount(0);
+  await aiuto.locator('.sn-sidebar-close').click();
+  await expect(aiuto.locator('.sn-sidebar')).toHaveCount(0);
   await apri();
-  await sito.fill('.sn-sidebar-input textarea', 'e il modulo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
+  await aiuto.fill('.sn-sidebar-input textarea', 'e il modulo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
   await expect.poll(async () => (await righeFilo(app)).length, { timeout: 10_000 }).toBe(2);
 });
 
@@ -182,7 +191,7 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   test.setTimeout(120_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'tesi', 'Il capitolo sui licheni crostosi è troppo lungo?');
+  await chatDellEditor(app, openTab, 'tesi', 'Il capitolo sui licheni crostosi è troppo lungo?');
   await attiva(shell, 'filo://newtab');
   const [conv] = await righeFilo(app);
   await modelloFinto(app, [
@@ -214,26 +223,21 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   expect(ordine.indexOf('dash-riga-app')).toBeLessThan(ordine.indexOf('dash-bubble'));
 });
 
-test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col nome dell’app', async ({ app, shell, openTab }) => {
+test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trova dal testo dello scambio', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'appunti', 'Mi riassumi i licheni?');
-
-  const archivio = await openTab('filo://archive/archive.html');
-  const voce = archivio.locator('.arc-chat[data-app="editor"]');
-  await expect(voce.locator('.arc-chat-title')).toHaveText('Editor · appunti', { timeout: 10_000 });
-  await expect(voce.locator('.arc-chat-date')).not.toHaveText('In corso');
-  // La ricerca della Cronologia la trova dal testo dello scambio.
-  await archivio.fill('#search', 'licheni');
-  await expect(voce).toBeVisible({ timeout: 10_000 });
-  await archivio.fill('#search', '');
+  await chatDellEditor(app, openTab, 'appunti', 'Mi riassumi i licheni?');
 
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  // La ricerca del filo la trova dal testo dello scambio (la Cronologia, che lo faceva, non c'è più: #872).
+  await casa.locator('#cercaInput').fill('licheni');
+  await expect(casa.locator('.dash-cerca-msg', { hasText: 'licheni' }).first()).toBeVisible({ timeout: 10_000 });
+  await casa.locator('#cercaInput').press('Escape');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click({ button: 'right' });
-  const menu = casa.locator('.sn-menu');
+  const menu = menuDi(casa).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Mostra lo scambio', { exact: true })).toBeVisible();
   await expect(menu.getByText("Apri nell'Editor", { exact: true })).toBeVisible();
@@ -245,8 +249,6 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   await clickConfirm(casa, 'ok');
   await expect(riga).toHaveCount(0);
   await expect.poll(async () => (await righeFilo(app)).length).toBe(0);
-  // La Cronologia aperta si riallinea da sola.
-  await expect(voce).toBeHidden({ timeout: 10_000 });
 });
 
 test('da un sito parla solo l’Aiuto, e il sito lo dice l’indirizzo di chi manda; righe e cancellazioni solo da Filo', async ({ app }) => {
@@ -276,7 +278,7 @@ test('con una conversazione della home aperta, la riga di un’app nata adesso a
   await chiedi(casa, 'ciao Filo');
   await expect(casa.locator('.dash-bubble-filo', { hasText: 'Ciao, dimmi.' })).toBeVisible({ timeout: 15_000 });
   await prepara(app);
-  await chatDellEditor(openTab, 'tesi', 'E il capitolo sui licheni?');
+  await chatDellEditor(app, openTab, 'tesi', 'E il capitolo sui licheni?');
   await attiva(shell, 'filo://newtab');
   const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi", { timeout: 10_000 });
@@ -290,14 +292,14 @@ test('rinominato dopo la chat, il documento o il mazzo: la riga e la ricerca dic
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  const editor = await chatDellEditor(openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
+  const editor = await chatDellEditor(app, openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
   await editor.click('#docSwitch');
   await editor.locator('.ed-doc-item').first().locator('.ed-doc-rename').click();
   await editor.locator('.ed-doc-item-input').fill('tesi definitiva');
   await editor.locator('.ed-doc-item-input').press('Enter');
   await editor.keyboard.press('Escape');
   await attiva(shell, 'filo://newtab');
-  await expect(casa.locator('#righeApp .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
+  await expect(casa.locator('#bubbles .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
   const [conv] = await righeFilo(app);
   expect(conv.title).toBe('Editor · tesi definitiva');
 
@@ -318,24 +320,34 @@ test('le risposte di Filo nello scambio aperto restano formattate, e il loro lin
   await app.evaluate(() => {
     const P = globalThis.SN_PROVIDERS;
     const prima = P.completeWithFallback;
-    P.completeWithFallback = async (o) => {
+    const primaInDiretta = P.streamCompleteWithFallback;
+    const risposta = (o) => {
       const sistema = String((o.messages.find((m) => m.role === 'system') || {}).content || '');
-      if (!sistema.includes('# Protocollo di risposta')) return prima(o);
+      if (!sistema.includes('# Protocollo di risposta')) return null;
       const text = '**Iscriviti** è in alto a destra: vedi [la guida](https://example.com/guida). <b>niente markup</b>';
       return { text: JSON.stringify({ text, status: 'done' }), model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o) || prima(o);
+    // L'Aiuto chiede in diretta, per mostrare il ragionamento (#578.1).
+    P.streamCompleteWithFallback = async (o) => {
+      const r = risposta(o);
+      if (!r) return primaInDiretta(o);
+      try { o.onDelta && o.onDelta(r.text); } catch (_) {}
+      return r;
     };
   });
   const casa = await home(app);
   const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await sito.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(sito.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await riga.locator('.dash-riga-app-testa').click();
   const msg = riga.locator('.dash-riga-app-msg-filo');
   await expect(msg.locator('strong')).toHaveText('Iscriviti');

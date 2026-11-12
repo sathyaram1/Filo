@@ -78,8 +78,8 @@ const REPORT = 'Report per l’owner: la causa era altrove, il pulsante non veni
 test('dispatch: --ticket davanti a un --record-* fa quello che fa messo in coda', async () => {
   const esiti = [];
   for (const argv of [
-    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', REPORT],
-    ['--record-fixed', 'fid-900', REPORT, '--ticket', BIGLIETTO],
+    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa'],
+    ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', '--ticket', BIGLIETTO],
   ]) {
     const { srv, ricevuti, port } = await fintoServer();
     const casa = depositoSulRamo();
@@ -252,8 +252,8 @@ test('battito senza biglietto: uscita 1, non 3 («canale giù»), e nessuna chia
 
 test('dispatch: --ticket=<codice> vale come --ticket <codice>, davanti e dopo', async () => {
   for (const argv of [
-    [`--ticket=${BIGLIETTO}`, '--record-fixed', 'fid-900', REPORT],
-    ['--record-fixed', 'fid-900', REPORT, `--ticket=${BIGLIETTO}`],
+    [`--ticket=${BIGLIETTO}`, '--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa'],
+    ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', `--ticket=${BIGLIETTO}`],
   ]) {
     await conServer(async ({ ricevuti, env }) => {
       const r = await esegui('dispatch.mjs', argv, env);
@@ -325,7 +325,7 @@ test('canale: un biglietto vero col trattino davanti è un biglietto, non un\'op
 
 test('registrazioni: un biglietto vero con due trattini passa col segno uguale', async () => {
   await conServer(async ({ ricevuti, env }) => {
-    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, `--ticket=${VERO_DUE_TRATTINI}`], env);
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', `--ticket=${VERO_DUE_TRATTINI}`], env);
     assert.equal(r.code, 0, `stderr: ${r.se}`);
     assert.equal(ricevuti.find((x) => x.url.includes('routineDeliver'))?.body.ticket, VERO_DUE_TRATTINI);
   });
@@ -342,7 +342,7 @@ test('canale e registrazioni danno lo stesso esito sui casi fuori dal comune del
   for (const c of casi) {
     for (const [script, argv] of [
       ['routine-channel.mjs', ['deliver', 'note', '--text', 'Una nota.', ...c.canale]],
-      ['dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, ...c.canale]],
+      ['dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', ...c.canale]],
     ]) {
       await conServer(async ({ ricevuti, env }) => {
         const r = await esegui(script, argv, env);
@@ -375,5 +375,45 @@ test('consegna con biglietto davanti e intento storto: si ferma qui, non parte v
     assert.equal(r.code, 1, `stderr: ${r.se}`);
     assert.match(r.se, /Intento non capito: «fixd»/);
     assert.equal(ricevuti.length, 0);
+  });
+});
+
+// #878: un biglietto copiato con uno spazio o un a capo in fondo arriva al server ripulito, davanti come a mano.
+test('il biglietto davanti con spazi o un a capo intorno arriva al server ripulito, in ogni comando che ne usa uno', async () => {
+  for (const sporco of [`${VERO} `, `${VERO}\n`, ` ${VERO_TRATTINO}\r\n`, `${BIGLIETTO}\n`]) {
+    const pulito = sporco.trim();
+    for (const [argv, url] of [
+      [['deliver', sporco, 'note', '--notes', 'Report.'], 'routineDeliver'],
+      [['release', sporco, '--role', 'verifier', '--senza-push', '--senza-rapporto'], 'routineRelease'],
+      [['heartbeat', sporco], 'routineHeartbeat'],
+      [['compare', sporco, 'verifier', '12'], 'routineCompare'],
+    ]) {
+      await conServer(async ({ ricevuti, env }) => {
+        const r = await esegui('routine-channel.mjs', argv, env);
+        const chiamata = ricevuti.find((x) => x.url.includes(url));
+        assert.ok(chiamata, `${argv[0]} ${JSON.stringify(sporco)}: doveva arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
+        assert.equal(chiamata.body.ticket, pulito, `${argv[0]} ${JSON.stringify(sporco)}`);
+      });
+    }
+  }
+  // Lo stesso biglietto davanti e a mano, uno dei due con l'a capo, è uno solo.
+  assert.deepEqual(bigliettoAMano('deliver', [`${VERO}\n`, 'note'], VERO), { args: [VERO, 'note'] });
+});
+
+// #878: senza biglietto il ruolo scalava al suo posto e partiva verso il server come biglietto.
+test('confronto senza biglietto: si ferma dicendo che manca, e il server non viene chiamato', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    for (const argv of [['compare', 'verifier', '12'], ['compare', 'new-work', '1359']]) {
+      const r = await esegui('routine-channel.mjs', argv, env);
+      assert.equal(r.code, 1, `${argv.join(' ')}: ${r.se}`);
+      assert.match(r.se, /NESSUN BIGLIETTO/);
+      assert.match(r.se, /compare <biglietto> <ruolo> <numero>/);
+    }
+    assert.equal(ricevuti.length, 0, 'il ruolo non parte come biglietto');
+    const r = await esegui('routine-channel.mjs', ['compare', 'verifier', '12', '--ticket', BIGLIETTO], env);
+    assert.equal(r.code, 0, r.se);
+    const chiamata = ricevuti.find((x) => x.url.includes('routineCompare'));
+    assert.equal(chiamata?.body.ticket, BIGLIETTO);
+    assert.deepEqual(chiamata?.body.mine, { role: 'verifier', num: '12' });
   });
 });

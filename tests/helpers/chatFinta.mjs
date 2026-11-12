@@ -1,19 +1,36 @@
 // La chat della home con un modello finto che risponde coi giri dati (tool call, testo, ritardo), senza rete.
 // Nessuna chiamata vera al fornitore: `ripristina` rimette quello vero.
 import { expect } from '@playwright/test';
+import { paginaDellaScheda } from './schede.mjs';
 
-export async function home(app) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) {
-      await win.waitForLoadState('domcontentloaded');
-      await expect(win.locator('#input')).toBeVisible({ timeout: 8000 });
-      return win;
+// Le schede che possono dare la home, nell'ordine in cui valgono: quella chiesta; la attiva, se è una home, da sola
+// (anche ancora in caricamento: una home vecchia non deve passare per lei); se no la home usata più di recente.
+const schedeCandidate = (app, scheda) => app.evaluate(({ BrowserWindow }, scheda) => {
+  if (scheda != null) return [scheda];
+  const tutte = BrowserWindow.getAllWindows().filter((w) => w._filoTabs && !w.isDestroyed());
+  const w = tutte.find((x) => x.isFocused()) || tutte.find((x) => !x._filoIncognito) || tutte[0];
+  if (!w) return [];
+  const tm = w._filoTabs;
+  const suHome = (u) => String(u || '').startsWith('filo://newtab');
+  const home = (t) => { try { return suHome(t.url) || suHome(t.view.webContents.getURL()); } catch (_) { return suHome(t.url); } };
+  const attiva = tm.tabs.find((t) => t.id === tm.activeId);
+  if (attiva && home(attiva)) return [attiva.id];
+  return tm.tabs.filter(home).sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0)).map((t) => t.id);
+}, scheda);
+
+/** La home della scheda attiva, o della scheda `scheda`: per indirizzo si prendeva la prima, quella dell'avvio (#877.2). */
+export async function home(app, { scheda } = {}) {
+  let win = null;
+  await expect.poll(async () => {
+    for (const id of await schedeCandidate(app, scheda)) {
+      win = await paginaDellaScheda(app, id, (p) => p.url().startsWith('filo://newtab'));
+      if (win) return true;
     }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('newtab non trovata');
+    return false;
+  }, { message: `newtab non trovata${scheda != null ? ` nella scheda ${scheda}` : ''}`, timeout: 10_000, intervals: [100] }).toBe(true);
+  await win.waitForLoadState('domcontentloaded');
+  await expect(win.locator('#input')).toBeVisible({ timeout: 8000 });
+  return win;
 }
 
 export async function modelloFinto(app, giri) {

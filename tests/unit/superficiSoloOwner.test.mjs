@@ -36,21 +36,29 @@ test('il menu App mostra Feedback e Gestione solo all\'owner', () => {
     assert.ok(!new RegExp(`label: '${riservata}'`).test(perTutti),
       `«${riservata}» apre una pagina che solo l'owner può leggere: non va nel ramo visibile a tutti`);
   }
-  // E la bacheca, che invece è di tutti, deve restarci.
-  assert.match(perTutti, /label: 'Bacheca'/,
-    'la bacheca è la superficie pubblica dei miglioramenti: non va nascosta');
+  // La Bacheca segue il suo interruttore (#1592); in pausa, al suo posto, le segnalazioni che l'utente ha mandato.
+  assert.match(perTutti, /inPausaVisibili\.bacheca\s*\?\s*\{ label: 'Bacheca'[^}]*\}\s*:\s*\{ label: 'Le tue segnalazioni'[^}]*#segnalazioni/,
+    'con la Bacheca in pausa le segnalazioni mandate devono restare raggiungibili dal menu App');
+  assert.match(perTutti, /inPausaVisibili\.mazzi\s*\?\s*\[\{ label: 'Deck builder MTG'/,
+    'il Deck builder segue il suo interruttore');
 });
 
-test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner', () => {
-  const icons = leggi('src', 'content', 'menuIcons.js');
-  assert.match(icons, /if \(isOwner\)\s*\{[\s\S]{0,400}?registry\.feedbackApp/,
-    'feedbackApp deve entrare nel registro solo con isOwner: un id assente dal registro '
-    + 'sparisce anche dai layout che l\'utente si era salvato');
-  assert.match(icons, /MSG\.AUTH_STATUS/,
-    'lo stato di owner va CHIESTO al main: senza, resterebbe un valore inventato in pagina');
-  assert.match(icons, /let isOwner = false;/,
-    'deve partire da "non owner": sbagliare per difetto costa un\'icona a una persona, '
-    + 'sbagliare per eccesso manda tutti gli altri in un vicolo cieco');
+test('l\'icona «Feedback» della barra laterale, e della fila del tasto destro, esiste solo per l\'owner', () => {
+  // Le icone stanno nella barra (#1246): la disegna e la esegue il main, che sa chi è l'owner. Portate nella fila del
+  // tasto destro (#1434) le descrive ed esegue lo stesso main, con la stessa regola: la pagina non la riscrive.
+  const disp = leggi('src', 'shared', 'disposizioneIcone.js');
+  assert.match(disp, /feedbackApp: \{[^}]*soloOwner: true/, 'feedbackApp deve dichiararsi del solo owner');
+  const barra = leggi('src', 'main', 'barraLaterale.js');
+  assert.match(barra, /_descrivi\(id, \{[^\n]*\{\n[\s\S]{0,300}?if \(!d \|\| \(d\.soloOwner && !owner\)\) return null;/,
+    'la barra non deve disegnare un\'icona del solo owner a chi non lo è');
+  assert.match(barra, /_icone\(\) \{[\s\S]{0,700}?this\._descrivi\(id,/, 'la barra disegna con _descrivi');
+  assert.match(barra, /iconeFila\(\) \{[\s\S]{0,500}?this\._descrivi\(id,/, 'la fila del tasto destro riceve le icone da _descrivi');
+  const fila = leggi('src', 'content', 'menuIcons.js');
+  assert.doesNotMatch(fila, /feedbackApp|isAdmin|AUTH_STATUS/, 'la fila non decide da sé chi vede «Feedback»');
+  assert.match(barra, /esegui\(id[^\n]*\{\n[\s\S]{0,400}?if \(d\.soloOwner && !this\._owner\(\)\) return;/,
+    'né eseguirla: un clic arrivato lo stesso non apre la posta delle segnalazioni');
+  assert.match(barra, /_owner\(\) \{\s*try \{ return !!require\('\.\/auth\/google-auth'\)\.isAdmin\(\); \} catch \(_\) \{ return false; \}/,
+    'lo stato di owner lo dice l\'accesso, e nel dubbio è «non owner»');
 });
 
 test('il comando /feedback della home è riservato all\'owner e dice l\'altra strada', () => {
@@ -85,4 +93,18 @@ test('mandare un feedback resta una strada di tutti', () => {
     'il manifesto deve indicare la strada che funziona per un utente qualunque');
   assert.ok(!voce.includes('filo://feedback/feedback.html'),
     'il manifesto mandava l\'utente alla posta dell\'owner, che lui non può aprire');
+});
+
+// #1414: le pagine dell'owner si raggiungono da Gestione e basta. Un'altra voce di menu che porta lì è un secondo
+// ingresso, e il vecchio indirizzo scritto in un menu è una strada che passa dal rimando invece di dire dov'è la cosa.
+test('Modelli predefiniti e Inviti e utenti non hanno ingressi fuori da Gestione', () => {
+  const shell = leggi('src', 'renderer', 'shell.js');
+  const impostazioni = shell.match(/function buildSettings\(\)\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(impostazioni, 'non trovo buildSettings() in shell.js');
+  assert.ok(!/isAdmin/.test(impostazioni), 'il menu Impostazioni torna a distinguere l\'owner: le sue voci stanno in Gestione');
+  const vecchi = /filo:\/\/admin-defaults\/|filo:\/\/credits\/owner\.html/;
+  for (const file of [['src', 'renderer', 'shell.js'], ['src', 'main', 'menu.js'], ['src', 'main', 'barraLaterale.js'],
+    ['src', 'pages', 'dashboard', 'dashboard.js'], ['src', 'shared', 'wallet.js'], ['src', 'pages', 'credits', 'credits.html']]) {
+    assert.ok(!vecchi.test(leggi(...file)), `${file.join('/')} porta ancora al vecchio indirizzo di una pagina dell'owner`);
+  }
 });

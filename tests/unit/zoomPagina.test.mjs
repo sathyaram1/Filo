@@ -226,7 +226,12 @@ test('ogni scheda e ogni finestra di login passano i tasti dello zoom dal main',
   const cablaggi = tabs.match(/installZoom\((wc|pwc)\)/g) || [];
   assert.deepEqual(cablaggi.sort(), ['installZoom(pwc)', 'installZoom(wc)'], 'schede e finestre di login');
   const zoom = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabZoom.js'), 'utf8');
-  assert.match(zoom, /before-input-event[\s\S]{0,200}tastoZoom\(input\)[\s\S]{0,120}preventDefault\(\)/);
+  assert.match(zoom, /function zoomDaTasto\(wc, input\)[\s\S]{0,200}tastoZoom\(input\)[\s\S]{0,120}'filo:zoom-key'/);
+  assert.match(zoom, /before-input-event[\s\S]{0,200}zoomDaTasto\(wc, input\)[\s\S]{0,60}preventDefault\(\)/);
+  // Scrivendo in un riquadro di Filo sopra la pagina (#1509.1) tasti e rotella dello zoom restano della pagina.
+  const strato = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'stratoDeiRiquadri.js'), 'utf8');
+  assert.match(strato, /before-input-event[\s\S]{0,300}zoomDaTasto\(s\.wc, input\)/);
+  assert.match(strato, /'zoom-changed'[\s\S]{0,200}rotellaZoom\(s\.wc, dir\)/);
   // Un gesto di un riquadro vale solo se viene da un riquadro, e solo in forma nota.
   assert.match(zoom, /'filo:zoom-gesto'[\s\S]{0,120}principale\(e\)[\s\S]{0,80}gestoValido/);
 });

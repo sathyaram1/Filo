@@ -26,10 +26,8 @@
   const REQUEST_TIMEOUT_MS = 30_000;
   const PRICE_TTL_MS = 6 * 60 * 60 * 1000; // prezzi: stantii dopo 6 ore
 
-  // User-Agent identificativo, OBBLIGATORIO: l'API Scryfall risponde
-  // 400 `generic_user_agent` alle richieste con la UA di default della
-  // libreria HTTP (il fetch di Node/Electron nel main) — senza questo header
-  // OGNI chiamata fallisce in produzione (ricerca in chat, hover sui nomi…).
+  // Senza una User-Agent identificativa l'API risponde 400 `generic_user_agent`: con quella
+  // di default di Node/Electron fallisce ogni chiamata.
   let USER_AGENT = 'Filo/0.0.0 (https://singolarita.com)';
   try {
     USER_AGENT = `Filo/${require('../../../package.json').version} (https://singolarita.com)`;
@@ -98,10 +96,8 @@
       });
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
-        // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
-        // sbagliata di una query 400): recuperalo, così chi gestisce l'errore
-        // può correggere la query o spiegare il problema all'utente invece di
-        // mostrare un codice HTTP nudo (#331).
+        // Scryfall spiega l'errore nel body (`details`): recuperarlo permette di correggere la
+        // query invece di mostrare un codice HTTP nudo.
         let details = '';
         try {
           const body = await res.json();
@@ -176,8 +172,6 @@
     return card;
   }
 
-  // ── Cache dati carta (chiave: scryfall_id) ───────────────────────────────
-
   async function readCardCache() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_CARDS);
     const map = res[STORAGE_KEYS.SCRYFALL_CARDS];
@@ -209,8 +203,7 @@
     const missing = [];
     for (const id of wanted) {
       const e = map[id];
-      // `producedMana`/`oracleText === undefined` = entry scritta prima che il
-      // campo esistesse (schema vecchio): si rifetcha per avere il dato nuovo.
+      // Campo `undefined` = entry scritta prima che il campo esistesse: si rifetcha.
       if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card
           && e.card.producedMana !== undefined && e.card.oracleText !== undefined) out[id] = e.card;
       else missing.push(id);
@@ -239,9 +232,7 @@
     return map[String(id)] || null;
   }
 
-  // ── Conteggio ristampe per nome (modulo "Prezzo e dati", §5.2) ───────────
-  // `unique=prints` conta tutte le stampe della carta; il numero cambia solo
-  // quando esce un set nuovo → cache permanente per nome (minuscolo).
+  // Il numero di ristampe cambia solo quando esce un set nuovo: cache permanente.
   async function prints(name) {
     const n = String(name || '').trim();
     if (!n) return null;
@@ -257,7 +248,7 @@
     return count;
   }
 
-  // ── Simboli di mana (symbology): symbol → svg_uri, cache permanente ──────
+  // Simboli di mana (symbology): symbol → svg_uri, cache permanente.
   async function symbols() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_SYMBOLS);
     const cached = res[STORAGE_KEYS.SCRYFALL_SYMBOLS];

@@ -47,12 +47,21 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   il trascinamento, né la chat lo offrono.
 - **Clic e Invio fanno la stessa cosa.** A sinistra aprono nel filo; a destra aprono l'app della carta
   (`apri`), o nel filo se non ne ha una (`usaCarta`).
+- **Un avviso che porta a una pagina lo dice nella notifica.** Il main scrive `action.apri` (solo un indirizzo
+  `filo://`, `paginaDiAvviso` in `src/shared/carteHome.js`) ed `etichetta`: la carta ne fa il pulsante principale,
+  con «Chiudi» accanto, e il clic sulla carta resta «apri nel filo». `action.titolo` sostituisce «Avviso», perché
+  più avvisi insieme si distinguano senza leggerli. Gli avvisi senza questi campi restano come sono (#855).
 - **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che
   ordine, e `trovaSinistra` le riconosce dalle parole dell'utente: la home la disegna da lì e la chat
   (`CARTA_HOME`) la legge da lì, così «metti il forno in cima» sposta la carta che l'utente vede in cima.
   Un nome di destra dalla chat vale solo esatto: «lo scaricamento del file» non è l'Editor. Quello che la chat
   racconta (la riga di attività, l'esito per il modello) nomina la carta toccata davvero, dall'esito, mai dalle
   parole del modello; e l'esito che serve a riprovare arriva intero, con le chiavi e la destra com'è.
+- **Al primo incontro la home tiene solo la sinistra.** Finché l'accoglienza non si chiude e la strada per
+  cominciare è una (i Crediti, poi l'intervista), destra e «altro» non si vedono (#1661); con un modello da
+  scegliere restano, perché quella strada sta fra i suggerimenti. Lo decide il main (`primoIncontro`), che legge
+  l'accoglienza dal disco anche per l'incognito, dove la pagina la vedrebbe da rifare. Tolta la carta dei Crediti
+  la home torna intera: è da «altro» che la si rimette.
 - **Un lavoro lungo è una carta finché dura.** Il main tiene i lavori in corso (`lavoriInCorso.js`: un turno
   di Filo, un comando del terminale) e li annuncia; `lavoriAltrove` decide quali sono carte (dopo qualche
   secondo, mai quello della conversazione che guarda: per la chat la richiesta in corso non è una carta), e
@@ -69,4 +78,5 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   Colori e misure passano dai token `--dash-*`
   ([Estetica: ogni variabile visiva è un token del registro, mai un valore sparso](estetica-ogni-variabile-visiva-e-un-token-del-registro.md)).
 
-Prove: `tests/unit/carteHome.test.mjs` (mosse e catalogo) e `tests/home-carte.spec.mjs` (la home vera).
+Prove: `tests/unit/carteHome.test.mjs` (mosse e catalogo), `tests/home-carte.spec.mjs` (la home vera) e
+`tests/home-primo-incontro.spec.mjs` (il primo avvio).

@@ -318,3 +318,29 @@ test('auto-tag dalla chat: applica i tag e riusa la cache (carta, tag) in un alt
   const autotagCallsAfter = await app.evaluate(() => globalThis.__calls.autotag);
   expect(autotagCallsAfter, 'secondo mazzo: giudizi dalla cache, zero chiamate').toBe(1);
 });
+
+// #1344.1: il riquadro chiede quando si disegna, e una richiesta fallita non riparte a ogni ridisegno.
+test('«Prezzo e dati» con Scryfall che non dà le ristampe: una richiesta, non una raffica, e lo dice', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+  await addBoltViaChat(page);
+  await app.evaluate(() => {
+    globalThis.__ristampe = 0;
+    const vero = globalThis.SN_SCRYFALL.prints;
+    globalThis.SN_SCRYFALL.prints = async (name) => {
+      globalThis.__ristampe += 1;
+      if (name) throw new Error('Scryfall 503');
+      return vero(name);
+    };
+  });
+  await chooseModule(page, 'bolt-1', 'Prezzo e dati');
+  await expect(page.locator('#previewModule [data-prints]')).toContainText('Scryfall non ha risposto', { timeout: 10_000 });
+  const prima = await app.evaluate(() => globalThis.__ristampe);
+  await page.waitForTimeout(2000);
+  expect(await app.evaluate(() => globalThis.__ristampe)).toBe(prima);
+  expect(prima).toBeLessThanOrEqual(2);
+});

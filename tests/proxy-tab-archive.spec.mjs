@@ -93,17 +93,13 @@ test('archivia una tab proxata e la riapre proxata sulla stessa location', async
       return e && e.proxy ? e.proxy.country : null;
     }), { timeout: 8_000 }).toBe('us');
 
-    // Riapri dall'archivio: la pagina archivio mostra la chip e la voce
-    // "Riapri" del menu contestuale (tasto destro) manda anche la location
-    // proxy all'handler.
-    const archive = await openTab('filo://archive/archive.html');
-    await archive.waitForLoadState('domcontentloaded');
-    const row = archive.locator('.arc-tab', { hasText: 'Sito Proxato' });
-    await expect(row).toBeVisible({ timeout: 8_000 });
-    await row.click({ button: 'right' });
-    const menu = archive.locator('.arc-ctxmenu');
-    await expect(menu).toBeVisible();
-    await menu.getByText('Riapri', { exact: true }).click();
+    // Riapri dalla ricerca del filo (la Cronologia non c'è più, #872): il risultato porta la voce d'archivio,
+    // e il main la riapre con la location proxy che la voce ricorda.
+    const home = await openTab('filo://newtab/');
+    await home.locator('#cercaInput').fill('Sito Proxato');
+    const voce = home.locator('.dash-cerca-pagina', { hasText: 'Sito Proxato' });
+    await expect(voce).toBeVisible({ timeout: 8_000 });
+    await voce.click();
 
     // La tab riaperta NASCE proxata sulla stessa location (us), non diretta.
     await expect.poll(async () => app.evaluate(({ BrowserWindow }, target) => {

@@ -5,6 +5,8 @@
 // modello entra nella pagina e va a chiedere l'indirizzo esterno.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { confirmText, clickConfirm } from './helpers/confirm.mjs';
 
 const OSTILE = 'filo-853.invalid';
 const RISPOSTA_BELLA = 'Il **grassetto** resta.\n\n- la [guida](https://example.com/guida) si apre\n- secondo punto';
@@ -78,7 +80,7 @@ async function selezionaEApriMenu(page) {
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   });
   await page.locator('#bersaglio853').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const corpo = menu.locator('.sn-menu-inline-explain .sn-menu-inline-body');
   await expect(corpo).not.toHaveText(/Spiegazione…/, { timeout: 30_000 });
@@ -116,16 +118,12 @@ for (const [nome, url] of [['Editor', 'filo://editor/'], ['Gestione', 'filo://ma
     await expect(riquadro.locator('a.filo-md-link')).toHaveAttribute('href', 'https://example.com/guida');
     await expect(riquadro).not.toContainText('**');
 
-    // Il link si clicca davvero: apre la guida in una scheda nuova.
-    const aperture = await page.evaluate(() => {
-      window.__aperte853 = [];
-      const orig = window.open;
-      window.open = (u) => { window.__aperte853.push(u); return null; };
-      document.querySelector('.sn-popup .sn-popup-body a.filo-md-link').click();
-      window.open = orig;
-      return window.__aperte853;
-    });
-    expect(aperture).toEqual(['https://example.com/guida']);
+    // Il link si clicca davvero: scritto da un modello e mai giudicato, chiede l'OK (#1505); dopo apre la guida.
+    await riquadro.locator('a.filo-md-link').click();
+    await expect.poll(() => confirmText(page)).toContain('https://example.com/guida');
+    await clickConfirm(page, 'ok');
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith('https://example.com/guida')))), { timeout: 10_000 }).toBe(true);
   });
 }
 

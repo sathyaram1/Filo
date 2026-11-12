@@ -31,6 +31,8 @@ async function withFetch(impl, run) {
     const u = String(url);
     const body = init && init.body ? JSON.parse(init.body) : null;
     calls.push({ url: u, body, headers: (init && init.headers) || {} });
+    // Coi crediti di Filo il classificatore parte solo se i suoi host dichiarano la ritenzione zero (#831).
+    if (u === OR.ZDR_ENDPOINT) return jsonRes({ data: [{ model_id: 'typesafe/jev-1.13', provider_name: 'TypeSafe', tag: 'typesafe' }] });
     if (u.includes('/endpoints')) return jsonRes({ data: { endpoints: [{ provider_name: 'TypeSafe', tag: 'typesafe' }] } });
     return impl({ url: u, body });
   };
@@ -62,6 +64,18 @@ test('la richiesta va all\'endpoint delle decisioni con modello, stato, domande 
     assert.equal(r.usage.promptTokens, 476);
     assert.equal(r.usage.completionTokens, 70);
     assert.ok(Math.abs(r.usage.costUsd - 0.000019992) < 1e-12);
+    // Senza il campo della cache l'host non l'ha detta (#1464): per i contatori è «nd», non uno zero.
+    assert.deepEqual([r.usage.cachedPromptTokens, r.usage.cacheDetta], [0, false]);
+  });
+});
+
+test('la cache letta dal classificatore si conta come nelle chat (#1464)', async () => {
+  await withFetch(() => jsonRes({
+    answers: { f1: { type: 'noul', noul: 0.4 } },
+    usage: { input_tokens: 3000, output_tokens: 3, prompt_tokens_details: { cached_tokens: 2500 }, cost: 0.0001 },
+  }), async () => {
+    const r = await OR.decisions({ apiKey: 'k', model: 'typesafe/jev-1.13', state: 's', questions: DOMANDE });
+    assert.deepEqual([r.usage.cachedPromptTokens, r.usage.cacheDetta], [2500, true]);
   });
 });
 

@@ -5,7 +5,7 @@
 'use strict';
 
 const cfg = require('./config');
-const G = require('../services/dominiGoogle');
+const G = require('../../shared/dominiGoogle');
 
 const DOPO = 'https://www.youtube.com/';
 const INVITO = 'YouTube, Gmail e Drive nelle schede non sono ancora collegati al tuo account Google.';
@@ -60,7 +60,7 @@ function collega({ daUrl = '', finestra = null } = {}) {
       // Una pagina che non si carica non è un no di Google: l'invito resta.
       if (motivo !== 'rete') googleRifiutaLeSchede();
       const testo = motivo === 'rete' ? NON_CARICATA : RIFIUTO;
-      try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'prodotti-google-rifiutati' }); } catch (_) {}
+      try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'prodotti-google-rifiutati', tipo: 'prodotti_google_rifiutati' }); } catch (_) {}
     },
   });
   if (!scheda) return { ok: false, error: 'Apri una finestra normale di Filo e riprova.' };
@@ -79,7 +79,7 @@ async function invitaSeServe(finestra = null) {
   try {
     win.webContents.send('shell:toast', {
       text: INVITO,
-      opts: { durationSec: 20, key: 'invito-prodotti-google', actions: [{ label: 'Collega', collegaGoogle: true }] },
+      opts: { durationSec: 20, key: 'invito-prodotti-google', tipo: 'invito_prodotti_google', actions: [{ label: 'Collega', collegaGoogle: true }] },
     });
   } catch (_) { return false; }
   segnaInvitoFatto();

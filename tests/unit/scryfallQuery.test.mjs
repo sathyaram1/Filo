@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'scryfallQuery.js'));
 
 const Q = globalThis.SN_SCRYFALL_Q;
@@ -233,11 +234,13 @@ test('parseAgentReply: filter — criterio semantico estratto, stringa vuota/ass
   assert.equal(Q.parseAgentReply('{"query":"t:dragon","filter":42}').filter, '');
 });
 
-test('parseAgentReply: tollera fence ```json e testo attorno', () => {
-  const fenced = 'Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie';
-  assert.equal(Q.parseAgentReply(fenced).query, 't:dragon');
+test('parseAgentReply: tollera fence ```json e frasi su righe loro; un oggetto dentro una frase fa della risposta prosa (#1302)', () => {
+  assert.equal(Q.parseAgentReply('\n```json\n{"query":"t:dragon"}\n```\n').query, 't:dragon');
+  assert.equal(Q.parseAgentReply('Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie').query, 't:dragon');
+  assert.equal(Q.parseAgentReply('Ecco:\n{"query":"t:elf"}').query, 't:elf');
+  assert.equal(Q.parseAgentReply('  {"reply":"ok","cards":[]}  ').reply, 'ok');
   const attorno = 'premessa {"reply":"ok","cards":[]} coda';
-  assert.equal(Q.parseAgentReply(attorno).reply, 'ok');
+  assert.deepEqual(Q.parseAgentReply(attorno), { ...NONE, reply: attorno });
 });
 
 test('parseAgentReply: non-JSON → il testo grezzo diventa reply', () => {
@@ -260,13 +263,22 @@ test('parseAgentReply: budget — numero imposta, null rimuove, spazzatura si ig
 });
 
 test('parseAgentReply: prob — needs come oggetto o array, tag normalizzati, invalidi scartati', () => {
+  const noCond = { game: '', mulligans: 0, keep: [], extraDraws: 0 };
   const asObj = Q.parseAgentReply('{"prob":{"turn":10,"needs":{"Ramp":2,"terre":3}}}');
-  assert.deepEqual(asObj.prob, { turn: 10, needs: [{ tag: 'ramp', n: 2 }, { tag: 'terre', n: 3 }] });
+  assert.deepEqual(asObj.prob, { turn: 10, needs: [{ tag: 'ramp', n: 2 }, { tag: 'terre', n: 3 }], ...noCond });
   const asArr = Q.parseAgentReply('{"prob":{"turn":"4","needs":[{"tag":"Draw","n":"1"}]}}');
-  assert.deepEqual(asArr.prob, { turn: 4, needs: [{ tag: 'draw', n: 1 }] });
+  assert.deepEqual(asArr.prob, { turn: 4, needs: [{ tag: 'draw', n: 1 }], ...noCond });
   assert.equal(Q.parseAgentReply('{"prob":{"turn":0,"needs":{"a":1}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":{"turn":5,"needs":{"a":0}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":"domani"}').prob, null);
+});
+
+// #791: «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre» arriva intero al motore.
+test('parseAgentReply: prob — partita, mulligan con mano da tenere e pescate extra', () => {
+  const p = Q.parseAgentReply('{"prob":{"turn":3,"needs":{"terre":3},"game":" Draw ","mulligans":"1","keep":{"Terre":2},"extraDraws":2}}').prob;
+  assert.deepEqual(p, { turn: 3, needs: [{ tag: 'terre', n: 3 }], game: 'draw', mulligans: 1, keep: [{ tag: 'terre', n: 2 }], extraDraws: 2 });
+  const bad = Q.parseAgentReply('{"prob":{"turn":3,"needs":{"terre":3},"game":7,"mulligans":-2,"keep":"due terre","extraDraws":"tante"}}').prob;
+  assert.deepEqual(bad, { turn: 3, needs: [{ tag: 'terre', n: 3 }], game: '', mulligans: 0, keep: [], extraDraws: 0 });
 });
 
 test('parseAgentReply: evaluate — "deck"/"results" passano, true legacy → deck, altro si scarta', () => {

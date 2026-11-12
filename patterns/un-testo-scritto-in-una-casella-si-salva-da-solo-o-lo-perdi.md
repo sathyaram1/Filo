@@ -77,7 +77,8 @@ sito e concludeva che la lista non funzionava (#590.2).
   (`src/main/tabs/chiusuraConCaselle.js`, #666). Chi spedisce manda il suo
   messaggio senza `await` davanti, così arriva prima del «niente più». Le prove
   chiudevano con `filoShell.tabs.close` senza nessun fuoco perso: prima di
-  questo il numero si perdeva.
+  questo il numero si perdeva. Lo stesso vale per la finestra chiusa e per
+  l'uscita da Filo (sezione in fondo).
 - **Quindi il testo parte mentre si scrive**, dopo una pausa breve, e subito al
   primo segno di uscita: il Ctrl, Cmd o Alt premuto da solo (arriva alla pagina
   prima della lettera di Ctrl+W, Ctrl+Tab o Alt+cifra, che il main si tiene), il
@@ -189,4 +190,32 @@ scheda col cursore dentro buttava via il numero (#666).
   (e resta da spedire); un salvataggio chiesto in quel mentre parte appena
   torna la risposta.
 - **Dove:** `collega` in `src/shared/campoNumero.js`, `costruisciManopole` in
-  `src/pages/credits/owner.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
+  `src/pages/manage/manageUtenti.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
+
+## Il main aspetta la pagina anche alla finestra chiusa e all'uscita da Filo
+
+Chiudere la finestra o uscire da Filo distrugge le schede senza passare dalla
+chiusura della singola scheda: l'ultima modifica a metà pausa, o una rinomina
+ancora aperta, si perdeva.
+
+- **Una regola sola per le tre uscite.** Scheda, finestra (`close` in
+  `src/main/window.js`) e uscita (`before-quit` in `src/main/main.js`, tutte le
+  finestre) chiedono a `chiusuraConCaselle`; la pagina riceve lo stesso
+  `TAB_IN_VISTA` falso e lo tratta come uscita vera.
+- **Lo stato «in sospeso» è della pagina**, non dell'istanza: Opzioni e Altro
+  stanno nella stessa scheda, e il «niente più» di una non deve far chiudere
+  la pagina mentre l'altra ha ancora da spedire.
+- **Prima di sparire c'è tempo per UN messaggio.** Chi salva all'uscita spedisce
+  subito quello che ha in mano, senza rileggere prima lo storage: il Correttore
+  rileggeva l'elenco e quel giro arrivava a scheda già distrutta.
+- **Un campo che si conferma lasciandolo** (rinomina nell'Editor,
+  riga del Correttore) a metà non deve partire, né alla pausa né al Ctrl:
+  `SN_CASELLE.alVolo()` dice al main di aspettare e ne fa partire la conferma
+  solo all'uscita vera.
+- **«Salvato» parla dell'ultima modifica.** `spedita()` restituisce un biglietto;
+  a risposta arrivata la pagina accende la conferma solo se `aggiornata()` dice
+  che dopo non è cambiato niente, e `spegni` la toglie appena arriva una
+  modifica.
+- **Dove:** `src/main/tabs/chiusuraConCaselle.js`, `src/shared/caselleAlSicuro.js`.
+  Test: `tests/unit/chiusuraConCaselle.test.mjs`, `tests/unit/caselleAlSicuro.test.mjs`,
+  `tests/uscite-che-salvano.spec.mjs`, `tests/chiusura-scheda-salva.spec.mjs`.

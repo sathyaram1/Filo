@@ -28,6 +28,8 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
 // Come nel main (loader.js): serve alla sostituzione a pesi aperti per sapere
 // se il sostituto fa il mestiere della funzione.
 require(join(__dirname, '..', '..', 'src', 'shared', 'modelCaps.js'));
+// La frase di un rifiuto del router, la stessa della chat (#1345).
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 const { MSG } = globalThis.SN_MSG;
 
 // ── harness: registra l'handler con dipendenze finte ────────────────────────
@@ -46,9 +48,9 @@ const state = {
 };
 
 const fornitoreFinto = (provider) => ({
-  streamComplete: async ({ apiKey, model, messages, providerRouting, onDelta }) => {
-    state.calls.push({ provider, apiKey, model, providerRouting });
-    if (state.streamError) throw new Error(state.streamError);
+  streamComplete: async ({ apiKey, model, messages, providerRouting, reasoning, onDelta }) => {
+    state.calls.push({ provider, apiKey, model, providerRouting, reasoning });
+    if (state.streamError) throw (typeof state.streamError === 'string' ? new Error(state.streamError) : state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
     return { usage: { completionTokens: 7 } };
@@ -57,10 +59,8 @@ const fornitoreFinto = (provider) => ({
 globalThis.SN_PROVIDERS = { getProvider: (nome) => fornitoreFinto(nome) };
 require(join(__dirname, '..', '..', 'src', 'main', 'services', 'modelGate.js'));
 
-const providerRoutingFinto = (settings) => {
-  const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-  return ignore.length ? { ignore } : null;
-};
+// La regola vera: esclusione più ordinamento, quello della voce prima di quello generale.
+const providerRoutingFinto = (settings, entrySort) => globalThis.SN_CONST.providerRoutingFor(settings, entrySort);
 const modelGate = globalThis.SN_MODEL_GATE.create({
   getSettings: async () => state.effective,
   routing: providerRoutingFinto,
@@ -162,6 +162,38 @@ test('errore del provider propagato come ok:false (es. modello inesistente su Op
   const res = await testModel({ provider: 'openrouter', model: 'finto/modello' });
   assert.equal(res.ok, false);
   assert.match(String(res.error), /No endpoints found/);
+});
+
+// #1345: un rifiuto del router, nei due «Prova», con la stessa causa che direbbe la chat e mai il JSON del servizio.
+test('rifiuto del router: il «Prova» dice la causa come la chat, non il messaggio grezzo', async () => {
+  const CE = globalThis.SN_CHAT_ERRORS;
+  const rifiuto = (code, testo, extra = {}) => Object.assign(
+    new Error(`OpenRouter 404: {"error":{"message":"${testo}","code":404}}`),
+    { status: 404, provider: 'openrouter', code, ...extra },
+  );
+  const casi = [
+    [rifiuto('NO_PROVIDER_ALLOWED', 'No allowed providers are available for the selected model.'), /fra quelli ammessi/],
+    [rifiuto('DATA_POLICY', 'No endpoints found matching your data policy.'), /privacy/],
+    [rifiuto('INGRESSO_NON_LETTO', 'No endpoints found that support input audio', { ingresso: 'audio' }), /non ascolta l'audio/],
+    [rifiuto('NO_TOOL_HOST', 'No endpoints found that support tool use'), /nessun fornitore ammesso sa usare gli strumenti/],
+    [Object.assign(new Error(CE.fraseNessunHost({ modello: 'finto/modello', motivo: CE.motivoHostEsclusi(['DeepSeek']) })), {
+      code: 'NO_ALLOWED_HOST', reason: 'excluded', model: 'finto/modello', hosts: ['DeepSeek'],
+    }), /Lo serve solo DeepSeek, che Filo esclude/],
+  ];
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  for (const [errore, causa] of casi) {
+    state.streamError = errore;
+    for (const res of [
+      await testModel({ provider: 'openrouter', model: 'finto/modello' }),
+      await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente', model: 'finto/modello' }),
+    ]) {
+      assert.equal(res.ok, false);
+      assert.match(String(res.error), causa, errore.code);
+      assert.doesNotMatch(String(res.error), /OpenRouter 404|\{"error"/, errore.code);
+      assert.equal(res.error, CE.sentence(errore), 'la stessa frase della chat');
+    }
+  }
 });
 
 // ── { nickname }: lista read-only delle Opzioni ──────────────────────────────
@@ -311,6 +343,42 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   const ignore = (state.calls[0].providerRouting || {}).ignore || [];
   assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
+});
+
+// ── La prova misura la velocità: deve girare come girerebbe la voce ─────────
+
+test('riga non salvata: la prova parte con ordinamento e reasoning scritti sulla riga', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price' };
+  const res = await testModel({
+    provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput', reasoning: 'low',
+  });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
+  assert.equal(state.calls[0].reasoning, 'low');
+});
+
+test('nickname salvato: la prova prende ordinamento e reasoning dalla voce del registry', async () => {
+  state.defaults = {
+    modelRegistry: { svelto: { provider: 'openrouter', model: 'vendor/aperto', sort: 'latency', reasoning: 'off' } },
+    apiKeys: { openrouter: 'sk-or-default' },
+  };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'] };
+  const res = await testModel({ nickname: 'svelto' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'latency' });
+  assert.equal(state.calls[0].reasoning, 'off');
+});
+
+test('prova dalle Opzioni: vale anche lì la scelta fatta sulla voce personale', async () => {
+  state.effective = {
+    modelRegistry: { mio: { provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput' } },
+    apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price',
+  };
+  const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-mia', model: 'vendor/aperto', nickname: 'mio' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
 });
 
 // ── Il limite di spesa vale anche per le prove (#591): sono chiamate vere ─────

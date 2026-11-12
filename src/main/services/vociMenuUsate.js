@@ -1,0 +1,72 @@
+// Le voci scelte in un menu a comparsa, contate per chi usa Filo (#1129): la più usata si prepara all'apertura del menu.
+// Non prepara niente da sé (tabs.js, preparaDalMenu); l'incognito non conta. Prova: tests/unit/riservaNuovaScheda.test.mjs.
+
+// La più scelta fra `candidati`; a pari conto vince `predefinita`, poi l'ordine del menu.
+function scegli(conti, candidati, predefinita = '') {
+  const voci = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u);
+  if (!voci.length) return '';
+  const n = (u) => {
+    const v = conti && Object.prototype.hasOwnProperty.call(conti, u) ? Number(conti[u]) : 0;
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  };
+  const prima = voci.includes(predefinita) ? predefinita : voci[0];
+  let migliore = prima;
+  for (const u of voci) if (n(u) > n(migliore)) migliore = u;
+  return migliore;
+}
+
+function crea({ leggi, scrivi } = {}) {
+  // In memoria, così l'apertura del menu sceglie senza aspettare il disco; la tengono fresca le scritture di qui e
+  // `allinea` (ogni altra scrittura della chiave, come un backup importato).
+  let tutti = null;
+  let inCorso = null;
+
+  const valido = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+  function carica() {
+    if (tutti) return Promise.resolve(tutti);
+    if (!inCorso) {
+      // Una lettura fallita lascia vuoto e si ritenta: un conto scritto sopra il disco non letto lo cancellerebbe.
+      inCorso = Promise.resolve().then(() => leggi()).then((v) => { if (!tutti) tutti = valido(v); return tutti; }, () => tutti)
+        .finally(() => { inCorso = null; });
+    }
+    return inCorso;
+  }
+
+  function piuUsata(menu, candidati, predefinita) {
+    return scegli(tutti ? valido(tutti[menu]) : {}, candidati, predefinita);
+  }
+
+  // Quello che si sceglie in incognito non lascia traccia sul disco.
+  async function conta(menu, url, { incognito = false } = {}) {
+    if (incognito || !menu || typeof url !== 'string' || !url) return;
+    if (!(await carica())) return;
+    const voci = { ...valido(tutti[menu]) };
+    voci[url] = (Number(voci[url]) || 0) + 1;
+    tutti = { ...tutti, [menu]: voci };
+    try { await scrivi(tutti); } catch (_) {}
+  }
+
+  function allinea(v) { tutti = valido(v); }
+
+  return { carica, piuUsata, conta, allinea };
+}
+
+let predefinito = null;
+// Quello dell'app, sul disco del profilo normale: anche la finestra in incognito sceglie dalle abitudini di sempre.
+function servizio() {
+  if (predefinito) return predefinito;
+  const DiskStorage = require('../shim/storage');
+  const chiave = () => globalThis.SN_CONST.STORAGE_KEYS.VOCI_MENU_USATE;
+  predefinito = crea({
+    leggi: () => DiskStorage.runNormale(() => DiskStorage.get(chiave())).then((r) => r && r[chiave()]),
+    scrivi: (v) => DiskStorage.runNormale(() => DiskStorage.set({ [chiave()]: v })),
+  });
+  DiskStorage.onChanged((changes) => {
+    const c = changes && changes[chiave()];
+    if (c) predefinito.allinea(c.newValue);
+  });
+  return predefinito;
+}
+
+module.exports = { scegli, crea, servizio };

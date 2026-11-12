@@ -36,8 +36,10 @@ import { createRequire } from 'node:module';
 import { scrivi } from './owner-feedback.mjs';
 // #583: leggere i feedback vuole le credenziali dell'owner (le stesse con cui
 // questo script scrive), e i voti stanno sulle schede pubbliche.
-import { acquireBearer } from './lib/firestore-auth.mjs';
+import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
+import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
+import { NOTE_FISSE } from './lib/note-fisse.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +76,28 @@ const CAMPI_SEGNALAZIONI = [...BA.CAMPI_DECISIONE, 'seq', 'subSeq'];
 // Il nome con cui la lettura di questo giro si mette da parte (lib/scansione-secco).
 const COPIA = 'auto-archive/segnalazioni';
 
+// La decisione guarda solo le chiuse: lo stato vero è cifrato, `statusPublic` è in chiaro e il database lo filtra da sé
+// (#1335). Una segnalazione senza `statusPublic` il filtro la lascerebbe fuori in silenzio, quindi lo si usa solo quando
+// un conteggio dice che ce l'hanno tutte; altrimenti si leggono tutte, dicendolo.
+export const SOLO_CHIUSE = Object.freeze({ campo: 'statusPublic', valore: 'closed' });
+const CON_STATO_PUBBLICO = { field: 'statusPublic', op: 'IN', value: { arrayValue: { values: [{ stringValue: 'open' }, { stringValue: 'closed' }] } } };
+
+async function filtroDelleChiuse(token, letture) {
+  const comune = { bearer: token };
+  const [tutte, conStato] = await Promise.all([
+    contaDocumenti(FIRESTORE_BASE, FIREBASE_API_KEY, 'feedback', comune),
+    contaDocumenti(FIRESTORE_BASE, FIREBASE_API_KEY, 'feedback', { ...comune, filtro: CON_STATO_PUBBLICO }),
+  ]);
+  if (!Number.isFinite(tutte) || !Number.isFinite(conStato)) {
+    return { avviso: 'AVVISO: il server non ha saputo dire se ogni segnalazione ha lo stato pubblico: leggo tutte, aperte comprese.' };
+  }
+  letture.aggiungi(2, 'conteggi');
+  if (tutte !== conStato) {
+    return { avviso: `AVVISO: ${tutte - conStato} segnalazioni non hanno lo stato pubblico, e il filtro sul server le lascerebbe fuori: leggo tutte, aperte comprese.` };
+  }
+  return { uguale: SOLO_CHIUSE };
+}
+
 // `bearer`: il token, se chi chiama ce l'ha già. Serve solo alla lettura, quindi
 // quando le righe arrivano dalla copia non si chiede a nessuno.
 export async function runAutoArchive({
@@ -84,8 +108,13 @@ export async function runAutoArchive({
 
   const { dati } = await scansione({
     nome: COPIA, dry: dryRun, now, dir: copiaDir, usaCopia,
+    // Lo stato di ogni riga si confronta col presente quando si scrive (scrivi, statoAtteso): l'elenco intero non ha
+    // niente da controllare in più.
+    confronta: () => '',
     scansiona: async () => {
       const token = bearer || await acquireBearer();
+      const filtro = await filtroDelleChiuse(token, letture);
+      if (filtro.avviso) console.warn(filtro.avviso);
       // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
       // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
       // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
@@ -93,7 +122,7 @@ export async function runAutoArchive({
       // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
       // ne restavano fuori 211, e il numero cresceva da solo.
       const r = typeof FB.listAllPaged === 'function'
-        ? await FB.listAllPaged({ idToken: token, fields: CAMPI_SEGNALAZIONI })
+        ? await FB.listAllPaged({ idToken: token, fields: CAMPI_SEGNALAZIONI, ...(filtro.uguale ? { uguale: filtro.uguale } : {}) })
         : { rows: await FB.list({ pageSize: 500, idToken: token, fields: CAMPI_SEGNALAZIONI }), complete: false };
       const grezzi = r.rows;
       const complete = r.complete;
@@ -123,18 +152,22 @@ export async function runAutoArchive({
   const { toArchive, toFlag } = BA.applyAutoArchive(feedbacks, { now, releasedVersion: ver });
 
   const archivedDetails = [];
+  const saltate = [];
   for (const id of toArchive) {
     const fb = feedbacks.find((f) => f._id === id);
     const { score } = FB.tallyVotes(fb && fb.votes);
-    const note = `auto-archiviato (DC3): punteggio ${score} dopo 24h+ dalla messa in produzione (${ver || 'n/d'}).`;
-    archivedDetails.push({ id, num: fb ? FB.formatNum(fb.seq, fb.subSeq) : '', score, note });
+    // Una nota composta qui, non dalla sessione: passa anche da un terminale senza biglietto pulito (#1428.1).
+    const nota = NOTE_FISSE.autoArchivio({ punteggio: score, versione: ver });
+    const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
     if (!dryRun) {
       // Archiviare rilegge la segnalazione: è una lettura come le altre e va
       // nella riga del costo, o il giro che riusa la scansione dichiara zero
-      // mentre paga (#680).
-      const r = await scrivi(id, 'archived', note, { attore: 'owner', letture });
+      // mentre paga (#680). Si scrive solo se lo stato è ancora quello su cui si è deciso (#680.2).
+      const r = await scrivi(id, 'archived', nota, { attore: 'owner', letture, statoAtteso: (fb && fb.status) || '' });
+      if (r.cambiata) { saltate.push({ id, num, motivo: r.motivo }); continue; }
       if (!r.ok) console.warn(`  ! ${id} non archiviato: ${r.motivo}`);
     }
+    archivedDetails.push({ id, num, score, note: nota.testo });
   }
 
   // Tenere la copia dopo un'applicazione vorrebbe dire far ripartire un secondo
@@ -142,7 +175,7 @@ export async function runAutoArchive({
   dopoApplicazione(COPIA, { dry: dryRun, usaCopia, dir: copiaDir });
 
   return {
-    releasedVersion: ver, toArchive: archivedDetails, toFlag, dryRun, complete,
+    releasedVersion: ver, toArchive: archivedDetails, toFlag, saltate, dryRun, complete,
     letture: letture.totale, rigaLetture: letture.riga(),
   };
 }
@@ -177,6 +210,9 @@ const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run', '--rileggi'] 
   } else {
     console.log(`${dryRun ? '[dry-run] ' : ''}Da archiviare (${result.toArchive.length}):`);
     for (const a of result.toArchive) console.log(`  - ${a.num || a.id} (score ${a.score})${dryRun ? '' : ' → accodato'}`);
+  }
+  if (result.saltate.length) {
+    console.log(`Saltate perché cambiate dalla lettura su cui si è deciso (${result.saltate.length}): ${result.saltate.map((x) => x.num || x.id).join(', ')}`);
   }
   if (result.toFlag.length) {
     console.log(`Segnalati come "gli utenti dicono che non va" (${result.toFlag.length}, NON archiviati né riaperti): ${result.toFlag.join(', ')}`);

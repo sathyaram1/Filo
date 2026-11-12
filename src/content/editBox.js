@@ -1,10 +1,5 @@
-// Box "Modifica" (preview + conferma, mai sovrascrittura cieca).
-// Apre un overlay modale (HTML), mostra originale + proposta con diff, e
-// azioni esplicite [Sostituisci] / [Copia la nuova] / [Annulla]. Scorciatoie
-// pronte (più formale / informale / riassumi / traduci / correggi) + campo
-// libero per istruzioni arbitrarie.
-// Estratto da content.js — viene caricato prima di lui dai preload. content.js
-// chiama init() passando l'accesso al pasteContext (che resta suo).
+// Box «Modifica»: anteprima con diff e conferma esplicita, mai sovrascrittura cieca.
+// Caricato prima di content.js, che gli passa il contesto d'incolla con init().
 
 (function (global) {
   'use strict';
@@ -14,20 +9,25 @@
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
 
-  // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
     getPasteContext: () => null,
     setPasteContext: () => {},
     restorePasteContext: () => false,
   };
 
-  function openEditBox(originalText) {
-    if (!deps.getPasteContext()) {
+  // `sostituisci`: nello strato sopra un sito il campo sta nella pagina sotto, e il testo scelto torna a lei (#1509.1).
+  function openEditBox(originalText, { sostituisci: altrove = null } = {}) {
+    if (!altrove && !deps.getPasteContext()) {
       // Rivalido al volo: senza editable il "Sostituisci" non avrebbe senso.
-      Popup.showToast(I18n.t('err_no_selection'));
+      Popup.toastErrore('err_no_selection');
       return;
     }
-    const savedCtx = deps.getPasteContext(); // congelo il riferimento per il momento del replace
+    const savedCtx = altrove ? null : deps.getPasteContext(); // congelo il riferimento per il momento del replace
+    if (savedCtx && global.SN_RIQUADRI_SOPRA?.apri('modifica', { testo: originalText, contesto: savedCtx }, () => apriQui(originalText, savedCtx, null))) return;
+    apriQui(originalText, savedCtx, altrove);
+  }
+
+  function apriQui(originalText, savedCtx, altrove) {
 
     const root = document.createElement('div');
     root.className = 'sn-editbox-overlay';
@@ -82,6 +82,19 @@
       translate: 'Traduci il testo in inglese.',
       fix: 'Correggi eventuali errori grammaticali e di ortografia, senza alterare il senso.',
     };
+    // Per i contatori (#1465): quale scorciatoia ha fatto la proposta (un'istruzione scritta è «libera», mai il suo
+    // testo), quante proposte prima dell'esito, e l'esito.
+    const CONTATA = { formal: 'formale', casual: 'informale', summarize: 'riassumi', translate: 'traduci', fix: 'correggi' };
+    const scorciatoiaDi = (istruzione) => CONTATA[Object.keys(SHORTCUTS).find((k) => SHORTCUTS[k] === istruzione)] || 'libera';
+    const conta = (campi) => Popup.conta?.({ misura: 'riquadro', cosa: 'riscrittura', ...campi });
+    let proposte = 0;
+    let scorciatoia = '';
+    let finita = false;
+    const fine = (esito) => {
+      if (finita) return;
+      finita = true;
+      if (proposte > 0) conta({ scorciatoia, esito, proposte });
+    };
     // Una riscrittura spende una chiamata: parte solo da un tasto o da un clic dell'utente (#1071).
     root.querySelectorAll('.sn-editbox-shortcuts button').forEach((b) => {
       b.addEventListener('click', (e) => {
@@ -95,11 +108,14 @@
     let currentResult = '';
     let inFlight = false;
     let $nota = null; // la riga del ripiego sui crediti di Filo, della proposta in vista
+    let $interrotta = null; // la riga della proposta fermata dal tetto di lunghezza (#1097.3)
     async function runEdit() {
       const instruction = $instr.value.trim();
       if (!instruction || inFlight) return;
       inFlight = true;
       if ($nota) { $nota.remove(); $nota = null; }
+      if ($interrotta) { $interrotta.remove(); $interrotta = null; }
+      $prop.classList.remove('sn-editbox-errore');
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
@@ -112,22 +128,34 @@
           diceRipiego: true,
         });
         if (!res?.ok || !res.text) {
-          // Perché la riscrittura non è partita, in italiano: la regola sta in
+          // Perché la riscrittura non è partita, con la strada per rimediare: la regola sta in
           // SN_CHAT_ERRORS, non un elenco di casi per riquadro (#663).
-          $prop.textContent = Popup.frasePerLUtente(res);
+          mostraErrore(res);
           return;
         }
         currentResult = res.text.trim();
+        proposte += 1;
+        scorciatoia = scorciatoiaDi(instruction);
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
         $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
+        $interrotta = Popup.notaInterrotta($prop.parentNode, res.finishReason);
         $copy.disabled = false;
-        $replace.disabled = false;
+        // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
+        $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
+        if ($replace.disabled) conta({ scorciatoia, tagliata: true });
       } catch (e) {
-        $prop.textContent = Popup.frasePerLUtente({ message: e?.message });
+        mostraErrore({ message: e?.message });
       } finally {
         inFlight = false;
       }
+    }
+    // Il motivo prende il posto della proposta, ma non il suo aspetto né quello dell'attesa: chi legge di sfuggita
+    // non lo deve scambiare per la riscrittura (#663).
+    function mostraErrore(res) {
+      $prop.classList.remove('sn-editbox-empty');
+      $prop.classList.add('sn-editbox-errore');
+      Popup.scriviErrore($prop, res);
     }
 
     $instr.addEventListener('keydown', (e) => {
@@ -147,41 +175,32 @@
       if (!e.isTrusted) return;
       navigator.clipboard.writeText(currentResult).then(() => {
         Popup.showToast(I18n.t('toast_copied'));
+        fine('copiato');
         close();
-      }, () => Popup.showToast(I18n.t('err_provider_failed')));
+      }, () => Popup.toastErrore('err_provider_failed'));
     });
     $replace.addEventListener('click', (e) => {
       if (!e.isTrusted) return;
-      deps.setPasteContext(savedCtx);
-      deps.restorePasteContext();
-      // In input/textarea sostituisco il range salvato; in contenteditable uso execCommand insertText
-      // dopo aver ripristinato la selezione originale, così Ctrl+Z funziona.
-      if (savedCtx.kind === 'input') {
-        const el = savedCtx.el;
-        const start = savedCtx.start, end = savedCtx.end;
-        const caret = start + currentResult.length;
-        // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
-        if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
-          el.setSelectionRange(start, caret);
-        } else {
-          el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
-          el.setSelectionRange(start, caret);
-          // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
-          const ev = new Event('input', { bubbles: true });
-          el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
-        }
-      } else if (savedCtx.kind === 'ce') {
-        try { document.execCommand('insertText', false, currentResult); } catch (_) {}
+      if (altrove) {
+        fine('sostituito');
+        close();
+        altrove(currentResult);
+        return;
       }
-      Popup.showToast(I18n.t('edit_box_replaced'));
+      sostituisci(savedCtx, currentResult);
+      fine('sostituito');
       close();
     });
 
     function close() {
+      fine('chiuso');
       if (Popup.togliRiquadro) Popup.togliRiquadro(root);
       else { try { root.remove(); } catch (_) {} }
       document.removeEventListener('keydown', onDocKey, true);
+      window.removeEventListener('pagehide', close);
     }
+    // La pagina che se ne va col riquadro aperto lo chiude.
+    window.addEventListener('pagehide', close);
     const onDocKey = (e) => {
       if (e.key !== 'Escape') return;
       close();
@@ -190,17 +209,42 @@
     };
     document.addEventListener('keydown', onDocKey, true);
     root.addEventListener('mousedown', (e) => {
-      if (e.target === root) close(); // click fuori dal box
+      if (e.target === root) close();
     });
 
-    // Avvia subito una proposta neutra (rifrasi), così l'utente vede già qualcosa.
     $instr.value = '';
     // No autorun — l'utente deve dare istruzione esplicita.
     $prop.textContent = '—';
   }
 
-  // Diff parola-per-parola: ricostruisce il testo proposto evidenziando aggiunte
-  // (verde) e rimozioni (rosso barrato). Algoritmo LCS semplice sulle parole.
+  // Il testo scelto entra nel campo e nella selezione di quando la Modifica è stata chiesta.
+  function sostituisci(savedCtx, testo) {
+    if (!savedCtx) return;
+    deps.setPasteContext(savedCtx);
+    deps.restorePasteContext();
+    // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione,
+    // così Ctrl+Z funziona.
+    if (savedCtx.kind === 'input') {
+      const el = savedCtx.el;
+      const start = savedCtx.start, end = savedCtx.end;
+      const caret = start + testo.length;
+      // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
+      if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, testo)) {
+        el.setSelectionRange(start, caret);
+      } else {
+        el.value = el.value.slice(0, start) + testo + el.value.slice(end);
+        el.setSelectionRange(start, caret);
+        // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
+        const ev = new Event('input', { bubbles: true });
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+      }
+    } else if (savedCtx.kind === 'ce') {
+      try { document.execCommand('insertText', false, testo); } catch (_) {}
+    }
+    Popup.modificaDiFilo(savedCtx.el || document.activeElement, 'modifica-testo');
+    Popup.showToast(I18n.t('edit_box_replaced'));
+  }
+
   function renderDiff(container, original, proposed) {
     container.innerHTML = '';
     const a = original.split(/(\s+)/);
@@ -242,5 +286,5 @@
 
   function init(d) { deps = { ...deps, ...d }; }
 
-  global.SN_EDITBOX = { init, openEditBox };
+  global.SN_EDITBOX = { init, openEditBox, sostituisci };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

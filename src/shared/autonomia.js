@@ -19,7 +19,7 @@
   const GUARDIANO_REGISTRI = false;
 
   const CLASSI = Object.freeze({
-    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le chat passate',
+    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le chat passate in cui non è entrato testo di altri',
     2: 'I file su cui lavori: l\'editor, quelli toccati di recente',
     3: 'Autori fidati: mittenti a cui hai risposto o che hai segnato, siti di un autore solo segnati da te',
     4: 'Gli altri file del computer',
@@ -129,12 +129,12 @@
   function piuStretta(a, b) { return PESO[a] >= PESO[b] ? a : b; }
 
   // Ingressi: livello, stato ('pulito'|'contaminato'), costo 0-3, dentroPerimetro, origine ('chat'|'automazione'),
-  // campo, manopole; più elenco (id dell'elenco fisso colpito) e difesa (l'azione abbassa una difesa), che
-  // dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
+  // campo, manopole; più elenco (id dell'elenco fisso colpito), difesa (l'azione abbassa una difesa) e parola
+  // (l'azione vuole «conferma» a ogni livello), che dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
   // Esce { risposta, digita, regola, cella }: risposta fra RISPOSTE, digita = va scritta la parola «conferma».
   function decideDettaglio({
     livello, stato: st, costo, dentroPerimetro = true, origine = 'chat', campo = null,
-    manopole = null, elenco = '', difesa = false, guardiano = false,
+    manopole = null, elenco = '', difesa = false, parola = false, guardiano = false,
   } = {}) {
     const lv = livelloDa(livello);
     if (!costoValido(costo)) return { risposta: 'no', digita: false, regola: 'costo', cella: 'no' };
@@ -151,6 +151,7 @@
       else cella = TABELLA[lv].contaminato[c] === 'si' ? 'si+G' : TABELLA[lv].contaminato[c];
     }
     if (difesa && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'difesa'; }
+    if (parola && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'parola'; }
     let risposta = cella;
     if (risposta === 'si+G') risposta = guardiano ? 'si' : 'chiede';
     let digita = risposta === 'conferma';
@@ -281,6 +282,7 @@
     password: 'una password',
     codice: 'un codice usa e getta o di recupero',
     banca: 'delle coordinate bancarie che non mi hai chiesto di mandare',
+    dati: 'dati tuoi dentro un indirizzo che ho scritto io e che non compare da nessuna parte',
   });
 
   // La frase che il popup aggiunge quando a farlo chiedere è ciò che il compito ha letto.
@@ -290,9 +292,10 @@
   }
 
   // Il testo di un «no», da una regola sola: solo il no dell'elenco fisso dice «a nessun livello»; quello della
-  // tabella dice cosa ha letto il compito e le strade che restano (#530). `daPagina`: la fonte è la pagina stessa,
-  // e una conversazione nuova lì nasce uguale.
-  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false } = {}) {
+  // tabella dice cosa ha letto il compito e le strade che restano (#530). La conversazione nuova si consiglia solo se
+  // nasce pulita: non sopra una pagina (`daPagina`), né quando il filo che avrebbe davanti la sporca già
+  // (`nuovaUguale`, o una fonte `ereditata` dalle altre conversazioni, #1508).
+  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false, nuovaUguale = false } = {}) {
     if (regola === 'elenco' || regola === 'costo') {
       const voce = ELENCO_FISSO.find((e) => e.id === elenco);
       const cosa = seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
@@ -304,12 +307,13 @@
     }
     const nome = infoLivello(livello).nome;
     const letto = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
-    const strade = daPagina
+    const soloLivello = daPagina || nuovaUguale || !!(fonte && fonte.ereditata);
+    const strade = soloLivello
       ? 'alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»'
       : 'chiederlo in una conversazione nuova, che non ha ancora letto niente, oppure alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»';
     return {
       breve: `a livello ${nome} non lo faccio da solo, perché in questo compito ${letto}. `
-        + (daPagina ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
+        + (soloLivello ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
       perModello: `a livello di autonomia ${nome}, dopo che in questo compito ${letto}, Filo non fa da solo ciò che non si disfa. `
         + `Non è vietato a ogni livello: dillo all'utente in una riga, con le strade che ha (${strade}). Non riprovare in questa conversazione`,
     };

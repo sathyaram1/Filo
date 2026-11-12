@@ -28,7 +28,8 @@
   const APP = [
     { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
     { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
-    { id: 'cronologia', titolo: 'Cronologia', icona: 'history', url: 'filo://archive/archive.html' },
+    // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
     { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
   ];
 
@@ -127,11 +128,33 @@
     return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
   }
 
+  // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
+  // gli avvisi che non la portano restano come sono.
+  function paginaDiAvviso(n) {
+    const a = n && n.action && typeof n.action === 'object' ? n.action : null;
+    const url = a && typeof a.apri === 'string' ? a.apri.trim() : '';
+    if (!/^filo:\/\/[a-z0-9-]+\/\S*$/i.test(url)) return null;
+    const etichetta = typeof a.etichetta === 'string' && a.etichetta.trim() ? a.etichetta.trim() : 'Apri';
+    return { url, etichetta };
+  }
+
   // Le carte di sinistra che l'utente ha tolto e che ci sarebbero ancora: stanno in «altro», da cui si rimettono una per una.
   function nascosteSinistra(dati, layout, ora = Date.now()) {
     const l = normalizza(layout);
     const nascoste = new Set(l.nascoste);
     return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
+  }
+
+  // Il primo incontro (#1661): finché l'accoglienza non si è chiusa la home tiene solo la colonna di sinistra, se la
+  // strada per cominciare è una (i Crediti, o l'intervista). Senza un modello da scegliere resta intera: quella strada
+  // sta fra i suggerimenti. `onb`: lo stato dell'accoglienza; `motivo`: SN_CONST.whyCannotServe ('' se Filo risponde).
+  function primoIncontro(onb, motivo) {
+    const s = onb && typeof onb === 'object' ? onb : {};
+    return !s.done && s.rifatta !== true && (motivo === '' || motivo === 'chiave');
+  }
+  // Tolta la carta dei Crediti l'utente ha scelto la home intera, da cui la rimette. `crediti`: la carta ci sarebbe.
+  function homeRidotta(primo, layout, crediti) {
+    return !!primo && !(crediti && normalizza(layout).nascoste.includes('crediti'));
   }
 
   const TIPI_SINISTRA = {
@@ -252,6 +275,6 @@
   global.SN_CARTE_HOME = {
     CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
-    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra,
+    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

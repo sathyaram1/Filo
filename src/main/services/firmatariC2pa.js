@@ -6,22 +6,29 @@
 
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { impronta } = require('./improntaPixel');
 
 // Lo pubblica chi gestisce lo standard (programma di conformità del C2PA).
 const FONTE = 'https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/C2PA-TRUST-LIST.pem';
 // Le autorità di marcatura temporale: dicono se una firma fatta con un certificato oggi scaduto valeva quando è stata fatta.
 const FONTE_TSA = 'https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/C2PA-TSA-TRUST-LIST.pem';
+// L'elenco provvisorio, congelato, che legge il verificatore di riferimento: autorità e singoli firmatari ammessi (#946.1).
+const FONTE_PROVVISORIO = 'https://raw.githubusercontent.com/contentauth/verify-site/main/static/trust/anchors.pem';
+const FONTE_AMMESSI = 'https://raw.githubusercontent.com/contentauth/verify-site/main/static/trust/allowed.pem';
 const RINFRESCO_MS = 24 * 60 * 60 * 1000;
 const CONTROLLO_MS = 60 * 60 * 1000;
 // Dopo un fallimento non si riprova subito: il canale del menu lo può toccare anche una pagina web.
 const RIPROVA_MS = 10 * 60 * 1000;
+// Un elenco provvisorio che manca si richiede, ma non ogni dieci minuti: senza, l'elenco ufficiale basta a rispondere.
+const RIPROVA_PROVVISORIO_MS = 6 * 60 * 60 * 1000;
 // Alla prima immagine firmata, se l'elenco sta arrivando, lo si aspetta un poco invece di dire «non verificato».
 const ATTESA_PRIMA_VOLTA_MS = 3000;
 // L'elenco pesa decine di KB: oltre il tetto si rifiuta col numero nei log e si tiene quello che c'era.
 const MAX_BYTE = 8 * 1024 * 1024;
 const TIMEOUT_MS = 30_000;
 
-let salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
+const VUOTO = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '', pemProvvisorio: '', pemAmmessi: '' };
+let salvato = { ...VUOTO };
 // Il thread di lettura riceve l'elenco solo quando cambia: ogni cambio di `ancore` la fa salire.
 let versioneElenco = 0;
 let ancore = null;
@@ -54,7 +61,10 @@ async function carica() {
     const dati = JSON.parse(await fsp.readFile(file(), 'utf8'));
     const lette = leggiAncore(dati && dati.pem);
     if (lette.length) {
-      salvato = { pem: String(dati.pem), scaricatoIl: Number(dati.scaricatoIl) || 0, fonte: String(dati.fonte || ''), pemTsa: String(dati.pemTsa || '') };
+      salvato = {
+        pem: String(dati.pem), scaricatoIl: Number(dati.scaricatoIl) || 0, fonte: String(dati.fonte || ''), pemTsa: String(dati.pemTsa || ''),
+        pemProvvisorio: String(dati.pemProvvisorio || ''), pemAmmessi: String(dati.pemAmmessi || ''),
+      };
       ancore = lette;
       const tsa = leggiAncore(salvato.pemTsa);
       ancoreTsa = tsa.length ? tsa : null;
@@ -107,25 +117,37 @@ async function scarica(url) {
 // Un elenco che non si legge non prende il posto di quello buono: una risposta
 // sbagliata del server non deve far diventare «sconosciuto» chi era riconosciuto.
 // `urlTsa` assente con un `url` di prova: nei test la rete vera non si tocca.
-function aggiorna({ forza = false, url = FONTE, urlTsa = url === FONTE ? FONTE_TSA : null } = {}) {
+function aggiorna({
+  forza = false, url = FONTE, urlTsa = url === FONTE ? FONTE_TSA : null,
+  urlProvvisorio = url === FONTE ? FONTE_PROVVISORIO : null, urlAmmessi = url === FONTE ? FONTE_AMMESSI : null,
+} = {}) {
   if (inCorso) return inCorso;
-  if (!forza && ancore && Date.now() - salvato.scaricatoIl < RINFRESCO_MS) {
+  if (!forza && ancore && !(urlProvvisorio && mancaProvvisorio()) && Date.now() - salvato.scaricatoIl < RINFRESCO_MS) {
     return Promise.resolve({ ok: true, saltato: true, certificati: ancore.length, scaricatoIl: salvato.scaricatoIl });
   }
   ultimoTentativo = Date.now();
   inCorso = (async () => {
     try {
-      const [pem, pemTsa] = await Promise.all([
+      // Gli elenchi di contorno che non arrivano non fermano quello ufficiale, né fanno perdere quelli di prima.
+      const contorno = (u, nome) => (u ? scarica(u).catch((e) => {
+        console.warn(`[firmatari-c2pa] ${nome} non aggiornato:`, e && e.message);
+        return '';
+      }) : Promise.resolve(''));
+      const [pem, pemTsa, pemProvvisorio, pemAmmessi] = await Promise.all([
         scarica(url),
-        urlTsa ? scarica(urlTsa).catch((e) => {
-          console.warn('[firmatari-c2pa] elenco delle marche temporali non aggiornato:', e && e.message);
-          return '';
-        }) : Promise.resolve(''),
+        contorno(urlTsa, 'elenco delle marche temporali'),
+        contorno(urlProvvisorio, 'elenco provvisorio'),
+        contorno(urlAmmessi, 'elenco provvisorio dei firmatari ammessi'),
       ]);
       const lette = leggiAncore(pem);
       if (!lette.length) throw new Error('nessun certificato leggibile nell’elenco scaricato');
       const tsa = leggiAncore(pemTsa);
-      salvato = { pem, scaricatoIl: Date.now(), fonte: url, pemTsa: tsa.length ? pemTsa : salvato.pemTsa };
+      const P = provenienza();
+      salvato = {
+        pem, scaricatoIl: Date.now(), fonte: url, pemTsa: tsa.length ? pemTsa : salvato.pemTsa,
+        pemProvvisorio: leggiAncore(pemProvvisorio).length ? pemProvvisorio : salvato.pemProvvisorio,
+        pemAmmessi: P && P.ammessiDaPem(pemAmmessi).length ? pemAmmessi : salvato.pemAmmessi,
+      };
       ancore = lette;
       if (tsa.length) ancoreTsa = tsa;
       versioneElenco++;
@@ -143,9 +165,13 @@ function aggiorna({ forza = false, url = FONTE, urlTsa = url === FONTE ? FONTE_T
   return inCorso;
 }
 
+function mancaProvvisorio() { return !salvato.pemProvvisorio && !salvato.pemAmmessi; }
+
 function serveAggiornare() {
+  const daUltimo = Date.now() - ultimoTentativo;
+  if (ancore && mancaProvvisorio() && daUltimo >= RIPROVA_PROVVISORIO_MS) return true;
   const vecchio = !ancore || Date.now() - salvato.scaricatoIl >= RINFRESCO_MS;
-  return vecchio && Date.now() - ultimoTentativo >= RIPROVA_MS;
+  return vecchio && daUltimo >= RIPROVA_MS;
 }
 
 async function init() {
@@ -162,7 +188,13 @@ const attesa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.u
 
 // La lettura che usano il menu, la chat e l'Aiuto: una sola, così le strade dicono la stessa cosa.
 function elenco() {
-  return { versione: versioneElenco, pem: ancore ? salvato.pem : '', pemTsa: ancore && ancoreTsa ? salvato.pemTsa : '' };
+  return {
+    versione: versioneElenco,
+    pem: ancore ? salvato.pem : '',
+    pemTsa: ancore && ancoreTsa ? salvato.pemTsa : '',
+    pemProvvisorio: ancore ? salvato.pemProvvisorio : '',
+    pemAmmessi: ancore ? salvato.pemAmmessi : '',
+  };
 }
 
 // Un marchio nei pixel si cerca solo se il file non dichiara niente: le sue etichette parlano per prime (#889).
@@ -200,7 +232,9 @@ async function analizzaImmagine(byte) {
     const m = await marchioNeiPixel(byte);
     return (m && P && P.esitoDaMarchio(m)) || { ...res, marchiCercati: !!m };
   }
-  if (res.firmatario !== 'non_verificato') return res;
+  // «Sconosciuto» senza l'elenco provvisorio non è ancora la risposta: chi lo aspetta è chi sta arrivando.
+  const inAttesa = res.firmatario === 'non_verificato' || (res.firmatario === 'sconosciuto' && mancaProvvisorio());
+  if (!inAttesa) return res;
   const giro = inCorso || (automatico() && serveAggiornare() ? aggiorna() : null);
   if (!giro) return res;
   await Promise.race([giro, attesa(ATTESA_PRIMA_VOLTA_MS)]);
@@ -212,41 +246,6 @@ async function analizzaImmagine(byte) {
 // l'esito letto sull'originale si ricorda per i pixel della copia, e la chat lo ritrova.
 const MAX_COPIE = 500;
 const copie = new Map();
-
-// L'impronta decodifica i pixel nel processo principale: un PNG di pochi MB può dichiararne miliardi (#946).
-const MAX_PIXEL_IMPRONTA = 100_000_000;
-
-// Larghezza per altezza dichiarate nell'intestazione di un PNG o di un JPEG, senza decodificare.
-function pixelDichiarati(b) {
-  if (b.length >= 24 && b[0] === 0x89 && b.toString('latin1', 12, 16) === 'IHDR') return b.readUInt32BE(16) * b.readUInt32BE(20);
-  if (b[0] === 0xff && b[1] === 0xd8) {
-    let i = 2;
-    while (i + 9 < b.length) {
-      if (b[i] !== 0xff) { i++; continue; }
-      const m = b[i + 1];
-      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7) || m === 0xff) { i += m === 0xff ? 1 : 2; continue; }
-      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return b.readUInt16BE(i + 5) * b.readUInt16BE(i + 7);
-      if (m === 0xd9 || m === 0xda) break;
-      i += 2 + b.readUInt16BE(i + 2);
-    }
-  }
-  return 0;
-}
-
-function immagine(x) {
-  if (!x) return null;
-  if (typeof x.toBitmap === 'function') return x;
-  const b = Buffer.from(x);
-  if (pixelDichiarati(b) > MAX_PIXEL_IMPRONTA) return null;
-  try { return require('electron').nativeImage.createFromBuffer(b); } catch (_) { return null; }
-}
-function impronta(x) {
-  const img = immagine(x);
-  if (!img || img.isEmpty()) return '';
-  const { width, height } = img.getSize();
-  if (width * height > MAX_PIXEL_IMPRONTA) return '';
-  return require('node:crypto').createHash('sha256').update(`${width}x${height}:`).update(img.toBitmap()).digest('hex');
-}
 
 async function ricordaCopia(originale, copiate) {
   const res = await analizzaImmagine(originale);
@@ -274,6 +273,7 @@ function stato() {
     scaricato: !!ancore,
     certificati: ancore ? ancore.length : 0,
     autoritaMarca: ancoreTsa ? ancoreTsa.length : 0,
+    provvisorio: { autorita: leggiAncore(salvato.pemProvvisorio).length, ammessi: (provenienza() ? provenienza().ammessiDaPem(salvato.pemAmmessi) : []).length },
     scaricatoIl: salvato.scaricatoIl,
     fonte: salvato.fonte,
     ultimoErrore,
@@ -285,7 +285,7 @@ function _rallentaMarchi(ms) { ritardoMarchi = Math.max(0, Number(ms) || 0); }
 
 // Solo per i test: si riparte come al primo avvio, senza elenco in memoria.
 function _dimentica() {
-  salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
+  salvato = { ...VUOTO };
   ancore = null;
   ancoreTsa = null;
   versioneElenco++;
@@ -295,4 +295,4 @@ function _dimentica() {
   marchi.clear();
 }
 
-module.exports = { FONTE, FONTE_TSA, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica, _rallentaMarchi };
+module.exports = { FONTE, FONTE_TSA, FONTE_PROVVISORIO, FONTE_AMMESSI, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica, _rallentaMarchi };

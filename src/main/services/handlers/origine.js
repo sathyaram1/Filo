@@ -1,28 +1,38 @@
 // Da dove arriva la richiesta: la porta unica del confine d'origine (#583).
-//
-// Il canale dei messaggi è UNO SOLO, e ci parlano tre mondi: la shell della
-// finestra, le pagine interne `filo://` e i content script che girano dentro i
-// siti visitati. Chiedere soltanto «chi sei» non basta per le cose che hanno
-// potere: sul computer di chi gestisce i feedback la risposta a «sei
-// l'amministratore?» è sempre sì, e su quello di chiunque altro una sessione
-// aperta è tutto ciò che serve per votare al posto suo o spendergli i crediti.
-// Prima si guarda DA DOVE arriva: il gesto che vale è quello fatto su una
-// superficie di Filo.
-//
-// `code: 'forbidden'` è il motivo in una parola, e serve a chi deve DIRE
-// all'utente cosa succede: senza, il rifiuto arriva alla pagina come un errore
-// qualunque e finisce tradotto in «controlla la connessione», che manda a
-// controllare la cosa sbagliata.
-//
-// Chi aggiunge una porta con potere passa di qui. `tests/feedback-canali-origine.spec.mjs`
-// bussa a tutte da un sito visitato e diventa rossa se una risponde altro.
+// Il canale è uno solo: shell, pagine filo:// e content script dei siti. Per le cose con
+// potere «chi sei» non basta: con una sessione aperta si vota e si spende al posto altrui.
+
+const { navigazioneVersoFilo } = require('../navigazioneVersoFilo');
+
+// Vale come Filo chi ha una vista di Filo: la barra, una scheda interna, la home pronta, una vista segnata (una scheda
+// interna che si chiude, una cattura). L'indirizzo non basta: la
+// finestrella di accesso e le schede del web girano col preload delle pagine web anche su un filo:// (#1506). PURA.
+function vistaInterna({ isShell = false, riserva = false, tab = null, segnata = false } = {}) {
+  if (isShell || riserva) return true;
+  return tab ? tab.isInternal === true : segnata === true;
+}
+
+// L'indirizzo che fa da origine ai servizi. Un mittente come lo costruisce senderInfo porta `interna`; uno fatto a mano
+// (test, chiamate interne) no, e conta il suo indirizzo. PURA.
+function origineDi(sender) {
+  const u = String((sender && ((sender.tab && sender.tab.url) || sender.url)) || '');
+  return sender && sender.interna === false && /^filo:/i.test(u) ? '' : u;
+}
 
 /** La richiesta arriva da una superficie di Filo? PURA. */
 function daFilo(origin, sender) {
+  if (sender && sender.interna === false) return false;
   return String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
 }
 
-/** Avvolge un handler: da un sito visitato risponde «rifiutato per provenienza». */
+// Un sito, o un content script che lui guida, apre una pagina di Filo solo col clic dell'utente, come quello sul menu
+// di Filo che la pagina non può fingere (#1506). Il clic vale anche dopo una risposta del server (l'invio del Red-team).
+const GESTO_PER_FILO_MS = 30000;
+function filoNegatoAllaPagina(url, sender, origin) {
+  if (daFilo(origin, sender) || !navigazioneVersoFilo(url)) return false;
+  return !require('../permessiPagine').gestoDellUtente(sender && sender.wc, GESTO_PER_FILO_MS);
+}
+
 function soloFilo(handler) {
   return async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
@@ -30,4 +40,4 @@ function soloFilo(handler) {
   };
 }
 
-module.exports = { daFilo, soloFilo };
+module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina };

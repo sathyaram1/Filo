@@ -4,6 +4,8 @@
 
 'use strict';
 
+const { stessoSitoWeb } = require('./perContoDellaScheda');
+
 // Una favicon vera sta sotto i 400 KB (un .ico col 256 px non compresso): oltre, la scheda resta senza icona.
 const TETTO_BYTE = 1024 * 1024;
 const ATTESA_MS = 15000;
@@ -33,6 +35,8 @@ function tipoImmagine(buf) {
   if (RADICE_SVG.test(buf.toString('utf8', 0, Math.min(buf.length, 8192)))) return 'image/svg+xml';
   return '';
 }
+// Tutti i tipi che tipoImmagine può dare: chi accetta le icone delle schede (il gettone, #2085) si confronta con questi.
+const TIPI = [...new Set([...FIRME.map(([, t]) => t), 'image/webp', 'image/avif', 'image/svg+xml'])];
 
 function bytesDaDataUrl(url) {
   const m = /^data:([^,]*),([\s\S]*)$/i.exec(String(url || ''));
@@ -41,11 +45,11 @@ function bytesDaDataUrl(url) {
   return /;\s*base64\s*$/i.test(m[1]) ? Buffer.from(grezzo, 'base64') : Buffer.from(grezzo, 'latin1');
 }
 
-async function scarica(ses, url) {
+async function scarica(ses, url, cookie) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ATTESA_MS);
   try {
-    const res = await ses.fetch(url, { signal: ctrl.signal, credentials: 'include', redirect: 'follow' });
+    const res = await ses.fetch(url, { signal: ctrl.signal, credentials: cookie ? 'include' : 'omit', redirect: 'follow' });
     if (!res.ok || !res.body) return null;
     if (Number(res.headers.get('content-length')) > TETTO_BYTE) return null;
     const lettore = res.body.getReader();
@@ -68,23 +72,25 @@ async function scarica(ses, url) {
 }
 
 // Una pagina web può dichiarare come icona un indirizzo qualunque: file: e i protocolli interni non si seguono.
-function bytesDi(ses, url, { interna }) {
+function bytesDi(ses, url, { interna, cookie }) {
   const schema = /^([a-z][a-z0-9+.-]*):/i.exec(url)?.[1]?.toLowerCase() || '';
   if (schema === 'data') return Promise.resolve(bytesDaDataUrl(url));
-  if (schema === 'http' || schema === 'https' || (schema === 'filo' && interna)) return scarica(ses, url);
+  if (schema === 'http' || schema === 'https' || (schema === 'filo' && interna)) return scarica(ses, url, cookie);
   return Promise.resolve(null);
 }
 
 // `candidati`: gli indirizzi di page-favicon-updated, nell'ordine della pagina. Torna il primo che è davvero un'immagine.
-async function iconaPer(ses, candidati, { interna = false, vivo = () => true } = {}) {
+// `cookie: false` per chi chiede l'icona senza avere il sito aperto: a quel sito non si dice chi la vuole.
+// I cookie vanno solo a un'icona del sito di `pagina`: a un altro la pagina darebbe i soli SameSite=None, inutili a un'icona.
+async function iconaPer(ses, candidati, { interna = false, vivo = () => true, cookie = true, pagina = '' } = {}) {
   const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u).slice(0, MAX_CANDIDATI);
   for (const url of lista) {
     if (!vivo()) break;
-    const buf = await bytesDi(ses, url, { interna });
+    const buf = await bytesDi(ses, url, { interna, cookie: cookie && stessoSitoWeb(pagina, url) });
     const tipo = buf && buf.length <= TETTO_BYTE ? tipoImmagine(buf) : '';
     if (tipo) return { url, dato: `data:${tipo};base64,${buf.toString('base64')}` };
   }
   return { url: '', dato: '' };
 }
 
-module.exports = { iconaPer, tipoImmagine, bytesDaDataUrl, TETTO_BYTE };
+module.exports = { iconaPer, tipoImmagine, bytesDaDataUrl, TETTO_BYTE, TIPI };

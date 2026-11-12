@@ -158,6 +158,51 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
   ]) assert.equal(famigliaPrezzo(model).known, true, model);
 });
 
+// #883: un turno veloce contato a tariffa normale faceva dire al rapporto la metà del costo vero.
+const UN_MILIONE = (speed) => ({
+  input_tokens: 1e6, cache_creation_input_tokens: 2e6,
+  cache_creation: { ephemeral_5m_input_tokens: 1e6, ephemeral_1h_input_tokens: 1e6 },
+  cache_read_input_tokens: 1e6, output_tokens: 1e6, ...(speed === undefined ? {} : { speed }),
+});
+
+test('un turno in modalità veloce costa la sua tariffa: il doppio su Opus 5.5, Opus 5 e Opus 4.8, senza nota', async () => {
+  for (const [model, normale] of [['claude-opus-5-5', 37.2], ['claude-opus-5-5[1m]', 37.2], ['claude-opus-5', 46.75], ['claude-opus-4-8', 46.75]]) {
+    const veloce = await analizzaRighe([assistant('v', model, UN_MILIONE('fast'), [], T('00:00'))]);
+    assert.equal(veloce.costUsd, normale * 2, model);
+    assert.deepEqual(veloce.notes, [], model);
+    for (const speed of ['standard', undefined]) {
+      const rep = await analizzaRighe([assistant('n', model, UN_MILIONE(speed), [], T('00:00'))]);
+      assert.equal(rep.costUsd, normale, `${model} ${speed}`);
+      assert.deepEqual(rep.notes, [], `${model} ${speed}`);
+    }
+  }
+  const misto = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', UN_MILIONE('standard'), [], T('00:00')),
+    assistant('b', 'claude-opus-5-5', UN_MILIONE('fast'), [], T('00:01')),
+  ]);
+  assert.equal(misto.costUsd, 111.6, 'in una sessione mista raddoppia solo il turno veloce');
+  assert.match(riassunto(misto)[3], /costo stimato: \$111\.6000/);
+});
+
+test('modalità veloce che il listino non conosce per quel modello: il doppio, e la nota come per un modello sconosciuto', async () => {
+  for (const [model, tariffa, normale] of [
+    ['claude-opus-4-7', 'Opus 5', 46.75], ['claude-sonnet-5-5', 'Sonnet 5', 18.7], ['claude-haiku-4-5', 'Haiku 4.5', 9.35],
+    ['claude-fable-5-1', 'Fable 5.1', 92.75], ['claude-opus-6', 'Opus 5', 46.75],
+  ]) {
+    const rep = await analizzaRighe([
+      assistant('v', model, UN_MILIONE('fast'), [], T('00:00')),
+      assistant('w', model, UN_MILIONE('fast'), [], T('00:01')),
+    ]);
+    assert.equal(rep.costUsd, normale * 4, model);
+    assert.ok(rep.notes.includes(`velocità «fast» non a listino per «${model}»: 2 turni calcolati a 2× la tariffa ${tariffa}`), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  const ignota = await analizzaRighe([assistant('t', 'claude-opus-5-5', UN_MILIONE('Turbo'), [], T('00:00'))]);
+  assert.equal(ignota.costUsd, 37.2, 'una velocità che il listino non ha affatto resta a tariffa normale');
+  assert.deepEqual(ignota.notes, ['velocità «turbo» non a listino per «claude-opus-5-5»: 1 turno calcolato a tariffa Opus 5.5']);
+  assert.match(riassunto(ignota)[4], /note: velocità «turbo»/);
+  assert.equal(valutaUso(UN_MILIONE(42), 'claude-opus-5-5').costo, 37.2, 'un campo che non è testo non è una velocità');
+});
+
 // L'orchestratore delle routine gira su Haiku 5.5: prezzato come Haiku 4.5, il suo costo usciva dieci volte tanto.
 test('Haiku 5.5 e Sonnet 5.5 si riconoscono per nome, ognuno col suo listino e senza nota', async () => {
   for (const [model, key] of [
@@ -733,6 +778,36 @@ test('orchestratore su Haiku 5.5: prezzato col suo listino, e le sue richieste o
   } finally { togliCartella(base); }
 });
 
+test('orchestratore in modalità veloce: costa la sua tariffa, e la nota di una tariffa di ripiego arriva nel rapporto del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-veloce-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, tool = null) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('o') ? 'orch' : 'w5',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1000000, speed: 'fast' }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('o1', 'claude-sonnet-5-5', H('09:00:00')),
+      riga('o2', 'claude-opus-5-5', H('09:01:00'), { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w5.jsonl'), riga('w1', 'claude-opus-5-5', H('09:02:00')) + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w5');
+    assert.equal(rep.costUsd, 40, 'un milione in uscita su Opus 5.5 veloce: 40 $');
+    assert.equal(rep.orchestrator.costUsd, 60, 'Sonnet 5.5 veloce, non a listino, al doppio (20 $) più Opus 5.5 veloce (40 $)');
+    assert.deepEqual(rep.notes.filter((n) => /velocità/.test(n)),
+      ['orchestratore: velocità «fast» non a listino per «claude-sonnet-5-5»: 1 turno calcolato a 2× la tariffa Sonnet 5']);
+    assert.match(riassunto(rep)[4], /note: .*orchestratore: velocità «fast»/);
+  } finally { togliCartella(base); }
+});
+
 // Worker in sottofondo (il default di Claude Code): la chiamata riceve subito
 // «Async agent launched», la fine arriva come notifica in più forme.
 const lanciato = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Async agent launched successfully.\nagentId: x' }] }] } });
@@ -882,4 +957,165 @@ test('il marcatore di un altro biglietto non dà il momento del rilascio', async
     assert.equal(readTicketSince(base, { ticket: 'due' }), '');
     assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
+});
+
+// #882: chi confronta costi di prima e di dopo un cambio di prezzi deve vedere dove sta il salto.
+test('ogni rapporto porta la versione del listino, e un prezzo cambiato senza nuova versione è rosso', async () => {
+  const { LISTINO, VERSIONI, VELOCE, VELOCE_RIPIEGO } = await import('../../scripts/session-report.mjs');
+  const { createHash } = await import('node:crypto');
+  // Cambiando PREZZI, VERSIONI o i moltiplicatori della modalità veloce: LISTINO va alla data del nuovo listino, e qui si aggiunge la sua impronta.
+  const IMPRONTE = { '2026-10-06': '13fddb51dfc48202' };
+  const impronta = createHash('sha256').update(JSON.stringify({ p: PREZZI, v: VERSIONI, f: VELOCE, fr: VELOCE_RIPIEGO })).digest('hex').slice(0, 16);
+  assert.equal(IMPRONTE[LISTINO], impronta, `listino cambiato (impronta ${impronta}) senza una versione nuova in LISTINO`);
+  assert.equal(rapportoVuoto().listino, LISTINO);
+  const rep = await analizzaRighe([assistant('a', 'claude-opus-5-5', { input_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 1 }, [], T('00:00'))], { role: 'resolver' });
+  assert.equal(rep.listino, LISTINO, 'anche il rapporto di una sessione vera');
+  assert.match(riassunto(rep)[3], new RegExp(`listino ${LISTINO}`));
+  const senza = await generaRapporto({ transcript: join(cartellaTemporanea(), 'non-esiste.jsonl'), role: 'resolver' });
+  assert.equal(senza.listino, LISTINO, 'anche il rapporto minimo, senza transcript');
+});
+
+test('una sessione partita sopra i cloni: il transcript si trova dall’id della sessione (#1761)', () => {
+  const casa = cartellaTemporanea('filo-rapporto-sopra-');
+  try {
+    const config = join(casa, 'claude');
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(lavoro, { recursive: true });
+    const cartella = join(config, 'projects', slugProgetto(resolve(join(casa, 'sopra'))));
+    mkdirSync(cartella, { recursive: true });
+    const id = '44c316b4-5439-5fcd-9342-9194c06de00c';
+    const file = join(cartella, `${id}.jsonl`);
+    writeFileSync(file, RIGHE.join('\n'), 'utf8');
+    assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: {} }).file, '', 'dalla cartella di lavoro sola non si vede');
+    assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: { CLAUDE_CODE_SESSION_ID: id } }).file, file);
+    for (const strano of ['../sopra', 'a/b', ' ', `${id}.jsonl`]) {
+      assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: { CLAUDE_CODE_SESSION_ID: strano } }).file, '', strano);
+    }
+  } finally { togliCartella(casa); }
+});
+
+// ─── SPEC-MANUTENTORE § 6: strumenti falliti e attese, dal transcript ─────────
+
+const { ELENCO_MAX_BYTE, rigaErrore, rigaPulita, stringiElenchi } = await import('../../scripts/session-report.mjs');
+const U1 = { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 };
+const chiama = (id, ts, name, input) => assistant(`m-${id}`, 'claude-opus-5-5', U1, [{ type: 'tool_use', id, name, input }], ts);
+// Una stringa finta con la forma di un biglietto (43 caratteri senza spazi).
+const FINTO_BIGLIETTO = 'FINTObigliettoPerLaProva_0000000000000000000';
+
+test('i falliti dicono strumento, errore in una riga e cosa è successo dopo; le attese sopra 30 s cosa e quanto', async () => {
+  const unit = { command: 'npm run test:unit', description: 'Run unit tests' };
+  const rep = await analizzaRighe([
+    chiama('a1', T('00:00'), 'Bash', unit),
+    result('a1', `Exit code 1\n\nnot ok 3 - il biglietto ${FINTO_BIGLIETTO} scaduto\nseconda riga`, T('00:40'), true),
+    chiama('a2', T('00:41'), 'Bash', unit),
+    result('a2', 'ok', T('04:41')),
+    chiama('a3', T('04:42'), 'Read', { file_path: '/x/manca.js' }),
+    result('a3', '<tool_use_error>File does not exist.</tool_use_error>', T('04:43'), true),
+    chiama('a4', T('04:44'), 'Bash', { command: 'ls', description: 'List files' }),
+    result('a4', 'ok', T('04:45')),
+    chiama('a5', T('04:46'), 'Bash', { command: 'git push' }),
+    result('a5', 'Permission denied', T('04:47'), true),
+  ], { role: 'resolver' });
+  assert.deepEqual(rep.falliti, [
+    { strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 1: not ok 3 - il biglietto […] scaduto', dopo: 'riprovato uguale' },
+    { strumento: 'Read', errore: 'File does not exist.', dopo: 'Bash: List files' },
+    { strumento: 'Bash', cosa: 'git push', errore: 'Permission denied', dopo: 'niente: la sessione finisce lì' },
+  ]);
+  assert.deepEqual(rep.attese, [
+    { strumento: 'Bash', cosa: 'Run unit tests', s: 240 },
+    { strumento: 'Bash', cosa: 'Run unit tests', s: 40 },
+  ], 'dalla più lunga; quelle da un secondo non ci sono');
+  assert.equal(rep.atteseOltre30, 2);
+  assert.equal(rep.tools.errors, 3);
+  assert.deepEqual(rep.notes, [], 'niente tagliato, niente nota');
+  assert.match(riassunto(rep)[4], /attese oltre 30 s 2/);
+  // Un comando ripetuto con altre parole è un'altra strada, e lo si dice.
+  const diverso = await analizzaRighe([
+    chiama('b1', T('00:00'), 'Bash', unit),
+    result('b1', 'Exit code 2', T('00:01'), true),
+    chiama('b2', T('00:02'), 'Bash', { command: 'npm run test:unit -- --solo x', description: 'Run one unit test' }),
+  ]);
+  assert.deepEqual(diverso.falliti, [{ strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 2', dopo: 'riprovato diverso: Run one unit test' }]);
+});
+
+test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sotto-agenti si sommano', async () => {
+  const righe = [];
+  for (let i = 0; i < 260; i++) {
+    const ora = `2026-09-16T1${Math.floor(i / 60)}:${String(i % 60).padStart(2, '0')}`;
+    righe.push(chiama(`f${i}`, `${ora}:00.000Z`, 'Bash', { command: `x${i}`, description: `passo ${i}` }));
+    righe.push(result(`f${i}`, `errore numero ${i} ${'parola '.repeat(40)}`, `${ora}:${String(31 + (i % 28)).padStart(2, '0')}.000Z`, true));
+  }
+  const rep = await analizzaRighe(righe);
+  assert.equal(rep.tools.errors, 260);
+  assert.equal(rep.atteseOltre30, 260);
+  assert.equal(rep.falliti.length, 200, 'il tetto del server, non uno più stretto');
+  assert.ok(Buffer.byteLength(JSON.stringify(rep.falliti)) <= ELENCO_MAX_BYTE);
+  assert.ok(Buffer.byteLength(JSON.stringify(rep.attese)) <= ELENCO_MAX_BYTE);
+  assert.ok(rep.falliti.every((f) => f.errore.length <= 120), 'un errore resta una riga corta');
+  assert.equal(rep.falliti[0].errore.startsWith('errore numero 0 '), true, 'i falliti in ordine di tempo');
+  assert.equal(rep.attese[0].s, 58, 'le attese dalla più lunga');
+  assert.ok(rep.notes.includes(`strumenti falliti 260, elencati i primi ${rep.falliti.length}`));
+  assert.ok(rep.notes.includes(`attese oltre 30 s 260, elencate le ${rep.attese.length} più lunghe`));
+
+  const madre = rapportoVuoto();
+  madre.attese = [{ strumento: 'Bash', cosa: 'corta', s: 31 }];
+  madre.atteseOltre30 = 1;
+  sommaSottoAgente(madre, rep);
+  assert.equal(madre.atteseOltre30, 261);
+  assert.equal(madre.attese[0].s, 58);
+  assert.equal(madre.notes.filter((n) => /^attese oltre/.test(n)).length, 1, 'una nota sola, coi conti sommati');
+  assert.ok(madre.notes.includes(`attese oltre 30 s 261, elencate le ${madre.attese.length} più lunghe`));
+  assert.equal(madre.notes.some((n) => /^sotto-agente: (strumenti falliti|attese oltre)/.test(n)), false);
+});
+
+test('una riga del rapporto: niente a capo, niente stringhe lunghe come un biglietto, tetto di lunghezza', () => {
+  assert.equal(rigaPulita('a\n\tb\u0007c', 50), 'a b c');
+  assert.equal(rigaPulita(`chiave ${FINTO_BIGLIETTO} fine`, 80), 'chiave […] fine');
+  assert.equal(rigaPulita(`${'x'.repeat(10)} ${'y'.repeat(20)}`, 12), 'xxxxxxxxxx …');
+  assert.equal(rigaErrore(''), '(senza testo)');
+  assert.equal(rigaErrore([{ type: 'text', text: 'Exit code 127\nnode: not found' }]), 'exit 127: node: not found');
+  const vuoto = stringiElenchi(rapportoVuoto());
+  assert.deepEqual([vuoto.falliti, vuoto.attese, vuoto.atteseOltre30, vuoto.notes], [[], [], 0, []]);
+});
+
+test('la riga d\'errore è quella del fallimento: mai una prova passata che si chiama «errore», mai la posizione nel sorgente', () => {
+  const npm = 'Exit code 1\n\n> filo@0.9.0 test:unit\n> node scripts/run-unit-tests.mjs\n\nTAP version 13\n# Subtest: senza transcript: mai un errore\nok 1 - senza transcript: mai un errore\n# Subtest: la somma\nnot ok 2 - la somma\n  error: |-\n    Expected values to be strictly equal:';
+  assert.equal(rigaErrore(npm), 'exit 1: not ok 2 - la somma');
+  assert.equal(rigaErrore('Exit code 1\n✔ il rilascio non perde errore (0.9ms)\n✖ la somma (1.2ms)\n  AssertionError [ERR_ASSERTION]: Expected'), 'exit 1: ✖ la somma (1.2ms)');
+  assert.equal(rigaErrore('Exit code 1\n[eval]:1\nx()\n^\n\nReferenceError: x is not defined\n    at [eval]:1:1'), 'exit 1: ReferenceError: x is not defined');
+  assert.equal(rigaErrore("Exit code 1\n/tmp/x.mjs:3\n  throw new Error('boom');\n  ^\n\nError: boom\n    at file:///tmp/x.mjs:3:9"), 'exit 1: Error: boom');
+  assert.equal(rigaErrore('Exit code 1\nTo https://github.com/o/r.git\n ! [rejected]        claude/x -> claude/x (non-fast-forward)\nerror: failed to push some refs'), 'exit 1: ! [rejected] claude/x -> claude/x (non-fast-forward)');
+  assert.equal(rigaErrore('Exit code 1\n  ✓  1 tests/a.spec.mjs:3:1 › apre (1s)\n  ✘  2 tests/b.spec.mjs:22:3 › salva (5s)'), 'exit 1: ✘ 2 tests/b.spec.mjs:22:3 › salva (5s)');
+});
+
+// #2121: i dollari della cache li scrive il rapporto, ogni richiesta col suo listino; il conto della cache a un'ora li
+// legge e non riprezza i token al primo modello.
+test('la cache in dollari: ogni richiesta col suo modello, la soglia di Haiku, le scritture già a un ora, i sotto-agenti', async () => {
+  const vicino = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} contro ${b}`);
+  const opus = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 1000000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00')),
+    // Il secondo turno riscrive: rewarm, a 5 minuti.
+    assistant('b', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 500000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:10')),
+    // Una scrittura già a un'ora: niente sovrapprezzo né risparmio dall'ora.
+    assistant('c', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 100000, cache_creation: { ephemeral_1h_input_tokens: 100000, ephemeral_5m_input_tokens: 0 }, cache_read_input_tokens: 1500000, output_tokens: 0 }, [], T('00:20')),
+  ]);
+  // Opus 5.5: 5 $/M a cinque minuti, 8 $/M a un'ora, lettura 0,2 $/M.
+  vicino(opus.cache.scrittaUsd, 1.5 * 5 + 0.1 * 8);
+  vicino(opus.cache.rewarmUsd, 0.5 * 5);
+  vicino(opus.cache.sovrapprezzoOraUsd, 1.5 * 3);
+  vicino(opus.cache.risparmioOraUsd, 0.5 * 4.8);
+  vicino(opus.cache.risparmioSeTuttoUsd, 1.5 * 4.8);
+
+  // Un sotto-agente Haiku 5.5 oltre la soglia del prompt: la sua tariffa alta, non quella di Opus.
+  const haiku = await analizzaRighe([
+    assistant('h', 'claude-haiku-5-5', { input_tokens: 0, cache_creation_input_tokens: 200000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00')),
+  ]);
+  vicino(haiku.cache.scrittaUsd, 0.2 * 0.625);
+  sommaSottoAgente(opus, haiku);
+  vicino(opus.cache.scrittaUsd, 1.5 * 5 + 0.1 * 8 + 0.2 * 0.625);
+  vicino(opus.cache.sovrapprezzoOraUsd, 1.5 * 3 + 0.2 * 0.375);
+  // Un sotto-agente da un rapporto vecchio, senza il campo: non rompe la somma.
+  sommaSottoAgente(opus, { costUsd: 0, tokens: {}, tools: {} });
+  vicino(opus.cache.rewarmUsd, 2.5);
+  assert.deepEqual(rapportoVuoto().cache, { scrittaUsd: 0, rewarmUsd: 0, sovrapprezzoOraUsd: 0, risparmioOraUsd: 0, risparmioSeTuttoUsd: 0 });
 });

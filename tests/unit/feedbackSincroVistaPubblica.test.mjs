@@ -19,7 +19,7 @@ const FB = globalThis.SN_FEEDBACK;
 
 const TETTO = FB.LIST_PAGE_SIZE;
 
-function feedbackChiuso(i) {
+function feedbackChiuso(i, extra = {}) {
   return {
     _id: `fb${i}`,
     seq: i,
@@ -33,6 +33,7 @@ function feedbackChiuso(i) {
     // ambiguo.
     createdAt: new Date(Date.UTC(2026, 8, 20) - i * 3600_000).toISOString(),
     resolvedAt: '2026-09-10T10:00:00Z',
+    ...extra,
   };
 }
 
@@ -63,7 +64,7 @@ function collezioneFinta({ feedbacks, schede }) {
   };
   FB.publishPublicCard = async (id, card) => { conto.scritte.push({ id, card }); return true; };
   FB.unpublishPublicCard = async (id) => { conto.tolte.push(id); return true; };
-  FB.ensureSeqCounter = async (n, opts) => { conto.contatore = { n, allowLower: !!(opts && opts.allowLower) }; return n; };
+  FB.ensureSeqCounter = async (n, opts) => { conto.contatore = { n, pavimento: Number((opts && opts.pavimento) || 0) }; return n; };
   return conto;
 }
 
@@ -85,7 +86,7 @@ test('con più feedback del tetto una scheda orfana si toglie lo stesso', async 
   assert.deepEqual(conto.tolte, ['fb-cancellato']);
   // Il contatore NON si abbassa su una lettura parziale: il massimo `seq` che
   // si è visto non è il massimo che esiste.
-  assert.equal(conto.contatore.allowLower, false);
+  assert.equal(conto.contatore ? conto.contatore.pavimento : 0, 0);
 });
 
 test('le schede fuori pagina si chiedono tutte, a blocchi', async () => {
@@ -130,5 +131,18 @@ test('a parità di dati le scritture sono le stesse di una lettura intera', asyn
     assert.equal(s.card.statusPublic, 'closed');
   }
   // Il contatore si può riportare in pari: qui si è letto tutto.
-  assert.equal(conto.contatore.allowLower, true);
+  assert.equal(conto.contatore.pavimento, 20);
+});
+
+// #923: un create anonimo sceglie il proprio numero, fino a un milione. Il
+// contatore si alza solo fino ai numeri con la prova del mittente; quello
+// anonimo può solo impedirgli di scendere.
+test('un numero anonimo enorme non diventa il numero a cui alzare il contatore', async () => {
+  const feedbacks = Array.from({ length: 20 }, (_, i) => feedbackChiuso(i + 1, { senderProof: i < 15 ? 'admin' : undefined }));
+  feedbacks.push(feedbackChiuso(1000000, { _id: 'falso' }));
+  const conto = collezioneFinta({ feedbacks, schede: [] });
+  const r = await publishPublicView();
+  assert.equal(r.tuttiLetti, true);
+  assert.equal(conto.contatore.n, 15, 'si alza al più fino al numero provato più alto');
+  assert.equal(conto.contatore.pavimento, 1000000, 'il massimo di tutti resta un pavimento: mai sotto un numero in uso');
 });

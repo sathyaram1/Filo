@@ -14,7 +14,8 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 
-  const list = () => F().chats();
+  // Le nascoste (#1295) restano fuori se non si chiedono: `{ nascoste: true }` tutte, `'solo'` solo quelle.
+  const list = (opts) => F().chats(opts);
   const get = (id) => (id ? F().chat(String(id)) : Promise.resolve(null));
 
   // Per la Cronologia: senza i messaggi, che con anni di chat sarebbero megabyte a ogni apertura della pagina.
@@ -60,7 +61,8 @@
         }, { autore: m.role === 'user' ? 'utente' : 'filo', ts });
       });
       if (eventi.length) await t.scrivi(eventi);
-      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId));
+      // `eids`: con quali eventi il turno è entrato nel filo, per le fonti delle memorie (#872).
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId), { ids: true });
     });
   }
 
@@ -81,7 +83,8 @@
   }
 
   // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
-  function close(id) {
+  // `fine`: chiusa apposta dall'utente, non da una scheda che se ne va (src/shared/filoCoda.js, chatCorrente).
+  function close(id, { fine = false } = {}) {
     if (!id) return Promise.resolve(null);
     id = String(id);
     return F().transazione(async (t) => {
@@ -91,7 +94,9 @@
         await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
         return null;
       }
-      if (!c.closedAt) await t.scrivi([t.evento(T().CHAT_CHIUSA, { chat: id }, { autore: 'utente' })]);
+      if (!c.closedAt || (fine && !c.finita)) {
+        await t.scrivi([t.evento(T().CHAT_CHIUSA, { chat: id, fine: fine ? true : undefined }, { autore: 'utente' })]);
+      }
       return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
     });
   }
@@ -192,19 +197,34 @@
     return list();
   }
 
+  // Nascondere si disfa: la chat resta intera nel filo, esce da ciò che si vede e da ciò che Filo ha davanti (#1295).
+  // Ritorna la chat com'è adesso, o null se non c'è.
+  function nascondi(id, nascosta = true) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      if (!!c.nascosta !== !!nascosta) {
+        await t.scrivi([t.evento(T().CHAT_NASCOSTA, { chat: id, nascosta: !!nascosta }, { autore: 'utente' })]);
+      }
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
+  }
+
   // Le chat rimaste aperte perché l'app è stata chiusa di colpo: alla partenza dopo si chiudono e si classificano.
   // Quelle delle altre app (#974) no: nome e tipo li hanno dalla nascita, e restano aperte finché l'app le continua.
   async function listDangling() {
-    return (await list()).filter((c) => !c.app && !c.closedAt && c.messages.length);
+    return (await list({ nascoste: true })).filter((c) => !c.app && !c.closedAt && c.messages.length);
   }
 
   // Le chat chiuse ancora senza titolo e tipo (classificazione non riuscita, o conversazione andata avanti).
   async function listUntriaged() {
-    return (await list()).filter((c) => !c.app && c.closedAt && needsTriage(c));
+    return (await list({ nascoste: true })).filter((c) => !c.app && c.closedAt && needsTriage(c));
   }
 
   async function clear() {
-    const ids = (await list()).map((c) => c.id);
+    const ids = (await list({ nascoste: true })).map((c) => c.id);
     if (ids.length) {
       await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
     }
@@ -215,6 +235,6 @@
 
   global.SN_FILO_CHATS = {
     list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid, open, append, close, setTriage, setUserTriage,
-    remove, clear, segnaFonti,
+    remove, clear, segnaFonti, nascondi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -3,7 +3,7 @@
 // Lancia l'app via _electron.launch e fornisce ai test:
 //   - app:        l'istanza ElectronApplication
 //   - shell:      Page object della shell (BrowserWindow primary)
-//   - openTab:    apre una URL come nuovo tab e ritorna la Page del WebContentsView
+//   - openTab:    apre una URL come nuovo tab e ritorna la Page della sua vista
 //   - testServer: mini HTTP server locale per pagine di test (i content
 //                 script Filo si caricano via preload anche su http://127.0.0.1)
 //
@@ -22,6 +22,7 @@ import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from '../helpers/schede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -97,10 +98,25 @@ function registraUsciteApp(app) {
 
 // Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
 // dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
+// `argomentiInPiu` vanno dopo la manopola della scala: una prova che fissa il suo fattore lo tiene anche con FILO_TEST_SCALE.
 export const test = base.extend({
   accoglienzaFatta: [true, { option: true }],
+  // La home nascosta pronta per la scheda nuova (#1128) nelle prove è spenta (playwright.config.js): chi la prova la
+  // riaccende con `test.use({ riservaNuovaScheda: true })`.
+  riservaNuovaScheda: [false, { option: true }],
+  // Lo strato del menu del tasto destro sopra la scheda (#1053) è spento di serie: chi lo prova lo accende con
+  // `test.use({ stratoDelMenu: true })`.
+  stratoDelMenu: [false, { option: true }],
+  argomentiInPiu: [[], { option: true }],
+  // Nomi in più portati al loopback, per le prove che vogliono un sito col suo nome (example.org, #823).
+  hostInPiu: [[], { option: true }],
+  // Bacheca e Deck builder (#1592) sono in pausa per chi non è owner: le loro prove li trovano aperti a tutti.
+  // Chi prova la pausa e l'interruttore passa `test.use({ inPausaAperte: false })`.
+  inPausaAperte: [true, { option: true }],
+  // Variabili d'ambiente in più per l'app, come il programma finto dei video in streaming (#1488).
+  envInPiu: [{}, { option: true }],
 
-  app: async ({ accoglienzaFatta }, use, testInfo) => {
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte, envInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -124,7 +140,8 @@ export const test = base.extend({
       //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
+        ...argomentiInPiu,
+        `--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1${hostInPiu.map((h) => `, MAP ${h} 127.0.0.1`).join('')}`,
         '.',
       ],
       cwd: APP_ROOT,
@@ -132,6 +149,9 @@ export const test = base.extend({
         ...process.env,
         FILO_USER_DATA: userData,
         FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
+        ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
+        FILO_STRATO_MENU: stratoDelMenu ? '1' : '0',
+        FILO_TEST_IN_PAUSA_APERTE: inPausaAperte ? '1' : '0',
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
@@ -141,6 +161,7 @@ export const test = base.extend({
         // anche per la cinquantina di spec che lancia Electron senza passare da
         // questa fixture. Qui la eredita e basta (`...process.env` sopra).
         NODE_ENV: 'test',
+        ...envInPiu,
       },
     });
     const usciteApp = registraUsciteApp(app);
@@ -171,15 +192,20 @@ export const test = base.extend({
     await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
-  // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
-  // Polling sull'URL: app.waitForEvent('window') può risolvere con la
-  // newtab (già pendente al boot), non con il tab appena aperto. Per evitare
-  // race usiamo app.windows() filtrato per hostname della URL richiesta.
+  // Apre un URL come scheda e torna la Page della scheda che Filo dice di aver aperto, arrivata sull'host chiesto: per
+  // indirizzo si prendeva una scheda vecchia o una finestra nascosta sullo stesso host (#877, tests/helpers/schede.mjs).
   openTab: async ({ app, shell }, use) => {
     const fn = async (url) => {
       const target = new URL(url).hostname;
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === target, `openTab: nessuna window per ${url}`);
+      const sulPosto = (w) => new URL(w.url()).hostname === target;
+      const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      let page = null;
+      // Nessuna scheda (indirizzo fermato, sito bloccato): resta la ricerca per host, e il rosso dice perché.
+      if (!aperta?.id) page = await aspettaFinestra(app, sulPosto, `openTab: Filo non ha aperto una scheda per ${url} (${JSON.stringify(aperta)}) e nessuna finestra è su ${target}`);
+      else {
+        await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, sulPosto)),
+          { message: `openTab: la scheda aperta per ${url} non è arrivata su ${target}`, timeout: 0, intervals: [100] }).toBe(true);
+      }
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };

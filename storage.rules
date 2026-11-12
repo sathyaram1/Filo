@@ -18,14 +18,13 @@ rules_version = '2';
 //
 // Il confine ora:
 // - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
-//   voluto, e resta — fino a 4 MB, SOLO tipi passivi in allowlist esplicita,
-//   SOLO in creazione e SOLO su un nome che non si indovina (sotto, in
-//   dettaglio).
-//   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-//   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
-//   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
-//   i feedback con allegati fuori allowlist: questa regola è la cintura,
-//   quello le bretelle.
+//   voluto, e resta — fino a 4 MB, SOLO in creazione, SOLO un blob cifrato
+//   dall'app (tipo opaco, estensione fissa, nessuna chiave né nome di scarico
+//   scelti da chi carica: #1518, #1769) e SOLO su un nome che non si indovina.
+//   Il tipo VERO del file lo decide il client prima di cifrare
+//   (src/shared/feedbackAttachTypes.js) e lo ricontrolla il gate L0 del server
+//   (filo-security, fileGate) sul documento del feedback: qui non c'è più una
+//   lista di tipi, perché da #602 nessun caricatore manda byte in chiaro.
 // - List: NEGATO (#583). Un elenco è una cosa diversa da un file: chiedendolo,
 //   chiunque si portava via il nome di ogni allegato mai caricato e poi il
 //   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
@@ -91,6 +90,8 @@ rules_version = '2';
 // ⚠️ Queste regole diventano vere il giorno in cui le si pubblica sul progetto
 // Firebase. Finché quel comando non gira, nel repo c'è un confine stretto e in
 // produzione la porta è ancora quella di prima: è un passo da fare a mano.
+// E dopo, un caricamento vero: emulatore e API di prova non vedono i campi che
+// il deposito scrive da sé, e sono stati verdi su regole che negavano tutto (#1769).
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -103,26 +104,11 @@ service firebase.storage {
     // in laboratorio non si riusciva a misurare (il motore degli emulatori al
     // database quella domanda non la gira).
 
-    // Tipi PASSIVI, allowlist esplicita, allineata a
-    // src/shared/feedbackAttachTypes.js.
-    // ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-    // attivi (`text/html` con script, `image/svg+xml`), eseguibili nel dominio
-    // di Google Storage quando chi fa triage apre il link.
-    function tipoPassivo() {
-      return request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
-        || request.resource.contentType == 'text/plain'
-        || request.resource.contentType == 'text/markdown'
-        || request.resource.contentType == 'text/csv'
-        || request.resource.contentType == 'application/pdf'
-        || request.resource.contentType == 'application/json'
-        // `.tsv` e `.yaml`: li dichiara così `npm run feedback:apri` (scripts/
-        // claude-feedback.mjs), che diceva di usare "la stessa allowlist" e non
-        // era vero — un allegato .yaml partiva dall'app e veniva respinto qui.
-        // Sono passivi quanto il CSV: il browser li scarica, non li esegue.
-        || request.resource.contentType == 'text/tab-separated-values'
-        || request.resource.contentType == 'application/x-yaml'
-        // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
-        || request.resource.contentType == 'application/octet-stream';
+    // Solo il tipo dei blob cifrati (#1518): con la lista dei tipi «passivi» chiunque, senza
+    // mandare un feedback, ci teneva un file qualunque dietro un link che non scade. Tipo ed
+    // estensione vengono da `SN_FEEDBACK` (src/shared/feedback.js): la sentinella li confronta.
+    function soloCifrato() {
+      return request.resource.contentType == 'application/octet-stream';
     }
 
     // Il tetto è il limite del client (4 MB per allegato, misurato sul file
@@ -134,11 +120,24 @@ service firebase.storage {
       return request.resource.size <= 4 * 1024 * 1024 + 64 * 1024;
     }
 
-    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.<estensione>.
+    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.octetstream.
     // L'uuid è la parte che non si indovina; l'etichetta facoltativa distingue
     // la provenienza (`agent_` per i ritrovamenti dell'agente esploratore).
+    // L'estensione è fissa: libera, il link diventava `fattura.exe`.
     function nomeConEntropia(file) {
-      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.[A-Za-z0-9]{1,12}$');
+      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.octetstream$');
+    }
+
+    // Nessuna chiave né nome di scarico scelti da chi carica (#1518): passano solo il codice di scarico e le
+    // forme di Content-Disposition che Firebase scrive da sé. Codifica, cache e lingua NON si leggono (#1769):
+    // il deposito vero le riempie da sé (probabile la codifica «identity»), e ogni regola su di loro ha negato
+    // ogni caricamento vero dal 23/10, verde a emulatore e API di prova. Sceglierle su un blob opaco servito
+    // solo col codice non cambia tipo né nome di scarico: rischio accettato. Regole: storageRulesAllegati.test.
+    function senzaMetadatiScelti(r, file) {
+      return (!('metadata' in r) || r.metadata == null
+          || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
+        && (!('contentDisposition' in r) || r.contentDisposition == null
+          || r.contentDisposition in ['', 'inline', "inline; filename*=utf-8''" + file]);
     }
 
     match /feedback/{file} {
@@ -154,8 +153,9 @@ service firebase.storage {
 
       allow create: if resource == null
         && dimensioneAmmessa()
-        && tipoPassivo()
-        && nomeConEntropia(file);
+        && soloCifrato()
+        && nomeConEntropia(file)
+        && senzaMetadatiScelti(request.resource, file);
 
       // Un allegato non si sovrascrive e non si cancella: quello che il
       // mittente ha spedito resta quello che l'owner e i giudici leggono.

@@ -54,6 +54,19 @@ cifratura sta accecando i controlli, non gli estranei.**
 5. **In dubbio ci si ferma** (coerente con l'interruttore delle routine): se il
    server non risponde, il giro non lavora. Meglio un giro saltato che un giro
    che scrive senza controlli.
+6. **Una sessione, una fiducia** (#1419). Dentro lo stesso contenitore i worker
+   girano con lo stesso utente: uno può leggere i file dell'altro, compresi il
+   biglietto e la parola d'ordine (§ 3). Il server tratta i biglietti della
+   stessa sessione cloud come un gruppo solo:
+   - quando uno si sporca, nato così o sporcato dopo, si sporcano anche i
+     fratelli vivi e i loro token del server vengono revocati;
+   - una sessione che ha avuto un biglietto sporco non ne riceve altri
+     (`sessione_finita`): il clone del giro resta lo stesso fra un worker e
+     l'altro, e chi viene dopo eseguirebbe quello che lo sporco ha lasciato;
+   - una richiesta di biglietto senza sessione non aggira la regola: il
+     biglietto nasce sporco.
+
+   Prove: `functions/test/fiducia-sessione-1419.test.js` del server.
 
 ---
 
@@ -65,9 +78,17 @@ cifratura sta accecando i controlli, non gli estranei.**
 | **Worker** (l'istanza che lavora) | un **biglietto** monouso, opaco | ottenere il proprio lavoro, battere il cuore, consegnare, rilasciare |
 | **Server** | la chiave privata dei feedback in **cassaforte** (Secret Manager) + accesso al database | scegliere il lavoro, decifrare, validare, scrivere |
 | **Owner** | le sue credenziali admin, come oggi | tutto, dalla dashboard |
+| **Manutentore** (#1961) | una parola d'ordine di classe `manutentore` | gli ordini del manutentore (`routineManutentore`): mai fusioni, L5, codice, risposte all'owner. Scrive non fidato |
+| **Owner da una sede non fidata** (#2011) | una parola d'ordine di classe `owner-non-fidato` | i poteri del manutentore più le domande per l'owner tranne quelle dell'addetto comunicazioni (`chiaveDomande`, il contratto di `ownerDomande`): leggere, rispondere, archiviare, riaprire. Mai fusioni, L5, chiavi, interruttori, «segna fidato», abbassare o archiviare una priorità 3, bilanci. Scrive non fidato, e la risposta porta il segno della chiave (Gestione, recap del mattino) |
 
 Una parola d'ordine **per routine schedulata**: si revoca la singola, e nel
 registro del server si vede quale ha fatto cosa.
+
+**La parola d'ordine non è fuori portata del worker.** Sta nel prompt della
+sessione, quindi nel transcript su disco, leggibile dallo stesso utente che fa
+girare i worker. Un worker sporco può chiedere da sé un biglietto nuovo: per
+questo la fiducia si condivide per sessione (§ 2, principio 6), con il limite
+detto in § 7.
 
 **La chiave di lettura sparisce dalle macchine delle routine.** È il cambiamento
 più importante di tutta la spec: oggi vive in tante copie, su computer che
@@ -172,8 +193,8 @@ Punti non negoziabili del flusso:
    il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
    stesso per tutti i biglietti emessi su quel feedback: un biglietto nuovo
    giudica sempre. Non chiude feedback e non ne apre (dal 2026-09-05,
-   feedback #561: i rilievi che non corregge li raccoglie il server in UN
-   feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
+   feedback #561): i feedback derivati li apre il server, come dice
+   `FEEDBACK-STATES.md` §3. Sono respinti, prima di scrivere qualsiasi
    cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
    senza lo sha del commit provato (in ogni forma), una critica coi livelli
    scritti fuori posto (`Rilievo [2]: …` non è un rilievo), una consegna il
@@ -206,11 +227,17 @@ diventa un **muro**.
 
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
-| `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica: li corregge chi li ha scritti |
-| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
+| `new-work` | il testo del suo feedback; il ramo, se il biglietto ne ha già uno (lavoro ripartito sullo stesso biglietto, #1632) | — |
+| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni fusione fermata (un conflitto, o gli unit rossi sul risultato della fusione con il loro elenco: chi riallinea li elenca nel report e non li corregge, #1204) | i rilievi di una verifica |
+| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver scritto la critica, nella verifica piena, i rilievi del sotto-agente che legge il diff con la richiesta davanti (`lettura-diff.md`, #1363: la registrazione rifiuta la critica senza la sua ricevuta); **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
-| `prober` | niente | la coda |
+| `risposta` | la **sua domanda** (conversazione e note per gli agenti, allegati dell'owner aperti), numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5) | testi di feedback, diff, rami; nessun passaggio di stato, nessuna azione di consenso |
+| `smistamento` | la **sua domanda** appena nata (note per gli agenti comprese), il feedback da cui viene con conversazione e note, numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5, #1790) | diff, rami; le azioni fuori da `guasto`, `ricevuti`, `automatica` e `pubblica`; nessuna azione di consenso |
+
+Delle note di un feedback chi lo lavora riceve solo la spec di un pacchetto nato
+prima di #2033 (FEEDBACK-STATES.md § 3a, #2038): i turni «SPEC DEL PACCHETTO»,
+come ultimo dei `documents`, a `new-work`, `fixer` e `verifier`; mai a
+`secaudit`, che del feedback non riceve niente.
 
 **L'ambito della verifica.** Il payload del `verifier` porta `scope`, deciso dal
 server:
@@ -221,7 +248,9 @@ server:
   (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
   in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
 - `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
-  lavoro era verificato e un conflitto di fusione è stato risolto a mano.
+  lavoro era verificato e la base è stata rifatta su main, dopo un conflitto
+  di fusione o dopo unit rossi sul risultato della fusione. Chi verifica
+  rilancia gli unit: ogni rosso è un rilievo interno.
 
 dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
 `verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come
@@ -249,6 +278,11 @@ rispettare.
 - **Il ramo principale non è protetto da questa spec**: continua a esserlo dal
   cancello di fusione e dalla regola che nessun salvataggio automatico ci fa
   atterrare niente.
+- **La sessione la dichiara chi chiede il biglietto** (#1419). Un worker sporco
+  che ha letto la parola d'ordine può presentarsi con l'id di una sessione
+  inventata, e il server non lo distingue ancora da una vera: la fiducia per
+  sessione (§ 2, principio 6) ferma chi usa la propria sessione o la toglie,
+  non chi la inventa. Aperto in #2044.
 
 ---
 
@@ -304,14 +338,27 @@ deposita, mai lo interpreta. Da quel momento l'emissione dei biglietti risponde
 solo: il paracadute giornaliero deve sempre poter lavorare. Per il client
 `fault_declared` è un **guasto** (exit 3): l'orchestratore chiude senza
 rispawnare — con una causa deterministica i worker morirebbero in fila — e non
-lo ritenta, perché è una risposta, non un'interruzione di rete.
+lo ritenta, perché è una risposta, non un'interruzione di rete. Dal 31/10
+(SPEC-MANUTENTORE.md § 7) il periodo di rispetto non c'è più: il guasto ferma
+solo il lavoro che l'ha dichiarato, finché il manutentore non lo sblocca.
+
+**Il rilascio guarda il biglietto come le consegne (#2295).** Passa dallo
+stesso controllo di vita, meno la finestra di ritiro. Un biglietto già
+rilasciato non scrive più niente: il rilascio ripetuto risponde ok e ridà solo
+la domanda di fine turno già data. Col semaforo perso il biglietto si chiude
+(`dead_ticket`) tenendo solo i numeri, cioè il consumo e i dollari del
+rapporto per il costo del feedback, senza guasto, testo del rapporto né
+domanda di processo; per il manutentore la sessione resta una caduta senza
+rilascio. Con la parola d'ordine revocata o oltre il freno del biglietto il
+rilascio è rifiutato. Un
+fratello sporco nella stessa sessione sporca anche i biglietti già rilasciati,
+senza toccare i loro rami.
 
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
 (`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
-(qualcuno sta già lavorando)? run giornalieri rimasti (tetto di default 12,
-`config/routines.pacemakerDailyCap`)? l'ultimo giro non è **nato morto** e
-nessun guasto è stato dichiarato (periodo di rispetto ≥ 1h)? c'è lavoro (stessa
+(qualcuno sta già lavorando)? l'account non è in pausa (un'accensione rifiutata
+da claude.ai la mette, crescente; nessun tetto giornaliero, #996)? l'ultimo giro non è **nato morto**? c'è lavoro (stessa
 domanda del sondaggio di prontezza, fatta dentro il server)? Solo se tutto dice
 sì, una POST accende la routine su claude.ai (id in
 `config/routines.routineId`, token nei Secret delle functions — mai negli
@@ -337,10 +384,17 @@ tutti. "Difficile" non è una difesa: **l'ultimo livello deve essere non
 convincibile**, cioè un posto dove non c'è nessun LLM da persuadere e nessun
 ambiente da avvelenare.
 
-Da oggi la fusione è una consegna del canale come le altre:
+Da oggi la fusione è una consegna del canale come le altre. **Dal #1207
+(decisione dell'owner del 12/10/2026) non la chiede più nessuno**: col pass
+della verifica e del controllo di sicurezza registrati il server accende da sé
+l'azione degli unit sulla fusione e, con l'esito letto da GitHub, fa i passi qui
+sotto (sezione «Gli unit sulla fusione li lancia GitHub»). `routineMerge` resta
+per gli strumenti di prima: controlla biglietto, ruolo, ramo e verdetti come
+sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
+`esito: 'attesa_unit'`).
 
-- **`routineMerge` `{ ticket, branch }`** — la chiede solo il controllo di
-  sicurezza, a verdetto registrato. Il server, in ordine e fail-closed:
+- **La fusione** (fino al #1207 `routineMerge` `{ ticket, branch }`, chiesta
+  dal controllo di sicurezza a verdetto registrato). Il server, in ordine e fail-closed:
   1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
      messaggio che ne nomina un altro è respinto e registrato, non corretto);
   2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
@@ -366,7 +420,14 @@ Da oggi la fusione è una consegna del canale come le altre:
   sporco e si sporca quando il server gli consegna qualcosa di non fidato
   (`channel.fetchWork`, prima della consegna); ogni biglietto che può spingere
   sul ramo entra nel registro `routine-branches` con la sua fiducia e lo sha
-  (emissione, consegne `fixed`/`status`, riallineamenti del server). Al passo
+  (emissione, consegne `fixed`/`status`, rilascio che ha spinto, riallineamenti
+  del server). All'emissione una punta oltre l'ultimo sha registrato è un buco,
+  salvo che GitHub l'abbia vista arrivare mentre il biglietto dell'ultima voce
+  viveva (dalla nascita al rilascio; per un biglietto morto senza rilascio,
+  alla scadenza del suo semaforo, #2021.1): allora è sua, voce `finestra` (#2021).
+  Un registro bucato lo sana solo l'owner (`npm run fiducia:sana -- <ramo>`,
+  che chiama `ownerFiducia` op `sana`), se ogni commit oltre main è nato
+  mentre viveva un biglietto pulito registrato, la stessa finestra. Al passo
   4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
   fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
   apre la richiesta**: fonde lo sha esaminato con la sua identità e registra
@@ -379,10 +440,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive
   più: lo legge solo la decisione dei rami nati prima del registro
   (`fiduciaRamo.decisioneL5Legacy`), finché l'ultimo non si chiude.
-- **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
-  e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
-  1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
-  sono spariti da questa macchina: qui non c'è più niente da convincere.
+- **Il citofono `scripts/merge-gate.mjs`** presentava il biglietto e riferiva
+  l'esito; dal #1207 non c'è più: il git locale, l'L5 locale, il verdetto
+  passato via ambiente e infine la prova degli unit sono spariti dalla macchina
+  che lavora, e lì non c'è più niente da convincere.
 - **Cosa copre un'approvazione** (dal 2026-09-13). Un'approvazione copre il
   contenuto approvato più uno spostamento su main senza conflitti,
   ricontrollato. Vale per il click dell'owner in Gestione come per il segno di
@@ -579,13 +640,14 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
-  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
-  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
-  Il server fonde solo se main è ancora lo sha provato (`main_moved`
-  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
-  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
-  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `ownerMerge` porta anche
+  `provaUnit`: gli unit girati da chi chiede sul risultato della fusione con
+  origin/main (`scripts/lib/unit-sulla-fusione.mjs`); per le routine, dal #1207,
+  la prova la legge il server da GitHub. Il server fonde solo se main è ancora lo
+  sha provato (`main_moved` altrimenti, e la prova si rifà, al massimo tre
+  volte); rossi solo sulla fusione → riallineamento con l'elenco dei test
+  (`unit_rossi`); senza prova fonde come prima e lo scrive nel log
+  (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
@@ -600,9 +662,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
@@ -645,14 +708,70 @@ La regola, uguale per tutti e due:
   richiesta partiva lo stesso. Adesso il nome e la directory devono combaciare,
   ed è il primo controllo di tutti.
 
-Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
-`scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
-timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs` e
+`scripts/routine-channel.mjs`, dove lo sha si timbra da solo invece di
+chiederlo a chi lavora — e questa regola. (Fino al #1207 anche il citofono,
+`scripts/merge-gate.mjs`, coi controlli descritti qui sopra.) **Il
 confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
 il posto giusto: è l'ultimo livello, quello che non si può convincere. Il
 repo pubblico chiude il cammino onesto; il muro è il server, che dal #773
 respinge un verdetto L4 senza sha e al cancello lo confronta con la punta
 come quello della verifica.
+
+### Gli unit sulla fusione li lancia GitHub (#1207, 12/10/2026)
+
+Fino al #1207 gli unit sul risultato della fusione del ramo con main li faceva
+girare l'agente del controllo di sicurezza (5–20 minuti, `scripts/merge-gate.mjs`)
+e la prova la dichiarava lui al server. Adesso:
+
+- **chi lavora registra il verdetto e rilascia.** Col pass il server mette la
+  pratica in attesa (`feedback.attesa = 'unit_fusione'`, `routine-state.provaFusione`):
+  `select` non le dà ruoli e il recupero delle fusioni non la tocca;
+- **l'azione** è `.github/workflows/unit-fusione.yml` del repo pubblico, accesa
+  dal server con `repository_dispatch` (basta il permesso sui contenuti che il
+  cancello ha già). GitHub accende sempre la versione del workflow che sta su
+  main: un ramo non la cambia per la propria corsa. Gira il codice di un ramo
+  che può venire da un feedback non fidato, quindi: nessun segreto, token in
+  sola lettura (`contents: read`), credenziali mai lasciate nei checkout, la
+  coppia di sha solo come variabili d'ambiente validate, e nessun workflow del
+  repo usa le cache di Actions (sentinella: `tests/unit/unitFusioneAzione.test.mjs`).
+  Gli strumenti della prova vengono da main (`scripts/unit-fusione-azione.mjs`),
+  le dipendenze dal ramo, come sulla macchina che provava prima;
+- **Linux e Windows** (#2225): la coppia la provano in parallelo due lavori,
+  `linux` (tutti gli unit) e `windows` (di default solo gli unit che il ramo
+  cambia o che nominano un file cambiato: pochi minuti, dentro la corsa Linux;
+  `client_payload.windows` = `tutti` li fa tutti, circa venti minuti di cancello
+  in più, `spento` toglie la parte; il server la legge da
+  `config/routines.unitWindows`, che l'owner sceglie in Gestione → Automazioni,
+  e il lavoro di cui legge il registro è solo `unit`). Ognuno passa il suo esito come uscita del
+  lavoro, e la riga `FILO-UNIT-FUSIONE` la scrive solo il terzo lavoro, `unit`,
+  che li unisce: conflitto, poi rossi sulla fusione (quelli di Windows portano
+  `[Windows]` in coda), poi una parte caduta (`non_provata`), poi l'esito che
+  fonde. Con la parte Windows accesa un ramo che contiene già main non si
+  fonde senza la corsa (verifica e sicurezza l'hanno provato solo su Linux):
+  `linux` risponde «main contenuto», `windows` prova il ramo stesso. Un rosso
+  `[Windows]` va corretto anche nel riallineamento: la verifica che segue gira
+  su Linux e non lo vedrebbe. Al codice provato non arrivano i file dei comandi di Actions;
+- **il server si fida solo di quello che legge da GitHub per quella coppia**
+  (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
+  `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo
+  registro la riga `FILO-UNIT-FUSIONE` con i due sha interi e un esito che dice
+  la stessa cosa della conclusione. Una corsa accesa da una spinta, o con
+  un'altra coppia, non decide niente;
+- **gli esiti**: verde (o rosso anche su main da solo, o main già dentro il
+  ramo, che non costa una corsa) → cancello e fusione sul main provato, come
+  sempre; rossi solo sulla fusione o conflitto → riallineamento; main o punta
+  mossi prima della fusione → la prova si rifà, al più tre volte, poi la
+  riprende il recupero fra un'ora. Un blocco L5 va all'owner con la spiegazione
+  composta dal server dai blocchi. Un'azione che non parte, non finisce o non
+  scrive la riga si riaccende; alla terza di fila si fonde senza prova, come
+  quando la prova non si poteva fare, e la riga del registro in Gestione lo conta;
+- **il recupero delle fusioni mai chieste (#715)** si riduce al rilancio
+  dell'azione: un'ora senza fusione, o un'attesa che nessuno muove da tre ore,
+  e la prova riparte; al terzo rilancio sullo stesso verdetto la pratica va
+  all'owner;
+- **`npm run finish` non cambia**: la prova la fa il PC dell'owner, che la
+  dichiara con le sue credenziali (`ownerMerge`).
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
@@ -721,12 +840,26 @@ fila delle forme della scheda):
   secaudit`).
 
 Il salto di L4 è un'azione dell'owner (callable `ownerSkipSecaudit
-{ feedbackId }`, dal tasto «Salta il controllo» della dashboard): il server
+{ feedbackId }`, dal tasto «Salta il controllo» della dashboard o della pagina
+da browser, che con `{ op: 'list' }` ne legge le bocciature): il server
 verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+la richiesta e il suo stato, `conflitto`, `ramo assente`). Prima di tutto questo confronta
+la punta del ramo col commit verificato e con quello esaminato dall'audit,
+scritti nello stato del giro (#1040.1): se la
+punta è un'altra risponde `mosso`, se il giro non li ha `senza_controllo`, e in
+tutti e due i casi non scrive il salto, non lancia L5 e non apre richieste: un
+commit arrivato dopo i controlli non entra in main senza che nessuno l'abbia
+letto. Lo stato
+(`requestState`: `pending`, o `discarded`/`used` se quella versione era già
+decisa e la richiesta non si riapre) lo danno anche `ownerMerge` e il cancello
+(`approvalState`), e ogni strada lo racconta (#486). Un lavoro server non si fonde
+da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
+prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
+`rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
+solo col server su main. Le regole Firestore ammettono
 `livelli` nei due rami di triage con vincolo di forma (mappa con al più
 `l3`/`l4`, testo cifrato ≤ 20.000).
 
@@ -751,16 +884,32 @@ ma a scriverlo è il server.
      (`routine-state/release`) e non in memoria — le istanze muoiono e si
      moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
      pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
-  3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
-  4. **calcola lui** il numero successivo (aumento della patch). Nessun numero
-     che arrivi dal chiamante viene letto;
+  3. legge `package.json` e `package-lock.json` **da `main`, via API**, col
+     commit da cui li ha letti;
+  4. **calcola lui** il numero successivo: l'aumento della patch, o il campo
+     di primo livello `prossimaVersione` del manifesto quando c'è (un salto
+     come 0.3.0, dichiarato una volta dal repo). Il campo dev'essere `a.b.c` e
+     più alto della versione, a confronto fra numeri; se no si rifiuta
+     (`bad_next_version`) e non si scrive niente. Nessun numero che arrivi dal
+     chiamante viene letto;
   5. **costruisce lui** il contenuto nuovo partendo da quello vecchio, e
      verifica due volte che cambi SOLO la versione (una riga sola diversa nel
-     testo; manifesto identico una volta riletto come dati). Se una delle due
-     non torna, non si scrive niente;
-  6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
-     legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
-     GitHub risponde 409 e non si scrive.
+     testo; manifesto identico una volta riletto come dati). Col campo, nello
+     stesso commit sparisce anche la sua riga (un secondo commit passerebbe
+     per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
+     verifiche non torna, non si scrive niente;
+  6. **lo stesso numero nel lockfile** (#2040), nei due campi dove npm
+     tiene quello del progetto (`version` in cima e `packages[""].version`),
+     qualunque numero portassero prima, e nient'altro: il testo resta nel
+     formato di npm (JSON a due spazi, a capo finale). È la regola di
+     `applicaVersioneAlLock` in `scripts/release-apply-version.mjs`. Senza,
+     ogni `npm install` riscrive il numero nel lockfile e il rebase che viene
+     dopo rifiuta la cartella. Un lockfile che non si riallinea (assente,
+     illeggibile, fuori formato) non ferma l'aumento: il commit porta il solo
+     manifesto e il motivo finisce nel registro del server;
+  7. scrive **un solo** commit `release: vX.Y.Z [skip ci]` con i due file e
+     l'identità dell'App, figlio del commit letto e senza forzare: se `main`
+     si è mossa nel mezzo, GitHub lo rifiuta e non si scrive.
 - **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
   su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
   riaperto da un'altra porta.
@@ -769,8 +918,14 @@ ma a scriverlo è il server.
   manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
-  locale al suo manifesto, senza commit né push, e si ferma se non è più alto
-  di quello dell'albero. Il tag nasce sul commit costruito (`--target`).
+  locale al suo manifesto e al lockfile, senza commit né push, e si ferma se
+  non è più alto di quello dell'albero o se l'albero ne dichiara un altro in
+  `prossimaVersione` (un lockfile che non si riallinea lo avvisa e basta). Il
+  tag nasce sul commit costruito (`--target`).
+- **Nella cartella di chi guida un giro** il lockfile che l'install riscrive
+  torna com'è nel commit prima del rebase (`dispatch.mjs --rimetti-lockfile`,
+  e il preflight da sé): un lockfile disallineato non costa un giro nemmeno
+  quando il rilascio lo lascia indietro.
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 
@@ -780,7 +935,102 @@ A fine sessione orchestratore e worker rispondono a una domanda che l'owner
 imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
 
 - **`routineClosing` `{ passphrase | ticket, op: 'question' | 'answer', id?, answer?, requestId? }`** — domanda e risposta (`requestId`, uno per invocazione, fa ritrovare lo stesso documento ai ritentativi); mai rifiutata per `fault_declared` né a routine spente; `answer` oltre 32768 byte → `answer_too_big` con `bytes` e `max`, mai troncata.
-- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `prober` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
+- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `tutti`, `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `risposta`, `smistamento`, `compito` e `compito:<ricorrente>` (#1153, gli altri: `bad_slot` con l'elenco); vale il più preciso, poi il ripiego nel server.
 - `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
 - `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
 - `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.
+
+## 14. Lavori server: git verso filo-security su due strade (#1233, #1761)
+
+Ogni git di rete verso filo-security passa da `routine-channel.mjs git-server`,
+che prima chiede `routineGitToken` col biglietto. Il sì o il no si decide lì su
+tutte e due le strade: biglietto vivo e pulito, ambito `server`, feedback
+fidato, ramo del server in registro, tetto dei token, voce d'emissione al primo
+token.
+
+- **In locale** il token va a quella sola chiamata di git, nell'URL riscritto
+  dall'ambiente del figlio; aiutanti, askpass e intestazioni della macchina
+  per quella chiamata non valgono.
+- **In cloud** (`CLAUDE_CODE_REMOTE=true` o `GH_TOKEN=proxy-injected`) git
+  verso github.com passa dal proxy della sessione, che verifica una credenziale
+  sua e la scambia col token vero, e serve solo i repository agganciati alla
+  sessione: una credenziale nostra non è detto che arrivi a GitHub (in #1519 e
+  #1153 non ci è arrivata). Il token si chiede lo stesso, per il controllo, ma
+  non si usa: git parte con l'ambiente della sessione, aiutanti compresi.
+  Clone, fetch, ls-remote e spinta di un ramo `worker/*` passano; il proxy
+  rifiuta solo le cancellazioni di rami e tag.
+- **Il passo dell'owner**: la routine dei lavori server ha fra i suoi
+  repository sia Filo sia `sathyaram1/filo-security` (claude.ai/code/routines,
+  impostazioni avanzate). Senza, git-server dice che manca l'aggancio.
+- **La cartella di partenza.** Con due repository la sessione parte dalla
+  cartella sopra i cloni. Gli strumenti trovano Filo dal proprio percorso; se
+  la sessione non sta dentro Filo, il preflight dice all'orchestratore di
+  entrarci (`cd` col percorso intero) prima del setup e di git. Il rapporto di
+  fine sessione trova il transcript dall'id della sessione. Il comando del
+  compito programmato non nomina la cartella:
+
+  ```bash
+  export FILO_ROUTINE=1
+  node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
+  ```
+
+  Il `cd` non basta per le impostazioni: Claude Code legge quelle del
+  progetto solo dalla cartella di partenza, e da sopra i cloni i ganci di Filo
+  (salvataggio automatico, guardia del ramo) non partirebbero, nemmeno per i
+  worker (#1967). Il preflight li porta nelle impostazioni utente insieme al
+  gancio dell'orchestratore cieco, con la cartella del progetto fissata al
+  checkout; ognuno tace dove il progetto della sessione ha già il suo script,
+  così dentro Filo non gira due volte (`scripts/lib/ganci-del-progetto.mjs`).
+
+- **Cosa non garantisce.** In cloud il proxy autentica qualunque git della
+  sessione verso i repository agganciati, non solo quelli di git-server: il
+  sì del server lo fa rispettare lo strumento, non la rete. Quello che arriva
+  su main di filo-security passa comunque dal registro dei rami e dal
+  cancello.
+
+## 15. Schede e testi dei feedback per chi gestisce il lavoro: `routineFeedback` (#1785)
+
+Il manutentore in cloud (SPEC-RIDISEGNO-LAVORO.md § 5, fase 2) legge le schede e,
+per scriverle, i testi dei feedback: dal cloud non ci sono token admin né chiave
+di decifratura, quindi li dà il server.
+
+- **`routineFeedback` `{ ticket, op: 'leggi', numeri: [...] | 'aperti', schede?, testi?, allegato? }`**
+  → `{ ok, voci, resto }`. Solo un biglietto con l'ambito `gestione_lavoro` o quello
+  del manutentore (che il server emette senza ambiti);
+  schede e testi solo se gira nell'ambiente dei riservati (SPEC-DOMANDE § 5.1:
+  sono testo riservato), altrimenti si leggono solo numeri, stati e attese. Per
+  ogni numero: la riga dell'indice, la scheda salvata nel feedback e, con
+  `testi`, titolo, pagina, testo, conversazione, il mittente senza identità e
+  gli allegati testuali in chiaro, decodificati come li legge l'app (un tipo
+  testuale anche fuori da UTF-8; uno testuale solo per nome solo se è UTF-8,
+  altrimenti `nonTestuale`). Un feedback segnalato come attacco o file
+  sospetto ha solo la riga e `rifiutato` col motivo (la regola del lettore
+  locale, provata da un gemello). Tetto: 2000 numeri, oltre `troppi_numeri`
+  col conteggio; i testi a pagine da sei milioni di caratteri, il resto in
+  `resto`, un allegato che non ci sta torna `rinviato` e si chiede da solo con
+  `allegato`. Il biglietto si sporca prima che esca testo, o una scheda, non
+  fidati; con `testi` anche per la conversazione scritta da un biglietto
+  sporco, con la regola del payload e delle sessioni (#2166); la stessa regola
+  vale per un allegato della conversazione chiesto da solo.
+- **`routineFeedback` `{ ticket, op: 'scheda', numero, scheda, rilettura?, modello? }`**
+  → `{ ok, scheda, aggiornato }`: la scheda validata con `src/shared/schede.js`,
+  cifrata nel feedback (`scheda`) con la versione dello schema, la fonte e la
+  fiducia di chi la scrive e del feedback; `schedaAt` in chiaro è l'ora della
+  scrittura, uguale all'aggiornamento del feedback finché nessuno lo tocca.
+- **`ownerSchede` (callable owner)** `{ op: 'scheda', … }`: la stessa scrittura
+  dalla macchina dell'owner.
+- **Registro**: ogni lettura con schede o testi e ogni scheda scritta vanno in
+  `routine-letture` (biglietto, ruolo e tutti i numeri usciti con testo o scheda,
+  senza i rifiutati), che `routineLog` rimanda in `letture`.
+- **Due strade, stessa uscita**: `npm run feedback:leggi` e `npm run
+  feedback:schede` passano dal server in una routine (`isRoutineInstance`) col
+  biglietto, dal token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`).
+  Il server rimanda campi in chiaro e la cornice la mette l'app su tutte e due.
+- **La cartella delle schede è una copia**: quello che conta è la scheda nel
+  feedback. `elenca` scrive nell'indice l'ora della scheda che ogni feedback ha
+  (`nelFeedback`), ed `elenca`, `scrivi` e `rileggi` mandano, senza agente, le
+  schede buone e fresche della cartella che non sono quella (#1785.2): anche quelle scritte
+  prima che le schede stessero nei feedback, o lasciate da un comando
+  interrotto. Prima di mandare, `scrivi` e `rileggi` rileggono i feedback come
+  `elenca` e riscrivono l'indice: un indice vecchio non fa sovrascrivere una
+  scheda più nuova.

@@ -6,14 +6,25 @@ INPUT=""
 [ -t 0 ] || INPUT=$(cat 2>/dev/null)
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 
-# Read di un file dentro il progetto: niente da sporcare. Un «..», un escape JSON o un collegamento lungo il percorso
-# li decide node, che risolve il percorso vero. Si guarda solo prima della risposta, e con un solo "tool_name": le
-# chiavi scritte da altri (la risposta, i parametri di un mcp__) non devono far saltare node.
+# Read di un file dentro il progetto, o Grep coi soli nomi o con le righe del progetto: niente da sporcare. Un «..», un
+# escape JSON o un collegamento lungo il percorso li decide node, che risolve il percorso vero. Si guarda solo prima
+# della risposta, e con un solo "tool_name": le chiavi scritte da altri (la risposta, i parametri di un mcp__) non
+# devono far saltare node.
 RE_READ='"tool_name"[[:space:]]*:[[:space:]]*"Read"'
-RE_FILE='"file_path"[[:space:]]*:[[:space:]]*"([^"]*)"'
+RE_GREP='"tool_name"[[:space:]]*:[[:space:]]*"Grep"'
+RE_RIGHE='"output_mode"[[:space:]]*:[[:space:]]*"content"'
+RE_FILE=''
 TESTA=${INPUT%%'"tool_response"'*}
 DOPO_NOME=${TESTA#*'"tool_name"'}
-if [[ $TESTA =~ $RE_READ ]] && [[ $DOPO_NOME != *'"tool_name"'* ]] && [[ $TESTA =~ $RE_FILE ]]; then
+if [[ $DOPO_NOME != *'"tool_name"'* ]]; then
+  if [[ $TESTA =~ $RE_READ ]]; then
+    RE_FILE='"file_path"[[:space:]]*:[[:space:]]*"([^"]*)"'
+  elif [[ $TESTA =~ $RE_GREP ]]; then
+    [[ $TESTA =~ $RE_RIGHE ]] || exit 0
+    RE_FILE='"path"[[:space:]]*:[[:space:]]*"([^"]*)"'
+  fi
+fi
+if [[ -n $RE_FILE ]] && [[ $TESTA =~ $RE_FILE ]]; then
   F=${BASH_REMATCH[1]}
   F=${F//\\\\//}
   D=${PROJECT_DIR//\\//}

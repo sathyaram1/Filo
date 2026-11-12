@@ -25,9 +25,8 @@
     return state.months[month];
   }
 
-  // Stima costo (USD) -> ritorna EUR. Se il fornitore ha già detto quanto è
-  // costata la chiamata (`usage.costUsd`: voce, dettatura, indicizzazione, che
-  // non si contano a token), quel numero vale più di qualunque listino.
+  // Se il fornitore dice quanto è costata la chiamata (usage.costUsd), quel numero vale
+  // più di qualunque listino: voce, dettatura e indicizzazione non si contano a token.
   function estimateCostEur({ usage, pricing, usdToEur }) {
     const direct = usage && Number(usage.costUsd);
     if (Number.isFinite(direct) && direct > 0) return direct * (usdToEur || 0.92);
@@ -42,6 +41,45 @@
     return state.months[month] || { totalEur: 0, byAction: {}, byProvider: {} };
   }
 
+  // Il registro d'uso delle stime di costo (#819): token medi per funzione, un campione per uso. Un uso fatto di più
+  // chiamate (i giri di strumenti di un messaggio in chat) gira dentro `unUso` e diventa un campione solo.
+  let usoCorrente = null;
+  try { usoCorrente = new (require('async_hooks').AsyncLocalStorage)(); } catch (_) { usoCorrente = null; }
+
+  function campioneDi(model, usage) {
+    const u = usage || {};
+    return {
+      model: String(model || ''),
+      prompt: Number(u.promptTokens) || 0,
+      completion: Number(u.completionTokens) || 0,
+      cached: Number(u.cachedPromptTokens) || 0,
+      usd: Number(u.costUsd) || 0,
+    };
+  }
+
+  async function aggiungiAlRegistro(action, campione) {
+    const S = global.SN_STIMA_COSTO;
+    if (!S || !action) return;
+    const state = await getState();
+    state.tokens = S.aggiungiCampione(state.tokens || {}, action, campione);
+    await setState(state);
+  }
+
+  async function unUso(action, fn) {
+    if (!usoCorrente) return fn();
+    const uso = { action, campione: null };
+    try {
+      return await usoCorrente.run(uso, fn);
+    } finally {
+      if (uso.campione) { try { await aggiungiAlRegistro(action, uso.campione); } catch (_) {} }
+    }
+  }
+
+  async function registroToken() {
+    const state = await getState();
+    return state.tokens || {};
+  }
+
   async function record({ action, provider, model, usage, pricing, usdToEur }) {
     const eur = estimateCostEur({ usage, pricing, usdToEur });
     const state = await getState();
@@ -49,17 +87,18 @@
     m.totalEur += eur;
     m.byAction[action] = (m.byAction[action] || 0) + eur;
     m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
+    const campione = campioneDi(model, usage);
+    const uso = usoCorrente && usoCorrente.getStore();
+    if (uso && uso.action === action) {
+      const c = uso.campione || { model: campione.model, prompt: 0, completion: 0, cached: 0, usd: 0 };
+      for (const k of ['prompt', 'completion', 'cached', 'usd']) c[k] += campione[k];
+      uso.campione = c;
+    } else if (global.SN_STIMA_COSTO) {
+      state.tokens = global.SN_STIMA_COSTO.aggiungiCampione(state.tokens || {}, action, campione);
+    }
     await setState(state);
-    // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
-    // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
-    // Coperti così TUTTI i call site AI senza ritoccarli uno per uno.
-    //
-    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando non c'è
-    // un listino per il modello, e un saldo che non si muove sembra rotto. Il
-    // prezzo nozionale (listino del modello) fa scendere i crediti anche allora,
-    // senza toccare il limite di spesa REALE qui sopra (che resta su `eur`).
-    // Precedenza: prezzo reale passato → listino nozionale del modello →
-    // ripiego, così una chiamata reale non costa mai 0 crediti.
+    // I crediti usano un costo NOZIONALE: eur è 0 senza listino e un saldo fermo sembra rotto.
+    // Il limite di spesa reale resta su eur; precedenza: prezzo reale, listino, ripiego.
     const C = global.SN_CONST || {};
     const creditPricing = pricing
       || (C.notionalPricingFor && C.notionalPricingFor(model))
@@ -69,9 +108,8 @@
     try {
       await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
-    // Registro d'uso sul server (#598): una riga per chiamata fatta con la
-    // chiave personale. Decide l'handler wallet se scriverla; qui si passa
-    // solo quello che si sa. Best-effort come i crediti.
+    // Registro d'uso sul server (#598): una riga per chiamata con la chiave personale. Qui si
+    // passa solo ciò che si sa, decide l'handler wallet; best-effort come i crediti.
     try {
       await global.SN_WALLET_MAIN?.recordUsage({ action, provider, model, servedBy: usage && usage.servedBy, usage });
     } catch (_) {}
@@ -84,5 +122,5 @@
     return m.totalEur >= monthlyLimitEur;
   }
 
-  global.SN_COSTS = { record, getMonthly, isOverLimit, estimateCostEur, monthKey, getState };
+  global.SN_COSTS = { record, getMonthly, isOverLimit, estimateCostEur, monthKey, getState, unUso, registroToken };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -73,15 +73,44 @@ export const PINNED_PATHS = [
 
 const REPO_MARK = '.filo-repo-root';
 const ORIGIN_MARK = '.filo-origine';
+// Il commit intero da cui viene la copia: lo confronta con main chi decide se la sessione è vecchia (#1796).
+const COMMIT_MARK = '.filo-commit';
+// Questi strumenti hanno già preso un biglietto: il primo della sessione non si nega (lib/strumenti-vecchi.mjs).
+const LAVORO_MARK = '.filo-lavoro-preso';
 
-/** Da dove viene questa copia (ramo e commit), se lo ha registrato. */
-export function pinnedOrigin(toolsRoot = TOOLS_ROOT) {
+const leggiMarca = (toolsRoot, nome) => {
   try {
-    const f = resolve(toolsRoot, ORIGIN_MARK);
+    const f = resolve(toolsRoot, nome);
     return existsSync(f) ? String(readFileSync(f, 'utf8') || '').trim() : '';
   } catch (_) {
     return '';
   }
+};
+
+/** Da dove viene questa copia (ramo e commit), se lo ha registrato. */
+export function pinnedOrigin(toolsRoot = TOOLS_ROOT) {
+  return leggiMarca(toolsRoot, ORIGIN_MARK);
+}
+
+/** Lo sha intero del commit da cui la copia è stata fissata, '' se non lo sa (strumenti del repo, o copia vecchia). */
+export function pinnedCommit(toolsRoot = TOOLS_ROOT) {
+  const sha = leggiMarca(toolsRoot, COMMIT_MARK);
+  return /^[0-9a-f]{40}$/i.test(sha) ? sha : '';
+}
+
+/** Segna che questa copia ha preso un biglietto. Solo su una copia fissata: gli strumenti del repo non si sporcano. */
+export function segnaLavoroPreso(toolsRoot = TOOLS_ROOT, adesso = new Date()) {
+  if (!pinnedCommit(toolsRoot)) return false;
+  try {
+    writeFileSync(resolve(toolsRoot, LAVORO_MARK), `${adesso.toISOString()}\n`, 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function lavoroGiaPreso(toolsRoot = TOOLS_ROOT) {
+  return !!leggiMarca(toolsRoot, LAVORO_MARK);
 }
 
 /**
@@ -105,11 +134,13 @@ export function pinnedDir() {
  *
  * @returns {{ ok: boolean, dir: string, why: string }}
  */
-export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repoRoot } = {}) {
+export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repoRoot, commit = '' } = {}) {
   const progetto = resolve(repoRoot);
   // `da` diverso dal progetto: la copia di un worker nasce dagli strumenti
   // dell'orchestratore, non dal suo clone, che è già sul ramo (#1157).
   const src = resolve(da);
+  // La copia di un worker eredita il commit di quella da cui nasce: è la stessa versione degli strumenti.
+  const daCommit = /^[0-9a-f]{40}$/i.test(String(commit)) ? String(commit) : pinnedCommit(src);
   if (resolve(dest) === src) return { ok: false, dir: '', why: 'destinazione uguale alla sorgente' };
   // NON si fissa sopra la copia che sta girando adesso. Non è prudenza: a
   // metà giro il progetto è aperto sul ramo di lavoro, quindi ricopiare da lì
@@ -138,6 +169,7 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repo
     // un checkout non aggiornato riporterebbe indietro gli strumenti con
     // un'altra causa, e senza questa riga non si distinguerebbe.
     if (origine) writeFileSync(resolve(dest, ORIGIN_MARK), `${origine}\n`, 'utf8');
+    if (daCommit) writeFileSync(resolve(dest, COMMIT_MARK), `${daCommit}\n`, 'utf8');
     return { ok: true, dir: dest, why: 'copiati' };
   } catch (e) {
     return { ok: false, dir: '', why: String((e && e.message) || e) };
@@ -193,4 +225,35 @@ export function absolutizeRecipe(text, toolsRoot = TOOLS_ROOT, repoRoot = '') {
   // Le virgolette servono: in cloud la cartella temporanea può avere spazi.
   const base = tools.replace(/\\/g, '/');
   return t.replace(/\bnode\s+scripts\/([A-Za-z0-9._/-]+)/g, `node "${base}/scripts/$1"`);
+}
+
+/**
+ * Un pezzo stampato, coi comandi riscritti come nelle ricette. Un JSON resta com'è: dentro c'è testo di altri
+ * (il feedback), e le virgolette aggiunte romperebbero la busta. PURA.
+ */
+export function absolutizePrinted(chunk, toolsRoot = TOOLS_ROOT, repoRoot = '') {
+  if (typeof chunk !== 'string' || !/\bnode\s+scripts\//.test(chunk)) return chunk;
+  if (/^\s*[[{]/.test(chunk)) {
+    try { JSON.parse(chunk); return chunk; } catch (_) { /* testo che comincia con una parentesi */ }
+  }
+  return absolutizeRecipe(chunk, toolsRoot, repoRoot);
+}
+
+const OUTPUT_MARK = Symbol.for('filo.absolutizeOutput');
+
+/**
+ * Da qui ogni testo che il processo stampa passa da absolutizePrinted, scritto dallo strumento o arrivato dal server
+ * (istruzioni, motivi di rifiuto) (#763). La chiama all'avvio ogni strumento che le ricette nominano (sentinella in
+ * tests/unit/toolsPin.test.mjs). A strumenti non fissati non tocca niente.
+ */
+export function absolutizeOutput(repoRoot = '', { toolsRoot = TOOLS_ROOT, streams = [process.stdout, process.stderr] } = {}) {
+  const repo = repoRoot || pinnedRepoRoot(toolsRoot);
+  if (!repo || resolve(repo) === resolve(toolsRoot)) return false;
+  for (const s of streams) {
+    if (!s || typeof s.write !== 'function' || s[OUTPUT_MARK]) continue;
+    const write = s.write;
+    s.write = (chunk, ...rest) => write.call(s, absolutizePrinted(chunk, toolsRoot, repo), ...rest);
+    s[OUTPUT_MARK] = true;
+  }
+  return true;
 }

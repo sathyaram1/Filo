@@ -445,6 +445,9 @@ test('#497 — la frase parte chiusa, il tasto la apre, e cambiando feedback si 
 
   // Da chiusa, il tasto è l'unico posto dove si vede che una frase c'è già.
   await expect(tasto).toHaveClass(/mg-usernote-piena/);
+  // Il puntatore è rimasto sul tasto: il title lo tiene il fumetto, che è quello che si legge passandoci sopra.
+  await expect.poll(() => tasto.evaluate((el) => window.SN_SUGGERIMENTO.testoPer(el))).toMatch(/Frase già scritta/);
+  await page.mouse.move(0, 0);
   await expect(tasto).toHaveAttribute('title', /Frase già scritta/);
   await page.evaluate(() => window.__mgTest.openDetail('fb-uno'));
   await expect(tasto).not.toHaveClass(/mg-usernote-piena/);

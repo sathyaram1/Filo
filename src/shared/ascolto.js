@@ -21,15 +21,17 @@
   }
 
   function supportato() {
+    if (global.SN_MICROFONO_CORNICE) return Boolean(global.SN_DICTATION_SEGMENTER);
     return typeof window !== 'undefined'
       && Boolean(navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
       && Boolean(window.AudioContext || window.webkitAudioContext)
       && Boolean(global.SN_DICTATION_SEGMENTER);
   }
 
-  function avvisa(frase) {
+  // `rimedio`: la risposta d'errore del main, quando la frase nomina dove si rimedia (l'avviso porta il tasto, #663).
+  function avvisa(frase, rimedio = null) {
     if (!frase) return;
-    try { global.SN_POPUP.showToast(frase, { duration: 9000 }); } catch (_) { console.warn('[Filo voce]', frase); }
+    try { global.SN_POPUP.showToast(frase, { duration: 9000, rimedio }); } catch (_) { console.warn('[Filo voce]', frase); }
   }
 
   // Il posto dove si dà il permesso cambia col sistema.
@@ -45,7 +47,9 @@
   function fraseTrascrizione(res) {
     if (res && res.error && SPIEGATI.includes(res.code)) return res.error;
     const E = global.SN_CHAT_ERRORS;
-    const motivo = E ? E.friendly({ message: (res && res.error) || '', code: res && res.code }) : '';
+    // Ricomposta come ogni altra risposta d'errore: col solo codice si perdevano il rifiuto della chiave e la frase
+    // che il main scrive sui crediti finiti.
+    const motivo = E ? E.friendly(E.fromResponse(res, '')) : '';
     return t('voce_err_trascrizione', motivo || t('voce_riprova'));
   }
 
@@ -54,26 +58,9 @@
     try { fn(...a); } catch (e) { console.error('[Filo voce]', e); }
   }
 
-  // op: provvisorie (frasi a metà, costano), fineDaSola ({ silenceMs, waitMs }: chi ha finito di parlare),
-  //     lang, suLivello(0..1), suProvvisoria(testo), suFrase(testo), suStato('trascrive'), suFine({ frasi, errore, motivo }).
-  // → la sessione ({ ferma(motivo) }) o null se non è partita (e l'utente sa già perché).
-  // motivo: 'utente' | 'finito' | 'muto' | 'tempo' | 'errore' | 'altro' (ne parte un'altra) | 'annulla' (butta il resto).
-  async function avvia(op = {}) {
-    if (attiva) attiva.ferma('altro');
-    if (!supportato()) { avvisa(t('menu_dictate_not_supported')); return null; }
-    const { ACTIONS } = global.SN_CONST;
-    const { MSG } = global.SN_MSG;
-    let stream;
-    try {
-      // Il microfono lo chiede Filo, non il sito: senza lasciapassare la domanda uscirebbe col nome del sito.
-      try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'media' }); } catch (_) {}
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      avvisa(fraseMicrofono(e));
-      return null;
-    }
-    if (attiva) attiva.ferma('altro');
-    const Seg = global.SN_DICTATION_SEGMENTER;
+  // Il microfono di questo documento: le pagine di Filo, che non sono un sito a cui dare un permesso.
+  async function microfonoQui() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const Ctx = window.AudioContext || window.webkitAudioContext;
     let ctx; let source; let proc;
     try {
@@ -86,12 +73,65 @@
     } catch (_) {
       try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
       try { if (ctx) ctx.close(); } catch (_) {}
-      avvisa(t('voce_err_mic_occupato'));
+      throw Object.assign(new Error('microfono occupato'), { occupato: true });
+    }
+    return {
+      rate: ctx.sampleRate,
+      collega(suCampioni) {
+        proc.onaudioprocess = (e) => suCampioni(e.inputBuffer.getChannelData(0));
+        source.connect(proc);
+        // Lo ScriptProcessor lavora solo collegato all'uscita; non scrivendo nel buffer, dalle casse non esce niente.
+        proc.connect(ctx.destination);
+      },
+      chiudi() {
+        try { proc.onaudioprocess = null; proc.disconnect(); source.disconnect(); } catch (_) {}
+        try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+        try { ctx.close(); } catch (_) {}
+      },
+    };
+  }
+
+  // Su una pagina web ascolta la cornice di Filo e qui arrivano solo i campioni: il sito non riceve mai il microfono,
+  // nemmeno durante una dettatura, e Detta funziona anche dove l'utente gliel'ha negato (#586; preload/page-preload.js).
+  async function microfonoDellaCornice(cornice) {
+    let suCampioni = null; let suChiusa = null;
+    const f = await cornice.apri({
+      suDati: (x) => { if (suCampioni) suCampioni(x); },
+      suFine: () => { if (suChiusa) suChiusa(); },
+    });
+    return {
+      rate: f.rate,
+      collega(fn, chiusa) { suCampioni = fn; suChiusa = chiusa; },
+      chiudi: f.chiudi,
+    };
+  }
+
+  // op: provvisorie (frasi a metà, costano), fineDaSola ({ silenceMs, waitMs }: chi ha finito di parlare),
+  //     lang, suLivello(0..1), suProvvisoria(testo), suFrase(testo), suStato('trascrive'), suFine({ frasi, errore, motivo }).
+  // → la sessione ({ ferma(motivo) }) o null se non è partita (e l'utente sa già perché).
+  // motivo: 'utente' | 'finito' | 'muto' | 'tempo' | 'errore' | 'altro' (ne parte un'altra) | 'annulla' (butta il resto).
+  async function avvia(op = {}) {
+    if (attiva) attiva.ferma('altro');
+    if (!supportato()) { avvisa(t('menu_dictate_not_supported')); return null; }
+    const { ACTIONS } = global.SN_CONST;
+    const { MSG } = global.SN_MSG;
+    let mic;
+    try {
+      mic = global.SN_MICROFONO_CORNICE ? await microfonoDellaCornice(global.SN_MICROFONO_CORNICE) : await microfonoQui();
+    } catch (e) {
+      avvisa(e && e.occupato ? t('voce_err_mic_occupato') : fraseMicrofono(e));
       return null;
     }
+    if (attiva) attiva.ferma('altro');
+    const Seg = global.SN_DICTATION_SEGMENTER;
 
     const lang = op.lang || navigator.language || 'it-IT';
     const s = { fermata: false, frasi: 0, errore: false, annullata: false, inVolo: false, coda: Promise.resolve(), fine: null };
+    // Per i contatori (#1467): finché ascolta, il main sa cosa contare se la scheda si chiude. `invioSeLasciata`:
+    // l'invio di una dettatura rimasta a metà con delle frasi (di serie nessuno: Detta scrive in un campo).
+    const id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const inCorso = () => segnaSessione({ frasi: s.frasi, motivo: 'altro', provvisorie: !!op.provvisorie, id },
+      s.frasi > 0 ? op.invioSeLasciata || 'nessuno' : 'nessuno');
     const manda = (seg, interim) => chrome.runtime.sendMessage({
       type: MSG.AI_REQUEST,
       action: ACTIONS.TRANSCRIBE_AUDIO,
@@ -105,7 +145,7 @@
     const guasto = (res) => {
       if (s.errore || s.annullata) return;
       s.errore = true;
-      avvisa(fraseTrascrizione(res));
+      avvisa(fraseTrascrizione(res), res);
       sessione.ferma('errore');
     };
 
@@ -137,23 +177,26 @@
           s.frasi++;
           chiama(op.suProvvisoria, '');
           chiama(op.suFrase, testo);
+          inCorso();
         });
       },
     });
 
-    proc.onaudioprocess = (e) => {
+    mic.collega((campioni) => {
       if (s.fermata) return;
       try {
-        segmenter.push(Seg.downsample(e.inputBuffer.getChannelData(0), ctx.sampleRate, RATE));
+        segmenter.push(Seg.downsample(campioni, mic.rate, RATE));
         const st = segmenter.state();
         chiama(op.suLivello, st.level);
         const fine = op.fineDaSola ? Seg.endOfSpeech(st, op.fineDaSola) : '';
         if (fine) sessione.ferma(fine === 'done' ? 'finito' : 'muto');
       } catch (_) {}
-    };
-    source.connect(proc);
-    // Lo ScriptProcessor lavora solo collegato all'uscita; non scrivendo nel buffer, dalle casse non esce niente.
-    proc.connect(ctx.destination);
+    }, () => {
+      // La cornice ha smesso di ascoltare (finestra chiusa, microfono staccato): si dice, non si tace.
+      if (s.fermata) return;
+      avvisa(t('voce_err_mic_occupato'));
+      sessione.ferma('utente');
+    });
     const tetto = setTimeout(() => sessione.ferma('tempo'), MAX_MS);
 
     sessione.ferma = (motivo = 'utente') => {
@@ -161,9 +204,7 @@
       s.fermata = true;
       if (motivo === 'annulla') s.annullata = true;
       clearTimeout(tetto);
-      try { proc.onaudioprocess = null; proc.disconnect(); source.disconnect(); } catch (_) {}
-      try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
-      try { ctx.close(); } catch (_) {}
+      try { mic.chiudi(); } catch (_) {}
       // L'ultima frase è definitiva anche senza pausa.
       if (!s.annullata && motivo !== 'errore') { try { segmenter.flush(); } catch (_) {} }
       chiama(op.suLivello, 0);
@@ -173,18 +214,51 @@
         if (!s.frasi && !s.errore && !s.annullata && motivo !== 'altro') {
           avvisa(t(motivo === 'muto' ? 'voce_err_muto' : 'voce_vuoto'));
         }
-        const esito = { frasi: s.frasi, errore: s.errore, motivo };
+        const esito = { frasi: s.frasi, errore: s.errore, motivo, provvisorie: !!op.provvisorie, id };
         chiama(op.suFine, esito);
         return esito;
       });
       return s.fine;
     };
     attiva = sessione;
+    inCorso();
     return sessione;
   }
 
+  function mandaConto(esito, invio, misura) {
+    try {
+      const r = chrome.runtime.sendMessage({
+        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura, cosa: 'dettatura', motivo: esito.motivo, frasi: esito.frasi,
+        invio: String(invio || ''), provvisorie: !!esito.provvisorie, id: esito.id,
+      });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+  // Le sessioni non ancora contate, per id, con quello che conterebbero adesso: una pagina che se ne va nella stessa scheda
+  // (ricaricata, un'altra pagina) non distrugge la scheda, e allora le conta lei, come il main a scheda chiusa.
+  const inSospeso = new Map();
+  const contate = new Set();
+  // Una sessione si conta una volta (#1467), da chi sa che fine ha fatto il testo: `invio` dall'elenco dei contatori
+  // (SN_CONTATORI.INVII_DETTATURA). Escono il motivo, quante frasi e l'invio, mai le parole.
+  function contaSessione(esito, invio) {
+    if (!esito || esito.contata || (esito.id && contate.has(esito.id))) return;
+    esito.contata = true;
+    if (esito.id) { inSospeso.delete(esito.id); contate.add(esito.id); }
+    mandaConto(esito, invio, 'dettatura');
+  }
+  // Quello che si conterebbe se la pagina se ne andasse adesso, col testo ancora da mandare.
+  function segnaSessione(esito, invio) {
+    if (!esito || esito.contata || !esito.id || contate.has(esito.id)) return;
+    inSospeso.set(esito.id, { esito, invio });
+    mandaConto(esito, invio, 'in-corso');
+  }
+  function congeda() {
+    for (const { esito, invio } of [...inSospeso.values()]) contaSessione(esito, invio);
+  }
+  try { if (typeof global.addEventListener === 'function') global.addEventListener('pagehide', congeda); } catch (_) {}
+
   global.SN_ASCOLTO = {
-    avvia, supportato, fraseMicrofono, fraseTrascrizione,
+    avvia, supportato, fraseMicrofono, fraseTrascrizione, contaSessione, segnaSessione,
     attiva: () => attiva,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

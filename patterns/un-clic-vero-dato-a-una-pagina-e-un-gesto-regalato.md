@@ -85,7 +85,9 @@ voleva.
   sopra ascolta anche lì e li rimette dopo una riscrittura; un riquadro che ha un preload suo lo dice con un segno nel
   mondo isolato, e non si ascolta due volte. Il riquadro cambia documento tenendo la finestra (il vuoto iniziale, la
   riscrittura), e gli osservatori del documento vecchio tacciono: si riaggancia a ogni `load`. Un riquadro che sta per
-  caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì.
+  caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì
+  (regola e porte in [riquadri incorporati](riquadri-incorporati-iframe-filo-gira-anche-li.md), #1560).
+  La prova monta Filo coi riquadri ancora fermi: `tests/helpers/riquadriInRitardo.mjs` (#1568).
   Un riquadro dentro una radice ombra non lo vedono gli osservatori né `window.frames` (#737.1 giro 10): si cerca al
   passaggio del puntatore, prima della pressione. Radice aperta: l'evento porta il riquadro, o si visitano le radici.
   Radice chiusa: il preload conta i figli nell'albero dei frame, e a quelli in più fa presentare il riquadro nel suo

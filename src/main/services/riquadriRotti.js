@@ -28,6 +28,7 @@ const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per
 const funziona = new Map();   // pagina|riquadro → quando il modello l'ha visto non rotto
 const fotoMancate = new Map(); // riquadro → foto non riuscite
 let visioni = [];
+let visioniPiene = false;
 
 function Cookies() { return require('./cookies'); }
 function MSG() { return (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {}; }
@@ -109,19 +110,60 @@ function segnoDi(msg) {
 }
 
 // Codice per il mondo dei content script della pagina (quello di riquadroRotto.js), dove vive la mappa dei segni.
-const MONDO_SCRIPT = 999;
+const MONDO_SCRIPT = require('../../preload/mondo-esente').MONDO;
 function chiamaPagina(wc, metodo, ...args) {
   const code = `(() => { const R = globalThis.SN_RIQUADRO_COOKIE; return R && typeof R.${metodo} === 'function' ? R.${metodo}(...${JSON.stringify(args)}) : null; })()`;
   try { return wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]).catch(() => null); } catch (_) { return Promise.resolve(null); }
 }
+
+// I contatori (#1469): per servizio noto, o «altro», mai il sito. Un riquadro in incognito non arriva fin qui.
+function idServizio(urlFrame) {
+  const { host, percorso } = hostEPercorso(urlFrame);
+  const s = R.servizioDi(host, percorso);
+  return (s && s.id) || '';
+}
+function conta(id, evento, incognito = false) {
+  try {
+    const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+    const M = globalThis.SN_CONTATORI_MAIN;
+    if (N && M) M.navigazione(N.riquadro(id, evento), { incognito });
+  } catch (_) {}
+}
+
+// La risposta alla proposta, per i contatori della pagina (#1473): una sola, e quella senza risposta se ne va con la
+// pagina che la mostrava (un documento nuovo, la scheda chiusa). In incognito non si propone niente.
+function contaProposta(esito) {
+  require('./contatoriHomePagina').misura('proposta', 'riquadro_rotto', esito);
+}
+const pagineSeguite = new WeakSet();
+function seguiPagina(wc) {
+  if (!wc || pagineSeguite.has(wc) || typeof wc.on !== 'function') return;
+  pagineSeguite.add(wc);
+  const id = wc.id;
+  const via = () => {
+    for (const [token, p] of [...proposte]) {
+      if (p.wcId !== id) continue;
+      proposte.delete(token);
+      contaProposta('ignorata');
+    }
+  };
+  try { wc.on('did-navigate', via); wc.once('destroyed', via); } catch (_) {}
+}
+
+// I riquadri ricaricati dopo il sì: la loro prossima segnalazione dice se adesso funzionano.
+const dopoIlSi = new Map(); // wcId|ftn → { id, t }
+const DOPO_IL_SI_MS = 2 * 60 * 1000;
 
 function proponi(c, nome, segno) {
   const token = crypto.randomUUID();
   let url = '';
   let origin = '';
   try { url = String(c.figlio.url || ''); origin = String(c.figlio.origin || ''); } catch (_) {}
-  proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin, segno });
+  const id = idServizio(c.urlFrame);
+  conta(id, 'mostrata', c.incognito);
+  proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin, segno, id });
   while (proposte.size > MAX_VOCI) proposte.delete(proposte.keys().next().value);
+  seguiPagina(c.wc);
   try { c.top.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_PROPONI, token, nome, url, origin, segno }); } catch (_) {}
 }
 
@@ -192,11 +234,25 @@ async function guarda(c, segno) {
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
   // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
+  const Sicurezza = require('./contatoriSicurezza');
+  const perContatori = { incognito: !!c.incognito };
   try {
     const delicata = await globalThis.SN_DELICATE.filtro();
-    if (delicata(c.urlTop) || delicata(c.urlFrame)) return null;
-  } catch (_) { return null; }
-  if (!restanoVisioni()) return null;
+    const motivo = delicata(c.urlTop) || delicata(c.urlFrame);
+    if (motivo) {
+      conta(idServizio(c.urlFrame), 'pagina_delicata', c.incognito);
+      Sicurezza.misura('paginaDelicata', motivo, 'riquadri', perContatori);
+      return null;
+    }
+  } catch (_) { Sicurezza.misura('filtroGuasto', 'riquadri', perContatori); return null; }
+  if (!restanoVisioni()) {
+    conta(idServizio(c.urlFrame), 'tetto_visioni', c.incognito);
+    // Il tetto si conta toccato una volta, finché non torna a passare uno sguardo (#1474).
+    if (!visioniPiene) Sicurezza.misura('tetto', 'riquadri_visioni', perContatori);
+    visioniPiene = true;
+    return null;
+  }
+  visioniPiene = false;
   const immagine = await foto(c, segno);
   if (!immagine) return FOTO_MANCATA;
   visioni.push(Date.now());
@@ -206,6 +262,7 @@ async function guarda(c, segno) {
     return null;
   }
   const esito = R.leggiRisposta(testo, c.servizio);
+  if (esito) conta(idServizio(c.urlFrame), esito.rotto ? 'modello' : 'no', c.incognito);
   if (esito && !esito.rotto) {
     funziona.set(chiaveFunziona(c), Date.now());
     while (funziona.size > MAX_VOCI) funziona.delete(funziona.keys().next().value);
@@ -213,10 +270,24 @@ async function guarda(c, segno) {
   return esito;
 }
 
+// Il riquadro ricaricato dopo il sì che si racconta di nuovo: con i cookie, adesso funziona o è ancora rotto.
+function esitoDopoIlSi(c, msg) {
+  const k = `${c.wc.id}|${c.figlio.frameTreeNodeId}`;
+  const a = dopoIlSi.get(k);
+  if (!a) return;
+  dopoIlSi.delete(k);
+  if (Date.now() - a.t > DOPO_IL_SI_MS) return;
+  const o = osservazione(msg);
+  const { host, percorso } = hostEPercorso(c.urlFrame);
+  const rotto = !!R.riconosci({ host, percorso, testo: o.testo, parole: o.parole }) || R.sembraRotto(o);
+  conta(a.id, rotto ? 'ancora_rotto' : 'funziona', c.incognito);
+}
+
 // Il riquadro racconta cosa mostra; da qui in poi decide il main.
 async function segnala(msg, sender) {
   const c = contesto(sender);
   if (!c) return { ok: false };
+  esitoDopoIlSi(c, msg);
   const chiave = `${c.wc.id}|${c.figlio.frameTreeNodeId}|${c.servizio}`;
   if (visti.has(chiave) || rifiutate.has(`${c.servizio}|${c.ospite}`)) return { ok: true };
   if (!rifiutati(c) || pubblicita(c.urlFrame)) return { ok: true };
@@ -226,19 +297,20 @@ async function segnala(msg, sender) {
   const regola = R.riconosci({ host, percorso, testo: o.testo, parole: o.parole });
   if (regola) {
     tieni(visti, chiave);
+    conta(idServizio(c.urlFrame), 'regola', c.incognito);
     proponi(c, regola.nome || R.nomeDi(c.servizio, host, percorso), segno);
     return { ok: true, via: 'regola' };
   }
   if (!R.sembraRotto(o)) return { ok: true };
   tieni(visti, chiave);
   // Un modulo con la password è delicato (#1004): la sua immagine non va a un modello.
-  if (o.password) return { ok: true };
+  if (o.password) { conta(idServizio(c.urlFrame), 'password', c.incognito); return { ok: true }; }
   const esito = await guarda(c, segno);
   if (esito === FOTO_MANCATA) {
     const n = (fotoMancate.get(chiave) || 0) + 1;
     fotoMancate.set(chiave, n);
     while (fotoMancate.size > MAX_VOCI) fotoMancate.delete(fotoMancate.keys().next().value);
-    if (n >= FOTO_TENTATIVI) return { ok: true };
+    if (n >= FOTO_TENTATIVI) { conta(idServizio(c.urlFrame), 'foto_mancata', c.incognito); return { ok: true }; }
     visti.delete(chiave);
     return { ok: true, riprova: true };
   }
@@ -287,13 +359,17 @@ async function cambia(msg, sender) {
   const attiva = !!(msg && msg.attiva);
   if (attiva && !riattivati.has(c.servizio) && !rifiutati(c)) return { ok: false };
   await scrivi(c.servizio, attiva);
+  let ritirate = 0;
   for (const [token, p] of [...proposte]) {
     if (p.servizio !== c.servizio) continue;
     proposte.delete(token);
+    ritirate++;
     let w = null;
     try { w = require('electron').webContents.fromId(p.wcId); } catch (_) {}
     if (w && !w.isDestroyed()) ritira(w, token);
   }
+  // Il tasto destro sul riquadro risponde alla proposta che c'era, come il suo «Sì» o il suo «No».
+  if (ritirate) contaProposta(attiva ? 'accettata' : 'rifiutata');
   await ricarica(c.wc.id, c.figlio.frameTreeNodeId, segnoDi(msg));
   return { ok: true };
 }
@@ -305,10 +381,15 @@ async function risposta(msg, sender) {
   const wc = sender && sender.wc;
   if (!p || !wc || wc.isDestroyed() || wc.id !== p.wcId || !stesso(sender.frame, wc.mainFrame)) return { ok: false };
   proposte.delete(token);
+  // La pagina non ha trovato il riquadro dove mettere la barra: nessuno l'ha vista, e non è un no.
+  if (msg && msg.nonTrovato === true) return { ok: true };
   if (!(msg && msg.si === true)) {
     tieni(rifiutate, `${p.servizio}|${p.ospite}`);
+    contaProposta('rifiutata');
     return { ok: true };
   }
+  conta(p.id, 'accettata');
+  contaProposta('accettata');
   await scrivi(p.servizio, true);
   // Gli altri riquadri dello stesso servizio erano rotti per la stessa ragione: si ricaricano anche loro.
   const fratelli = [...proposte].filter(([, q]) => q.servizio === p.servizio);
@@ -320,7 +401,12 @@ async function risposta(msg, sender) {
   }
   let ricaricato = false;
   for (const q of [p, ...fratelli.map(([, x]) => x)]) {
+    // Segnato prima del ricaricamento: il riquadro si può raccontare prima che la chiamata torni.
+    const k = `${q.wcId}|${q.ftn}`;
+    dopoIlSi.set(k, { id: q.id, t: Date.now() });
+    while (dopoIlSi.size > MAX_VOCI) dopoIlSi.delete(dopoIlSi.keys().next().value);
     if (await ricarica(q.wcId, q.ftn, q.segno)) ricaricato = true;
+    else dopoIlSi.delete(k);
   }
   return { ok: true, ricaricato };
 }

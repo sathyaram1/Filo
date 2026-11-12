@@ -1,85 +1,37 @@
-// AUDIT: le regole proxy dominio (REGOLA_PROXY_DOMINIO) sono persistenti
-// ma non c'è nessuna UI per vederle o cancellarle.
-//
-// RIPRODUZIONE (utente):
-//   1. L'utente dice a Filo "Apri sempre netflix.com dalla Francia".
-//   2. Filo salva una regola in FILO_PROXY_RULES: da quel momento netflix.com
-//      nasce sempre instradata da fr, anche dopo il riavvio.
-//   3. L'utente non trova NESSUN posto nell'interfaccia dove vedere quali
-//      regole dominio ha impostato, né come cancellarle senza dire a Filo
-//      "togli la regola netflix.com" (che funziona solo se l'utente ricorda
-//      esattamente il dominio che aveva detto in precedenza).
-//
-// PARTE TECNICA:
-//   Le regole sono salvate in FILO_PROXY_RULES (storage.json) tramite
-//   FiloMem.setProxyRule() chiamato da TabManager.setDomainProxyRule().
-//   Nessuna pagina (dashboard, opzioni, sicurezza) mostra la lista né offre
-//   un controllo per cancellarle.
-//   L'unico accesso è tramite chat ("togli la regola per netflix.com").
-//   Invariante UX violata: se l'app salva N cose, l'utente deve poterle vedere.
+// Una regola «questo sito sempre da <paese>» salvata si vede: nel filo della home è un cambio col dominio e il paese,
+// e da lì si toglie. Si asserisce la regola vista, mai la sua assenza (#1569). Frasi dei cambi: src/shared/cambi.js.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { home } from './helpers/chatFinta.mjs';
 
-test('le regole proxy dominio sono salvabili ma non visibili nella dashboard', async ({ app, shell }) => {
-  // Aspettiamo che la shell sia pronta.
-  await shell.waitForLoadState('domcontentloaded');
-  await shell.waitForTimeout(500);
+const DOMAIN = 'audit-test-proxy-rules.example.com';
 
-  // (a) Salva una regola dominio tramite SN_STORAGE (come fa setDomainProxyRule).
-  const DOMAIN = 'audit-test-proxy-rules.example.com';
-  const COUNTRY = 'fr';
+const regole = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+  return { salvate: await globalThis.SN_FILO_MEMORY.listProxyRules(), vive: { ...((tm && tm._proxyRules) || {}) } };
+});
 
-  // Salviamo direttamente via storage (stesso percorso dell'handler).
-  const addResult = await app.evaluate(async (_e, { domain, country }) => {
-    const FM = globalThis.SN_FILO_MEMORY;
-    if (!FM) return { error: 'SN_FILO_MEMORY non disponibile' };
-    if (typeof FM.setProxyRule !== 'function') return { error: 'setProxyRule non è una funzione', keys: Object.keys(FM) };
-    await FM.setProxyRule(domain, { country });
-    const rules = await FM.listProxyRules();
-    return { ok: true, rules };
-  }, { domain: DOMAIN, country: COUNTRY });
+test('una regola proxy dominio salvata si vede nella home col dominio e il paese, e da lì si toglie', async ({ app }) => {
+  test.setTimeout(60_000);
+  const casa = await home(app);
 
-  if (addResult.error) {
-    // Se FM non è disponibile nel main process evaluate, prova via storage diretto.
-    const addResult2 = await app.evaluate(async (_e, { domain, country }) => {
-      const SN_STORAGE = globalThis.SN_STORAGE;
-      if (!SN_STORAGE) return { error: 'SN_STORAGE non disponibile' };
-      const settings = await SN_STORAGE.getSettings?.() || {};
-      const KEYS = globalThis.SN_CONST?.STORAGE_KEYS;
-      if (!KEYS) return { error: 'SN_CONST non disponibile' };
-      const existing = await SN_STORAGE.getRaw?.(KEYS.FILO_PROXY_RULES, {}) || {};
-      existing[domain] = country;
-      await SN_STORAGE.setRaw?.(KEYS.FILO_PROXY_RULES, existing);
-      const rules = await SN_STORAGE.getRaw?.(KEYS.FILO_PROXY_RULES, {});
-      return { ok: true, rules };
-    }, { domain: DOMAIN, country: COUNTRY });
-    expect(addResult2.ok, `setProxyRule fallito: ${addResult2.error}`).toBe(true);
-    expect(addResult2.rules[DOMAIN], 'la regola (storage diretto) deve essere salvata').toBeTruthy();
-  } else {
-    expect(addResult.ok, `setProxyRule deve avere successo: ${addResult.error}`).toBe(true);
-    expect(addResult.rules[DOMAIN], 'la regola deve essere salvata').toBeTruthy();
-    expect(addResult.rules[DOMAIN]?.country, 'il paese deve essere salvato').toBe(COUNTRY);
-  }
+  // Lo stesso salvataggio di «apri sempre questo sito dalla Francia» (che senza un proxy configurato si rifiuta).
+  await app.evaluate(async ({ BrowserWindow }, domain) => {
+    await globalThis.SN_FILO_MEMORY.setProxyRule(domain, { country: 'fr' });
+    for (const w of BrowserWindow.getAllWindows()) if (w._filoTabs) await w._filoTabs.loadProxyRules();
+  }, DOMAIN);
+  const prima = await regole(app);
+  expect([prima.salvate[DOMAIN]?.country, prima.vive[DOMAIN]?.country]).toEqual(['fr', 'fr']);
 
-  // (b) La regola NON è visibile in nessuna pagina dell'app.
-  // Cerca il dominio in tutte le finestre aperte.
-  const windows = app.windows();
-  let foundInAnyWindow = false;
-  for (const w of windows) {
-    try {
-      const hasText = await w.evaluate(
-        (domain) => document.body?.textContent?.includes(domain),
-        DOMAIN
-      );
-      if (hasText) { foundInAnyWindow = true; break; }
-    } catch (_) {}
-  }
+  const riga = casa.locator('.dash-cambio', { hasText: DOMAIN });
+  await expect(riga).toHaveCount(1, { timeout: 10_000 });
+  await expect(riga.locator('.dash-cambio-testo')).toContainText(`${DOMAIN} sempre da Francia`);
 
-  // BUG CONFERMATO SE: la regola NON compare in nessuna finestra.
-  // (Comportamento attuale documentato — deve essere false)
-  expect(foundInAnyWindow,
-    'BUG CONFERMATO: le regole proxy dominio salvate tramite REGOLA_PROXY_DOMINIO ' +
-    'non sono visibili in nessuna pagina dell\'interfaccia — l\'utente non può sapere ' +
-    'quali regole persistenti ha impostato né cancellarle dalla UI'
-  ).toBe(false);
+  await riga.hover();
+  await riga.locator('.dash-cambio-annulla', { hasText: 'annulla' }).click();
+  await expect.poll(async () => {
+    const r = await regole(app);
+    return [DOMAIN in r.salvate, DOMAIN in r.vive];
+  }, { timeout: 10_000 }).toEqual([false, false]);
+  await expect(riga).toHaveClass(/dash-cambi-annullato/);
 });

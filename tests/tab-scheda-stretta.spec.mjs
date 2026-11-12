@@ -28,7 +28,14 @@ function misura(shell) {
       .filter((c) => getComputedStyle(c).display !== 'none')
       // Le misure di layout, non il riquadro a schermo: la spinner gira e il suo riquadro ruotato è più largo.
       .map((c) => ({ cls: c.className.split(' ')[0], left: r.left + c.offsetLeft, right: r.left + c.offsetLeft + c.offsetWidth, width: c.offsetWidth }));
-    return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
+    // Il titolo che si legge: quanto è largo e quanto vuole la sua prima lettera coi puntini (#1293).
+    const t = tab.querySelector('.title');
+    const cs = getComputedStyle(t);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const leggibile = cs.display !== 'none' && cs.visibility === 'visible';
+    const titolo = { largo: leggibile ? t.offsetWidth : 0, serve: c.measureText(([...t.textContent][0] || '') + '…').width };
+    return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli, titolo };
   }));
 }
 
@@ -64,7 +71,7 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
   for (const attiva of [ids[4], ids[2]]) {
     await shell.evaluate((id) => window.filoShell.tabs.activate(id), attiva);
     await expect(shell.locator(`#tabs .tab[data-id="${attiva}"]`)).toHaveClass(/active/);
-    for (const w of [40, 44, 50, 57, 58, 60, 63, 64, 70, 80, 95, 96, 110, 140, 200]) {
+    for (const w of [40, 44, 50, 57, 58, 60, 63, 64, 65, 66, 70, 80, 89, 90, 95, 96, 99, 100, 110, 123, 124, 140, 200]) {
       await larghe(w);
       for (const s of await misura(shell)) {
         const dove = `scheda ${s.id}${s.active ? ' (attiva)' : ''} larga ${s.width}px: ${JSON.stringify(s.figli.map((f) => [f.cls, Math.round(f.left - s.left), Math.round(f.width)]))}`;
@@ -88,9 +95,12 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(icona, dove).toBe(true);
           expect(ha('close'), dove).toBe(s.width >= 58);
         }
-        // Il titolo vive da 6px di gap più 12 di testo dopo l'icona; sull'attiva anche la X in fila.
+        // Il posto del titolo c'è da 6px di gap più 12 dopo l'icona (sull'attiva anche la X in fila); il testo si legge
+        // quando ci sta una lettera coi puntini (2em), e il paese entra solo se al titolo restano i suoi 2em.
         expect(ha('title'), dove).toBe(s.width >= (s.active ? 64 : 52));
-        if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= 96);
+        expect(s.titolo.largo === 0 || s.titolo.largo >= s.titolo.serve - 0.5, `${dove} titolo ${JSON.stringify(s.titolo)}`).toBe(true);
+        expect(s.titolo.largo > 0, `${dove} titolo ${JSON.stringify(s.titolo)}`).toBe(s.width >= (s.active ? 90 : 66));
+        if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= (s.active ? 124 : 100));
         // La spinner non si schiaccia: resta un cerchio.
         const spin = s.figli.find((f) => f.cls === 'spinner');
         if (spin) expect(spin.width, dove).toBe(12);

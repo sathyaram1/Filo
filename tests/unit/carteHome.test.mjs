@@ -130,7 +130,10 @@ test('lo strumento della chat nomina ogni carta di destra e accetta anche quelle
   const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'CARTA_HOME');
   assert.ok(def, 'manca lo strumento CARTA_HOME');
   const p = def.function.parameters.properties;
-  for (const id of C.IDS) assert.match(p.carta.description, new RegExp(`\\b${id} =`), `la chat non conosce la carta ${id}`);
+  // #1592 — la carta dei Mazzi il Deck builder in pausa non la fa nominare: la chat la passa col nome che usa l'utente.
+  for (const id of C.IDS.filter((x) => x !== 'mazzi')) assert.match(p.carta.description, new RegExp(`\\b${id} =`), `la chat non conosce la carta ${id}`);
+  assert.doesNotMatch(`${def.function.description} ${p.carta.description}`, /mazz|deck/i, 'lo strumento nomina il Deck builder anche a chi non lo vede');
+  assert.equal(C.risolvi('la carta dei mazzi'), 'mazzi');
   // Un elenco chiuso rifiuterebbe «l'avviso del backup» prima ancora di arrivare al main.
   assert.equal(p.carta.enum, undefined);
   assert.equal(p.prima_di.enum, undefined);
@@ -252,4 +255,26 @@ test('a sinistra i Crediti e ciò che suona sono fissi in cima; il resto no', ()
     notifiche: [{ id: 'n1', text: 'La lavatrice ha finito.' }],
   }, null, ora);
   assert.deepEqual(sx.map((v) => [v.chiave, !!v.fissa]), [['crediti', true], ['timer:t2', true], ['timer:t1', false], ['avviso:n1', false]]);
+});
+
+// #1661 — al primo incontro la home tiene solo la colonna di sinistra.
+test('il primo incontro dura finché l’accoglienza non si chiude, e solo se la strada per cominciare è una', () => {
+  assert.equal(C.primoIncontro({ done: false }, 'chiave'), true);
+  assert.equal(C.primoIncontro({ done: false }, ''), true);
+  assert.equal(C.primoIncontro(null, 'chiave'), true);
+  assert.equal(C.primoIncontro({ done: true }, 'chiave'), false);
+  // Rifatta o ripresa dalle Preferenze: l'utente è già stato accolto.
+  assert.equal(C.primoIncontro({ done: false, rifatta: true }, ''), false);
+  // Un modello da scegliere: la strada sta fra i suggerimenti, a destra.
+  assert.equal(C.primoIncontro({ done: false }, 'modelli'), false);
+  assert.equal(C.primoIncontro({ done: false }, 'pesi-aperti'), false);
+});
+
+test('tolta la carta dei Crediti la home torna intera; con l’intervista no', () => {
+  assert.equal(C.homeRidotta(true, null, true), true);
+  assert.equal(C.homeRidotta(false, null, true), false);
+  const tolta = { nascoste: ['crediti'] };
+  assert.equal(C.homeRidotta(true, tolta, true), false);
+  // Coi crediti la carta non c'è: averla tolta prima non riapre la home durante l'intervista.
+  assert.equal(C.homeRidotta(true, tolta, false), true);
 });

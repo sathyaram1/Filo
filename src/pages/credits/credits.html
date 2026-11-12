@@ -9,12 +9,14 @@
   <link rel="stylesheet" href="credits.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/wallet.js"></script>
+  <script src="filo://shared/creditiAvvisoUi.js"></script>
 </head>
 <body>
   <main class="sn-page">
@@ -32,6 +34,8 @@
         <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
       </form>
       <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
+      <!-- I consumi usciti dalla coda del registro senza arrivare al server (#1601): nessuno sparisce senza dirlo. -->
+      <p class="sn-muted sn-wallet-note" id="usageLogNote" role="status" hidden></p>
       <button type="button" class="sn-btn sn-btn-secondary" id="reissueBtn" hidden>Richiedi una nuova chiave</button>
       <button type="button" class="sn-btn sn-btn-secondary" id="resetIdentityBtn" hidden>Ricomincia con un nuovo invito</button>
       <span class="sn-wallet-inline" id="resetIdentityConfirm" hidden>
@@ -58,6 +62,12 @@
     <p class="sn-muted" id="offlineHint" hidden>
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
+    <!-- #818 — l'avviso prima che i crediti finiscano, coi rimedi: ci porta la notifica, e qui restano i «com'era». -->
+    <section class="sn-wallet-section sn-crediti-avviso" id="avviso" hidden>
+      <h2>Per farli durare di più</h2>
+      <p class="sn-crediti-avviso-testo" id="avvisoTesto" role="status"></p>
+      <div id="avvisoRimedi"></div>
+    </section>
 
     <!-- Stesso campo delle Impostazioni (settings.apiKeys.openrouter), gestito da qui perché è qui che si decide
        con cosa si paga: con la chiave si vedono spesa, residuo e ultimo rifiuto; senza, solo il campo. -->
@@ -90,11 +100,16 @@
 
     <section id="invitesSection" class="sn-wallet-section" hidden>
       <h2>I tuoi inviti</h2>
+      <div id="invitesLocked" class="sn-wallet-invites-locked" hidden>
+        <button type="button" id="linkGoogleBtn" class="sn-wallet-link-google"></button>
+        <button type="button" id="linkGoogleLascia" class="sn-wallet-link-google" hidden>Lascia stare</button>
+        <p id="invitesLockedNote" class="sn-muted sn-wallet-note" role="status" hidden></p>
+      </div>
       <ul id="invites" class="sn-wallet-invites"></ul>
     </section>
 
-    <!-- La gestione owner (codici, regali, utenti) sta in owner.html: qui resta il rimando. -->
-    <p class="sn-muted" id="ownerLink" hidden><a href="owner.html">Inviti e utenti →</a></p>
+    <!-- La gestione owner (codici, regali, utenti) sta in Gestione → Utenti (#1414): qui resta il rimando. -->
+    <p class="sn-muted" id="ownerLink" hidden><a href="filo://manage/manage.html#utenti">Inviti e utenti →</a></p>
 
     <section class="sn-credits-usage" id="usageSection" hidden>
       <h2>Come hai usato i crediti</h2>

@@ -12,6 +12,9 @@
   let altroEl = null;
 
   let layout = null;
+  // Il primo incontro (#1661) lo decide il main: legge l'accoglienza dal disco anche in incognito.
+  let primoIncontro = false;
+  let giroPrimo = 0;
   const dati = {
     timers: [],
     notifiche: [],
@@ -23,6 +26,8 @@
     editor: null,
     mazzi: null,
     impostazioni: null,
+    // Bacheca e Deck builder in pausa (#1592): finché il main non risponde, in pausa come per chi non li vede.
+    aperte: { bacheca: false, mazzi: false },
   };
 
   const VOCI_IN_CARTA = 5;
@@ -48,7 +53,8 @@
     s.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](size) : '';
     return s;
   }
-  function apri(url) { d.send({ type: MSG.OPEN_URL, url }); }
+  // La strada la sa il main (#1468): una pagina di Filo aperta da una carta.
+  function apri(url) { d.send({ type: MSG.OPEN_URL, url, via: 'carta_home' }); }
   function fmtBytes(n) {
     n = Number(n) || 0;
     if (n < 1024) return `${n} B`;
@@ -69,6 +75,26 @@
   }
   function plurale(n, uno, tanti) { return n === 1 ? `1 ${uno}` : `${n} ${tanti}`; }
   let avvisoTimer = null;
+  // Un errore letto sulle carte si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461).
+  function avvisoErrore(testo, chiave) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    avviso(testo);
+  }
+  // L'uso di una carta (#1471): le mosse le conta il main, che le scrive. La chiave di una carta di sinistra porta l'id
+  // di quello che accade (un download, un timer): il main ne tiene solo il tipo.
+  function contaGesto(gesto, campi) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', gesto, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  const contaUso = (art, come) => contaGesto('carta_home', { carta: art.dataset.chiave, colonna: art.dataset.colonna, come });
+  // Una carta trascinata e lasciata dove nessuno la prende.
+  function contaFine(e) {
+    const ev = global.SN_GESTI && global.SN_GESTI.fine(e, 'carta_home');
+    if (ev) try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {}); } catch (_) {}
+  }
+  function contaRilascio(e, dove) {
+    const ev = global.SN_GESTI && global.SN_GESTI.rilascio(e.dataTransfer, dove);
+    if (ev) try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {}); } catch (_) {}
+  }
   function avviso(testo) {
     let n = document.getElementById('dashFlash');
     if (!n) {
@@ -157,13 +183,13 @@
     // Un programma si apre solo col sì dell'utente (#588): le parole le scrive il main.
     if (res.needsConfirm) {
       const ok = global.SN_CONFIRM_UI
-        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : global.confirm(res.text);
       if (ok) await apriDownload(r, true);
       return;
     }
     if (res.missing) caricaDownloads();
-    avviso(res.error || 'Il file non si apre');
+    avvisoErrore(res.error || 'Il file non si apre', 'file_non_aperto');
   }
   const cmdDownload = (type, r) => () => d.send({ type, id: r.id }).then(caricaDownloads);
 
@@ -178,7 +204,13 @@
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
-      const quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      let quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+      if (r.nota) quanto = pct != null || r.receivedBytes ? `${r.nota.toLowerCase()} · ${quanto}` : r.nota.toLowerCase();
+      // #1287 — quanto va veloce e quanto manca, come nel pannello e nella pagina Download.
+      let corsa = '';
+      try { corsa = global.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+      if (corsa) quanto = `${quanto} · ${corsa}`;
       const pausa = r.canPause === false ? null : (fermo
         ? { etichetta: 'Riprendi', fai: cmdDownload(MSG.DOWNLOAD_RESUME, r) }
         : { etichetta: 'Pausa', fai: cmdDownload(MSG.DOWNLOAD_PAUSE, r) });
@@ -192,6 +224,14 @@
         filo: pct != null ? `Sto scaricando «${nome}»: ${pct}% (${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}).` : `Sto scaricando «${nome}».`,
       };
     }
+    if (r.state === 'pending' && r.chiede === 'piuFile') {
+      return {
+        ...base,
+        stato: 'partito da solo: aspetta il tuo sì',
+        principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
+        filo: `«${nome}» l'ha fatto partire una pagina da sola, senza un tuo clic: lo scarico solo se mi dici di sì, dai Download.`,
+      };
+    }
     if (r.state === 'pending') {
       return {
         ...base,
@@ -203,12 +243,21 @@
     const cartella = {
       etichetta: 'Cartella',
       fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
-        if (res && res.ok === false) avviso(res.error || 'La cartella non si apre');
+        if (res && res.ok === false) avvisoErrore(res.error || 'La cartella non si apre', 'cartella_non_aperta');
         caricaDownloads();
       }),
     };
     if (r.state === 'interrupted') {
-      return { ...base, stato: 'interrotto', principale: cartella, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+      // #1287 — «Riprova» rifà lo stesso indirizzo nella stessa carta.
+      const riprova = /^https?:/i.test(String(r.url || ''))
+        ? { etichetta: 'Riprova', forte: true, fai: () => d.send({ type: MSG.DOWNLOAD_RIPROVA, id: r.id }).then((res) => {
+          if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
+          caricaDownloads();
+        }) }
+        : null;
+      // Il perché di un video non salvato (#1488) sta sulla carta e nel filo, non solo nell'avviso.
+      const perche = r.nota ? ` ${r.nota}.` : '';
+      return { ...base, stato: r.nota ? `interrotto · ${r.nota}` : 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.${perche}` };
     }
     if (r.missing) {
       return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };
@@ -234,17 +283,22 @@
     const scarica = AVVISI_AGGIORNAMENTO.includes(tipo);
     // Una versione pronta (#1039): il fallimento lo dice la barra, la carta resta per riprovare.
     const pronto = tipo === 'aggiornamento-pronto';
+    const pagina = C.paginaDiAvviso(n);
     let principale = { etichetta: 'Chiudi', fai: chiudi };
+    if (pagina) principale = { etichetta: pagina.etichetta, forte: true, fai: () => apri(pagina.url) };
     if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(URL_SCARICA_FILO) };
     if (pronto) principale = { etichetta: 'Riavvia e aggiorna', forte: true, fai: () => d.send({ type: MSG.AGGIORNAMENTO_INSTALLA, avvisa: true }) };
+    const titolo = n.action && typeof n.action.titolo === 'string' && n.action.titolo.trim();
     const carta = {
       chiave: `avviso:${n.id}`, tipo: 'avviso', icona: pronto ? 'download' : allarme ? 'warning' : 'bell',
-      titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
+      titolo: titolo || (allarme ? 'Avviso' : 'Filo'), stato: n.text, lungo: true,
       principale,
-      secondaria: scarica || pronto ? { etichetta: 'Chiudi', fai: chiudi } : null,
+      secondaria: scarica || pronto || pagina ? { etichetta: 'Chiudi', fai: chiudi } : null,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
+    // #906 — i giudici fermi: la carta dice uno stato del server e se ne va da sola quando il server lo azzera.
+    if (tipo === 'giudici-fermi') return { ...carta, secondaria: null, togli: null, etichettaTogli: null };
     return n.action && n.action.tipo === 'aggiornamento-disponibile' ? cartaAggiornamento(n, carta, chiudi) : carta;
   }
   // #786 — la versione nuova che aspetta il «Installa» dell'utente; cosa le sta succedendo lo dice il main.
@@ -256,7 +310,7 @@
       const r = await d.send({ type: MSG.FILO_INSTALLA_AGGIORNAMENTO });
       if (!r || r.ok === false) {
         if (b) b.disabled = false;
-        avviso((r && r.error) || 'L’aggiornamento non parte');
+        avvisoErrore((r && r.error) || 'L’aggiornamento non parte', 'aggiornamento_non_avviato');
       }
       d.refreshLive();
     };
@@ -349,12 +403,13 @@
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       const v = art._carta && art._carta.voci && art._carta.voci[i];
-      if (v) v.fai(b);
+      if (v) { contaUso(art, 'clic'); v.fai(b); }
     });
     // Il tasto destro su un documento parla di quel documento; su «altri…» o «Mostra tutti» vale la carta.
     const menuVoce = (e, x, y) => {
       e.preventDefault();
       e.stopPropagation();
+      contaUso(art, 'tasto_destro');
       const v = art._carta && art._carta.voci && art._carta.voci[i];
       if (!v || v.piano) { apriMenu(x, y, vociMenu(art)); return; }
       const voci = [{ etichetta: `Apri «${v.testo}»`, fai: () => v.fai(b) }];
@@ -432,7 +487,6 @@
   const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
-    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
@@ -442,14 +496,14 @@
       const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
-    if (url) {
-      const img = el('img');
-      img.src = url;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); generica(); };
-      ico.appendChild(img);
-    } else generica();
+    if (tipo !== 'NAVIGA') { generica(); return ico; }
+    const img = el('img');
+    img.alt = '';
+    img.onerror = () => { img.remove(); generica(); };
+    ico.appendChild(img);
+    // Un suggerimento scritto da un modello che ha letto testo di altri prende l'icona solo dalle copie, mai dal sito,
+    // che saprebbe dell'indirizzo prima di ogni clic (#1505). Una pagina salvata dall'utente (home senza modello) no.
+    d.iconaDelSito(s.action.url, { soloCopie: s.daSalvate !== true }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
@@ -457,7 +511,7 @@
     const tutti = dati.suggerimenti.filter((s) => s && s.text && s.carta !== 'crediti')
       .sort((a, b) => (b.importance || 0) - (a.importance || 0));
     const visibili = dati.tuttiSuggerimenti ? tutti : tutti.slice(0, SUGGERIMENTI_VISIBILI);
-    const voci = visibili.map((s) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b), filo: `Ti suggerisco: ${s.text}` }));
+    const voci = visibili.map((s, i) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b, i + 1), filo: `Ti suggerisco: ${s.text}` }));
     if (tutti.length > SUGGERIMENTI_VISIBILI) {
       voci.push({
         testo: dati.tuttiSuggerimenti ? 'Mostra meno' : `Mostra tutti (${tutti.length})`, piano: true,
@@ -484,10 +538,11 @@
   function pastiglie() {
     const s = dati.impostazioni || {};
     const scuro = temaScuro(s);
+    // `voce`: il controllo che la cambia in Preferenze, dove porta il suo tasto destro (#2096).
     return [
-      { etichetta: 'Tema scuro', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
-      { etichetta: 'Terminale', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
-      { etichetta: 'Anteprima schede', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
+      { etichetta: 'Tema scuro', voce: 'theme', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
+      { etichetta: 'Terminale', voce: 'terminalEnabled', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
+      { etichetta: 'Anteprima schede', voce: 'tabPreviewEnabled', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
     ];
   }
   function cartaRapide() {
@@ -503,8 +558,14 @@
 
   const COSTRUTTORI = { editor: cartaEditor, mazzi: cartaMazzi, suggerimenti: cartaSuggerimenti, rapide: cartaRapide };
 
+  // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
+  const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
+  // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
+  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
+  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
+
   function carteDestra() {
-    return ((layout && layout.destra) || []).map((id) => {
+    return ((layout && layout.destra) || []).filter((id) => !inPausa(id)).map((id) => {
       const def = C.carta(id);
       const corpo = COSTRUTTORI[id]();
       return {
@@ -545,7 +606,7 @@
     const filo = el('button', 'dash-carta-filo', 'apri nel filo');
     filo.type = 'button';
     filo.title = 'Apri nel filo';
-    filo.addEventListener('click', (e) => { e.stopPropagation(); apriNelFilo(art); });
+    filo.addEventListener('click', (e) => { e.stopPropagation(); contaUso(art, 'clic'); apriNelFilo(art); });
     mani.appendChild(filo);
     if (c.togli) {
       const x = el('button', 'dash-carta-togli', '\u00D7');
@@ -600,25 +661,31 @@
         if (!a) continue;
         const b = el('button', `dash-carta-az ${cls}${a.forte ? ' forte' : ''}`, a.etichetta);
         b.type = 'button';
-        b.addEventListener('click', (e) => { e.stopPropagation(); const cur = art._carta[cls]; if (cur) cur.fai(b); });
+        b.addEventListener('click', (e) => { e.stopPropagation(); const cur = art._carta[cls]; if (cur) { contaUso(art, 'clic'); cur.fai(b); } });
         piede.appendChild(b);
       }
       art.appendChild(piede);
     }
 
-    art.addEventListener('click', () => usaCarta(art));
+    art.addEventListener('click', () => { contaUso(art, 'clic'); usaCarta(art); });
     art.addEventListener('keydown', (e) => {
       if (e.target !== art) return;
-      if (e.key === 'Enter') { e.preventDefault(); usaCarta(art); }
+      if (e.key === 'Enter') { e.preventDefault(); contaUso(art, 'invio'); usaCarta(art); }
       else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
+        contaUso(art, 'tasto_destro');
         const r = art.getBoundingClientRect();
         apriMenu(r.left + 12, r.top + 28, vociMenu(art));
       } else if (e.key === 'Delete' && art._carta.togli) { e.preventDefault(); art._carta.togli(); }
     });
     art.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      apriMenu(e.clientX, e.clientY, vociMenu(art));
+      contaUso(art, 'tasto_destro');
+      // Su una pastiglia il menu è suo (#2096): accenderla o spegnerla, e la sua voce in Preferenze.
+      const pas = e.target && e.target.closest ? e.target.closest('.dash-pastiglia') : null;
+      const i = pas ? [...pas.parentElement.children].indexOf(pas) : -1;
+      const p = i >= 0 && art._carta.pastiglie ? art._carta.pastiglie[i] : null;
+      apriMenu(e.clientX, e.clientY, p ? vociPastiglia(p) : vociMenu(art));
     });
     agganciaTrascinamento(art);
     return art;
@@ -665,12 +732,12 @@
   const ICONA_SINISTRA = { crediti: 'credits', download: 'download', lavoro: 'sparkles', timer: 'timer', sveglia: 'alarm', avviso: 'bell' };
   let formaAltro = '';
   function disegnaAltro() {
-    const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
+    const tolte = ((layout && layout.tolte) || []).filter((id) => !inPausa(id)).map((id) => ({ ...C.carta(id), tolta: true }));
     const sinistre = C.nascosteSinistra(datiSinistra(), layout).map((v) => ({
       id: v.chiave, titolo: v.tipo === 'crediti' ? 'Crediti' : v.titolo, icona: ICONA_SINISTRA[v.tipo] || 'bell',
       url: v.tipo === 'crediti' ? URL_CREDITI : null, tolta: true, sinistra: true,
     }));
-    const voci = [...sinistre, ...tolte, ...C.APP];
+    const voci = [...sinistre, ...tolte, ...appVisibili()];
     const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}:${v.titolo}`).join(',');
     if (f === formaAltro && altroEl.childElementCount) return;
     formaAltro = f;
@@ -688,9 +755,12 @@
       b.appendChild(el('span', 'dash-altro-nome', v.titolo));
       b.title = v.tolta ? (v.url ? `Apri ${v.titolo}` : 'Rimetti nella home') : `Apri ${v.titolo}`;
       const rimetti = () => muovi(v.sinistra ? { tipo: 'mostra', chiave: v.id } : { tipo: 'aggiungi', carta: v.id });
-      b.addEventListener('click', () => { if (v.url) apri(v.url); else rimetti(); });
+      b.addEventListener('click', () => {
+        if (v.url) { contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'clic' }); apri(v.url); } else rimetti();
+      });
       b.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'tasto_destro' });
         const menu = [];
         if (v.url) menu.push({ etichetta: `Apri ${v.titolo}`, fai: () => apri(v.url) });
         if (v.tolta) menu.push({ etichetta: 'Rimetti nella home', fai: rimetti });
@@ -705,8 +775,9 @@
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('application/x-filo-carta', v.id);
           e.dataTransfer.setData('text/plain', v.titolo);
+          global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
         });
-        b.addEventListener('dragend', fineTrascinamento);
+        b.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
         const piu = el('button', 'dash-altro-rimetti', '+');
         piu.type = 'button';
         piu.title = 'Rimetti nella home';
@@ -727,6 +798,9 @@
     disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
     disegnaColonna(tieniEl, carteDestra(), 'destra');
     disegnaAltro();
+    const ridotta = C.homeRidotta(primoIncontro, layout, !!suggerimentoCrediti());
+    tieniEl.hidden = ridotta;
+    altroEl.hidden = ridotta;
     accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
   }
 
@@ -744,6 +818,12 @@
     if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
     if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
     if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
+    return voci;
+  }
+  // Il menu di una pastiglia delle Impostazioni rapide: le stesse cose del suo clic, più la sua voce in Preferenze.
+  function vociPastiglia(p) {
+    const voci = [{ etichetta: `${p.acceso ? 'Spegni' : 'Accendi'}: ${p.etichetta.toLowerCase()}`, fai: () => scriviImpostazione(p.scrivi()) }];
+    if (p.voce) voci.push({ etichetta: 'Apri la voce in Preferenze', fai: () => apri(`${URL_PREFERENZE}#${p.voce}`) });
     return voci;
   }
 
@@ -822,7 +902,8 @@
     const chiavi = mobili(accadeEl).map((n) => n.dataset.chiave).filter((k) => k !== chiave);
     const at = prima == null ? -1 : chiavi.indexOf(prima);
     if (at < 0) chiavi.push(chiave); else chiavi.splice(at, 0, chiave);
-    return muovi({ tipo: 'ordina-sinistra', ordine: chiavi });
+    // `chiave`: la carta spostata, per i contatori (#1471); la mossa la ignora.
+    return muovi({ tipo: 'ordina-sinistra', ordine: chiavi, chiave });
   }
   function spostaCarta(art, passo) {
     const fratelli = mobili(art.parentNode);
@@ -853,8 +934,9 @@
       e.dataTransfer.setData('application/x-filo-carta', art.dataset.chiave);
       // Nel campo di scrittura del filo arriva quello che la carta dice.
       e.dataTransfer.setData('text/plain', c.stato ? `${c.titolo}: ${c.stato}` : c.titolo);
+      global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
     });
-    art.addEventListener('dragend', fineTrascinamento);
+    art.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
   }
   // Dove va la carta lasciata qui. Sopra un'altra carta ne prende il posto, in qualunque punto la si lasci: chi
   // scende le passa sotto, chi sale o arriva da fuori le passa sopra. Fra due carte decide la metà più vicina.
@@ -897,6 +979,7 @@
     host.addEventListener('drop', (e) => {
       if (!ammessa(host)) return;
       e.preventDefault();
+      contaRilascio(e, 'colonna_home');
       const { chiave, colonna, sinistra } = presa;
       const b = bersaglio(host, e);
       const prima = b.prima ? b.prima.dataset.chiave : null;
@@ -923,6 +1006,7 @@
     altroEl.addEventListener('drop', (e) => {
       if (!presa || presa.colonna !== 'destra') return;
       e.preventDefault();
+      contaRilascio(e, 'altro_home');
       const chiave = presa.chiave;
       fineTrascinamento();
       muovi({ tipo: 'togli', carta: chiave });
@@ -958,8 +1042,19 @@
 
   // ===== Dati che la carta chiede da sé =====
   async function caricaLayout() {
+    const giro = ++giroPrimo;
     const r = await d.send({ type: MSG.CARTE_HOME_GET });
     layout = C.normalizza(r && r.ok ? r.layout : null);
+    if (giro === giroPrimo) primoIncontro = !!(r && r.ok && r.primoIncontro);
+    disegna();
+  }
+  // Finisce con l'accoglienza e dipende da cosa manca a Filo per rispondere. La disposizione di questa risposta no:
+  // può essere più vecchia di una mossa annunciata nel frattempo.
+  async function caricaPrimoIncontro() {
+    const giro = ++giroPrimo;
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    if (giro !== giroPrimo || !r || !r.ok || !!r.primoIncontro === primoIncontro) return;
+    primoIncontro = !!r.primoIncontro;
     disegna();
   }
   async function caricaDownloads() {
@@ -980,6 +1075,12 @@
   async function caricaLavori() {
     const r = await d.send({ type: MSG.LAVORI_IN_CORSO });
     dati.lavori = r && r.ok && Array.isArray(r.lavori) ? r.lavori : [];
+    disegna();
+  }
+  async function caricaAperte(attendi = false) {
+    const r = await d.send({ type: MSG.IN_PAUSA_STATO, attendi });
+    if (!r || !r.ok) return;
+    dati.aperte = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
     disegna();
   }
   async function caricaImpostazioni() {
@@ -1008,19 +1109,29 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
+      else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
+      else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
+        dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
+        disegna();
+      } else if (msg.type === MSG.AUTH_CHANGED) caricaAperte(true).catch(() => {});
       else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
         caricaEditor().catch(() => {});
         caricaMazzi().catch(() => {});
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
+        caricaAperte().catch(() => {});
+        caricaPrimoIncontro().catch(() => {});
       }
     });
-    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori()]).catch(() => {});
+    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
+      caricaAperte(true)]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {
     init,
+    aperta: (nome) => dati.aperte[nome] === true,
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];

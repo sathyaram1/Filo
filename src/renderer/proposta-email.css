@@ -1,0 +1,53 @@
+/* La proposta dell'email sotto un campo di un sito (#1124): lo stile del menu di Filo (src/styles/menu.css). La vista
+   è grande quanto il riquadro, quindi niente ombra esterna: fuori dai bordi la pagina sotto resta cliccabile. */
+
+html, body { margin: 0; background: transparent; overflow: hidden; }
+
+.riquadro {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: var(--sn-overlay-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  padding: 4px 0;
+  user-select: none;
+  animation: sn-entra calc(100ms * var(--sn-motion, 1)) ease-out;
+}
+
+@keyframes sn-entra {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.voce {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  cursor: pointer;
+  line-height: 1.35;
+  color: var(--sn-fg);
+  transition: background-color calc(80ms * var(--sn-motion, 1)) ease-out;
+}
+
+.voce:hover, .voce.attiva { background: rgba(var(--sn-accent-rgb), 0.35); }
+
+.ico {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--sn-muted);
+}
+
+.voce:hover .ico, .voce.attiva .ico { color: var(--sn-fg); }
+
+.email { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

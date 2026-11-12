@@ -1,0 +1,389 @@
+// #1150 (SPEC-DOMANDE §2.1, §3): la sezione Domande. Apertura su una bloccante, elenco e domanda intera, pulsanti
+// dalle azioni e non dal testo, risposte, «applica il consiglio» con l'elenco prima di partire; il main è finto.
+import { test, expect } from './fixtures/electron.mjs';
+
+const MANAGE = 'filo://manage/manage.html';
+const base = { clientId: 'tester@example.com', createdAt: '2026-10-01T08:00:00Z', images: [], subSeq: 0, text: 'x' };
+const RICEVUTO = { ...base, _id: 'i1', seq: 11, name: 'Da guardare', status: 'unlabeled' };
+const ora = Date.now();
+const BLOCCANTE = { id: 'D-7', numero: 7, stato: 'aperta', priorita: 'bloccante', titolo: 'Serve una scelta sul login', creataIl: ora };
+const IMPORTANTE = { id: 'D-8', numero: 8, stato: 'aperta', priorita: 'importante', titolo: 'Colore dei pulsanti', creataIl: ora };
+const IN_LAVORO = { id: 'D-9', numero: 9, stato: 'in_lavorazione', priorita: 'importante', titolo: 'Già presa', creataIl: ora };
+
+async function apri(page) {
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+}
+
+test('da non owner, o col server senza domande, il pannello lo dice: niente numero, niente Riprova', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+  // Le prove non hanno l'account dell'owner: il main rifiuta, e non è un guasto da riprovare.
+  await expect(page.locator('#mgDomandeStato')).toHaveText('Le domande le vede solo l’owner: accedi col suo account.');
+  await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('');
+  await expect(page.locator('#mgDomandeRiprova')).toBeHidden();
+  await page.evaluate(() => window.__mgTest.setDomande(null, { errore: 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.' }));
+  await expect(page.locator('#mgDomandeStato')).toContainText('non sono ancora disponibili');
+  await expect(page.locator('#mgDomandeRiprova')).toBeHidden();
+});
+
+test('con una bloccante aperta Gestione si apre su Domande, anche con i Ricevuti pieni', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate((items) => window.__mgTest.setData(items), [RICEVUTO]);
+  await page.evaluate((d) => window.__mgTest.setDomande(d), [IMPORTANTE, BLOCCANTE, IN_LAVORO]);
+  const scelta = await page.evaluate(() => window.__mgTest.sceltaApertura());
+  expect(scelta).toMatchObject({ sezione: 'domande', scheda: 'domande', motivo: 'bloccante' });
+
+  await expect(page.locator('.mg-sezione[data-sezione="domande"]')).toHaveClass(/mg-sezione--active/);
+  await expect(page.locator('.mg-sezione[data-sezione="domande"]')).toHaveClass(/mg-sezione--urgente/);
+  await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('(2)');
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (2)');
+  await expect(page.locator('.mg-tab[data-tab="domande-lavoro"]')).toHaveText('In lavorazione (1)');
+  await expect(page.locator('.mg-tab[data-tab="domande-archivio"]')).toHaveText('Archivio (0)');
+  const righe = page.locator('#mgDomandeLista .mg-domanda');
+  await expect(righe).toHaveCount(2);
+  await expect(page.locator('#mgDomandeLista .mg-domanda[data-priorita="bloccante"]')).toContainText('D-7');
+  await expect(page.locator('#mgDomandeLista .mg-domanda[data-priorita="bloccante"]')).toContainText('Serve una scelta sul login');
+
+  await page.locator('.mg-tab[data-tab="domande-lavoro"]').click();
+  await expect(righe).toHaveCount(1);
+  await expect(righe.first()).toContainText('Già presa');
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await expect(righe).toHaveCount(0);
+  await expect(page.locator('#mgDomandeStato')).toHaveText('Nessuna domanda in archivio.');
+});
+
+test('senza bloccante si apre sui Ricevuti se non sono vuoti', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.locator('.mg-sezione[data-sezione="routine"]').click();
+  await page.evaluate((items) => window.__mgTest.setData(items), [RICEVUTO]);
+  await page.evaluate((d) => window.__mgTest.setDomande(d), [IMPORTANTE]);
+  expect((await page.evaluate(() => window.__mgTest.sceltaApertura())).motivo).toBe('ricevuti');
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
+  await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+});
+
+test('dopo un clic dell’utente la scelta d’apertura non cambia sezione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.locator('.mg-sezione[data-sezione="routine"]').click();
+  await page.evaluate((d) => window.__mgTest.setDomande(d), [BLOCCANTE]);
+  expect(await page.evaluate(() => window.__mgTest.sceltaApertura({ comeAvvio: true }))).toBeNull();
+  await expect(page.locator('.mg-sezione[data-sezione="routine"]')).toHaveClass(/mg-sezione--active/);
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+});
+
+test('il titolo di una domanda è testo, mai codice; un guasto si dice e si riprova', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate(() => window.__mgTest.setDomande([{
+    id: 'D-3', numero: 3, stato: 'aperta', priorita: 'quando_puoi', titolo: '<img src=x onerror="window.__xss=1">', creataIl: Date.now(),
+  }]));
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  const riga = page.locator('#mgDomandeLista .mg-domanda');
+  await expect(riga).toContainText('<img src=x');
+  await expect(riga.locator('img')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+
+  await page.evaluate(() => window.__mgTest.setDomande(null, { errore: 'rete giù' }));
+  await expect(page.locator('#mgDomandeStato')).toContainText('Non riesco a leggere le domande: rete giù');
+  await expect(page.locator('#mgDomandeRiprova')).toBeVisible();
+  await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('');
+});
+
+// ── Fase 2: la domanda intera e le risposte ───────────────────────────────
+const RIF = {
+  fb902: { num: '#902', priorita: 1, stato: 'design', motivo: 'decisione' },
+  fb903: { num: '#903', priorita: 2, stato: 'design', motivo: 'locale' },
+};
+function domanda(numero, over) {
+  return Object.assign({
+    id: `D-${numero}`, numero, stato: 'aperta', priorita: 'importante', fiducia: 'non_fidato',
+    titolo: `Domanda ${numero}`, creataIl: ora - numero * 1000, modificataIl: ora - numero * 1000,
+    opzioni: [], consiglio: null, conversazione: [],
+  }, over);
+}
+const COMPLETA = domanda(7, {
+  priorita: 'bloccante',
+  titolo: 'Archiviare il vecchio login?',
+  contesto: 'Il login vecchio è **ancora acceso** per due utenti.',
+  problema: 'Chi lo usa vede <img src=x onerror="window.__xss=1"> una pagina rotta.',
+  origine: { tipo: 'feedback', id: 'fb902' },
+  opzioni: [
+    // Il testo dell'opzione mente: il pulsante deve dire cosa fa l'azione.
+    { testo: 'Approva tutto e fondi subito', pro: 'Più semplice', contro: 'Si perde la storia', azione: { tipo: 'archivia', feedbackId: 'fb902' } },
+    { testo: 'Alza la priorità', pro: '', contro: 'Costa', azione: { tipo: 'priorita', feedbackId: 'fb902', valore: 3 } },
+    { testo: 'Un ambito nuovo', azione: { tipo: 'ambito' } },
+    { testo: 'Un feedback che il server non conosce', azione: { tipo: 'archivia', feedbackId: 'ignoto' } },
+  ],
+  consiglio: { opzione: 0, perche: 'Nessuno lo usa più.' },
+  notePerAgenti: 'Il codice sta nel modulo del login.',
+});
+
+async function apriDomande(page, lista, riferimenti = RIF) {
+  await apri(page);
+  await page.evaluate(([l, r]) => window.__mgTest.setDomande(l, { riferimenti: r }), [lista, riferimenti]);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+}
+
+// Il main finto risponde alle domande e registra cosa gli arriva.
+async function mainFinto(page) {
+  await page.evaluate(() => {
+    window.__domande = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      const t = msg && msg.type;
+      if (!/^domand/.test(String(t))) return orig(msg);
+      window.__domande.push(msg);
+      const d = window.__mgTest.domandeStato().domande.find((x) => x.id === msg.id);
+      if (t === 'domanda_rispondi') {
+        const stato = Number.isInteger(msg.scelta) ? 'chiusa' : 'in_lavorazione';
+        return { ok: true, domanda: Object.assign({}, d, { stato, esito: { ok: true, applicataIl: Date.now() } }), esito: { ok: true } };
+      }
+      if (t === 'domande_consiglio') return { ok: true, esiti: msg.ids.map((id) => ({ id, ok: true })) };
+      if (t === 'domanda_mostra') return { ok: true, domanda: Object.assign({}, d, { stato: 'chiusa', esito: { ok: true, applicataIl: Date.now() } }), riferimenti: {} };
+      return { ok: false, error: 'non previsto' };
+    };
+  });
+}
+
+// Una marca di direzione non rigira il testo di una domanda non fidata sotto gli occhi dell'owner (#1502).
+test('domanda non fidata: i caratteri invisibili si leggono per esteso, in elenco e nella domanda', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const RLO = '\u202E';
+  await apriDomande(page, [domanda(8, {
+    titolo: `Approva${RLO}aivihcrA`,
+    opzioni: [{ testo: `Archivia${RLO}`, pro: `ok${RLO}`, azione: { tipo: 'archivia', feedbackId: 'fb902' } }],
+  })]);
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]');
+  await expect(dq.locator('.mg-dq-titolo')).toHaveText('Approva⟨U+202E⟩aivihcrA');
+  await expect(dq.locator('.mg-dq-opzione-testo')).toHaveText('Archivia⟨U+202E⟩');
+  await expect(dq.locator('.mg-dq-pro')).toContainText('ok⟨U+202E⟩');
+  await expect(page.locator('.mg-domanda-titolo').first()).toHaveText('Approva⟨U+202E⟩aivihcrA');
+  await expect(dq.locator('.mg-dq-azione')).toHaveCount(1);
+});
+
+test('la domanda si legge intera: contesto, problema, opzioni, consiglio, fiducia; il testo non diventa codice', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [COMPLETA]);
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-7"]');
+  await expect(dq).toBeVisible();
+  await expect(dq.locator('.mg-dq-titolo')).toHaveText('Archiviare il vecchio login?');
+  await expect(dq.locator('.mg-dq-fiducia')).toHaveText('Non fidata');
+  await expect(dq.locator('.mg-dq-legame')).toHaveText('#902');
+  await expect(dq.locator('strong', { hasText: 'ancora acceso' })).toHaveCount(1);
+  await expect(dq).toContainText('una pagina rotta');
+  await expect(dq.locator('img')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  await expect(dq.locator('.mg-dq-opzione')).toHaveCount(4);
+  await expect(dq.locator('.mg-dq-opzione').first()).toContainText('Più semplice');
+  await expect(dq.locator('.mg-dq-opzione').first()).toContainText('Si perde la storia');
+  await expect(dq.locator('.mg-dq-opzione--consigliata')).toHaveAttribute('data-indice', '0');
+  await expect(dq.locator('.mg-dq-consiglio')).toContainText('Nessuno lo usa più.');
+  // Le note per gli agenti ci sono, chiuse in fondo.
+  const note = dq.locator('details.mg-dq-note');
+  await expect(note).not.toHaveAttribute('open', '');
+  await expect(note.locator('summary')).toHaveText('Note per gli agenti');
+  await note.locator('summary').click();
+  await expect(note).toContainText('Il codice sta nel modulo del login.');
+});
+
+test('il pulsante dice cosa fa l’azione, mai il testo dell’opzione; senza dati del server nessun pulsante', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [COMPLETA]);
+  const ops = page.locator('#mgDomandaDettaglio .mg-dq-opzione');
+  await expect(ops.nth(0).locator('.mg-dq-azione')).toHaveText('Archivia #902');
+  await expect(ops.nth(0).locator('.mg-dq-azione')).not.toContainText('fondi');
+  await expect(ops.nth(1).locator('.mg-dq-azione')).toHaveText('Priorità di #902: 1 → 3');
+  for (const i of [2, 3]) {
+    await expect(ops.nth(i).locator('button')).toHaveCount(0);
+    await expect(ops.nth(i).locator('.mg-dq-senza-azione')).toBeVisible();
+  }
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq-applica')).toHaveText('Applica il consiglio: Archivia #902');
+});
+
+test('rispondere: un’opzione manda la scelta, le parole mandano il testo, «Discutiamone» copia la riga', async ({ app, openTab }) => {
+  const page = await openTab(MANAGE);
+  const altra = domanda(8, { opzioni: [], consiglio: null });
+  await apriDomande(page, [COMPLETA, altra]);
+  await mainFinto(page);
+
+  await page.locator('#mgDomandaDettaglio .mg-dq-opzione').nth(0).locator('.mg-dq-azione').click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq-msg')).toHaveText('Mandata.');
+  expect(await page.evaluate(() => window.__domande)).toEqual([{ type: 'domanda_rispondi', id: 'D-7', scelta: 0 }]);
+  // La domanda risposta lascia «Da rispondere» ma resta a schermo col suo esito.
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (1)');
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-7"] .mg-dq-azione')).toHaveCount(0);
+
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-8"]').click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]');
+  await dq.locator('button', { hasText: 'Discutiamone' }).click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Discutiamo la domanda D-8');
+  await expect(dq.locator('.mg-dq-msg')).toHaveText('Copiato: «Discutiamo la domanda D-8»');
+
+  await dq.locator('.mg-dq-testo').fill('Facciamolo la settimana prossima');
+  await dq.locator('button', { hasText: 'Rispondi' }).click();
+  await expect(dq.locator('.mg-dq-msg')).toHaveText('Mandata: la prende un agente.');
+  expect((await page.evaluate(() => window.__domande)).at(-1)).toEqual({ type: 'domanda_rispondi', id: 'D-8', testo: 'Facciamolo la settimana prossima' });
+  await expect(page.locator('.mg-tab[data-tab="domande-lavoro"]')).toHaveText('In lavorazione (1)');
+});
+
+test('applica il consiglio sulla scelta: prima l’elenco delle etichette, le una-per-una restano fuori, poi una chiamata', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const lista = [
+    domanda(1, { opzioni: [{ testo: 'Ok', azione: { tipo: 'archivia', feedbackId: 'fb902' } }], consiglio: { opzione: 0, perche: 'Sì.' } }),
+    domanda(2, { opzioni: [{ testo: 'Spegni', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } }], consiglio: { opzione: 0, perche: 'Sì.' } }),
+    domanda(3),
+  ];
+  await apriDomande(page, lista);
+  await mainFinto(page);
+
+  await page.locator('#mgDomandeTutte').check();
+  const btn = page.locator('#mgDomandeConsiglioSel');
+  await expect(btn).toHaveText('Applica il consiglio (3)');
+  await btn.click();
+  const box = page.locator('#mgDomandeConferma');
+  await expect(box).toBeVisible();
+  await expect(box).toContainText('Applico il consiglio a una domanda:');
+  await expect(box.locator('li').first()).toContainText('D-1');
+  await expect(box.locator('li').first()).toContainText('Archivia #902');
+  await expect(box).toContainText('una per una: Routine: spegni');
+  await expect(box).toContainText('nessun consiglio');
+  // Niente è partito prima del sì.
+  expect(await page.evaluate(() => window.__domande)).toEqual([]);
+
+  await box.locator('button', { hasText: 'Applica' }).click();
+  await expect(box).toContainText('Applicato a una domanda:');
+  expect(await page.evaluate(() => window.__domande)).toEqual([{ type: 'domande_consiglio', ids: ['D-1'] }]);
+  await expect(btn).toHaveText('Applica il consiglio (2)');
+});
+
+// #1790.1: in blocco, una ripresa su un lavoro che non era fermo non si dice «fatto»: sta a parte, col perché del server.
+test('applica il consiglio in blocco: la ripresa accodata sta a parte, con lo stato del lavoro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const riprendi = (fid) => ({ opzioni: [{ testo: 'Riprendi', azione: { tipo: 'riprendi', feedbackId: fid } }], consiglio: { opzione: 0, perche: 'Sì.' } });
+  await apriDomande(page, [domanda(21, riprendi('fb901')), domanda(22, riprendi('fb902'))]);
+  await mainFinto(page);
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => {
+      if (!msg || msg.type !== 'domande_consiglio') return prima(msg);
+      window.__domande.push(msg);
+      return { ok: true, esiti: [
+        { id: 'D-21', ok: true, etichetta: 'Riprendi #901', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'fb901' } } },
+        { id: 'D-22', ok: true, etichetta: 'Riprendi #902', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'fb902' }, accodata: true, statoLavoro: 'todo' } },
+      ] };
+    };
+  });
+  await page.locator('#mgDomandeTutte').check();
+  await page.locator('#mgDomandeConsiglioSel').click();
+  const box = page.locator('#mgDomandeConferma');
+  await box.locator('button', { hasText: 'Applica' }).click();
+  await expect(box).toContainText('Applicato a una domanda:');
+  await expect(box).toContainText('Decisione accodata per una domanda, il lavoro resta dov\'è:');
+  const accodata = box.locator('li', { hasText: 'D-22' });
+  await expect(accodata).toContainText('non era fermo: è in coda, la decisione resta accodata');
+  await expect(box.locator('.mg-dom-conferma-ok + ul li')).toHaveCount(1);
+  await expect(box.locator('.mg-dom-conferma-ok + ul li')).toContainText('D-21');
+  await page.screenshot({ path: 'tests/.shots/manage-domande-consiglio-accodata.png' });
+});
+
+test('un gruppo si apre come un blocco solo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [
+    domanda(4, { gruppo: 'Login' }), domanda(5, { gruppo: 'login' }), domanda(6, { priorita: 'bloccante' }),
+  ]);
+  // La bloccante sta in cima e si apre da sola.
+  await expect(page.locator('#mgDomandeLista .mg-domanda').first()).toHaveAttribute('data-id', 'D-6');
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq')).toHaveAttribute('data-id', 'D-6');
+  const gruppo = page.locator('#mgDomandeLista .mg-domande-gruppo');
+  await expect(gruppo).toHaveCount(1);
+  await expect(gruppo).toContainText('2');
+  await gruppo.click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq')).toHaveCount(2);
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq').nth(0)).toHaveAttribute('data-id', 'D-5');
+});
+
+// #1152: la risposta a parole la gestisce un agente. Quello che scrive si legge nella conversazione col suo ruolo, e il
+// principio che lascia (la regola del registro) sta sotto l'esito, dove l'owner lo vede.
+const GESTITA = domanda(12, {
+  stato: 'chiusa', fiducia: 'fidato', titolo: 'Crediti dichiarati dal client',
+  esito: { azione: null, ok: true, applicataIl: ora - 400, compito: { id: 'C-3', stato: 'fatto' } },
+  principio: 'Zero fiducia nei crediti dichiarati dal client.',
+  conversazione: [
+    { autore: { tipo: 'owner', fiducia: 'fidato' }, ora: ora - 3000, tipo: 'risposta', testo: 'Non fidarti dei crediti del client.' },
+    { autore: { tipo: 'biglietto', ruolo: 'risposta', fiducia: 'fidato' }, ora: ora - 2000, tipo: 'chiarimento', testo: 'Vale anche per i crediti regalati?' },
+    { autore: { tipo: 'owner', fiducia: 'fidato' }, ora: ora - 1000, tipo: 'risposta', testo: 'Sì, per tutti.' },
+    { autore: { tipo: 'biglietto', ruolo: 'risposta', fiducia: 'fidato' }, ora: ora - 500, tipo: 'esito', testo: 'Aperto #1300 per il controllo sul server.' },
+  ],
+});
+
+test('una risposta gestita da un agente: chiarimento e resoconto nella conversazione, il principio sotto l’esito, in chiaro e in scuro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [GESTITA]);
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-12"]');
+  await expect(dq.locator('.mg-dq-principio')).toContainText('Principio');
+  await expect(dq.locator('.mg-dq-principio')).toContainText('Zero fiducia nei crediti dichiarati dal client.');
+  await expect(dq.locator('.mg-dq-esito')).toContainText('Fatto');
+  const turni = dq.locator('.mg-dq-turno');
+  await expect(turni).toHaveCount(4);
+  await expect(turni.nth(1)).toContainText('Agente (risposta)');
+  await expect(turni.nth(1)).toContainText('Vale anche per i crediti regalati?');
+  await expect(turni.nth(3)).toContainText('Aperto #1300 per il controllo sul server.');
+  // Il principio sta fra l'esito e la conversazione.
+  const ordine = await dq.evaluate((art) => [...art.children].map((c) => c.className.split(' ').find((x) => /mg-dq-(esito|principio|conv)$/.test(x))).filter(Boolean));
+  expect(ordine).toEqual(['mg-dq-esito', 'mg-dq-principio', 'mg-dq-conv']);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-principio.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  const colori = await dq.locator('.mg-dq-principio').evaluate((s) => ({ testo: getComputedStyle(s).color, fondo: getComputedStyle(document.body).backgroundColor }));
+  expect(colori.testo).not.toBe(colori.fondo);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-principio-scuro.png' });
+});
+
+// #1790: appena nata la domanda la smista un agente. Non è da rispondere e non apre Gestione da bloccante, ma si vede
+// nella sua scheda (#1791), e chi la apre legge cosa sta succedendo; una smistata come guasto dice com'è finita.
+test('una domanda in smistamento sta nella sua scheda e lo dice; una smistata come guasto lo dice in archivio', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const nata = domanda(20, { stato: 'in_smistamento', priorita: 'bloccante', titolo: 'Bordo caldo o freddo?' });
+  const guasto = domanda(21, { stato: 'chiusa', titolo: 'Il clone del server è respinto', esito: { ok: true, smistata: 'guasto' } });
+  await apriDomande(page, [nata, guasto, IMPORTANTE]);
+  expect(await page.evaluate(() => window.__mgTest.sceltaApertura())).not.toMatchObject({ motivo: 'bloccante' });
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (1)');
+  await expect(page.locator('.mg-tab[data-tab="domande-smistamento"]')).toHaveText('In smistamento (1)');
+  await expect(page.locator('.mg-tab[data-tab="domande-lavoro"]')).toHaveText('In lavorazione (0)');
+  await page.locator('.mg-tab[data-tab="domande-smistamento"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]');
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.');
+  await expect(dq.locator('.mg-dq-testo')).toHaveCount(0);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-smistamento.png' });
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-21"] .mg-dq-esito')).toHaveText('Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.');
+});
+
+// #1928: lo smistamento chiude un doppione sulla domanda viva che chiede la stessa scelta; l'archivio dice quale, e ci porta.
+test('una domanda chiusa come doppione dice di quale e il collegamento apre quella da rispondere', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const doppia = domanda(22, { stato: 'chiusa', titolo: 'Tenere Haiku o passare a Kimi?', esito: { ok: true, smistata: 'doppione', doppioneDi: 'D-8' } });
+  const senzaNumero = domanda(23, { stato: 'chiusa', titolo: 'Stessa scelta', esito: { ok: true, smistata: 'doppione' } });
+  await apriDomande(page, [doppia, senzaNumero, IMPORTANTE]);
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (1)');
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-23"]').click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-23"] .mg-dq-esito')).toHaveText('Chiedeva la stessa scelta di un’altra domanda: rispondi lì.');
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-22"]').click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-22"]');
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('Chiedeva la stessa scelta di D-8: rispondi lì.');
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-doppione.png' });
+  await dq.locator('.mg-dq-esito .mg-dq-legame[data-domanda="D-8"]').click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]')).toBeVisible();
+});

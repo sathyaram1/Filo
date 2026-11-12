@@ -21,10 +21,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, cpSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
+import { STAMPA_TETTO } from '../../scripts/lib/consegna-file.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -60,7 +62,7 @@ function fintoServer(rispostaLavoro, consegne = []) {
  * cartella git usa-e-getta (così claim e posizionamento non toccano niente di
  * reale). Ritorna il JSON che il giro consegna al lavoratore.
  */
-async function giro(rispostaLavoro, consegne = []) {
+async function giro(rispostaLavoro, consegne = [], prepara = null, ambiente = {}) {
   const { srv, port } = await fintoServer(rispostaLavoro, consegne);
   const casa = cartellaTemporanea('filo-catena-');
   try {
@@ -98,6 +100,7 @@ async function giro(rispostaLavoro, consegne = []) {
       execFileSync('git', ['branch', ramo], { cwd: casa });
       execFileSync('git', ['push', '-q', 'origin', ramo], { cwd: casa });
     }
+    if (prepara) prepara(casa);
 
     const out = await new Promise((risolvi) => {
       const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-di-prova'], {
@@ -121,6 +124,7 @@ async function giro(rispostaLavoro, consegne = []) {
           // staccato apposta per sopravvivergli: qui lascerebbe un processo per
           // ogni caso di prova. Il battito ha un test suo (routineBeat).
           FILO_NO_BEAT: '1',
+          ...ambiente,
         },
       });
       let so = ''; let se = '';
@@ -137,19 +141,43 @@ async function giro(rispostaLavoro, consegne = []) {
   }
 }
 
-test('lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedback', async () => {
-  const { json } = await giro({
-    ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
-    payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
-  });
-  assert.ok(json, 'il giro deve consegnare qualcosa');
-  assert.equal(json.role, 'new-work');
-  assert.ok(json.instructions && json.instructions.length > 500,
-    `la ricetta del ruolo deve arrivare non vuota (arrivati ${(json.instructions || '').length} caratteri)`);
-  assert.ok(json.payload && json.payload.feedback, 'il feedback deve esserci');
-  assert.equal(json.payload.feedback.text, FEEDBACK.text,
-    'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
-});
+const FINE_ALLUNGATO = 'Fine del ruolo allungato per la prova.';
+
+// Strumenti con un ruolo resolver oltre la soglia della stampa, qualunque sia il percorso: in produzione il ruolo esce
+// nel suo file, e a percorso corto la prova non ci passerebbe mai.
+function strumentiColRuoloLungo() {
+  const strumenti = cartellaTemporanea('filo-catena-strumenti-');
+  const ruoli = resolve(strumenti, 'routines', 'roles');
+  cpSync(resolve(REPO, 'routines', 'roles'), ruoli, { recursive: true });
+  appendFileSync(resolve(ruoli, 'resolver.md'), `\n${'Una riga che allunga il ruolo.\n'.repeat(Math.ceil(STAMPA_TETTO / 30))}${FINE_ALLUNGATO}\n`, 'utf8');
+  return strumenti;
+}
+
+async function lavoroNuovo({ allunga }) {
+  const strumenti = allunga ? strumentiColRuoloLungo() : '';
+  try {
+    const { json } = await giro({
+      ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
+      payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
+    }, [], null, strumenti ? { FILO_TOOLS_ROOT: strumenti } : {});
+    assert.ok(json, 'il giro deve consegnare qualcosa');
+    assert.equal(json.role, 'new-work');
+    if (allunga) assert.ok(json.istruzioniFile, 'il ruolo oltre la soglia esce dalla stampa');
+    const ruolo = ruoloConsegnato(json);
+    assert.match(ruolo, /# Ruolo: resolver[\s\S]*Contratto comune dei worker/,
+      `la ricetta del ruolo deve arrivare intera (arrivati ${ruolo.length} caratteri)`);
+    if (allunga) assert.ok(ruolo.includes(FINE_ALLUNGATO), 'il file ha il ruolo fino in fondo');
+    assert.ok(json.payload && json.payload.feedback, 'il feedback deve esserci');
+    assert.equal(json.payload.feedback.text, FEEDBACK.text,
+      'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
+  } finally {
+    if (strumenti) togliCartella(strumenti);
+  }
+}
+
+test('lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedback', () => lavoroNuovo({ allunga: false }));
+
+test('lavoro nuovo col ruolo oltre la soglia della stampa: arriva intero nel suo file, il feedback resta in stampa', () => lavoroNuovo({ allunga: true }));
 
 test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async () => {
   // Il ramo di un lavoro nuovo lo decide il giro, e per un po' lo ha deciso
@@ -201,6 +229,29 @@ test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {
   assert.equal(json.payload.feedback, undefined);
   assert.equal(JSON.stringify(json.payload).includes(FEEDBACK.text), false,
     'il testo del feedback non deve raggiungerlo per nessuna strada');
+});
+
+test('controllo di sicurezza su un clone che non sa calcolare il diff → il giro si ferma, non consegna un diff vuoto (#740)', async () => {
+  // Il clone a ramo singolo delle routine: niente main, né locale né scaricato, e origin che non la dà. Origin muto del
+  // tutto ferma il giro prima, al posizionamento sul ramo (#1779.1), e il diff non si guarderebbe più.
+  const { json, stderr } = await giro({
+    ok: true, role: 'secaudit', id: 'fid-740', num: '#740', branch: 'worker/740',
+    payload: { role: 'secaudit', branch: 'worker/740' },
+  }, [], (casa) => {
+    const g = (...a) => execFileSync('git', a, { cwd: casa, stdio: ['ignore', 'pipe', 'pipe'] });
+    g('checkout', '-q', 'worker/740');
+    writeFileSync(resolve(casa, 'del-ramo.txt'), 'modifica da controllare\n', 'utf8');
+    // Solo il file: con `add -A` il commit imbarcherebbe il finto origin, che sta nella cartella, e il ripristino del
+    // ramo gli rimetterebbe la main tolta qui sotto.
+    g('add', 'del-ramo.txt');
+    g('commit', '-qm', 'lavoro del ramo');
+    g('push', '-q', 'origin', 'worker/740');
+    g('branch', '-D', 'main');
+    g('update-ref', '-d', 'refs/remotes/origin/main');
+    g('--git-dir', resolve(casa, 'altrove.git'), 'update-ref', '-d', 'refs/heads/main');
+  });
+  assert.equal(json.role, 'halt', `un diff che non si calcola non arriva al controllo come se fosse vuoto: ${stderr}`);
+  assert.match(json.payload.message, /diff del ramo worker\/740 non si calcola[^]*origin\/main/);
 });
 
 test('busta formalmente giusta ma VUOTA dentro → il giro si ferma', async () => {

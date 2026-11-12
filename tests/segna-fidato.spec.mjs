@@ -16,6 +16,7 @@
 //   Come merge-approvals.spec.mjs: si stubba il canale verso il main e si ripercorre il codice VERO della pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const SHA = 'a1b2c3d4'.repeat(5);
@@ -181,7 +182,7 @@ test('Log: il lavoro fidato si legge come «lavoro fidato: controllo registrato�
   };
   await apri(page, [pratica({ fiducia: 'fidato' })], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   await expect(box).toContainText('lavoro fidato: controllo registrato');
@@ -215,7 +216,7 @@ test('Log: le righe di prima restano leggibili, con tutto quello che era stato s
   };
   await apri(page, [pratica()], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
@@ -265,7 +266,7 @@ test('Log: la data della fusione per esteso, e quante ne restano fuori', async (
     };
   });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible();
   await expect(box.locator('.sn-mac-preapproved-row')).toHaveCount(8);
@@ -277,7 +278,7 @@ test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) =
   const page = await openTab(MANAGE);
   await apri(page, [pratica()], { preapproved: [] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
 });
 
@@ -295,7 +296,7 @@ test('Log: una fusa col segno di un sì non dice «fondi senza chiedermelo»', a
   const daSi = riga(1, { preapprovedBy: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56' });
   await apri(page, [pratica()], { preapproved: [daSi] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   const intro = box.locator('.sn-mac-preapproved-intro');

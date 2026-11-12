@@ -21,7 +21,7 @@
 // In una finestra in incognito, a qualunque livello acceso, il seme nasce e muore con la finestra (#800).
 
 const crypto = require('node:crypto');
-const Sito = require('./stessoSito');
+const Sito = require('../../shared/stessoSito');
 
 const MODES = { OFF: 'off', DEFAULT: 'default', PRIVACY: 'privacy' };
 const SECRET_KEY = '__fpMasterSecret';
@@ -47,10 +47,8 @@ function levelNum(mode) {
   return mode === MODES.PRIVACY ? 2 : mode === MODES.DEFAULT ? 1 : 0;
 }
 
-// Carica (o genera) il master secret persistente e fissa la modalità corrente.
-// Chiamato una volta all'avvio. Best-effort: in caso di errore di storage usa
-// un secret effimero (il rumore funziona comunque, solo non sopravvive al
-// riavvio — accettabile).
+// Best-effort: se lo storage non risponde si usa un secret effimero, il rumore funziona
+// comunque e solo non sopravvive al riavvio.
 async function init(settings) {
   _mode = getMode(settings);
   try {
@@ -104,7 +102,7 @@ function seedForOrigin(origin, ambito = '') {
   return h.readUInt32BE(0) >>> 0;
 }
 
-// Un sito, un rumore: lo stesso sito dei cookie (services/stessoSito.js), così uno script presente su due pagine di
+// Un sito, un rumore: lo stesso sito dei cookie (shared/stessoSito.js), così uno script presente su due pagine di
 // github.io le vede come due browser diversi. Le esenzioni stanno in configForHref, non qui.
 function seedForHref(href, ambito = '') {
   return seedForOrigin(Sito.sitoDi(href) || String(href || ''), ambito);
@@ -144,26 +142,23 @@ function isIdentityProviderHref(href) {
   }
 }
 
-// Superfici "prodotto" di Google in cui l'utente è AUTENTICATO col proprio
-// account (Documenti/Fogli/Presentazioni, Drive, Gmail, Calendar, Meet…). Qui
-// il rumore anti-fingerprint non offre ALCUNA protezione privacy — sei comunque
-// identificato dal cookie del tuo account Google, che ti segue su tutte le sue
-// app — ma altera gli stessi segnali canvas/WebGL/audio che i controlli di
-// sicurezza antifrode di Google campionano lungo il flusso di accesso, facendo
-// scattare il blocco "questo browser o questa app potrebbero non essere sicuri"
-// (feedback #299: accesso a Google Documenti). È lo stesso ragionamento
-// dell'esenzione del login (accounts.google.com, via isIdentityProviderHref),
-// esteso alle app in cui quel login sfocia: costo privacy nullo, elimina un
-// possibile attrito reale.
-//
-// Lista CURATA (come AUTH_HOSTS), NON l'eTLD+1 google.com: esentare tutto
-// "google.com" spegnerebbe la protezione anche sulla ricerca (www.google.com),
-// dove l'utente può NON essere loggato e il rumore ha un valore reale. Match su
-// host esatto o suo sottodominio.
+// Un sito dove solo alcune pagine sono esenti (gli accessi di github.com, x.com…): un suo documento che la guardia
+// della pagina non sa riconoscere potrebbe essere una di quelle (#798).
+function esentiNelSito(href) {
+  try {
+    const o = new URL(String(href || '')).origin;
+    return !isIdentityProviderHref(o + '/') && isIdentityProviderHref(o + '/login');
+  } catch (_) {
+    return false;
+  }
+}
+
+// App Google dove l'utente è già autenticato (#299): lì il rumore non protegge — il cookie
+// identifica comunque — e fa scattare gli avvisi. Lista CURATA, non l'eTLD+1 google.com.
 const GOOGLE_APP_HOSTS = [
-  'docs.google.com',        // Documenti, Fogli, Presentazioni, Moduli
+  'docs.google.com',
   'drive.google.com',
-  'mail.google.com',        // Gmail
+  'mail.google.com',
   'calendar.google.com',
   'keep.google.com',
   'meet.google.com',
@@ -171,10 +166,10 @@ const GOOGLE_APP_HOSTS = [
   'contacts.google.com',
   'photos.google.com',
   'sites.google.com',
-  'script.google.com',      // Apps Script
+  'script.google.com',
   'classroom.google.com',
   'myaccount.google.com',
-  'admin.google.com',       // Workspace admin
+  'admin.google.com',
 ];
 
 function isGoogleAppSurface(href) {
@@ -209,6 +204,24 @@ function configForHref(href, ambito = '') {
   return { level, seed: seedForHref(href, String(ambito || '')) };
 }
 
+// Un riquadro, dato con gli indirizzi dei frame da lui alla pagina principale: ha la protezione della pagina col suo
+// seme se è dello stesso sito, o se non ha un indirizzo web (srcdoc, data:, blob:) e quindi è contenuto del frame che
+// lo contiene. Un riquadro di un altro sito resta com'è, e un riquadro esente per conto suo (un accesso) resta esente.
+function configForFrames(catena, ambito = '') {
+  const OFF = { level: 0, seed: 0 };
+  if (!Array.isArray(catena) || !catena.length) return OFF;
+  const cima = String(catena[catena.length - 1] || '');
+  const pagina = configForHref(cima, ambito);
+  if (!pagina.level) return OFF;
+  for (let i = 0; i < catena.length - 1; i++) {
+    const u = String(catena[i] || '');
+    if (!/^https?:/i.test(u)) continue;
+    const sito = Sito.sitoDi(u);
+    return sito && sito === Sito.sitoDi(cima) && configForHref(u, ambito).level ? pagina : OFF;
+  }
+  return pagina;
+}
+
 module.exports = {
   MODES,
   getMode,
@@ -220,6 +233,8 @@ module.exports = {
   seedForOrigin,
   seedForHref,
   isIdentityProviderHref,
+  esentiNelSito,
   isGoogleAppSurface,
   configForHref,
+  configForFrames,
 };

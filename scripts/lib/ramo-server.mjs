@@ -21,12 +21,20 @@ export function cartellaDelServer(radice, esiste = existsSync) {
 }
 
 const corto = (s) => String(s || '').slice(0, 8);
-const MAIN_SERVER = 'refs/remotes/origin/main';
+export const MAIN_SERVER = 'refs/remotes/origin/main';
+
+/** Le punte di `ramo` nel repo del server `radice`: `sha` è la locale, o quella su origin se in locale manca. */
+export function punteDelRamo(radice, ramo, { punta = 'locale', git = gitIn } = {}) {
+  const rev = (r) => String(git(radice, ['rev-parse', '--verify', '--quiet', `${r}^{commit}`]) || '').trim();
+  const locale = rev(`refs/heads/${ramo}`);
+  const origine = rev(`refs/remotes/origin/${ramo}`);
+  return { locale, origine, sha: punta === 'origine' ? origine : (locale || origine), rev };
+}
 
 /**
  * Il ramo `ramo` nel checkout del server. null = server assente (o ramo che non può avere un gemello); `sha` '' = il
- * ramo non c'è. `sha` è la punta locale (o su origin se in locale manca); con `punta: 'origine'` quella che fonde
- * server:fondi. `shaVerificato` fa calcolare se è su main e se dopo di lui sono entrate solo fusioni pulite di main.
+ * ramo non c'è. `sha` come in punteDelRamo; con `punta: 'origine'` quella che fonde server:fondi. `shaVerificato` fa
+ * calcolare se è su main e se dopo di lui sono entrate solo fusioni pulite di main.
  */
 export function statoRamoServer(ramo, {
   cartellaServer = '', shaVerificato = '', fetch = false, punta = 'locale', git = gitIn,
@@ -36,10 +44,7 @@ export function statoRamoServer(ramo, {
   if (git(radice, ['rev-parse', '--git-dir']) === null) return null;
   // server:fondi fonde la punta su origin dopo un fetch: chi gli fa da cancello deve guardare la stessa.
   if (fetch) git(radice, ['fetch', '--quiet', 'origin']);
-  const rev = (r) => String(git(radice, ['rev-parse', '--verify', '--quiet', `${r}^{commit}`]) || '').trim();
-  const locale = rev(`refs/heads/${ramo}`);
-  const origine = rev(`refs/remotes/origin/${ramo}`);
-  const sha = punta === 'origine' ? origine : (locale || origine);
+  const { locale, origine, sha, rev } = punteDelRamo(radice, ramo, { punta, git });
   const main = rev(MAIN_SERVER);
   const dentro = (x) => !!(x && main) && git(radice, ['merge-base', '--is-ancestor', x, main]) !== null;
   const v = /^[0-9a-f]{40}$/i.test(String(shaVerificato || '')) ? shaVerificato : '';

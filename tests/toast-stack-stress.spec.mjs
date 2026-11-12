@@ -13,6 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -42,7 +43,7 @@ function firstOverlap(boxes) {
 }
 
 async function runLinkAction(page, label, { exclude = null, settle = 200 } = {}) {
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   let item = null;
   for (let i = 0; i < 6 && !item; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
@@ -73,7 +74,7 @@ test('il menu del tasto destro resta aperto mentre gli avvisi compaiono e scadon
   for (let i = 0; i < 4; i++) await runLinkAction(page, 'Copia URL', { exclude: 'immagine', settle: 60 });
 
   await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await shot(page, 'toast-stack-409-menu-aperto');
 

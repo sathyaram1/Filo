@@ -92,6 +92,27 @@ test('server giù poi su: "Riprova" carica davvero la pagina', async ({ app, she
   }
 });
 
+test('un indirizzo chiesto subito dopo il crollo della scheda si apre, e la pagina della scheda caduta non lo copre', async ({ app, openTab, testServer }) => {
+  const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
+  const dopo = testServer.html('<!DOCTYPE html><title>dopo</title><p>arrivata</p>');
+  await openTab(url);
+  await app.evaluate(async ({ webContents, BrowserWindow }, [target, verso]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
+    const wc = tab.view.webContents;
+    process.kill(wc.getOSProcessId(), 'SIGKILL');
+    // Appena il main la sa caduta, prima che la rimessa in piedi parta: la persona che scrive subito un indirizzo.
+    for (let i = 0; i < 200 && !wc.isCrashed(); i++) await new Promise((r) => setTimeout(r, 10));
+    w._filoTabs.navigate(tab.id, verso);
+  }, [url, dopo]);
+  await new Promise((r) => setTimeout(r, 1500));
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.map((t) => t.view.webContents.getURL());
+  }), { timeout: 10_000 }).toContain(dopo);
+  expect(app.windows().some((p) => { try { return p.url().startsWith('filo://error/'); } catch (_) { return false; } })).toBe(false);
+});
+
 test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
   await openTab(url);
@@ -102,8 +123,7 @@ test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', 
   // che ospita anche la shell).
   // SIGKILL al processo e non forcefullyCrashRenderer: il perché sta in tests/unit/chiusuraApp.test.mjs (#639).
   await app.evaluate(({ webContents, BrowserWindow }, target) => {
-    const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
-    const mainWin = BrowserWindow.fromWebContents(shellWc);
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
     const wc = webContents.getAllWebContents().find((w) =>
       w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
     if (!wc) throw new Error('webContents della scheda non trovato');

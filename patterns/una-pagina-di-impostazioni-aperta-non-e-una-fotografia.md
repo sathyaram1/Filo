@@ -79,5 +79,5 @@ anche le catene dei modelli per azione cambiate, con `imposta` di
 `src/shared/aestheticRefiner.js` con `src/pages/dashboard/dashboard-attivita.js`.
 Sentinella: `tests/unit/paginaImpostazioniViva.test.mjs`. Le prove dal punto
 di vista dell'utente sono `tests/preferences-pagina-viva.spec.mjs`,
-`tests/options-pagina-viva.spec.mjs`, `tests/security-pagina-viva.spec.mjs` e,
+`tests/options.spec.mjs` (gruppo `options-pagina-viva`), `tests/security-pagina-viva.spec.mjs` e,
 per il box in chat, `tests/filo-estetica-chat.spec.mjs`.

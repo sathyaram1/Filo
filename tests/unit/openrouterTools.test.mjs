@@ -74,7 +74,8 @@ test('streaming: le chiamate spezzate in più delta vengono ricomposte, e il nom
   ]);
   // Avviso una volta per chiamata, appena c'è il nome.
   assert.deepEqual(started, [{ id: 'call_a', name: 'CERCA_WEB' }, { id: 'call_b', name: 'TIMER' }]);
-  assert.deepEqual(r.reasoningDetails, [{ index: 0, type: 'reasoning.text', text: 'Penso.' }]);
+  assert.deepEqual(r.reasoningDetails.slice(0, -1), [{ index: 0, type: 'reasoning.text', text: 'Penso.' }]);
+  assert.equal(r.reasoningDetails.at(-1).type, 'filo.impronta', 'il ragionamento porta l\'impronta della richiesta (#1552)');
   assert.equal(r.finishReason, 'tool_calls');
   assert.equal(r.servedBy, 'DeepInfra');
   assert.equal(r.usage.promptTokens, 10);
@@ -118,7 +119,8 @@ test('non in streaming: le chiamate e il ragionamento del messaggio tornano piat
   assert.equal(body.provider.require_parameters, true, 'anche senza politica sui fornitori');
   assert.equal(r.text, '');
   assert.deepEqual(r.toolCalls, [{ id: 'x1', name: 'SVEGLIA', arguments: '{"time":"07:00"}' }]);
-  assert.deepEqual(r.reasoningDetails, [{ type: 'reasoning.summary', summary: 'sveglia' }]);
+  assert.deepEqual(r.reasoningDetails.slice(0, -1), [{ type: 'reasoning.summary', summary: 'sveglia' }]);
+  assert.equal(r.reasoningDetails.at(-1).type, 'filo.impronta');
   assert.equal(r.finishReason, 'tool_calls');
   assert.equal(r.servedBy, 'Fireworks');
 });
@@ -264,7 +266,7 @@ for (const metodo of ['streamComplete', 'complete']) {
         assert.doesNotMatch(s, /strumenti/);
         assert.match(s, frase);
       }
-      assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), code === 'NO_PROVIDER_ALLOWED' ? /account OpenRouter/ : /Modelli predefiniti/);
+      assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), code === 'NO_PROVIDER_ALLOWED' ? /account OpenRouter/ : /Opzioni → Modelli per azione/);
     });
   }
 

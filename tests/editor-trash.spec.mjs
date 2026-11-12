@@ -166,6 +166,69 @@ test('dal cestino si può anche buttare via per sempre, ma solo confermando', as
   await expect(page.locator('.ed-vh-empty')).toContainText('Nessun documento eliminato');
 });
 
+// #256.6: «Confermi?» è più corto di «Elimina definitivamente»; senza la scatola ferma il tasto si stringeva verso destra
+// e «Ripristina» scivolava sotto il punto del primo clic, così il secondo ripristinava invece di eliminare.
+async function cestinoConUnDocumento(page, testo) {
+  await page.waitForSelector('#doc');
+  await page.evaluate(async () => {
+    localStorage.removeItem('filo.editor.trash');
+    localStorage.removeItem('filo.editor.collection');
+    try { await chrome.storage.local.remove('filo.editor.collection'); } catch (_) {}
+  });
+  await page.reload();
+  await page.waitForSelector('#doc');
+  await page.click('#doc');
+  await setDocText(page, testo);
+  await newDocWithText(page, 'documento che resta');
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await page.click('#docTrash');
+  await expect(page.locator('.ed-tr-item')).toHaveCount(1);
+}
+
+test('«Elimina definitivamente» cliccato nel terzo sinistro: la scatola resta ferma e il secondo clic elimina', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await cestinoConUnDocumento(page, 'appunti da buttare');
+  const purge = page.locator('.ed-tr-purge');
+  const prima = await purge.boundingBox();
+  const x = prima.x + prima.width / 6;
+  const y = prima.y + prima.height / 2;
+  await page.mouse.click(x, y);
+  await expect(purge).toHaveText('Confermi?');
+  const dopo = await purge.boundingBox();
+  expect(dopo.x).toBeCloseTo(prima.x, 0);
+  expect(dopo.y).toBeCloseTo(prima.y, 0);
+  expect(dopo.width).toBeCloseTo(prima.width, 0);
+  expect(dopo.height).toBeCloseTo(prima.height, 0);
+  mkdirSync(shotsDir, { recursive: true });
+  await page.screenshot({ path: join(shotsDir, 'editor-trash-conferma.png') });
+  await page.mouse.click(x, y);
+  // Eliminato: né nel cestino né fra i documenti aperti.
+  await expect(page.locator('.ed-vh-empty')).toContainText('Nessun documento eliminato');
+  await page.click('#ovClose');
+  expect((await docTexts(page)).join('|')).not.toContain('appunti da buttare');
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(1);
+});
+
+test('«Svuota cestino» armato tiene la sua scatola e il secondo clic svuota', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await cestinoConUnDocumento(page, 'altro da buttare');
+  const svuota = page.locator('#trEmpty');
+  const prima = await svuota.boundingBox();
+  const x = prima.x + prima.width / 6;
+  const y = prima.y + prima.height / 2;
+  await page.mouse.click(x, y);
+  await expect(svuota).toHaveText('Confermi?');
+  await expect(svuota).toHaveAttribute('title', 'Elimini 1 documento per sempre');
+  const dopo = await svuota.boundingBox();
+  expect(dopo.x).toBeCloseTo(prima.x, 0);
+  expect(dopo.width).toBeCloseTo(prima.width, 0);
+  expect(dopo.height).toBeCloseTo(prima.height, 0);
+  await page.mouse.click(x, y);
+  await expect(page.locator('.ed-vh-empty')).toContainText('Nessun documento eliminato');
+});
+
 // ── La conferma sul posto regge il doppio clic (#415) ─────────────────────
 // "Confermi?" compare SOTTO il cursore, quindi il secondo colpo di una coppia
 // ci cadeva sopra e mandava via il documento per sempre in un gesto solo: la

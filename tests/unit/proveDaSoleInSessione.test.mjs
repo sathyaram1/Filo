@@ -5,13 +5,13 @@
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { IDENTITA_SESSIONE, fileArgs } from '../../scripts/run-unit-tests.mjs';
+import { IDENTITA_SESSIONE, fileArgs, flagsConAvanzamento, lanciaSorvegliato, testoFermo, testoFileChiusi } from '../../scripts/run-unit-tests.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { chiaviDelRegistroUnit } from '../../scripts/build-alarm.mjs';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');
@@ -20,8 +20,46 @@ const QUESTO = basename(fileURLToPath(import.meta.url));
 const NOTI = ['dispatch', 'domandaChiusura', 'esitoPerCommit', 'routineChannelRilascio', 'routineRole', 'routineTicket', 'sessionReport']
   .map((n) => `${n}.test.mjs`);
 const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
+let corse = 0;
 
-test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', () => {
+/**
+ * Decine di file sotto carico durano quanto vuole la macchina: il tetto conta il tempo in cui niente va avanti, come nel
+ * lanciatore, non la durata della corsa (#1214). `fermo` è il rosso col nome del file e il tempo, o null.
+ */
+async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
+  // Con NODE_TEST_CONTEXT il figlio si crederebbe una sotto-prova di questa e non correrebbe niente.
+  const { NODE_TEST_CONTEXT: _figlio, ...ambiente } = process.env;
+  const avanzamento = join(casa, `avanzamento-${++corse}.jsonl`);
+  const r = await lanciaSorvegliato(['--test', ...flagsConAvanzamento(['--test-reporter=tap'], avanzamento), ...fileArgs(file, ROOT)], {
+    env: { ...ambiente, ...sessione }, avanzamento, tetto, raccogli: true,
+  });
+  // Gli avvisi del lanciatore, tutti: un file fermo lo chiude da solo il tetto per file (#1231), la corsa ferma dice chi.
+  const avvisi = [r.chiusi?.length && testoFileChiusi(r.chiusi, tetto), r.fermo && testoFermo(r.fermo, tetto)].filter(Boolean);
+  return { ...r, fermo: avvisi.length ? avvisi.join('\n') : null };
+}
+
+const nomiRossi = (tap) => [...new Set([...String(tap || '').matchAll(/^\s*not ok \d+ - (.*)$/gm)].map((m) => m[1].trim()))];
+
+/**
+ * I rossi che solo la sessione accende. Un rosso che il file ha anche senza sessione lo tiene già la sua chiave
+ * `unit:<file>`: contato anche qui, l'allarme lo dava per un guasto nuovo di questo file (#2174).
+ */
+async function rossiDiSessione(file, sessione, { casa, radice = ROOT }) {
+  const con = await daSoli(file, sessione, { casa });
+  if (con.fermo || con.status === 0) return { fermo: con.fermo, soloInSessione: [], dettaglio: '' };
+  const dettaglio = String(con.stderr || con.error || '').slice(-4000);
+  const rossiCon = nomiRossi(con.stdout);
+  // Un'uscita rossa senza un caso rosso non si attribuisce: resta rossa.
+  if (!rossiCon.length) return { fermo: null, soloInSessione: [`uscita ${con.status} senza un caso rosso`], dettaglio };
+  const chiavi = chiaviDelRegistroUnit(con.stdout, radice);
+  const daRifare = chiavi.includes('unit') ? file : chiavi.map((k) => join(radice, k.slice('unit:'.length)));
+  const senza = await daSoli(daRifare, {}, { casa });
+  if (senza.fermo) return { fermo: senza.fermo, soloInSessione: [], dettaglio };
+  const rossiSenza = new Set(nomiRossi(senza.stdout));
+  return { fermo: null, soloInSessione: rossiCon.filter((n) => !rossiSenza.has(n)), dettaglio };
+}
+
+test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', async () => {
   const importano = readdirSync(QUI).filter((f) => f.endsWith('.test.mjs') && f !== QUESTO && IMPORTA.test(readFileSync(join(QUI, f), 'utf8')));
   const file = [...new Set([...NOTI, ...importano])];
   const casa = cartellaTemporanea('filo-prove-da-sole-');
@@ -32,18 +70,52 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     const uso = { input_tokens: 12, output_tokens: 34, cache_read_input_tokens: 5600, cache_creation_input_tokens: 78 };
     writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: { id: 'msg_1', model: 'claude-opus-4-8', usage: uso } })}\n`, 'utf8');
     const sessione = {
-      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'prober', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
+      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'verifier', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
       FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid,
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');
-    // Con NODE_TEST_CONTEXT il figlio si crederebbe una sotto-prova di questa e non correrebbe niente.
-    const { NODE_TEST_CONTEXT: _figlio, ...ambiente } = process.env;
-    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...fileArgs(file.map((f) => join(QUI, f)), ROOT)], {
-      cwd: ROOT, env: { ...ambiente, ...sessione }, encoding: 'utf8', timeout: TETTO_ATTESA_MS, maxBuffer: 256 * 1024 * 1024,
-    });
-    const rossi = String(r.stdout || '').match(/^\s*not ok .*$/gm) || [];
-    assert.equal(r.status, 0, rossi.join('\n') || String(r.stderr || r.error || '').slice(-4000));
-    assert.match(String(r.stdout), /^# fail 0$/m);
+    const r = await rossiDiSessione(file.map((f) => join(QUI, f)), sessione, { casa });
+    assert.equal(r.fermo, null, r.fermo);
+    assert.deepEqual(r.soloInSessione, [], r.soloInSessione.join('\n') || r.dettaglio);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('un rosso che il file ha anche senza sessione non è di questa prova; uno che solo la sessione accende sì (#2174)', async () => {
+  const casa = cartellaTemporanea('filo-prove-da-sole-propri-');
+  try {
+    const sempre = join(casa, 'sempre.test.mjs');
+    writeFileSync(sempre, "import { test } from 'node:test';\ntest('rosso di suo', () => { throw new Error('rotto'); });\ntest('verde', () => {});\n");
+    const legge = join(casa, 'legge.test.mjs');
+    writeFileSync(legge, "import { test } from 'node:test';\ntest('legge la sessione', () => { if (process.env.FILO_ROUTINE) throw new Error('sessione'); });\n");
+    const soloSuo = await rossiDiSessione([sempre], { FILO_ROUTINE: '1' }, { casa, radice: casa });
+    assert.equal(soloSuo.fermo, null, soloSuo.fermo);
+    assert.deepEqual(soloSuo.soloInSessione, []);
+    const entrambi = await rossiDiSessione([sempre, legge], { FILO_ROUTINE: '1' }, { casa, radice: casa });
+    assert.deepEqual(entrambi.soloInSessione, ['legge la sessione']);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('la corsa va avanti oltre il tetto finché avanza; ferma, è un rosso col nome del file e il tempo (#1214)', async () => {
+  const casa = cartellaTemporanea('filo-prove-da-sole-tetto-');
+  try {
+    // Dieci passi da 400 ms in fila durano più del tetto, e nessuno lo sfiora: un tetto sulla durata la taglierebbe.
+    const tetto = 3000;
+    const lento = join(casa, 'lento.test.mjs');
+    writeFileSync(lento, "import { test } from 'node:test';\nfor (let i = 0; i < 10; i++) test(`passo ${i}`, () => new Promise((r) => setTimeout(r, 400)));\n");
+    const r = await daSoli([lento], {}, { casa, tetto });
+    assert.equal(r.fermo, null, r.fermo);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal((r.stdout.match(/^ok \d+ - passo \d$/gm) || []).length, 10, r.stdout);
+
+    const fermo = join(casa, 'fermo.test.mjs');
+    writeFileSync(fermo, "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const f = await daSoli([fermo], {}, { casa, tetto });
+    assert.match(String(f.fermo), /fermo\.test\.mjs non è andato avanti per 3 secondi/);
+    assert.notEqual(f.status, 0);
   } finally {
     togliCartella(casa);
   }

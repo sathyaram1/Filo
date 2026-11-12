@@ -24,14 +24,14 @@
 (function (global) {
   'use strict';
 
-  // Soglie (tarate per il caso realistico: il modello, istruito a "metti i dati
-  // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
+  // Soglie tarate sul caso realistico: il modello istruito a mettere i dati nell'URL li
+  // mette in chiaro o base64, non in forme cifrate sofisticate.
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
   const STRUCT_BLOB = 24;   // singolo blocco opaco (sottodominio/segmento) → sospetto
 
-  // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
-  // evitano che un URL legittimo che le contiene scateni il match a token singolo.
+  // Parole comuni (it/en) lunghe ma innocue: evitano che un URL legittimo che le contiene
+  // scateni il match a token singolo.
   const STOPWORDS = new Set([
     'preferenze', 'preferences', 'informazioni', 'information', 'impostazioni',
     'settings', 'configurazione', 'configuration', 'utente', 'browser',
@@ -39,8 +39,7 @@
     'applicazione', 'navigazione', 'navigation', 'messaggio', 'message',
   ]);
 
-  // Decodifica "best effort" un blob base64/base64url se sembra tale e produce
-  // testo stampabile; altrimenti ''. Serve a smascherare ?d=<base64 dei segreti>.
+  // Smaschera ?d=<base64 dei segreti>; '' se non sembra base64 o non dà testo stampabile.
   function tryBase64(tok) {
     if (tok.length < 8 || tok.length % 4 === 1) return '';
     if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(tok)) return '';
@@ -122,12 +121,11 @@
     return varianti(url).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 
-  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
-  // email (interi e parte locale). Normalizzate in minuscolo alfanumerico.
+  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) ed email, intere e
+  // come parte locale.
   function corpusTokens(corpus) {
     const text = String(corpus || '');
     const out = new Set();
-    // email: forti, le aggiungiamo intere e come parte locale.
     const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
     let m;
     while ((m = emailRe.exec(text))) {
@@ -142,8 +140,8 @@
     return out;
   }
 
-  // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
-  // cifra (nomi+numeri, token, id) → segnale specifico, non parola comune.
+  // Combacia «forte» se lungo e non stopword, oppure se contiene una cifra (nomi+numeri,
+  // token, id): segnale specifico, non parola comune.
   function isStrong(tok) {
     if (/[0-9]/.test(tok) && tok.length >= MIN_TOKEN) return true;
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
@@ -439,14 +437,20 @@
     } catch (_) { return raw.replace(/#.*$/, '').replace(/\/+$/, ''); }
   }
 
+  function hostDi(url) {
+    try { return new URL(url).hostname; } catch (_) { return String(url || '').slice(0, 80); }
+  }
+
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
   // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
-  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6).
+  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6), `salvate` = le pagine di «Aperti per
+  // dopo» lette (#845).
   function contestoDaAzioni(actions) {
     const pezzi = [];
     const conversazioni = [];
+    const salvate = [];
     let nonFidato = false;
     const linkNoti = new Set();
     const esterni = [];
@@ -465,6 +469,12 @@
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
+      } else if (type === 'VEDI_SCHERMO') {
+        // #778 — quello che si vede in una finestra (e i titoli delle finestre aperte) l'hanno scritto altri.
+        const titoli = [out.finestra, ...(Array.isArray(out.elenco) ? out.elenco.map((v) => v && v.nome) : [])]
+          .map(testo).filter((t) => t.trim()).join('\n');
+        const t = [testo(out.testo), titoli].filter((x) => x.trim()).join('\n');
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, 'da una finestra guardata sullo schermo'); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
       } else if (type === 'CERCA_DOCUMENTI') {
@@ -488,6 +498,31 @@
         const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
         for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
         daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'LEGGI_PAGINA') {
+        // Una pagina letta è testo di sconosciuti (#553): i suoi codici non escono, e il suo indirizzo il modello l'ha visto.
+        if (!out.ok) continue;
+        nonFidato = true;
+        if (out.url) linkNoti.add(chiaveLink(out.url));
+        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
+      } else if (type === 'SCHEDE_CHIUSE' || type === 'RIAPRI_SCHEDA') {
+        // #884 — titoli e riassunti delle schede chiuse li hanno scritti i siti (o un modello leggendoli): testo di fuori.
+        const schede = type === 'RIAPRI_SCHEDA' ? (out.titolo || out.riassunto ? [out] : [])
+          : (Array.isArray(out.schede) ? out.schede : []).filter(Boolean);
+        if (schede.length) nonFidato = true;
+        for (const p of schede) if (p.url) linkNoti.add(chiaveLink(p.url));
+        const t = schede.map((p) => `${testo(p.titolo)}\n${testo(p.riassunto)}`).join('\n');
+        if (t.trim()) { pezzi.push(t); daFuori(t, 'dalle schede chiuse'); }
+      } else if (type === 'CERCA_SALVATE' || type === 'APRI_SALVATA') {
+        // #845 — cosa ha salvato l'utente, con titoli scritti dai siti. Una pagina si riapre tale e quale, come i link di
+        // una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK (`salvate`, in assess). Gli indirizzi non
+        // vanno fra i testi di fuori: un codice nel loro indirizzo fermerebbe la pagina stessa, anche dalla lista.
+        const pagine = type === 'APRI_SALVATA'
+          ? (out.aperta ? [{ title: out.titolo, url: out.url }] : [])
+          : (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
+        if (pagine.length) nonFidato = true;
+        for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
+        for (const p of pagine) salvate.push(`${testo(p.title)}\n${testo(p.url)}\n${testo(p.categoria)}`);
+        daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.categoria)}`).join('\n'), 'dalle pagine salvate per dopo');
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;
@@ -500,7 +535,7 @@
     if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
     let scritto = conversazioni.filter(Boolean).join('\n');
     if (scritto.length > MAX_LETTO) scritto = scritto.slice(-MAX_LETTO);
-    return { letto, nonFidato, linkNoti, esterni, scritto };
+    return { letto, nonFidato, linkNoti, esterni, scritto, salvate: salvate.join('\n').slice(-MAX_LETTO) };
   }
 
   // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
@@ -508,21 +543,22 @@
   // scritto = ciò che l'utente ha scritto in chat, tranne `domanda` (quella di adesso).
   // fromUntrusted = nel contesto è entrato testo scritto da altri: allora anche
   // la forma dell'URL conta, salvo i link citati tali e quali da una ricerca
-  // (aprirli non porta fuori niente che la ricerca non contenesse già).
+  // (aprirli non porta fuori niente che la ricerca non contenesse già). `salvate` = le pagine salvate lette: un loro
+  // indirizzo si riapre tale e quale, un altro che ne porta dei pezzi chiede l'OK (#845).
   function assess(url, {
-    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '',
+    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '', salvate = '',
   } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus) || taintLetto(link, letto);
-    if (t) return { exfil: true, reason: t.reason };
     const noto = !!(linkNoti && linkNoti.has(chiaveLink(link)));
+    const t = taint(link, corpus) || taintLetto(link, letto) || (noto ? null : taintLetto(link, salvate));
+    if (t) return { exfil: true, reason: t.reason };
     const s = noto ? null : taintScritto(link, scritto, domanda) || (fromUntrusted ? structural(link) : null);
     if (s) return { exfil: true, reason: s.reason };
     return { exfil: false, reason: '' };
   }
 
-  // NAVIGA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
+  // NAVIGA e LEGGI_PAGINA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
   // `daPagina` = l'agente vive su una pagina web, che è già nel suo contesto.
   function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false, parole = '', domanda = '' } = {}) {
     const ctx = contestoDaAzioni(azioni);
@@ -533,6 +569,7 @@
       linkNoti: ctx.linkNoti,
       scritto: [String(parole || ''), ctx.scritto].filter(Boolean).join('\n'),
       domanda,
+      salvate: ctx.salvate,
     });
   }
 
@@ -556,10 +593,13 @@
   // «far uscire un segreto» del capitolo 9: nessun livello e nessun OK lo sblocca.
   const USCITE = Object.freeze({
     NAVIGA: "non ho aperto l'indirizzo",
+    LEGGI_PAGINA: 'non ho letto la pagina',
     CERCA_WEB: 'non ho fatto la ricerca',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
+    APRI_SALVATA: 'non ho aperto la pagina salvata',
+    CERCA_DOCUMENTI: 'non ho cercato fra i documenti',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
@@ -570,12 +610,21 @@
   });
   const verboUscita = (tipo) => USCITE[tipo] || USCITE_PAGINA[tipo] || '';
 
-  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer. Conta ogni
-  // campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
+  // Un percorso che fa contattare un altro computer (`\\host\…`, `//host/…`, `/net/host` del Mac): il nome del computer
+  // e della cartella escono dalla macchina come un indirizzo (#1499). La regola è quella del perimetro, su ogni sistema.
+  function diRete(v) {
+    const C = global.SN_CMD_CLASSIFY;
+    // Senza la regola non si sa: si guarda come un'uscita (il controllo dei segreti, niente di più).
+    if (!C || !C.diRete) return !!String(v ?? '').trim();
+    return C.diRete(v, { win: true }) || C.diRete(v, { win: false });
+  }
+
+  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo o a un altro computer, non a un file di questo.
+  // Conta ogni campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
   function puntaFuori(action) {
     return [action.percorso, action.path, action.url].some((v) => {
       const meta = String(v ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
-      return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+      return (!!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file') || diRete(v);
     });
   }
 
@@ -585,6 +634,7 @@
     accesso: 'un token del tuo accesso a Filo',
     identita: "l'identità di questa copia di Filo",
     portafoglio: 'la chiave del tuo portafoglio',
+    feedback: 'la chiave che apre i feedback cifrati',
   });
   const LETTI = Object.freeze({
     codice: 'un codice letto',
@@ -665,7 +715,21 @@
     }
     const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (largo && regola === 'carta' && u.cifre.some((f) => f.includes(norm))) return true;
+    if (largo && regola === 'chiave' && pezzoDiChiave(v, u)) return true;
     return norm.length >= 8 && u.alnum.includes(norm);
+  }
+
+  // La parte variabile di una chiave senza il suo prefisso, o un suo pezzo di almeno FINESTRA caratteri (#1507): basta a
+  // ricostruirla. Le finestre di ciò che esce si calcolano una volta per uscita.
+  function pezzoDiChiave(valore, u) {
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!G || typeof G.partiSegreto !== 'function') return false;
+    const p = G.partiSegreto(valore);
+    if (p.nuclei.some((n) => u.alnum.includes(n))) return true;
+    if (p.a <= p.da) return false;
+    if (!u.finestre) u.finestre = G.finestreDi({ norm: u.alnum, da: 0, a: u.alnum.length - G.FINESTRA + 1 });
+    for (const f of G.finestreSegreto(p)) if (u.finestre.has(f)) return true;
+    return false;
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
@@ -678,18 +742,23 @@
     const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
+    // Una ricerca fra i documenti esce dal computer solo con una cartella su un altro computer: esce il suo nome.
+    if (tipo === 'CERCA_DOCUMENTI') {
+      if (!diRete(action.cartella)) return niente;
+      action = { type: tipo, cartella: action.cartella };
+    }
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);
-    const min = (G && G.SEGRETO_MIN) || 12;
     for (const s of Array.isArray(segreti) ? segreti : []) {
       const v = String((s && s.valore) || '').trim();
+      const min = G && typeof G.segretoDi === 'function' ? G.segretoDi(s).min : 12;
       if (v.length < min) continue;
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
       // Lo stesso riconoscimento che lo toglie dai messaggi verso i modelli: travestito, al contrario o codificato, esce uguale.
-      const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [v]) !== uscente;
-      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
-        return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
+      const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [s]) !== uscente;
+      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm)) || pezzoDiChiave(v, u)) {
+        return { ...niente, blocca: true, regola: 'custodito', tipo: String(s.tipo || ''), frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
     const avvisi = { memoria, azioni, daPagina, parole, domanda };
@@ -747,8 +816,9 @@
 
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
-    if (tipo === 'NAVIGA') {
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+    if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
+      const L = global.SN_ACTION_LEVELS;
+      const url = L && L.indirizzoDi ? L.indirizzoDi(action) : String(action.url ?? action.href ?? action.link ?? '').trim();
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
@@ -761,6 +831,8 @@
 
   global.SN_URL_EXFIL = {
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
-    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens,
+    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
+    // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
+    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

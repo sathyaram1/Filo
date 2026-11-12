@@ -1,10 +1,10 @@
 // #410.1 — Scaricamenti "nativi" della navigazione: cliccando un link a un file
 // (che il server serve come allegato) Filo deve intercettare il download,
-// mostrarne l'avanzamento nella barra in alto, scrivere il file su disco,
+// mostrarne l'avanzamento, scrivere il file su disco,
 // avvisare a fine scaricamento e registrarlo in una cronologia persistente.
 //
 // I test asseriscono il SUCCESSO (il file arriva + la cronologia segna
-// "completato" + compare l'indicatore e il toast di conferma), non l'assenza di
+// "completato" + compare il toast di conferma), non l'assenza di
 // un errore. Senza l'intercettazione (il fix): nessun file gestito, nessuna voce
 // di cronologia → rosso.
 //
@@ -62,9 +62,7 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
     expect(entry.totalBytes).toBe(FILE.length);
     expect(entry.savePath).toContain('report.pdf');
 
-    // 3) L'utente lo vede: compare l'indicatore nella barra e il toast di conferma
-    //    con le azioni "Apri file"/"Apri cartella".
-    await expect(shell.locator('#dl-indicator')).toBeVisible();
+    // 3) L'utente lo vede: il toast di conferma con le azioni "Apri file"/"Apri cartella".
     await expect(shell.locator('.shell-notif-msg')).toContainText('Scaricato', { timeout: 8000 });
     await expect((await avvisi()).locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
 
@@ -213,7 +211,8 @@ test('una pagina web esterna non può leggere né comandare gli scaricamenti', a
 
     // Comandi: tutti negati (aprire un file scaricato = eseguirlo, su Windows).
     for (const type of ['download_open_file', 'download_open_folder', 'download_remove',
-      'download_cancel', 'download_pause', 'download_resume', 'downloads_clear']) {
+      'download_cancel', 'download_pause', 'download_resume', 'downloads_clear',
+      'download_riprova', 'download_trascina', 'download_chiusura']) {
       const r = await fromWeb({ type, id });
       expect(r.error, `${type} accessibile da una pagina web`).toBe('forbidden');
     }

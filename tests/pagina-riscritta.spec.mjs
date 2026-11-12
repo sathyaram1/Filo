@@ -3,6 +3,8 @@
 // Regola: patterns/un-documento-riscritto-non-spegne-filo.md (#686.1 giro 7).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 async function percentOf(app, page) {
   const url = await page.evaluate(() => location.href);
@@ -68,7 +70,7 @@ for (const [nome, riscrivi] of Object.entries(RISCRITTURE)) {
     await expect.poll(async () => percentOf(app, page)).toBe(120);
 
     await page.locator('h1').click({ button: 'right' });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu, 'il tasto destro non apre il menu di Filo').toBeVisible();
     expect(await menu.evaluate((m) => getComputedStyle(m).position), 'il menu è senza il suo stile').toBe('fixed');
     await menu.getByText(/Dimensione reale \(ora 120%\)/).click();
@@ -76,19 +78,26 @@ for (const [nome, riscrivi] of Object.entries(RISCRITTURE)) {
   });
 }
 
-test('il pannello Aiuto aperto se ne va con la pagina riscritta, e si riapre', async ({ shell, openTab, testServer }) => {
+// Su un sito il pannello sta nello strato sopra la scheda (#1509.3): la pagina che si riscrive non lo porta via, e Aiuto
+// lo ritrova lì, aperto, invece di crederlo sparito.
+test('il pannello Aiuto resta sopra la pagina che si riscrive, e Aiuto lo ritrova', async ({ app, shell, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<!doctype html><html><body style="height:4000px"><h1>un sito</h1></body></html>');
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
 
   await page.evaluate(() => {
     document.open();
     document.write('<!doctype html><html><body style="height:4000px"><h1>riscritta</h1></body></html>');
     document.close();
   });
+  await expect(page.locator('h1')).toHaveText('riscritta');
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible();
   await expect(page.locator('.sn-sidebar')).toHaveCount(0);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar'), 'Aiuto non si riapre sulla pagina riscritta').toBeVisible({ timeout: 8000 });
+  await page.waitForTimeout(500);
+  await expect(aiuto.locator('.sn-sidebar'), 'Aiuto non ritrova il pannello sopra la pagina riscritta').toBeVisible();
+  await expect(aiuto.locator('.sn-sidebar')).toHaveCount(1);
 });

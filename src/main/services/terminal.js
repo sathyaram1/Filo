@@ -1,20 +1,11 @@
-// Esecuzione di comandi shell per Filo (#146.6).
-//
-// Il main process esegue il comando EFFETTIVO deciso dall'utente, con:
-//   • la shell scelta nelle preferenze (powershell | cmd | bash);
-//   • un timeout, oltre il quale il processo viene ucciso;
-//   • cattura di stdout/stderr, troncati se enormi (la chat non deve esplodere).
-//
-// La classificazione di sicurezza NON avviene qui: la fa il gate dei livelli
-// (src/shared/cmdClassify.js + actionLevels.js) PRIMA di chiamare runCommand.
-// Qui ci limitiamo a eseguire ciò che è già stato autorizzato.
+// Esecuzione di comandi shell (#146.6): shell dalle preferenze, timeout che uccide il
+// processo, stdout/stderr troncati se enormi perché la chat non esploda.
+// La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
-const { spawn, execFile } = require('node:child_process');
+const { spawn, execFile, execFileSync } = require('node:child_process');
 
-// Uccide l'INTERO albero del processo. Su Windows `child.kill()` non termina i
-// figli (es. una shell che ne lancia un'altra): le pipe restano aperte e la
-// `close` non scatta → il timeout non libererebbe mai. taskkill /T /F chiude
-// l'albero. Su POSIX SIGKILL sul processo basta nei casi comuni.
+// Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
+// e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
 function killTree(child) {
   if (!child || child.killed) return;
   if (process.platform === 'win32') {
@@ -25,6 +16,154 @@ function killTree(child) {
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
+
+// Le variabili segrete di Filo (chiave dei feedback, chiavi di fabbrica) non arrivano ai comandi: un `env` le
+// stamperebbe davanti al modello (#1507). Restano quelle che i comandi di sistema leggono (FILO_SIS_*) e quelle dell'utente.
+const VARIABILE_SEGRETA = /^FILO_(?!SIS_)\w*(?:KEY|SECRET|TOKEN|PASSWORD)/i;
+function ambienteComandi(base = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(base || {})) if (!VARIABILE_SEGRETA.test(k)) out[k] = v;
+  return out;
+}
+
+// cmd cerca un programma prima nella cartella di lavoro: dopo un `cd` in un archivio estratto, il `whoami` o il
+// `where git` del modello avvierebbero quelli dell'archivio (#2312). Questa variabile toglie la cartella dalla ricerca,
+// come in PowerShell: lì un programma della cartella si chiama con `.\`. Fuori da Windows la cartella non c'è già.
+const SENZA_CARTELLA_NELLA_RICERCA = 'NoDefaultCurrentDirectoryInExePath';
+function ambienteDelModello(base) {
+  const out = ambienteComandi(base || undefined);
+  if (process.platform !== 'win32') return out;
+  // Su Windows i nomi delle variabili non distinguono le maiuscole: una seconda copia potrebbe vincere su questa.
+  for (const k of Object.keys(out)) if (k.toLowerCase() === SENZA_CARTELLA_NELLA_RICERCA.toLowerCase()) delete out[k];
+  out[SENZA_CARTELLA_NELLA_RICERCA] = '1';
+  return out;
+}
+
+// Oltre questi sottomoduli la sonda non li guarda uno per uno: risponde 'ignoto', e il comando chiede.
+const GIT_SOTTOMODULI_MAX = 200;
+
+// Gli hook che git fa partire a una LETTURA, non a una scrittura: post-index-change lo lanciano git status e
+// git diff a ogni rinfresco dell'indice. Gli hook di scrittura (pre-commit, pre-push…) non partono a una lettura,
+// e sono comuni nei repository dell'utente: chiedere per loro sarebbe solo attrito (#2292).
+const HOOK_DI_LETTURA = ['post-index-change'];
+// I file che git prova per un hook: git per Windows, se manca il nome nudo, prova il nome con .exe.
+function fileDiHook(dirHooks, nome) {
+  const path = require('node:path');
+  const p = path.join(dirHooks, nome);
+  return process.platform === 'win32' ? [p, `${p}.exe`] : [p];
+}
+// 'si' se nella cartella degli hook c'è un programma d'avvio che una lettura farebbe partire. Su Windows git
+// esegue l'hook se il file c'è; su POSIX serve il bit d'esecuzione.
+function hookDiLetturaAttivo(dirHooks) {
+  const fs = require('node:fs');
+  for (const nome of HOOK_DI_LETTURA) {
+    for (const p of fileDiHook(dirHooks, nome)) {
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile() && (process.platform === 'win32' || (st.mode & 0o111))) return true;
+      } catch (_) {}
+    }
+  }
+  return false;
+}
+
+// Un esito '' resta buono finché nessuno dei file da cui dipende cambia: la sonda lancia git più volte per ogni
+// sottomodulo, a processo fermo, e rifarla a ogni comando bloccava Filo per secondi nei repository grandi.
+const GIT_RICORDATI_MAX = 500;
+const gitRicordati = new Map();
+// Di un `.git` conta solo che ci sia e quale sia: la sua data cambia a ogni lettura (il lucchetto dell'indice).
+function firmaFile(p) {
+  try {
+    const s = require('node:fs').statSync(p);
+    if (s.isDirectory() && require('node:path').basename(p) === '.git') return `d:${s.ino}`;
+    return `${s.mtimeMs}:${s.size}:${s.mode}:${s.ino}`;
+  } catch (_) { return '-'; }
+}
+function ricordoValido(dir) {
+  const r = gitRicordati.get(dir);
+  return !!r && r.firme.every(([p, f]) => firmaFile(p) === f);
+}
+
+// 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
+// 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
+function gitLanciaIn(dir, visti) {
+  if (visti) return sondaGit(dir, visti);
+  if (ricordoValido(dir)) return '';
+  const nuovi = { n: 0, file: [] };
+  const esito = sondaGit(dir, nuovi);
+  gitRicordati.delete(dir);
+  if (esito === '' && nuovi.dentro) {
+    if (gitRicordati.size >= GIT_RICORDATI_MAX) gitRicordati.delete(gitRicordati.keys().next().value);
+    gitRicordati.set(dir, { firme: nuovi.file.map((p) => [p, firmaFile(p)]) });
+  }
+  return esito;
+}
+
+function sondaGit(dir, visti) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  // Una cartella che qui non c'è vuol dire che la shell entra altrove (`cd Downloads/*/`, gli spazi di cmd): non si sa.
+  let cartella = false;
+  try { cartella = fs.statSync(dir).isDirectory(); } catch (_) {}
+  if (!cartella) return 'ignoto';
+  // Senza git nel PATH non lo trova nemmeno la shell dei comandi.
+  const programma = require('./programmaIntero').programmaIntero('git');
+  if (!programma) return '';
+  const git = (args, cwd) => execFileSync(programma, args, {
+    cwd, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  let out = '';
+  try {
+    out = git(['config', '--list', '--show-scope', '--includes', '-z'], dir);
+  } catch (e) {
+    // Senza git installato il comando git non parte nemmeno: non c'è niente da avviare.
+    return e && e.code === 'ENOENT' ? '' : 'ignoto';
+  }
+  const C = globalThis.SN_CMD_CLASSIFY;
+  if (!C || typeof C.gitConfigLancia !== 'function') return 'ignoto';
+  if (C.gitConfigLancia(out)) return 'si';
+  // git status e git diff entrano in ogni sottomodulo presente con le sue impostazioni, anche senza .gitmodules.
+  // Oltre alle impostazioni, git fa partire a una lettura anche un programma d'avvio (hook) che il repository
+  // si porta dietro: lo cerca nella cartella degli hook EFFETTIVA (--git-path la sposta con core.hooksPath).
+  let righe = [];
+  try {
+    righe = git(['rev-parse', '--show-toplevel', '--git-path', 'hooks', '--git-path', 'index', '--git-dir', '--git-common-dir'], dir)
+      .split(/\r?\n/).map((r) => r.trim());
+  } catch (e) {
+    // 128: fuori da un repository o senza cartella di lavoro, dove nessuna lettura entra in un sottomodulo.
+    return e && e.status === 128 ? '' : 'ignoto';
+  }
+  const [radice, hooksRel, indice, gitDir, comune] = righe;
+  if (!radice) return '';
+  const hooks = hooksRel ? path.resolve(dir, hooksRel) : '';
+  if (hooks && hookDiLetturaAttivo(hooks)) return 'si';
+  // Da cosa dipende l'esito: impostazioni, hook, indice, e ogni .git fra la cartella e la radice (uno nuovo la sposta).
+  visti.dentro = true;
+  for (let a = path.resolve(dir); ; a = path.dirname(a)) {
+    visti.file.push(path.join(a, '.git'));
+    if (a === path.resolve(radice) || path.dirname(a) === a) break;
+  }
+  for (const d of [gitDir, comune].filter(Boolean).map((x) => path.resolve(dir, x))) {
+    visti.file.push(path.join(d, 'config'), path.join(d, 'config.worktree'));
+  }
+  if (hooks) visti.file.push(hooks, ...HOOK_DI_LETTURA.flatMap((n) => fileDiHook(hooks, n)));
+  if (indice) visti.file.push(path.resolve(dir, indice));
+  let voci = '';
+  try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
+  for (const voce of voci.split('\u0000')) {
+    if (!voce.startsWith('160000 ')) continue;
+    const sotto = path.join(radice, voce.slice(voce.indexOf('\t') + 1));
+    // Un sottomodulo popolato dopo (senza toccare l'indice di sopra) cambia l'esito: anche la sua assenza conta.
+    visti.file.push(path.join(sotto, '.git'));
+    if (!fs.existsSync(path.join(sotto, '.git'))) continue;
+    visti.n += 1;
+    if (visti.n > GIT_SOTTOMODULI_MAX) return 'ignoto';
+    const r = gitLanciaIn(sotto, visti);
+    if (r) return r;
+  }
+  return '';
+}
 
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
@@ -38,13 +177,8 @@ function defaultShell() {
   return process.platform === 'win32' ? 'powershell' : 'sh';
 }
 
-// Risolve la shell RICHIESTA in quella EFFETTIVAMENTE disponibile sulla
-// piattaforma. Fuori da Windows, 'powershell'/'cmd' non esistono (pwsh è
-// raramente installato) → ricadiamo su /bin/sh, ESATTAMENTE come fa la shell
-// persistente della modalità terminale (src/main/services/shell.js, che fuori
-// da Windows usa sempre /bin/sh). Così i comandi dell'assistente girano davvero
-// anche su Linux/macOS invece di fallire con ENOENT, e le due shell restano
-// coerenti. 'bash' resta bash se esplicitamente preferito.
+// Fuori da Windows 'powershell'/'cmd' non esistono: si ricade su /bin/sh, o i comandi
+// dell'assistente fallirebbero con ENOENT. 'bash' resta bash se preferito apposta.
 function resolveShell(shell) {
   const s = String(shell || '').toLowerCase();
   if (process.platform === 'win32') {
@@ -91,14 +225,14 @@ function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
   return { ...shellInvocation(shell, testo), stdin: null };
 }
 
-function truncate(text) {
+function truncate(text, max = MAX_OUTPUT_CHARS) {
   const s = String(text || '');
-  if (s.length <= MAX_OUTPUT_CHARS) return { text: s, truncated: false };
+  if (s.length <= max) return { text: s, truncated: false };
   // Il taglio cade dove capita, e un'emoji occupa DUE unità di testo: tagliando
   // per numero di unità si può restare con la prima metà, che da sola non è
   // nessun carattere e si mostra come un rombo. Se in fondo resta una metà di
   // coppia, la si lascia fuori: un carattere in meno, nessun carattere rotto.
-  let n = MAX_OUTPUT_CHARS;
+  let n = max;
   const ultimo = s.charCodeAt(n - 1);
   if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
   return { text: s.slice(0, n), truncated: true };
@@ -199,9 +333,10 @@ function nuovoMarcatore() {
     + Date.now().toString(36).slice(-5);
 }
 
-// L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
-// i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
-const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+// L'esito di un comando PowerShell (#718, scelta dell'owner): un programma esterno uscito con errore in un punto
+// qualunque lo fa fallito col suo codice ($__filo_x), anche se dopo c'è un comando riuscito. Altrimenti decide il
+// $? dell'ultimo ($__filo_ok): $LASTEXITCODE lo scrivono solo i programmi, un cmdlet fallito lo lascia a 0 (#714).
+const ESITO_POWERSHELL = 'if ($__filo_x) { $__filo_x } elseif ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
   // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive. A dire come basta il $? della riga
   // che lo ha eseguito ($__filo_riga): falso dopo un errore che ferma, vero dopo un return o un break, anche se prima
   // un errore era stato zittito o gestito (in $Error ci finiscono pure quelli, quindi da lì non si può dedurre).
@@ -233,17 +368,44 @@ function testoPowerShell(testo) {
   return `(-join @(${pezzi.join(',')}))`;
 }
 
+// Dopo ogni istruzione di primo livello: il primo codice d'errore di un programma resta in $__filo_x, perché quello
+// riuscito dopo lo azzera. Poi $? torna com'era (Write-Error ignorato lo spegne senza lasciare traccia).
+const SONDA_ISTRUZIONE_POWERSHELL = '$__filo_p=$?;if($global:LASTEXITCODE -and -not $__filo_x)'
+  + '{$__filo_x=$global:LASTEXITCODE};if(-not $__filo_p){Write-Error -Message x -ErrorAction Ignore}';
+
+// Le sonde entrano nell'albero del comando, non nel testo: così un errore mostra la riga e il testo che l'utente ha
+// scritto. Il costruttore a quattro argomenti è l'unico senza ambiguità con $null, anche nella 5.1. Con param, begin,
+// process o using la sonda va in fondo al testo e basta.
+const AST_POWERSHELL = 'Management.Automation.Language';
+function bloccoConSonde(conCoda, coda) {
+  const istruzioni = (testo) => `[${AST_POWERSHELL}.Parser]::ParseInput('${testo}', [ref]$null, [ref]$null).EndBlock.Statements`;
+  const copia = (da, verso) => `foreach ($__filo_z in @(${da})) { if ($__filo_z) { ${verso}.Add($__filo_z.Copy()) } }; `;
+  return '$__filo_b=$null; if ($__filo_a -and $__filo_a.EndBlock -and -not ($__filo_a.ParamBlock -or $__filo_a.BeginBlock '
+    + '-or $__filo_a.ProcessBlock -or $__filo_a.DynamicParamBlock -or @($__filo_a.UsingStatements).Count)) { try { '
+    + `$__filo_q=@(${istruzioni(SONDA_ISTRUZIONE_POWERSHELL)}); `
+    + `$__filo_l=[Collections.Generic.List[${AST_POWERSHELL}.StatementAst]]::new(); `
+    + 'foreach ($__filo_s in $__filo_a.EndBlock.Statements) { $__filo_l.Add($__filo_s.Copy()); '
+    + 'foreach ($__filo_z in $__filo_q) { $__filo_l.Add($__filo_z.Copy()) } }; '
+    + (coda ? copia(istruzioni(coda), '$__filo_l') : '')
+    + `$__filo_r=[Collections.Generic.List[${AST_POWERSHELL}.TrapStatementAst]]::new(); `
+    + copia('$__filo_a.EndBlock.Traps', '$__filo_r')
+    + `$__filo_b=[${AST_POWERSHELL}.ScriptBlockAst]::new($__filo_a.Extent, $null, `
+    + `[${AST_POWERSHELL}.StatementBlockAst]::new($__filo_a.EndBlock.Extent, $__filo_l, $__filo_r), $false).GetScriptBlock() `
+    + '} catch { $__filo_b=$null } }; '
+    + `if (-not $__filo_b) { $__filo_b=[ScriptBlock]::Create($__filo_t + [char]10 + '${SONDA_ISTRUZIONE_POWERSHELL}'${conCoda}) }; `;
+}
+
 // Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
 // di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
 // gira dopo ma resta fuori. In modalità ristretta (PC aziendali bloccati) quei metodi sono vietati: resta
-// Invoke-Expression, l'unica strada che lì il comando lo esegue.
+// Invoke-Expression, l'unica strada che lì il comando lo esegue, senza le sonde (#718): lì decide l'ultimo comando.
 function invocaCodificato(testo, coda = '') {
   const conCoda = coda ? ` + [char]10 + '${coda}'` : '';
   return `$__filo_t=${testoPowerShell(testo)}; $__filo_pe=$null; `
     + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
-    + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
+    + 'try { $__filo_a=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch { $__filo_a=$null }; '
     + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
-    + `else { . ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
+    + `else { ${bloccoConSonde(conCoda, coda)}. $__filo_b } }`;
 }
 
 const SEGNA_ESITO = '$__filo_ok=$?';
@@ -252,7 +414,7 @@ const SEGNA_ESITO = '$__filo_ok=$?';
 // usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
 // resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
-  return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+  return `$global:LASTEXITCODE=0\n$__filo_x=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
     + `${codifica(command, SEGNA_ESITO)}\n$__filo_riga=$?\n`
     + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
 }
@@ -291,11 +453,11 @@ function extractCwdMark(rawStdout, mark) {
   };
 }
 
-// Esegue `command` e risolve con { command, stdout, stderr, code, signal,
-// truncated, timedOut, durationMs }. Non rigetta mai: gli errori di spawn
-// finiscono in stderr/code così il chiamante può sempre mostrare un esito.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
+// Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
+// esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
   const cmd = String(command || '').trim();
+  const env = ambienteDelModello(chiesto);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
@@ -338,9 +500,11 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     let timedOut = false;
     let child;
     try {
-      child = spawn(file, args, {
+      const programma = require('./programmaIntero').programmaIntero(file);
+      if (!programma) throw new Error(`${file} non è nel PATH`);
+      child = spawn(programma, args, {
         cwd: cartella,
-        env: env || process.env,
+        env,
         windowsHide: true,
         shell: false,
       });
@@ -385,7 +549,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       const s = String(chunk);
       if (which === 'out') {
         codaOut = codaOut.length + s.length > CODA_CHARS ? (codaOut + s).slice(-CODA_CHARS) : codaOut + s;
-        if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s;
+        if (stdout.length < tettoUscita * 2) stdout += s;
       } else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
     };
     if (child.stdout) child.stdout.on('data', (c) => cap(c, 'out'));
@@ -414,7 +578,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         if (letto.code !== null) realCode = letto.code;
         if (letto.cwd) resultCwd = letto.cwd;
       }
-      const out = truncate(rawOut);
+      const out = truncate(rawOut, tettoUscita);
       const err = truncate(stderr);
       resolve({
         command: cmd,
@@ -505,7 +669,8 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
 }
 
 module.exports = {
-  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
+  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi, ambienteDelModello,
+  gitLanciaIn,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
@@ -516,5 +681,5 @@ module.exports = {
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
-  CWD_MARK_PREFIX, nuovoMarcatore,
+  CWD_MARK_PREFIX, nuovoMarcatore, extractCwdMark,
 };

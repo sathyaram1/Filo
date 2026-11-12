@@ -84,8 +84,8 @@ test('profilo nuovo: una lettura parte subito con la frase della prima volta, un
   await fakeProvider(app, [
     comando('c1', 'echo spazio-libero-892', 'Misuro lo spazio libero sul disco'),
     { text: 'Hai parecchio spazio libero.' },
-    comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'),
-    { text: 'Ti chiedo conferma prima di cancellare.' },
+    // Un comando fermo sulla conferma chiude il turno (#1130): la frase va scritta insieme.
+    { ...comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'), text: 'Ti chiedo conferma prima di cancellare.' },
   ]);
 
   // Lettura: nessun popup, l'esito è già lì; la frase spiega cosa è successo e dove si spegne.

@@ -12,10 +12,10 @@
 
 const auth = require('../../auth/google-auth');
 const Gate = require('../redteamGate');
+const Verificato = require('../redteamVerificato');
 const { daFilo, soloFilo } = require('./origine');
 
-// Endpoint delle callable gen2. Region/progetto = quelli del deploy di
-// filo-security (europe-west1, filo-8b9cb). Override per i test via env.
+// Region e progetto sono quelli del deploy di filo-security; override per i test via env.
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
@@ -26,7 +26,14 @@ module.exports = function register(on, ctx) {
   // Riaperto o rimesso in pausa: le pagine di Filo aperte (la home) lo sanno subito.
   Gate.suCambio((s) => {
     try { ctx.broadcastToFiloPages({ type: MSG.REDTEAM_VISIBILITY_CHANGED, visible: s.visible }); } catch (_) {}
+    rileggiLaVoce();
   });
+
+  // La voce «Invia attacco» del tasto destro: ogni scheda, sito o riquadro incorporato, la richiede quando cambia.
+  function rileggiLaVoce() {
+    try { ctx.broadcastToTabs({ type: MSG.REDTEAM_VERIFICATO_CHANGED }); } catch (_) {}
+  }
+  Verificato.suCambio(rileggiLaVoce);
 
   async function inPausa() {
     const s = await Gate.assicura();
@@ -39,8 +46,7 @@ module.exports = function register(on, ctx) {
     return r;
   }
 
-  // Invoca una Cloud Function callable (protocollo onCall): POST {data} con
-  // Bearer ID token; risposta {result}. Lancia su errore (auth/rete/HTTP).
+  // Protocollo onCall: POST {data} con Bearer ID token, risposta {result}; lancia su errore.
   async function callable(name, data = {}) {
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('not_signed_in');
@@ -66,7 +72,8 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Invio tentativo. { attackText, description } → vedi MSG.REDTEAM_SUBMIT.
+  Verificato.leggiCon(() => callable('redteamState', {}));
+
   on(MSG.REDTEAM_SUBMIT, async (msg) => {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
@@ -81,13 +88,13 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Stato gamification dell'utente per la tab Statistiche. Include `isOwner`
-  // così la pagina può mostrare il pannello owner di generazione codici.
+  // `isOwner` serve alla pagina per mostrare il pannello owner di generazione codici.
   on(MSG.REDTEAM_STATE, async () => {
     if (await inPausa()) return { paused: true, error: PAUSA, verified: false, signedIn: auth.isSignedIn(), isOwner: false };
     if (!auth.isSignedIn()) return { verified: false, signedIn: false, isOwner: false };
     try {
       const r = pausaDalServer(await callable('redteamState', {}));
+      Verificato.ricorda(r);
       return Object.assign({ signedIn: true, isOwner: auth.isAdmin() }, r);
     } catch (e) {
       if (e && e.paused) return { paused: true, error: e.message, verified: false, signedIn: true, isOwner: false };
@@ -95,7 +102,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Un tentativo (polling della rivelazione live). { attemptId }.
   on(MSG.REDTEAM_ATTEMPT, async (msg) => {
     if (await inPausa()) return { paused: true, error: PAUSA, hidden: true };
     if (!auth.isSignedIn()) return { notFound: true };
@@ -107,7 +113,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Leaderboard (tutti i loggati).
   on(MSG.REDTEAM_LEADERBOARD, async () => {
     if (await inPausa()) return { paused: true, error: PAUSA, entries: [] };
     if (!auth.isSignedIn()) return { entries: [], signedIn: false };
@@ -120,15 +125,16 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Riscatto codice monouso → verifica + handle. { code, handle }.
   on(MSG.REDTEAM_REDEEM, async (msg) => {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
     try {
-      return await callable('redteamRedeem', {
+      const r = await callable('redteamRedeem', {
         code: String(msg?.code || ''),
         handle: String(msg?.handle || ''),
       });
+      if (r && (r.status === 'ok' || r.status === 'already_verified')) Verificato.ricorda({ verified: true });
+      return r;
     } catch (e) {
       if (e && e.paused) return { status: 'paused', paused: true, error: e.message };
       return { status: 'error', error: e?.message || String(e) };
@@ -169,12 +175,14 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // Il Red Team si mostra? A un sito visitato solo il sì/no: chi è owner lo chiede una superficie di Filo.
-  // Una copia scaduta si rilegge in sottofondo; `attendi` aspetta la prima lettura.
+  // Il Red Team si mostra? A un sito visitato solo il sì/no e se chi lo usa ha un codice (la voce del tasto destro,
+  // #991): chi è owner lo chiede una superficie di Filo. Una copia scaduta si rilegge in sottofondo; `attendi` aspetta.
   on(MSG.REDTEAM_VISIBILITY, async (msg, sender, origin) => {
-    const s = msg && msg.attendi ? await Gate.assicura() : Gate.aggiorna();
-    if (!daFilo(origin, sender)) return { ok: true, visible: s.visible };
-    return { ok: true, visible: s.visible, owner: s.owner, openToAll: s.openToAll, letto: s.letto };
+    const attendi = !!(msg && msg.attendi);
+    const s = attendi ? await Gate.assicura() : Gate.aggiorna();
+    const verificato = s.visible ? (attendi ? await Verificato.assicura() : Verificato.noto()) : false;
+    if (!daFilo(origin, sender)) return { ok: true, visible: s.visible, verificato };
+    return { ok: true, visible: s.visible, verificato, owner: s.owner, openToAll: s.openToAll, letto: s.letto };
   });
 
   // L'interruttore di Gestione: lettura fresca e scrittura, solo all'owner e solo da Filo.
@@ -188,6 +196,17 @@ module.exports = function register(on, ctx) {
     try {
       const s = await Gate.impostaApertoATutti(msg.openToAll);
       return { ok: true, openToAll: s.openToAll };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  }));
+
+  // I tetti dell'invio (#2296): il server li valida e li applica, qui solo il trasporto.
+  on(MSG.REDTEAM_LIMITI, soloOwner(async (msg) => {
+    const imposta = !!msg && (msg.perUserDay !== undefined || msg.globalDay !== undefined);
+    try {
+      const r = await callable('redteamLimiti', imposta
+        ? { op: 'imposta', perUserDay: msg.perUserDay, globalDay: msg.globalDay }
+        : { op: 'leggi' });
+      return Object.assign({ ok: true }, r);
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 };

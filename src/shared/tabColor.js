@@ -1,25 +1,15 @@
-// Logica pura del colore delle tab.
-//
-// Decide se un colore "ha identità" (croma sufficiente per rappresentare il
-// brand del sito) oppure è solo chrome neutra — bianco/nero/grigio — che NON
-// va usata come tinta della tab. È la stessa regola che il campionatore del
-// favicon (src/content/content.js) applica già ai pixel: la centralizziamo qui
-// così la usano in modo coerente il path theme-color, il path manifest e la
-// shell, ed è unit-testabile senza Electron.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Logica pura del colore delle tab: decide se un colore «ha identità» (croma sufficiente
+// per rappresentare il brand) o è chrome neutra da non usare come tinta. È la stessa regola
+// del campionatore favicon, qui perché theme-color, manifest e shell la applichino uguale.
 
 (function (global) {
   'use strict';
 
-  // Soglia di croma (max-min sui canali RGB, scala 0..255). Sotto questa soglia
-  // un colore è considerato grigio/bianco/nero → nessuna identità. Stesso valore
-  // usato dal campionatore favicon, così i tre percorsi (theme-color, manifest,
-  // favicon) concordano su cosa "conta" come colore identità.
+  // Soglia di croma (max-min sui canali RGB): sotto, il colore è grigio/bianco/nero e
+  // non ha identità.
   const IDENTITY_CHROMA_MIN = 24;
 
-  // "rgb(r,g,b)" / "rgba(r,g,b,a)" → [r,g,b] | null. NON risolve named/hex:
-  // i chiamanti passano già stringhe rgb() (risolte via getComputedStyle).
+  // NON risolve named/hex: i chiamanti passano rgb() già risolto da getComputedStyle.
   function parseRgb(str) {
     const m = /rgba?\(([^)]+)\)/.exec(str || '');
     if (!m) return null;
@@ -28,29 +18,20 @@
     return [p[0], p[1], p[2]];
   }
 
-  // Croma = differenza tra canale massimo e minimo. 0 = grigio puro.
+  // Croma = differenza fra canale massimo e minimo. 0 = grigio puro.
   function chroma(str) {
     const p = parseRgb(str);
     if (!p) return 0;
     return Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]);
   }
 
-  // true se il colore ha abbastanza croma da rappresentare l'identità del sito.
   // Esempi: bianco/nero/grigio → false; rosso YouTube → true.
   function hasIdentity(str) {
     return chroma(str) >= IDENTITY_CHROMA_MIN;
   }
 
-  // ------------------------------------------------------------
-  // Estrazione colore identità dal favicon (spec "Colore identità delle tab")
-  // ------------------------------------------------------------
-  // Pipeline a due path sui pixel del favicon (scalato es. 64×64):
-  //  - cromatico: clustering per tinta + punteggio saturazione×centralità, il
-  //    bucket vincente dà il colore (così giallo+blu di Poste non si annullano);
-  //  - acromatico (nessun pixel saturo): grigio della luminosità media (X,
-  //    Wikipedia, GitHub restano bianchi/neri invece di sparire).
-  // È logica pura: i chiamanti (pageColor.js) le passano gli RGBA del canvas,
-  // così è unit-testabile senza Electron.
+  // Estrazione del colore identità dai pixel del favicon. Due strade: cromatica (cluster per
+  // tinta, così giallo e blu non si annullano) e acromatica, così Wikipedia resta bianca.
 
   // I tre parametri dell'ESTRAZIONE dal favicon. Saturazione e luminosità si
   // applicano solo a schermo (adaptIdentity): il colore salvato del sito tiene la
@@ -87,15 +68,13 @@
       comment: 'Quanto il colore copre lo sfondo della barra delle schede. 0 = nessun colore, 1 = tinta piena.' },
   ];
 
-  // Oggetto coi sei valori predefiniti.
   function defaultParams() {
     const o = {};
     for (const m of IDENTITY_PARAM_META) o[m.key] = m.def;
     return o;
   }
 
-  // Normalizza un set di parametri (parziale o completo) ai sei validi, dentro i
-  // range, riempiendo i mancanti coi default. `bucket_tinta` viene arrotondato.
+  // Riempie i mancanti coi default e riporta dentro i range; `bucket_tinta` arrotondato.
   function clampParams(params) {
     const out = {};
     for (const m of IDENTITY_PARAM_META) {
@@ -146,9 +125,7 @@
     ];
   }
 
-  // pixels: RGBA (Uint8ClampedArray o Array) di un'immagine width×height.
-  // Ritorna "rgb(r,g,b)" del colore identità, oppure null se il favicon è
-  // vuoto/interamente trasparente.
+  // pixels: RGBA di un'immagine width×height. null se il favicon è vuoto o tutto trasparente.
   function extractIdentityFromPixels(pixels, width, height, opts) {
     if (!pixels || !width || !height) return null;
     const p = Object.assign({}, IDENTITY_PARAMS, opts || {});
@@ -162,7 +139,7 @@
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
-        if (pixels[idx + 3] < 128) continue; // trasparente → ignora
+        if (pixels[idx + 3] < 128) continue;
         const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
         const [h, s, l] = rgbToHsl(r, g, b);
         lumSum += l; lumCount++;
@@ -194,8 +171,8 @@
       }
     }
 
-    // Fallback acromatico: grigio della luminosità media (nessuna centralità —
-    // per un sito acromatico conta l'impressione d'area, non il logo centrale).
+    // Fallback acromatico: nessuna centralità — per un sito acromatico conta l'impressione
+    // d'area, non il logo centrale.
     const v = Math.round((lumSum / lumCount) * 255);
     return `rgb(${v}, ${v}, ${v})`;
   }
@@ -288,6 +265,32 @@
     return { ink, hover: blendRgb(bg, far, 0.85) };
   }
 
+  // ------------------------------------------------------------
+  // Ordine arcobaleno della barra: /riordina e la riapertura (§1.3)
+  // ------------------------------------------------------------
+  // La chiave è il colore salvato, cioè quello estratto: l'adattamento a schermo non sposta nessuno.
+  // Grigi chiari in testa e scuri in coda, dal più chiaro al più scuro; i senza colore dopo, com'erano.
+  // Il cerchio si taglia a metà fra magenta e rosso (330°): un rosso che tende al magenta (Netflix, Pinterest)
+  // apre l'arcobaleno accanto al rosso pieno, invece di chiuderlo dopo il viola (#822.1).
+  const TAGLIO_ARCOBALENO = 330 / 360;
+  function rainbowKey(color) {
+    const c = toRgb(color);
+    if (!c || !c.every(Number.isFinite)) return [3, 0];
+    const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+    if (mx - mn >= IDENTITY_CHROMA_MIN) {
+      const h = rgbToHsl(c[0], c[1], c[2])[0];
+      return [1, h >= TAGLIO_ARCOBALENO ? h - 1 : h];
+    }
+    const l = (mx + mn) / 510;
+    return [l >= 0.5 ? 0 : 2, -l];
+  }
+
+  // 0 a parità: l'ordine di prima lo tiene il sort, che è stabile.
+  function compareRainbow(a, b) {
+    const ka = rainbowKey(a), kb = rainbowKey(b);
+    return (ka[0] - kb[0]) || (ka[1] - kb[1]);
+  }
+
   function rgbCss(c) {
     return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
   }
@@ -322,6 +325,7 @@
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
     adaptIdentity, blendRgb, inactiveTabBackground,
-    relativeLuminance, contrastRatio, readableInk, inkAndHover, rgbCss, resolveCssColor,
+    relativeLuminance, contrastRatio, readableInk, inkAndHover, rainbowKey, compareRainbow,
+    rgbCss, resolveCssColor,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -34,7 +34,7 @@ test('sentinella: ogni azione del registro dei livelli è uno strumento, e vicev
 });
 
 test('le definizioni hanno la forma che il fornitore capisce', () => {
-  const defs = Tools.definitions({ sistema: 'win32' });
+  const defs = Tools.definitions();
   assert.ok(defs.length > 20);
   for (const d of defs) {
     assert.equal(d.type, 'function');
@@ -46,29 +46,27 @@ test('le definizioni hanno la forma che il fornitore capisce', () => {
       assert.ok(r in d.function.parameters.properties, `${d.function.name}: obbligatorio "${r}" senza schema`);
     }
   }
-  // ONBOARDING solo durante l'intervista di benvenuto.
-  assert.ok(!defs.some((d) => d.function.name === 'ONBOARDING'));
-  const onb = Tools.definitions({ sistema: 'win32', onboarding: true });
-  assert.ok(onb.some((d) => d.function.name === 'ONBOARDING'));
-  assert.equal(onb.length, defs.length + 1);
+  // ONBOARDING c'è sempre: gli strumenti sono uguali per ogni ruolo, e fuori dall'intervista lo ferma il main.
+  assert.ok(defs.some((d) => d.function.name === 'ONBOARDING'));
 });
 
 test('ONBOARDING: le voci da spuntare sono quelle dell’intervista, e c’è la scelta dell’autonomia (#1188)', () => {
-  const onb = Tools.definitions({ sistema: 'win32', onboarding: true }).find((d) => d.function.name === 'ONBOARDING');
+  const onb = Tools.definitions().find((d) => d.function.name === 'ONBOARDING');
   const props = onb.function.parameters.properties;
   assert.deepEqual(props.spunta.items.enum, globalThis.SN_ONBOARDING.ITEM_IDS, 'una voce nuova dell’intervista arriva da sola allo strumento');
   assert.ok(props.spunta.items.enum.includes('autonomia'));
   assert.equal(props.autonomia.type, 'boolean');
 });
 
-test('le descrizioni che dipendono dal sistema lo dicono per quel sistema', () => {
-  const win = Tools.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  const mac = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  assert.ok(win.includes(C.descriviSistema('win32').shellPref));
-  assert.ok(mac.includes(C.descriviSistema('darwin').shellPref));
-  assert.notEqual(win, mac);
-  const doc = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'LEGGI_DOCUMENTO').function.description;
-  assert.ok(!/C:\\/.test(doc), 'un esempio di percorso Windows finirebbe davanti a chi sta su un Mac');
+test('gli strumenti sono gli stessi su ogni sistema: shell e percorsi di questo computer li dice la parte dell\'utente', () => {
+  const pref = Tools.definitions().find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  for (const sh of ['powershell', 'cmd', 'bash', 'sh']) assert.ok(pref.includes(`"${sh}"`), `manca la shell ${sh}`);
+  assert.ok(pref.includes("IL COMPUTER DELL'UTENTE"));
+  for (const nome of ['LEGGI_DOCUMENTO', 'RINOMINA_FILE']) {
+    const d = Tools.definitions().find((x) => x.function.name === nome).function.description;
+    assert.ok(!/C:\\|\/Users\/|\/home\//.test(d), `${nome}: un esempio di percorso di un sistema solo`);
+    assert.ok(d.includes("IL COMPUTER DELL'UTENTE"), `${nome}: manca il rimando al computer dell'utente`);
+  }
 });
 
 test('il prompt della chat non descrive più il formato JSON, ma spiega gli strumenti', () => {

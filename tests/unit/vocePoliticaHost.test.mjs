@@ -41,12 +41,28 @@ function audioRes() {
 
 const endpoints = (...hosts) => jsonRes({ data: { endpoints: hosts.map(([provider_name, tag]) => ({ provider_name, tag })) } });
 
-// `hosts`: modello → risposta dell'elenco host (o funzione che la costruisce).
-async function withRouter(hosts, run) {
+// `hosts`: modello → risposta dell'elenco host (o funzione che la costruisce). `zdr`: il catalogo a ritenzione zero
+// (#831), che conta perché qui paga Filo; 'tutti' (di serie) dichiara ogni host elencato, null non risponde.
+async function zdrDiTutti(hosts) {
+  const data = [];
+  for (const [model, h] of Object.entries(hosts)) {
+    if (!h || typeof h === 'function') continue;
+    const body = await h.json();
+    for (const e of (body && body.data && body.data.endpoints) || []) data.push({ model_id: model, provider_name: e.provider_name, tag: e.tag });
+  }
+  return { data };
+}
+
+async function withRouter(hosts, run, { zdr = 'tutti' } = {}) {
   const real = global.fetch;
-  const calls = { endpoints: [], audio: [] };
+  const calls = { endpoints: [], audio: [], zdr: 0 };
   global.fetch = async (url) => {
     const u = String(url);
+    if (u === OR.ZDR_ENDPOINT) {
+      calls.zdr++;
+      if (zdr === 'tutti') return jsonRes(await zdrDiTutti(hosts));
+      return zdr ? jsonRes(zdr) : jsonRes({ error: 'not found' }, 404);
+    }
     if (u.endsWith('/endpoints')) {
       calls.endpoints.push(u);
       const model = decodeURIComponent(u.slice(`${OR.MODELS_ENDPOINT}/`.length, -'/endpoints'.length));
@@ -197,7 +213,7 @@ test('una lettura fallita non si ripete a ogni frase, ma si ritenta presto: torn
       await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'z', providerRouting: ROUTING });
       assert.equal(n, 2);
       assert.equal(calls.audio.length, 1);
-    });
+    }, { zdr: { data: [{ model_id: model, provider_name: 'DeepInfra', tag: 'deepinfra' }] } });
   } finally {
     Date.now = realNow;
   }
@@ -220,12 +236,24 @@ test('un id che uscirebbe dal percorso non diventa una richiesta a un altro endp
   );
 });
 
-test('senza lista di esclusione né vincolo di produttore non si chiede niente in più', async () => {
-  await withRouter({}, async (calls) => {
-    await OR.synthesizeSpeech({ apiKey: 'k', model: 'hexgrad/kokoro-82m', text: 'x', providerRouting: null });
-    assert.deepEqual(calls.endpoints, []);
-    assert.equal(calls.audio.length, 1);
-  });
+test('senza lista di esclusione né vincolo di produttore, con la chiave propria non si chiede niente in più', async () => {
+  globalThis.SN_WALLET_MAIN = { keySourceOf: async (k) => (k === 'mia' ? 'own' : 'personal') };
+  try {
+    const model = 'hexgrad/kokoro-82m';
+    await withRouter({ [model]: endpoints(['DeepInfra', 'deepinfra']) }, async (calls) => {
+      await OR.synthesizeSpeech({ apiKey: 'mia', model, text: 'x', providerRouting: null });
+      assert.deepEqual(calls.endpoints, []);
+      assert.equal(calls.zdr, 0);
+      assert.equal(calls.audio.length, 1);
+      // Coi crediti di Filo resta la ritenzione zero (#831): si leggono host e catalogo.
+      await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: null });
+      assert.equal(calls.endpoints.length, 1);
+      assert.equal(calls.zdr, 1);
+      assert.equal(calls.audio.length, 2);
+    });
+  } finally {
+    delete globalThis.SN_WALLET_MAIN;
+  }
 });
 
 test('un elenco scaduto si usa mentre si rilegge: niente attesa sulla lettura', async () => {
@@ -254,7 +282,7 @@ test('un elenco scaduto si usa mentre si rilegge: niente attesa sulla lettura', 
         OR.synthesizeSpeech({ apiKey: 'k', model, text: 'z', providerRouting: ROUTING }),
         (e) => e.code === 'NO_ALLOWED_HOST',
       );
-    });
+    }, { zdr: { data: [{ model_id: model, provider_name: 'DeepInfra', tag: 'deepinfra' }] } });
   } finally {
     Date.now = realNow;
   }

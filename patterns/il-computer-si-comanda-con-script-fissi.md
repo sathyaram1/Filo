@@ -78,10 +78,60 @@ mai chi chiede. I casi noti:
 - **Linux**: `wpctl`, poi `pactl`, poi `amixer`; `bluetoothctl` (più `rfkill`
   per sbloccare); `nmcli`, che può essere negato da polkit.
 
+## Le icone del desktop (#1621)
+
+«Mettile in ordine alfabetico, da sinistra a destra»: Windows sa ordinarle solo a
+colonne, con «Disponi automaticamente». Filo le sposta una per una con la stessa
+regola degli altri comandi, con qualche punto in più:
+
+- **Lo script legge e sposta, JavaScript decide.** La Shell (l'`IFolderView2` della
+  finestra del desktop) dà nomi, posizioni, passo della griglia e l'area dello
+  schermo principale nelle stesse coordinate; ordine e griglia sono logica pura,
+  provata su Linux. Le posizioni tornano allo script nell'ambiente, a pezzi sotto
+  il tetto di una variabile di Windows (`FILO_SIS_POS_0`, `_1`…), e l'uscita si
+  legge col suo tetto (`tettoUscita` di `runCommand`), non con quello del modello.
+- **Pixel veri.** Lo script chiede a Windows le coordinate senza scala: a 125%
+  l'area dello schermo uscirebbe più piccola delle posizioni delle icone.
+- **La griglia è quella di Windows.** Con «Allinea alla griglia» le icone stanno
+  già su una griglia; le nuove posizioni ne prendono l'allineamento, così
+  riaccendendola nessuna salta di casella. Durante lo spostamento «Disponi
+  automaticamente» e «Allinea alla griglia» si spengono (la prima rimette tutto in
+  colonna, la seconda sposta chi trova la casella ancora occupata); la griglia
+  torna com'era, la disposizione automatica resta spenta e l'esito lo dice.
+- **«Fatto» lo dice l'ordine riletto (#1617).** Dopo lo spostamento si rilegge il
+  desktop e si guarda l'ordine in cui l'occhio legge le icone, casella per casella:
+  se non è quello chiesto (un programma come Fences, le pile del Mac, due icone
+  nella stessa casella) l'esito è un fallimento detto. Il desktop però è cambiato:
+  quel cambio si registra comunque e l'esito dà l'annullo. Fermo del tutto è
+  «non spostate»; uno script che si rompe a metà rilegge e registra allo stesso modo.
+  La rilettura conferma il piano, non il criterio: un dato che manca diventa in
+  silenzio l'ordine per nome. Per questo il Finder, se rifiuta un dato in blocco,
+  si interroga voce per voce, e per data o dimensione senza il dato per nessuna
+  icona l'esito è «senza-dati», non «fatto».
+- **Troppe per lo schermo: niente.** Fuori dallo schermo un'icona non si raggiunge
+  più; si rifiuta coi due numeri e la strada (icone piccole).
+- **Ogni disposizione è un cambio del filo** (`tipo: 'desktop'`, prima e dopo con
+  tutte le posizioni e «Disponi automaticamente»): l'annullo di ANNULLA_CAMBIO e
+  del segno sulla bolla rimette ogni icona ancora presente, e rifarlo rimette
+  l'ordine. Al modello vanno numeri e frasi di Filo, mai i nomi dei file.
+- **Mac (#1617)**: JavaScript for Automation sul Finder, mandato a `osascript` da un
+  heredoc fra apici; stesse righe e stessa codifica `\uXXXX` di Windows, l'id è
+  l'indirizzo `file://` dell'elemento. La posizione è il centro dell'icona (la
+  prima casella comincia mezzo passo dentro l'area) e il Finder non dice il passo:
+  si ricava dalle icone, o dalla loro dimensione. «Ordina per» (`arranged by …`) si
+  toglie prima di spostare e l'annullo lo rimette col suo valore (`finder` nel
+  cambio). Il permesso è quello di Automazione: senza, errore -1743, la frase e il
+  tasto che apre le impostazioni; la frase per macOS sta in
+  `NSAppleEventsUsageDescription`.
+- **Linux** lo dice, con la strada del sistema: ogni ambiente grafico tiene le
+  posizioni a modo suo.
+
 ## Dove vive
 
 - `src/main/services/comandiSistema.js`: script, costruttori, letture delle uscite,
   frasi, la coda.
+- `src/main/services/iconeDesktop.js`: le icone del desktop (prove in
+  `tests/unit/iconeDesktop.test.mjs` e `tests/icone-desktop.spec.mjs`).
 - `src/main/services/statoSistema.js`: legge anche volume e radio del Wi-Fi.
 - `src/pages/dashboard/dashboard-sistema.js`: i comandi nel riquadro delle voci.
 - Prove: `tests/unit/comandiSistema.test.mjs` (gli script di Linux e Mac girano

@@ -118,6 +118,7 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       '--record-fixed', 'fid-900',
       'Report per l’owner: la causa era altrove, il pulsante non veniva mai agganciato.',
       '--frase', 'Il pulsante per rimuovere un modello ora funziona.',
+      '--motivo', 'ripresa',
     ], {
       FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
       FILO_REPO_ROOT: casa,
@@ -151,7 +152,7 @@ test('un report a elenco puntato arriva intero anche dalla correzione, come dal 
     writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
       id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
     }), 'utf8');
-    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', PUNTI, '--frase', 'Ora il pulsante salva.'], {
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', PUNTI, '--frase', 'Ora il pulsante salva.', '--motivo', 'ripresa'], {
       FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
       FILO_REPO_ROOT: casa,
       FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),

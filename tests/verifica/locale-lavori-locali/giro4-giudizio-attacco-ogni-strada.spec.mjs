@@ -1,5 +1,5 @@
 // Verifica locale «lavori locali», giro 4: la porta del giro 3 riprovata. Il giudizio d'attacco che ferma il lettore
-// ferma anche chi dà fiducia: segno locale (strumento e Gestione), prova del mittente («È mio» e --riconosci), ripasso.
+// ferma anche chi dà fiducia: segno locale (strumento e Gestione), prova del mittente («È mio» e --riconosci).
 // Rete finta: nessuna lettura né scrittura su Firestore vero.
 import { test, expect } from './../../fixtures/electron.mjs';
 import { pathToFileURL } from 'node:url';
@@ -68,16 +68,6 @@ test('la prova del mittente su parola dell’owner (--riconosci) si rifiuta sui 
     expect(ok.ok, ok.motivo).toBe(true);
     expect(scritture).toEqual([]);
   });
-});
-
-test('il ripasso non dà la prova a un feedback dell’owner o di una sessione fermo nei Ricevuti col giudizio d’attacco', async () => {
-  const R = await imp('scripts/ripasso-mittenti.mjs');
-  const prima = '2026-09-20T10:00:00Z';
-  const docs = Object.entries(GIUDIZI).map(([k, g], i) => ({ id: k, clientId: i % 2 ? 'owner:me' : 'local:claude', createTime: prima, seq: 9100 + i, ...g }));
-  docs.push({ id: 'pulito', clientId: 'local:claude', createTime: prima, seq: 9199, status: 'aligned', pipeline: { verdicts: [{ class: 'aligned' }] } });
-  const soglia = Date.parse('2026-10-01T11:16:16Z');
-  const esito = R.candidatiAlRipasso(docs, { local: soglia, owner: soglia });
-  expect(esito.promossi.map((d) => d.id), R.resoconto(esito).join(' | ')).toEqual(['pulito']);
 });
 
 test('in Gestione: su un tuo feedback segnalato il tasto «Locale» non mette il segno e il tasto destro non lo offre; «È mio» avverte da tutte e due le strade', async ({ openTab }) => {

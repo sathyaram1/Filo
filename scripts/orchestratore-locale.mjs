@@ -14,9 +14,10 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, attesePc, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
+import { ensureCommentChar } from './lib/carattere-commento.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
@@ -222,7 +223,7 @@ export function trovaClaude(env = process.env, piattaforma = process.platform) {
 /** Gli argomenti di `claude -p` per un ruolo. PURA. */
 export function argomentiClaude({ model, effort, nome, addDirs = [], permessi = 'auto', budget = '' }) {
   return [
-    '-p', '--output-format', 'json', '--model', model, '--effort', effort,
+    '-p', '--output-format', 'json', '--model', model, ...(effort ? ['--effort', effort] : []),
     '--permission-mode', permessi, '-n', nome,
     ...addDirs.flatMap((d) => ['--add-dir', d]),
     ...(budget ? ['--max-budget-usd', String(budget)] : []),
@@ -273,7 +274,53 @@ export function richiestaDaLettura(testo) {
   return [pezzo('Titolo'), pezzo('Testo')].filter(Boolean).join('\n\n');
 }
 
-function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
+/**
+ * La regola di verify-local start --feedback per il lavoro `num`, col rifiuto già scritto (#1514). Senza credenziali è un
+ * no detto, non un'uscita del processo: l'orchestratore ferma la pratica e prosegue. `auth`: le prove ci mettono le credenziali finte.
+ */
+export async function praticaVera(num, { auth: authFinto } = {}) {
+  const auth = authFinto || await import('./lib/firestore-auth.mjs');
+  if (!auth.loadServiceAccount() && !auth.findAdminRefreshToken()) {
+    return { ok: false, motivo: 'nessuna credenziale per leggere la pratica (FILO_ADMIN_REFRESH_TOKEN o service account): non so di chi è' };
+  }
+  const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
+  const { praticaPerLaSessione, rifiutoPratica } = await import('./owner-feedback.mjs');
+  const bearer = await auth.acquireBearer();
+  const r = await risolviFeedback(String(num), { bearer, base: auth.FIRESTORE_BASE });
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  const l = await praticaPerLaSessione(r.id, { bearer });
+  return l.ok ? { ok: true, fiducia: l.fiducia, id: r.id } : { ...l, motivo: rifiutoPratica(r.id, l) };
+}
+
+/**
+ * Mette in coda i lavori `nums` nello stato `s`, che modifica: prima di tutto di chi è la pratica (#1514), e un rifiuto
+ * la lascia fuori. Un ramo già di un altro lavoro scelto con --slug è un errore. → { righe, rifiutate }.
+ */
+export async function aggiungiInCoda(s, nums, opz, { praticaDi, ora = '' }) {
+  const righe = [];
+  const rifiutate = [];
+  for (const n of nums) {
+    if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { righe.push(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
+    // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
+    const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
+    let slug = opz.slug || '';
+    if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
+    let r;
+    try { r = await praticaDi(n); } catch (e) { r = { ok: false, motivo: String((e && e.message) || e) }; }
+    if (!r || !r.ok) {
+      rifiutate.push(n);
+      righe.push(`#${n} non messo in coda:\n${(r && r.motivo) || 'pratica non controllata'}`);
+      continue;
+    }
+    if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
+    s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: opz.richiesta, file: opz.file, ora });
+    s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
+    righe.push(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
+  }
+  return { righe, rifiutate };
+}
+
+export function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
   return new Promise((ok) => {
     const bin = cmd === 'node' ? process.execPath : cmd;
     let stdout = '';
@@ -347,6 +394,28 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+/** L'automazione `file` è su main di filo-security: deploy.yml pubblica ogni spinta, regole.yml le regole ogni ora (#1159 fase 2). In dubbio no. */
+async function automazioneSuMain(P, file) {
+  if (!P.serverRadice) return false;
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
+  if (f.code !== 0) return false;
+  return (await esegui('git', ['cat-file', '-e', `refs/remotes/origin/main:.github/workflows/${file}`], { cwd: P.serverRadice })).code === 0;
+}
+
+/**
+ * main di Filo appena letto da origin, in una cartella sua fuori dal repo (un worktree staccato): le prove di server:fondi
+ * lo leggono con le parti dell'app appena fuse (#1222). → { dir, togli() } | null.
+ */
+async function filoDiMain(P) {
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.radice });
+  if (f.code !== 0) return null;
+  const dir = join(P.note, `filo-main-${Date.now()}`);
+  mkdirSync(P.note, { recursive: true });
+  const w = await esegui('git', ['worktree', 'add', '--detach', '--quiet', dir, 'refs/remotes/origin/main'], { cwd: P.radice });
+  if (w.code !== 0) return null;
+  return { dir, togli: () => esegui('git', ['worktree', 'remove', '--force', dir], { cwd: P.radice }) };
+}
+
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
@@ -376,6 +445,8 @@ function depVere(P, opz, log) {
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
     },
     pubblica: () => pubblicaDavvero(P),
+    pubblicaGitHub: () => automazioneSuMain(P, 'deploy.yml'),
+    regoleGitHub: () => automazioneSuMain(P, 'regole.yml'),
     carico,
     dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
     log,
@@ -387,6 +458,7 @@ function depVere(P, opz, log) {
       return annotaPratica(id, testo);
     },
     richiestaDi: async (num) => richiestaDaLettura((await esegui('node', ['scripts/leggi-feedback.mjs', String(num)], { cwd: ROOT })).stdout),
+    praticaDi: praticaVera,
   };
 }
 
@@ -421,6 +493,8 @@ function depAVuoto(P, stato, log) {
       return {};
     },
     pubblica: async () => { log(`[a vuoto] (${join(P.serverRadice, 'functions')}) npm run server:pubblica`); return { code: 0, out: '' }; },
+    pubblicaGitHub: async () => false,
+    regoleGitHub: async () => false,
     carico: async () => ({ cpu: 0, liberaGB: 99 }),
     dormi: () => new Promise((ok) => setImmediate(ok)),
     log,
@@ -433,6 +507,7 @@ function depAVuoto(P, stato, log) {
     },
     annota: async () => {},
     richiestaDi: async (num) => `(la richiesta del feedback #${num})`,
+    praticaDi: async (num) => { log(`[a vuoto] controllo di chi è la pratica #${num}: la prova la dà per lavorabile`); return { ok: true, fiducia: 'fidato' }; },
   };
 }
 
@@ -463,19 +538,10 @@ async function main(argv) {
     if (!nums.length) throw erroreDiUso('aggiungi vuole almeno un numero di feedback');
     if (nums.length > 1 && (opz.slug || opz.richiesta)) throw erroreDiUso('aggiungi: --slug e --richiesta valgono per un lavoro solo');
     const s = store.leggi();
-    for (const n of nums) {
-      if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { console.log(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
-      // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
-      const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
-      let slug = opz.slug || '';
-      if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
-      if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
-      s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: opz.richiesta, file: opz.file, ora: ora() });
-      s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
-      console.log(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
-    }
+    const { righe, rifiutate } = await aggiungiInCoda(s, nums, opz, { praticaDi: praticaVera, ora: ora() });
     store.scrivi(s);
-    return 0;
+    for (const r of righe) (/ non messo in coda:/.test(r) ? console.error : console.log)(r);
+    return rifiutate.length ? 1 : 0;
   }
 
   // Il pid dell'orchestratore vivo, 0 se nessuno: un lavoro rimasto a metà da uno chiuso non lo guida più nessuno.
@@ -551,9 +617,10 @@ async function main(argv) {
     return 0;
   }
 
-  // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
+  // I lavori server passati in cloud aspettano il PC (#1159): prima la parte dell'app, poi il server, poi il deploy.
   const depFusioni = (log) => ({
-    attese: () => attesePc(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+    attese: () => attesePcConStato(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P),
+    fondiApp: (id) => fondiApp(id), filoDiMain: () => filoDiMain(P), log, radice: P.radice,
   });
   const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
 
@@ -598,6 +665,8 @@ async function main(argv) {
       } catch (e) {
         log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
       }
+      // Le worktree dei lavori nascono qui sotto e leggono la config del principale.
+      for (const radice of [P.radice, P.serverRadice].filter(Boolean)) ensureCommentChar(radice);
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.

@@ -25,7 +25,12 @@ const ESTERNO = Object.freeze({
 function pulisci(messaggi) {
   return (Array.isArray(messaggi) ? messaggi : [messaggi])
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'filo', text: m.text }));
+    .map((m) => {
+      // Le schede lasciate nel messaggio (#2085): la riga ripiegata ridisegna i gettoni come il filo della home.
+      const G = globalThis.SN_SCHEDE_IN_CHAT;
+      const schede = m.role === 'user' && G ? G.perIlDisco(m.schede) : [];
+      return { role: m.role === 'user' ? 'user' : 'filo', text: m.text, ...(schede.length ? { schede } : {}) };
+    });
 }
 
 // «Riprova» rimanda la stessa domanda subito dopo sé stessa: è lo stesso turno, non si scrive due volte.
@@ -39,7 +44,8 @@ function senzaRiprova(prima, nuovi) {
 }
 
 // `rif` dice quale conversazione dell'app (documento e modulo, mazzo, apertura dell'Aiuto); `dove` riapre l'app lì.
-function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
+// `daPagina`: l'Aiuto parla da sopra un sito, che vede le parole dell'utente (#1508, src/shared/filoApp.js → conProvenienza).
+function annota({ app: nome, rif, soggetto, dove, messaggi, daPagina = false } = {}, opts) {
   const R = A();
   if (!R.eApp(nome)) return Promise.resolve(null);
   const chiave = String(rif == null ? '' : rif).slice(0, 400);
@@ -47,7 +53,8 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
   if (!chiave || !nuovi.length) return Promise.resolve(null);
   const sogg = R.soggetto(soggetto);
   return F().transazione(async (t) => {
-    const c = R.daContinuare(t.tutte(), { app: nome, rif: chiave, ora: Date.now() });
+    // Una conversazione nascosta (#1295) non si continua: quello che l'app scrive dopo è una riga nuova, in vista.
+    const c = R.daContinuare(t.tutte().filter((x) => !x.nascosta), { app: nome, rif: chiave, ora: Date.now() });
     const id = c ? c.id : globalThis.SN_FILO_EVENTI.uuid();
     const eventi = [];
     if (!c) {
@@ -65,7 +72,7 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
     }
     for (const m of senzaRiprova(c ? c.messages : [], nuovi)) {
       eventi.push(t.evento(T().MESSAGGIO, {
-        chat: id, msg: { role: m.role, text: m.text, ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : {}) },
+        chat: id, msg: { role: m.role, text: m.text, ...(m.schede ? { schede: m.schede } : {}), ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : (daPagina === true ? { daPagina: true } : {})) },
       }, { autore: m.role === 'user' ? 'utente' : 'filo' }));
     }
     await t.scrivi(eventi);
@@ -113,7 +120,7 @@ async function dimentica({ app: nome, rif, prefisso } = {}) {
   const r = rif == null ? '' : String(rif);
   const p = prefisso == null ? '' : String(prefisso);
   if (!r && !p) return [];
-  const tutte = await F().chats();
+  const tutte = await F().chats({ nascoste: true });
   const tolte = tutte.filter((c) => c.app === nome && (r ? c.rif === r : String(c.rif || '').startsWith(p))).map((c) => c.id);
   for (const id of tolte) await globalThis.SN_FILO_CHATS.remove(id);
   if (tolte.length) { try { app.annuncia(tolte); } catch (_) {} }

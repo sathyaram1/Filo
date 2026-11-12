@@ -221,6 +221,8 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
   const sollecito = primi[2][primi[2].length - 1];
   expect(sollecito.role).toBe('user');
   expect(String(sollecito.content)).toMatch(/non l'ha letto come risposta/);
+  // #1921.1: il sollecito dice al modello di non raccontare all'utente che riscrive, né perché.
+  expect(String(sollecito.content)).toContain('non dire all\'utente che stai riscrivendo');
 
   // Muto anche sollecitato: un sollecito solo, poi la risposta fissa.
   await page.locator('#input').fill('apri questa scheda dalla Francia');
@@ -319,11 +321,14 @@ test('domanda doppia, giro finale muto: la risposta all\'altra metà non sparisc
   await expect(fissa).toHaveCount(1, { timeout: 15_000 });
   await expect(fissa).toContainText('SOLE_A_ROMA');
 
-  // Risposta in un giro prima, instradamento in un giro senza testo.
+  // Risposta, apertura e instradamento nello stesso giro: un'apertura da sola chiuderebbe il turno (#1130), qui
+  // l'instradamento che non si può lo tiene aperto fino al giro muto.
   const meteo = testServer.html('<title>Meteo</title><p>pioggia</p>');
   await copioneGiri(app, [
-    { text: 'PIOGGIA_A_PARIGI: a Parigi piove, 14 gradi.', toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: meteo, etichetta: 'Meteo' }) }] },
-    { text: '', toolCalls: [{ id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+    { text: 'PIOGGIA_A_PARIGI: a Parigi piove, 14 gradi.', toolCalls: [
+      { id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: meteo, etichetta: 'Meteo' }) },
+      { id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' },
+    ] },
     { text: '' },
   ]);
   await page.locator('#input').fill('che tempo fa a Parigi? poi apri la scheda dalla Francia');
@@ -366,6 +371,9 @@ test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e 
   const giri = await app.evaluate(() => globalThis.__legacy);
   expect(giri.length).toBe(2);
   expect(giri[1]).toContain('aprire da un altro paese non è ancora disponibile');
+  // Anche nel formato vecchio l'avviso del testo finito fra le note chiede di non raccontarlo (#1921.1).
+  expect(giri[1]).toContain('riscrivila per intero');
+  expect(giri[1]).toContain('non dire all\'utente che stai riscrivendo');
   const regole = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listProxyRules());
   expect(Object.keys(regole || {})).toEqual([]);
 });

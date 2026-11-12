@@ -282,7 +282,7 @@ test('una cartella che il sistema non lascia leggere (il «Non consentire» del 
 test('l\'esempio dato al modello per cercare un documento non porta un anno scritto fisso, che invecchia e vince sull\'ultimo', () => {
   // Con l'anno nella richiesta vince quell'anno (è voluto): un «marzo 2026» ricopiato nel 2027 darebbe la bolletta vecchia.
   require('../../src/shared/actionTools.js');
-  const def = globalThis.SN_ACTION_TOOLS.definitions({}).find((d) => d.function.name === 'CERCA_DOCUMENTI');
+  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'CERCA_DOCUMENTI');
   const testo = `${def.function.description}\n${JSON.stringify(def.function.parameters)}`;
   assert.doesNotMatch(testo, /\b(?:19|20)\d\d\b/);
 });

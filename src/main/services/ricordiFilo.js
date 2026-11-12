@@ -128,13 +128,15 @@ function perParole(domanda, tratti) {
   return FC().ricordiPerParole(domanda, tratti);
 }
 
-// `vecchi`: i messaggi del filo più vecchi della finestra. `davanti`: quelli che il modello ha già, che non si ripescano.
-async function cerca(domanda, { vecchi = [], davanti = [] } = {}) {
+// `vecchi`: i messaggi del filo più vecchi della finestra. `davanti`: quelli che il modello ha già, che non si ripescano;
+// `esiti`: le azioni i cui esiti ha davanti, con i pezzi già ripescati e le conversazioni rilette intere (#868.1).
+async function cerca(domanda, { vecchi = [], davanti = [], esiti = [] } = {}) {
   const q = String(domanda || '').trim();
   const e0 = epoca;
   if (!q || Disco.inIncognito() || !vecchi.length) return [];
   const gia = new Set(davanti.map((m) => `${m.chat}|${m.ts}`));
-  const tratti = FC().tratti(vecchi).filter((t) => !gia.has(t.chiave));
+  const giaRipescati = FC().giaDavanti(esiti);
+  const tratti = FC().tratti(vecchi).filter((t) => !gia.has(t.chiave) && !giaRipescati.chiavi.has(t.chiave) && !giaRipescati.chat.has(t.chat));
   if (!tratti.length) return [];
   let emb = null;
   try { emb = app.vettori ? await app.vettori([q]) : null; } catch (_) { emb = null; }

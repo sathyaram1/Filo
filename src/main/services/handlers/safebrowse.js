@@ -12,7 +12,7 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
-    const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+    const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment, insecureForm: !!msg.insecureForm };
     // #758 — un campo password nella PAGINA (non in un riquadro, che nominerebbe un sito non suo) è una pagina di
     // accesso: il sito vale quello della scheda.
     if (msg.hasPassword) {
@@ -21,6 +21,21 @@ module.exports = function register(on, ctx) {
       if (suo) { try { require('../cookieIncorporati').paginaDiAccesso(sender.tab.url, { forte: true }); } catch (_) {} }
     }
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
+  });
+
+  // #965 — i link della pagina della scheda (un riquadro no: i suoi link si giudicano al clic). Un link lunghissimo resta
+  // fuori dall'esame anticipato, non dall'avviso: al clic si giudica comunque.
+  on(MSG.SAFEBROWSE_LINKS, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabId = sender?.tab?.id;
+    const top = sender?.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+    if (!win || !win._filoTabs || !tabId || !suo) return { ok: false };
+    const urls = msg && Array.isArray(msg.urls) ? msg.urls : null;
+    if (!urls) return { ok: false, error: 'formato' };
+    const max = globalThis.SN_SAFEBROWSE?.links?.LOTTO_MAX || 500;
+    if (urls.length > max) return { ok: false, error: 'troppi', max };
+    return win._filoTabs.safebrowseLinks(tabId, urls.filter((u) => typeof u === 'string' && u.length <= 16384));
   });
 
   // Un campo password o carta a schermo, nella pagina o in un suo riquadro: vale per la pagina della scheda, che dà il
@@ -60,8 +75,22 @@ module.exports = function register(on, ctx) {
     return { ok: true, richiesta: win._filoTabs.richiestaCasa(tabId) };
   }));
 
-  // Geo-block: l'utente ha accettato la proposta inline (#151) → instrada la tab
-  // dal paese indicato. Il tabId arriva dal sender (content script).
+  // #967 — un sito entra fra quelli fidati solo col nome che ne ricava il main (`indirizzo`); ne escono le voci dette.
+  // In incognito non entra niente: la scelta resta nella scheda.
+  on(MSG.SITI_FIDATI_IMPOSTA, soloFilo(async (msg, sender) => {
+    const Fidati = require('../sitiFidati');
+    const win = winOf(sender);
+    if (msg && msg.fidato === true) {
+      const SB = globalThis.SN_SAFEBROWSE;
+      const voce = SB && typeof msg.indirizzo === 'string' ? SB.voceFidata(msg.indirizzo.slice(0, 2048)) : null;
+      if (!voce) return { ok: false, code: 'sito', error: 'Non è l\'indirizzo di un sito' };
+      return Fidati.fidati(voce, { win: msg.avvisa === true ? win : null, incognito: !!(sender && sender.isIncognito) });
+    }
+    const voci = Array.isArray(msg && msg.voci) ? msg.voci.filter((v) => typeof v === 'string').slice(0, 500) : [];
+    return { ok: true, ...(await Fidati.cambia({ togli: voci })) };
+  }));
+
+  // Geo-block accettato: instrada la tab dal paese indicato; il tabId arriva dal sender.
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -69,8 +98,7 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.geoProposeAccept(tabId, msg.country);
   });
 
-  // Geo-block: l'utente ha rifiutato/chiuso la proposta → non riproporla per
-  // questo dominio nel tab.
+  // Geo-block: proposta rifiutata o chiusa → non riproporla per questo dominio nel tab.
   on(MSG.GEO_PROPOSE_DISMISS, async (msg, sender, origin) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -146,6 +174,25 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La risposta arriva prima del clic: la foto la fa il mondo dei content script della pagina, e qui la si aspetta.
+  on(MSG.COOKIES_ANSWER_BASE, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const top = wc && !wc.isDestroyed() && wc.mainFrame;
+    if (!top || !sender.frame || sender.frame.frameTreeNodeId === top.frameTreeNodeId) return { ok: false };
+    try {
+      const fatta = await wc.executeJavaScriptInIsolatedWorld(require('../../../preload/mondo-esente').MONDO,
+        [{ code: '!!(globalThis.SN_COOKIES_CS && globalThis.SN_COOKIES_CS.frameBase())' }]);
+      return { ok: !!fatta };
+    } catch (_) { return { ok: false }; }
+  });
+
+  on(MSG.COOKIES_ACCESSO, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabId = sender && sender.tab && sender.tab.id;
+    const top = sender && sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    if (!win || !win._filoTabs || !tabId || !top || !sender.frame) return { ok: false };
+    return win._filoTabs.accessoTentato(tabId);
+  });
   // #760 — il riquadro rotto dai cookie: servizio e pagina li ricava riquadriRotti.js dal mittente.
   on(MSG.RIQUADRO_COOKIE_SEGNALA, async (msg, sender) => require('../riquadriRotti').segnala(msg, sender));
   on(MSG.RIQUADRO_COOKIE_STATO, async (msg, sender) => require('../riquadriRotti').stato(sender));

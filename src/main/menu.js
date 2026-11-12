@@ -1,43 +1,6 @@
-// La barra dei menu dell'applicazione.
-//
-// PERCHÉ ESISTE (#527)
-//   Su Windows e Linux la finestra di Filo è senza cornice: nessuna barra dei
-//   menu viene disegnata e i suoi tasti non arrivano a nessuno. Su macOS la
-//   barra è dell'APPLICAZIONE: sta in cima allo schermo, c'è sempre — anche con
-//   la finestra senza cornice — ed è la PRIMA a vedere i tasti, prima di
-//   qualunque cosa la pagina ascolti.
-//
-//   Filo non ne dichiarava nessuna, quindi restava appesa quella di serie di
-//   Electron: in inglese, con le voci di un altro prodotto e i link al suo
-//   sito, e con otto voci che si prendevano Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0 —
-//   cioè proprio le scorciatoie che il manifesto delle capacità promette
-//   all'utente Mac. Chiudere una scheda gli chiudeva la finestra intera.
-//
-// LA REGOLA, UNA SOLA
-//   Ogni tasto che compare in questa barra fa ESATTAMENTE quello che Filo fa
-//   già per quel tasto. Non basta togliere la barra: su macOS Chromium NON ha
-//   scorciatoie di modifica proprie (taglia, copia, incolla, seleziona tutto,
-//   annulla le lascia apposta al menu dell'applicazione), quindi una barra
-//   assente spegne copia e incolla in ogni campo di testo. Va sostituita, non
-//   rimossa.
-//
-//   Da qui le due metà del file:
-//   · i `role` di Electron si usano SOLO dove il tasto non è di Filo (taglia,
-//     copia, incolla, seleziona tutto, nascondi, riduci a icona, esci);
-//   · dove il tasto è di Filo (T, W, R, Z, +, -, 0) la voce NON ha `role`: ha
-//     un `click` che chiama la stessa funzione della scorciatoia. Un `role` lì
-//     significherebbe il comportamento di Electron al posto di quello di Filo,
-//     ed è esattamente il difetto che questo file chiude.
-//
-//   `registerAccelerator: false` non è una via d'uscita su Mac: Electron lo
-//   onora solo su Windows e Linux. Lì lo usiamo, ed è giusto — i tasti li
-//   gestiscono già le pagine (src/main/tabs.js, src/renderer/shell.js), la
-//   barra non si vede e non deve toglierglieli. Su Mac l'unico modo di non
-//   prendersi un tasto è non scriverlo.
-//
-// NIENTE STRUMENTI DA SVILUPPATORE
-//   La barra di serie apriva le DevTools con Opzione+Cmd+I a chiunque. Non è
-//   una voce per l'utente di Filo: qui non c'è.
+// La barra dei menu dell'applicazione (#527). Su Mac esiste sempre ed è la prima a vedere
+// i tasti: ogni voce fa esattamente quello che Filo fa già, e toglierla spegnerebbe copia
+// e incolla. Il perché: patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md
 
 // Electron si chiede DENTRO le funzioni, non qui in cima: così `template()` —
 // la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
@@ -46,8 +9,7 @@
 // Il nome di una scorciatoia non si scrive a mano nemmeno qui: su Mac indietro
 // e avanti stanno su un'altra combinazione (src/shared/tasti.js).
 require('../shared/tasti');
-
-// ─── a chi si parla ─────────────────────────────────────────────────────────
+const Strade = require('./services/contatoriStrade');
 
 function finestra() {
   const { BrowserWindow } = require('electron');
@@ -56,16 +18,51 @@ function finestra() {
   return BrowserWindow.getAllWindows().find((w) => w._filoTabs) || null;
 }
 
-function schedaAttiva() {
-  const win = finestra();
+// Davanti c'è una finestra senza schede (la finestrella di accesso) e dietro una con: le voci della scheda agiscono su
+// di lei o non fanno niente, mai su quella dietro (#2031: Cmd+W chiudeva il sito che aspettava l'accesso). Senza
+// finestre con schede la voce ridà la finestra, come chiede la segnalazione.
+function finestrellaDavanti() {
+  const { BrowserWindow } = require('electron');
+  const messa = BrowserWindow.getFocusedWindow();
+  return messa && !messa.isDestroyed() && !messa._filoTabs && finestra() ? messa : null;
+}
+
+// Su Mac Filo resta acceso senza finestre con schede (finestrella di accesso aperta, o nessuna): le voci la ridanno come
+// Dock e seconda apertura, e agiscono a schede riaperte; ridotta o dietro, torna davanti (#2031). `nascita`: solo se
+// l'ha fatta nascere questa voce, con `ripristinata` se ha ridato le schede salvate.
+async function finestraPerAgire() {
+  const W = require('./window');
+  const c = finestra();
+  if (c && c !== require('electron').BrowserWindow.getFocusedWindow()) {
+    try { if (c.isMinimized()) c.restore(); } catch (_) {}
+    W.revealWindow(c);
+  }
+  const win = c || W.ridaiFinestraNormale();
+  if (!win) return {};
+  const esito = await W.quandoPronta(win);
+  if (!esito || win.isDestroyed()) return {};
+  return { win, nascita: c ? null : esito };
+}
+
+// La scheda su cui agisce una voce: `wc` è la pagina, della finestrella se è lei davanti.
+async function schedaPerAgire() {
+  const f = finestrellaDavanti();
+  if (f) return { finestrella: f, wc: f.webContents };
+  const { win, nascita } = await finestraPerAgire();
+  const c = win && schedaAttiva(win);
+  if (!c) return {};
+  const wc = c.tab.view && c.tab.view.webContents;
+  return { ...c, nascita, wc: wc && !wc.isDestroyed() ? wc : null };
+}
+
+function schedaAttiva(win = finestra()) {
   const tabs = win && win._filoTabs;
   if (!tabs) return null;
   const tab = tabs.tabs.find((t) => t.id === tabs.activeId);
   return tab ? { win, tabs, tab } : null;
 }
 
-// La webContents che ha davvero il cursore: può essere la shell (la fila delle
-// schede) o la pagina dentro la scheda attiva.
+// Può essere la shell (la fila delle schede) o la pagina dentro la scheda.
 function contenutoAFuoco() {
   try {
     const { webContents } = require('electron');
@@ -91,105 +88,220 @@ async function staScrivendo(wc) {
     if (qui !== null) return !!qui;
     const riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || [];
     const risposte = await Promise.all(riquadri
-      .filter((f) => f !== wc.mainFrame && !f.detached)
+      .filter((f) => f !== wc.mainFrame && require('./services/riquadroArrivato').riquadroArrivato(f))
       .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
     return risposte.some((r) => r === true);
   } catch (_) {
-    // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
-    // annullare non fa nulla, mentre andare indietro mentre si scrive porta via
-    // il testo appena battuto.
+    // Nel dubbio si annulla: un annulla a vuoto non fa niente, un "indietro"
+    // mentre si scrive porta via il testo appena battuto.
     return true;
   }
 }
 
+const SORGENTE_CAMPO_VUOTO = `(() => {
+  let a = document.activeElement;
+  while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+  if (!a) return false;
+  const v = typeof a.value === 'string' ? a.value : a.textContent;
+  return typeof v === 'string' && v.trim() === '';
+})()`;
+async function campoVuoto(wc) {
+  try { return (await wc.executeJavaScript(SORGENTE_CAMPO_VUOTO, false)) === true; } catch (_) { return false; }
+}
+
+// Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
+// deve poterlo rifiutare col perché invece di vedere aprirsi una scheda. Il tasto le arriva com'è stato premuto.
+function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
+  return (...args) => {
+    const wc = aFuoco();
+    if (!wc || !require('./shortcuts').staRegistrandoTasti(wc)) return fa(...args);
+    const pezzi = String(accel).split('+');
+    const keyCode = pezzi.pop();
+    const nomi = { commandorcontrol: mac ? 'meta' : 'control', cmd: 'meta', command: 'meta', ctrl: 'control', control: 'control', alt: 'alt', shift: 'shift' };
+    const modifiers = pezzi.map((m) => nomi[m.toLowerCase()]).filter(Boolean);
+    try {
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    } catch (_) {}
+    return undefined;
+  };
+}
+
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
 
-function nuovaScheda() {
-  const win = finestra();
-  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+// Ogni voce è un'azione contata (#1461), con lo stesso id della scorciatoia che la fa nelle pagine.
+function contata(azione, fn) {
+  return (...args) => {
+    const win = finestra();
+    return require('./services/azioniContate').azione(azione, () => fn(...args), { incognito: !!(win && win._filoIncognito) });
+  };
 }
 
-function chiudiScheda() {
-  const c = schedaAttiva();
-  try { c && c.tabs.closeTab(c.tab.id); } catch (_) {}
+// Da dove parte (#1468): dal tasto, che su Mac la barra dei menu vede prima della pagina, o da un clic sulla voce.
+const viaMenu = (ev) => (ev && ev.triggeredByAccelerator ? 'scorciatoia' : 'menu_app');
+const dalTasto = (ev) => !!(ev && ev.triggeredByAccelerator);
+function strada(azione, ev, tastoDelBrowser = '') {
+  const win = finestra();
+  const incognito = !!(win && win._filoIncognito);
+  if (azione) Strade.misura('azione', azione, viaMenu(ev), { incognito });
+  if (tastoDelBrowser && dalTasto(ev)) Strade.misura('tastoNome', tastoDelBrowser, { incognito });
 }
+
+const nuovaScheda = contata('new-tab', async (_voce, _win, ev) => {
+  strada('newTab', ev, 'ctrl_t');
+  const { win, nascita } = await finestraPerAgire();
+  // Nata senza schede da ridare, la finestra ha già la sua scheda nuova: un'altra sarebbe un doppione.
+  if (!win || (nascita && !nascita.ripristinata)) return;
+  try { win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
+
+const riapriSchedaChiusa = contata('reopen-closed-tab', async (_voce, _win, ev) => {
+  strada('', ev, 'ctrl_shift_t');
+  const { win, nascita } = await finestraPerAgire();
+  // Rinata con le sue schede, è tornato quello che si era chiuso: la finestra, come in Chrome senza finestre.
+  if (!win || (nascita && nascita.ripristinata)) return undefined;
+  try { return await win._filoTabs.riapriChiusa({ tasto: dalTasto(ev) ? 'ctrl_shift_t' : '' }).catch(() => {}); } catch (_) { return undefined; }
+});
+
+// Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
+const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
+  strada('', ev, 'ctrl_w');
+  const f = finestrellaDavanti();
+  if (f) { try { f.close(); } catch (_) {} return; }
+  const c = schedaAttiva();
+  try { c && c.tabs.closeTab(c.tab.id, { via: ev && ev.triggeredByAccelerator ? 'ctrl_w' : 'altro', strada: viaMenu(ev) }); } catch (_) {}
+});
 
 function chiudiFinestra() {
-  const win = finestra();
+  const win = finestrellaDavanti() || finestra();
   try { win && win.close(); } catch (_) {}
 }
 
-function ricarica() {
-  const c = schedaAttiva();
-  try { c && c.tabs.reload(c.tab.id); } catch (_) {}
-}
+const ricarica = contata('reload', async (_voce, _win, ev) => {
+  strada('reload', ev, 'ctrl_r');
+  const c = await schedaPerAgire();
+  if (c.finestrella) { try { c.wc.reload(); } catch (_) {} return; }
+  // Appena rinata, le sue pagine si stanno caricando adesso.
+  if (!c.tab || c.nascita) return;
+  try { c.tabs.reload(c.tab.id); } catch (_) {}
+});
 
 // Indietro e avanti passano dalla stessa porta di tutte le altre strade
 // (scorciatoia, tasti laterali del mouse, swipe): se non c'è dove andare non
 // succede niente.
-function indietro() {
-  const c = schedaAttiva();
-  try { c && c.tabs.navigaCronologia('indietro', c.tab.id); } catch (_) {}
-}
-
-function avanti() {
-  const c = schedaAttiva();
-  try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
-}
-
-function vaiAScrivereUnIndirizzo() {
-  const c = schedaAttiva();
-  if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
-  nuovaScheda();
-}
-
-// Lo zoom è della PAGINA, non della fila delle schede: passa dallo stesso punto
-// da cui passa Ctrl+rotella (src/preload/wheel-zoom.js), così le pagine che
-// zoomano da sé — l'editor — restano escluse anche da questa strada.
-function zoom(verso) {
-  const c = schedaAttiva();
-  if (!c) return;
-  try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
-}
-
-function schermoIntero() {
+function cronologia(verso, ev) {
+  strada('', ev, 'alt_freccia');
   const win = finestra();
+  Strade.misura('cronologia', verso, dalTasto(ev) ? 'alt_freccia' : 'menu_app', { incognito: !!(win && win._filoIncognito) });
+}
+
+async function muovi(verso, ev) {
+  cronologia(verso, ev);
+  const c = await schedaPerAgire();
+  if (c.finestrella) {
+    try { const h = c.wc.navigationHistory; if (verso === 'indietro') h.goBack(); else h.goForward(); } catch (_) {}
+    return;
+  }
+  try { c.tab && c.tabs.navigaCronologia(verso, c.tab.id); } catch (_) {}
+}
+
+const indietro = contata('navigate-back-forward', (_voce, _win, ev) => muovi('indietro', ev));
+const avanti = contata('navigate-back-forward', (_voce, _win, ev) => muovi('avanti', ev));
+
+const vaiAScrivereUnIndirizzo = contata('address-bar', async (_voce, _win, ev) => {
+  strada('', ev, 'ctrl_l');
+  const { win, nascita } = await finestraPerAgire();
+  if (!win) return;
+  // Rinata con le sue schede, quella davanti è appena tornata: la home si apre accanto invece di prenderle il posto.
+  const c = nascita && nascita.ripristinata ? null : schedaAttiva(win);
+  if (c) { try { c.tabs.vaiAScrivereUnIndirizzo(c.tab.id, { tasto: dalTasto(ev) ? 'ctrl_l' : '' }).catch(() => {}); } catch (_) {} return; }
+  try { win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
+
+// Stessa porta di Ctrl+rotella (src/preload/wheel-zoom.js): lo zoom è della
+// PAGINA, e le pagine che zoomano da sé restano escluse anche da qui.
+// Lo zoom si conta dove si registra, la raffica finita (src/main/tabs.js): da qui, dalla tastiera e dalla rotella.
+async function zoom(verso, ev) {
+  const c = await schedaPerAgire();
+  if (!c.wc) return;
+  strada(globalThis.SN_CONTATORI_STRADE?.ZOOM[verso] || '', ev);
+  try { c.wc.send('filo:zoom-key', verso); } catch (_) {}
+}
+
+// Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
+// A schermo intero la finestrella perderebbe la barra col sito (#1066): con lei davanti la voce non fa niente.
+const schermoIntero = contata('fullscreen', async (_voce, _finestra, evento) => {
+  if (finestrellaDavanti()) return;
+  const c = finestra();
+  if (evento && evento.triggeredByAccelerator && c && c._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
+  strada('fullscreen', evento);
+  const { win } = await finestraPerAgire();
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
+});
+
+// La barra è della finestra con le schede, non della pagina: anche con la finestrella davanti si chiede a lei.
+// La barra laterale e l'Aiuto si contano dove arrivano tutte le loro strade: la barra che si apre, il comando.
+async function barraLaterale(_voce, _win, ev) {
+  const { win } = await finestraPerAgire();
+  try { win && win._filoTabs.barra.commuta('tasto', viaMenu(ev)); } catch (_) {}
 }
 
-function barraLaterale() {
-  const win = finestra();
-  try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
+async function lucchettoBarra() {
+  const { win } = await finestraPerAgire();
+  try { if (win) win._filoTabs.barra.blocca(!win._filoTabs.barra.opzioni.bloccata); } catch (_) {}
 }
 
-function apriPagina(url) {
-  const win = finestra();
-  try { win && win._filoTabs.openTab(url); } catch (_) {}
+// Il pannello degli strumenti dell'app davanti (#1433): il tasto lo ascolta la scheda, così sui siti resta loro.
+async function pannelloStrumenti() {
+  const { win } = await finestraPerAgire();
+  try { win && win._filoTabs.barra.destro.comandaDavanti('commuta', 'tasto'); } catch (_) {}
 }
 
-function finestraIncognito() {
+// `azione`: l'icona della barra che apre la stessa pagina, per le strade (#1468).
+async function apriPagina(url, azione = '') {
+  const { win } = await finestraPerAgire();
+  if (win && win._filoTabs) {
+    const incognito = !!win._filoIncognito;
+    Strade.misura('pagina', url, 'menu_app', { finestra: win._filoTabs, incognito });
+    if (azione) Strade.misura('azione', azione, 'menu_app', { incognito });
+  }
+  try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
+}
+
+const finestraIncognito = contata('incognito', () => {
   try { require('./window').createIncognitoWindow(); } catch (_) {}
+});
+
+async function assistenteLaterale() {
+  const { win } = await finestraPerAgire();
+  try { if (win) require('./shortcuts').dispatch('open-help-sidebar', win, 'menu_app'); } catch (_) {}
 }
 
-function assistenteLaterale() {
-  try { require('./shortcuts').dispatch('open-help-sidebar', finestra()); } catch (_) {}
-}
-
-// Ctrl/Cmd+Z: dentro un campo di testo annulla quello che si sta scrivendo,
-// fuori torna alla pagina precedente. È la stessa regola di src/content/content.js
-// — quella strada vale dove il tasto arriva alla pagina, questa dove se lo
-// prende la barra dei menu.
+// Ctrl/Cmd+Z: nel campo di testo annulla, fuori torna indietro. Stessa regola di
+// src/content/content.js, che vale quando il tasto arriva alla pagina.
 async function annulla() {
   const wc = contenutoAFuoco();
   if (!wc) return;
-  if (await staScrivendo(wc)) { try { wc.undo(); } catch (_) {} return; }
+  const win = finestra();
+  const incognito = !!(win && win._filoIncognito);
+  if (await staScrivendo(wc)) {
+    // Un campo vuoto non ha niente da disfare: è l'azione di Filo appena fatta (src/content/content.js, stessa regola).
+    if (await campoVuoto(wc)) { try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {} }
+    try { wc.undo(); } catch (_) {}
+    return;
+  }
+  // Fuori da un campo è un indietro: con la finestrella davanti non porta indietro il sito dietro, che aspetta l'accesso.
+  if (finestrellaDavanti()) return;
+  // Subito dopo un'azione di Filo, Ctrl/Cmd+Z è un «annulla» per lei (#1461); ed è comunque un indietro.
+  try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {}
   const c = schedaAttiva();
-  try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  require('./services/azioniContate').azione('navigate-back-forward', () => {
+    try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  }, { incognito });
 }
 
-// Ctrl/Cmd+Shift+Z: solo "ripeti", e solo mentre si scrive. Fuori da un campo
-// di testo non significa niente (Filo non ha un "avanti" su questo tasto), e
-// una voce che non fa niente è meglio di una che fa una cosa a sorpresa.
+// Solo mentre si scrive: fuori da un campo Filo non ha un "avanti" su questo
+// tasto, e una voce che non fa niente è meglio di una che sorprende.
 async function ripeti() {
   const wc = contenutoAFuoco();
   if (!wc) return;
@@ -213,9 +325,10 @@ function template(piattaforma) {
     label: 'Filo',
     submenu: [
       { role: 'about', label: 'Informazioni su Filo' },
+      { label: 'Novità', click: () => apriPagina('filo://novita/novita.html') },
       { type: 'separator' },
       { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
-      { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
+      { label: 'Opzioni', click: () => apriPagina('filo://options/options.html', 'openOptions') },
       // Dove si riscatta un invito (#664): fuori dalla pagina, l'invito non aveva altre porte.
       { label: 'Crediti e inviti', click: () => apriPagina('filo://credits/credits.html') },
       { type: 'separator' },
@@ -235,6 +348,7 @@ function template(piattaforma) {
     label: 'Schede',
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
+      { label: 'Riapri scheda chiusa', accelerator: 'CommandOrControl+Shift+T', click: riapriSchedaChiusa, ...SOLO_SCRITTA },
       { label: 'Nuova finestra in incognito', click: finestraIncognito },
       { type: 'separator' },
       { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },
@@ -242,10 +356,10 @@ function template(piattaforma) {
       { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
-      { label: 'Cronologia', click: () => apriPagina('filo://history/history.html') },
+      { label: 'Quaderno delle memorie', click: () => apriPagina('filo://quaderno/quaderno.html') },
+      { label: 'Cronologia AI', click: () => apriPagina('filo://history/history.html') },
       { type: 'separator' },
-      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette e
-      // quello che fa dovunque non ci sia una barra dei menu di mezzo.
+      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette.
       { label: 'Chiudi scheda', accelerator: 'CommandOrControl+W', click: chiudiScheda, ...SOLO_SCRITTA },
       { label: 'Chiudi finestra', click: chiudiFinestra },
     ],
@@ -268,18 +382,18 @@ function template(piattaforma) {
   const menuVista = {
     label: 'Vista',
     submenu: [
-      { label: 'Ingrandisci', accelerator: 'CommandOrControl+Plus', click: () => zoom('in'), ...SOLO_SCRITTA },
-      // Sulle tastiere il "+" si fa con Shift: senza questo alias Cmd+= — il
-      // modo in cui lo zoom si preme davvero — resterebbe scoperto.
-      { label: 'Ingrandisci', accelerator: 'CommandOrControl+=', click: () => zoom('in'), visible: false, ...SOLO_SCRITTA },
-      { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
-      { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
+      { label: 'Ingrandisci', accelerator: 'CommandOrControl+Plus', click: (_v, _w, ev) => zoom('in', ev), ...SOLO_SCRITTA },
+      // Il "+" si fa con Shift: senza questo alias Cmd+=, che è come lo zoom si
+      // preme davvero, resterebbe scoperto.
+      { label: 'Ingrandisci', accelerator: 'CommandOrControl+=', click: (_v, _w, ev) => zoom('in', ev), visible: false, ...SOLO_SCRITTA },
+      { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: (_v, _w, ev) => zoom('out', ev), ...SOLO_SCRITTA },
+      { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: (_v, _w, ev) => zoom('reset', ev), ...SOLO_SCRITTA },
       { type: 'separator' },
-      // Senza acceleratore, e non è una dimenticanza: in questa barra ci vanno
-      // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
-      // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
-      { label: 'Schermo intero', click: schermoIntero },
+      // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
+      { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
+      { label: 'Tieni aperta o sblocca la barra laterale', accelerator: tasto(globalThis.SN_TASTI.ACCEL_LUCCHETTO_BARRA), click: lucchettoBarra, ...SOLO_SCRITTA },
+      { label: 'Pannello degli strumenti', accelerator: tasto('Ctrl+\\'), click: pannelloStrumenti, registerAccelerator: false },
     ],
   };
 
@@ -299,11 +413,15 @@ function template(piattaforma) {
     label: 'Aiuto',
     role: 'help',
     submenu: [
-      { label: 'Assistente laterale', click: assistenteLaterale },
+      { id: 'assistente-laterale', label: 'Assistente laterale', click: assistenteLaterale },
     ],
   };
 
-  return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  const barra = [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  for (const m of barra) {
+    for (const v of m.submenu || []) if (v.accelerator && typeof v.click === 'function') v.click = oRegistra(v.accelerator, v.click, MAC);
+  }
+  return barra;
 }
 
 // Da chiamare una volta sola, dopo `app.whenReady()`.
@@ -317,6 +435,15 @@ function installaMenuApplicazione() {
   } catch (e) {
     console.warn('[Filo] barra dei menu non installata', e && e.message);
   }
+  // L'Aiuto spento (#841) non resta nel menu: la voce segue l'interruttore.
+  try {
+    const segui = (s) => {
+      const voce = Menu.getApplicationMenu()?.getMenuItemById('assistente-laterale');
+      if (voce) voce.visible = require('./services/interruttoreAiuto').acceso(s);
+    };
+    globalThis.SN_STORAGE.getSettings().then(segui, () => {});
+    require('./shim/storage').onChanged((changes) => { if (changes && changes.settings) segui(changes.settings.newValue); });
+  } catch (_) {}
 }
 
-module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo, oRegistra };

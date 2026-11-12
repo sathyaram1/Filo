@@ -14,13 +14,23 @@
     RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
     LEGGI_FILE: ['Letto un file', (k) => `Letti ${n(k)} file`, 'file'],
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
+    LEGGI_PAGINA: ['Letta una pagina', (k) => `Lette ${n(k)} pagine`, 'pagina web'],
+    VEDI_SCHERMO: ['Guardato lo schermo', (k) => `Guardato lo schermo ${n(k)} volte`, 'schermo'],
     CERCA_DOCUMENTI: ['Cercato fra i documenti', (k) => `Fatte ${n(k)} ricerche fra i documenti`, 'documenti'],
+    CERCA_SALVATE: ['Cercato fra le pagine salvate', (k) => `Fatte ${n(k)} ricerche fra le pagine salvate`, 'pagine salvate'],
+    APRI_SALVATA: ['Aperta una pagina salvata', (k) => `Aperte ${n(k)} pagine salvate`, 'pagina salvata'],
+    SCHEDE_CHIUSE: ['Cercato fra le schede chiuse', (k) => `Fatte ${n(k)} ricerche fra le schede chiuse`, 'schede chiuse'],
+    RIAPRI_SCHEDA: ['Riaperta una scheda chiusa', (k) => `Riaperte ${n(k)} schede chiuse`, 'scheda chiusa'],
+    RIPRENDI_AUDIO: ['Fatta ripartire la musica', (k) => `Fatta ripartire la musica ${n(k)} volte`, 'musica'],
+    PAUSA_AUDIO: ['Messa in pausa la musica', (k) => `Messa in pausa la musica ${n(k)} volte`, 'musica'],
+    MOSTRA_SCHEDA: ['Portato su una scheda', (k) => `Portato su una scheda ${n(k)} volte`, 'scheda'],
     LEGGI_TRASPARENZA: ['Riletta la trasparenza', (k) => `Rilette ${n(k)} pagine di trasparenza`, 'trasparenza'],
     LEGGI_IMPOSTAZIONI: ['Lette le impostazioni', (k) => `Lette le impostazioni ${n(k)} volte`, 'impostazioni'],
     CAPACITA_DETTAGLIO: ['Verificato cosa so fare', (k) => `Verificato cosa so fare ${n(k)} volte`, 'capacità'],
     NAVIGA: ['Aperta una pagina', (k) => `Aperte ${n(k)} pagine`, 'pagina'],
     APRI_FILE: ['Mostrato un file', (k) => `Mostrati ${n(k)} file`, 'file'],
     RINOMINA_FILE: ['Dato un nome ai file', (k) => `Dato un nome ai file ${n(k)} volte`, 'nomi dei file'],
+    ELIMINA_FILE: ['Tolti dei file', (k) => `Tolti dei file ${n(k)} volte`, 'file tolti'],
     TIMER: ['Avviato un timer', (k) => `Avviati ${n(k)} timer`, 'timer'],
     SVEGLIA: ['Messa una sveglia', (k) => `Messe ${n(k)} sveglie`, 'sveglia'],
     CANCELLA_SVEGLIA: ['Tolta una sveglia', (k) => `Tolte ${n(k)} sveglie`, 'sveglia'],
@@ -29,6 +39,9 @@
     SALVA_APPUNTO: ['Scritto un appunto', (k) => `Scritti ${n(k)} appunti`, 'appunto'],
     SALVA_LEZIONE: ['Memorizzata una cosa', (k) => `Memorizzate ${n(k)} cose`, 'memoria'],
     DIMENTICA: ['Dimenticata una cosa', (k) => `Dimenticate ${n(k)} cose`, 'memoria'],
+    TOGLI_CHAT: ['Tolta una conversazione', (k) => `Tolte ${n(k)} conversazioni`, 'conversazione'],
+    RIMETTI_CHAT: ['Rimessa una conversazione', (k) => `Rimesse ${n(k)} conversazioni`, 'conversazione'],
+    CORREGGI_MEMORIA: ['Corretta una cosa', (k) => `Corrette ${n(k)} cose`, 'memoria'],
     CANCELLA_MEMORIA: ['Cancellata la memoria', (k) => `Cancellata la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_PAGINE: ['Cancellate pagine visitate', (k) => `Cancellate pagine visitate ${n(k)} volte`, 'pagine visitate'],
     IMPOSTA_PREFERENZA: ['Cambiata un\'impostazione', (k) => `Cambiate ${n(k)} impostazioni`, 'impostazione'],
@@ -37,6 +50,7 @@
     TOGLI_PERMESSO_SITO: ['Tolto un permesso', (k) => `Tolti ${n(k)} permessi`, 'permesso'],
     ESEGUI_COMANDO: ['Eseguito un comando', (k) => `Eseguiti ${n(k)} comandi`, 'comando'],
     PULISCI_TAB: ['Riordinate le schede', (k) => `Riordinate le schede ${n(k)} volte`, 'schede'],
+    CHIUDI_SCHEDE: ['Chiuse delle schede', (k) => `Chiuse schede ${n(k)} volte`, 'schede'],
     CANCELLA_ARCHIVIO: ['Eliminate schede dall\'archivio', (k) => `Eliminate schede dall'archivio ${n(k)} volte`, 'archivio'],
     INVIA_FEEDBACK: ['Preparata una segnalazione', (k) => `Preparate ${n(k)} segnalazioni`, 'segnalazione'],
     ONBOARDING: ['Proseguita l\'accoglienza', (k) => `Proseguita l'accoglienza ${n(k)} volte`, 'accoglienza'],
@@ -45,15 +59,22 @@
     RIMUOVI_PROXY_TUTTE: ['Riportate le schede in Italia', (k) => `Riportate le schede in Italia ${n(k)} volte`, 'paese'],
     REGOLA_PROXY_DOMINIO: ['Salvata una regola sul paese', (k) => `Salvate ${n(k)} regole sul paese`, 'regola'],
     RIMUOVI_REGOLA_PROXY: ['Tolta una regola sul paese', (k) => `Tolte ${n(k)} regole sul paese`, 'regola'],
+    TIENI_APERTA: ['Salvato un sito da tenere aperto', (k) => `Salvati ${n(k)} siti da tenere aperti`, 'siti aperti'],
+    NON_TENERE_APERTA: ['Tolto un sito da tenere aperto', (k) => `Tolti ${n(k)} siti da tenere aperti`, 'siti aperti'],
     COMANDO_FINESTRA: ['Azionata la finestra', (k) => `Azionata la finestra ${n(k)} volte`, 'finestra'],
+    ACCOUNT: ['Sistemato l\'accesso', (k) => `Sistemato l'accesso ${n(k)} volte`, 'accesso'],
     CARTA_HOME: ['Sistemata una carta della home', (k) => `Sistemate ${n(k)} carte della home`, 'carta'],
     SPOSTA_ICONA: ['Spostata un\'icona', (k) => `Spostate ${n(k)} icone`, 'icona'],
+    PANNELLO_APP: ['Sistemato il pannello degli strumenti', (k) => `Sistemato il pannello degli strumenti ${n(k)} volte`, 'pannello'],
     STILE_PAGINA: ['Cambiato l\'aspetto della pagina', (k) => `Cambiato l'aspetto della pagina ${n(k)} volte`, 'aspetto della pagina'],
     RIPRISTINA_STILE_PAGINA: ['Rimessa la pagina com\'era', (k) => `Rimesse ${n(k)} pagine com'erano`, 'aspetto della pagina'],
     ZOOM_PAGINA: ['Cambiato lo zoom', (k) => `Cambiato lo zoom ${n(k)} volte`, 'zoom'],
     VOLUME: ['Cambiato il volume', (k) => `Cambiato il volume ${n(k)} volte`, 'volume'],
     BLUETOOTH: ['Comandato il Bluetooth', (k) => `Comandato il Bluetooth ${n(k)} volte`, 'Bluetooth'],
     WIFI: ['Comandato il Wi-Fi', (k) => `Comandato il Wi-Fi ${n(k)} volte`, 'Wi-Fi'],
+    ORDINA_DESKTOP: ['Sistemate le icone del desktop', (k) => `Sistemate le icone del desktop ${n(k)} volte`, 'desktop'],
+    PULSANTE_PREFERENZE: ['Usato un pulsante delle Preferenze', (k) => `Usati ${n(k)} pulsanti delle Preferenze`, 'Preferenze'],
+    RIMEDIO_CREDITI: ['Lavorato sui crediti', (k) => `Lavorato sui crediti ${n(k)} volte`, 'crediti'],
     INSTALLA_AGGIORNAMENTO: ['Avviato l\'aggiornamento', (k) => `Avviato l'aggiornamento ${n(k)} volte`, 'aggiornamento'],
   };
   const MAX_DETTAGLI = 3;
@@ -181,8 +202,12 @@
     wrap.appendChild(piano);
 
     const calmo = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+    // Token `motion`: ogni tempo del filo si moltiplica; a 0 il filo sta fermo come col movimento ridotto.
+    const motion = () => (global.SN_THEME_TOKENS ? global.SN_THEME_TOKENS.motionFactor(document) : 1);
     const durata = (nome, base) => {
-      try { return ms(getComputedStyle(wrap).getPropertyValue(nome), base); } catch (_) { return base; }
+      let v = base;
+      try { v = ms(getComputedStyle(wrap).getPropertyValue(nome), base); } catch (_) {}
+      return Math.round(v * motion());
     };
 
     const nodi = [];
@@ -246,15 +271,17 @@
       if (!finito) return false;
       if (avv.m !== avv.a) return false;
       if (Math.abs(onda.amp) > 0.02) return false;
-      return nodi.every((nd) => nd.stretta >= 1 || (nd.riaperto && Date.now() - nd.riaperto > 400)) && nodi.every((nd) => !nd.strappo);
+      const k = motion();
+      return nodi.every((nd) => nd.stretta >= 1 || (nd.riaperto && Date.now() - nd.riaperto > 400 * k)) && nodi.every((nd) => !nd.strappo);
     }
 
     function disegna() {
       if (!vivo || !wrap.isConnected) { corre = false; return; }
       const ora = Date.now();
-      onda.amp += (onda.ampA - onda.amp) * (calmo ? 1 : 0.06);
+      const k = motion();
+      onda.amp += (onda.ampA - onda.amp) * (calmo || !k ? 1 : 0.06);
       onda.vel += (onda.velA - onda.vel) * 0.08;
-      if (!calmo) onda.fase += onda.vel;
+      if (!calmo && k) onda.fase += onda.vel / k;
 
       if (avv.m !== avv.a) {
         const t = avv.durata > 0 && !calmo ? Math.min(1, (ora - avv.t0) / avv.durata) : 1;
@@ -262,7 +289,9 @@
         if (t >= 1) avv.m = avv.a;
       }
 
-      const fondo = fondoVivo();
+      // Fermo (tagliato o chiuso) il filo resta dentro il blocco: senza righe sotto, la sua lunghezza d'attesa lo portava
+      // sopra la riga che segue (#1296).
+      const fondo = finito ? Math.max(0, Math.min(fondoVivo(), wrap.clientHeight - onda.coda)) : fondoVivo();
       const alto = Math.max(fondo + onda.coda + 6, 30);
       piano.setAttribute('height', String(alto));
       piano.style.height = `${alto}px`;
@@ -272,7 +301,7 @@
         if (avv.m === 0) nd.y = nd.seg.offsetTop + RIGA;
         if (nd.riaperto) {
           // Un passo fallito: il cappio si stringe e poi si riapre, e il nodo non si forma mai.
-          const p = calmo ? 1 : Math.min(1, (ora - nd.riaperto) / 340);
+          const p = calmo || !k ? 1 : Math.min(1, (ora - nd.riaperto) / (340 * k));
           nd.stretta = 1 - 0.62 * facile(p);
         } else if (nd.stretta < 1) {
           nd.stretta = calmo || nd.durata <= 0 ? 1 : Math.min(1, (ora - nd.nato) / nd.durata);
@@ -290,7 +319,7 @@
         if (nd.riaperto) q = 0;
         let r = R_NODO * Math.min(1, q);
         if (nd.strappo) {
-          const p = Math.min(1, (ora - nd.strappo) / 180);
+          const p = k ? Math.min(1, (ora - nd.strappo) / (180 * k)) : 1;
           r *= 1 + Math.sin(Math.PI * p) / 3;
           if (p >= 1) nd.strappo = 0;
         }
@@ -326,15 +355,16 @@
       requestAnimationFrame(disegna);
     }
     let osserva = null;
-    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); } catch (_) {}
+    // Anche il blocco: la riga in testa che si apre sposta le righe senza cambiarne la misura.
+    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); osserva.observe(wrap); } catch (_) {}
     sveglia();
 
     return {
       el: piano,
       sveglia,
       // Mentre il modello ragiona il filo ondeggia pieno; mentre uno strumento lavora si tende, il lavoro è altrove.
-      pensa() { onda.ampA = calmo ? 0 : 3.2; onda.velA = 0.065; sveglia(); },
-      agisce() { onda.ampA = calmo ? 0 : 0.3; onda.velA = 0.014; sveglia(); },
+      pensa() { onda.ampA = calmo || !motion() ? 0 : 3.2; onda.velA = 0.065; sveglia(); },
+      agisce() { onda.ampA = calmo || !motion() ? 0 : 0.3; onda.velA = 0.014; sveglia(); },
       // Fermato dall'utente: il filo si taglia e la punta si affloscia di lato.
       taglia() { onda.tagliato = true; onda.ampA = 0; onda.coda = 2; finito = true; sveglia(); },
       // Lavoro chiuso: quello che è già successo sta fermo.

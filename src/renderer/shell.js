@@ -1,5 +1,6 @@
-// Shell renderer: tab bar + barra indirizzi.
-// Sottoscrive a `filoShell.tabs.onUpdate` per il rerender.
+// La barra in alto di Filo: fila delle schede, icone, notifiche, pannello degli
+// scaricamenti. Vive fuori dalle WebContentsView, quindi è l'unica superficie
+// che resta visibile sopra qualunque pagina.
 
 (() => {
   const api = window.filoShell;
@@ -7,10 +8,9 @@
     console.error('[Filo shell] filoShell non disponibile (preload non caricato?)');
     return;
   }
+  window.SN_RILASCIO_VISTA?.ascolta(document, { percorsoDi: api.percorsoDelFile, manda: api.rilascioNellaChat });
 
-  // Come si chiamano i tasti sul sistema di chi guarda: su Mac la scheda nuova
-  // si apre con Cmd+T, e il suggerimento deve dire quello. L'HTML è uno solo
-  // per tutti i sistemi, quindi la scritta si compone qui.
+  // Il nome del tasto si compone qui, non nell'HTML: regola in CLAUDE.md § Mac.
   const TASTI = window.SN_TASTI;
   const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
 
@@ -44,9 +44,8 @@
   const winMaxBtn = document.getElementById('win-max');
   const winCloseBtn = document.getElementById('win-close');
 
-  // Popola i bottoni del chrome con le SVG della libreria condivisa
-  // (`src/shared/icons.js`) così la barra in alto ha la stessa famiglia
-  // visiva del menu tasto destro.
+  // Icone da src/shared/icons.js: la barra deve stare nella stessa famiglia
+  // visiva del menu del tasto destro.
   const ICONS = window.SN_ICONS || {};
   function setIcon(el, name, size) {
     if (!el || typeof ICONS[name] !== 'function') return;
@@ -61,12 +60,13 @@
   setIcon(accountBtn, 'user', 16);
   setIcon(newBtn, 'plus', 16);
 
-  // Token estetici (#146.1): applica gli override dell'utente alle variabili
-  // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
-  // (stesso canale SETTINGS_UPDATED usato dalle pagine).
+  // #146.1 — i token estetici dell'utente valgono anche qui, e si riapplicano
+  // dal vivo a ogni cambio: la barra non può restare indietro sulle pagine.
   const ThemeTokens = window.SN_THEME_TOKENS;
+  let tokenShell = {};
   function applyShellTokens(tokens) {
-    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
+    tokenShell = tokens && typeof tokens === 'object' ? tokens : {};
+    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokenShell, { shell: true });
   }
   // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
   const TabColor = window.SN_TAB_COLOR;
@@ -141,10 +141,7 @@
     });
   }
 
-  // ── Modalità incognito ────────────────────────────────────────────────────
-  // La finestra incognito carica shell.html?incognito=1. Applichiamo un tema
-  // scuro dedicato (via data-incognito sul <html>, vedi shell.css) e mostriamo
-  // un badge "Incognito" nella barra così la finestra è inconfondibile.
+  // Tema dedicato e badge: una finestra incognito dev'essere inconfondibile.
   const isIncognito = new URLSearchParams(location.search).get('incognito') === '1';
   if (isIncognito) {
     document.documentElement.dataset.incognito = '1';
@@ -253,18 +250,24 @@
   // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
   // utente comune aprirebbero una pagina che non ha niente da mostrare, con un
   // invito ad accedere come amministratore che non porta da nessuna parte
-  // (amministratori non si diventa accedendo). Compaiono solo all'admin, come
-  // già fa "Modelli predefiniti" nel menu Impostazioni. Chi vuole MANDARE un
-  // feedback non passa di qui: passa dal menu del tasto destro, che il
-  // cambiamento non tocca.
+  // (amministratori non si diventa accedendo). Compaiono solo all'admin.
+  // Gestione è l'ingresso unico delle pagine dell'owner (#1414): Modelli
+  // predefiniti e Inviti e utenti stanno lì, non in altri menu. Chi vuole MANDARE
+  // un feedback non passa di qui: passa dal menu del tasto destro.
+  // Bacheca e Deck builder in pausa (#1592): li vede l'owner, o tutti se l'owner li ha aperti. Con la Bacheca in
+  // pausa le segnalazioni mandate restano raggiungibili: la voce porta alla sola parte che è dell'utente.
+  let inPausaVisibili = { bacheca: false, mazzi: false };
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-      { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+      ...(inPausaVisibili.mazzi ? [{ label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' }] : []),
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
-      { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
+      inPausaVisibili.bacheca
+        ? { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' }
+        : { label: 'Le tue segnalazioni', icon: 'feedback', url: 'filo://board/board.html#segnalazioni' },
     ];
     if (isAdmin) {
       entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
@@ -272,33 +275,27 @@
     }
     return entries;
   }
-  // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
-  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
-  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  // Voci del menu Impostazioni (ingranaggio): uguali per tutti. Le impostazioni
+  // predefinite dell'owner stanno in Gestione (#1414). `predefinita`: la pagina che il main prepara finché l'utente
+  // non ne ha scelta più spesso un'altra (#1129).
   function buildSettings() {
-    const entries = [
+    return [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
       { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
-      // Sta con "Modelli" e "Sicurezza" perché risponde alle stesse domande —
-      // quali modelli, che fine fanno i dati — ma dal lato del PERCHÉ.
+      // Con "Modelli" e "Sicurezza": stesse domande, dal lato del perché.
       { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
+      { label: 'Novità', icon: 'novita', url: 'filo://novita/novita.html' },
       { type: 'separator' },
-      { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
+      { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html', predefinita: true },
     ];
-    if (isAdmin) {
-      entries.push({ type: 'separator' });
-      entries.push({ label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' });
-    }
-    return entries;
   }
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
   // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
   let ancoraMenu = null;
-  function showNativeMenu(btn, entries) {
+  function showNativeMenu(btn, entries, opzioni) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
@@ -313,31 +310,43 @@
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
-    api.popupMenu(entries, x, y);
+    api.popupMenu(entries, x, y, opzioni);
   }
 
-  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
-  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
+  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings(), { prepara: 'impostazioni' }));
+  // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
+  function rifletteInPausa(r) {
+    if (!r || !r.ok) return;
+    inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+  }
+  function refreshInPausa(attendi = false) {
+    if (!MSG_FILO.IN_PAUSA_STATO) return Promise.resolve();
+    return api.message({ type: MSG_FILO.IN_PAUSA_STATO, attendi }).then(rifletteInPausa).catch(() => {});
+  }
+  refreshInPausa(true);
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(inPausaVisibili, m.nome)) {
+        inPausaVisibili = { ...inPausaVisibili, [m.nome]: m.visible === true };
+      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa(true);
+    });
+  }
+  appsBtn.addEventListener('click', () => { showNativeMenu(appsBtn, buildApps()); refreshInPausa(); });
 
-  // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
-  // non più nel menu Impostazioni → apre la finestra incognito nel main.
-  // Registrazione separata così funziona anche se il bottone account non è
-  // presente. L'altro ingresso resta l'icona nel menu del tasto destro.
+  // Registrata a parte perché deve funzionare anche senza il bottone account.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
       if (action === 'open-incognito' && api.openIncognito) api.openIncognito();
     });
   }
 
-  // ── Account "Accedi con Google" ───────────────────────────────────────────
-  // Lo stato vive nel main; qui mostriamo solo il profilo pubblico. Quando
-  // loggato, l'icona diventa l'avatar (foto Google) e il click apre un menu
-  // con "Esci"; quando non loggato, il click avvia il login.
+  // I token vivono nel main: qui arriva solo il profilo pubblico.
   let authProfile = null;
   let authBusy = false;
-  // Gate UX della voce admin "Modelli predefiniti". La garanzia forte resta nel
-  // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
-  // mostrare la voce di menu.
+  // «Lascia stare» chiude l'attesa qui: l'esito dell'accesso lasciato, se arriva, non parla più (#678.6).
+  let accessoN = 0;
+  // Gate UX delle voci dell'owner nel menu App. La garanzia forte resta nel main
+  // e nelle regole Firestore: qui decidiamo solo se mostrare la voce.
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
@@ -362,9 +371,9 @@
       accountBtn.dataset.tip = authProfile.email ? `${label} — ${authProfile.email}` : label;
       accountBtn.setAttribute('aria-label', `Account: ${label}`);
       accountBtn.classList.add('signed-in');
-      if (authProfile.picture) {
-        // Costruisco l'<img> via DOM così posso ripiegare sull'icona utente
-        // se la foto Google non si carica (CSP/rete).
+      // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
+      if (/^filo:\/\/icone\//.test(authProfile.picture || '')) {
+        // Via DOM per poter ripiegare sull'icona se la copia non si legge.
         const img = document.createElement('img');
         img.className = 'account-avatar';
         img.alt = '';
@@ -397,27 +406,41 @@
     renderAccount();
   }
 
+  // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461); la chiave è anche il loro tipo.
+  function avvisoErrore(testo, chiave, opts) {
+    try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave });
+  }
+
   async function doSignIn() {
-    if (authBusy) return;
+    // Con un accesso già aperto (lo chiede anche la chat, #1615) il main ne riporta davanti la pagina: l'esito resta al primo.
+    if (authBusy) { Promise.resolve(api.auth.signIn()).catch(() => {}); return; }
+    const n = ++accessoN;
     authBusy = true; renderAccount();
-    try {
-      const r = await api.auth.signIn();
-      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
-      else showToast((r && r.error) || 'Accesso non riuscito: riprova.');
-    } catch (_) {
-      showToast('Accesso non riuscito: riprova.');
-    } finally {
-      authBusy = false; renderAccount();
-    }
+    let r = null;
+    try { r = await api.auth.signIn(); } catch (_) { r = null; }
+    if (n !== accessoN) return;
+    authBusy = false;
+    if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
+    else avvisoErrore((r && r.error) || 'Accesso non riuscito: riprova.', 'accesso_non_riuscito');
+    renderAccount();
+  }
+
+  function lasciaStareAccesso() {
+    if (!authBusy) return;
+    Promise.resolve(api.message({ type: 'auth_signin_lascia' })).catch(() => {});
+    accessoN++;
+    authBusy = false;
+    renderAccount();
   }
 
   // YouTube, Gmail e Drive nelle schede: l'accesso a Google si apre in una scheda, con l'email già scritta.
   async function collegaGoogle() {
     try {
       const r = await api.message({ type: 'auth_collega_google' });
-      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+      if (r && r.ok === false) avvisoErrore(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.', 'accesso_non_riuscito');
     } catch (_) {
-      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+      avvisoErrore('Non sono riuscito ad aprire l\'accesso a Google. Riprova.', 'accesso_non_riuscito');
     }
   }
 
@@ -432,9 +455,23 @@
     // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
     // sloggato mostra "Accedi con Google" + incognito.
     accountBtn.addEventListener('click', async () => {
-      if (authBusy) return;
+      // Un accesso che aspetta il browser non spegne il menu (#678.6): lo dice, e si riapre o si lascia stare.
+      if (authBusy) {
+        showNativeMenu(accountBtn, [
+          { label: 'Completa l\'accesso nella pagina di Google', disabled: true },
+          { label: 'Torna all\'accesso', icon: 'user', action: 'auth-signin' },
+          { label: 'Lascia stare', icon: 'close', action: 'auth-lascia' },
+          { type: 'separator' },
+          { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
+          { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
+        ]);
+        return;
+      }
+      // L'ancora la toglie chi aziona il bottone appena il clic torna: dopo l'attesa il menu finiva nell'angolo.
+      const ancora = ancoraMenu;
       // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
       if (authProfile) await refreshAuth({ senzaRete: true });
+      ancoraMenu = ancora;
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
@@ -455,15 +492,14 @@
         ]);
       }
     });
-    // Il menu account usa azioni custom invece di url: ascolta la scelta.
     if (api.onMenuAction) {
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
         else if (action === 'auth-signin') doSignIn();
+        else if (action === 'auth-lascia') lasciaStareAccesso();
         else if (action === 'collega-google') collegaGoogle();
       });
     }
-    // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
       api.auth.onChanged((m) => {
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
@@ -478,7 +514,7 @@
   }
   // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
   // (tema, token dell'utente, incognito) e il profilo da mostrare.
-  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius', '--sn-motion', '--sn-ombra'];
   function rispecchiaBarra() {
     if (!api.barra) return;
     const cs = getComputedStyle(document.documentElement);
@@ -494,11 +530,23 @@
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
+  // A schermo intero il quadrato si vede solo con le schede scese dal bordo alto, e lì fa uscire (#1343).
+  function quadratoPerSchermoIntero(on) {
+    if (!winMaxBtn) return;
+    const testo = on ? 'Esci da schermo intero' : 'Massimizza';
+    setIcon(winMaxBtn, on ? 'restore' : 'maximize', 14);
+    winMaxBtn.dataset.tip = testo;
+    winMaxBtn.setAttribute('aria-label', testo);
+  }
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
+      if (m && m.type === tipo) quadratoPerSchermoIntero(!!m.fullscreen);
+    });
+  }
 
-  // Comandi shell pilotati dall'agente "Aiuto": l'AI aziona i comandi rapidi
-  // della barra cliccando il bottone REALE (così riusa menu, navigazione e
-  // toggle finestra senza duplicare logica). "close" è escluso di proposito:
-  // non è mappato qui, quindi l'AI non può chiudere la finestra.
+  // L'agente "Aiuto" clicca il bottone VERO, così non si duplica niente.
+  // "close" non è mappato apposta: l'agente non deve chiudere la finestra.
   if (api.onTriggerButton) {
     const triggerMap = {
       home: homeBtn,
@@ -525,7 +573,11 @@
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
   // schede nate dopo.
   // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
-  const SUGGERIMENTO_RITARDO = 350;
+  // L'attesa è il token `fumetto.ritardo`, la stessa del fumetto nelle pagine (src/shared/suggerimento.js).
+  function ritardoSuggerimento() {
+    const ms = ThemeTokens && ThemeTokens.durataMs ? ThemeTokens.durataMs(ThemeTokens.effectiveValue('fumetto.ritardo', tokenShell)) : NaN;
+    return Number.isFinite(ms) ? ms : 350;
+  }
   (() => {
     let showTimer = null;
     let currentTarget = null;
@@ -535,7 +587,8 @@
       if (currentTarget) api.tooltipHide();
       currentTarget = null;
     }
-    document.addEventListener('mouseover', (e) => {
+    // Anche `pointerover`: su un tasto disabilitato arrivano gli eventi del puntatore, non sempre quelli del mouse.
+    const sopra = (e) => {
       const t = e.target.closest('[data-tip]');
       if (t === currentTarget) return;
       // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
@@ -546,18 +599,23 @@
       if (!text) return;
       showTimer = setTimeout(() => {
         const r = t.getBoundingClientRect();
-        // Punto di ancoraggio: sotto il bottone, centrato. Il main rifinisce la
-        // posizione una volta misurato il testo (e potrà flipparlo se necessario).
+        // Ancora provvisoria: il main la rifinisce dopo aver misurato il testo.
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
+        // La carta se ne va adesso, prima della richiesta: due attese uguali non decidono chi arriva prima (#2310).
+        if (ANTEPRIMA.aperta()) ANTEPRIMA.nascondi();
         api.tooltipShow(text, x, y);
-      }, SUGGERIMENTO_RITARDO);
-    });
-    document.addEventListener('mouseout', (e) => {
+      }, ritardoSuggerimento());
+    };
+    const fuori = (e) => {
       const t = e.target.closest('[data-tip]');
       if (!t) return;
       if (t === currentTarget && (!e.relatedTarget || !t.contains(e.relatedTarget))) hide();
-    });
+    };
+    document.addEventListener('mouseover', sopra);
+    document.addEventListener('pointerover', sopra);
+    document.addEventListener('mouseout', fuori);
+    document.addEventListener('pointerout', fuori);
     document.addEventListener('mousedown', hide, true);
     window.addEventListener('blur', hide);
   })();
@@ -569,7 +627,7 @@
   const ANTEPRIMA = (() => {
     const RITARDO = 200;
     const CALDA = 600;
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     let timer = null;
     let attesaDi = null;
     let puntatore = null;
@@ -602,14 +660,16 @@
         misura: anteprimaSchede.size, tema: tema(),
       });
     }
-    function nascondi() {
+    // `clic`: la carta se ne va perché si è cliccata la sua scheda (contatori della finestra, #1470).
+    function chiudi(clic) {
       if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!aperta) return;
       aperta = null;
       spentaAlle = Date.now();
-      try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
+      try { api.anteprima && api.anteprima.nascondi({ clic: clic === true }); } catch (_) {}
     }
+    function nascondi() { chiudi(false); }
     function sopra(id) {
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!anteprimaSchede.enabled || drag) return;
@@ -636,7 +696,7 @@
     }
     function cede() {
       if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
-      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, ritardoSuggerimento());
     }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
@@ -674,7 +734,7 @@
     tabsEl.addEventListener('mousedown', (e) => {
       const el = e.target.closest('.tab[data-anteprima]');
       zittita = el ? el.dataset.anteprima : null;
-      nascondi();
+      chiudi(e.button === 0 && !!el && el.dataset.anteprima === aperta && !e.target.closest('.close'));
     }, true);
     tabsEl.addEventListener('wheel', nascondi, { passive: true });
     tabsEl.addEventListener('contextmenu', nascondi, true);
@@ -687,71 +747,170 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
-  // ── Drag & drop per riordinare le tab ─────────────────────────────────────
-  // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
-  // draggable: il drag nativo è inaffidabile in Electron sopra le
-  // WebContentsView ed è praticamente non testabile da Playwright. Con i mouse
-  // event il riordino è deterministico e si lascia esercitare dai test.
-  // `drag` resta non-null per tutta la trascinata; `moved` diventa true solo
-  // oltre la soglia, così un semplice click non viene scambiato per drag.
-  let drag = null; // { id, el, startX, moved }
+  // Trascinamento a mouse event, non col drag HTML5: quello è inaffidabile sopra le WebContentsView e Playwright non
+  // lo prova. La linguetta segue il puntatore con un transform e i nodi non si spostano fino al rilascio; fuori dalla
+  // fila la scheda va a chi sta sotto il puntatore (una chat di Filo, un campo di testo), via main (#2084).
+  let drag = null; // { id, el, startX, startY, moved, posti, da, a, fuori, pointerId }
   let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+  let ultimoPointerId = null;
+  const SOGLIA_TRASCINAMENTO = 4;
+  // Oltre questo margine sopra o sotto la fila la scheda esce dalla barra: tirando un po' storto si riordina ancora.
+  const MARGINE_FUORI = 10;
 
-  // Elemento .tab (escluso quello trascinato) dopo cui inserire, in base alla X.
-  function tabDragAfter(x) {
-    const els = [...tabsEl.querySelectorAll('.tab:not(.dragging)')];
-    let best = null;
-    let bestOffset = -Infinity;
-    for (const child of els) {
-      const box = child.getBoundingClientRect();
-      const offset = x - (box.left + box.width / 2);
-      if (offset < 0 && offset > bestOffset) { bestOffset = offset; best = child; }
-    }
-    return best;
+  function fuoriDallaFila(x, y) {
+    const r = tabRowEl.getBoundingClientRect();
+    if (y < r.top - MARGINE_FUORI || y > r.bottom + MARGINE_FUORI) return true;
+    return x < 0 || x > window.innerWidth;
   }
 
-  function onTabPointerMove(e) {
-    if (!drag) return;
-    if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
-    drag.moved = true;
-    // Difesa in profondità: se per qualsiasi motivo il nodo trascinato non è più
-    // attaccato al DOM (un ridisegno l'ha rigenerato), NON reinserire l'orfano —
-    // creerebbe un duplicato con lo stesso id. Riaggancia il nodo vivo per questo
-    // id prima di manipolarlo. Con la sospensione del render in drag questo non
-    // dovrebbe mai scattare, ma tiene l'invariante "mai due .tab con lo stesso id"
-    // vera comunque cambi la logica di render.
+  // Il posto d'arrivo: quante altre schede hanno il centro prima del centro della linguetta trascinata.
+  function postoDiArrivo(dx) {
+    const io = drag.posti[drag.da];
+    const centro = io.left + io.width / 2 + dx;
+    let a = 0;
+    drag.posti.forEach((p, i) => { if (i !== drag.da && p.left + p.width / 2 < centro) a++; });
+    return a;
+  }
+
+  function disponi(dx) {
+    const { posti, da, el } = drag;
+    const a = drag.fuori ? da : postoDiArrivo(dx);
+    drag.a = a;
+    const largo = posti[da].width;
+    posti.forEach((p, i) => {
+      if (i === da) return;
+      let sposta = 0;
+      if (da < a && i > da && i <= a) sposta = -largo;
+      else if (a < da && i >= a && i < da) sposta = largo;
+      p.el.style.transform = sposta ? `translateX(${sposta}px)` : '';
+    });
+    el.style.transform = drag.fuori ? '' : `translateX(${dx}px)`;
+  }
+
+  function avviaTrascinamento() {
+    // Invariante: mai due .tab con lo stesso id. Se il nodo trascinato è stato orfanato da un
+    // ridisegno, si riaggancia quello vivo.
     if (!drag.el.isConnected) {
       const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
       if (live) drag.el = live;
     }
+    const nodi = [...tabsEl.querySelectorAll('.tab')];
+    drag.posti = nodi.map((n) => { const r = n.getBoundingClientRect(); return { el: n, left: r.left, width: r.width }; });
+    drag.da = Math.max(0, nodi.indexOf(drag.el));
+    drag.a = drag.da;
+    drag.moved = true;
     drag.el.classList.add('dragging');
-    const after = tabDragAfter(e.clientX);
-    if (after == null) tabsEl.appendChild(drag.el);
-    else if (after !== drag.el.nextSibling) tabsEl.insertBefore(drag.el, after);
+    tabsEl.classList.add('riordino');
+    document.documentElement.classList.add('trascina-scheda');
+    try { ANTEPRIMA.nascondi(); } catch (_) {}
+    // Il puntatore resta alla barra anche sopra la pagina o fuori dalla finestra.
+    if (drag.pointerId != null) { try { tabsEl.setPointerCapture(drag.pointerId); } catch (_) {} }
   }
 
-  function onTabPointerUp() {
+  // Le posizioni fuori dalla fila vanno al main una per fotogramma: è lui che sa quale vista sta sotto.
+  let fuoriInAttesa = null;
+  function mandaFuori(fase, x, y) {
+    if (!api.schedaFuori || !drag) return;
+    const dati = { fase, id: drag.id, x: Math.round(x), y: Math.round(y) };
+    if (fase !== 'sopra') { fuoriInAttesa = null; try { api.schedaFuori(dati); } catch (_) {} return; }
+    const giaInCoda = !!fuoriInAttesa;
+    fuoriInAttesa = dati;
+    if (giaInCoda) return;
+    requestAnimationFrame(() => {
+      const d = fuoriInAttesa;
+      fuoriInAttesa = null;
+      if (d && drag && drag.fuori) { try { api.schedaFuori(d); } catch (_) {} }
+    });
+  }
+
+  function onTabPointerMove(e) {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < SOGLIA_TRASCINAMENTO) return;
+    if (!drag.moved) avviaTrascinamento();
+    const eraFuori = drag.fuori;
+    drag.fuori = fuoriDallaFila(e.clientX, e.clientY);
+    drag.el.classList.toggle('fuori', drag.fuori);
+    disponi(e.clientX - drag.startX);
+    if (drag.fuori) mandaFuori('sopra', e.clientX, e.clientY);
+    else if (eraFuori) mandaFuori('esci', e.clientX, e.clientY);
+  }
+
+  function smonta(d) {
     window.removeEventListener('mousemove', onTabPointerMove);
     window.removeEventListener('mouseup', onTabPointerUp);
+    if (d.pointerId != null) { try { tabsEl.releasePointerCapture(d.pointerId); } catch (_) {} }
+    d.el.classList.remove('dragging', 'fuori');
+    document.documentElement.classList.remove('trascina-scheda');
+  }
+
+  // Fine senza effetti (Esc, finestra che perde il fuoco): tutto torna dov'era.
+  function annullaTrascinamento() {
     const d = drag;
-    drag = null;
     if (!d) return;
-    d.el.classList.remove('dragging');
+    if (d.moved && d.fuori) mandaFuori('esci', 0, 0);
+    drag = null;
+    smonta(d);
     if (!d.moved) return;
-    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
-    ridisegnoRimandato = false;
+    suppressClickId = d.id;
+    tabsEl.classList.remove('riordino');
+    for (const p of d.posti) p.el.style.transform = '';
+    if (ridisegnoRimandato) render();
+  }
+
+  // Al rilascio i nodi prendono l'ordine nuovo e la linguetta scivola nel suo posto dal punto in cui la si è lasciata.
+  function assesta(d, dx) {
+    const nodi = d.posti.map((p) => p.el).filter((n) => n !== d.el);
+    nodi.splice(d.a, 0, d.el);
+    tabsEl.classList.remove('riordino');
+    for (const n of nodi) n.style.transform = '';
+    nodi.forEach((n, i) => { if (tabsEl.children[i] !== n) tabsEl.insertBefore(n, tabsEl.children[i] || null); });
+    const dove = d.posti[d.da].left + dx;
+    const ora = d.el.getBoundingClientRect().left;
+    if (Math.abs(dove - ora) < 1) return;
+    d.el.style.transform = `translateX(${dove - ora}px)`;
+    d.el.getBoundingClientRect();
+    d.el.classList.add('assesta');
+    d.el.style.transform = '';
+    const fine = () => d.el.classList.remove('assesta');
+    d.el.addEventListener('transitionend', fine, { once: true });
+    setTimeout(fine, 400);
+  }
+
+  function onTabPointerUp(e) {
+    const d = drag;
+    if (!d) return;
+    if (d.moved && !d.fuori && e && Number.isFinite(e.clientX)) {
+      d.fuori = fuoriDallaFila(e.clientX, e.clientY);
+      if (!d.fuori) disponi(e.clientX - d.startX);
+    }
+    if (d.moved && d.fuori && e) mandaFuori('lascia', e.clientX, e.clientY);
+    drag = null;
+    smonta(d);
+    if (!d.moved) return;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
-    // La posizione di rilascio è quella del NODO effettivamente trascinato, non
-    // la prima occorrenza dell'id: usare l'identità del nodo (indexOf(d.el)) è
-    // robusto anche se in barra esistesse un secondo .tab con lo stesso id, dove
-    // indexOf(id) prenderebbe la posizione sbagliata. Se il nodo non è in barra
-    // (non dovrebbe capitare), ripiego sull'id.
-    const nodes = [...tabsEl.querySelectorAll('.tab')];
-    let toIndex = nodes.indexOf(d.el);
-    if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
-    if (toIndex >= 0) api.tabs.move(d.id, toIndex);
+    if (d.fuori) {
+      tabsEl.classList.remove('riordino');
+      for (const p of d.posti) p.el.style.transform = '';
+      if (ridisegnoRimandato) render();
+      try {
+        Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
+          a: 'fuori_barra', esito: 'posato' })).catch(() => {});
+      } catch (_) {}
+      return;
+    }
+    const dx = e && Number.isFinite(e.clientX) ? e.clientX - d.startX : 0;
+    assesta(d, dx);
+    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
+    if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
+    // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
+    try {
+      Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
+        a: 'striscia_schede', esito: 'posato' })).catch(() => {});
+    } catch (_) {}
   }
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drag && drag.moved) { e.preventDefault(); annullaTrascinamento(); } }, true);
+  window.addEventListener('blur', () => { if (drag && drag.moved) annullaTrascinamento(); });
 
   // Un clic arriva solo se pressione e rilascio cadono sullo stesso nodo: se un aggiornamento ricrea la
   // striscia in mezzo, la X e il tasto centrale non chiudono niente. Col tasto giù si ridisegna al rilascio.
@@ -775,7 +934,7 @@
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
     if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
-    drag = { id: t.id, el, startX: e.clientX, moved: false };
+    drag = { id: t.id, el, startX: e.clientX, startY: e.clientY, moved: false, fuori: false, pointerId: e.isTrusted ? ultimoPointerId : null };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
   }
@@ -889,17 +1048,15 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
-  // Indicatore "audio in riproduzione": altoparlante con onde, così si
-  // riconoscono a colpo d'occhio le tab che stanno suonando — anche quelle in
-  // background. Cliccabile per silenziare al volo (parità col menu "Muta").
+  // Le schede che suonano si riconoscono a colpo d'occhio anche in secondo
+  // piano, e l'icona muta al clic: stessa cosa della voce "Muta" nel menu.
   const AUDIO_IND_SVG =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M18.5 6a9 9 0 0 1 0 12"/></svg>';
 
-  // Indicatore "aperta da un altro paese": globo + codice paese, discreto e
-  // caldo (accento Filo, niente lucchetti da security tool).
+  // Globo e codice paese: il tono è viaggio, non un lucchetto da antivirus.
   const PROXY_IND_SVG =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -918,8 +1075,7 @@
 
   let ctxTabId = null;
   let ctxMenuPos = { x: 0, y: 0 };
-  // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
-  // cambiare dalle impostazioni mentre l'app è aperta).
+  // Richiesto a ogni apertura: la configurazione può cambiare a Filo acceso.
   let ctxProxyStatus = null;
   let ctxGiro = 0;
   const senzaErrore = (fn) => { try { return Promise.resolve(fn()).catch(() => null); } catch (_) { return Promise.resolve(null); } };
@@ -927,10 +1083,12 @@
     const mio = ++ctxGiro;
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
-    // Le due domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi] = await Promise.all([
+    // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
+    const [proxy, permessi, impostazioni, chiuse] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
+      senzaErrore(() => api.message({ type: 'get_settings' })),
+      senzaErrore(() => api.tabs.ciSonoChiuse()),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
@@ -940,17 +1098,18 @@
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
-      { label: 'Aiuto', icon: 'help', action: 'tab-help' },
     ];
+    // L'Aiuto spento (#841) non ha la sua voce.
+    const ff = impostazioni && impostazioni.settings && impostazioni.settings.featureFlags;
+    if (!(ff && ff.help === false)) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
     // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
     // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
-        // Tab già instradata: si può cambiare paese (apre la lista) o tornare
-        // diretti. Senza "Cambia paese" l'utente dovrebbe prima tornare in
-        // Italia e poi riproxare — un'asimmetria inutile.
+        // "Cambia paese" c'è perché senza si dovrebbe prima tornare in Italia
+        // e poi ripartire: un giro in più per niente.
         entries.push({ label: 'Cambia paese', icon: 'globe', action: 'tab-proxy-pick' });
         entries.push({ label: 'Torna in Italia', icon: 'globe', action: 'tab-proxy-clear' });
       } else {
@@ -962,25 +1121,69 @@
     }
     // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
     const ck = t.cookies;
-    if (ck && (ck.shown || ck.rejected || ck.hidden)) {
-      entries.push({ type: 'separator' });
-      if (ck.shown) {
-        entries.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
-      } else {
-        if (ck.rejected) entries.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
-        if (ck.hidden) entries.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
-        entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
-      }
+    const cookieVoci = [];
+    if (ck && ck.shown) {
+      cookieVoci.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
+    } else if (ck && (ck.rejected || ck.hidden)) {
+      if (ck.rejected) cookieVoci.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
+      if (ck.hidden) cookieVoci.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
+      cookieVoci.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
     }
+    // #759 — con la privacy massima l'accesso al sito si perde alla chiusura, se non resta connesso.
+    if (t.connesso) {
+      cookieVoci.push(t.connesso.fidato
+        ? { label: 'Non restare connesso', icon: 'key', action: 'tab-connesso-no' }
+        : { label: 'Resta connesso qui', icon: 'key', action: 'tab-connesso-si' });
+    }
+    if (cookieVoci.length) entries.push({ type: 'separator' }, ...cookieVoci);
     // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }
-    entries.push(
-      { type: 'separator' },
-      { label: 'Chiudi', icon: 'close', action: 'tab-close' },
-    );
+    entries.push({ type: 'separator' }, { label: 'Chiudi', icon: 'close', action: 'tab-close' });
+    // #1695 — con una scheda sola non c'è niente da chiudere; senza chiuse la voce resta, spenta, dove la si cerca.
+    if (state.tabs.length > 1) entries.push({ label: 'Chiudi le altre schede', icon: 'tabs', action: 'tab-close-others' });
+    entries.push(vocePerRiaprire(chiuse));
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  const vocePerRiaprire = (ci) => (ci
+    ? { label: 'Riapri scheda chiusa', icon: 'undo', action: 'reopen-closed-tab' }
+    : { label: 'Riapri scheda chiusa', icon: 'undo', disabled: true });
+
+  // Il «+» ha il suo tasto destro (#1695): la scheda nuova e quella appena chiusa stanno nello stesso punto.
+  async function openNewTabContextMenu(x, y) {
+    const mio = ++ctxGiro;
+    const chiuse = await senzaErrore(() => api.tabs.ciSonoChiuse());
+    if (mio !== ctxGiro) return;
+    api.popupMenu([vocePerRiaprire(chiuse)], Math.round(x), Math.round(y));
+  }
+
+  async function chiudiLeAltre(id) {
+    let r = null;
+    try { r = await api.tabs.chiudiAltre(id); } catch (_) { r = null; }
+    const R = window.SN_RESTANO_APERTE;
+    const resto = r && R ? R.frase(R.conto(r.restano)) : '';
+    if (!resto) return;
+    const n = Number(r.chiuse) || 0;
+    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`, 'altre_schede_restano');
+  }
+
+  // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
+  async function restaConnesso(id, on, sito) {
+    let r = null;
+    try { r = await api.tabs.restaConnesso(id, on, sito); } catch (_) { r = null; }
+    if (!r || !r.ok) return;
+    // In Automatico l'accesso al sito resta comunque: la voce decide dei suoi contenuti incorporati in altri siti.
+    const automatico = r.modo === 'default';
+    // Un sito che tiene l'accesso in un archivio che non si sposta (chiavi crittografiche, WhatsApp Web): si rientra una volta.
+    const rientra = r.rientra ? (r.fidato ? ' Rientra una volta: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.'
+      : ' Per continuare devi rientrare: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.') : '';
+    showToast((r.fidato
+      ? (automatico ? `Resti connesso a ${r.nome} anche nei suoi contenuti dentro altri siti.`
+        : `Resti connesso a ${r.nome} anche quando chiudi la scheda o riapri Filo.`)
+      : (automatico ? `Dentro altri siti i contenuti di ${r.nome} tengono i cookie solo per la visita.`
+        : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra, 'resta_connesso_scelta');
   }
 
   async function azzeraPermessi(id) {
@@ -989,7 +1192,7 @@
     if (!r || !r.tolte) return;
     showToast(r.ricarica
       ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
-      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
+      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.', 'permessi_azzerati');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -1007,7 +1210,7 @@
       : err === 'bad_country'
         ? 'Paese non riconosciuto: riprova con un altro.'
         : 'Non sono riuscito ad aprire la scheda da un altro paese: il fornitore di rete non ha risposto. Riprova più tardi.';
-    showToast(msg);
+    avvisoErrore(msg, 'scheda_da_altro_paese');
   }
 
   function openProxyCountryMenu() {
@@ -1020,21 +1223,29 @@
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
-  // Le azioni del menu tornano qui (canale globale onMenuAction): filtriamo solo
-  // quelle `tab-…` e le applichiamo alla tab memorizzata in ctxTabId.
+  // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
+      // Dal menu della linguetta o del «+»: non riguarda una scheda.
+      if (action === 'reopen-closed-tab') { api.tabs.riapriChiusa('menu'); return; }
       const id = ctxTabId;
       if (!id) return;
+      // Quale voce si sceglie (#1470); le chiusure le conta la chiusura, e il paese scelto non esce.
+      if (/^tab-/.test(action) && !/^tab-close/.test(action) && !action.startsWith('tab-proxy-go:')) {
+        try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: action })).catch(() => {}); } catch (_) {}
+      }
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
-      else if (action === 'tab-close') api.tabs.close(id);
+      else if (action === 'tab-close') api.tabs.close(id, 'tasto_destro_scheda');
+      else if (action === 'tab-close-others') chiudiLeAltre(id);
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-connesso-si') restaConnesso(id, true);
+      else if (action === 'tab-connesso-no') restaConnesso(id, false);
       else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
@@ -1044,18 +1255,24 @@
   // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
   // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
   // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
+  // Nessuna scheda, attiva e stacco compresi, supera la larghezza massima del token `tab.larghezza` (#1493).
   const STACCO = 1.25;
   const STACCO_MAX = 1.8;
   const MIN_ATTIVA = 110;
   const MIN_SCHEDA = 40;
   let larghezzeInVigore = null; // { chiave, w: number[] }
+  function larghezzaMassima() {
+    const v = ThemeTokens ? parseInt(ThemeTokens.effectiveValue('tab.larghezza', tokenShell), 10) : NaN;
+    return Number.isFinite(v) ? Math.max(MIN_ATTIVA, v) : Infinity;
+  }
   function spazioDellaStriscia() {
     const spazio = tabRowEl.querySelector('.tab-drag-spacer');
     const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
     const cs = getComputedStyle(tabsEl);
     return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
   }
-  function larghezzeDistribuite(naturali, ia, posto) {
+  function larghezzeDistribuite(piene, ia, posto, massimo) {
+    const naturali = piene.map((w) => Math.min(w, massimo));
     const dietro = naturali.filter((_, i) => i !== ia);
     const ordinate = [...dietro].sort((a, b) => a - b);
     const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
@@ -1072,7 +1289,7 @@
     const attiva = attivaCon(tetto);
     const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
     const avanzo = Math.floor(posto - totale(tetto));
-    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    const conStacco = Math.min(massimo, attiva + Math.max(0, Math.min(stacco, avanzo)));
     return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
   }
   function misuraLarghezzeChieste() {
@@ -1084,7 +1301,7 @@
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
     const ia = schede.findIndex((el) => el.classList.contains('active'));
-    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const misurate = larghezzeDistribuite(naturali, ia, posto, larghezzaMassima());
     const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
     const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
     passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);
@@ -1095,6 +1312,7 @@
       const contenuto = Math.max(1, Math.ceil(w[i] - bordi));
       el.style.setProperty('--tab-chiesta', `${contenuto}px`);
       el.style.setProperty('--tab-crescita', String(contenuto));
+      el.classList.toggle('segni-stretti', w[i] < naturali[i]);
       el.classList.remove('misura');
     });
   }
@@ -1123,6 +1341,15 @@
   const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
   let firmaMisura = '';
   let attivaInVista = null;
+  // Nel posto del titolo ci sta almeno una lettera coi puntini (2em), o il titolo non si mostra, puntini compresi: mai un
+  // tratto di lettera, qualunque cosa gli stia accanto (#1293). Il posto resta, così chi gli sta dopo non si sposta.
+  const titoliStretti = typeof ResizeObserver === 'function' ? new ResizeObserver((voci) => {
+    for (const v of voci) {
+      const largo = v.contentRect.width;
+      const em = parseFloat(getComputedStyle(v.target).fontSize) || 13;
+      v.target.classList.toggle('illeggibile', largo > 0 && largo < 2 * em);
+    }
+  }) : null;
   // Colori veri del tema: leggerli forza un ricalcolo degli stili, quindi si rileggono solo al cambio di tema.
   let coloriTema;
   function coloriDelTema() {
@@ -1186,7 +1413,49 @@
     d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
     d.titolo = tabLabel(t);
     d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
+    const pm = t.permessi;
+    if (pm && ((pm.usati && pm.usati.length) || (pm.negati && pm.negati.length))) {
+      d.permessi = { usati: [...(pm.usati || [])].sort(), negati: [...(pm.negati || [])].sort() };
+    }
     return d;
+  }
+
+  // Il segno di cosa il sito della scheda ha avuto in questa pagina o si è visto negare (#586): icone piccole prima della
+  // croce. Se lo usa ancora lo sa solo la pagina, e la pagina può mentire: le frasi dicono cosa ha avuto, non «adesso».
+  const SEGNI_PERMESSI = {
+    audio: ['mic', 'Ha avuto il microfono in questa pagina', 'Microfono negato'],
+    video: ['camera', 'Ha avuto la fotocamera in questa pagina', 'Fotocamera negata'],
+    posizione: ['location', 'Ha saputo dove ti trovi in questa pagina', 'Posizione negata'],
+    schermo: ['windowFrame', 'Ha visto il tuo schermo in questa pagina', 'Schermo negato'],
+    notifiche: ['bell', '', 'Notifiche negate'],
+    appunti: ['clipboard', '', 'Appunti negati'],
+    schermi: ['windowFrame', '', 'Schermi negati'],
+    presenza: ['user', '', 'Presenza al computer negata'],
+    strumenti: ['readAloud', '', 'Strumenti musicali negati'],
+    rete: ['wifi', '', 'Rete locale negata'],
+    file: ['pencil', '', 'Modifica dei file negata'],
+    scaricamenti: ['download', '', 'Scaricamenti senza un tuo clic negati'],
+  };
+  // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
+  const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
+  const pesoSegno = (x) => { const i = PESO_SEGNO.indexOf(x); return i < 0 ? PESO_SEGNO.length : i; };
+  function disegnaSegni(nodo, pm) {
+    const frasi = [];
+    nodo.replaceChildren();
+    const usati = [...pm.usati].sort((a, b) => pesoSegno(a) - pesoSegno(b));
+    for (const [parte, negato] of [...usati.map((x) => [x, false]), ...pm.negati.map((x) => [x, true])]) {
+      const def = SEGNI_PERMESSI[parte];
+      if (!def) continue;
+      const i = document.createElement('span');
+      i.className = negato ? 'segno negato' : 'segno';
+      i.dataset.parte = parte;
+      setIcon(i, def[0], 13);
+      nodo.appendChild(i);
+      frasi.push(negato ? def[2] : def[1]);
+    }
+    const tip = frasi.filter(Boolean).join(' · ');
+    nodo.dataset.tip = tip;
+    nodo.setAttribute('aria-label', tip);
   }
 
   function creaScheda(id) {
@@ -1195,12 +1464,13 @@
     const ico = document.createElement('div');
     const title = document.createElement('span');
     title.className = 'title';
+    if (titoliStretti) titoliStretti.observe(title);
     const close = document.createElement('span');
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
     else close.textContent = '×';
     el.append(ico, title, close);
-    el._parti = { ico, title, close, paese: null, audio: null };
+    el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
     return el;
   }
 
@@ -1225,9 +1495,12 @@
     el.style.maxWidth = ferma;
 
     const p = el._parti;
-    p.ico.className = d.icona === null ? 'spinner' : 'favicon';
+    // Un sito senza icona prende il globo, come nella home: il posto vuoto sembrava un'icona che non si è caricata.
+    const senzaIcona = d.icona === '';
+    p.ico.className = d.icona === null ? 'spinner' : senzaIcona ? 'favicon senza-icona' : 'favicon';
     const nota = d.icona ? iconeNote.get(id) : null;
     p.ico.style.backgroundImage = nota && nota.dato ? `url("${nota.dato}")` : '';
+    p.ico.innerHTML = senzaIcona && typeof ICONS.globe === 'function' ? ICONS.globe(14) : '';
 
     // Indicatore "aperta da un altro paese": globo + codice paese accanto al
     // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
@@ -1269,6 +1542,16 @@
       p.audio.innerHTML = muta ? MUTE_IND_SVG : AUDIO_IND_SVG;
     }
 
+    if (d.permessi && !p.permessi) {
+      p.permessi = document.createElement('span');
+      p.permessi.className = 'tab-permessi';
+      el.insertBefore(p.permessi, p.audio || p.close);
+    } else if (!d.permessi && p.permessi) {
+      p.permessi.remove();
+      p.permessi = null;
+    }
+    if (p.permessi) disegnaSegni(p.permessi, d.permessi);
+
     // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
     p.close.dataset.tip = d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
   }
@@ -1307,10 +1590,16 @@
         el._firma = firma;
         cambiata = true;
       }
-      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0]);
+      // L'avviso audio non rimisura: la fila e il «+» restano fermi quando una scheda comincia o smette di suonare, e
+      // l'avviso prende posto dal titolo finché la fila non si rimisura per altro (#431.2).
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.ferma || 0, d.permessi || null]);
       nodi.push(el);
     }
-    for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
+    for (const [id, el] of [...schedeVive]) {
+      if (visti.has(id)) continue;
+      if (titoliStretti) titoliStretti.unobserve(el._parti.title);
+      schedeVive.delete(id);
+    }
     if (nodi.length !== tabsEl.children.length || nodi.some((n, i) => tabsEl.children[i] !== n)) {
       allineaSchede(nodi);
       cambiata = true;
@@ -1334,15 +1623,12 @@
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
-    // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
-    // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
+    // Non c'è un campo URL: l'indirizzo si scrive dalla home.
     const a = activeTab();
     backBtn.disabled = !(a && a.canBack);
     fwdBtn.disabled = !(a && a.canFwd);
     reloadBtn.disabled = !a;
 
-    // Chrome compatto: la barra indirizzi (icone + URL) si vede SOLO sulla home
-    // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
   }
 
@@ -1360,6 +1646,7 @@
     e.preventDefault();
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
+  tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
     if (s) startTabDrag(e, s.t, s.el);
@@ -1367,7 +1654,7 @@
   tabsEl.addEventListener('click', (e) => {
     const s = schedaDellEvento(e);
     if (!s) return;
-    if (e.target.closest('.close')) { api.tabs.close(s.t.id); return; }
+    if (e.target.closest('.close')) { api.tabs.close(s.t.id, 'pulsante_x'); return; }
     if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
     if (suppressClickId === s.t.id) { suppressClickId = null; return; }
     api.tabs.activate(s.t.id);
@@ -1375,7 +1662,7 @@
   tabsEl.addEventListener('auxclick', (e) => {
     if (e.button !== 1) return;
     const s = schedaDellEvento(e);
-    if (s) api.tabs.close(s.t.id);
+    if (s) api.tabs.close(s.t.id, 'clic_centrale');
   });
   // Un font che finisce di caricare cambia la larghezza dei nomi.
   try { document.fonts.addEventListener('loadingdone', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); }); } catch (_) {}
@@ -1386,51 +1673,44 @@
     return url;
   }
 
-  // Etichette pulite per le schede delle pagine interne di Filo: niente prefisso
-  // "Filo —", e il nome è quello del tasto che apre la pagina (es. "Modelli" per
-  // le Opzioni). La newtab è "Home". Le pagine web esterne tengono il loro title.
+  // Il nome sulla scheda di una pagina interna è quello del TASTO che la apre, senza prefisso:
+  // due nomi per la stessa cosa sono un modo di non farla trovare.
   const FILO_TAB_LABELS = {
     'newtab': 'Home',
     'options/options.html': 'Modelli',
     'options/altro.html': 'Altro',
     'security/security.html': 'Sicurezza',
     'preferences/preferences.html': 'Preferenze',
-    'admin-defaults/admin-defaults.html': 'Modelli predefiniti',
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',
-    'archive/archive.html': 'Cronologia',
+    'quaderno/quaderno.html': 'Memorie',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };
 
-  // Toglie un eventuale prefisso "Filo — " / "Filo -" da un titolo di pagina.
   function stripFiloPrefix(title) {
     return String(title || '').replace(/^\s*Filo\s*[—–-]\s*/i, '').trim();
   }
 
-  // Nome da mostrare sulla scheda. Le pagine filo:// interne usano l'etichetta
-  // pulita; tutto il resto usa il title della pagina (o l'URL come ripiego).
   function tabLabel(t) {
     const url = t.url || '';
     if (url.startsWith('filo://')) {
-      // Chiave = host + path, senza lo slash iniziale del path. La newtab è
-      // "filo://newtab/" → chiave "newtab".
+      // Chiave = host + path senza slash iniziale: "filo://newtab/" → "newtab".
       const rest = url.slice('filo://'.length);
       const noQuery = rest.split(/[?#]/)[0];
       const key = noQuery.replace(/\/+$/, '');
       if (FILO_TAB_LABELS[key]) return FILO_TAB_LABELS[key];
       const host = key.split('/')[0];
       if (FILO_TAB_LABELS[host]) return FILO_TAB_LABELS[host];
-      // Pagina interna non mappata: almeno togli il prefisso "Filo —".
+      // Pagina interna non mappata: almeno via il prefisso.
       const clean = stripFiloPrefix(t.title);
       if (clean) return clean;
     }
     return t.title || displayUrl(t.url) || 'Nuova scheda';
   }
 
-  // La "home" di Filo è la newtab (mappata sulla dashboard). Senza tab attiva
-  // trattiamo lo stato come home così la barra resta accessibile.
+  // Senza scheda attiva vale "home", o la barra diventa irraggiungibile.
   function isHomeUrl(url) {
     return !url || url.startsWith('filo://newtab/');
   }
@@ -1447,9 +1727,8 @@
     try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
-  // §6 — la rotellina verticale del mouse scrolla la striscia delle tab in
-  // orizzontale (la tab bar non ha scroll verticale). Solo quando c'è davvero
-  // overflow, così non intercettiamo gesti inutili.
+  // §6 — la rotella verticale scorre la striscia in orizzontale, ma solo se
+  // c'è davvero overflow: altrimenti si ruberebbe un gesto per niente.
   tabsEl.addEventListener('wheel', (e) => {
     if (tabsEl.scrollWidth <= tabsEl.clientWidth) return;
     const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -1458,22 +1737,20 @@
     e.preventDefault();
   }, { passive: false });
 
-  // Notifiche/toast in basso a destra (spec #170.1). Sistema riutilizzabile:
-  // ogni notifica è una card impilata nell'angolo, con durata configurabile
-  // (0 = infinita → resta finché l'utente non preme la X) e suono opzionale.
-  // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
+  // #170.1 — notifiche impilate in basso a destra; durata 0 = resta finché non
+  // la si chiude. È la base su cui passano tutti gli avvisi della shell.
   const NOTIFS = (() => {
     let host = null;
-    // Tetto al numero di card impilate insieme. Senza limite una raffica di
-    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
-    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
-    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
-    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
-    // vengono rimosse subito, senza attendere il timeout.
+    // Tetto alle carte a schermo: una raffica non spinge le più vecchie fuori dalla finestra. Quelle oltre il tetto
+    // non si buttano (#1477): aspettano dietro un «+N» che le mostra. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
     const MAX_STACK = 5;
+    // «+N» aperto: tutte a schermo finché sono più del tetto.
+    let aperta = false;
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
+    // Il puntatore sopra la pila: le carte in vista in quel momento sono lette (#1470).
+    let sopraOra = false;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -1485,29 +1762,40 @@
         }
         new MutationObserver(rispecchia).observe(host, {
           childList: true, subtree: true, characterData: true,
-          attributes: true, attributeFilter: ['class', 'data-closing'],
+          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa'],
         });
       }
       return host;
     }
     // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
     // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
         testo: c.querySelector('.shell-notif-msg')?.textContent || '',
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
+        indirizzo: c.dataset.indirizzo || '',
+        // #588.8 — lo scaricamento che la carta porta con sé quando la si trascina.
+        trascina: c.dataset.trascina || '',
       }));
+      const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
-      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
+      if (api.avvisi.onSopra) {
+        api.avvisi.onSopra((dati) => {
+          sopraOra = !!(dati && dati.sopra);
+          tempi.ferma(sopraOra);
+          if (sopraOra) for (const c of vive()) if (c.dataset.attesa !== '1') c._letta = true;
+        });
+      }
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -1517,34 +1805,69 @@
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
         if (btn) btn.click();
       });
+      if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
-    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
-    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
-    function enforceCap() {
-      const h = hostEl();
-      const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
-      const over = live.length - MAX_STACK;
-      for (let i = 0; i < over; i++) {
-        const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._tempo) c._tempo.annulla();
-        try { c.remove(); } catch (_) {}
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
+    function disponi() {
+      const live = vive();
+      if (live.length <= MAX_STACK) aperta = false;
+      const nascoste = aperta ? 0 : live.length - MAX_STACK;
+      live.forEach((c, i) => {
+        const attesa = i < nascoste;
+        if (attesa === (c.dataset.attesa === '1')) return;
+        if (attesa) {
+          c.dataset.attesa = '1';
+          c._inAttesa = true;
+          if (c._tempo) c._tempo.annulla();
+          c._tempo = null;
+        } else {
+          delete c.dataset.attesa;
+          if (sopraOra) c._letta = true;
+          avviaTempo(c, c._durata);
+        }
+      });
+    }
+    function comandoPila(azione) {
+      if (azione === 'apri' || azione === 'riduci') {
+        aperta = azione === 'apri';
+        disponi();
+      } else if (azione === 'chiudi-tutti') {
+        for (const c of vive()) dismiss(c, 'chiuse_tutte');
       }
+    }
+    function uscita(card) {
+      const fn = card._alChiudere;
+      card._alChiudere = null;
+      if (typeof fn === 'function') { try { fn(); } catch (_) {} }
     }
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
-      card._tempo = tempi.avvia(ms, () => dismiss(card));
+      card._tempo = tempi.avvia(ms, () => dismiss(card, 'scaduta'));
     }
-    function dismiss(card) {
+    // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
+    function contaUscita(card, esito) {
+      try {
+        Promise.resolve(api.message({
+          type: 'contatori_evento', misura: 'notifica', tipo: card._tipo || '', esito, letta: !!card._letta, inAttesa: !!card._inAttesa,
+        })).catch(() => {});
+      } catch (_) {}
+    }
+    // `esito`: scaduta, chiusa_x, azione_N, chiuse_tutte, sostituita; senza, l'ha ritirata chi l'aveva mostrata.
+    function dismiss(card, esito = 'ritirata') {
       if (!card || card.dataset.closing === '1') return;
+      contaUscita(card, esito);
       card.dataset.closing = '1';
       if (card._tempo) card._tempo.annulla();
       card._tempo = null;
+      uscita(card);
       card.classList.remove('show');
+      disponi();
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
+      if (!vive().length) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
     // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3). Stanno prima della X.
     function azioni(card, actions) {
@@ -1553,8 +1876,10 @@
       if (!Array.isArray(actions) || !actions.length) return;
       const bar = document.createElement('div');
       bar.className = 'shell-notif-actions';
+      let indice = 0;
       for (const a of actions) {
         if (!a || !a.label) continue;
+        const esito = `azione_${indice++}`;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'shell-notif-action';
@@ -1564,20 +1889,22 @@
           // ripeterebbe l'azione (due schede da «Apri comunque»).
           if (card.dataset.closing === '1') return;
           try { a.onClick && a.onClick(); } catch (_) {}
-          dismiss(card);
+          dismiss(card, esito);
         });
         bar.appendChild(btn);
       }
       card.insertBefore(bar, card.querySelector('.shell-notif-close'));
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
-    // actions: [{ label, onClick }], unica }. Senza opts usa la config delle Preferenze.
+    // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, «Chiudi tutti»).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
+    // `indirizzo`: il sito da cui nasce l'avviso; nel filo se ne va con le pagine di quel sito (#1561).
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
-      if (opts.key) dismissKey(opts.key);
+      if (opts.key) dismissKey(opts.key, 'sostituita');
       // Una durata scelta da chi chiama vale per la durata standard: quella delle Preferenze la riporta in scala.
       const chiesta = opts.durationSec != null ? Number(opts.durationSec) : window.SN_AVVISI.STANDARD_SEC;
       const durata = window.SN_AVVISI.durata(Number.isFinite(chiesta) && chiesta >= 0 ? chiesta * 1000 : undefined, notifConfig.durationSec);
@@ -1586,8 +1913,20 @@
       const gemella = chiave && Array.from(hostEl().children)
         .find((c) => c.dataset.unica === chiave && c.dataset.closing !== '1');
       if (gemella) {
+        // Chi c'era è stata sostituita: la nuova riparte coi suoi segni.
+        contaUscita(gemella, 'sostituita');
+        gemella._tipo = typeof opts.tipo === 'string' ? opts.tipo : '';
+        gemella._letta = sopraOra && gemella.dataset.attesa !== '1';
+        gemella._inAttesa = false;
+        if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
+        gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
+        gemella.dataset.indirizzo = opts.indirizzo ? String(opts.indirizzo) : '';
+        gemella.dataset.trascina = opts.trascinaDownloadId ? String(opts.trascinaDownloadId) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        gemella._durata = durata;
+        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
         avviaTempo(gemella, durata);
         return gemella;
       }
@@ -1595,8 +1934,13 @@
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._durata = durata;
+      card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
+      card._tipo = typeof opts.tipo === 'string' ? opts.tipo : '';
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
+      if (opts.indirizzo) card.dataset.indirizzo = String(opts.indirizzo);
+      if (opts.trascinaDownloadId) card.dataset.trascina = String(opts.trascinaDownloadId);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1610,19 +1954,18 @@
       close.className = 'shell-notif-close';
       close.setAttribute('aria-label', 'Chiudi notifica');
       close.textContent = '×';
-      close.addEventListener('click', () => dismiss(card));
+      close.addEventListener('click', () => dismiss(card, 'chiusa_x'));
       card.appendChild(close);
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
-      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
-      enforceCap();
+      disponi();
+      if (sopraOra && card.dataset.attesa !== '1') card._letta = true;
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
 
-      // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
@@ -1637,17 +1980,17 @@
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
-    function dismissKey(key) {
+    function dismissKey(key, esito = 'ritirata') {
       for (const c of hostEl().querySelectorAll('.shell-notif')) {
-        if (c.dataset.key === String(key)) dismiss(c);
+        if (c.dataset.key === String(key)) dismiss(c, esito);
       }
     }
     return { show, dismiss, dismissKey, rispecchia };
   })();
 
-  // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
-  // passa per il sistema di notifiche, così rispetta la durata configurata.
-  function showToast(text) { return NOTIFS.show(text); }
+  // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
+  // `tipo`: l'id della notifica per i contatori (#1470).
+  function showToast(text, tipo) { return NOTIFS.show(text, tipo ? { tipo } : undefined); }
 
   // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
   // Il main risponde { ok:false, missing:true, error } quando il percorso non
@@ -1655,30 +1998,37 @@
   // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
   // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
   // cartella come via d'uscita (il file potrebbe essere lì rinominato).
-  function openDownloadFile(id, confirmed) {
+  // `luogo`: 'notifica' dai pulsanti di un avviso; senza, il pannello (contatori #1470).
+  function openDownloadFile(id, confirmed, luogo) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFile(id, confirmed).then((res) => {
+    return api.downloads.openFile(id, confirmed, luogo).then((res) => {
       if (!res || res.ok !== false) return;
       // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
       // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
       // senza eseguirlo) resta a un clic.
       // La domanda sta nella riga del pannello: un avviso in basso finirebbe
       // sotto la pagina, e il clic sembrerebbe non fare niente.
-      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.parti); return; }
       const opts = res.missing
-        ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
+        ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id, 'notifica') }] }
         : undefined;
-      NOTIFS.show(res.error || 'Non è stato possibile aprire il file', opts);
+      avvisoErrore(res.error || 'Non è stato possibile aprire il file', 'file_non_aperto', opts);
     }).catch(() => {});
   }
-  function openDownloadFolder(id) {
+  function openDownloadFolder(id, luogo) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFolder(id).then((res) => {
+    return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
-      if (res.ok === false) { NOTIFS.show(res.error || 'Non è stato possibile aprire la cartella'); return; }
-      // Cartella aperta, ma il file dentro non c'è più: meglio dirlo che
-      // lasciare l'utente a cercarlo.
-      if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
+      if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
+      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+    }).catch(() => {});
+  }
+
+  // #1287 — «Riprova» da un avviso o da una riga: lo stesso indirizzo riparte nella stessa voce.
+  function riprovaDownload(id) {
+    if (!api.downloads || !api.downloads.riprova) return Promise.resolve();
+    return api.downloads.riprova(id).then((res) => {
+      if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
     }).catch(() => {});
   }
 
@@ -1686,8 +2036,17 @@
   // programma?», dove la pagina non la copre.
   let chiediApertura = null;
 
+  if (api.onSuona) api.onSuona((info) => {
+    const S = window.SN_SOUNDS;
+    if (!S || !info || !S.TONES[info.tono]) return;
+    S.play(info.tono, info.volume);
+  });
+
   if (api.onToast) api.onToast((info) => {
+    if (info && typeof info.ritira === 'string') { NOTIFS.dismissKey(info.ritira); return; }
     if (!info || !info.text) return;
+    let annullata = false;
+    let allaChiusura = null;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito; con apriComunque scavalca la lista dei siti bloccati (#170.3).
@@ -1699,12 +2058,23 @@
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl, a.apriComunque === true) };
           }
-          // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
+          // #759 — la proposta dopo un accesso: «Resta connesso» su quel sito.
+          if (a && typeof a.restaConnesso === 'string' && !a.onClick && api.tabs.restaConnesso) {
+            const sito = a.restaConnesso;
+            return { label: a.label, onClick: () => restaConnesso(null, true, sito) };
+          }
+          // F4 — la segnalazione automatica aspetta questo avviso (#784.6): Annulla la ferma, chiuderlo la fa partire.
           if (a && a.cancelAutoFeedback && !a.onClick) {
-            const fbId = a.cancelAutoFeedback;
+            const fbId = String(a.cancelAutoFeedback);
+            const nonRitirata = (r) => NOTIFS.show((r && r.frase) || 'Non sono riuscito a ritirare la segnalazione', { tipo: 'segnalazione_non_ritirata' });
+            allaChiusura = () => { if (!annullata) api.message({ type: 'auto_feedback_parti', id: fbId }).catch(() => {}); };
             return {
               label: a.label,
-              onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
+              onClick: () => {
+                annullata = true;
+                api.message({ type: 'cancel_auto_feedback', id: fbId })
+                  .then((r) => { if (!r || r.ok === false) nonRitirata(r); }, () => nonRitirata(null));
+              },
             };
           }
           // #975 — la proposta del menu del sito: «Sì» lo mette al primo posto su quel sito, «Annulla» lo toglie.
@@ -1715,6 +2085,29 @@
               onClick: () => api.message({ type: 'menu_del_sito_imposta', sito, attivo: attivo === true, avvisa: attivo === true }).catch(() => {}),
             };
           }
+          // #843 — «Annulla» dopo aver spento o riacceso Filo su un sito: rimette i siti di quel cambio.
+          if (a && a.filoSpento && !a.onClick) {
+            const { siti, spento } = a.filoSpento;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'filo_spento_imposta', siti: Array.isArray(siti) ? siti : [], spento: spento === true }).catch(() => {}),
+            };
+          }
+          // #967 — «Annulla» dopo un «Continua»: il sito esce dai fidati e l'avviso torna sulla pagina.
+          if (a && a.sitiFidati && !a.onClick) {
+            const voci = Array.isArray(a.sitiFidati.voci) ? a.sitiFidati.voci : [];
+            return { label: a.label, onClick: () => api.message({ type: 'siti_fidati_imposta', fidato: false, voci }).catch(() => {}) };
+          }
+          // #349 — «Riapri» dopo la pulizia delle schede: riporta quelle chiuse da quel giro.
+          if (a && Number.isInteger(a.riapriPulizia) && !a.onClick) {
+            const pulizia = a.riapriPulizia;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'riapri_pulizia_schede', pulizia }).then((r) => {
+                if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home', { tipo: 'riordino_schede' });
+              }).catch(() => {}),
+            };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
@@ -1722,37 +2115,65 @@
             return {
               label: a.label,
               onClick: () => api.message({ type: 'aggiornamento_installa' }).then((res) => {
-                if (res && res.ok === false) NOTIFS.show(res.frase || 'Non sono riuscito ad avviare l’aggiornamento');
+                if (res && res.ok === false) avvisoErrore(res.frase || 'Non sono riuscito ad avviare l’aggiornamento', 'aggiornamento_non_avviato');
               }).catch(() => {}),
             };
           }
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
-            return { label: a.label, onClick: () => openDownloadFile(id) };
+            return { label: a.label, onClick: () => openDownloadFile(id, false, 'notifica') };
+          }
+          // #941.1 — l'avviso di via porta alla home, dove lo scaricamento avanza: una home già aperta, se c'è.
+          if (a && a.apriHome && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => {
+                const home = state.tabs.find((t) => t.url && isHomeUrl(t.url));
+                if (home) api.tabs.activate(home.id); else api.tabs.open('filo://newtab/');
+              },
+            };
           }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
-            return { label: a.label, onClick: () => openDownloadFolder(id) };
+            return { label: a.label, onClick: () => openDownloadFolder(id, 'notifica') };
           }
           // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
           if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
             const id = a.rimettiNomeDownloadId;
             return {
               label: a.label,
-              onClick: () => api.downloads.rimettiNome(id).then((r) => {
-                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
-                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+              onClick: () => api.downloads.rimettiNome(id, 'notifica').then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso' });
+                else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };
+          }
+          // #1287 — lo scaricamento non riuscito riparte nella stessa voce.
+          if (a && a.riprovaDownloadId && !a.onClick && api.downloads && api.downloads.riprova) {
+            const id = a.riprovaDownloadId;
+            return { label: a.label, onClick: () => riprovaDownload(id) };
+          }
+          // #906 — una pagina di Filo (i giudici fermi aprono Gestione): solo indirizzi filo://.
+          if (a && typeof a.apriFilo === 'string' && !a.onClick && /^filo:\/\/[a-z0-9-]+\/\S*$/i.test(a.apriFilo)) {
+            const url = a.apriFilo;
+            return { label: a.label, onClick: () => api.tabs.open(url) };
+          }
+          // #1357.2 — il nome che Filo non ha saputo dare: la casella per scriverlo, nella pagina Download.
+          if (a && a.rinominaDownloadId && !a.onClick) {
+            const id = a.rinominaDownloadId;
+            return { label: a.label, onClick: () => api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(id)}`) };
           }
           return a;
         }),
       };
+      if (allaChiusura) opts.alChiudere = allaChiusura;
+      // #588.8 — l'avviso di un file arrivato si trascina come il file: dove lo si lascia, arriva quello.
+      const delFile = info.opts.actions.find((a) => a && typeof a.openDownloadId === 'string');
+      if (delFile) opts.trascinaDownloadId = delFile.openDownloadId;
     }
     NOTIFS.show(info.text, opts);
   });
-  // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
   // Il sì di una domanda che la pagina fa comparire sotto il cursore si arma dopo ARMA_MS (scaricamenti, permessi):
@@ -1769,17 +2190,10 @@
   }
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
-  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
-  // nativa della pagina) + pannello espandibile con i singoli download. Il
-  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
-  // WebContentsView nativa e altrimenti lo occulterebbe).
+  // Pannello dei singoli download, che si apre da solo quando c'è una domanda (#588): nella fila di tab non
+  // c'è un tasto (#941), l'elenco sta nella home e nella pagina Download. reserveTop lo porta SOPRA la view
+  // nativa della pagina, che altrimenti lo coprirebbe.
   if (api.downloads) {
-    const dlBtn = document.getElementById('dl-indicator');
-    const dlIcon = document.getElementById('dl-ind-icon');
-    const dlCount = document.getElementById('dl-ind-count');
-    const dlFill = document.getElementById('dl-ind-fill');
-    setIcon(dlIcon, 'download', 15);
-
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
@@ -1790,6 +2204,8 @@
     // nella riga che li ha chiesti (id → testo).
     const domandeApri = new Map();
     const avvisiRiga = new Map();
+    // #1287 — { n, nome } mentre la finestra in incognito aspetta di sapere cosa fare degli scaricamenti in corso.
+    let chiusura = null;
     // #588 — il «sì» di una domanda sui programmi non si dà col clic che l'ha
     // fatta comparire: la riga nasce dove la pagina ha appena mandato il
     // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
@@ -1800,11 +2216,6 @@
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
-
-    // #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «Altro»): lì l'indicatore
-    // c'è solo a pannello aperto, che una domanda sui programmi apre da sé (#588).
-    let suHome = true;
-    const indicatoreNascosto = () => dls.size === 0 || (suHome && !panelOpen);
 
     function fmtBytes(n) {
       n = Number(n) || 0;
@@ -1828,44 +2239,9 @@
       }
     }
 
-    function renderIndicator() {
-      const all = Array.from(dls.values());
-      if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = indicatoreNascosto();
-      const active = all.filter(isActive);
-      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
-      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
-      // segno che la domanda è ancora lì sparirebbe con lui.
-      const attesa = all.filter((r) => r && r.state === 'pending');
-      dlBtn.classList.toggle('attesa', attesa.length > 0);
-      dlBtn.dataset.tip = attesa.length
-        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Download';
-      if (active.length || attesa.length) {
-        dlCount.hidden = false;
-        dlCount.textContent = String(active.length + attesa.length);
-        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
-        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
-        let recv = 0; let total = 0; let known = 0;
-        for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (!active.length) {
-          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
-          // che aspetta l'utente e non si muove.
-          dlBtn.classList.remove('indeterminate', 'active');
-          dlFill.style.width = '0%';
-        } else if (known && total > 0) {
-          dlBtn.classList.remove('indeterminate');
-          dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
-          dlBtn.classList.add('active');
-        } else {
-          dlBtn.classList.add('indeterminate', 'active');
-          dlFill.style.width = '40%';
-        }
-      } else {
-        dlBtn.classList.remove('active', 'indeterminate');
-        dlCount.hidden = true;
-        dlFill.style.width = '0%';
-      }
+    // Un elenco svuotato non lascia aperto un pannello che direbbe solo «Nessun download».
+    function aggiornaPannello() {
+      if (!dls.size) { if (panelOpen) closePanel(); return; }
       if (panelOpen) renderPanel();
     }
 
@@ -1889,7 +2265,7 @@
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo dei download';
+      allBtn.dataset.tip = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
@@ -1898,14 +2274,30 @@
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
       clearBtn.textContent = 'Svuota';
-      clearBtn.title = 'Rimuovi i download conclusi';
+      clearBtn.dataset.tip = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
+      // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'dl-panel-close';
+      closeBtn.id = 'dl-panel-close';
+      closeBtn.dataset.tip = 'Chiudi';
+      closeBtn.setAttribute('aria-label', 'Chiudi');
+      setIcon(closeBtn, 'close', 13);
+      closeBtn.addEventListener('click', () => closePanel());
       head.appendChild(title);
       head.appendChild(allBtn);
       head.appendChild(clearBtn);
+      head.appendChild(closeBtn);
       panel.appendChild(head);
+      const domandaChiusura = document.createElement('div');
+      domandaChiusura.className = 'dl-chiusura';
+      domandaChiusura.id = 'dl-chiusura';
+      domandaChiusura.hidden = true;
+      domandaChiusura.setAttribute('role', 'alertdialog');
+      panel.appendChild(domandaChiusura);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
       list.id = 'dl-panel-list';
@@ -1923,7 +2315,8 @@
         if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
-      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|')
+        + (chiusura ? `|chiusura:${chiusura.n}` : '');
       if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       if (!all.length) {
         const empty = document.createElement('div');
@@ -1935,6 +2328,7 @@
       } else {
         list.replaceChildren(...all.map(renderRow));
       }
+      disegnaChiusura();
       const manca = elencoFermoDa + ARMA_MS - Date.now();
       if (manca > 0 && !timerArma) {
         timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);
@@ -1963,7 +2357,7 @@
         name.appendChild(tag);
       }
       name.appendChild(document.createTextNode(r.filename || 'download'));
-      name.title = r.filename || '';
+      name.dataset.tip = r.filename || '';
       row.appendChild(name);
 
       if (isActive(r)) {
@@ -1982,9 +2376,15 @@
       meta.className = 'dl-row-meta';
       const p = pct(r);
       if (isActive(r)) {
-        meta.textContent = p != null
+        let base = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+        // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+        if (r.nota) base = p != null || r.receivedBytes ? `${r.nota} · ${base}` : r.nota;
+        // #1287 — quanto va veloce e quanto manca, misurati dal main.
+        let corsa = '';
+        try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+        meta.textContent = corsa ? `${base} · ${corsa}` : base;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       } else if (r.state === 'pending') {
@@ -1992,18 +2392,21 @@
         // solo nell'avviso che l'utente può aver già chiuso.
         const da = provenienza(r);
         meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
+      } else if (r.state === 'interrupted' && r.nota) {
+        meta.textContent = `${stateLabel(r)} · ${r.nota}`;
+        meta.dataset.tip = r.nota;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
       row.appendChild(meta);
 
-      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
-      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : null;
+      const domanda = r.state === 'pending' ? partiScarica(r) : apri;
       if (domanda) {
         row.dataset.chiede = '1';
         const ask = document.createElement('div');
         ask.className = 'dl-row-ask';
-        ask.textContent = domanda;
+        riempiDomanda(ask, domanda);
         row.appendChild(ask);
       }
       if (avvisiRiga.has(r.id)) {
@@ -2053,9 +2456,21 @@
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       } else {
+        if (r.state === 'interrupted' && /^https?:/i.test(String(r.url || ''))) addBtn('Riprova', () => riprovaDownload(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      // #588.8 — un file arrivato si trascina dalla sua riga: sul campo per caricare file di un sito, nella chat.
+      if (r.state === 'completed' && !r.missing && api.downloads.trascina) {
+        row.draggable = true;
+        row.dataset.trascina = '1';
+        row.addEventListener('dragstart', (e) => {
+          e.preventDefault();
+          api.downloads.trascina(r.id).then((res) => {
+            if (res && res.ok === false && res.error) { avvisiRiga.set(r.id, res.error); if (panelOpen) renderPanel(); }
+          }).catch(() => {});
+        });
+      }
       if (r.state === 'completed' && !apri) {
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
         if (menuRiga.id === r.id && menuRiga.voci.length) {
@@ -2147,40 +2562,25 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
-      dlBtn.hidden = indicatoreNascosto();
-      dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
-      // I file possono essere spariti dal disco mentre il pannello era chiuso
-      // (nessun evento lo annuncia): ri-leggendo la lista all'apertura le voci
-      // ormai vuote si mostrano già attenuate, senza aspettare un clic a vuoto.
+      // Un file può sparire dal disco a pannello chiuso e nessun evento lo
+      // annuncia: la lista si rilegge all'apertura, non dopo un clic a vuoto.
       api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
     }
     function closePanel() {
       panelOpen = false;
-      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
-      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      // Chiuso il pannello senza rispondere, la finestra in incognito resta aperta.
+      chiusura = null;
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre un programma in attesa resta in
+      // attesa, e la risposta si dà dalla pagina Download o dalla carta della home.
       domandeApri.clear();
       avvisiRiga.clear();
       firmaElenco = '';
       if (panel) panel.hidden = true;
-      dlBtn.classList.remove('open');
-      dlBtn.hidden = indicatoreNascosto();
       riservaSopra('scaricamenti', 0);
     }
-    function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
-    dlBtn.addEventListener('click', togglePanel);
-
-    function seguiScheda(snap) {
-      const a = snap && Array.isArray(snap.tabs) ? snap.tabs.find((t) => t.id === snap.activeId) : null;
-      const home = isHomeUrl(a ? a.url : null);
-      if (home === suHome) return;
-      suHome = home;
-      renderIndicator();
-    }
-    api.tabs.onUpdate(seguiScheda);
-    api.tabs.snapshot().then(seguiScheda).catch(() => {});
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
@@ -2190,17 +2590,67 @@
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
-      renderIndicator();
+      aggiornaPannello();
       if (panelOpen) renderPanel();
+    }
+
+    // #1287 (D51) — la finestra in incognito si sta chiudendo con scaricamenti in corso: la domanda sta in cima al
+    // pannello, sopra la pagina. Le due risposte chiudono la finestra; chiudere il pannello la lascia aperta.
+    function disegnaChiusura() {
+      const el = panel && panel.querySelector('#dl-chiusura');
+      if (!el) return;
+      if (!chiusura) { el.hidden = true; el.replaceChildren(); return; }
+      const testo = document.createElement('div');
+      testo.className = 'dl-chiusura-testo';
+      if (chiusura.n === 1) {
+        testo.append('Chiudo la finestra, ma ');
+        const nome = document.createElement('span');
+        nome.className = 'dl-chiusura-nome';
+        nome.textContent = `«${chiusura.nome}»`;
+        testo.append(nome, ' non ha finito di scaricarsi: lo lascio finire?');
+      } else {
+        testo.textContent = `Chiudo la finestra, ma ${chiusura.n} scaricamenti non sono finiti: li lascio finire?`;
+      }
+      const azioni = document.createElement('div');
+      azioni.className = 'dl-row-actions';
+      const spento = Date.now() - elencoFermoDa < ARMA_MS;
+      for (const [etichetta, scelta, nota] of [
+        ['Lascia finire', 'finire', 'Chiude la finestra: il file arriva lo stesso nella cartella Download'],
+        ['Annulla', 'annulla', 'Ferma lo scaricamento e chiude la finestra'],
+      ]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dl-row-btn';
+        b.textContent = etichetta;
+        b.dataset.scelta = scelta;
+        b.dataset.tip = nota;
+        b.disabled = spento;
+        b.addEventListener('click', () => {
+          api.downloads.chiusura(scelta).then((res) => {
+            if (res && res.ok === false) { chiusura = null; if (panelOpen) renderPanel(); }
+          }).catch(() => {});
+        });
+        azioni.appendChild(b);
+      }
+      el.replaceChildren(testo, azioni);
+      el.hidden = false;
+    }
+    function chiediChiusura(items) {
+      const vive = (Array.isArray(items) ? items : []).filter((r) => r && r.id);
+      if (!vive.length) return;
+      for (const r of vive) dls.set(r.id, r);
+      chiusura = { n: vive.length, nome: vive[0].filename || 'download' };
+      if (panelOpen) renderPanel(); else openPanel();
     }
 
     // Aggiornamenti live dal main (start/progress/done/error/removed).
     api.downloads.onEvent((info) => {
+      if (info && info.kind === 'chiusura') { chiediChiusura(info.items); return; }
       if (!info || !info.item) return;
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
-      renderIndicator();
+      aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
       if (info.kind === 'ask') mostraRiga(info.item.id);
       else if (panelOpen) renderPanel();
@@ -2211,9 +2661,30 @@
       return r.site ? `da ${r.site}` : '';
     }
 
-    function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
-      return `«${r.filename}» è un programma. Scaricarlo?`;
+    // Le domande sui programmi a pezzi: il nome lo sceglie il sito, e fra le parole di Filo potrebbe chiudere le
+    // virgolette e continuare con la sua voce. Sta in un riquadro suo, come nei popup di conferma (#592.7).
+    function partiScarica(r) {
+      try {
+        if (r.chiede === 'piuFile') return window.SN_ESEGUIBILI.partiPiuFile(r.filename, r.fermati);
+        return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy);
+      } catch (_) {}
+      return ['Il file', { citazione: String(r.filename || '') }, 'è un programma. Scaricarlo?'];
+    }
+
+    function riempiDomanda(el, parti) {
+      for (const p of parti) {
+        if (typeof p === 'string') {
+          if (!p.trim()) continue;
+          const t = document.createElement('div');
+          t.textContent = p.trim();
+          el.appendChild(t);
+        } else if (p && typeof p === 'object' && p.citazione != null) {
+          const q = document.createElement('div');
+          q.className = 'dl-row-ask-nome';
+          q.textContent = String(p.citazione);
+          el.appendChild(q);
+        }
+      }
     }
 
     // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
@@ -2225,8 +2696,11 @@
       });
     }
 
-    chiediApertura = (id, testo) => {
-      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+    chiediApertura = (id, parti) => {
+      const r = dls.get(id);
+      let d = Array.isArray(parti) && parti.length ? parti : null;
+      if (!d && r) { try { d = window.SN_ESEGUIBILI.partiApri(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {} }
+      domandeApri.set(id, d || ['È un programma: aprirlo vuol dire eseguirlo.']);
       mostraRiga(id);
     };
 
@@ -2234,7 +2708,11 @@
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
   }
 
-  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
+  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
+  newBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openNewTabContextMenu(e.clientX, e.clientY);
+  });
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
@@ -2246,34 +2724,33 @@
     winCloseBtn?.addEventListener('click', () => api.window.close());
   }
 
-  // Scorciatoie globali a livello shell.
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 't') {
       e.preventDefault();
-      api.tabs.open('filo://newtab/');
+      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
+      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/', e.repeat ? '' : 'scorciatoia');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
-      const a = activeTab(); if (a) api.tabs.close(a.id);
+      const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
     } else if (meta && e.key.toLowerCase() === 'l') {
-      // L'indirizzo si digita dalla home: Ctrl+L apre la home di Filo.
+      // L'indirizzo si digita dalla home: la stessa porta del tasto premuto in una pagina.
       e.preventDefault();
       const a = activeTab();
-      if (a) api.tabs.navigate(a.id, 'filo://newtab/');
+      if (a) api.tabs.scriviIndirizzo(a.id);
       else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();
-      const a = activeTab(); if (a) api.tabs.reload(a.id);
+      const a = activeTab(); if (a) api.tabs.reload(a.id, e.repeat ? '' : 'scorciatoia');
     } else {
-      // Salto alla N-esima scheda (quando il focus è sulla barra di Filo; per
-      // le pagine ci pensa before-input-event nel main). Quale combinazione
-      // sia lo decide src/shared/tasti.js: Alt+cifra qui, Cmd+cifra su Mac.
-      // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
-      // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
-      const idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, (state.tabs || []).length) : null;
+      // Salto alla N-esima scheda, o alla vicina con Ctrl+Tab, col fuoco sulla barra (per le pagine ci pensa il main). La
+      // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.
+      const schede = state.tabs || [];
+      let idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, schede.length) : null;
+      if (idx == null && TASTI) idx = TASTI.indiceSchedaVicina(e, schede.findIndex((t) => t.id === state.activeId), schede.length);
       if (idx != null) {
         e.preventDefault();
-        const tab = state.tabs[idx];
+        const tab = schede[idx];
         if (tab) api.tabs.activate(tab.id);
       }
     }
@@ -2286,20 +2763,13 @@
   });
   api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
-  // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
-  // Il box feedback vive in un content script sulla pagina e da lì oscura solo
-  // l'area pagina. Quando si apre, il main ci avvisa via `shell:feedback-dim`
-  // così copriamo ANCHE la barra in alto di Filo con lo stesso velo: tutta la
-  // app entra in penombra, segnalando che si è in modalità annotazione. Il velo
-  // intercetta i click (cursore a mirino) per evitare interazioni accidentali
-  // con tab/indirizzo mentre si sta dando un feedback.
+  // Il box feedback vive sulla pagina e da lì oscura solo la pagina: la barra la deve oscurare
+  // la shell, o l'app resta a metà in penombra. Il velo intercetta anche i clic.
   if (api.onFeedbackDim) {
     let dimTabId = null;
 
-    // ── Disegno annotazione sulla barra in alto ──────────────────────────
-    // Permette di disegnare a mano libera su tab+barra indirizzi (la parte di
-    // Filo non coperta dalla WebContentsView), così l'annotazione copre TUTTA
-    // l'app. I tratti sono identici a quelli della pagina (rosso, spessore 3).
+    // Si disegna anche sulla barra, o l'annotazione coprirebbe solo mezza app.
+    // Tratti identici a quelli della pagina: è lo stesso disegno.
     const drawCanvas = document.getElementById('feedback-draw');
     const STROKE_COLOR = '#ff3b30';
     const STROKE_WIDTH = 3;
@@ -2371,7 +2841,7 @@
       drawCanvas.addEventListener('pointerup', endStroke);
       drawCanvas.addEventListener('pointercancel', endStroke);
       window.addEventListener('resize', () => { if (!drawCanvas.hidden) sizeDrawCanvas(); });
-      // Il box (pagina) ha premuto "Cancella disegno": ripuliamo anche la barra.
+      // "Cancella disegno" sulla pagina deve cancellare anche qui.
       api.onFeedbackClearDraw?.(() => { clearDraw(); reportState(); });
     }
 
@@ -2396,9 +2866,8 @@
       }
     }
     api.onFeedbackDim(setDim);
-    // Rete di sicurezza: se l'utente cambia tab mentre il box è aperto, il
-    // content script di quella pagina non riceve più eventi e non potrà
-    // togliere la penombra → la togliamo qui appena la tab attiva cambia.
+    // Cambiando scheda a box aperto, il content script di quella pagina non
+    // riceve più eventi e la penombra resterebbe: la togliamo noi.
     api.tabs.onUpdate((snap) => {
       if (document.documentElement.dataset.feedbackDim && snap && snap.activeId !== dimTabId) {
         setDim(false);
@@ -2441,6 +2910,7 @@
       popupAvvisati.set(tabId, voce);
       voce.carta = NOTIFS.show(testo, {
         durationSec: 8,
+        tipo: 'popup_bloccato',
         actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(voce.url, false, tabId); } catch (_) {} } }],
       });
       const x = voce.carta && voce.carta.querySelector('.shell-notif-close');
@@ -2470,9 +2940,11 @@
       if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
       if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
       if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'schermo') return { testo: 'vuole vedere il tuo schermo', icone: ['windowFrame'] };
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'scaricamenti') return { testo: 'vuole scaricare più file senza un tuo clic', icone: ['download'] };
       if (d.tipo === 'file') {
         const o = d.oggetto || {};
         const nome = String(o.nome || '');
@@ -2498,12 +2970,46 @@
       return bar;
     };
 
-    const rispondiA = (d, si) => {
+    const rispondiA = (d, si, fonte) => {
       const i = domande.indexOf(d);
       if (i >= 0) domande.splice(i, 1);
-      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      api.tabs.rispondiPermesso(d.id, si, fonte).catch(() => {});
       mostraDomanda();
     };
+
+    const creaConsenti = (d) => {
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      si.addEventListener('click', () => rispondiA(d, true));
+      return si;
+    };
+
+    const fontiDelloSchermo = (d) => (Array.isArray(d.fonti) ? d.fonti : []).map((f) => {
+      const bt = document.createElement('button');
+      bt.type = 'button';
+      bt.className = 'permesso-btn permesso-fonte';
+      bt.dataset.tipo = String(f.tipo || '');
+      const nome = f.questa ? 'Questa scheda' : String(f.nome || '');
+      bt.dataset.tip = nome;
+      const vista = document.createElement('span');
+      vista.className = 'permesso-fonte-vista';
+      if (typeof f.anteprima === 'string' && f.anteprima.startsWith('data:image/')) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = f.anteprima;
+        vista.appendChild(img);
+      } else {
+        setIcon(vista, f.tipo === 'scheda' ? 'globe' : 'windowFrame', 22);
+      }
+      const n = document.createElement('span');
+      n.className = 'permesso-fonte-nome';
+      n.textContent = nome;
+      bt.append(vista, n);
+      bt.addEventListener('click', () => rispondiA(d, true, String(f.id || '')));
+      return bt;
+    });
 
     // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
     const mostraDomanda = () => {
@@ -2537,7 +3043,7 @@
         const s = document.createElement('span');
         s.className = 'permesso-sotto';
         s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
-        s.title = d.host || '';
+        s.dataset.tip = d.host || '';
         chi.appendChild(s);
       }
       const host = document.createElement('strong');
@@ -2553,28 +3059,33 @@
         n.className = 'permesso-oggetto';
         const c = Array.from(cosa.nome);
         n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
-        n.title = String(cosa.percorso || cosa.nome);
+        n.dataset.tip = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }
-      const si = document.createElement('button');
-      si.type = 'button';
-      si.className = 'permesso-btn permesso-si';
-      si.textContent = 'Consenti';
+      // Lo schermo (#586): ogni cosa che si può mostrare è il suo «Consenti», e la scelta vale per questa volta.
+      const consensi = d.tipo === 'schermo' ? fontiDelloSchermo(d) : [creaConsenti(d)];
       // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
       const arma = () => {
-        si.disabled = true;
+        for (const c of consensi) c.disabled = true;
         clearTimeout(timerArma);
-        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+        timerArma = setTimeout(() => { if (mostrata === d) for (const c of consensi) c.disabled = false; }, ARMA_MS);
       };
       arma();
-      b.onpointerdown = () => { if (si.disabled) arma(); };
-      si.addEventListener('click', () => rispondiA(d, true));
+      b.onpointerdown = () => { if (consensi.some((c) => c.disabled)) arma(); };
       const no = document.createElement('button');
       no.type = 'button';
       no.className = 'permesso-btn permesso-no';
       no.textContent = 'Non consentire';
       no.addEventListener('click', () => rispondiA(d, false));
-      b.replaceChildren(icone, msg, no, si);
+      b.classList.toggle('permesso-schermo', d.tipo === 'schermo');
+      if (d.tipo === 'schermo') {
+        const fila = document.createElement('div');
+        fila.className = 'permesso-fonti';
+        fila.append(...consensi);
+        b.replaceChildren(icone, msg, no, fila);
+      } else {
+        b.replaceChildren(icone, msg, no, ...consensi);
+      }
       b.hidden = false;
       requestAnimationFrame(() => {
         const h = Math.ceil(b.getBoundingClientRect().height);
@@ -2602,6 +3113,66 @@
         }
       }
       mostraDomanda();
+    });
+  }
+
+  // Il microfono di Filo per una pagina web (#586): si apre qui, nella cornice, e alla pagina vanno solo i campioni a
+  // 16 kHz (services/microfonoDiFilo.js). Così il sito non riceve mai il permesso.
+  if (api.tabs.onMicrofono) {
+    const RATE = 16000;
+    const aperti = new Map();
+    const chiudiMic = (id) => {
+      const m = aperti.get(id);
+      aperti.delete(id);
+      if (!m || !m.ctx) return;
+      try { m.proc.onaudioprocess = null; m.proc.disconnect(); m.source.disconnect(); } catch (_) {}
+      try { m.stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+      try { m.ctx.close(); } catch (_) {}
+    };
+    const apriMic = async (id) => {
+      const Seg = window.SN_DICTATION_SEGMENTER;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      aperti.set(id, {});
+      let stream;
+      try {
+        if (!Seg || !Ctx) throw Object.assign(new Error('mic'), { name: 'NotSupportedError' });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: String((e && e.name) || 'NotAllowedError') });
+        return;
+      }
+      // Chiuso mentre il sistema rispondeva: il microfono non resta acceso per nessuno.
+      if (!aperti.has(id)) { try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {} return; }
+      let ctx; let source; let proc;
+      try {
+        ctx = new Ctx();
+        source = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(4096, 1, 1);
+        try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
+      } catch (_) {
+        try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+        try { if (ctx) ctx.close(); } catch (_) {}
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: 'NotReadableError' });
+        return;
+      }
+      aperti.set(id, { stream, ctx, source, proc });
+      proc.onaudioprocess = (e) => {
+        if (!aperti.has(id)) return;
+        try { api.tabs.microfonoDati(id, Seg.downsample(e.inputBuffer.getChannelData(0), ctx.sampleRate, RATE)); } catch (_) {}
+      };
+      source.connect(proc);
+      proc.connect(ctx.destination);
+      // Il microfono staccato a metà: la pagina lo sa, e non aspetta campioni che non arrivano.
+      for (const tr of stream.getAudioTracks()) tr.addEventListener('ended', () => { if (aperti.has(id)) { chiudiMic(id); api.tabs.microfonoFine(id); } });
+      api.tabs.microfonoEsito(id, { ok: true, rate: RATE });
+    };
+    api.tabs.onMicrofono(({ azione, id } = {}) => {
+      const k = String(id || '');
+      if (!k) return;
+      if (azione === 'apri') apriMic(k);
+      else if (azione === 'chiudi') chiudiMic(k);
     });
   }
 })();

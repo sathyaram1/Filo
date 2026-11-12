@@ -1,11 +1,11 @@
 // L'account Google entrato nelle schede (#1123): da lì i domini di Google tengono i cookie anche nei riquadri
 // (Automatico) e il loro jar comune diventa persistente (Privacy). Non apre pagine: lo fa auth/prodottiGoogle.js.
-// I domini del gruppo stanno in dominiGoogle.js.
+// I domini del gruppo stanno in shared/dominiGoogle.js.
 
 'use strict';
 
 const { session } = require('electron');
-const G = require('./dominiGoogle');
+const G = require('../../shared/dominiGoogle');
 
 const ACCOUNTS = 'https://accounts.google.com/';
 const seguite = new WeakSet();

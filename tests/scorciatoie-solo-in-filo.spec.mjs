@@ -4,7 +4,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, statoDi } from './helpers/riquadri.mjs';
 
 // Sui siti la spiegazione sta in uno shadow root chiuso (#1071): il titolo si legge dal mondo dei content script.
 const titolo = async (app, page, frame = null) => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo || '';
@@ -79,11 +79,11 @@ test('Alt+T sul testo selezionato apre la traduzione', async ({ app, openTab, te
 test('Alt+H apre l\'Aiuto sulla pagina, anche col fuoco sulla barra di Filo', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, TESTO);
   await premi(app, 'H');
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  await expect((await paginaDellAiuto(app, page)).locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
 
   const altra = await testServer.openReady(openTab, TESTO);
   await premi(app, 'H', { dove: 'barra' });
-  await expect(altra.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  await expect((await paginaDellAiuto(app, altra)).locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
 });
 
 test('Alt+H funziona anche su una pagina interna di Filo', async ({ app, openTab }) => {
@@ -189,11 +189,16 @@ function tastieraSullaAttiva(app) {
   });
 }
 
+// Sui siti l'Aiuto sta nello strato sopra la scheda (#1509.3); la domanda alla scheda resta, ed è anche l'attesa che
+// la pagina appena tornata davanti risponda.
 function aiutoSullaAttiva(app) {
-  return app.evaluate(({ BrowserWindow }) => {
+  return app.evaluate(async ({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    return t.view.webContents.executeJavaScript('!!document.querySelector(".sn-sidebar")');
+    const qui = await t.view.webContents.executeJavaScript('!!document.querySelector(".sn-sidebar")');
+    const s = w._filoTabs.riquadri?.strati?.get(t.view.webContents);
+    if (qui || !s || !s.pronta || s.vista.webContents.isDestroyed()) return qui;
+    return s.vista.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: '!!document.querySelector(".sn-sidebar")' }]);
   });
 }
 

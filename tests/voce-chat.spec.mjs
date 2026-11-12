@@ -1,11 +1,15 @@
 // #948 — Il tasto microfono delle chat: si preme, si parla, il testo compare nella casella e la richiesta parte
-// da sola dopo un attimo per annullare; con «Lascia il testo da correggere» resta nella casella. Home, Aiuto, Editor.
+// da sola dopo un attimo per annullare; con «Lascia il testo da correggere» resta nella casella. Home e Aiuto, che
+// dal #1433 è anche la chat dell'Editor.
+// Nella home, mentre Filo lavora, il dettato parte come seguito (#1296).
 // Microfono finto (un tono: per il segmentatore è voce, spento è silenzio), trascrizione e chat finte nel main:
 // tutto il resto (ascolto, fine del parlato, WAV, inserimento, invio) è il codice di produzione.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'che tempo fa domani a Lisbona';
@@ -123,6 +127,40 @@ test('home: il microfono si vede accanto all\'invio, si parla e la richiesta par
   expect(richieste.some((r) => r.includes(DETTO))).toBe(true);
 });
 
+// #1296 — dettato mentre Filo lavora è un seguito, come Invio con del testo: non ferma e non aspetta la fine per partire.
+test('home: dettato mentre Filo lavora, parte come seguito senza fermarlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  await app.evaluate(() => {
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const ultimo = [...messages].reverse().find((m) => m.role === 'user');
+      globalThis.__richieste.push(typeof ultimo?.content === 'string' ? ultimo.content : JSON.stringify(ultimo?.content));
+      const primo = n++ === 0;
+      if (primo) await new Promise((r) => setTimeout(r, 12_000));
+      const testo = primo ? 'Prima risposta.' : 'Domani c\'è il sole.';
+      try { onDelta && onDelta(testo); } catch (_) {}
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: testo, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+  const page = await home(app);
+  await page.locator('#input').fill('prima domanda');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('#stopBtn')).toBeVisible();
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await parla(page);
+  await expect(page.locator('.dash-bubble-attesa', { hasText: DETTO })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#input')).toHaveValue('');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Prima risposta.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Domani c\'è il sole.' })).toBeVisible({ timeout: 10_000 });
+  const richieste = await app.evaluate(() => globalThis.__richieste);
+  expect(richieste.length).toBe(2);
+  expect(richieste[1]).toContain(DETTO);
+});
+
 test('home: nell\'attimo per annullare, la croce ferma l\'invio e il testo resta da correggere', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -153,7 +191,7 @@ test('home: con «Lascia il testo da correggere» (scelto dal tasto destro sul m
 
   // Il tasto destro sul microfono offre le due scelte; quella di serie è segnata.
   await mic.click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('✓ Invia da solo')).toBeVisible();
   await menu.getByText('Lascia il testo da correggere').click();
@@ -224,40 +262,19 @@ test('trascrizione fallita: un avviso lo dice e niente parte', async ({ app, she
   expect(await app.evaluate(() => globalThis.__richieste.length)).toBe(0);
 });
 
-// Le altre chat di Filo rispondono col modello senza flusso: qui risponde quello finto.
+// L'Aiuto chiede in diretta, per mostrare il ragionamento (#578.1): qui risponde quello finto.
 async function rispostaFinta(app, testo) {
   await app.evaluate((_e, t) => {
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+    const finto = async ({ attempts, messages, onDelta }) => {
       const ultimo = [...messages].reverse().find((m) => m.role === 'user');
       globalThis.__richieste.push(typeof ultimo?.content === 'string' ? ultimo.content : JSON.stringify(ultimo?.content));
+      try { onDelta && onDelta(t); } catch (_) {}
       return { text: t, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   }, testo);
 }
-
-test('editor: la chat del documento ha il microfono, e la domanda detta parte da sola', async ({ app, shell, openTab }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await prepara(app);
-  await rispostaFinta(app, 'Il documento è vuoto.');
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="switch"]');
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="chat"]');
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
-  await microfonoFinto(page);
-  const chat = page.locator('.ed-module[data-type="chat"]');
-  const mic = chat.locator('.sn-voce-btn');
-  await expect(mic).toBeVisible();
-  await expect(mic).toHaveAttribute('title', /^Parla \(/);
-  mkdirSync(SHOTS, { recursive: true });
-  await chat.screenshot({ path: `${SHOTS}/voce-chat-editor.png` });
-  await mic.click();
-  await parla(page, mic);
-  await expect(chat.locator('.ed-chat-msg.user', { hasText: DETTO })).toBeVisible({ timeout: 10_000 });
-  await expect(chat.locator('[data-chat="input"]')).toHaveValue('');
-  expect((await app.evaluate(() => globalThis.__richieste)).some((r) => r.includes(DETTO))).toBe(true);
-});
 
 test('Aiuto: la chat della scheda ha il microfono, la scorciatoia vale per lei e la domanda detta parte', async ({ app, shell }) => {
   test.setTimeout(90_000);
@@ -293,11 +310,14 @@ test('Aiuto su un sito: il microfono c\'è, e un clic fabbricato dal sito non lo
     t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
     t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
   });
-  const mic = page.locator('.sn-sidebar .sn-voce-btn');
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): il sito non trova il microfono.
+  const aiuto = await paginaDellAiuto(app, page);
+  const mic = aiuto.locator('.sn-sidebar .sn-voce-btn');
   await expect(mic).toBeVisible({ timeout: 8_000 });
   await expect(mic).toHaveAttribute('title', /^Parla \(/);
-  // Lo script del sito prova ad accenderlo: niente.
-  await page.evaluate(() => {
+  expect(await page.evaluate(() => document.querySelector('.sn-sidebar .sn-voce-btn'))).toBeNull();
+  // Un clic o un tasto fabbricati da codice non lo accendono, nemmeno nello strato.
+  await aiuto.evaluate(() => {
     const b = document.querySelector('.sn-sidebar .sn-voce-btn');
     b.click();
     b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -308,6 +328,7 @@ test('Aiuto su un sito: il microfono c\'è, e un clic fabbricato dal sito non lo
   await page.waitForTimeout(500);
   await expect(mic).toHaveAttribute('data-stato', 'pronto');
   await expect(page.locator('.sn-toast', { hasText: 'microfono' })).toHaveCount(0);
+  await expect(aiuto.locator('.sn-toast', { hasText: 'microfono' })).toHaveCount(0);
 });
 
 test('home: «Detta» dal tasto destro nella casella della chat è lo stesso microfono, e la richiesta parte', async ({ app, shell }) => {
@@ -317,7 +338,7 @@ test('home: «Detta» dal tasto destro nella casella della chat è lo stesso mic
   const page = await home(app);
   const mic = page.locator('.dash-input-wrap .sn-voce-btn');
   await page.locator('#input').click({ button: 'right' });
-  const detta = page.locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' });
+  const detta = menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' });
   await expect(detta).toBeVisible();
   const tasto = await page.evaluate(() => window.SN_TASTI.etichetta(window.SN_VOCE_CHAT.TASTO));
   await expect(detta.locator('.sn-menu-shortcut')).toHaveText(tasto);
@@ -397,7 +418,7 @@ test('Aiuto su un sito che vieta i fogli di stile esterni: il microfono ha il su
       t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
       t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
     });
-    const mic = page.locator('.sn-sidebar .sn-voce-btn');
+    const mic = (await paginaDellAiuto(app, page)).locator('.sn-sidebar .sn-voce-btn');
     await expect(mic).toBeVisible({ timeout: 8_000 });
     // Tondo grande quanto l'invio, col solo microfono: niente croce, niente anello.
     await expect.poll(async () => { const b = await mic.boundingBox(); return [Math.round(b.width), Math.round(b.height)]; }).toEqual([32, 32]);
@@ -436,38 +457,6 @@ test('i tempi sono dell\'utente: la pausa più lunga non chiude chi si ferma a p
   await expect(mic).toHaveAttribute('data-stato', 'attesa', { timeout: 5_000 });
   expect(await mic.evaluate((b) => b.style.getPropertyValue('--sn-voce-attesa'))).toBe('500ms');
   await expect(page.locator('.dash-bubble-user', { hasText: DETTO })).toBeVisible({ timeout: 3_000 });
-});
-
-test('editor: col microfono accanto, la casella della chat mostra tutto il suggerimento e cresce col testo invece di scorrere', async ({ shell, openTab }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const ed = await openTab('filo://editor/editor.html');
-  await ed.waitForSelector('.ed-module[data-type="switch"]');
-  await ed.locator('.ed-switch-icon').nth(1).click();
-  const chat = ed.locator('.ed-module[data-type="chat"]');
-  await expect(chat.locator('.sn-voce-btn')).toBeVisible();
-  const casella = chat.locator('[data-chat="input"]');
-  const misura = () => casella.evaluate((i) => ({ sh: i.scrollHeight, ch: i.clientHeight, h: i.offsetHeight, barra: i.offsetWidth - i.clientWidth }));
-  const vuota = await misura();
-  expect(vuota.sh).toBeLessThanOrEqual(vuota.ch);
-  expect(vuota.barra).toBeLessThan(6);
-  await casella.fill('riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera');
-  const piena = await misura();
-  expect(piena.sh).toBeLessThanOrEqual(piena.ch);
-  expect(piena.h).toBeGreaterThan(vuota.h);
-  mkdirSync(SHOTS, { recursive: true });
-  await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
-  // Cinque righe a capo vero, non del font: un tetto fisso (ne teneva quattro) torna rosso su qualunque macchina (#667.6).
-  await casella.fill(Array.from({ length: 5 }, (_, i) => `riga ${i + 1}`).join('\n'));
-  const cinque = await misura();
-  expect(cinque.sh).toBeLessThanOrEqual(cinque.ch);
-  // Un testo che non ci sta scorre dentro la casella: il modulo non trabocca e la conversazione resta in vista.
-  await casella.fill('una domanda lunghissima sul documento '.repeat(30));
-  const lunga = await misura();
-  expect(lunga.sh).toBeGreaterThan(lunga.ch);
-  const [c, mod, reg] = await Promise.all([casella.boundingBox(), chat.boundingBox(), chat.locator('[data-chat="log"]').boundingBox()]);
-  expect(c.y + c.height).toBeLessThanOrEqual(mod.y + mod.height);
-  expect(reg.height).toBeGreaterThan(50);
 });
 
 // Un Esc o un Invio mentre l'ultima frase è ancora in trascrizione: quello che arriva resta nella casella.

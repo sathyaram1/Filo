@@ -17,7 +17,8 @@
 //  6. risposta vuota ed errore del provider.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo, statoDi, conta, scrivi } from './helpers/riquadri.mjs';
+import { neiRiquadri, statoDi, conta, scrivi, tastieraDi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function preparaProvider(app, attesaMs = 300, opts = {}) {
   await app.evaluate(async (_electron, o) => {
@@ -194,24 +195,25 @@ test('freccetta del tasto destro su una parola in basso: stessa posa della scorc
   // Tasto destro sulla parola: il menu contestuale di Filo con la sezione
   // "Spiega" e la freccetta dell'approfondimento.
   await page.locator('#bersaglio').click({ button: 'right' });
-  const freccia = page.locator('.sn-menu-inline-arrow');
+  const freccia = menuDi(page).locator('.sn-menu-inline-arrow');
   await expect(freccia).toBeVisible({ timeout: 10_000 });
   await freccia.click();
 
   await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-meta'))?.testo || '', { timeout: 25_000 }).toContain('€');
-  await nelMondoDiFilo(app, page, async () => {
+  // Sui siti il riquadro sta nello strato sopra la scheda (#1509.1): lì si misura.
+  await neiRiquadri(app, page, async () => {
     const root = globalThis.SN_FILO_UI._test.trova('.sn-popup');
     if (root?.getAnimations) await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
   });
 
-  const m = await nelMondoDiFilo(app, page, misura);
+  const m = await neiRiquadri(app, page, misura);
   expect(fuoriDaiBordi(m), 'dalla freccetta del tasto destro il riquadro esce dallo schermo').toEqual([]);
-  expect(await nelMondoDiFilo(app, page, casellaCliccabile)).toBe(true);
+  expect(await neiRiquadri(app, page, casellaCliccabile)).toBe(true);
   await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-input'))?.valore).toBe('e adesso?');
 
-  try { await page.screenshot({ path: 'tests/.shots/zz502-tasto-destro.png' }); } catch (_) {}
+  try { await (await tastieraDi(app, page)).screenshot({ path: 'tests/.shots/zz502-tasto-destro.png' }); } catch (_) {}
   await ripristinaProvider(app);
 });
 

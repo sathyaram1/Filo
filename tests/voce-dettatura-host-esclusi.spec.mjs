@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -113,7 +114,7 @@ test('Voce e dettatura: un modello servito solo da un fornitore escluso non part
     '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
   await page.locator('#campoDetta').focus();
   await page.locator('#campoDetta').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.SN_TTS.startDictation());
   await expect(page.locator('.sn-dictate-pill')).toBeVisible({ timeout: 5_000 });
@@ -275,11 +276,11 @@ test('Detta dal tasto destro: scegliere un modello che non partirebbe lo dice su
     '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
   await page.locator('#campoDetta').focus();
   await page.locator('#campoDetta').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const detta = menu.locator('.sn-menu-split', { hasText: 'Detta' }).first();
   await detta.locator('.sn-menu-split-arrow').hover();
-  const sub = page.locator('.sn-menu-sub');
+  const sub = menuDi(page).locator('.sn-menu-sub');
   await expect(sub).toBeVisible();
   await sub.locator('button', { hasText: 'Ascolto misto' }).first().click();
   const avviso = page.locator('.sn-toast', { hasText: 'Modello dettatura aggiornato' });

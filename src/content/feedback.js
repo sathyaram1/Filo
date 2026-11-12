@@ -1,10 +1,6 @@
-// Modale "Invia feedback" per l'alpha test.
-// Aperta dalla voce di menu omonima. Permette:
-//   - testo libero (persistito tra aperture e riavvii)
-//   - annotare lo schermo a mano libera (disegno) e allegare lo screenshot
-//     annotato in un colpo solo (il pulsante "Annota e allega" fa da toggle)
-//   - incollare/trascinare immagini (Ctrl+V o drop ovunque dentro il box)
-// Invio → upload immagini su Firebase Storage + record su Firestore.
+// Modale «Invia feedback»: testo persistito fra aperture, annotazione a mano libera,
+// immagini incollate o trascinate, altri allegati dal selettore.
+// Immagini e record vanno a Firebase instradati dal main (il perché è più sotto).
 
 (function (global) {
   'use strict';
@@ -13,16 +9,15 @@
   const Popup = global.SN_POPUP;
   const Feedback = global.SN_FEEDBACK;
   const Icons = global.SN_ICONS || {};
-  // Allowlist condivisa dei tipi di allegato (stessa lista di storage.rules).
+  // Allowlist condivisa dei tipi di allegato: decide qui, prima della cifratura.
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
-  // Testo del rifiuto quando un file non è tra i tipi ammessi (immagini raster,
-  // PDF, testo, markdown, CSV, JSON). Vale sia per "Allega" sia per drag & drop.
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  // Vale sia per «Allega» sia per il drag & drop.
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
-  // Classifica un file secondo l'allowlist condivisa. Fallback prudente se il
-  // modulo shared non fosse caricato: consenti solo le immagini raster note.
+  // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
+  // raster note.
   function classifyAttachment(file) {
     if (AttachTypes && typeof AttachTypes.classify === 'function') {
       return AttachTypes.classify(file);
@@ -39,11 +34,17 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal riquadro (#1096).
+  let pulizia = null;
   let clientIdCache = null;
+  // I testi in viaggio verso il server: un riquadro riaperto mentre aspettano non li ripropone come bozza (#1681).
+  const inVolo = new Set();
+  let daRiaprire = null;
+  // L0 (#1403): la rilettura del testo parte dopo questa pausa nello scrivere, così all'invio è già pronta.
+  const ANTICIPO_MS = 1500;
 
-  // Avvisa la shell (barra in alto di Filo) che si entra/esce dalla modalità
-  // annotazione, così l'ombra copre TUTTO Filo e non solo l'area pagina dove
-  // vive questo content script.
+  // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
+  // pagina.
   function setShellDim(on) {
     try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_ANNOTATE, on: !!on }); } catch (_) {}
   }
@@ -68,12 +69,21 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
     else activeRoot.remove();
     activeRoot = null;
     setShellDim(false);
+    // Un feedback che L0 rimanda indietro mentre è aperto un altro riquadro si riapre quando quello si chiude.
+    if (daRiaprire) {
+      const d = daRiaprire;
+      daRiaprire = null;
+      setTimeout(() => { if (!activeRoot) apriQui(d); else daRiaprire = d; }, 0);
+    }
   }
 
   function blobToDataUrl(blob) {
@@ -85,17 +95,19 @@
     });
   }
 
+  // La schermata esce dal computer: la copre il main come la foto per un modello. `{ segreti: true, motivo }` se
+  // coprirla non riesce, e allora la pagina non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, coperta: true });
+      if (r?.ok && r.dataUrl) return { dataUrl: r.dataUrl };
+      if (r?.code === 'coperture') return { segreti: true, motivo: String(r.motivo || '') };
     } catch (_) {}
     return null;
   }
 
-  // Converte un dataUrl in un object URL (blob:) per aggirare le CSP delle pagine
-  // ospitanti che bloccano img-src data:. L'object URL va revocato quando l'immagine
-  // viene rimossa.
+  // Object URL invece di dataUrl perché le CSP delle pagine ospiti bloccano img-src data:. Va
+  // revocato quando l'immagine viene rimossa.
   function dataUrlToBlobUrl(dataUrl) {
     try {
       const m = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
@@ -128,6 +140,8 @@
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const reduce = !!(global.matchMedia &&
         global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Token `motion`: moltiplica le durate; a 0 l'etichetta resta ferma il tempo di leggerla.
+      const k = global.SN_THEME_TOKENS ? global.SN_THEME_TOKENS.motionFactor(document) : 1;
 
       const layer = document.createElement('div');
       layer.className = 'sn-fb-credit-fly';
@@ -149,7 +163,6 @@
       const ty = Math.max(26, window.innerHeight - 64);
       const GOLD = '#e0a93f';
 
-      // Etichetta "+N" che sale e svanisce sopra l'origine.
       const label = document.createElement('div');
       label.className = 'sn-fb-credit-label';
       label.textContent = `+${n}`;
@@ -162,7 +175,7 @@
 
       const coinSvg = icon('credits', 22) || '●';
       const coins = [];
-      const count = reduce ? 0 : Math.min(7, Math.max(4, n));
+      const count = reduce || !k ? 0 : Math.min(7, Math.max(4, n));
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.className = 'sn-fb-coin';
@@ -176,15 +189,15 @@
         coins.push(c);
       }
 
-      let maxEnd = 900;
+      let maxEnd = 900 * k;
       coins.forEach((c, i) => {
         const sx = ox + (Math.random() - 0.5) * 80;
         const sy = oy + (Math.random() - 0.5) * 30;
         // Punto intermedio: si alza in un arco prima di puntare in alto a destra.
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
         const my = Math.min(sy, ty) - 40 - Math.random() * 40;
-        const delay = i * 40;
-        const dur = 650 + i * 50 + Math.random() * 120;
+        const delay = i * 40 * k;
+        const dur = (650 + i * 50 + Math.random() * 120) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         c.animate([
           { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
@@ -194,34 +207,49 @@
         ], { duration: dur, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
       });
 
-      label.animate([
-        { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
-        { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
-        { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
-      ], { duration: reduce ? 900 : Math.max(900, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      if (k) {
+        label.animate([
+          { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
+          { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
+          { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
+        ], { duration: reduce ? 900 * k : Math.max(900 * k, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      } else {
+        label.style.transform = 'translate(-50%,-110%)';
+      }
 
-      const total = (reduce ? 900 : maxEnd) + 120;
+      const total = k ? (reduce ? 900 * k : maxEnd) + 120 : 1200;
       setTimeout(() => { try { layer.remove(); } catch (_) {} }, total);
     } catch (_) {}
   }
 
   // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
-  function open({ testo: proposta = '' } = {}) {
+  // Su un sito il box sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function open({ testo = '' } = {}) {
+    if (activeRoot) return;
+    const qui = () => apriQui({ testo });
+    if (global.SN_RIQUADRI_SOPRA?.apri('feedback', { testo: String(testo || '') }, qui)) return;
+    qui();
+  }
+
+  // `ripresa`: il feedback che torna indietro dall'invio (L0 o un errore), con testo, allegati e avviso intatti.
+  function apriQui({ testo: proposta = '', ripresa = null } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
     global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    // Layout richiesto dall'utente: solo il box per scrivere + 4 bottoni
-    // (Allega, Chiudi, Invia, e "Cancella disegno" che compare solo quando c'è
-    // qualcosa da cancellare). Si può trascinare/incollare/allegare immagini e
-    // disegnare a mano libera su TUTTA l'app (pagina + barra in alto).
+    // Solo il box e quattro bottoni; «Cancella disegno» c'è solo quando c'è qualcosa da
+    // cancellare.
     root.innerHTML = `
       <canvas class="sn-fb-canvas"></canvas>
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
         <div class="sn-fb-drag" title="Trascina per spostare il box"><span class="sn-fb-grip"></span></div>
         <div class="sn-fb-body">
-          <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          <div class="sn-fb-l0" role="alert" hidden></div>
+          <div class="sn-fb-campo">
+            <div class="sn-fb-evidenze" aria-hidden="true"></div>
+            <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          </div>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
@@ -236,21 +264,29 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
-    // Entra in modalità annotazione: oscura anche la barra in alto di Filo.
+    // Ciò che si aggancia fuori dal riquadro (window, documento, messaggi) si stacca alla chiusura (#1096): un
+    // ascoltatore rimasto tiene in memoria tela, immagini e allegati di ogni apertura, e lo strato sopra un sito vive a lungo.
+    const stacchi = [];
+    const aggancia = (bersaglio, tipo, fn, opz) => {
+      bersaglio.addEventListener(tipo, fn, opz);
+      stacchi.push(() => bersaglio.removeEventListener(tipo, fn, opz));
+    };
+    pulizia = () => { for (const s of stacchi.splice(0).reverse()) { try { s(); } catch (_) {} } };
     setShellDim(true);
-    // Se la pagina viene abbandonata (navigazione o chiusura tab) senza passare
-    // da close(), il content script muore ma il velo della shell resterebbe
-    // appeso: avvisiamo esplicitamente di toglierlo.
-    window.addEventListener('pagehide', () => setShellDim(false), { once: true });
-    Popup?.attachZoomCompensation?.(root);
-    // Partecipa allo stacking dei popup: sopra ai box aperti prima, sotto a
-    // quelli aperti dopo. Il menu contestuale (right-click) ha un proprio
-    // z-index più alto, quindi resta sempre visibile sopra il modale.
+    // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe
+    // appeso: va chiesto di toglierlo.
+    aggancia(window, 'pagehide', () => setShellDim(false), { once: true });
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
+    if (typeof staccaZoom === 'function') stacchi.push(staccaZoom);
+    // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha
+    // z-index più alto e resta sempre sopra.
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-fb-modal');
     const dragHandle = root.querySelector('.sn-fb-drag');
     const textEl = root.querySelector('.sn-fb-text');
+    const avvisoEl = root.querySelector('.sn-fb-l0');
+    const evidenzeEl = root.querySelector('.sn-fb-evidenze');
     const thumbsEl = root.querySelector('.sn-fb-thumbs');
     const statusEl = root.querySelector('.sn-fb-status');
     const sendBtn = root.querySelector('.sn-fb-send');
@@ -259,21 +295,21 @@
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
+    if (AttachTypes && AttachTypes.ACCEPT) fileInput.accept = AttachTypes.ACCEPT;
 
-    // stato locale: data URLs delle immagini incollate/trascinate
+    const LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
     const images = [];
-    const MAX_IMAGES = 5;
+    const MAX_IMAGES = LIMITI.immagini;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
     const files = [];
-    const MAX_FILES = 5;
-    const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
+    const MAX_FILES = LIMITI.file;
+    const MAX_ATTACH_BYTES = LIMITI.byte;
+    // Quello che L0 ha segnato: i pezzi di testo da evidenziare e le immagini da ricontrollare.
+    let pezziSegnati = [];
+    const immaginiSegnate = new Set();
 
-    // Anti-duplicati (#370): id STABILE di questa composizione. Tutti i tentativi
-    // di invio della stessa bozza condividono l'id, così se un invio va in timeout
-    // lato UI ma riesce comunque sul server, ripremere "Invia" NON crea un
-    // duplicato (il server rifiuta un secondo doc con lo stesso id). Cambia solo
-    // quando l'utente modifica il contenuto (testo o allegati): un messaggio
-    // diverso è un feedback diverso e deve poter essere inviato a parte.
+    // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
+    // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
     function newSubmissionId() {
       try {
         if (global.crypto?.randomUUID) return global.crypto.randomUUID();
@@ -283,29 +319,65 @@
     let submissionId = newSubmissionId();
     function bumpSubmissionId() { submissionId = newSubmissionId(); }
 
-    // ---- bozza di testo persistente ----
     let saveTimer = null;
+    // Chiudendo entro i 250 ms la bozza si scrive subito, non da un timer che sopravvive al riquadro.
+    stacchi.push(() => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); } });
     function saveDraft() {
       if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
     }
-    function clearDraft() {
+    // Solo se la bozza è ancora quella partita: un riquadro riaperto intanto può averne scritta un'altra (#1681).
+    function clearDraft(inviata) {
       if (!DRAFT_KEY) return;
-      try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
+      try {
+        if (inviata === undefined) { chrome.storage.local.remove([DRAFT_KEY]); return; }
+        chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+          if (r?.[DRAFT_KEY] === inviata) chrome.storage.local.remove([DRAFT_KEY]);
+        }).catch(() => {});
+      } catch (_) {}
     }
-    textEl.addEventListener('input', () => {
-      // Contenuto cambiato → nuova composizione (id di invio fresco).
+    // L0: una rilettura per pausa, pagata da un gesto vero nella casella (patterns/una-chiamata-che-spende-parte-da-un-gesto-vero.md).
+    let anticipoTimer = null;
+    let gestoPerAnticipo = false;
+    let anticipato = '';
+    stacchi.push(() => { clearTimeout(anticipoTimer); anticipoTimer = null; });
+    function preparaAnticipo(e) {
+      const G = global.SN_GESTO;
+      const vero = G && typeof G.prendi === 'function'
+        ? G.prendi('feedback-l0', undefined, (l) => !!(l && l.el && (l.el === textEl || textEl.contains(l.el))))
+        : !!(e && e.isTrusted);
+      if (vero) gestoPerAnticipo = true;
+      clearTimeout(anticipoTimer);
+      anticipoTimer = setTimeout(() => {
+        anticipoTimer = null;
+        const t = textEl.value.trim();
+        if (!gestoPerAnticipo || !t || t === anticipato) return;
+        gestoPerAnticipo = false;
+        anticipato = t;
+        try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_L0_ANTICIPA, testo: t })?.catch?.(() => {}); } catch (_) {}
+      }, ANTICIPO_MS);
+    }
+    textEl.addEventListener('input', (e) => {
+      // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
+      aggiornaEvidenze();
+      preparaAnticipo(e);
     });
     // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
     const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
-    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
+    if (ripresa) {
+      textEl.value = String(ripresa.testo || '');
+      for (const im of ripresa.images || []) images.push(im);
+      for (const f of ripresa.files || []) files.push(f);
+      if (ripresa.submissionId) submissionId = ripresa.submissionId;
+      saveDraft();
+    } else if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
-      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
-        const saved = r?.[DRAFT_KEY];
+      if (DRAFT_KEY && !ripresa) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+        const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
         else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
@@ -316,13 +388,12 @@
       }).catch(() => {});
     } catch (_) {}
 
-    // ---- disegno (annotazione a mano libera sullo schermo) ----
     const ctx = canvas.getContext('2d');
     const strokes = []; // [{ color, width, points: [{x,y}] }] in coordinate viewport CSS
     let drawing = false;
     let curStroke = null;
-    // C'è un disegno sulla barra in alto di Filo (shell)? La barra vive in un
-    // altro processo: lo sappiamo via broadcast FEEDBACK_DRAW_STATE.
+    // La barra in alto vive in un altro processo: se ci si è disegnato sopra lo sappiamo solo via
+    // broadcast FEEDBACK_DRAW_STATE.
     let topbarHasDrawing = false;
 
     function sizeCanvas() {
@@ -349,19 +420,16 @@
         ctx.lineWidth = s.width;
         ctx.beginPath();
         s.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-        // Un singolo punto: disegna un puntino.
+        // Un punto solo: il micro-scostamento disegna un puntino invece di niente.
         if (s.points.length === 1) { ctx.lineTo(s.points[0].x + 0.1, s.points[0].y + 0.1); }
         ctx.stroke();
       }
     }
     function hasPageDrawing() { return strokes.some((s) => s.points.length > 0); }
-    // C'è un disegno da cancellare ovunque nell'app? (pagina O barra in alto)
     function hasAnyDrawing() { return hasPageDrawing() || topbarHasDrawing; }
 
-    // Il bottone è sempre presente: di default "Allega screenshot" (premuto =
-    // selezionato → all'invio si allega lo scatto della pagina anche senza
-    // disegnare). Appena si disegna diventa "Cancella" (stesso colore selezionato)
-    // e cliccarlo cancella il disegno.
+    // Un bottone, due stati: «Allega screenshot» (all'invio si allega lo scatto anche senza
+    // disegnare), e appena si disegna diventa «Cancella».
     let shotArmed = false;
     function updateClearBtn() {
       const drawing = hasAnyDrawing();
@@ -388,81 +456,80 @@
       if (!drawing) return;
       drawing = false;
       curStroke = null;
-      // Appena c'è un disegno, all'invio allegheremo automaticamente lo
-      // screenshot annotato (niente più toggle): basta che ci sia un tratto.
       refreshClear();
     }
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
-    window.addEventListener('resize', sizeCanvas);
+    aggancia(window, 'resize', sizeCanvas);
     sizeCanvas();
+    // La tela a tutto schermo pesa larghezza × altezza × dpr²: si libera alla chiusura, non quando passa il GC.
+    stacchi.push(() => { canvas.width = 0; canvas.height = 0; });
 
-    // "Cancella disegno": pulisce i tratti sulla pagina E quelli sulla barra in
-    // alto di Filo (che vivono nella shell), così un solo bottone cancella tutto.
+    // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono
+    // nella shell: un bottone solo cancella tutto.
     clearBtn.addEventListener('click', () => {
       if (hasAnyDrawing()) {
-        // Stato "Cancella": pulisce i tratti (pagina + barra in alto) e disarma.
         strokes.length = 0;
         redraw();
         try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_CLEAR_DRAW }); } catch (_) {}
         topbarHasDrawing = false;
         shotArmed = false;
       } else {
-        // Stato "Allega screenshot": toggle dell'allega-screenshot.
         shotArmed = !shotArmed;
       }
       updateClearBtn();
     });
 
-    // La shell ci dice se c'è (o non c'è più) un disegno sulla barra in alto,
-    // così "Cancella disegno" compare anche quando si è disegnato SOLO lassù.
+    // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare
+    // anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
-      // Auto-rimozione quando il box non è più questo (chiuso/riaperto).
-      if (activeRoot !== root) {
-        try { chrome.runtime.onMessage.removeListener(onBroadcast); } catch (_) {}
-        return;
-      }
+      if (activeRoot !== root) return;
       if (message?.type === MSG.FEEDBACK_DRAW_STATE) {
         topbarHasDrawing = !!message.topbar;
         refreshClear();
       }
     }
-    try { chrome.runtime.onMessage.addListener(onBroadcast); } catch (_) {}
+    try {
+      chrome.runtime.onMessage.addListener(onBroadcast);
+      stacchi.push(() => chrome.runtime.onMessage.removeListener(onBroadcast));
+    } catch (_) {}
 
-    function renderThumbs() {
-      // Revoca eventuali object URL precedenti per evitare leak
+    function revocaMiniature() {
       thumbsEl.querySelectorAll('img[data-sn-objurl="1"]').forEach((img) => {
         try { URL.revokeObjectURL(img.src); } catch (_) {}
       });
+    }
+    stacchi.push(revocaMiniature);
+    function renderThumbs() {
+      revocaMiniature();
       thumbsEl.innerHTML = '';
       images.forEach((img, i) => {
         const wrap = document.createElement('div');
         wrap.className = 'sn-fb-thumb';
+        if (immaginiSegnate.has(img)) wrap.classList.add('sn-fb-thumb--l0');
         const imEl = document.createElement('img');
         imEl.src = dataUrlToBlobUrl(img.dataUrl);
         imEl.dataset.snObjurl = '1';
         imEl.alt = '';
-        imEl.title = 'Clicca per ingrandire';
+        imEl.title = immaginiSegnate.has(img) ? 'Da ricontrollare: clicca per ingrandire' : 'Clicca per ingrandire';
         imEl.addEventListener('click', () => openLightbox(img.dataUrl));
         const xBtn = document.createElement('button');
         xBtn.type = 'button';
         xBtn.className = 'sn-fb-thumb-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { images.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
+        xBtn.addEventListener('click', () => { images.splice(i, 1); immaginiSegnate.delete(img); bumpSubmissionId(); renderThumbs(); });
         wrap.appendChild(imEl);
         wrap.appendChild(xBtn);
         thumbsEl.appendChild(wrap);
       });
-      // Allegati non-immagine: una "pillola" con icona, nome e dimensione.
       files.forEach((f, i) => {
         const chip = document.createElement('div');
         chip.className = 'sn-fb-file-chip';
         chip.title = f.name;
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
-        // Icona documento in linea (coerente con lo stile a tratto di Filo):
-        // non esiste un'icona 'file' nel set condiviso.
+        // Icona documento in linea: nel set condiviso non c'è un'icona 'file'.
         ic.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
         const nameEl = document.createElement('span');
         nameEl.className = 'sn-fb-file-name';
@@ -484,6 +551,89 @@
       });
     }
 
+    // Le parti segnate da L0 si ritrovano nel testo com'è adesso: corretta una parte, la sua evidenza sparisce. Il
+    // testo dello sfondo è quello dell'utente, scritto come testo e mai come markup.
+    function aggiornaEvidenze() {
+      evidenzeEl.textContent = '';
+      const v = textEl.value;
+      const tratti = [];
+      for (const p of pezziSegnati) {
+        if (!p.testo) continue;
+        let i = v.indexOf(p.testo);
+        let guardia = 0;
+        while (i >= 0 && guardia++ < 200) { tratti.push([i, i + p.testo.length]); i = v.indexOf(p.testo, i + p.testo.length); }
+      }
+      if (!tratti.length) { evidenzeEl.parentElement.classList.remove('sn-fb-campo--evidenze'); return; }
+      tratti.sort((a, b) => a[0] - b[0]);
+      let at = 0;
+      for (const [a, b] of tratti) {
+        if (b <= at) continue;
+        const da = Math.max(a, at);
+        if (da > at) evidenzeEl.appendChild(document.createTextNode(v.slice(at, da)));
+        const m = document.createElement('mark');
+        m.textContent = v.slice(da, b);
+        evidenzeEl.appendChild(m);
+        at = b;
+      }
+      // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
+      evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
+      evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      evidenzeEl.scrollTop = textEl.scrollTop;
+    }
+    textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+
+    // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
+    function mostraRilettura(r) {
+      pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
+      immaginiSegnate.clear();
+      for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      avvisoEl.textContent = '';
+      const titolo = document.createElement('div');
+      titolo.className = 'sn-fb-l0-titolo';
+      titolo.textContent = String(r?.titolo || 'Prima che parta, ricontrolla.');
+      const lista = document.createElement('ul');
+      lista.className = 'sn-fb-l0-frasi';
+      for (const f of Array.isArray(r?.frasi) ? r.frasi : []) {
+        const li = document.createElement('li');
+        li.textContent = String(f);
+        lista.appendChild(li);
+      }
+      const azioni = document.createElement('div');
+      azioni.className = 'sn-fb-l0-azioni';
+      const correggi = document.createElement('button');
+      correggi.type = 'button';
+      correggi.className = 'sn-fb-btn-secondary sn-fb-l0-correggi';
+      correggi.textContent = 'Correggi';
+      correggi.title = 'Torna al testo, sulla prima parte segnata';
+      correggi.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
+        avvisoEl.hidden = true;
+        const v = textEl.value;
+        const primo = pezziSegnati.map((p) => v.indexOf(p.testo)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+        textEl.focus();
+        if (primo !== undefined) {
+          const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
+          try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
+        } else {
+          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+        }
+      });
+      const manda = document.createElement('button');
+      manda.type = 'button';
+      manda.className = 'sn-fb-btn-secondary sn-fb-l0-manda';
+      manda.textContent = 'Manda così';
+      manda.title = 'Manda il feedback com’è, senza rileggerlo';
+      manda.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: false }); });
+      azioni.appendChild(correggi);
+      azioni.appendChild(manda);
+      avvisoEl.appendChild(titolo);
+      avvisoEl.appendChild(lista);
+      avvisoEl.appendChild(azioni);
+      avvisoEl.hidden = false;
+      renderThumbs();
+      aggiornaEvidenze();
+    }
+
     function humanSize(n) {
       const b = Number(n) || 0;
       if (b < 1024) return `${b} B`;
@@ -491,46 +641,34 @@
       return `${(b / (1024 * 1024)).toFixed(1)} MB`;
     }
 
+    // Un allegato lasciato fuori si dice col suo nome e il perché, anche in mezzo ad altri entrati (#1681). Ritornano
+    // null se l'allegato è entrato, sennò { name, reason }.
+    const TIPO_NO = 'tipo non supportato';
+    const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
     async function addImageFromBlob(blob) {
-      // Solo immagini raster note: esclude image/svg+xml (documento attivo) e
-      // qualsiasi altro tipo che si spacci per immagine.
-      if (!blob || classifyAttachment(blob) !== 'image') return;
-      if (images.length >= MAX_IMAGES) {
-        statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
-        return;
-      }
-      if (blob.size > 4 * 1024 * 1024) {
-        statusEl.textContent = 'Immagine troppo grande (max 4 MB).';
-        return;
-      }
+      // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
+      // tipo che si spacci per immagine.
+      if (!blob) return null;
+      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
+      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
       const dataUrl = await blobToDataUrl(blob);
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
+      return null;
     }
 
-    // Smista un file: le immagini seguono il percorso esistente (anteprima +
-    // annotazione), gli altri tipi (pdf, txt, md, json…) diventano allegati.
     async function addAttachment(file) {
-      if (!file) return;
-      // Gate condiviso: stesso filtro per "Allega" e per drag & drop. L'attributo
-      // `accept` del picker NON vincola il drop (né la scelta "Tutti i file"),
-      // quindi la whitelist va applicata qui, sul tipo reale del file.
+      if (!file) return null;
+      // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
+      // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
-      if (!kind) {
-        statusEl.textContent = ATTACH_REJECT_MSG;
-        return;
-      }
-      if (kind === 'image') { await addImageFromBlob(file); return; }
-      if (files.length >= MAX_FILES) {
-        statusEl.textContent = `Massimo ${MAX_FILES} file.`;
-        return;
-      }
-      if (file.size > MAX_ATTACH_BYTES) {
-        statusEl.textContent = 'File troppo grande (max 4 MB).';
-        return;
-      }
+      if (!kind) return scarto(file, TIPO_NO, 'allegato');
+      if (kind === 'image') return addImageFromBlob(file);
+      if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
+      if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
       const dataUrl = await blobToDataUrl(file);
       files.push({
         name: file.name || 'allegato',
@@ -539,87 +677,105 @@
         dataUrl,
       });
       bumpSubmissionId();
-      statusEl.textContent = '';
       renderThumbs();
+      return null;
     }
 
-    // Compone lo screenshot della tab con sopra i tratti disegnati, in scala.
-    function composeAnnotated(shotDataUrl) {
+    // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
+    async function allega(lista, aggiungi = addAttachment) {
+      const fuori = [];
+      for (const f of lista) {
+        const no = await aggiungi(f);
+        if (no) fuori.push(no);
+      }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
+        : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
+      const tipi = fuori.some((f) => f.reason === TIPO_NO)
+        ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
+      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
+    }
+
+    function caricaImmagine(src) {
       return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const w = img.naturalWidth || window.innerWidth;
-            const h = img.naturalHeight || window.innerHeight;
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            const cx = c.getContext('2d');
-            cx.drawImage(img, 0, 0, w, h);
-            const sx = w / Math.max(1, window.innerWidth);
-            const sy = h / Math.max(1, window.innerHeight);
-            cx.lineCap = 'round';
-            cx.lineJoin = 'round';
-            for (const s of strokes) {
-              if (s.points.length < 1) continue;
-              cx.strokeStyle = s.color;
-              cx.lineWidth = s.width * Math.max(sx, sy);
-              cx.beginPath();
-              s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, p.y * sy) : cx.moveTo(p.x * sx, p.y * sy)));
-              if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, s.points[0].y * sy + 0.1);
-              cx.stroke();
-            }
-            resolve(c.toDataURL('image/png'));
-          } catch (_) {
-            resolve(shotDataUrl);
+        if (!src) { resolve(null); return; }
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => resolve(null);
+        im.src = src;
+      });
+    }
+
+    // La schermata sale solo sotto il tetto degli allegati (#1667): PNG se ci sta, poi WebP più leggero, poi più
+    // piccola. Un PNG di uno schermo grande ad alta densità passa facilmente i 4 MB, e il deposito lo rifiuterebbe.
+    function entroIlTetto(c) {
+      const sotto = (u) => Feedback.byteDiDataUrl(u) < MAX_ATTACH_BYTES;
+      let u = c.toDataURL('image/png');
+      if (sotto(u)) return u;
+      for (const q of [0.92, 0.8, 0.65]) {
+        u = c.toDataURL('image/webp', q);
+        if (sotto(u)) return u;
+      }
+      let w = c.width;
+      let h = c.height;
+      for (let i = 0; i < 8 && w > 64 && h > 64; i++) {
+        w = Math.round(w * 0.75);
+        h = Math.round(h * 0.75);
+        const r = document.createElement('canvas');
+        r.width = w; r.height = h;
+        r.getContext('2d').drawImage(c, 0, 0, w, h);
+        u = r.toDataURL('image/webp', 0.8);
+        r.width = 0; r.height = 0;
+        if (sotto(u)) return u;
+      }
+      return null;
+    }
+
+    // Un'immagine sola di tutta l'app: la barra in alto (se ci si è disegnato) sopra la pagina coi suoi tratti.
+    async function schermataAnnotata(shotDataUrl, topbarDataUrl) {
+      const [pagina, barra] = await Promise.all([caricaImmagine(shotDataUrl), caricaImmagine(topbarDataUrl)]);
+      if (!pagina && !barra) return null;
+      const c = document.createElement('canvas');
+      try {
+        const w = pagina ? (pagina.naturalWidth || window.innerWidth) : barra.naturalWidth;
+        const barH = barra ? Math.round(barra.naturalHeight * (w / Math.max(1, barra.naturalWidth))) : 0;
+        const pagH = pagina ? (pagina.naturalHeight || window.innerHeight) : 0;
+        c.width = w; c.height = barH + pagH;
+        const cx = c.getContext('2d');
+        if (barra) cx.drawImage(barra, 0, 0, w, barH);
+        if (pagina) {
+          cx.drawImage(pagina, 0, barH, w, pagH);
+          const sx = w / Math.max(1, window.innerWidth);
+          const sy = pagH / Math.max(1, window.innerHeight);
+          cx.lineCap = 'round';
+          cx.lineJoin = 'round';
+          for (const s of strokes) {
+            if (s.points.length < 1) continue;
+            cx.strokeStyle = s.color;
+            cx.lineWidth = s.width * Math.max(sx, sy);
+            cx.beginPath();
+            s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, barH + p.y * sy) : cx.moveTo(p.x * sx, barH + p.y * sy)));
+            if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, barH + s.points[0].y * sy + 0.1);
+            cx.stroke();
           }
-        };
-        img.onerror = () => resolve(shotDataUrl);
-        img.src = shotDataUrl;
-      });
+        }
+        return entroIlTetto(c);
+      } catch (_) {
+        return null;
+      } finally {
+        c.width = 0; c.height = 0;
+      }
     }
 
-    // Impila lo scatto annotato della barra in alto (shell) SOPRA lo screenshot
-    // della pagina: il risultato è un'unica immagine di tutta l'app Filo con
-    // sopra i tratti disegnati sia sulla pagina sia sulla barra. Se manca lo
-    // scatto della barra, ritorna lo screenshot della sola pagina (fallback).
-    function stackTopbar(pageDataUrl, topbarDataUrl) {
-      return new Promise((resolve) => {
-        if (!topbarDataUrl) { resolve(pageDataUrl); return; }
-        const pageImg = new Image();
-        pageImg.onload = () => {
-          const barImg = new Image();
-          barImg.onload = () => {
-            try {
-              const w = pageImg.naturalWidth;
-              const barH = Math.round(barImg.naturalHeight * (w / Math.max(1, barImg.naturalWidth)));
-              const c = document.createElement('canvas');
-              c.width = w;
-              c.height = barH + pageImg.naturalHeight;
-              const cx = c.getContext('2d');
-              cx.drawImage(barImg, 0, 0, w, barH);
-              cx.drawImage(pageImg, 0, barH, w, pageImg.naturalHeight);
-              resolve(c.toDataURL('image/png'));
-            } catch (_) { resolve(pageDataUrl); }
-          };
-          barImg.onerror = () => resolve(pageDataUrl);
-          barImg.src = topbarDataUrl;
-        };
-        pageImg.onerror = () => resolve(pageDataUrl);
-        pageImg.src = pageDataUrl;
-      });
-    }
-
-    // Chiusura (il bottone "Chiudi" sostituisce la vecchia × e "Annulla")
     cancelBtn.addEventListener('click', close);
-    // Niente chiusura su click backdrop: si chiude solo con × o Annulla
-    // (Esc resta disponibile come scorciatoia).
+    // Il click sul velo non chiude: si esce solo dal bottone o con Esc.
     function closeLightbox(lb) {
       const im = lb.querySelector('img');
       if (im) { try { URL.revokeObjectURL(im.src); } catch (_) {} }
       lb.remove();
     }
     function openLightbox(dataUrl) {
-      const prev = activeRoot.querySelector('.sn-fb-lightbox');
+      const prev = root.querySelector('.sn-fb-lightbox');
       if (prev) closeLightbox(prev);
       const lb = document.createElement('div');
       lb.className = 'sn-fb-lightbox';
@@ -628,25 +784,18 @@
       im.alt = '';
       lb.appendChild(im);
       lb.addEventListener('click', () => closeLightbox(lb));
-      activeRoot.appendChild(lb);
+      root.appendChild(lb);
     }
+    stacchi.push(() => { const lb = root.querySelector('.sn-fb-lightbox'); if (lb) closeLightbox(lb); });
 
-    document.addEventListener('keydown', function onKey(e) {
-      if (!activeRoot) { document.removeEventListener('keydown', onKey, true); return; }
-      if (e.key === 'Escape') {
-        // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
-        const lb = activeRoot.querySelector('.sn-fb-lightbox');
-        if (lb) {
-          e.stopImmediatePropagation();
-          closeLightbox(lb);
-          return;
-        }
-        // Evita che lo stesso ESC inneschi anche la chiusura del topmost
-        // gestita dal modulo Popup.
-        e.stopImmediatePropagation();
-        close();
-        document.removeEventListener('keydown', onKey, true);
-      }
+    aggancia(document, 'keydown', (e) => {
+      if (activeRoot !== root || e.key !== 'Escape') return;
+      // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
+      const lb = root.querySelector('.sn-fb-lightbox');
+      // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
+      e.stopImmediatePropagation();
+      if (lb) closeLightbox(lb);
+      else close();
     }, true);
 
     // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
@@ -655,25 +804,20 @@
       if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
       if (!items) return;
-      for (const it of items) {
-        if (it.type?.startsWith('image/')) {
-          const blob = it.getAsFile();
-          if (blob) await addImageFromBlob(blob);
-        }
-      }
+      const blobs = Array.from(items).filter((it) => it.type?.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (blobs.length) await allega(blobs, addImageFromBlob);
     });
 
-    // Accetta immagini incollate via tasto destro (custom event da content.js)
+    // Immagini incollate col tasto destro: evento su misura da content.js.
     modal.addEventListener('filo:paste-image', async (e) => {
       if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
         e.preventDefault();
-        await addImageFromBlob(e.detail.blob);
+        await allega([e.detail.blob], addImageFromBlob);
       }
     });
 
-    // Drag & drop: si può trascinare un'immagine OVUNQUE dentro il box (niente
-    // più riquadro dedicato).
+    // Si può trascinare un'immagine OVUNQUE dentro il box, non in un riquadro dedicato.
     ['dragenter', 'dragover'].forEach((ev) => modal.addEventListener(ev, (e) => {
       e.preventDefault(); modal.classList.add('sn-fb-drop-hover');
     }));
@@ -682,8 +826,10 @@
     }));
     modal.addEventListener('drop', async (e) => {
       const dropped = e.dataTransfer?.files;
+      // Qui servono solo i file: un testo lasciato nel riquadro non va da nessuna parte (#1471).
+      if (e.isTrusted) try { Popup?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'campo_feedback', !!(dropped && dropped.length))); } catch (_) {}
       if (!dropped || !dropped.length) return;
-      for (const f of dropped) await addAttachment(f);
+      await allega(Array.from(dropped));
     });
 
     // "Allega": apre il selettore file. Si possono allegare immagini E altri
@@ -692,33 +838,53 @@
     attachBtn.addEventListener('click', (e) => { if (e.isTrusted) { try { fileInput.click(); } catch (_) {} } });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
-      for (const f of picked) await addAttachment(f);
       fileInput.value = '';
+      await allega(picked);
     });
 
-    // Invio: solo dal clic dell'utente sul tasto (#1071).
-    sendBtn.addEventListener('click', async (e) => {
-      if (!e.isTrusted) return;
+    // Invio: solo dal clic dell'utente sul tasto (#1071). «Manda così» dall'avviso di L0 salta la rilettura.
+    sendBtn.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: true }); });
+    let inviando = false;
+    async function invia({ rileggi }) {
+      if (inviando || activeRoot !== root) return;
       const text = textEl.value.trim();
-      // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
-      // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).
       const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && files.length === 0 && !wantShot) {
         statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
         return;
       }
+      // Un esito che arriva col riquadro già chiuso (Esc durante l'invio) si legge in un avviso.
+      const dici = (testo) => {
+        statusEl.classList.remove('sn-fb-status--attesa');
+        if (activeRoot === root) statusEl.textContent = testo;
+        else Popup?.showToast?.(testo, { duration: 6000 });
+      };
+      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; inviando = false; };
+      const testoInviato = textEl.value;
+      inVolo.add(testoInviato);
+      inviando = true;
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
+      statusEl.classList.add('sn-fb-status--attesa');
+      // Dopo la chiusura il feedback torna indietro intatto, con quello che L0 ha visto o con l'errore (#1403).
+      let partito = null;
+      let attesa = null;
+      const riapri = (extra) => {
+        try { attesa?.close?.(); } catch (_) {}
+        const d = { ripresa: { testo: testoInviato, images: partito.images, files: partito.files, submissionId: partito.submissionId, ...extra } };
+        if (activeRoot) daRiaprire = d;
+        else apriQui(d);
+      };
       try {
         const clientId = await getClientId();
-        // S1.F2.2: hash deterministico del clientId per il match C5 sulla macchina utente.
-        // Il main process userà questo hash per il confronto (la macchina non ha la privata).
+        // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
+        // che qui non ha la chiave privata.
         const clientIdHash = await (async () => {
           try {
             const H = global.SN_FEEDBACK_CLIENT_ID_HASH;
             if (H && H.hashClientId) return await H.hashClientId(clientId);
-            // Fallback: WebCrypto diretto (il modulo potrebbe non essere caricato nel preload)
+            // Fallback: WebCrypto diretto, il modulo potrebbe non essere caricato nel preload.
             const enc = new TextEncoder();
             const buf = enc.encode(String(clientId || ''));
             const hashBuf = await global.crypto.subtle.digest('SHA-256', buf);
@@ -728,16 +894,18 @@
             return hex;
           } catch (_) { return ''; }
         })();
-        // Costruisce la lista immagini: incollate/trascinate/allegate + (se c'è
-        // un disegno) lo screenshot di tutta l'app con sopra l'annotazione.
         const outImages = images.slice();
-        if (wantShot) {
-          // Nascondiamo l'overlay (box + ombra) per non includerlo nello scatto.
+        let senzaSchermata = '';
+        // Il deposito tiene cinque immagini: la schermata che non ci sta si dice, non sparisce (#1681).
+        if (wantShot && outImages.length >= MAX_IMAGES) {
+          senzaSchermata = `La schermata annotata non è partita: c'erano già ${MAX_IMAGES} immagini, il massimo.`;
+        } else if (wantShot) {
+          // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
-          const shot = await captureScreenshot();
-          // Scatto annotato della barra in alto di Filo (vive nella shell): lo
-          // chiediamo solo se ci si ha disegnato sopra.
+          const foto = await captureScreenshot();
+          const shot = foto?.dataUrl || null;
+          // Lo scatto annotato della barra in alto si chiede solo se ci si ha disegnato sopra.
           let topbarShot = null;
           if (topbarHasDrawing) {
             try {
@@ -746,44 +914,70 @@
             } catch (_) {}
           }
           root.style.visibility = '';
-          if (shot) {
-            const annotated = await composeAnnotated(shot);
-            const full = await stackTopbar(annotated, topbarShot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
-          } else if (topbarShot) {
-            // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
+          const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
+          const perche = foto?.motivo === 'misura'
+            ? 'la pagina non ha risposto in tempo, e senza sapere dove sono i campi password o carta non la mando.'
+            : foto?.motivo === 'riquadri'
+              ? 'nella pagina c’è un riquadro di un altro sito che non sono riuscito a coprire.'
+              : 'nella pagina c’è un campo riservato (password o carta) che non sono riuscito a coprire.';
+          if (full) {
+            outImages.push({ dataUrl: full, name: 'schermata annotata' });
+            if (foto?.segreti) senzaSchermata = `Della schermata è partita solo la barra in alto: ${perche}`;
+          } else if (foto?.segreti) {
+            senzaSchermata = `La schermata non è partita: ${perche}`;
           } else {
-            statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
+            senzaSchermata = (shot || topbarShot)
+              ? 'Non sono riuscito a preparare la schermata annotata.'
+              : 'Screenshot non disponibile su questa pagina.';
           }
         }
-        // Routing via main process: la CSP della pagina ospite blocca fetch
-        // diretti verso firestore/firebasestorage dal preload. Il main usa
-        // undici (Node) e non è soggetto alla CSP della pagina.
+        // Senza testo né allegati partirebbe un feedback vuoto (#1667): il riquadro resta aperto e dice perché.
+        if (!text && outImages.length === 0 && files.length === 0) {
+          riprova(senzaSchermata || 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.');
+          return;
+        }
+        // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
+        // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
+        // Nello strato la pagina è quella sotto, non il documento dello strato.
+        const sotto = global.SN_FILO_UI?.nelloStrato ? global.SN_PAGINA_SOTTO : null;
         const payload = {
           text,
-          url: location.href,
-          title: document.title,
+          url: sotto ? String(sotto.url || '') : location.href,
+          title: sotto ? String(sotto.titolo || '') : document.title,
           userAgent: navigator.userAgent,
           clientId,
-          clientIdHash, // S1.F2.2: hash deterministico in chiaro per match C5
+          clientIdHash,
           images: outImages,
-          files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
-          submissionId, // #370: id stabile → il server deduplica i re-invii
+          files: files.slice(),
+          submissionId,
         };
-        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
-        if (!res?.ok) {
-          const err = new Error(res?.error || 'invio fallito');
-          // #602 — quando il no arriva dalla cifratura, il main manda già la
-          // frase intera per chi legge: mostrarla così com'è.
-          err.fraseGiaPronta = !!res?.cifratura;
-          throw err;
-        }
-        statusEl.textContent = '';
-        clearDraft();
+        partito = { images: outImages.slice(), files: files.slice(), submissionId };
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
-        close();
+        // Il riquadro si chiude subito (#1403): il feedback è al sicuro nella coda del main, e se torna indietro
+        // si riapre intatto. Chiuso con Esc durante lo scatto, il riquadro aperto adesso è un altro: resta (#1681).
+        if (activeRoot === root) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
+          clearDraft();
+          close();
+        } else {
+          clearDraft(testoInviato);
+        }
+        attesa = Popup?.showToast?.('Sto inviando il feedback', { duration: 0 }) || null;
+        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload, rileggi: rileggi !== false });
+        if (!res?.ok && res?.rilettura) {
+          riapri({ rilettura: res.rilettura });
+          return;
+        }
+        if (!res?.ok) {
+          const err = new Error(res?.error || 'invio fallito');
+          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
+          // la frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
+          throw err;
+        }
+        try { attesa?.close?.(); } catch (_) {}
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
         // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
         // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
@@ -791,34 +985,31 @@
         let awarded = 5;
         let premio = null;
         try {
-          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
-          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo };
+          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK, ref: res.id || null });
+          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo, senzaPremio: String(ar.senzaPremio || '') };
           else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         if (!premio) flyCredits(originRect, awarded);
-        // Se qualche allegato non è riuscito a caricarsi, il feedback parte
-        // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
-        // sono andati persi, così non resta convinto che siano stati inviati.
-        const failed = Array.isArray(res.failed) ? res.failed : [];
-        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.' : '';
-        if (failed.length) {
-          const names = failed.map((f) => f?.name || 'allegato').join(', ');
-          const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
-          Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
-        } else {
-          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio ? 4000 : 2800 });
-        }
+        // «Inviato» solo a consegna avvenuta (#1667); gli allegati saltati li dice l'avviso nella finestra.
+        const detto = res.consegnato ? 'Grazie! Feedback inviato.' : 'Feedback in partenza: arriva da solo appena c’è rete.';
+        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.'
+          : (premio?.senzaPremio ? ` ${premio.senzaPremio}` : '');
+        const conSchermata = senzaSchermata ? ` ${senzaSchermata}` : '';
+        Popup?.showToast?.(premio ? `${detto}${dopo}${conSchermata}` : `${detto} +${awarded} crediti.${conSchermata}`,
+          { duration: (premio?.senzaPremio || senzaSchermata) ? 5500 : (premio || !res.consegnato ? 4000 : 2800) });
       } catch (e) {
         console.error('[SN feedback] submit', e);
-        statusEl.textContent = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
-        sendBtn.disabled = false;
-        cancelBtn.disabled = false;
+        root.style.visibility = '';
+        const frase = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
+        if (partito) riapri({ messaggio: frase });
+        else riprova(frase);
+      } finally {
+        inVolo.delete(testoInviato);
       }
-    });
+    }
 
-    // ---- posizione iniziale + trascinamento ----
-    // Centra orizzontalmente con `left` INTERO (niente translateX(-50%): su
-    // display HiDPI cadrebbe su un pixel frazionario → testo sfocato).
+    // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un
+    // pixel frazionario e sfocherebbe il testo.
     function centerModal() {
       const w = modal.offsetWidth || 540;
       modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';
@@ -856,6 +1047,11 @@
     updateClearBtn();
     textEl.focus();
     if (proposta) inFondo();
+    if (ripresa) {
+      renderThumbs();
+      if (ripresa.rilettura) mostraRilettura(ripresa.rilettura);
+      if (ripresa.messaggio) statusEl.textContent = String(ripresa.messaggio);
+    }
   }
 
   global.SN_FEEDBACK_UI = { open, close };

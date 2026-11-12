@@ -18,8 +18,9 @@ e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; per
 l'Aiuto ogni apertura del pannello, o pagina nuova, è una conversazione nuova), il costo,
 il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
-credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»
-a ogni livello). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
+credenziali, regole, cancellazioni definitive), la difesa abbassata («conferma»
+a ogni livello) e `parola`, per un'azione che vuole «conferma» a ogni livello
+senza abbassare difese (il «per sempre» di TOGLI_CHAT, #1295). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
 non registrate o senza costo**, e nessuna superficie decide da sé: nemmeno le
 azioni che l'agente sulla pagina fa nel content script, che dichiarano il costo
 e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`), né i pannelli propri
@@ -67,7 +68,7 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
   tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano
   nel contesto del turno successivo come righe di sistema
-  (`confirmedActionsForPrompt`, `interruptedActionsForPrompt`). Senza, a «l'hai
+  (`SN_AZIONI_PER_MODELLO.confermate` e `.interrotte`, in `src/shared/azioniPerModello.js`). Senza, a «l'hai
   attivato?» il modello tirava a indovinare, e un «Riprova» rifaceva il timer
   che aveva appena messo. Per le preferenze il costo è per-setter in `preferences.js`
   (`costo`, più `allenta` sui valori che spengono una difesa). La sospensione e la conferma
@@ -126,6 +127,19 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   non entra MAI nel livello. Quello che il sistema sa da sé (cartella, «perché
   te lo chiedo», «non è reversibile») resta sotto e non lo scrive il modello.
   Sentinella: `tests/unit/terminaleAccesoDiSerie.test.mjs`.
+- **Leggere fuori da Filo chiede alla prima occhiata, non a ogni occhiata (#778).** `VEDI_SCHERMO` costa 0, ma la
+  prima lettura di ogni finestra di un'altra app in una richiesta sta fuori dal `perimetro` e chiede a ogni livello;
+  le finestre approvate le ricorda il main per la scheda finché l'utente non scrive di nuovo, e `_approvata` la scrive
+  solo lui. La frase del popup la dà l'azione (`perchePerimetro`); un setter che vuole sempre un clic senza abbassare
+  una difesa dichiara `chiede`. L'OK che risponde a una domanda rimasta aperta fa riprendere la richiesta da sola,
+  dopo l'ultimo popup della fila. Sentinella: `tests/unit/vediSchermo.test.mjs`.
+- **Il testo che torna dal filo porta la lettura da cui è nato (#1508).** Una risposta di Filo salva `classeLetta`, la
+  classe peggiore che il compito aveva letto; riletta da un'altra conversazione (nel tratto, da CERCA_CHAT o da un
+  ricordo) entra nelle fonti come `filo:altra-chat`, a catena. Le pagine visitate ritrovate sono classe 3 (titoli) o 5
+  (riassunti), le parole scritte nell'Aiuto sopra un sito (`daPagina`) testo da fuori. Le risposte delle altre chat nel
+  tratto hanno la forma di una CERCA_CHAT (`trattoComeAzione`), così stato, uscite e accoglienza le leggono uguali.
+  Un tipo che le uscite trattano da non fidato dichiara una `fonte`. Sentinelle: `tests/unit/autonomia.test.mjs`,
+  `tests/unit/fontiDelFilo.test.mjs`.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.

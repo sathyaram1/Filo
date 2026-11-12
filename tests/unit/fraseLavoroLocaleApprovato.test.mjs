@@ -4,15 +4,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { PULITO, reteFinta } from '../helpers/bigliettoFinto.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
 const MR = globalThis.SN_MANAGE_REVIEW;
+// Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
+mod.sessione.biglietto = async () => PULITO;
 
 const SEGNO = { by: 'owner@esempio', at: 1790000000000 };
 const segnoFs = { mapValue: { fields: { by: { stringValue: SEGNO.by }, at: { integerValue: String(SEGNO.at) } } } };
@@ -99,20 +101,9 @@ test('un passaggio di stato con una frase oltre i 500 caratteri è rifiutato col
 });
 
 test('chiusa a mano senza frase, npm run feedback la ricorda; con la frase no', () => {
-  const dir = cartellaTemporanea('frase-913-');
-  const finto = join(dir, 'rete.mjs');
-  writeFileSync(finto, `
-const doc = ${JSON.stringify(utente())};
-globalThis.fetch = async (url, opts = {}) => {
-  const u = new URL(String(url));
-  if (!/firestore/.test(u.hostname)) return new Response(JSON.stringify({ id_token: 'finto', expires_in: '3600' }), { status: 200 });
-  if ((opts.method || 'GET') !== 'GET') return new Response('{}', { status: 200 });
-  const m = u.searchParams.getAll('mask.fieldPaths');
-  const fields = m.length ? Object.fromEntries(Object.entries(doc.fields).filter(([k]) => m.includes(k))) : doc.fields;
-  return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
-};`);
-  const lancia = (...extra) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'u1', 'done', 'finito', '--come-routine', ...extra], {
-    encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
+  const rete = reteFinta(cartellaTemporanea('frase-913-'), { doc: utente() });
+  const lancia = (...extra) => spawnSync(process.execPath, [...rete.importa, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'u1', 'done', 'finito', '--come-routine', ...extra], {
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: rete.env,
   });
   const senza = lancia();
   assert.equal(senza.status, 0, senza.stderr);

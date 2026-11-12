@@ -3,10 +3,10 @@
 // dagli scaricamenti, dalla chat (elenco vecchio → nuovo con conferma), da un file trascinato e da sole sugli
 // scaricamenti quando l'utente le accende. Il modello è finto: risponde con le prime righe del documento che riceve.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { confirmText, clickConfirm } from './helpers/confirm.mjs';
@@ -96,8 +96,9 @@ async function scarica(nome, corpo, { shell, openTab, testServer }) {
     res.end(corpo);
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${srv.address().port}/${nome}`;
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`);
+  // Pagina e file con un nome da internet: da 127.0.0.1, rete di casa, il nome automatico non parte (#1274.1).
+  const url = `http://sito-pubblico.test:${srv.address().port}/${nome}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`, { pubblico: true });
   await page.locator('#dl').click();
   let rec = null;
   await expect.poll(async () => {
@@ -185,8 +186,9 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Rinominato: Bolletta marzo (2).pdf');
     await expect(page.locator('.sn-rinomina-stato')).toContainText('già preso');
     expect(readdirSync(dir).sort()).toEqual(['Bolletta marzo (2).pdf', 'Bolletta marzo.pdf']);
-    // Un'etichetta scelta dal modello resta, ma il riferimento punta al file nuovo.
-    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('La scansione');
+    // Un'etichetta scelta dal modello resta, accanto al nome vero, e il riferimento punta al file nuovo (#1499).
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('Bolletta marzo (2).pdf');
+    await expect(chip.locator('.dash-file-btn-etichetta')).toHaveText('La scansione');
     await expect(chip).toHaveAttribute('data-percorso', join(dir, 'Bolletta marzo (2).pdf'));
 
     // Esc chiude senza fare niente; vuoto e soli spazi non partono.
@@ -405,15 +407,54 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
   await pref.locator('#sec-nomi-file').screenshot({ path: join(SHOTS, 'rinomina-preferenze.png') });
   const { rec, chiudi } = await scarica('scan_00999.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
-    const nuovo = join(rec.savePath, '..', NOME_NUOVO);
+    // La voce segue il file: su una macchina carica la rinomina arriva prima che la prova legga la voce, che porta già
+    // il nome nuovo. I due percorsi si contano dalla cartella, mai dalla voce.
+    const vecchio = join(dirname(rec.savePath), 'scan_00999.pdf');
+    const nuovo = join(dirname(rec.savePath), NOME_NUOVO);
     // Il nome nuovo nasce un attimo prima che il vecchio sparisca (mai sovrascrivere): si aspetta l'insieme.
-    await expect.poll(() => existsSync(nuovo) && !existsSync(rec.savePath), { timeout: 20000 }).toBe(true);
+    await expect.poll(() => existsSync(nuovo) && !existsSync(vecchio), { timeout: 20000 }).toBe(true);
     const vista = await avvisi();
     const annulla = vista.locator('.shell-notif-action', { hasText: 'Annulla' }).last();
     await expect(annulla).toBeVisible({ timeout: 10000 });
     await annulla.click();
-    await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
+    await expect.poll(() => existsSync(vecchio) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
   } finally { await chiudi(); }
+});
+
+// #1357.2 — col nome automatico acceso, uno scaricamento che non prende il nome lo dice, con la strada per darlo a mano.
+test('col nome automatico acceso, il PDF che non prende un nome lo dice con «Dai un nome»; senza modello lo dice una volta', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(120_000);
+  await modelloDeiNomi(app);
+  // Il modello legge il file ma non capisce cosa sia.
+  await app.evaluate(() => {
+    const legge = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => ({ ...(await legge(o)), text: 'NESSUN NOME' });
+  });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#nomiSensatiScaricamenti').check();
+  await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
+  const primo = await scarica('scan_00888.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00888.pdf' });
+    await expect(carta).toBeVisible({ timeout: 20000 });
+    expect(existsSync(primo.rec.savePath)).toBe(true);
+    await carta.locator('.shell-notif-action', { hasText: 'Dai un nome' }).click();
+    const dl = await aspettaFinestra(app, (w) => w.url().startsWith('filo://downloads/'), '«Dai un nome» non ha aperto la pagina Download');
+    await expect(dl.locator('.sn-rinomina-campo')).toBeVisible({ timeout: 15000 });
+  } finally { await primo.chiudi(); }
+
+  // Il modello che non risponde: l'avviso arriva al primo file, non a ogni file della stessa serie.
+  await app.evaluate(() => { globalThis.SN_PROVIDERS.completeWithFallback = async () => { throw new Error('rete giù'); }; });
+  const secondo = await scarica('scan_00889.pdf', BOLLETTA, { shell, openTab, testServer });
+  const terzo = await scarica('scan_00890.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00889.pdf' })).toBeVisible({ timeout: 20000 });
+    await vista.waitForTimeout(3000);
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00890.pdf' })).toHaveCount(0);
+    expect(existsSync(secondo.rec.savePath) && existsSync(terzo.rec.savePath)).toBe(true);
+  } finally { await secondo.chiudi(); await terzo.chiudi(); }
 });
 
 // Clic altrove dopo «Rinomina»: il riquadro con «Annulla» se ne va, il nome di prima resta al tasto destro.
@@ -503,6 +544,16 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
   }
 });
 
+// Il pannello si apre solo quando il main chiede qualcosa su una voce (#941): si rigioca quel messaggio.
+async function apriPannelloSu(app, shell, item) {
+  if (await shell.locator('#dl-panel').isVisible()) return;
+  await app.evaluate(({ BrowserWindow }, it) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.webContents.send('shell:download', { kind: 'ask', item: it });
+  }, item);
+  await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+}
+
 async function sceltaDalPannello(shell, riga, testo) {
   await riga.click({ button: 'right' });
   const voce = shell.locator('#dl-panel .dl-row-menu .dl-row-menu-voce', { hasText: testo });
@@ -511,13 +562,12 @@ async function sceltaDalPannello(shell, riga, testo) {
   await expect(shell.locator('#dl-panel .dl-row-menu')).toHaveCount(0);
 }
 
-test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
+test('pannello degli scaricamenti: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await modelloDeiNomi(app);
   const { rec, chiudi } = await scarica('scan_00231.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
-    await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+    await apriPannelloSu(app, shell, rec);
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.pdf' });
     await expect(riga).toBeVisible();
     // Esc chiude il menu della riga, non il pannello.
@@ -536,7 +586,7 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     const nuovo = join(rec.savePath, '..', NOME_NUOVO);
     expect(existsSync(nuovo)).toBe(true);
 
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+    await apriPannelloSu(app, shell, rec);
     const rinominata = shell.locator('#dl-panel .dl-row', { hasText: NOME_NUOVO });
     await expect(rinominata).toBeVisible({ timeout: 10000 });
     await sceltaDalPannello(shell, rinominata, 'Rimetti il nome di prima');
@@ -601,11 +651,10 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
   writeFileSync(join(dir, 'scan_00900.pdf'), pdfGrande(['Manuale lavatrice Bosch', 'Serie 6']));
   writeFileSync(join(dir, 'scan_00901.pdf'), scansioneBiancoNero());
   try {
+    // Un file mostrato o un'azione ferma sulla conferma chiudono il turno (#1130): la frase va scritta insieme.
     await modelloFinto(app, [
-      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, 'scan_00901.pdf'), etichetta: 'scan_00901.pdf' }) }] },
-      { text: 'Eccolo.' },
-      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
-      { text: 'Ti ho preparato i nomi nuovi.' },
+      { text: 'Eccolo.', toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, 'scan_00901.pdf'), etichetta: 'scan_00901.pdf' }) }] },
+      { text: 'Ti ho preparato i nomi nuovi.', toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
     ]);
     await modelloDeiNomi(app);
     // La scansione arriva al modello come immagine: lì il nome lo legge dalla pagina.
@@ -638,4 +687,15 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Perché un file resta com'è: le stesse parole che usa il cestino. Un file nascosto non «sta fuori» dalla cartella personale.
+test('in chat, un file nascosto della cartella personale non si rinomina, e il perché dice che è nascosto', async ({ app }) => {
+  const dir = cartellaInCasa('filo-nomi-nascosto-');
+  const nascosto = join(dir, '.scan_00231.pdf');
+  writeFileSync(nascosto, BOLLETTA);
+  const r = await app.evaluate((_e, p) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'RINOMINA_FILE', percorsi: [p] }), nascosto);
+  expect(r.executed).toBe(false);
+  expect(r.output.saltati.map((x) => x.perche)).toEqual(['è un file nascosto o di un programma']);
+  expect(existsSync(nascosto)).toBe(true);
 });

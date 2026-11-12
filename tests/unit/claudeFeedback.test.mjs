@@ -256,7 +256,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
-test('mimeDiAllegato: solo i tipi dell\'allowlist del gate L0, dal nome', () => {
+test('mimeDiAllegato: solo i tipi dell\'allowlist del cancello degli allegati, dal nome', () => {
   assert.equal(SCRIPT.mimeDiAllegato('spec.md'), 'text/markdown');
   assert.equal(SCRIPT.mimeDiAllegato('SPEC.MD'), 'text/markdown');
   assert.equal(SCRIPT.mimeDiAllegato('errori.log'), 'text/plain');
@@ -354,6 +354,35 @@ test('#908 senza --locale né --non-locale non apre niente e dice le due strade;
     }
     assert.equal(visti.length, 0);
   });
+});
+
+test('#2217 --server, anche accanto a --non-locale, apre col segno lavoro server e lo dice', async () => {
+  for (const argv of [['T', 'X', '--non-locale', '--server'], ['T', 'X', '--server'], ['T', 'X', '--non-locale', '--lavoro-server']]) {
+    const righe = [];
+    const orig = console.log;
+    console.log = (...a) => righe.push(a.join(' '));
+    try {
+      await conSubmit(async (_p, o) => ({ id: 'd11', seq: 911, senderProof: 'admin', localOnly: !!o.localOnly }), async (visti) => {
+        assert.equal(await SCRIPT.main(argv), SCRIPT.EXIT.FATTO, argv.join(' '));
+        assert.ok(visti.opts[0].localOnly, argv.join(' '));
+        assert.equal(visti[0].text, 'X', 'l’opzione non finisce nel testo');
+      });
+    } finally { console.log = orig; }
+    assert.ok(righe.some((r) => /lavoro server/.test(r)), righe.join('\n'));
+    assert.ok(!righe.some((r) => /verify-local/.test(r)), righe.join('\n'));
+  }
+});
+
+test('#2217 --server non fidato non promette le routine: va nei Ricevuti a chiedere la fiducia; fidato sì', async () => {
+  const casi = [
+    [{ biglietto: 'assente' }, false], [{ biglietto: 'sporco' }, false], [{ biglietto: 'tolto', nonFidato: 'allegati' }, false],
+    [{ biglietto: 'pulito', nonFidato: 'allegati' }, false], [{ biglietto: 'pulito' }, true],
+  ];
+  for (const [r, promette] of casi) {
+    const riga = SCRIPT.rigaAperto({ server: true, r: { seq: 912, ...r } });
+    assert.equal(/lo prendono le routine/.test(riga), promette, `${JSON.stringify(r)}: ${riga}`);
+    if (!promette) assert.match(riga, /Ricevuti a chiedere la fiducia/);
+  }
 });
 
 test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {
@@ -460,9 +489,10 @@ test('#914 la create admin porta priorità cifrata e priorityManual; la create a
   const corpi = [];
   const origFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
-    if (init.method === 'POST' && /\/feedback\?/.test(String(url))) {
-      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body) });
-      return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/x' }), text: async () => '' };
+    // La create passa da `:commit` (#1517): il documento è la scrittura.
+    if (init.method === 'POST' && /:commit\?/.test(String(url))) {
+      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body).writes[0].update });
+      return { ok: true, status: 200, json: async () => ({ writeResults: [{}] }), text: async () => '' };
     }
     return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
   };

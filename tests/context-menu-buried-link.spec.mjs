@@ -17,12 +17,13 @@
 // sopra, velo, componenti) devono CONTINUARE ad adottare il loro collegamento.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const LINK_LABELS = ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link'];
 
 async function openMenuOn(page, selector, position) {
   await page.locator(selector).click({ button: 'right', ...(position ? { position } : {}) });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }

@@ -34,6 +34,11 @@ async function preparaRouter(app, modo, rifiuto = NO_PARAMS) {
     if (!globalThis.__fetchVero) {
       globalThis.__fetchVero = globalThis.fetch;
       globalThis.fetch = async (url, init) => {
+        // Gli host dichiarati dicono se manca chi regge gli strumenti o chi regge il tetto della risposta: qui gli strumenti.
+        if (/openrouter\.ai\/api\/v1\/models\/.+\/endpoints$/.test(String(url))) {
+          const endpoints = [{ provider_name: 'DeepInfra', tag: 'deepinfra', supported_parameters: ['max_tokens', 'reasoning'], max_completion_tokens: 65536 }];
+          return new Response(JSON.stringify({ data: { endpoints } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
         if (!String(url).includes('openrouter.ai/api/v1/chat/completions')) return globalThis.__fetchVero(url, init);
         const body = JSON.parse(init.body);
         globalThis.__corpi.push(body);
@@ -125,7 +130,9 @@ test('nessun host ammesso regge gli strumenti: la chat lo dice, e niente parte s
   await scrivi(page, 'apri le impostazioni');
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'nessun fornitore ammesso sa usare gli strumenti' });
   await expect(bolla).toBeVisible({ timeout: 15_000 });
-  await expect(bolla).toContainText('Scegli un altro modello in Modelli predefiniti.');
+  await expect(bolla).toContainText('Scegli un altro modello in Opzioni → Modelli per azione.');
+  // La frase dice dove si cambia il modello, e il tasto porta lì (#1344.1).
+  await expect(page.locator('.dash-action-btn-primary', { hasText: 'Apri Opzioni' })).toBeVisible();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' })).toHaveCount(0);
   const corpi = await corpiConStrumenti(app);
   vincoliIntatti(corpi);
@@ -190,7 +197,8 @@ for (const [nome, rifiuto, frase] of [
     await scrivi(page, 'che ore sono a Tokyo?');
     const bolla = page.locator('.dash-bubble-filo', { hasText: frase });
     await expect(bolla).toBeVisible({ timeout: 15_000 });
-    await expect(bolla).toContainText('Modelli predefiniti');
+    await expect(bolla).toContainText('Opzioni → Modelli per azione');
+    await expect(page.locator('.dash-action-btn-primary', { hasText: 'Apri Opzioni' })).toBeVisible();
     await expect(bolla).not.toContainText('strumenti');
     const corpi = await corpiConStrumenti(app);
     vincoliIntatti(corpi);

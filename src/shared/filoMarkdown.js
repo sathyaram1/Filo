@@ -1,32 +1,16 @@
-// SORGENTE UNICA del rendering "testo di Filo -> HTML leggero" (#418).
-//
-// Ovunque Filo scriva una risposta - la chat della home (filo://dashboard), il
-// popup di risposta AI sulle pagine web, il riquadro "Spiega" del tasto destro,
-// la sidebar - il testo del modello va mostrato con una formattazione leggera e
-// COERENTE: grassetto, corsivo, codice, elenchi, titoli e LINK cliccabili. Prima
-// il popup aveva una sua copia (senza link) e la home non interpretava nulla:
-// due superfici, due comportamenti diversi. Da qui in poi tutte usano questo.
-//
-// SICUREZZA - il testo di Filo e' contenuto NON FIDATO (puo' nascere da una
-// pagina web che il modello ha letto). Un link renderizzato:
-//   - deve avere uno schema esplicito e sicuro (http/https/mailto). Tutto il
-//     resto (filo://, javascript:, data:, file:, about:, e i link RELATIVI o
-//     protocol-relative //host, che su una pagina filo:// risolverebbero verso
-//     le pagine INTERNE dell'app) viene scartato: il testo resta visibile ma non
-//     cliccabile;
-//   - porta rel="noopener noreferrer nofollow" e apre in una nuova scheda.
-// La classe `filo-md-link` e' l'aggancio con cui ogni superficie intercetta il
-// click e apre il link nel modo giusto (nuova scheda), invece di navigare via la
-// pagina interna.
+// SORGENTE UNICA del rendering «testo di Filo → HTML leggero» (#418).
+// Il testo del modello NON è fidato: un link si rende cliccabile solo con schema http,
+// https o mailto, perché filo://, javascript: e i relativi puntano dentro l'app.
 
 (function (global) {
   'use strict';
 
   const LINK_CLASS = 'filo-md-link';
-  // Sentinelle Private-Use: non compaiono mai nel testo del modello, quindi un
-  // innocente " T3 " nella prosa non viene scambiato per un segnaposto.
-  const S0 = '';
-  const S1 = '';
+  // Sentinelle Private-Use dei segnaposto: tolte dal testo in arrivo, così ogni segnaposto è uno dei nostri.
+  const S0 = '\uE000';
+  const S1 = '\uE001';
+  const SENTINELLE = /[\uE000\uE001]/g;
+  const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -34,11 +18,8 @@
     })[c]);
   }
 
-  // Dato un URL (gia' HTML-escapato: & e' &amp;, ecc.), ritorna l'URL se e' un
-  // link esterno SICURO da rendere cliccabile, altrimenti null. Solo schema
-  // esplicito http/https/mailto: niente filo://, javascript:, data:, file:,
-  // niente link relativi o protocol-relative (che punterebbero alle pagine
-  // interne dell'app).
+  // Ritorna l'URL solo se è un link esterno SICURO: niente filo://, javascript:, data:, file:,
+  // né relativi o protocol-relative. Altrimenti null: il testo resta visibile, non cliccabile.
   function safeLinkUrl(rawUrl) {
     const u = String(rawUrl || '').trim();
     if (!u) return null;
@@ -80,59 +61,59 @@
     return [m.slice(0, fine), m.slice(fine)];
   }
 
-  // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
-  // di URL nudi, grassetto, corsivo. Codice e link vengono "messi da parte" con
-  // segnaposto cosi' le trasformazioni successive (autolink, grassetto/corsivo)
-  // non ne corrompono il contenuto e non ri-linkano l'href appena creato.
+  // Grassetto poi corsivo: l'ordine evita che ** venga letto come due *.
+  const enfasi = (s) => s
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+
+  // Link markdown [testo](url). Il testo non contiene [ né ]: da ogni [ la ricerca
+  // si ferma alla quadra seguente, così una fila di [ aperte resta lineare (#853).
+  // L'url può contenere parentesi bilanciate (wiki/Mercurio_(astronomia)), mai un segnaposto.
+  const LINK_MD = /\[([^[\]\n]+)\]\(((?:[^()\s\uE000\uE001]|\([^()\s\uE000\uE001]*\))+)\)/g;
+  // Dove finisce un URL nudo lo decide separaCoda; qui si ferma ai caratteri che in un URL
+  // non stanno mai (" < > già escapati, virgolette tipografiche) e al codice che gli sta attaccato.
+  const URL_NUDO = /\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”\uE000\uE001])+/gi;
+
+  // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
+  // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo
+  // di un link ha la sua enfasi e il suo codice, rimessi dentro l'<a> (#853).
   function inlineMd(escaped) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
-    let t = String(escaped);
+    const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
+    let t = String(escaped).replace(SENTINELLE, '');
 
-    // Codice inline `...`
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
-    // Link markdown [testo](url): l'url può contenere parentesi bilanciate
-    // (wiki/Mercurio_(astronomia)).
-    t = t.replace(/\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g, (m, label, url) => {
+    t = t.replace(LINK_MD, (m, label, url) => {
       const safe = safeLinkUrl(url);
-      return safe ? stash(anchor(safe, label)) : label;
+      return safe ? stash(anchor(safe, rimetti(enfasi(label)))) : label;
     });
 
-    // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    // Dove finisce l'URL lo decide separaCoda; qui si ferma solo ai caratteri
-    // che in un URL non stanno mai (" < > già escapati, virgolette tipografiche).
-    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi, (m) => {
+    t = t.replace(URL_NUDO, (m) => {
       const [url, trail] = separaCoda(m);
       const safe = safeLinkUrl(url);
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });
 
-    // Grassetto poi corsivo (l'ordine evita che ** venga letto come due *).
-    t = t
-      .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
-
-    // Ripristina i segnaposto (codice e link).
-    t = t.replace(new RegExp(S0 + '(\\d+)' + S1, 'g'), (m, i) => tokens[Number(i)] || '');
-    return t;
+    return rimetti(enfasi(t));
   }
 
-  // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
-  // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
-  function render(text) {
-    if (!text) return '';
+  // I blocchi del testo (paragrafi, titoli, elenchi, codice ```), con le righe GIA' escapate. Li leggono sia
+  // render sia testo: «Copia» copia la stessa lettura che si vede a schermo (#846).
+  function blocchi(text) {
+    if (!text) return [];
     const lines = escapeHtml(text).split('\n');
     const out = [];
-    let listType = null;
+    let lista = null;
     let para = [];
     let inCode = false;
     let codeBuf = [];
     const flushPara = () => {
-      if (para.length) { out.push('<p>' + para.map(inlineMd).join('<br>') + '</p>'); para = []; }
+      if (para.length) { out.push({ k: 'p', righe: para }); para = []; }
     };
     const flushList = () => {
-      if (listType) { out.push('</' + listType + '>'); listType = null; }
+      if (lista) { out.push(lista); lista = null; }
     };
     // Il tipo di voce d'elenco di una riga, o null.
     const tipoVoce = (s) => (/^[-*]\s+\S/.test(s) ? 'ul' : /^\d+\.\s+\S/.test(s) ? 'ol' : null);
@@ -140,7 +121,7 @@
       const raw = lines[i];
       if (raw.trim().startsWith('```')) {
         if (inCode) {
-          out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
+          out.push({ k: 'code', righe: codeBuf });
           codeBuf = []; inCode = false;
         } else { flushPara(); flushList(); inCode = true; }
         continue;
@@ -152,34 +133,60 @@
         // Voci staccate da righe vuote restano un elenco solo: chiuso qui, «1.» «2.» «3.» ripartivano tutte da 1 (#703).
         let j = i + 1;
         while (j < lines.length && lines[j].trim() === '') j++;
-        if (!listType || j >= lines.length || tipoVoce(lines[j].trim()) !== listType) flushList();
+        if (!lista || j >= lines.length || tipoVoce(lines[j].trim()) !== lista.k) flushList();
         continue;
       }
       let m;
       if ((m = trimmed.match(/^(#{1,6})\s+(.+)$/))) {
         flushPara(); flushList();
-        const level = Math.min(m[1].length + 2, 6);
-        out.push('<h' + level + '>' + inlineMd(m[2]) + '</h' + level + '>');
+        out.push({ k: 'h', livello: Math.min(m[1].length + 2, 6), riga: m[2] });
       } else if ((m = trimmed.match(/^[-*]\s+(.+)$/))) {
         flushPara();
-        if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; }
-        out.push('<li>' + inlineMd(m[1]) + '</li>');
+        if (!lista || lista.k !== 'ul') { flushList(); lista = { k: 'ul', voci: [] }; }
+        lista.voci.push(m[1]);
       } else if ((m = trimmed.match(/^(\d+)\.\s+(.+)$/))) {
         flushPara();
-        if (listType !== 'ol') {
-          flushList();
-          // Il numero scritto vale: un elenco spezzato da un paragrafo riprende da dove era, non da 1.
-          const da = Math.min(Number(m[1]), 1e6);
-          out.push(da === 1 ? '<ol>' : '<ol start="' + da + '">');
-          listType = 'ol';
-        }
-        out.push('<li>' + inlineMd(m[2]) + '</li>');
+        // Il numero scritto vale: un elenco spezzato da un paragrafo riprende da dove era, non da 1.
+        if (!lista || lista.k !== 'ol') { flushList(); lista = { k: 'ol', da: Math.min(Number(m[1]), 1e6), voci: [] }; }
+        lista.voci.push(m[2]);
       } else { flushList(); para.push(trimmed); }
     }
-    if (inCode) out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
+    if (inCode) out.push({ k: 'code', righe: codeBuf });
     flushPara();
     flushList();
+    return out;
+  }
+
+  // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
+  // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
+  function render(text) {
+    const out = [];
+    for (const b of blocchi(text)) {
+      if (b.k === 'p') out.push('<p>' + b.righe.map(inlineMd).join('<br>') + '</p>');
+      else if (b.k === 'h') out.push('<h' + b.livello + '>' + inlineMd(b.riga) + '</h' + b.livello + '>');
+      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n') + '</code></pre>');
+      else {
+        out.push(b.k === 'ol' && b.da !== 1 ? '<ol start="' + b.da + '">' : '<' + b.k + '>');
+        for (const v of b.voci) out.push('<li>' + inlineMd(v) + '</li>');
+        out.push('</' + b.k + '>');
+      }
+    }
     return out.join('\n');
+  }
+
+  // Il testo semplice di una risposta, per gli appunti: quello che si legge a schermo, senza asterischi, cancelletti
+  // né parentesi dei link (resta la parola del link). Le voci d'elenco tengono il pallino o il numero che si vedono.
+  const DISESCAPE = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+  const disescapa = (s) => s.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => DISESCAPE[e]);
+  // Il testo entra escapato, quindi gli unici < rimasti sono i tag messi da inlineMd.
+  const inlineTesto = (riga) => disescapa(inlineMd(riga).replace(/<[^>]*>/g, ''));
+  function testo(text) {
+    return blocchi(text).map((b) => {
+      if (b.k === 'p') return b.righe.map(inlineTesto).join('\n');
+      if (b.k === 'h') return inlineTesto(b.riga);
+      if (b.k === 'code') return disescapa(b.righe.join('\n'));
+      return b.voci.map((v, i) => (b.k === 'ol' ? (b.da + i) + '. ' : '• ') + inlineTesto(v)).join('\n');
+    }).join('\n\n');
   }
 
   // Aggancio comune per il click sui link renderizzati. Ogni superficie passa il
@@ -201,5 +208,11 @@
     return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
   }
 
-  global.SN_MARKDOWN = { render, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
+  // Un collegamento disegnato da qui, o dentro una frase di Filo, l'ha scritto un modello: senza verdetto della porta,
+  // clic, tasto destro e anteprima lo trattano da indirizzo da confermare (#1505).
+  function scrittoDaUnModello(el) {
+    return !!(el && el.closest && (el.closest('a.' + LINK_CLASS) || el.closest('[data-filo-verdetti]')));
+  }
+
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, scrittoDaUnModello, LINK_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -12,6 +12,8 @@
   --tab-active: #fdf6ec;
   --border: #e2d3b5;
   --radius: 10px;
+  /* Proporzione delle ombre sul token `shadow`, come in theme.css. */
+  --sn-ombra: calc(var(--sn-shadow-opacity, 0.18) / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -81,7 +83,7 @@ html[data-chrome-compact="1"] .addr {
   background: var(--accent);
   opacity: 0.5;
   cursor: pointer;
-  transition: opacity 0.15s ease, width 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, width calc(0.15s * var(--sn-motion, 1)) ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -155,7 +157,7 @@ html[data-chrome-compact="1"] .addr {
   font-size: 13px;
   color: var(--fg-soft);
   cursor: default;
-  transition: background 0.1s ease;
+  transition: background calc(0.1s * var(--sn-motion, 1)) ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
   /* Contenitore delle priorità delle icone (sotto); la larghezza che chiede alla striscia la calcola shell.js. */
@@ -164,7 +166,7 @@ html[data-chrome-compact="1"] .addr {
 }
 
 .tab.audible {
-  animation: tab-glow-pulse 2.4s ease-in-out infinite;
+  animation: tab-glow-pulse calc(2.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
 /* Scheda col colore del sito, attiva o no: titolo, crocetta e indicatori prendono l'inchiostro che shell.js
@@ -179,28 +181,37 @@ html[data-chrome-compact="1"] .addr {
 .tab.inked .proxy-ind { color: inherit; }
 .tab.inked .close:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 /* Un favicon del colore del suo sito sparirebbe sulla sua scheda a tinta piena: un filo d'inchiostro ne tiene la sagoma. */
-.tab.inked .favicon:not(.favicon-audible) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
+.tab.inked .favicon:not(.favicon-audible):not(.senza-icona) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
 .tab.inked .spinner {
   border-color: color-mix(in srgb, currentColor 30%, transparent);
   border-top-color: currentColor;
 }
 /* Transizione di sfondo spenta durante il trascinamento: così la tab segue il puntatore senza scatti. */
 .tab.dragging {
-  opacity: 0.7;
+  /* Piena: sopra le vicine che le scivolano sotto non deve lasciar trasparire i loro titoli. */
+  opacity: 1;
   z-index: 5;
   transition: none;
   cursor: grabbing;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, calc(0.25 * var(--sn-ombra, 1)));
 }
+/* Mentre una scheda si trascina le vicine scivolano al posto nuovo, e al rilascio lei si assesta nel suo (#2084). */
+.tabs.riordino .tab:not(.dragging),
+.tab.assesta {
+  transition: background calc(0.1s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease;
+}
+/* Portata fuori dalla fila torna al suo posto, spenta: la sta prendendo chi sta sotto il puntatore. */
+.tab.dragging.fuori { opacity: 0.45; box-shadow: none; }
+html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);
   margin-bottom: 0;
   z-index: 1;
   /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita): di quanto
-     lo decide shell.js, che non le mette un tetto fisso (#429). */
+     lo decide shell.js, entro la larghezza massima delle schede (#429, #1493). */
   min-width: 110px;
-  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, calc(0.05 * var(--sn-ombra, 1)));
 }
 
 .tab.misura {
@@ -210,7 +221,7 @@ html[data-chrome-compact="1"] .addr {
 }
 
 .tab.active.audible {
-  animation: tab-glow-pulse 2.4s ease-in-out infinite;
+  animation: tab-glow-pulse calc(2.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 
 .tab::after {
@@ -264,6 +275,8 @@ html[data-chrome-compact="1"] .addr {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Nel suo posto non sta una lettera coi puntini: la classe la mette shell.js (#1293). */
+.tab .title.illeggibile { visibility: hidden; }
 .tab .close {
   /* La larghezza oltre alla base: la scheda misurata col contenuto conta la larghezza, non la base (#429). */
   flex: 0 0 18px;
@@ -281,12 +294,17 @@ html[data-chrome-compact="1"] .addr {
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
 .tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
-/* Sulle schede dietro la X non tiene posto: compare al passaggio sopra la fine del nome, che sfuma sotto di lei,
-   così con la fila piena il nome arriva al bordo (#429). Con l'avviso audio resta in fila: gli starebbe sopra. */
-.tab:not(.active):not(.misura):not(:has(> .tab-alert)) > .close {
+/* Dietro la X non tiene posto, nemmeno con l'avviso (che le sta dopo): compare al passaggio sopra la fine del nome,
+   che sfuma sotto di lei. Il suo posto vuoto toglieva il nome alla scheda che comincia a suonare (#429, #1688). */
+.tab:not(.active):not(.misura) > .close {
   position: absolute;
   right: 8px;
   top: 7px;
+}
+.tab:not(.active):not(.misura):has(> .tab-alert) > .close { right: 30px; }
+.tab:not(.active):has(> .tab-alert):hover > .title {
+  -webkit-mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+  mask-image: linear-gradient(to left, transparent 20px, #000 28px);
 }
 .tab .favicon {
   width: 16px; height: 16px;
@@ -296,6 +314,15 @@ html[data-chrome-compact="1"] .addr {
   background-repeat: no-repeat;
   background-position: center;
 }
+/* Il globo dei siti senza icona prende l'inchiostro della scheda, un po' più tenue del titolo. */
+.tab .favicon.senza-icona {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.75;
+}
+.tab .favicon.senza-icona svg { display: block; }
 .tab .spinner {
   flex: 0 0 12px;
   width: 12px; height: 12px;
@@ -304,7 +331,7 @@ html[data-chrome-compact="1"] .addr {
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  animation: spin calc(0.6s * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -321,6 +348,12 @@ html[data-chrome-compact="1"] .addr {
 }
 .tab .tab-alert svg { display: block; }
 .tab .tab-alert:hover { opacity: 0.7; }
+/* Cosa il sito usa o si è visto negare (#586): discreto come l'audio; il no è barrato. */
+.tab .tab-permessi { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 2px; color: inherit; }
+.tab .tab-permessi .segno { display: inline-flex; position: relative; }
+.tab .tab-permessi .segno svg { display: block; }
+.tab .tab-permessi .segno.negato { opacity: 0.55; }
+.tab .tab-permessi .segno.negato::after { content: ''; position: absolute; left: -1px; right: -1px; top: 50%; border-top: 1.5px solid currentColor; transform: rotate(-45deg); }
 
 /* Indicatore "aperta da un altro paese" (proxy per-tab): discreto di proposito, è un segnale
    di viaggio, non di sicurezza. */
@@ -339,26 +372,37 @@ html[data-chrome-compact="1"] .addr {
   line-height: 1;
 }
 
-/* Scheda stretta con l'avviso audio, priorità come in Chrome: avviso > icona > X (sull'attiva sempre) > paese > titolo.
-   Soglia = spazio di chi resta (icone 16, X 18, paese ~26, gap 6); prova in tests/tab-audio-indicator.spec.mjs. */
-@container tab (width < 100px) {
-  .tab:has(> .tab-alert) > .proxy-ind { display: none; }
+/* I segni dei permessi non si mangiano il nome: sulla scheda che la fila stringe resta il primo (shell.js, misura). */
+.tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
+
+/* Scheda stretta con l'avviso: allargandola compaiono avviso, icona, X, titolo, paese, ognuno quando ci sta con chi lo
+   precede (icone 16, X 18 solo sull'attiva, paese 28, gap 6, titolo 2em), così il titolo non risparisce (#1293). */
+@container tab (width < calc(102px + 2em)) {
+  .tab.active:has(> .tab-alert) > .proxy-ind { display: none; }
+}
+@container tab (width < calc(78px + 2em)) {
+  .tab:not(.active):has(> .tab-alert) > .proxy-ind { display: none; }
 }
 @container tab (width < 68px) {
   .tab:not(.active):has(> .tab-alert) > .close { display: none; }
-}
-@container tab (width < 44px) {
   .tab:has(> .tab-alert) > .title { display: none; }
+  /* Senza titolo l'avviso resta dove lo si trova sulla scheda larga: in fondo, prima della X. */
+  .tab > .tab-alert { margin-left: auto; }
 }
 @container tab (width < 38px) {
   .tab:has(> .tab-alert) > :is(.favicon, .spinner) { display: none; }
   .tab > .tab-alert { margin: 0 auto; }
+  /* Rimasto solo, l'avviso è la scheda: il clic la apre senza toccarne l'audio, il trascinamento la sposta (#1293). */
+  .tab:not(.active) > .tab-alert { pointer-events: none; }
 }
 
 /* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
    e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
-@container tab (width < 78px) {
-  .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+@container tab (width < calc(56px + 2em)) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+}
+@container tab (width < calc(80px + 2em)) {
+  .tab.active:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
 @container tab (width < 46px) {
   .tab.active:not(:has(> .tab-alert)) > .title { display: none; }
@@ -473,24 +517,6 @@ html[data-chrome-compact="1"] .addr {
   align-self: stretch;
 }
 
-/* Tooltip della shell, in pendant con .sn-tooltip di src/styles/menu.css: senza, l'hover su
-   nav-btn e tab-new mostrerebbe il tooltip nativo bianco e squadrato. */
-.shell-tooltip {
-  position: fixed;
-  z-index: 2147483647;
-  pointer-events: none;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 4px 8px;
-  white-space: nowrap;
-  max-width: 240px;
-  backdrop-filter: blur(4px);
-}
 
 /* Incognito: la finestra carica shell.html?incognito=1 → <html data-incognito="1">. Vira tutta la
    shell verso un viola scuro, distinguibile a colpo d'occhio da una finestra normale. */
@@ -532,7 +558,7 @@ html[data-incognito="1"] {
    regione draggabile, che il compositore disegna SOPRA ogni velo: si scurisce solo col filtro. */
 html[data-feedback-dim="1"] .shell {
   filter: brightness(0.82);
-  transition: filter 120ms ease-out;
+  transition: filter calc(120ms * var(--sn-motion, 1)) ease-out;
 }
 
 /* Durante l'annotazione si disegna a mano libera anche su tab e barra indirizzi. Serve il no-drag,
@@ -548,68 +574,6 @@ html[data-feedback-dim="1"] .shell {
 }
 #feedback-draw[hidden] { display: none; }
 
-/* L'indicatore sta nella fila di tab perché quella non è mai coperta dalla view nativa della pagina. */
-.dl-indicator {
-  position: relative;
-  align-self: center;
-  flex: 0 0 auto;
-  margin: -8px 6px 0 0;
-  height: 26px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  background: var(--tab-bg);
-  border: 1px solid var(--border);
-  color: var(--fg-soft);
-  cursor: default;
-  overflow: hidden;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-.dl-indicator[hidden] { display: none; }
-.dl-indicator:hover,
-.dl-indicator.open { background: var(--tab-active); color: var(--fg); }
-.dl-ind-icon { display: inline-flex; }
-.dl-ind-icon svg { display: block; }
-.dl-ind-count {
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font: 600 10px/15px system-ui, sans-serif;
-  text-align: center;
-}
-.dl-ind-count[hidden] { display: none; }
-/* #588 — un programma fermo in attesa di risposta: il bordo d'accento dice che
-   qui c'è una domanda aperta, non uno scaricamento che sta andando avanti. */
-.dl-indicator.attesa {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  color: var(--fg);
-}
-.dl-ind-bar {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 2px;
-  background: transparent;
-  overflow: hidden;
-}
-.dl-indicator.active .dl-ind-bar {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-.dl-ind-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--accent);
-  transition: width 0.2s ease;
-}
-.dl-indicator.indeterminate .dl-ind-fill {
-  width: 40% !important;
-  animation: dlIndet 1.1s ease-in-out infinite;
-}
 @keyframes dlIndet {
   0%   { transform: translateX(-110%); }
   100% { transform: translateX(320%); }
@@ -630,21 +594,21 @@ html[data-feedback-dim="1"] .shell {
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.20);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, calc(0.20 * var(--sn-ombra, 1)));
   z-index: 1000;
 }
 .dl-panel[hidden] { display: none; }
 .dl-panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
+  gap: 2px;
+  padding: 9px 8px 9px 12px;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   background: var(--bg);
 }
-.dl-panel-title { font: 600 13px/1 system-ui, sans-serif; }
+.dl-panel-title { flex: 1; font: 600 13px/1 system-ui, sans-serif; }
 .dl-panel-clear {
   background: transparent;
   border: none;
@@ -655,6 +619,20 @@ html[data-feedback-dim="1"] .shell {
   border-radius: 6px;
 }
 .dl-panel-clear:hover { background: var(--border); color: var(--fg); }
+.dl-panel-close {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+.dl-panel-close svg { display: block; }
+.dl-panel-close:hover { background: var(--border); color: var(--fg); }
 .dl-panel-list { display: flex; flex-direction: column; }
 .dl-empty { padding: 18px 12px; text-align: center; color: var(--fg-soft); font: 12px/1.4 system-ui; }
 .dl-row {
@@ -678,8 +656,8 @@ html[data-feedback-dim="1"] .shell {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   overflow: hidden;
 }
-.dl-row-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
-.dl-row-bar.indeterminate .dl-row-fill { width: 40%; animation: dlIndet 1.1s ease-in-out infinite; }
+.dl-row-fill { height: 100%; width: 0%; background: var(--accent); transition: width calc(0.2s * var(--sn-motion, 1)) ease; }
+.dl-row-bar.indeterminate .dl-row-fill { width: 40%; animation: dlIndet calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite; }
 .dl-row-meta { font: 11px/1.2 system-ui, sans-serif; color: var(--fg-soft); }
 .dl-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1px; }
 .dl-row-btn {
@@ -701,7 +679,7 @@ html[data-feedback-dim="1"] .shell {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, calc(0.08 * var(--sn-ombra, 1)));
 }
 .dl-row-menu-voce {
   padding: 6px 10px;
@@ -710,7 +688,7 @@ html[data-feedback-dim="1"] .shell {
   color: var(--fg);
   cursor: pointer;
   outline: none;
-  transition: background 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dl-row-menu-voce:hover,
 .dl-row-menu-voce:focus-visible { background: var(--tab-bg); }
@@ -742,6 +720,16 @@ html[data-feedback-dim="1"] .shell {
 /* Il nome lo sceglie il sito e può non avere spazi: va a capo dove serve, o
    la sua coda (l'estensione) finirebbe oltre il bordo. */
 .dl-row-ask { font: 12px/1.4 system-ui, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+/* Il nome scelto dal sito sta su un foglietto suo, come il testo altrui nei popup di conferma (#592.7): il filo
+   a sinistra è per metà colore del testo, così un accento spento non lo spegne. */
+.dl-row-ask-nome {
+  margin: 4px 0;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 50%, currentColor);
+  border-radius: 6px;
+}
 .dl-row-note { font: 11px/1.3 system-ui, sans-serif; color: var(--accent); overflow-wrap: anywhere; }
 .dl-row-meta { overflow-wrap: anywhere; }
 .dl-row[data-state="interrupted"] .dl-row-name,
@@ -749,6 +737,22 @@ html[data-feedback-dim="1"] .shell {
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
+/* #588.8 — un file arrivato si prende dalla sua riga e si lascia dove serve. */
+.dl-row[data-trascina="1"] { cursor: grab; }
+.dl-row[data-trascina="1"] .dl-row-btn { cursor: pointer; }
+/* #1287 — l'incognito che si chiude chiede degli scaricamenti in corso: una domanda come le righe che chiedono. */
+.dl-chiusura {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.dl-chiusura[hidden] { display: none; }
+.dl-chiusura-testo { font: 12px/1.4 system-ui, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+.dl-chiusura-nome { font-weight: 600; }
 
 /* Domanda di permesso di una pagina (#591.1): sta nella cornice, subito sotto la fila di tab, e la pagina scende. */
 .permesso-bar {
@@ -781,13 +785,22 @@ html[data-feedback-dim="1"] .shell {
   color: var(--fg);
   font: inherit;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease, transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .permesso-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.12); }
 .permesso-btn:active:not(:disabled) { transform: scale(0.97); }
 .permesso-si { background: var(--accent); border-color: var(--accent); color: #fff; }
 .permesso-si:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); }
 .permesso-si:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+/* Lo schermo: cosa mostrare sta sotto la domanda, una fila che scorre di lato se le finestre sono tante. */
+.permesso-bar.permesso-schermo { flex-wrap: wrap; }
+.permesso-fonti { flex: 1 0 100%; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.permesso-fonte { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 132px; padding: 6px; }
+.permesso-fonte:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+.permesso-fonte:hover:not(:disabled) { border-color: var(--accent); }
+.permesso-fonte-vista { width: 120px; height: 68px; display: flex; align-items: center; justify-content: center; border-radius: 5px; background: rgba(var(--accent-rgb), 0.08); color: var(--fg-soft); overflow: hidden; }
+.permesso-fonte-vista img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.permesso-fonte-nome { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 /* Suoneria in corso: stessa forma del chip scaricamenti, ma col colore d'allerta e un battito, perché
    deve farsi notare da qualunque scheda l'utente stia guardando. Cliccarlo ferma. */
@@ -806,7 +819,7 @@ html[data-feedback-dim="1"] .shell {
   border: 1px solid var(--accent);
   color: var(--fg);
   cursor: pointer;
-  animation: ringPulse 1.1s ease-in-out infinite;
+  animation: ringPulse calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

@@ -13,6 +13,7 @@
 // quello del filmato). Senza il fix la voce non esiste → il click fallisce → rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Pagina-tipo: la scheda di un video in una lista (il <video> è dentro l'<a>).
 function cardHtml(linkHref) {
@@ -38,7 +39,7 @@ function overlayCardHtml(linkHref) {
 
 async function openMenuOn(page, selector, position = { x: 20, y: 20 }) {
   await page.locator(selector).click({ button: 'right', position });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }

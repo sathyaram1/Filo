@@ -17,7 +17,20 @@ const CAMPI_WEB = Object.freeze({
   blocklist: true,
   // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
   menuDelSito: Object.freeze({ siti: true }),
-  featureFlags: Object.freeze({ spellcheck: true }),
+  // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
+  featureFlags: Object.freeze({ spellcheck: true, spellcheckContext: true, help: true }),
+  // Il correttore (#1446): la parte del modello, le ripetizioni e i tempi dei due controlli; la correzione automatica e
+  // quante volte serve per imparare (#1447); i segnaposti (#1448).
+  correttore: Object.freeze({
+    modelloErrori: true, ripetizioni: true, pausaRapidoMs: true, ogniRapidoMs: true, pausaRagionatoMs: true, segnaposti: true,
+    automatica: true, accettiPerImparare: true, annulliPerImparare: true, riscrittePerImparare: true,
+  }),
+  // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
+  spiegaAnticipata: true,
+  // Le sezioni nascoste della pagina: tradotte subito o quando si aprono (#1290).
+  traduzionePagina: true,
+  // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
+  scorciatoie: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
   notifications: Object.freeze({ durationSec: true }),
@@ -49,7 +62,14 @@ const SPINTE_WEB = Object.freeze(new Set([
   'tts_global_reading',
   'tts_stop',
   'fullscreen_changed',
+  'form_recheck',
+  'form_sent',
+  // Dizionario, correzioni e parole da non correggere del correttore (#1447): correttoreSpinte.js.
+  'correttore_memorie',
+  // Dove stanno le icone, per la fila del tasto destro (#1434): solo id di Filo, niente della persona.
   'icon_layout_changed',
+  // «Rileggi la voce Invia attacco» (#991): nessun dato, la risposta la chiede il content script.
+  'redteam_verificato_changed',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
@@ -62,8 +82,6 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'settings',
   'sn_personal_dict',
   'sn_autocorrect',
-  'sn_icon_layout',
-  'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
@@ -151,10 +169,34 @@ function indirizziDelMittente(sender) {
   return [riquadro, String(sender?.tab?.url || sender?.url || '')];
 }
 
+// #843 — dall'Aiuto di un sito si spegne o si riaccende Filo solo lì: si aggiunge il nome del sito, si tolgono le voci
+// che lo coprono. Mai un altro sito, che il testo della pagina potrebbe far nominare.
+function filoSulSitoStesso(action, origine) {
+  const N = globalThis.SN_NOMI_SITO || require('../../shared/nomiSito.js');
+  const D = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+  if (!globalThis.SN_PREF) require('../../shared/preferences.js');
+  const P = globalThis.SN_PREF;
+  const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
+  const setter = P.setterDellaChiave(chiave);
+  if (!setter || setter.scrive.length !== 1 || setter.scrive[0] !== 'blocklist') return false;
+  const host = hostDi(origine);
+  const sito = N.daScritto(host);
+  if (!sito) return false;
+  const r = D.risolviSchede(action.valore ?? action.value ?? action.valoreNuovo ?? action.val, { schede: [], attiva: origine });
+  const b = r.rifiuto ? null : P.buildPreferencePartial(chiave, r.valore);
+  const e = b && !b.rifiuto && b.elenco;
+  if (!e || !e.voci.length) return false;
+  if (e.op === 'aggiungi') return e.voci.every((v) => v === sito);
+  return e.op === 'togli' && e.voci.every((v) => N.copre(v, host));
+}
+
 function azioneAmmessaDa(action, origine) {
   if (isFilo(origine)) return true;
   if (!action || typeof action !== 'object') return false;
   const type = String(action.type || '').toUpperCase();
+  if (type === 'IMPOSTA_PREFERENZA') {
+    try { return filoSulSitoStesso(action, origine); } catch (_) { return false; }
+  }
   if (!AZIONI_WEB.has(type)) return false;
   return type !== 'NAVIGA' || indirizzoWeb(action.url ?? action.href ?? action.link);
 }
@@ -178,31 +220,49 @@ function messaggioPerDestinazione(message, url, pagina, dove = {}) {
   return { ...message, settings: impostazioniPerWeb(message.settings, [url, pagina]) };
 }
 
+// L'avviso breve che Filo manda alle pagine entra nel filo una volta, per quante schede lo ricevano (#1561).
+function avvisoNelFilo(message) {
+  const M = globalThis.SN_MSG && globalThis.SN_MSG.MSG;
+  if (!message || !M || message.type !== M.SHOW_TOAST) return;
+  try { require('./accaduti').avviso(message.text, 'pagina', { messaggio: message }); } catch (_) {}
+}
+
 // Una spinta a una scheda, frame per frame (#405: i content script girano anche nei
 // riquadri), ognuno col messaggio ritagliato sul suo indirizzo e su `inVista` (la
 // scheda in primo piano della finestra). Ogni spinta a più schede passa da qui.
-function spingiAllaScheda(wc, message, { inVista = false } = {}) {
+// `soloFrame(url)` restringe la spinta ai frame che lo meritano (un dato di un sito solo ai suoi).
+function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {}) {
   if (!wc || wc.isDestroyed?.()) return;
+  avvisoNelFilo(message);
   let pagina = '';
   try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
   if (!frames || !frames.length) {
+    if (soloFrame && !soloFrame(pagina)) return;
     try { const m = messaggioPerDestinazione(message, pagina, undefined, { inVista }); if (m) wc.send('filo:broadcast', m); } catch (_) {}
     return;
   }
   for (const f of frames) {
     try {
-      if (f.detached) continue;
+      if (f.detached || (soloFrame && !soloFrame(f.url))) continue;
       const m = messaggioPerDestinazione(message, f.url, pagina, { inVista, riquadro: Boolean(f.parent) });
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}
+  }
+  // I riquadri di Filo sopra la pagina (#1509.1) ricevono quello che riceve lei, ritagliato per lei; gli avvisi li
+  // mostra la pagina.
+  let strato = null;
+  try { strato = require('../stratoDeiRiquadri').stratoDellaPagina(wc); } catch (_) { strato = null; }
+  if (strato && (!soloFrame || soloFrame(pagina))) {
+    try { const m = messaggioPerDestinazione(message, pagina, pagina, { inVista, riquadro: true }); if (m) strato.send('filo:broadcast', m); } catch (_) {}
   }
 }
 
 // Una finestra riceve solo nel frame principale: la shell, oppure una finestra
 // aperta da un sito (i popup di accesso), che vale come sito.
 function spingiAllaFinestra(win, message) {
+  avvisoNelFilo(message);
   try {
     const wc = win && win.webContents;
     if (!wc || wc.isDestroyed?.()) return;

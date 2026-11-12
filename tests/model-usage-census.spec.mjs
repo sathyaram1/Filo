@@ -40,11 +40,11 @@ test('ogni punto censito come impostabile ha davvero un campo nelle Opzioni', as
   expect(cells).toBe(expected.length);
 
   // Fra queste ci sono i punti che prima erano invisibili: l'indicizzazione
-  // dell'archivio (il modello era scritto nel codice) e le tre funzioni
-  // dell'editor (prendevano in prestito il modello di «Spiega»).
+  // dell'archivio (il modello era scritto nel codice) e le funzioni dell'editor
+  // (prendevano in prestito il modello di «Spiega»). La chat dell'editor è l'Aiuto (#1433).
   const A = await page.evaluate(() => window.SN_CONST.ACTIONS);
-  for (const action of [A.ARCHIVE_EMBED, A.EDITOR_TITLE, A.EDITOR_SUMMARY, A.EDITOR_CHAT,
-    A.PROVIDER_TEST]) {
+  expect(A.EDITOR_CHAT).toBeUndefined();
+  for (const action of [A.ARCHIVE_EMBED, A.EDITOR_TITLE, A.EDITOR_SUMMARY, A.PROVIDER_TEST]) {
     expect(expected).toContain(action);
   }
   // La ricerca fra i feedback la usa solo chi gestisce Filo: si imposta in

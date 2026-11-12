@@ -81,3 +81,17 @@ test('un duplicato con form non inviato non viene collassato', () => {
   assert.equal(dup.has(1), false);
   assert.equal(dup.size, 0);
 });
+
+test('#1626 — un riordino chiesto senza giudizio non è riuscito, anche coi doppioni chiusi, e dice perché', () => {
+  assert.equal(T.riordinoNonRiuscito({ archived: 3 }), '');
+  assert.equal(T.riordinoNonRiuscito({ archived: 0 }), '');
+  assert.equal(T.riordinoNonRiuscito({ archived: 0, giudizioMancato: true }), 'Filo non è riuscito a valutare le schede.');
+  assert.equal(
+    T.riordinoNonRiuscito({ archived: 2, giudizioMancato: true, motivo: 'I crediti sono finiti: ricarica in Crediti' }),
+    'Filo non è riuscito a valutare le schede: ha chiuso solo 2 doppioni (stessa pagina aperta due volte). I crediti sono finiti: ricarica in Crediti.',
+  );
+  assert.match(T.riordinoNonRiuscito({ archived: 1, giudizioMancato: true }), /solo un doppione/);
+  assert.match(T.riordinoNonRiuscito({ archived: 0, giaInCorso: true }), /già in corso/);
+  assert.match(T.riordinoNonRiuscito({ archived: 0, incognito: true }), /incognito/);
+  assert.match(T.riordinoNonRiuscito(null), /valutare/);
+});

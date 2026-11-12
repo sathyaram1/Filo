@@ -21,25 +21,35 @@
 //   (`bigliettoLocale`, #1148): la fiducia la decide il server da lì, e senza biglietto nasce non fidato. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
 //   lavoro di questa sessione: nessuna routine lo prende), `--non-locale` lo apre per le routine. Fidati,
-//   tutti e due saltano i giudici: il primo va nei Lavori locali, il
-//   secondo In coda. Una routine non lo usa. Senza scelta
+//   tutti e due saltano i giudici e vanno In coda, il primo con l'etichetta «server». Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
+//                                                         [--server]
 //                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
+//                                                         [--aspetta 676,663.2]
+//                                                         [--pacchetto 812,815]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
 //   cifrato per l'owner come il testo. È la strada per una spec o un log che
 //   nel testo non entra (tetto ~6000 caratteri): il server la apre con la sua
 //   chiave e la consegna ai giudici e alle routine come testo. Ammessi i tipi
-//   dell'allowlist del gate L0 (md, txt, log, json, csv, tsv, yaml, pdf,
+//   dell'allowlist del cancello degli allegati (md, txt, log, json, csv, tsv, yaml, pdf,
 //   immagini); un tipo diverso è un errore d'uso, non un feedback sospetto.
 //   node scripts/claude-feedback.mjs "<titolo>" -          ← testo da stdin
+//
+//   `--aspetta` (#903): nasce aspettando quei feedback; nessuna routine lo prende finché non sono tutti fusi.
+//   Numeri inesistenti e più di venti si rifiutano prima di aprire.
+//
+//   `--pacchetto` (FEEDBACK-STATES.md § 3a, Pacchetti): il feedback è un pacchetto che unisce quelle segnalazioni, e il
+//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e le loro attese, e alla nascita le archivia; chi
+//   le aspettava aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
+//   Anche il testo, prima della rete: nomina ogni unita, non manda la spec nelle note, e chi mette prima è in --aspetta.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
@@ -62,9 +72,14 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
+import '../src/shared/feedbackAttachTypes.js';
+import '../src/shared/feedbackImage.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
+import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
+import { difettiDellaSpec, prerequisitiMancanti, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
@@ -72,9 +87,9 @@ const FB = globalThis.SN_FEEDBACK;
 /** Il mittente con cui si firma una sessione locale. Fonte unica: shared. */
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 
-// Tipo dichiarato per estensione: la stessa allowlist del gate deterministico
-// sugli allegati (filo-security, L0 fileGate) e delle storage.rules. Fuori da
-// qui il feedback diventerebbe `suspicious_file`: meglio fermarsi prima.
+// Tipo dichiarato per estensione; se ammetterlo lo decide `SN_FEEDBACK_ATTACH.classify`, l'elenco
+// unico del riquadro e della pagina dei feedback, a cui resta allineato il cancello degli allegati del server
+// (filo-security, cancelloAllegati). Fuori da lì il feedback diventerebbe `suspicious_file`.
 // ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
 // src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
 // file, e una tabella normale contiene già `__proto__` e `constructor` senza che
@@ -97,7 +112,9 @@ export function mimeDiAllegato(nome) {
   // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
   // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
   // una stringa non è un tipo, ed è un allegato da rifiutare.
-  return typeof tipo === 'string' ? tipo : '';
+  if (typeof tipo !== 'string') return '';
+  const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
+  return ATTACH && ATTACH.classify({ name: String(nome || ''), type: tipo }) ? tipo : '';
 }
 
 /**
@@ -163,14 +180,14 @@ export { PRIORITA_AMMESSE, parsePriorita };
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [], unisce = [], nonFidato = '' } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale, attese, unisce };
   }
   if (!idToken) {
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
@@ -198,11 +215,16 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
-      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
-      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
+      ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
+      // Un pacchetto porta tutti gli allegati delle unite o non nasce: un caricamento mancato ferma prima del documento.
+      ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })), interi: true } : {}),
+      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato. Così
+      // anche con `nonFidato`: porta scritti di chi non è fidato, e un biglietto pulito non li rende fidati (SPEC-DOMANDE § 1.3).
+      ...(b && b.fp && !b.inAttesa && !nonFidato ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
-    return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
+    const motivo = String((e && e.message) || e);
+    return { ok: false, motivo: e && e.allegatiFalliti ? `${motivo}. Il pacchetto non è nato: rilancia` : motivo, codice: exitCodeForError(e) };
   }
   // Un allegato che non si è caricato NON è silenzioso: il feedback esiste,
   // ma senza il documento per cui magari è stato aperto. Si riporta.
@@ -210,9 +232,10 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese, unisce,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
-    biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
+    biglietto: b && b.fp ? (nonFidato ? 'tolto' : b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
+    nonFidato,
   };
 }
 
@@ -230,6 +253,312 @@ export const credenziale = {
     } catch (e) {
       return { idToken: '', motivo: String((e && e.message) || e) };
     }
+  },
+};
+
+/**
+ * I numeri di `--aspetta` → [{ id, num }], con le regole di Gestione (SN_FB_ATTESE.valida): un feedback che nasce non
+ * può aspettare sé stesso né chiudere un giro, quindi restano i numeri inesistenti e il tetto. Oggetto: i test lo sostituiscono.
+ */
+export const attese = {
+  async risolvi(testo, idToken) {
+    const ATT = globalThis.SN_FB_ATTESE;
+    const letti = ATT.leggiNumeri(testo);
+    if (!letti.ok || !letti.numeri.length) return letti.ok ? { ok: true, attese: [] } : letti;
+    const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    return ATT.valida({
+      id: '', numeri: letti.numeri,
+      risolvi: async (n) => {
+        const r = await risolviFeedback(n, { bearer: idToken, base: FIRESTORE_BASE });
+        if (r.ok) return r.id;
+        if (/^nessun feedback/.test(r.motivo)) return null;
+        throw new Error(r.motivo);
+      },
+      leggiAttese: async () => new Map(),
+    });
+  },
+};
+
+/**
+ * Le segnalazioni lette per `--pacchetto` → i motivi per cui non entrano (vuoto = entrano tutte). PURA.
+ * `lette`: [{ ok, num, stato, priorita, locale, attese, ramo?, motivo? }]; `aspetta`: i numeri che il pacchetto stesso
+ * aspetta; `pacchetti`: i numeri dei pacchetti aperti fra gli aspettati dalle unite; `pacchettiPerId`: { id: num } dei
+ * pacchetti aperti nominati dal rimando `unitoIn` delle unite.
+ */
+export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiPerId = {} } = {}) {
+  const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
+  const motivi = [];
+  for (const u of Array.isArray(lette) ? lette : []) {
+    const n = `#${u.num}`;
+    if (!u.ok) { motivi.push(`${n}: ${u.motivo}`); continue; }
+    if (!u.stato) motivi.push(`${n}: lo stato non si legge (manca la chiave privata?), e senza non so se è già in lavorazione`);
+    else if (u.stato !== 'todo') motivi.push(`${n} è «${u.stato}»: nel pacchetto vanno solo segnalazioni in coda e non ancora lavorate`);
+    // In coda non vuol dire mai lavorata: dopo una risposta dell'owner o una riapertura il ramo resta.
+    else if (u.ramo) motivi.push(`${n} ha già un ramo con lavoro (${u.ramo}): nel pacchetto si rifarebbe da capo`);
+    const dentro = (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter((x) => giaPacchetti.has(x));
+    // Dal #1903 le unite non aspettano il pacchetto: una rimasta in coda (archiviazione mancata) lo dice il rimando.
+    const rimando = u.unitoIn && Object.prototype.hasOwnProperty.call(pacchettiPerId, u.unitoIn) ? String(pacchettiPerId[u.unitoIn]).replace(/^#/, '') : '';
+    if (rimando && !dentro.includes(rimando)) dentro.push(rimando);
+    if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
+    if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
+    if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
+    if (aspetta.includes(String(u.num))) motivi.push(`${n} è anche fra quelli che il pacchetto aspetta: si aspetterebbero a vicenda`);
+  }
+  return motivi;
+}
+
+/**
+ * Le attese con cui nasce il pacchetto: quelle di `--aspetta` più quelle delle unite, che archiviate non contano più da
+ * nessuna parte; quelle su un'altra unita cadono. Il tetto di un feedback si conta qui, mai un taglio. PURA.
+ * `proprie`: [{ id, num }]; `unite`: [{ id, num, attese }]. → { attese: [{ id, num }], ereditate: [{ id, num, da: [num] }], motivo }
+ */
+export function atteseDelPacchetto(proprie, unite) {
+  const MAX = globalThis.SN_FB_ATTESE.MAX;
+  const lista = Array.isArray(unite) ? unite.filter(Boolean) : [];
+  const dentro = new Set(lista.map((u) => u.id));
+  const attese = [];
+  const ereditate = [];
+  const viste = new Map();
+  for (const w of Array.isArray(proprie) ? proprie : []) {
+    if (!w || !w.id || viste.has(w.id)) continue;
+    viste.set(w.id, null);
+    attese.push({ id: w.id, num: w.num || '' });
+  }
+  for (const u of lista) {
+    for (const w of u.attese || []) {
+      if (!w || !w.id || dentro.has(w.id)) continue;
+      if (!viste.has(w.id)) {
+        const e = { id: w.id, num: w.num || '', da: [] };
+        viste.set(w.id, e);
+        attese.push({ id: e.id, num: e.num });
+        ereditate.push(e);
+      }
+      const e = viste.get(w.id);
+      if (e && !e.da.includes(String(u.num))) e.da.push(String(u.num));
+    }
+  }
+  let motivo = '';
+  if (attese.length > MAX) {
+    const perUnita = lista.map((u) => [u.num, ereditate.filter((e) => e.da.includes(String(u.num))).length]).filter(([, k]) => k > 0);
+    const proprieN = attese.length - ereditate.length;
+    motivo = `il pacchetto aspetterebbe ${attese.length} feedback (${[
+      ...(proprieN ? [`${proprieN} di --aspetta`] : []),
+      `${ereditate.length} dalle unite: ${perUnita.map(([n, k]) => `#${n}: ${k}`).join(', ')}`,
+    ].join(', ')}), e un feedback ne aspetta al più ${MAX}: togline ${attese.length - MAX} dalle unite o da --aspetta, o dividi il pacchetto`;
+  }
+  return { attese, ereditate, motivo };
+}
+
+/** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
+export function prioritaDelPacchetto(scelta, lette) {
+  if (Number.isInteger(scelta)) return scelta;
+  const note = (Array.isArray(lette) ? lette : []).map((u) => u && u.priorita).filter(Number.isInteger);
+  return note.length ? Math.max(...note) : null;
+}
+
+// Lo stesso tetto di un feedback: le regole (immaginiValide, documentiValidi) e submit ne tengono 5 per tipo.
+export const TETTO_PER_TIPO = 5;
+
+/** La nota con cui una segnalazione unita si archivia alla nascita del pacchetto. PURA. */
+export function notaUnita(numPacchetto) {
+  return `Unito nel pacchetto #${numPacchetto}: il lavoro continua lì`;
+}
+
+/**
+ * I riferimenti agli allegati di una unita, dai campi grezzi e dalla conversazione in chiaro: prima quelli della
+ * segnalazione, poi quelli dei commenti. PURA. → [{ tipo: 'immagine'|'documento', nome, type, url, conversazione, indice }]
+ */
+export function riferimentiAllegati(fields, conversazione = '') {
+  const valori = (k) => (fields && fields[k] && fields[k].arrayValue && fields[k].arrayValue.values) || [];
+  const str = (v) => (v && typeof v.stringValue === 'string' ? v.stringValue : '');
+  const immagini = valori('images').map((v) => ({ url: str(v) || str(v && v.mapValue && v.mapValue.fields && v.mapValue.fields.url), conversazione: false }));
+  const documenti = valori('files').map((v) => {
+    const m = (v && v.mapValue && v.mapValue.fields) || {};
+    return { url: str(m.url), nome: str(m.name), type: str(m.type), conversazione: false };
+  });
+  for (const a of String(conversazione || '').split('\n').map((r) => THREAD.parseAttachmentLine(r)).filter(Boolean)) {
+    if (a.kind === 'file') documenti.push({ url: a.url, nome: a.name, type: a.type, conversazione: true });
+    else immagini.push({ url: a.url, conversazione: true });
+  }
+  // L'indice conta dentro la sua fonte: «la sua immagine 1 della conversazione» è la prima dei commenti.
+  const conIndice = (lista, tipo) => [false, true].flatMap((conv) => lista.filter((a) => a.url && a.conversazione === conv)
+    .map((a, i) => ({ tipo, nome: a.nome || '', type: a.type || '', url: a.url, conversazione: conv, indice: i + 1 })));
+  return [...conIndice(immagini, 'immagine'), ...conIndice(documenti, 'documento')];
+}
+
+/**
+ * Gli allegati delle unite ci stanno nel pacchetto, con quelli di `--allega`? I motivi del no (vuoto = sì). PURA.
+ * `perUnita`: [{ u: { num }, allegati: [{ tipo }] }]; `propri`: { immagini, documenti } contati.
+ */
+export function tettoAllegati(perUnita, propri = {}) {
+  const motivi = [];
+  for (const [tipo, parola, mie] of [['immagine', 'immagini', Number(propri.immagini) || 0], ['documento', 'documenti', Number(propri.documenti) || 0]]) {
+    const conti = (Array.isArray(perUnita) ? perUnita : []).map(({ u, allegati }) => [u.num, (allegati || []).filter((a) => a.tipo === tipo).length]).filter(([, n]) => n > 0);
+    const dalleUnite = conti.reduce((s, [, n]) => s + n, 0);
+    if (dalleUnite + mie <= TETTO_PER_TIPO) continue;
+    motivi.push(`le unite portano ${dalleUnite} ${parola} (${conti.map(([n, k]) => `#${n}: ${k}`).join(', ')})${mie ? ` e tu ne alleghi ${mie}` : ''}: un feedback ne tiene al più ${TETTO_PER_TIPO}. Dividi il pacchetto${mie ? ', o allega meno' : ''}`);
+  }
+  return motivi;
+}
+
+/**
+ * Le unite i cui allegati il pacchetto porta e che non sono fidate, o li hanno in una conversazione scritta anche da
+ * altri (`daAltri`): con loro il pacchetto nasce non fidato, come un figlio di genitori non fidati. PURA. → ['#N']
+ */
+export function uniteNonFidate(perUnita) {
+  return (Array.isArray(perUnita) ? perUnita : [])
+    .filter(({ u, allegati }) => (allegati || []).length && (u.fidato !== true || allegati.some((a) => a.conversazione && a.daAltri)))
+    .map(({ u }) => `#${u.num}`);
+}
+
+/** Il tipo vero di un'immagine dai suoi byte, '' se non è un'immagine che Filo apre (l'SVG è attivo). PURA. */
+function tipoImmagine(byte) {
+  const b = byte || [];
+  const t = globalThis.SN_FEEDBACK_IMAGE.sniffImageMime(b);
+  // Il riconoscitore ripiega su PNG quando non riconosce: un PNG vero comincia con la sua firma.
+  if (t === 'image/png' && !(b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)) return '';
+  return globalThis.SN_FEEDBACK_ATTACH.classify({ name: '', type: t }) === 'image' ? t : '';
+}
+
+/**
+ * Gli allegati scaricati delle unite → quelli del pacchetto: i documenti col nome «#N — nome», le immagini (che un nome
+ * non l'hanno) con l'origine scritta in `origine`, da mettere in coda alla spec. `primaImmagini`: quante ne porta
+ * `--allega`, che vengono prima. PURA. → { immagini, documenti, origine, motivi }
+ */
+export function copieDegliAllegati(perUnita, { primaImmagini = 0 } = {}) {
+  const immagini = [];
+  const documenti = [];
+  const righe = [];
+  const motivi = [];
+  const dati = (type, byte) => `data:${type};base64,${Buffer.from(byte).toString('base64')}`;
+  for (const { u, allegati } of Array.isArray(perUnita) ? perUnita : []) {
+    for (const a of allegati || []) {
+      const dove = a.conversazione ? ' della conversazione' : '';
+      const byte = a.byte;
+      const chi = a.tipo === 'immagine' ? `l'immagine ${a.indice}${dove}` : `l'allegato${dove} «${a.nome || a.indice}»`;
+      if (!byte || !byte.length) { motivi.push(`#${u.num}: ${chi} è vuoto`); continue; }
+      if (byte.length > MAX_ALLEGATO_BYTES) { motivi.push(`#${u.num}: ${chi} supera i 4 MB`); continue; }
+      if (a.tipo === 'immagine') {
+        const type = tipoImmagine(byte);
+        if (!type) { motivi.push(`#${u.num}: ${chi} non è un'immagine che Filo apre`); continue; }
+        immagini.push({ name: `#${u.num} — immagine ${a.indice}${dove}`, type, dataUrl: dati(type, byte) });
+        righe.push(`- immagine ${primaImmagini + immagini.length}: da #${u.num}, la sua immagine ${a.indice}${dove}`);
+        continue;
+      }
+      const originale = String(a.nome || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim() || `allegato ${a.indice}`;
+      const name = `#${u.num} — ${originale}`;
+      const type = a.type || mimeDiAllegato(originale);
+      if (globalThis.SN_FEEDBACK_ATTACH.classify({ name, type }) !== 'file') { motivi.push(`#${u.num}: ${chi} ha un tipo che un feedback non ammette (${type || 'senza tipo'})`); continue; }
+      documenti.push({ name, type, dataUrl: dati(type, byte) });
+      righe.push(`- «${name}»: da #${u.num}${dove ? `, allegato${dove}` : ''}`);
+    }
+  }
+  const origine = righe.length ? ['Allegati copiati dalle segnalazioni unite:', ...righe].join('\n') : '';
+  return { immagini, documenti, origine, motivi };
+}
+
+/**
+ * Chi aspetta una delle unite, dalle righe lette → [{ id, num, togli: [id], quali: [num], tenute: [num] }]: `tenute` sono
+ * le sue altre attese. Le unite stesse no: si archiviano. PURA.
+ */
+export function chiAspetta(righe, unite) {
+  const perId = new Map((Array.isArray(unite) ? unite : []).map((u) => [u.id, String(u.num)]));
+  const out = [];
+  // Le attese di tutti, lette nella stessa scansione: servono a trovare i giri a catena (giriDelPacchetto).
+  const grafo = new Map();
+  Object.defineProperty(out, 'grafo', { value: grafo });
+  for (const r of Array.isArray(righe) ? righe : []) {
+    const id = String((r && r._id) || '');
+    if (!id) continue;
+    const attese = globalThis.SN_FB_ATTESE.atteseDi(r);
+    const num = FB.formatNum(Number(r.seq), Number(r.subSeq)) || '';
+    grafo.set(id, { num, attese });
+    if (perId.has(id)) continue;
+    const togli = attese.map((w) => w.id).filter((x) => perId.has(x));
+    if (!togli.length) continue;
+    out.push({
+      id, num: num || id, togli, quali: togli.map((x) => perId.get(x)),
+      tenute: attese.filter((w) => !perId.has(w.id)).map((w) => w.num || w.id),
+    });
+  }
+  return out;
+}
+
+/**
+ * I giri che il pacchetto chiuderebbe: chi aspetta una unita passa ad aspettare il pacchetto, quindi è un giro se lo si
+ * raggiunge dalle attese del pacchetto, direttamente o a catena (`aspettanti.grafo`, da chiAspetta). PURA.
+ * → [{ x, catena: [id] }]: `catena` va da un'attesa del pacchetto fino a x.
+ */
+export function giriDelPacchetto(attese, aspettanti, uniteIds = []) {
+  const lista = Array.isArray(aspettanti) ? aspettanti : [];
+  const grafo = lista.grafo instanceof Map ? lista.grafo : new Map();
+  const perId = new Map(lista.map((x) => [x.id, x]));
+  const dentro = new Set(uniteIds);
+  const padre = new Map();
+  const coda = [];
+  for (const w of Array.isArray(attese) ? attese : []) if (w && w.id && !padre.has(w.id)) { padre.set(w.id, null); coda.push(w.id); }
+  const giri = [];
+  for (let i = 0; i < coda.length; i += 1) {
+    const id = coda[i];
+    if (perId.has(id)) {
+      const catena = [];
+      for (let c = id; c != null; c = padre.get(c)) catena.unshift(c);
+      giri.push({ x: perId.get(id), catena });
+      continue;
+    }
+    // Le attese delle unite le prende il pacchetto: sono già fra i punti di partenza.
+    if (dentro.has(id)) continue;
+    for (const w of (grafo.get(id) || {}).attese || []) if (!padre.has(w.id)) { padre.set(w.id, id); coda.push(w.id); }
+  }
+  return giri;
+}
+
+/** Letture e scritture di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
+export const pacchetto = {
+  async leggi(numeri, idToken) {
+    const { segnalazioneDaUnire } = await import('./owner-feedback.mjs');
+    return Promise.all(numeri.map(async (n) => ({ num: n, ...(await segnalazioneDaUnire(n, { bearer: idToken })) })));
+  },
+  // I riferimenti agli allegati di una unita, compresi quelli della conversazione (cifrata: senza chiave non so se ce ne sono).
+  async allegati(u, idToken) {
+    const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(u.id)}?mask.fieldPaths=images&mask.fieldPaths=files&mask.fieldPaths=notes`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) throw new Error(`lettura degli allegati di #${u.num} fallita (${res.status})`);
+    const f = (await res.json()).fields || {};
+    let conversazione = f.notes?.stringValue || '';
+    if (globalThis.SN_FEEDBACK_CRYPTO.isEncrypted(conversazione)) {
+      const { decryptFeedbackFields, PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
+      conversazione = String((await decryptFeedbackFields({ _id: u.id, notes: conversazione })).notes || '');
+      if (conversazione === PLACEHOLDER || globalThis.SN_FEEDBACK_CRYPTO.isEncrypted(conversazione) || THREAD.reportUnreadable(conversazione)) {
+        throw Object.assign(new Error(`la conversazione di #${u.num} non si decifra (manca la chiave privata?): senza non so se porta allegati`), { definitivo: true });
+      }
+    }
+    const { motiviDiLettura } = await import('./lib/biglietto-locale.mjs');
+    const daAltri = motiviDiLettura({ fiducia: 'fidato', notes: conversazione }).length > 0;
+    return riferimentiAllegati(f, conversazione).map((a) => (a.conversazione && daAltri ? { ...a, daAltri } : a));
+  },
+  async scarica(a) {
+    if (!FB.isAttachmentUrl(a.url)) throw Object.assign(new Error('l’indirizzo non è del deposito di Filo: non lo scarico'), { definitivo: true });
+    const res = await fetch(a.url);
+    if (!res.ok) throw new Error(`download fallito (${res.status})`);
+    const { decryptAttachmentBytes } = await import('./lib/decrypt-feedback-fields.mjs');
+    try { return await decryptAttachmentBytes(new Uint8Array(await res.arrayBuffer())); } catch (e) { throw Object.assign(e, { definitivo: true }); }
+  },
+  // Una scansione con la sola proiezione delle attese: chi aspetta una unita può essere qualunque feedback.
+  async attesiDa(unite, idToken) {
+    const r = await FB.listAllPaged({ idToken, fields: ['seq', 'subSeq', globalThis.SN_FB_ATTESE.CAMPO] });
+    if (r.complete === false) throw new Error(`la lettura delle attese non è completa (${r.rows.length} documenti)`);
+    return chiAspetta(r.rows, unite);
+  },
+  async sposta(x, voce, idToken) {
+    const { spostaAttese } = await import('./owner-feedback.mjs');
+    return spostaAttese(x.id, x.togli, voce, { bearer: idToken });
+  },
+  async archivia(u, nota, idToken) {
+    const { scrivi } = await import('./owner-feedback.mjs');
+    return scrivi(u.id, 'archived', nota, { bearer: idToken, rif: `#${u.num}` });
   },
 };
 
@@ -252,7 +581,7 @@ const SENZA_SCELTA = [
 const IN_ROUTINE = [
   'RIFIUTATO: sei una routine, e da qui non apro niente: un feedback nato qui salterebbe i giudici come uno dell\'owner.',
   '  Un ritrovamento: node scripts/routine-channel.mjs deliver feedback --name "…" --text "…"',
-  '  Un lavoro che si fa solo in locale: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
+  '  Un lavoro che chiede il server: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
 ].join('\n');
 
 /** Siamo dentro una routine? Oggetto e non funzione, come `credenziale`, perché i test lo sostituiscono. */
@@ -260,9 +589,22 @@ export const ambiente = {
   routine() { return isRoutineInstance(resolve(fileURLToPath(import.meta.url), '..', '..')); },
 };
 
+/** Chi lo prende, detto dopo l'apertura. Un lavoro server non fidato non lo prende nessuna routine (#2217). PURA. */
+export function rigaAperto({ soloLocale = false, server = false, r = {} } = {}) {
+  const ref = r.seq || r.id;
+  if (soloLocale) return `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${ref} (o npm run finish -- --feedback ${ref}).`;
+  if (!server) return 'Aperto per le routine.';
+  return !r.nonFidato && r.biglietto === 'pulito'
+    ? 'Aperto come lavoro server: lo prendono le routine dei lavori server, se in Automazioni sono accese.'
+    : 'Aperto come lavoro server, non fidato: dopo i giudici va nei Ricevuti a chiedere la fiducia, e col tuo timbro lo prendono i lavori server.';
+}
+
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--server] [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
+  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
+  console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
+  console.error('     --server (anche con --non-locale): il lavoro tocca il codice del server, e lo prendono i lavori server.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
@@ -279,10 +621,10 @@ export async function main(argvIn) {
   // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
   // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
   // riga che chi l'ha scritta considera giusta.
-  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata, avvisoTrattinoDaNpm } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
-    conValore: ['--priorita', '--url', '--allega'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--server', '--lavoro-server', '--aspetta', '--pacchetto', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega', '--aspetta', '--pacchetto'],
     ripetibili: ['--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -307,12 +649,16 @@ export async function main(argvIn) {
   }
   // Chi lo lavora si dice sempre: senza scelta, una segnalazione per le routine nasceva lavoro locale e non la
   // prendeva nessuno (verifica di #908, giro 6). Un errore d'uso costa una riga; un feedback perso no.
-  const locale = argv.includes('--locale');
-  if (locale === argv.includes('--non-locale')) {
-    console.error(locale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
+  const soloLocale = argv.includes('--locale');
+  // `--server` è il segno «lavoro server» (`localOnly`, lo stesso di --locale) anche accanto a --non-locale (#2217).
+  const server = argv.includes('--server') || argv.includes('--lavoro-server');
+  const nonLocale = argv.includes('--non-locale');
+  if ((soloLocale && nonLocale) || (!soloLocale && !nonLocale && !server)) {
+    console.error(soloLocale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
     uso();
     return EXIT.USO;
   }
+  const locale = soloLocale || server;
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
@@ -323,11 +669,12 @@ export async function main(argvIn) {
   // parole «uguali al valore di un'opzione», e una parola del testo scritta
   // identica all'indirizzo passato spariva dal corpo senza dire niente — un
   // taglio muto sul testo di chi segnala (feedback #565).
-  const CON_VALORE = new Set(['--priorita', '--url', '--allega']);
+  const CON_VALORE = new Set(OPZ.conValore);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    // Per nome esatto: «-- vedi sotto» passa il controllo come testo, e qui non deve sparire (#878).
+    if (OPZ.opzioni.includes(a)) { if (CON_VALORE.has(a)) i += 1; continue; }
     posizionali.push(a);
   }
   const titolo = posizionali[0];
@@ -339,6 +686,14 @@ export async function main(argvIn) {
 
   const p = parsePriorita(prioritaRaw);
   if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo}`); return EXIT.USO; }
+  const aspettaRaw = flag('aspetta');
+  if (argv.includes('--aspetta') && !String(aspettaRaw || '').trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2). Non ho aperto niente.'); return EXIT.USO; }
+  const numeriAttesa = globalThis.SN_FB_ATTESE.leggiNumeri(aspettaRaw || '');
+  if (!numeriAttesa.ok) { console.error(`RIFIUTATO: --aspetta: ${numeriAttesa.motivo}. Non ho aperto niente.`); return EXIT.USO; }
+  const pacchettoRaw = flag('pacchetto');
+  if (argv.includes('--pacchetto') && !String(pacchettoRaw || '').trim()) { console.error('RIFIUTATO: --pacchetto vuole i numeri delle segnalazioni che unisce (--pacchetto 812,815). Non ho aperto niente.'); return EXIT.USO; }
+  const numeriUnite = globalThis.SN_FB_ATTESE.leggiNumeri(pacchettoRaw || '');
+  if (!numeriUnite.ok) { console.error(`RIFIUTATO: --pacchetto: ${numeriUnite.motivo.replace('un feedback ne aspetta', 'un pacchetto ne unisce')}. Non ho aperto niente.`); return EXIT.USO; }
 
   if (percorsiAllegati.length > MAX_ALLEGATI) {
     console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
@@ -347,23 +702,147 @@ export async function main(argvIn) {
   let allegati;
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
-
   // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
   // un errore d'uso o una prova a vuoto non toccano la rete.
   const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
+  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033). I feedback
+  // messi prima si guardano qui solo a vuoto: aprendo, dopo aver letto le attese che il pacchetto prende dalle unite.
+  const testoSpec = [testo, ...testoDegliAllegati(allegati)].join('\n');
+  if (numeriUnite.numeri.length && String(testo || '').trim()) {
+    const difetti = difettiDellaSpec(testoSpec, { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, prerequisiti: !deposita, aVuoto: dryRun });
+    if (difetti.length) {
+      console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.USO;
+    }
+  }
   const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
   if (deposita && !cred.idToken) {
     console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
     return EXIT.RIFIUTATO;
   }
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale });
+  // Le attese si controllano prima di aprire: un numero sbagliato non deve lasciare dietro un feedback senza.
+  let listaAttese = [];
+  if (deposita && numeriAttesa.numeri.length) {
+    let v;
+    try { v = await attese.risolvi(numeriAttesa.numeri, cred.idToken); } catch (e) { v = { ok: false, motivo: `lettura dei numeri fallita: ${String((e && e.message) || e)}`, rete: true }; }
+    if (!v.ok) { console.error(`RIFIUTATO: --aspetta: ${v.motivo}. Non ho aperto niente.`); return v.rete ? EXIT.IRRAGGIUNGIBILE : EXIT.RIFIUTATO; }
+    listaAttese = v.attese;
+  }
+  // Le segnalazioni del pacchetto si controllano tutte prima di aprire, e i motivi si dicono tutti insieme.
+  let unite = [];
+  let delPacchetto = { attese: listaAttese, ereditate: [] };
+  if (deposita && numeriUnite.numeri.length) {
+    let lette;
+    try { lette = await pacchetto.leggi(numeriUnite.numeri, cred.idToken); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: lettura delle segnalazioni fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
+      return EXIT.IRRAGGIUNGIBILE;
+    }
+    // Chi aspetta già un pacchetto aperto, o ne porta il rimando, è già preso: si leggono aspettati e rimandi per saperlo.
+    const leggibili = lette.filter((u) => u && u.ok);
+    const attesi = [...new Set([
+      ...leggibili.flatMap((u) => (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter(Boolean)),
+      ...leggibili.map((u) => String(u.unitoIn || '')).filter(Boolean),
+    ])];
+    let pacchetti = [];
+    const pacchettiPerId = {};
+    if (attesi.length) {
+      try {
+        const aperti = (await pacchetto.leggi(attesi, cred.idToken))
+          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato));
+        pacchetti = aperti.map((p) => String(p.num));
+        for (const p of aperti) if (p.id) pacchettiPerId[p.id] = String(p.num);
+      } catch (e) {
+        console.error(`RIFIUTATO: --pacchetto: lettura dei feedback aspettati fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
+        return EXIT.IRRAGGIUNGIBILE;
+      }
+    }
+    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
+    delPacchetto = atteseDelPacchetto(listaAttese, leggibili);
+    if (delPacchetto.motivo) motivi.push(delPacchetto.motivo);
+    const delTesto = prerequisitiMancanti(testoSpec, {
+      unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, ereditate: delPacchetto.ereditate.map((e) => e.num).filter(Boolean),
+    });
+    if (motivi.length || delTesto.length) {
+      console.error(`RIFIUTATO: --pacchetto, ${motivi.length ? '' : 'il testo va corretto e '}non ho aperto niente:\n${[...motivi, ...delTesto].map((m) => `  - ${m}`).join('\n')}`);
+      return motivi.length ? EXIT.RIFIUTATO : EXIT.USO;
+    }
+    unite = lette;
+  }
+  // Gli allegati delle unite si contano, si scaricano e si controllano tutti prima di aprire: un pacchetto non nasce monco.
+  const msg = (e) => String((e && e.message) || e);
+  const codiceDi = (e) => (e && e.definitivo ? EXIT.RIFIUTATO : exitCodeForError(e));
+  let copie = null;
+  let aspettanti = [];
+  if (unite.length) {
+    let riferimenti;
+    try { riferimenti = await Promise.all(unite.map(async (u) => ({ u, allegati: await pacchetto.allegati(u, cred.idToken) }))); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: ${msg(e)}. Non ho aperto niente.`);
+      return codiceDi(e);
+    }
+    const mieImmagini = allegati.filter((a) => a.type.startsWith('image/')).length;
+    const troppi = tettoAllegati(riferimenti, { immagini: mieImmagini, documenti: allegati.length - mieImmagini });
+    if (troppi.length) {
+      console.error(`RIFIUTATO: --pacchetto, gli allegati delle unite non ci stanno e non ho aperto niente:\n${troppi.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+    let scaricati;
+    try {
+      scaricati = await Promise.all(riferimenti.map(async ({ u, allegati: lista }) => ({
+        u,
+        allegati: await Promise.all(lista.map(async (a) => {
+          try { return { ...a, byte: await pacchetto.scarica(a) }; } catch (e) {
+            const chi = a.tipo === 'immagine' ? `l'immagine ${a.indice}` : `l'allegato «${a.nome || a.indice}»`;
+            throw Object.assign(new Error(`#${u.num}: ${chi}${a.conversazione ? ' della conversazione' : ''} non si apre (${msg(e)})`), { definitivo: !!(e && e.definitivo) });
+          }
+        })),
+      })));
+    } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: ${msg(e)}. Non ho aperto niente.`);
+      return codiceDi(e);
+    }
+    copie = { ...copieDegliAllegati(scaricati, { primaImmagini: mieImmagini }), nonFidate: uniteNonFidate(riferimenti) };
+    if (copie.motivi.length) {
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${copie.motivi.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+    // Chi aspetta una unita passerà ad aspettare il pacchetto: si sa prima di aprire, e un giro col pacchetto si dice prima.
+    try { aspettanti = await pacchetto.attesiDa(unite, cred.idToken); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
+      return codiceDi(e);
+    }
+    // Per id, anche sulle attese ereditate e a catena: dopo la nascita l'attesa che chiude il giro non si sposterebbe.
+    const giri = giriDelPacchetto(delPacchetto.attese, aspettanti, unite.map((u) => u.id));
+    if (giri.length) {
+      const perche = (id) => {
+        const e = delPacchetto.ereditate.find((w) => w.id === id);
+        return e ? `l'attesa di ${e.da.map((n) => `#${n}`).join(', ')}` : '--aspetta';
+      };
+      const numDi = (id) => {
+        const n = (aspettanti.find((x) => x.id === id) || {}).num || ((aspettanti.grafo && aspettanti.grafo.get(id)) || {}).num
+          || (delPacchetto.attese.find((w) => w.id === id) || {}).num;
+        return n ? `#${n}` : 'un feedback senza numero';
+      };
+      const riga = ({ x, catena }) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta ${numDi(catena[0])} (${perche(catena[0])})${catena.slice(1).map((id) => `, che aspetta ${numDi(id)}`).join('')}: si aspetterebbero a vicenda`;
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map(riga).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+  }
+  const prioritaScelta = unite.length ? prioritaDelPacchetto(p.valore, unite) : p.valore;
+  const r = await apri({
+    titolo, testo: copie && copie.origine ? `${String(testo || '').trim()}\n\n${copie.origine}` : testo, url, priorita: prioritaScelta,
+    allegati: copie ? [...allegati, ...copie.immagini, ...copie.documenti] : allegati,
+    dryRun, idToken: cred.idToken, locale, attese: delPacchetto.attese, unisce: unite,
+    nonFidato: copie && copie.nonFidate.length ? `porta allegati di ${copie.nonFidate.join(', ')}, scritti da chi non è fidato` : '',
+  });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
+    const daNpmSparito = r.uso && /mancante$/.test(r.motivo) ? avvisoTrattinoDaNpm(process.env) : '';
+    if (daNpmSparito) console.error(daNpmSparito);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${soloLocale ? 'lavoro locale' : server ? 'lavoro server' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -372,14 +851,59 @@ export async function main(argvIn) {
   console.log(r.seq
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
-  console.log(locale
-    ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Aperto per le routine.');
+  console.log(rigaAperto({ soloLocale, server, r }));
   // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
-  console.log(r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
-    : r.biglietto === 'sporco' ? 'Biglietto della sessione sporco: nasce non fidato, passa dai giudici e la fusione aspetta il tuo sì.'
-      : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
+  console.log(r.nonFidato ? `Nasce non fidato perché ${r.nonFidato}: passa dai giudici e la fusione aspetta il tuo sì.`
+    : r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
+      : r.biglietto === 'sporco' ? 'Biglietto della sessione sporco: nasce non fidato, passa dai giudici e la fusione aspetta il tuo sì.'
+        : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
+  if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
+  if (delPacchetto.ereditate.length) {
+    console.log(`Attese prese dalle unite: ${delPacchetto.ereditate.map((e) => `${globalThis.SN_FB_ATTESE.testoAttese([e])} (da ${e.da.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
+  }
+  // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
+  // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
+  let incompleto = false;
+  const cheAspetta = (x, num) => `npm run feedback -- ${x.num} --aspetta ${[...x.tenute, num].join(',')} --sostituisci`;
+  if (unite.length && !r.seq) {
+    incompleto = true;
+    const passi = [
+      ...aspettanti.map((x) => cheAspetta(x, '<numero del pacchetto>')),
+      ...unite.map((u) => `npm run feedback -- ${u.num} archived "${notaUnita('<numero del pacchetto>')}"`),
+    ];
+    console.error(`UNITE NON ARCHIVIATE: il pacchetto è nato senza numero (la numerazione non ha risposto), e attese e note lo nominano. ${unite.map((u) => `#${u.num}`).join(', ')} restano in coda. Quando ce l'ha, in quest'ordine:\n${passi.map((x) => `  ${x}`).join('\n')}`);
+  } else if (unite.length) {
+    const voce = { id: r.id, num: String(r.seq) };
+    const nota = notaUnita(voce.num);
+    // Prima le attese: una unita archiviata che qualcuno aspetta ancora manderebbe quel qualcuno all'owner (attesa chiusa).
+    const spostate = await Promise.all(aspettanti.map(async (x) => {
+      try { return { x, e: await pacchetto.sposta(x, voce, cred.idToken) }; } catch (e) { return { x, e: { ok: false, motivo: msg(e) } }; }
+    }));
+    const ferme = new Set(spostate.filter((s) => !s.e.ok).flatMap((s) => s.x.togli));
+    const fatte = spostate.filter((s) => s.e.ok);
+    if (fatte.length) console.log(`Attese spostate sul pacchetto: ${fatte.map(({ x }) => `#${x.num} (aspettava ${x.quali.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
+    for (const { x, e } of spostate.filter((s) => !s.e.ok)) {
+      incompleto = true;
+      console.error(`ATTESA NON SPOSTATA su #${x.num} (${e.motivo}): aspetta ancora ${x.quali.map((n) => `#${n}`).join(', ')}. Rimedia con: ${cheAspetta(x, voce.num)}`);
+    }
+    const archiviate = await Promise.all(unite.filter((u) => !ferme.has(u.id)).map(async (u) => {
+      try { return { u, e: await pacchetto.archivia(u, nota, cred.idToken) }; } catch (e) { return { u, e: { ok: false, motivo: msg(e) } }; }
+    }));
+    const riuscite = archiviate.filter((a) => a.e.ok).map((a) => `#${a.u.num}`);
+    if (riuscite.length) console.log(`Archiviate ${riuscite.join(', ')} con la nota «${nota}».`);
+    for (const { u, e } of archiviate.filter((a) => !a.e.ok)) {
+      incompleto = true;
+      console.error(`ARCHIVIAZIONE NON RIUSCITA su #${u.num} (${e.motivo}): resta in coda, e una routine la lavorerebbe da sola. Rimedia con: npm run feedback -- ${u.num} archived "${nota}"`);
+    }
+    for (const u of unite.filter((x) => ferme.has(x.id))) {
+      incompleto = true;
+      console.error(`#${u.num} NON ARCHIVIATA: qualcuno la aspetta ancora (sopra). Dopo aver spostato quell'attesa: npm run feedback -- ${u.num} archived "${nota}"`);
+    }
+  }
+  if (copie && copie.immagini.length + copie.documenti.length) {
+    console.log(`Allegati copiati dalle unite: ${copie.immagini.length} immagini, ${copie.documenti.length} documenti; da dove viene ognuno sta in coda alla spec.`);
+  }
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
@@ -391,7 +915,7 @@ export async function main(argvIn) {
   else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
-  return (r.falliti && r.falliti.length) ? EXIT.RIFIUTATO : EXIT.FATTO;
+  return (r.falliti && r.falliti.length) || incompleto ? EXIT.RIFIUTATO : EXIT.FATTO;
 }
 
 if (isMain) {

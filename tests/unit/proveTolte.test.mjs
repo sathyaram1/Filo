@@ -679,3 +679,40 @@ test('a una prova che copre anche un rilievo da correggere si toglie solo il cas
     togliCartella(dir);
   }
 });
+
+test('#747 in locale: la prova dimenticata dalla pulizia manda alla pulizia, e quella dopo le correzioni la lascia uscire', () => {
+  const { dir, g, scrivi, cartella, vl, corretto } = giroCriticato({
+    prove: { 'giro1-r1-a': ['a'], 'giro1-r2-b': ['b'], 'giro1-r2-bis': ['b'] },
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.',
+  });
+  const bis = `${cartella}/giro1-r2-bis.spec.mjs`;
+  try {
+    g('rm', '-q', `${cartella}/giro1-r2-b.spec.mjs`); g('commit', '-qm', 'pulizia che dimentica il bis');
+    const pulizia = g('rev-parse', 'HEAD');
+    assert.equal(vl('pulizia').status, 0);
+    corretto('a');
+    g('rm', '-q', bis); scrivi('codice.js', 'module.exports = 1;\n'); g('add', '-A'); g('commit', '-qm', 'correzione, e via anche il bis');
+    const no = vl('corretto', REPORT);
+    assert.notEqual(no.status, 0, no.testo);
+    assert.match(no.testo, /giro1-r2-bis\.spec\.mjs \(r2\)/);
+    assert.match(no.testo, /node scripts\/verify-local\.mjs pulizia/);
+    assert.doesNotMatch(no.testo, /correggi finché/i);
+    assert.equal(no.entry.verdict, 'fix-pending');
+    const mista = vl('pulizia');
+    assert.notEqual(mista.status, 0);
+    assert.match(mista.testo, /un commit a parte, l'ultimo/);
+    g('checkout', pulizia, '--', bis); g('commit', '-qm', 'rimessa com\'era');
+    g('rm', '-q', bis); g('commit', '-qm', 'pulizia dopo le correzioni');
+    const dopo = g('rev-parse', 'HEAD');
+    const p = vl('pulizia');
+    assert.equal(p.status, 0, p.testo);
+    assert.match(p.testo, /Pulizia dopo le correzioni registrata/);
+    assert.equal(p.entry.pending.shaPulizia, pulizia, 'la base della consegna resta la prima pulizia');
+    assert.deepEqual(p.entry.pending.pulizieDopo, [dopo]);
+    const si = vl('corretto', REPORT);
+    assert.equal(si.status, 0, si.testo);
+    assert.equal(si.entry.verdict, 'fixed');
+  } finally {
+    togliCartella(dir);
+  }
+});

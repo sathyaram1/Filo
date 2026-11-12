@@ -17,26 +17,7 @@
 //   torna indietro (e annulla mentre si scrive), ricarica, zoom. Più indietro e
 //   avanti, che nella barra sono arrivati dopo (#685).
 import { test, expect } from './fixtures/electron.mjs';
-
-// Aziona una voce della barra per etichetta, come farebbe il tasto su Mac.
-async function voceDellaBarra(app, etichetta) {
-  const trovata = await app.evaluate(({ Menu }, label) => {
-    const barra = Menu.getApplicationMenu();
-    if (!barra) return false;
-    const cerca = (voci) => {
-      for (const v of voci) {
-        if (v.label === label && typeof v.click === 'function') return v;
-        if (v.submenu) { const dentro = cerca(v.submenu.items); if (dentro) return dentro; }
-      }
-      return null;
-    };
-    const voce = cerca(barra.items);
-    if (!voce) return false;
-    voce.click();
-    return true;
-  }, etichetta);
-  expect(trovata, `la barra dei menu non ha una voce "${etichetta}"`).toBe(true);
-}
+import { voceDellaBarra } from './helpers/barraDeiMenu.mjs';
 
 const stato = (app) => app.evaluate(({ BrowserWindow }) => {
   const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w.isDestroyed());

@@ -148,6 +148,33 @@ test('un token revocato: la pagina offre di ricominciare, chiede il sì, «Annul
   expect(visti.signUp).toBe(nate + 1);
 });
 
+// Le righe del registro d'uso in coda sono del portafoglio che si lascia: nessuna passerebbe più (#1601).
+test('ricominciare con dei consumi ancora da registrare li toglie dalla coda, e la pagina dice quanti', async ({ app, openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  modoToken = 'revocato';
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.expireIdentityForTest());
+  await app.evaluate(async () => {
+    const riga = (action) => globalThis.SN_WALLET.usageRow({ pseudonym: 'abcdef0123456789', action, model: 'm', servedBy: 'Fake', usage: {}, costUsd: 0.0001, credits: 0.2 });
+    await globalThis.SN_STORAGE.setRaw('walletUsageQueue', [riga('UNO'), riga('DUE'), riga('TRE')]);
+    await globalThis.SN_WALLET_MAIN.rileggiCodaPerTest();
+  });
+  expect((await app.evaluate(() => globalThis.SN_WALLET_MAIN.usageLogStatus())).pending).toBe(3);
+
+  await page.reload();
+  await expect(page.locator('#walletNote')).toContainText('annullata', { timeout: 15000 });
+  await expect(page.locator('#usageLogNote')).toBeHidden();
+  await page.click('#resetIdentityBtn');
+  await page.click('#resetIdentityYes');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#usageLogNote')).toHaveText('3 consumi non sono stati registrati: tolti ricominciando con un nuovo invito.');
+  const stato = await app.evaluate(() => globalThis.SN_WALLET_MAIN.usageLogStatus());
+  expect(stato).toMatchObject({ pending: 0, discarded: 3, discardedBy: { ricomincia: 3 } });
+  expect(await app.evaluate(() => globalThis.SN_STORAGE.getRaw('walletUsageQueue', null))).toBeNull();
+  mkdirSync('tests/.shots', { recursive: true });
+  await page.screenshot({ path: 'tests/.shots/1601-ricomincia-registro.png' });
+});
+
 // La cartella dati va preparata PRIMA dell'avvio (l'identità si legge lì), quindi Filo si lancia qui.
 test('identità illeggibile con un portafoglio su disco: nessuna identità nuova in silenzio, la pagina lo dice, e ricominciare mette da parte il portafoglio', async () => {
   const userData = cartellaTemporanea('filo-identita-illeggibile-');

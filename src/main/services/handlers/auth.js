@@ -1,7 +1,6 @@
 // Handler di dominio: account "Accedi con Google", triage admin dei feedback
 // e config condivisa "modelli predefiniti".
 
-const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
@@ -9,8 +8,9 @@ const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
+require('../../../shared/routineCrediti.js');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
@@ -24,13 +24,11 @@ function testoAccessoNonRicordato() {
   return consiglio ? `${base} ${consiglio}` : base;
 }
 
-// Base delle Cloud Function callable del backend di sicurezza (filo-security):
-// stessa region/progetto del deploy. Override per i test via env.
+// Region e progetto sono quelli del deploy; override per i test via env.
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
-// Invoca una callable gen2 (protocollo onCall) con l'ID token admin. Lancia su
-// errore (auth/rete/HTTP). Speculare a handlers/redteam.js → callable().
+// Protocollo onCall con l'ID token admin: lancia su errore di auth, rete o HTTP.
 async function callSecurityFunction(name, data = {}) {
   const idToken = await auth.getIdToken();
   if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
@@ -42,14 +40,16 @@ async function callSecurityFunction(name, data = {}) {
   if (!res.ok) {
     let detail = '';
     let code = '';
+    let reason = '';
     try {
       const err = (await res.json())?.error || {};
       detail = err.message || '';
       code = err.status || '';
+      reason = (err.details && typeof err.details.reason === 'string') ? err.details.reason : '';
     } catch (_) {}
     // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
     throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
-      { httpStatus: res.status, code: String(code), detail: String(detail) });
+      { httpStatus: res.status, code: String(code), detail: String(detail), reason });
   }
   const body = await res.json();
   return body && body.result;
@@ -74,16 +74,60 @@ function erroreSegno(e) {
 
 // Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
 // protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
-function erroreDomande(e) {
+function erroreDomande(e, nonAncora) {
   const code = String(e?.code || '').toUpperCase();
   const detail = String(e?.detail || '').trim();
   if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'operazione_sconosciuta') return nonAncora;
   if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
   if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
   if (detail) return detail;
   if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
   if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
   return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerCrediti detto all'owner. Su un numero fuori misura la spiegazione è del server.
+function erroreCrediti(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I crediti delle routine non sono ancora pubblicati sul server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può toccare i crediti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice), e un server
+// più vecchio dell'app non conosce l'op (`op_sconosciuta`): lo si dice, con `nonAncora` per le op nuove.
+function erroreCompiti(e, nonAncora) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'op_sconosciuta') return nonAncora;
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
+const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
+  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte',
+  'usd24h', 'accensioniSettimana', 'accensioni24h']);
+function accountsCrediti(r) {
+  const out = {};
+  for (const a of ['A', 'B']) {
+    const v = r && r.accounts && r.accounts[a];
+    if (!v || typeof v !== 'object') continue;
+    out[a] = {};
+    for (const k of CREDITI_CAMPI_ACCOUNT) if (v[k] !== undefined) out[a][k] = v[k];
+  }
+  return out;
 }
 
 // Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
@@ -102,85 +146,35 @@ function aIso(v) {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
 }
 
-// ---- Slot chiave privata feedback (S1.3) ----------------------------------------
-// La privata non esce mai dal main process: il renderer non la vede. Si rilegge a ogni chiamata, così
-// un cambio a runtime vale subito.
-async function getPrivateKey() {
-  // Prima l'ambiente: è la scelta esplicita di chi lancia Filo.
-  if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
+// La privata non esce mai dal main process: il renderer non la vede.
+const { getPrivateKey } = require('../chiaveFeedback');
 
-  // Poi tests/agent/.env (gitignorato) e infine il campo `feedbackPrivateKey` di storage.json.
-  try {
-    const fs = require('node:fs');
-    // __dirname = src/main/services/handlers → root = ../../../../
-    const envFile = path.join(__dirname, '..', '..', '..', '..', 'tests', 'agent', '.env');
-    if (fs.existsSync(envFile)) {
-      const lines = fs.readFileSync(envFile, 'utf8').split('\n');
-      for (const line of lines) {
-        const m = line.match(/^FILO_FEEDBACK_PRIVKEY\s*=\s*(.+)$/);
-        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
-      }
-    }
-  } catch (_) {}
+// «È un allegato di Filo?» lo decide solo SN_FEEDBACK.isAttachmentUrl, come nelle pagine:
+// due strade per la stessa domanda è il difetto che questo confine ha già pagato.
 
-  try {
-    if (globalThis.SN_STORAGE) {
-      const v = await globalThis.SN_STORAGE.getRaw('feedbackPrivateKey', null);
-      if (v && typeof v === 'string') return v.trim();
-    }
-  } catch (_) {}
-
-  return null;
-}
-
-// «Questo indirizzo è un allegato di Filo?» si chiede a UNA funzione sola,
-// `SN_FEEDBACK.isAttachmentUrl`, che è anche quella usata dalle pagine. Qui
-// c'era una seconda copia, scritta a colpi di `startsWith`: due strade per la
-// stessa domanda sono esattamente la forma di difetto che questo confine ha
-// già pagato più volte (una delle due prima o poi non guarda quello che guarda
-// l'altra). I nomi storici del deposito che quella copia conosceva sono
-// passati nel modulo condiviso, insieme al resto.
-
-// Decifra i campi FENC1: di un oggetto con la chiave privata del main.
-// Retrocompatibile: i valori non cifrati passano invariati.
-// Senza chiave privata i campi cifrati diventano il placeholder leggibile.
-// S1.F2.1: aggiunto 'status' (cifrato quando gate on) — NON 'statusPublic' (sempre in chiaro).
-// S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
-// #476: 'reviewDecision'/'reviewedAt' viaggiano cifrati come 'reviewComment' —
-// la revisione dell'owner non deve essere leggibile da chi ha mandato il feedback.
+// Campi FENC1: i valori in chiaro passano invariati, senza chiave restano un placeholder.
+// `statusPublic` resta in chiaro; la revisione dell'owner viaggia cifrata (#476).
 const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'reviewDecision', 'reviewedAt', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
-// Quanti feedback si decifrano insieme nel batch: il pool di thread di Node ha
-// 4 posti di default, oltre non si guadagna.
+// Il pool di thread di Node ha 4 posti di default: oltre non si guadagna.
 const DECRYPT_CONCURRENCY = 4;
 
-// S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
-// PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO oggetto
-// pipeline serializzato in JSON. La dashboard owner deve decifrarlo PRIMA del
-// render così classifyBlock/manageReview leggono `fb.pipeline.action` ecc. come
-// sempre (ricevono già l'oggetto). Casi: assente → niente; già oggetto (vecchi
-// feedback in chiaro, retrocompat) → lascia; FENC1: senza chiave privata →
-// lascia la stringa com'è (placeholder, niente crash).
+// `pipeline` è cifrato come UNA stringa con dentro tutto l'oggetto: va decifrato prima del
+// render. Senza chiave resta la stringa cifrata: nessun crash.
 async function decryptPipelineField(out, C, priv) {
   const p = out.pipeline;
-  if (!C.isEncrypted(p)) return; // assente, già oggetto, o null: invariato
+  if (!C.isEncrypted(p)) return;
   if (!priv) return; // senza chiave: lascia la stringa cifrata (no crash)
   try {
     out.pipeline = JSON.parse(await C.decrypt(p, priv));
   } catch (e) {
     console.warn('[auth] decifratura/parse del pipeline fallita:', e?.message || e);
-    // lascia il valore com'è: i lettori (classifyBlock) gestiscono `pipeline`
-    // non-oggetto come "nessun blocco" senza crashare.
+    // I lettori gestiscono un `pipeline` non-oggetto come "nessun blocco", senza crashare.
   }
 }
 
-// I testi dei livelli 3 e 4 (`livelli.l3.testo`, `livelli.l4.testo`): quello
-// che Claude ha segnalato lavorando e il resoconto dell'audit di sicurezza.
-// Viaggiano nella stessa busta delle note, con la stessa chiave dell'owner,
-// quindi si decifrano con lo stesso helper — e la mappa si copia prima di
-// scriverci dentro, per non mutare il documento che il chiamante ha passato.
-// Senza chiave: il placeholder, come per gli altri testi (la dashboard lo
-// riconosce e lo dichiara invece di mostrare un blob).
+// I testi dei livelli 3 e 4 stanno nella stessa busta delle note, con la chiave dell'owner.
+// La mappa si copia prima di scriverci: il documento del chiamante non si muta.
 const LIVELLI_CON_TESTO = ['l3', 'l4'];
 async function decryptLivelliFields(out, C, priv) {
   const l = out.livelli;
@@ -203,9 +197,8 @@ async function decryptLivelliFields(out, C, priv) {
   if (toccato) out.livelli = copia;
 }
 
-// `privKey` (opzionale): la chiave già letta dal chiamante. Il batch della
-// dashboard la passa una volta per tutti i documenti — rileggerla dal disco a
-// ogni feedback (500 volte per una lista) era solo tempo perso.
+// `privKey` opzionale: il batch della dashboard la legge una volta per tutti i documenti,
+// invece di rileggerla dal disco 500 volte per una lista.
 async function decryptFeedbackObject(fields, privKey) {
   const C = globalThis.SN_FEEDBACK_CRYPTO;
   if (!C) return fields; // modulo non caricato: passthrough
@@ -214,13 +207,12 @@ async function decryptFeedbackObject(fields, privKey) {
   const out = { ...fields };
   for (const f of TEXT_FIELDS_TO_DECRYPT) {
     const v = out[f];
-    if (!C.isEncrypted(v)) continue; // in chiaro o null: invariato
+    if (!C.isEncrypted(v)) continue;
     if (!priv) { out[f] = PLACEHOLDER_NO_KEY; continue; }
     try {
       const plain = await C.decrypt(v, priv);
-      // #476: lo `status` è cifrato a lunghezza fissa (imbottito) perché il
-      // campo cifrato non riveli lo stato con la sola lunghezza — qui si toglie
-      // l'imbottitura, o la dashboard non riconoscerebbe più nessuno stato.
+      // Qui si toglie l'imbottitura dello status, o la dashboard non riconosce più nessuno stato.
+      // Regola dell'imbottitura: vedi shared/feedbackTransitions.js.
       out[f] = f === 'status' ? plain.trim() : plain;
     } catch (e) {
       console.warn(`[auth] decifratura campo "${f}" fallita:`, e?.message || e);
@@ -230,8 +222,7 @@ async function decryptFeedbackObject(fields, privKey) {
   await decryptPipelineField(out, C, priv);
   await decryptLivelliFields(out, C, priv);
 
-  // S1.priority: `priority` è un intero, non testo → logica dedicata (come in
-  // decrypt-feedback-fields.mjs). Retrocompat: se è già un numero → invariato.
+  // `priority` è un intero, non testo: logica dedicata. Se è già un numero resta invariato.
   if (C.isEncrypted(out.priority)) {
     if (priv) {
       try {
@@ -243,16 +234,13 @@ async function decryptFeedbackObject(fields, privKey) {
         // lascia il ciphertext: priorityOf() fa Number() → NaN → 0 (safe)
       }
     }
-    // senza chiave: lascia il ciphertext invariato (stessa scelta di decryptPipelineField)
   }
 
   return out;
 }
 
-// Il server considera admin questo account? La collezione `admins` è leggibile
-// SOLO da un admin (firestore.rules), quindi: 200 = admin, 403 = non admin.
-// Ritorna null se la risposta non è concludente (rete giù, token assente…):
-// il chiamante mostrerà entrambe le ipotesi invece di affermare il falso.
+// `admins` è leggibile solo da un admin: 200 = admin, 403 = no. null se la risposta non è
+// concludente, così il chiamante mostra il dubbio invece di affermare il falso.
 async function probeServerAdmin(claims) {
   try {
     const email = claims && claims.email;
@@ -263,8 +251,6 @@ async function probeServerAdmin(claims) {
     const url = `${rest.FIRESTORE_BASE}/admins/${encodeURIComponent(email)}?key=${rest.API_KEY}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
     if (res.status === 200) return true;
-    // Senza il documento admins/<email> la regola nega la lettura stessa: chi
-    // non è admin vede 403, mai 404.
     if (res.status === 403 || res.status === 404) return false;
     return null;
   } catch (_) {
@@ -274,15 +260,21 @@ async function probeServerAdmin(claims) {
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
-  // L'avviso «l'accesso è cambiato» porta con sé il profilo, cioè l'indirizzo
-  // email di chi sta usando Filo: va SOLO alle superfici di Filo. Mandarlo a
-  // tutte le schede vorrebbe dire consegnarlo anche ai content script dei siti
-  // visitati, ed è la stessa porta chiusa un attimo fa vista dal verso opposto:
-  // se un sito non lo può chiedere, non glielo si manda da soli.
+  let giudiciFermi = null;
+  // L'avviso porta l'email di chi usa Filo: va alle superfici di Filo, mai a tutte le schede,
+  // dove arrivano anche i content script dei siti visitati.
   const avvisaLeSuperficiDiFilo = (m) => {
     if (typeof ctx.broadcastToFiloPages === 'function') ctx.broadcastToFiloPages(m);
     else ctx.broadcastToTabs(m);
+    // L'owner entrato o uscito cambia chi vede Bacheca e Mazzi senza che l'interruttore si muova (#1592).
+    try { require('../inPausa').accessoCambiato(); } catch (_) {}
   };
+  // La copia della foto del profilo arriva dopo l'accesso (#1273): barra, shell e home la ridisegnano da qui.
+  if (typeof auth.suFoto === 'function') {
+    auth.suFoto((profile) => avvisaLeSuperficiDiFilo({
+      type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered: auth.isRemembered(),
+    }));
+  }
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
@@ -324,9 +316,18 @@ module.exports = function register(on, ctx) {
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
-  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
-  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
+  // Ai siti la porta dell'accesso è chiusa (#1132): il pannello del red-team che gira sopra di loro chiede con
+  // AUTH_SIGNIN_CLIC, legato a un clic vero. A un sito torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, soloFilo((msg, sender, origin) => accedi(origin, sender)));
+  on(MSG.AUTH_SIGNIN_CLIC, async (msg, sender, origin) => {
+    const Permessi = require('../permessiPagine');
+    if (!daFilo(origin, sender) && !Permessi.gestoDellUtente(sender && sender.wc)) {
+      return { ok: false, code: 'gesto', error: 'Premi di nuovo per accedere.' };
+    }
+    return accedi(origin, sender);
+  });
+  on(MSG.AUTH_SIGNIN_LASCIA, soloFilo(() => { auth.lasciaStare(); return { ok: true }; }));
+  async function accedi(origin, sender) {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -334,37 +335,93 @@ module.exports = function register(on, ctx) {
       // Nel main e non nelle pagine: all'accesso si arriva da molte porte
       // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
       if (auth.isSignedIn() && !remembered) {
-        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO, tipo: 'accesso_non_ricordato' });
       }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
       Defaults.refresh().catch(() => {});
-      // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
-      // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
+      // Con l'owner dentro il main ha di nuovo il token: la vista pubblica si rimette in pari.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       // I feedback dell'owner fermi ad aspettare la sua firma (#912) partono adesso, non al prossimo giro della coda.
       if (auth.isAdmin()) { try { globalThis.SN_FEEDBACK_OUTBOX?.accessoCambiato?.(); } catch (_) {} }
+      giudiciFermi?.colpo('accesso');
       if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
     }
-  });
+  }
 
-  // Uscire dall'account lo chiede solo la finestra di Filo. Da un sito
-  // visitato era un modo per buttare fuori chi sta usando Filo: da lì in poi
-  // la posta delle segnalazioni non si apre e la bacheca di tutti smette di
-  // aggiornarsi, finché non rientra.
+  // L'uscita dall'account la chiede solo Filo: da un sito era un modo per buttare fuori
+  // chi lo sta usando, e da lì posta delle segnalazioni e bacheca si fermano.
   on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      giudiciFermi?.colpo('accesso');
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
+
+  // «Aspetta #N» (#903): la pagina manda il gesto, non l'elenco: `waitsAggiungi` (i numeri come li ha scritti l'owner) e
+  // `waitsTogli` (id). Il main li applica alle attese lette adesso col token (la pagina ne vede una finestra, magari vecchia).
+  function richiestaAttese(msg) {
+    const A = globalThis.SN_FB_ATTESE;
+    const letti = A.leggiNumeri(msg.waitsAggiungi == null ? '' : msg.waitsAggiungi);
+    if (!letti.ok) return letti;
+    const togli = msg.waitsTogli === undefined ? [] : msg.waitsTogli;
+    if (!Array.isArray(togli) || togli.length > A.MAX || togli.some((x) => typeof x !== 'string')) {
+      return { ok: false, motivo: 'elenco delle attese da togliere non valido' };
+    }
+    return { ok: true, aggiungi: letti.numeri, togli };
+  }
+
+  // Le attese insieme a `campi`, scritte solo sull'elenco letto (SN_FB_ATTESE.scriviSullaLettura). Regole: SN_FB_ATTESE.valida.
+  async function scriviAttese(id, richiesta, campi, idToken) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    return A.scriviSullaLettura({
+      leggi: async () => {
+        const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+        return proprio ? { proprio, versione: proprio._updateTime || '' } : null;
+      },
+      calcola: async (letto) => {
+        if (!letto) return { fine: { ok: false, motivo: 'il feedback non esiste più' } };
+        const gia = A.atteseDi(letto.proprio);
+        const { numeri, tieni } = A.daScrivereSu(gia, richiesta);
+        // Un numero di più feedback (#1517) non si lega al primo che capita: lo si dice all'owner, con gli id.
+        const v = await A.valida({
+          id, num: FB.formatNum(letto.proprio.seq, letto.proprio.subSeq), numeri, gia, tieni,
+          risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+          leggiAttese: async (ids) => {
+            const out = new Map();
+            for (let i = 0; i < ids.length; i += 100) {
+              // eslint-disable-next-line no-await-in-loop
+              const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+              for (const r of righe) out.set(r._id, A.atteseDi(r));
+            }
+            return out;
+          },
+        }).catch((e) => {
+          if (e && Array.isArray(e.numeroDoppio)) return { ok: false, motivo: e.message };
+          throw e;
+        });
+        return v.ok ? { scrivi: v.attese } : { fine: v };
+      },
+      scrivi: async (attese, versione) => {
+        try {
+          await FB.updateStatus(id, { ...campi, waitsFor: attese }, { idToken, versione });
+        } catch (e) {
+          if (e && e.conflitto) return { conflitto: true };
+          throw e;
+        }
+        return { ok: true, attese };
+      },
+    });
+  }
 
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
@@ -382,9 +439,8 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      // `userNote` è la frase in chiaro per chi ha mandato il feedback: l'altra
-      // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
-      // dashboard resta l'unica strada da cui quella metà si perde.
+      // `userNote` è la frase in chiaro per chi ha segnalato: va inoltrata, o quella metà dei due
+      // testi si perde fuori dalla dashboard.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
       // «Solo in locale» (#908): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email del
       // token, la stessa che le regole vedono). La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
@@ -402,25 +458,30 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      await globalThis.SN_FEEDBACK.updateStatus(
-        id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval },
-        { idToken },
-      );
-      // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
-      // entra, uno riaperto esce, la frase per chi ha segnalato cambia): la
-      // vista pubblica si rifà subito, non al prossimo caricamento.
-      //
-      // Prima la scheda di QUESTO feedback, poi il giro generale. Non è un
-      // doppione: il giro generale guarda solo i 500 feedback più recenti per
-      // data d'invio, e Filo quel numero l'ha passato. Chiudere oggi una
-      // segnalazione vecchia non le scriveva nessuna scheda (niente bacheca,
-      // niente annuncio e niente crediti per chi l'aveva mandata) e riaprirne
-      // una vecchia non le toglieva la sua (restava in bacheca come risolta,
-      // votabile e riapribile a pagamento). Qui l'id ce l'abbiamo: si va
-      // dritti su quello, e l'età non conta più.
+      const attese = msg.waitsAggiungi !== undefined || msg.waitsTogli !== undefined ? richiestaAttese(msg) : null;
+      if (attese && !attese.ok) return { ok: false, error: attese.motivo, rifiutato: true };
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
+      // partenza si chiede al documento, non alla copia della pagina.
+      const FB = globalThis.SN_FEEDBACK;
+      let localMerges;
+      if (status !== undefined && FB.statusToPublic(status) === 'open') {
+        const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+        if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
+      }
+      const campi = { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges };
+      let waitsFor;
+      if (attese) {
+        const r = await scriviAttese(id, attese, campi, idToken);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      } else {
+        await FB.updateStatus(id, campi, { idToken });
+      }
+      // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
+      // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
+      if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {
@@ -431,29 +492,19 @@ module.exports = function register(on, ctx) {
       console.warn('[Filo] feedback_update respinto', id, campi, raw.slice(0, 300));
       let claims = null;
       try { claims = auth.getTokenClaims(); } catch (_) {}
-      // Un 403 può voler dire "non sei admin" oppure "sei admin ma il contenuto
-      // del feedback sfora i limiti". Chiediamolo al server invece di tirare a
-      // indovinare: la lettura di `admins/<email>` è consentita SOLO agli admin,
-      // quindi il suo esito distingue i due casi.
+      // Un 403 può dire «non sei admin» o «il contenuto sfora i limiti»: leggere `admins/<email>`
+      // riesce solo agli admin, e il suo esito distingue i due casi invece di indovinare.
       const serverAdmin = await probeServerAdmin(claims);
       return { ok: false, error: permissionDeniedHelp(raw, claims, { serverAdmin }) };
     }
   }));
 
-  // S1.3: decifratura dei campi feedback nel main (la privkey non esce mai da qui).
-  // Il renderer manda i campi con valori potenzialmente cifrati; il main li
-  // decifra e ritorna plaintext. Owner-only: se l'utente non è admin rifiuta.
-  //
-  // Modalità singola:  { fields: {text?,url?,…} } → { ok, fields: {…decifrati} }
-  // Modalità batch:    { list: [{…}, …] }         → { ok, list: [{…decifrati}, …] }
-  // (Il path singolo esiste per retrocompat; il batch serve alle dashboard che
-  //  caricano centinaia di feedback — una sola IPC invece di N.)
+  // Decifratura dei campi feedback nel main (la privkey non esce da qui), owner-only.
+  // Il batch serve alle dashboard che caricano centinaia di feedback: una IPC invece di N.
   on(MSG.FEEDBACK_DECRYPT_FIELDS, ownerOnly(async (msg) => {
     try {
-      // Batch: array di oggetti feedback. La chiave si legge UNA volta e i
-      // documenti si decifrano a gruppi in parallelo: la crittografia gira nel
-      // pool di thread di Node, quindi in sequenza si usava un solo core e
-      // 500 feedback costavano diversi secondi di attesa alla dashboard.
+      // Nel batch la chiave si legge UNA volta e i documenti vanno a gruppi in parallelo: la
+      // crittografia gira nel pool di thread, in sequenza 500 feedback costavano secondi.
       if (Array.isArray(msg.list)) {
         const priv = await getPrivateKey();
         const list = new Array(msg.list.length);
@@ -467,7 +518,6 @@ module.exports = function register(on, ctx) {
         await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
         return { ok: true, list };
       }
-      // Singolo (retrocompat).
       const fields = msg.fields || {};
       const decrypted = await decryptFeedbackObject(fields);
       return { ok: true, fields: decrypted };
@@ -476,73 +526,30 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // S1.2: decifratura di UN allegato immagine. Le immagini dei feedback sono
-  // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
-  // mostra un allegato rotto. Qui il main le scarica, le decifra con la chiave
-  // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
-  // mostrabile. Retrocompat: immagini NON cifrate (storiche) passano invariate
-  // (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
-  // PROVENIENZA sì, `ownerOnly` no, e la differenza è voluta. Il confine
-  // d'origine (#583) vale anche qui: da un sito visitato questa porta risponde
-  // «rifiutato per provenienza», come ogni altra del corridoio. Quello che NON
-  // può fare è fermarsi a «sei l'amministratore?», perché questo canale lo
-  // chiamano DUE pagine di Filo: la dashboard di chi riceve le segnalazioni e
-  // il riquadro dei feedback, dove un tester qualunque riapre le proprie. Con
-  // `ownerOnly` un tester si sentiva rispondere «operazione riservata agli
-  // amministratori» davanti al proprio screenshot — mandato a cercare un
-  // permesso che non avrà mai (#582). La risposta giusta gliela dà il corpo,
-  // dopo aver guardato PRIMA dove punta l'indirizzo.
+  // Le immagini sono byte cifrati: il main le scarica, le decifra e torna un data URL.
+  // Provenienza sì, `ownerOnly` no: qui entra anche il tester che riapre le proprie (#582).
   on(MSG.FEEDBACK_DECRYPT_IMAGE, soloFilo(async (msg) => {
     try {
       const url = String((msg && msg.url) || '');
       const FB = globalThis.SN_FEEDBACK;
       if (!FB?.isAttachmentUrl) throw new Error('SN_FEEDBACK non caricato nel main process');
-      // DOVE PUNTA, PRIMA DI CHI GUARDA (#582, giro 4). Solo URL https del
-      // bucket feedback: evita che questo canale diventi un fetch arbitrario
-      // (SSRF) pilotato dal renderer.
-      //
-      // Questo controllo sta PRIMA di quello sull'identità, e l'ordine è il
-      // punto. L'indirizzo di un allegato non lo sceglie Filo: sta scritto
-      // dentro la segnalazione, e una segnalazione la manda chiunque, anche
-      // senza account e senza avere Filo installato. Con l'identità davanti, a
-      // chi non riceve le segnalazioni si rispondeva «consegnato» senza aver
-      // mai guardato l'indirizzo: Filo dichiarava partito — e cifrato con la
-      // chiave di chi le riceve — un «allegato» che nel suo deposito non era
-      // mai entrato, e la pillola finta di chi aveva messo l'esca diventava
-      // indistinguibile da una vera, avvalorata da Filo. A chi le riceve
-      // l'indirizzo veniva invece controllato: due strade per la stessa cosa e
-      // una non guardava niente (la stessa forma del rilievo del giro 2).
-      //
-      // Fuori dal deposito di Filo la risposta è UNA SOLA, uguale per tutti:
-      // quello non è un allegato di Filo. Niente `soloDestinatario`, così il
-      // segnaposto torna a dire che non è disponibile invece di prometterlo
-      // consegnato.
+      // DOVE PUNTA, PRIMA DI CHI GUARDA (#582): solo URL https del deposito feedback, o il canale
+      // diventa un fetch arbitrario pilotato dal renderer (SSRF). Fuori, la risposta è una sola.
       if (!FB.isAttachmentUrl(url)) {
         return { ok: false, error: 'url allegato non valido' };
       }
-      // Questo canale lo chiamano DUE pagine: la dashboard dell'owner e il
-      // riquadro dei feedback, dove un utente qualunque riapre le proprie
-      // segnalazioni. Chi non è amministratore l'immagine non la vedrà (è
-      // cifrata con la chiave di chi riceve le segnalazioni), ma `soloDestinatario`
-      // dice alla pagina che non è un guasto: l'allegato è partito, e il
-      // segnaposto lo scrive così invece di dire "non disponibile".
+      // Chi non è admin l'immagine non la vede (cifrata con la chiave di chi riceve), ma
+      // `soloDestinatario` dice alla pagina che non è un guasto: il segnaposto lo scrive.
       if (!auth.isAdmin()) {
         return { ok: false, soloDestinatario: true, error: attachmentNotForYouHelp() };
       }
-      // Quello che apre l'allegato è il download token dentro l'URL salvato nel
-      // feedback: dal #583 le regole del deposito non concedono la lettura a
-      // nessuno, owner compreso. L'identità si manda lo stesso, e solo verso il
-      // deposito di Filo (`attachmentFetchHeaders` lo confronta per intero):
-      // oggi non apre niente da sola, ma se un domani le regole tornassero a
-      // riconoscerla la richiesta è già firmata nel modo giusto. Se la sessione
-      // è scaduta si prosegue senza: non cambia nulla per l'allegato.
+      // Ad aprire l'allegato è il download token nell'URL; l'identità si manda comunque, e solo
+      // verso il deposito di Filo, così se le regole tornassero a leggerla è già firmata giusta.
       let idToken = '';
       try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
       const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
       if (!res.ok) {
-        // Un 403 su un allegato ora ha una causa sola e una cura sola: dirla
-        // qui è la differenza fra un segnaposto muto e un problema che si
-        // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
+        // Un 403 qui ha una causa sola e una cura sola: dirla evita un segnaposto muto.
         if (res.status === 403) {
           return { ok: false, error: attachmentForbiddenHelp() };
         }
@@ -563,15 +570,13 @@ module.exports = function register(on, ctx) {
         try {
           bytes = await C.decryptBytes(raw, priv);
         } catch (e) {
-          // I byte iniziano come un ciphertext valido ma la decifratura fallisce
-          // (chiave sbagliata, dato corrotto): non ripiegare sui byte cifrati
-          // (sarebbero comunque illeggibili) — dichiara l'errore.
+          // Byte che sembrano un ciphertext ma non si decifrano: niente ripiego sui byte cifrati
+          // (illeggibili comunque), si dichiara l'errore.
           return { ok: false, error: 'decifratura immagine fallita' };
         }
       }
-      // Un DOCUMENTO (non immagine) torna con il tipo dichiarato dal chiamante:
-      // il link della dashboard lo scarica già decifrato, col nome originale.
-      // Prima il link puntava ai byte cifrati e l'owner apriva un file rotto.
+      // Un documento torna col tipo dichiarato dal chiamante, così il link lo scarica decifrato e
+      // col nome originale invece dei byte cifrati.
       const mime = String((msg && msg.mime) || '').trim();
       if (mime && !/^image\//i.test(mime) && /^[\w.+-]+\/[\w.+-]+$/.test(mime)) {
         return { ok: true, dataUrl: `data:${mime};base64,${Buffer.from(bytes).toString('base64')}` };
@@ -582,10 +587,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
-  // NON espone le chiavi vere, solo se sono configurate. La scrittura è
-  // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
-  // rifiutano i non-admin. La modifica si propaga a tutti gli utenti.
+  // La lettura non espone le chiavi vere, solo se sono configurate.
+  // La scrittura è riservata agli admin e si propaga a tutte le installazioni.
   on(MSG.DEFAULTS_GET, ownerOnly(async () => {
     try {
       await Defaults.refresh().catch(() => {});
@@ -595,18 +598,20 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Versione LEGGIBILE DA TUTTI della config modelli: solo i nomi (registry e
-  // modello per funzione), mai una chiave. La pagina Opzioni la usa per elencare
-  // i modelli predefiniti VERI — prima elencava quelli scritti nel codice, che
-  // possono essere stati sostituiti o eliminati dalla configurazione condivisa.
+  // Versione leggibile da TUTTI: solo i nomi, mai una chiave. Sono i modelli predefiniti VERI,
+  // quelli della configurazione condivisa, non quelli scritti nel codice.
   on(MSG.DEFAULT_MODELS_PUBLIC, async () => {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
       const FC = globalThis.SN_FILO_CONTESTO;
+      // Anche la scelta generale degli host: senza, una pagina non sa a cosa rimanda «Automatico».
       return {
         ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        providerSort: d.providerSort || '',
         contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+        lunghezzaRisposte: d.lunghezzaRisposte || {},
+        lunghezzaRisposteDiSerie: globalThis.SN_LUNGHEZZA_RISPOSTE ? { ...globalThis.SN_LUNGHEZZA_RISPOSTE.DI_SERIE } : {},
       };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
@@ -624,27 +629,24 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Interruttore master dell'auto-miglioramento (config/automation). Owner-only.
-  // Default OFF (autonomia spenta): mentre è OFF anche i feedback "sicuri"
-  // richiedono verifica umana. Vedi filo-security DESIGN §2. La scrittura passa
-  // dal main con l'ID token admin; le regole Firestore sono la garanzia forte.
+  // Interruttore master dell'auto-miglioramento (config/automation), owner-only.
+  // Default OFF: da spento anche i feedback «sicuri» richiedono verifica umana.
   on(MSG.AUTOMATION_GET, ownerOnly(async () => {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
       const lavoriServer = await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
 
-  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
-  // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
+  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa per fiducia
+  // dell'auto-approvazione, #446 e §10), e tocca SOLO ciò che riceve: la vecchia
   // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
   on(MSG.AUTOMATION_SET, ownerOnly(async (msg) => {
     try {
@@ -659,9 +661,6 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
-        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
-        : await Defaults.getAutomationProberIdle(idToken);
       // Interruttore master delle routine (config/routines): è ciò che ferma il
       // lavoro autonomo, mentre `enabled` qui sopra riguarda solo chi entra in
       // coda da solo. Due decisioni diverse, due interruttori.
@@ -672,7 +671,7 @@ module.exports = function register(on, ctx) {
       const lavoriServer = (typeof msg.lavoriServer === 'boolean')
         ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
         : await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -698,8 +697,7 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Tocca SOLO i campi che riceve (come AUTOMATION_SET): salvare un bilancio
-  // non deve riscrivere gli altri.
+  // Tocca SOLO i campi che riceve: salvare un bilancio non deve riscrivere gli altri.
   on(MSG.AUTOMATION_CAPS_SET, ownerOnly(async (msg) => {
     try {
       const idToken = await auth.getIdToken();
@@ -719,7 +717,7 @@ module.exports = function register(on, ctx) {
   // solo i campi scritti: gli altri restano ignoti invece di valere il default.
   const sessionsReply = (s) => {
     const r = { ok: true, letto: s.letto !== false };
-    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+    for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) {
       if (s[k] !== undefined) r[k] = s[k];
     }
     return r;
@@ -739,12 +737,78 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      return sessionsReply(await Defaults.setRoutineSessions({
-        maxSessions: msg.maxSessions,
-        priorityAccount: msg.priorityAccount,
-        accountAOff: msg.accountAOff,
-        accountBOff: msg.accountBOff,
-      }, idToken));
+      const patch = {};
+      for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) patch[k] = msg[k];
+      return sessionsReply(await Defaults.setRoutineSessions(patch, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Il recap del manutentore e la sua N (SPEC-MANUTENTORE § 9): due letture di ownerManutentore, indipendenti. Il
+  // testo è suo, scritto leggendo testo di chiunque: la pagina lo mostra come testo, mai come markup.
+  on(MSG.MANUTENTORE_RECAP_GET, ownerOnly(async () => {
+    const [recap, stato] = await Promise.allSettled([
+      callSecurityFunction('ownerManutentore', { op: 'recap', limite: 30 }),
+      callSecurityFunction('ownerManutentore', { op: 'stato' }),
+    ]);
+    if (recap.status === 'rejected' || !recap.value || recap.value.ok === false) {
+      const e = recap.status === 'rejected' ? recap.reason : null;
+      if (e?.httpStatus === 404 && !e?.code) return { ok: false, error: 'Il recap del manutentore non è ancora pubblicato sul server.' };
+      return { ok: false, error: e ? erroreDomande(e) : String(recap.value?.detail || recap.value?.reason || 'Il server non ha dato il recap.') };
+    }
+    const fogli = (Array.isArray(recap.value.recap) ? recap.value.recap : [])
+      .filter((f) => f && /^\d{4}-\d{2}-\d{2}$/.test(String(f.giorno)) && typeof f.testo === 'string')
+      .map((f) => ({ giorno: String(f.giorno), testo: f.testo, at: typeof f.at === 'string' ? f.at : null }));
+    const s = stato.status === 'fulfilled' && stato.value && stato.value.ok !== false ? stato.value : null;
+    const intero = (v) => (Number.isInteger(v) ? v : null);
+    return { ok: true, recap: fogli, stato: s ? { parallelismo: intero(s.parallelismo), parallelismoEffettivo: intero(s.parallelismoEffettivo), freno: intero(s.freno) } : null };
+  }));
+
+  // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i
+  // controlli della pagina (SN_ROUTINE_CREDITI). Si scrive solo il campo toccato; `numeri` torna sempre intero
+  // dalla scrittura, lo stato per account solo se la rilettura riesce.
+  async function statoCreditiRoutine() {
+    const r = await callSecurityFunction('ownerCrediti', { op: 'stato' });
+    const freni = r && (r.riserva === 'attivi' || r.riserva === 'numeri_assenti') ? r.riserva : '';
+    return { numeri: globalThis.SN_ROUTINE_CREDITI.leggiNumeri(r && r.numeri), accounts: accountsCrediti(r), freni };
+  }
+  on(MSG.ROUTINE_CREDITI_GET, ownerOnly(async () => {
+    try {
+      return Object.assign({ ok: true }, await statoCreditiRoutine());
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+  }));
+  on(MSG.ROUTINE_CREDITI_SET, ownerOnly(async (msg) => {
+    const RC = globalThis.SN_ROUTINE_CREDITI;
+    const patch = {};
+    for (const k of RC.CHIAVI) if (msg && Object.prototype.hasOwnProperty.call(msg, k)) patch[k] = msg[k];
+    const v = RC.valida(patch);
+    if (!v.ok) return { ok: false, error: v.testo };
+    let scritto;
+    try {
+      scritto = await callSecurityFunction('ownerCrediti', Object.assign({ op: 'imposta' }, v.valori));
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+    const out = { ok: true, numeri: RC.leggiNumeri(scritto && scritto.numeri) };
+    try {
+      const st = await statoCreditiRoutine();
+      Object.assign(out, { accounts: st.accounts, freni: st.freni });
+    } catch (_) { /* scritto sì: lo stato si rilegge alla prossima apertura */ }
+    return out;
+  }));
+
+  // Le pause in corso degli account e delle routine server e riservati, col motivo (#996), e lo stato della riservati
+  // (#2069). Lo stato del pacemaker non lo legge nessun client: passa dal registro delle routine, con le credenziali
+  // dell'owner (mai dalla callable dello storico).
+  on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
+    try {
+      const r = await callSecurityFunction('routineLog', { op: 'pause' });
+      const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
+      const voci = r && r.voci && typeof r.voci === 'object' ? r.voci : {};
+      return { ok: true, pause, voci, oraMs: Number(r && r.oraMs) || Date.now() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -773,6 +837,28 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Il tetto di spesa dei giudici per i non fidati (#1515): tocca SOLO i campi che riceve.
+  on(MSG.AUTOMATION_JUDGE_BUDGET_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return Object.assign({ ok: true }, await Defaults.getJudgeBudget(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+  on(MSG.AUTOMATION_JUDGE_BUDGET_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const patch = {};
+      for (const k of ['tettoUsd', 'maxCaratteri']) if (msg && msg[k] !== undefined) patch[k] = msg[k];
+      return Object.assign({ ok: true }, await Defaults.setJudgeBudget(patch, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
@@ -788,57 +874,24 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Registri del canale autenticato delle routine. Owner-only, sola lettura.
-  //
-  // Le due collezioni sono scritte dal backend di sicurezza con l'Admin SDK e
-  // nessun client le può leggere: un registro dei rifiuti leggibile da chiunque
-  // direbbe a chi sta provando ad abusare del canale quanto è stato notato.
-  // Perciò si passa dalla callable, che chiede le credenziali dell'owner.
+  // Le due collezioni le scrive il backend e nessun client le legge: un registro dei rifiuti
+  // aperto direbbe a chi abusa quanto è stato notato. Perciò si passa dalla callable.
   on(MSG.ROUTINE_LOG_GET, ownerOnly(async (msg) => {
     try {
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
-      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null };
+      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null, postiLasciati: (r && r.postiLasciati) || [], letture: (r && r.letture) || [] };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
 
-  // ── Fusioni bloccate, in attesa dell'owner (SPEC-RIDISEGNO-MAX.md §10) ─────
-  //
-  // I controlli deterministici del server fermano le fusioni che toccano le
-  // aree protette. Il lavoro LOCALE dell'owner ci cade dentro quasi sempre —
-  // in locale si lavora proprio su quelle cose — e senza una via d'uscita non
-  // avrebbe nessuna strada verso il ramo principale (nemmeno a mano: là scrive
-  // solo l'identità del server). Il blocco apre quindi una richiesta in attesa,
-  // e l'owner la decide da queste tre chiamate.
-  //
-  // DUE CANCELLI, non uno:
-  //   · `isAdmin()` — è il potere dell'owner, e il server lo ricontrolla;
-  //   · l'ORIGINE — solo pagine `filo://`. Il canale dei messaggi è uno solo e
-  //     ci arrivano anche i content script dei siti visitati: senza questo, un
-  //     sito qualunque potrebbe chiedere se c'è una fusione in attesa (e
-  //     scoprire su cosa sta lavorando l'owner) o provare a farla approvare
-  //     mentre lui guarda altrove. Il gesto che vale è quello fatto sulla
-  //     superficie di Filo: è tutto il senso di questa superficie.
-  //
-  // `ownerOnly` NON è delle sole fusioni: è la porta unica di OGNI canale con
-  // potere di proprietario di questo file. Ogni `on(MSG.…)` qui dentro che
-  // richieda l'amministratore ci passa — i feedback, i modelli predefiniti (che
-  // valgono per tutte le installazioni di Filo), l'automazione, i bilanci dei
-  // giri, i modelli dei giudici, i registri del lavoro e delle routine, le
-  // fusioni. Non è una regola di stile: il #583 ha chiuso quattro porte su
-  // nove, e le cinque rimaste erano quelle che cambiano la configurazione di
-  // tutti. `tests/feedback-canali-origine.spec.mjs` bussa a tutte da un sito
-  // visitato e diventa rossa se una risponde qualcosa di diverso da
-  // «rifiutato per provenienza»: è il posto dove aggiungere una porta nuova.
+  // DUE CANCELLI: `isAdmin()`, che il server ricontrolla, e l'origine (solo pagine filo://).
+  // Porta unica di ogni canale con potere di questo file: una nuova si aggiunge qui.
   function ownerOnly(handler) {
     return async (msg, sender, origin) => {
-      // La provenienza la decide la porta unica del confine (handlers/origine.js),
-      // che è la stessa di ogni altra porta con potere e porta con sé il motivo
-      // in una parola: senza, il rifiuto arriva a una pagina come un errore
-      // qualunque e finisce tradotto in "controlla la connessione", che non è
-      // vero e manda a controllare la cosa sbagliata.
+      // Il motivo in una parola: senza, il rifiuto arriva come errore qualunque e diventa
+      // «controlla la connessione». Confine d'origine: vedi handlers/origine.js.
       if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
       if (!auth.isAdmin()) {
         return {
@@ -860,15 +913,12 @@ module.exports = function register(on, ctx) {
     return {
       ok: true,
       pending: (r && r.pending) || [],
-      // Le fusioni approvate e mai avvenute (conflitto): restano in vista
-      // finché non vengono sistemate, non sono decisioni passate.
+      // Le fusioni approvate e mai avvenute restano in vista: non sono decisioni passate.
       failed: (r && r.failed) || [],
       recent: (r && r.recent) || [],
-      // Le fusioni avvenute SENZA chiedere, perché l'owner aveva pre-approvato
-      // la pratica: la traccia con cui controlla a posteriori.
+      // Fusioni fatte senza chiedere, su pratica pre-approvata: la traccia per controllare dopo.
       preapproved: (r && r.preapproved) || [],
-      // Quante sono in tutto: se il server ne ha lasciate fuori, la pagina lo
-      // dice invece di tacere. Un server vecchio non lo manda: vale l'elenco.
+      // Se il server ne lascia fuori la pagina lo dice; senza totale vale l'elenco.
       preapprovedTotal: Number(r && r.preapprovedTotal) || ((r && r.preapproved) || []).length,
       ttlMs: Number(r && r.ttlMs) || 0,
     };
@@ -876,24 +926,13 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
 
-  // ── #583: leggere i feedback, e tenere aggiornata la vista pubblica ───────
-  //
-  // La collezione `feedback` non si legge più senza credenziali. Le due
-  // superfici dell'owner (Gestione e la pagina dei feedback) girano in una
-  // pagina filo://, dove l'ID token non deve arrivare: chiedono la lettura
-  // qui, e qui la si fa col token. Stessi due cancelli delle approvazioni di
-  // fusione (`ownerOnly`): sei l'admin, e lo stai chiedendo da una superficie
-  // di Filo — un sito visitato non deve poter domandare al main cosa c'è nella
-  // posta dell'owner.
+  // La collezione `feedback` non si legge senza credenziali e in una pagina filo:// l'ID token
+  // non deve arrivare: si legge qui, col token e con gli stessi due cancelli (#583).
   const PUBLIC_VIEW = () => globalThis.SN_FEEDBACK_PUBLIC_VIEW;
   const FEEDBACK = () => globalThis.SN_FEEDBACK;
 
-  // I voti e le riaperture si scrivono sulla SCHEDA pubblica (è l'unico
-  // documento che chi vota può aprire), quindi chi legge il feedback dal main
-  // se li ritrova riuniti: la dashboard e l'archiviazione a punteggio
-  // continuano a leggere `fb.votes` come hanno sempre fatto. I voti storici,
-  // rimasti sul documento, non si perdono: la scheda vince solo dove ha
-  // qualcosa da dire.
+  // Voti e riaperture stanno sulla SCHEDA pubblica, l'unico documento che chi vota può aprire:
+  // si riuniscono qui, e la scheda vince solo dove ha qualcosa da dire.
   let cardsCache = { at: 0, rows: [] };
   const CARDS_TTL_MS = 30_000;
 
@@ -901,11 +940,8 @@ module.exports = function register(on, ctx) {
     const FB = FEEDBACK();
     if (!FB) return [];
     if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
-    // TUTTE le schede, paginate. Una finestra sui 500 più recenti per data
-    // d'invio qui vuol dire che le schede più vecchie non le può togliere più
-    // nessuno: un fix vecchio che torna in lavorazione resterebbe in bacheca
-    // come risolto, votabile e riapribile a pagamento — cioè il doppione che il
-    // blocco delle riaperture doveva impedire.
+    // TUTTE le schede, paginate: una finestra sui più recenti lascerebbe in bacheca come risolti
+    // i fix vecchi tornati in lavorazione, votabili e riapribili a pagamento.
     const rows = FB.listAllPublic
       ? await FB.listAllPublic({ timeoutMs: 20000, fresh })
       : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
@@ -917,9 +953,12 @@ module.exports = function register(on, ctx) {
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
   const SCHEDE_MIRATE_MAX = 100;
 
-  async function mergeCardFields(rows, { mirate = false } = {}) {
+  // `campi`: quelli che la pagina ha chiesto. Riceve quelli (#1335): niente voti non chiesti, né schede lette per loro.
+  async function mergeCardFields(rows, { mirate = false, campi = null } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    const daUnire = Array.isArray(campi) ? V.USER_FIELDS.filter((f) => campi.includes(f)) : V.USER_FIELDS;
+    if (!daUnire.length) return rows;
     let cards;
     const FB = FEEDBACK();
     const ids = rows.map((r) => r && r._id).filter(Boolean);
@@ -930,6 +969,11 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
+    }
+    if (daUnire.length < V.USER_FIELDS.length) {
+      cards = (Array.isArray(cards) ? cards : []).map((c) => Object.fromEntries(
+        Object.entries(c || {}).filter(([k]) => k === '_id' || daUnire.includes(k)),
+      ));
     }
     return V.mergeUserFields(rows, cards);
   }
@@ -946,7 +990,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true, campi: soloCampi }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
@@ -967,7 +1011,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
       if (w && complete) w.allineato(startedAt, rows, readTime);
-      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
+      return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -985,7 +1029,7 @@ module.exports = function register(on, ctx) {
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
     scheduleViewSync({ rows });
-    return { ok: true, rows: await mergeCardFields(rows) };
+    return { ok: true, rows: await mergeCardFields(rows, { campi: fields }) };
   }));
 
   // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────
@@ -1179,9 +1223,8 @@ module.exports = function register(on, ctx) {
     if (!FB || !V || !key || !idToken) return;
     try {
       const priv = await getPrivateKey();
-      // Senza chiave lo status è un blob: pubblicare sarebbe alla cieca e
-      // togliere cancellerebbe una scheda buona. Stessa scelta del giro
-      // generale: fermarsi e dirlo.
+      // Senza chiave lo status è un blob: pubblicare sarebbe alla cieca e togliere cancellerebbe
+      // una scheda buona. Ci si ferma e lo si dice.
       if (!priv) {
         console.warn('[feedback] scheda singola saltata: chiave privata non configurata');
         return;
@@ -1194,9 +1237,8 @@ module.exports = function register(on, ctx) {
       if (!card) {
         await FB.unpublishPublicCard(key, { idToken });
       } else {
-        // I voti e le riaperture stanno sulla scheda: la maschera di
-        // publishPublicCard non li tocca, ma quelli rimasti sul documento vanno
-        // portati dentro come fa il giro generale.
+        // Voti e riaperture stanno sulla scheda: la maschera non li tocca, ma quelli rimasti sul
+        // documento vanno portati dentro come fa il giro generale.
         let before = null;
         try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
         const carry = V.carryUserFields(fb, before);
@@ -1281,18 +1323,12 @@ module.exports = function register(on, ctx) {
     return { rows, aggiunti, schedeCoperte, chiusiLetti };
   }
 
-  /**
-   * Lo stato di questo feedback si è potuto leggere davvero? Un campo cifrato
-   * che non si apre torna come segnaposto, e uno stato illeggibile non è
-   * «questo feedback non merita una scheda»: pubblicare o togliere basandosi
-   * su quello vorrebbe dire far sparire dalla bacheca un fix buono. Sulle
-   * segnalazioni pescate fuori pagina, che prima questo giro non guardava
-   * nemmeno, in quel caso si sta fermi.
-   */
+  // Uno stato illeggibile non è «niente scheda»: pubblicare o togliere su quello farebbe
+  // sparire dalla bacheca un fix buono, quindi sulle segnalazioni fuori pagina si sta fermi.
   function statusLeggibile(fb) {
     const MR = globalThis.SN_MANAGE_REVIEW;
     const v = fb && fb.status;
-    if (!v) return true; // uno stato assente è il vecchio «da lavorare»: non è illeggibile
+    if (!v) return true; // stato assente = «da lavorare»: non è illeggibile
     if (MR && typeof MR.valueUnreadable === 'function') return !MR.valueUnreadable(v);
     return !String(v).startsWith('FENC');
   }
@@ -1317,8 +1353,6 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, skipped: true };
       const priv = await getPrivateKey();
       if (!priv) {
-        // Senza chiave ogni status è un blob: pubblicare sarebbe alla cieca e
-        // TOGLIERE cancellerebbe la bacheca. Si sta fermi e lo si dice.
         console.warn('[feedback] vista pubblica: chiave privata non configurata, sincronizzazione saltata');
         return { ok: false, skipped: true };
       }
@@ -1366,29 +1400,14 @@ module.exports = function register(on, ctx) {
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
-      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
-      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
-      // feedback nuovo arriverebbe senza numero.
-      //
-      // Il massimo si CHIEDE al server con una query sua (una lettura), non si
-      // ricava dai feedback caricati: quelli sono i 500 più recenti per data, e
-      // il numero più alto potrebbe stare fuori. Con il massimo vero,
-      // `allowLower` è sempre lecito, ed è l'unico modo perché la cura funzioni:
-      // chiunque può far avanzare il contatore di uno, e prima si abbassava solo
-      // quando il caricamento non toccava il tetto, cioè mai più.
+      // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
+      // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
+      const provato = FB.maxSeqProvato(raw);
       let piuAlto = null;
       try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
       catch (e) { console.warn('[feedback] numero più alto non letto:', e?.message || e); }
-      if (piuAlto === null) {
-        // Non lo sappiamo: al massimo alziamo il contatore fino a quello che
-        // abbiamo visto, mai abbassarlo alla cieca.
-        const visto = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
-        if (visto > 0) {
-          try { await FB.ensureSeqCounter(visto, { idToken }); }
-          catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
-        }
-      } else if (piuAlto > 0) {
-        try { await FB.ensureSeqCounter(piuAlto, { idToken, allowLower: true }); }
+      if (provato > 0 || piuAlto > 0) {
+        try { await FB.ensureSeqCounter(provato, { idToken, pavimento: piuAlto }); }
         catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
       }
 
@@ -1398,9 +1417,8 @@ module.exports = function register(on, ctx) {
       // per sempre proprio quelle che non ha guardato.
       if (chiusiLetti) await segnaSincroRiuscita();
       if (plan.upsert.length || plan.remove.length) {
-        cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
-        // E anche la memoria breve della lettura completa: le schede sono
-        // appena cambiate, quindi quella di mezzo minuto fa non vale più.
+        cardsCache = { at: 0, rows: [] };
+        // Le schede sono appena cambiate: anche la cache della lettura completa non vale più.
         if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
         console.log('[feedback] vista pubblica aggiornata:',
           `${plan.upsert.length} schede scritte, ${plan.remove.length} tolte`);
@@ -1414,14 +1432,8 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  // Una pagina di gestione GIÀ APERTA deve accorgersi di una richiesta nuova.
-  // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
-  // diceva "approvala da Filo" e sulla pagina aperta non compariva niente.
-  //
-  // Chi avvisa è il main, non la pagina, e per due motivi: la lettura è UNA
-  // sola anche con dieci schede aperte, e il cancello del proprietario resta in
-  // un posto solo. Il campanello e il perché di questa forma stanno in
-  // services/mergeApprovalSignal.js.
+  // Una pagina di gestione già aperta deve accorgersi di una richiesta nuova; ad avvisare è il
+  // main: una lettura sola con dieci schede. Vedi services/mergeApprovalSignal.js.
   try {
     require('../mergeApprovalSignal').start({
       isAdmin: () => auth.isAdmin(),
@@ -1433,14 +1445,28 @@ module.exports = function register(on, ctx) {
     console.warn('[Filo] campanello fusioni non agganciato:', e?.message || e);
   }
 
+  // I giudici fermi (#906): barra una volta per episodio e carta nella home, solo per l'owner. Vedi services/giudiciFermi.js.
+  try {
+    giudiciFermi = require('../giudiciFermi').start({
+      isAdmin: () => auth.isAdmin(),
+      leggi: async () => Defaults.getGiudiciFermi(await auth.getIdToken()),
+      mem: () => globalThis.SN_FILO_MEMORY,
+      storage: () => globalThis.SN_STORAGE,
+      avvisa: (testo, opts) => avvisoQuandoPronta(testo, opts),
+      ritira: (chiave) => ritiraAvviso(chiave),
+      broadcast: () => ctx.broadcastLiveUpdate(),
+    });
+    // Le prove lo rileggono senza aspettare l'orologio.
+    globalThis.SN_GIUDICI_FERMI = giudiciFermi;
+  } catch (e) {
+    console.warn('[Filo] giudici fermi non agganciati:', e?.message || e);
+  }
+
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
-    // Alla pagina arriva TUTTO quello che il server dice dell'esito, non solo
-    // esito e sha: il riallineamento fatto dal server (`realigned`), la
-    // richiesta nuova aperta per la sola differenza (`newRequest`, `newBlocks`)
-    // e il motivo di un tentativo fallito (`realignReason`). Senza, la pagina
-    // diceva «la richiesta decade, rilancia» a un riallineamento riuscito.
+    // Alla pagina arriva tutto l'esito, non solo esito e sha: senza riallineamento e motivo
+    // diceva «la richiesta decade» a un riallineamento riuscito.
     const out = { ok: true, result: (r && r.result) || '', sha: (r && r.sha) || '', headSha: (r && r.headSha) || '' };
     if (r && r.realigned && typeof r.realigned === 'object') {
       out.realigned = {
@@ -1465,19 +1491,25 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  const ESITI_SALTA = ['attesa_unit', 'riverifica', 'ricontrollo', 'fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner', 'mosso', 'senza_controllo'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
-    const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
+    // Il commit che l'owner ha visto bocciato: il server salta solo quello (#1502).
+    const sha = String(msg?.sha || '').trim();
+    if (sha && !/^[0-9a-f]{40}$/.test(sha)) return { ok: false, error: 'Il commit da saltare non è uno sha valido.' };
+    const r = await callSecurityFunction('ownerSkipSecaudit', sha ? { feedbackId, sha } : { feedbackId });
     if (!r || r.ok === false) {
-      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+      // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
+      return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };
     }
-    // Un esito che questo client non conosce non si traduce in «fatto»: passa
-    // com'è, e la pagina lo scrive invece di inventarsi un successo.
+    // Un esito che il client non conosce passa com'è: non si traduce in un successo inventato.
     const esito = String(r.esito || r.result || '').trim();
     const out = { ok: true, esito: ESITI_SALTA.includes(esito) ? esito : esito };
     if (r.requestId) out.requestId = String(r.requestId);
+    // In attesa o già decisa (#486): la scheda non annuncia un via libera che non c'è.
+    if (r.requestState) out.requestState = String(r.requestState).slice(0, 20);
+    if (r.requestOutcome) out.requestOutcome = String(r.requestOutcome).slice(0, 40);
     if (r.sha) out.sha = String(r.sha);
     if (r.error) out.error = String(r.error);
     return out;
@@ -1515,12 +1547,12 @@ module.exports = function register(on, ctx) {
 
   // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
   // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
-  async function chiamaDomande(data) {
+  async function chiamaDomande(data, nonAncora) {
     let r;
     try {
       r = await callSecurityFunction('ownerDomande', data);
     } catch (e) {
-      return { ok: false, error: erroreDomande(e) };
+      return { ok: false, error: erroreDomande(e, nonAncora) };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
     return r;
@@ -1576,9 +1608,21 @@ module.exports = function register(on, ctx) {
       if (!id) return { ok: false, error: 'Manca la domanda.' };
       const r = await chiamaDomande({ op, id });
       if (!r.ok) return r;
-      return { ok: true, domanda: r.domanda || null };
+      // Riaprire una risposta disfa quello che ha applicato dove si può (§3.6): il resto lo dice il server, e si legge.
+      const resoconto = typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
+      return resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
     }));
   }
+
+  // «Segna fidata» su una domanda chiusa (#2078), `fidata: false` per toglierla: come per i feedback la scrive solo il server.
+  on(MSG.DOMANDA_FIDUCIA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda.' };
+    const r = await chiamaDomande({ op: 'fiducia', id, fidata: msg?.fidata !== false },
+      'Il server non sa ancora dare fiducia a una domanda: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato', domanda: r.domanda || null };
+  }));
 
   // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
   on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
@@ -1595,13 +1639,132 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
-    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+    return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
+  }));
+
+  // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
+  // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
+  async function chiamaCompiti(data, nonAncora) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerCompiti', data);
+    } catch (e) {
+      return { ok: false, error: erroreCompiti(e, nonAncora) };
+    }
+    if (nonAncora && r && r.ok === false && r.errore === 'op_sconosciuta') return { ok: false, error: nonAncora };
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
+    return r;
+  }
+  on(MSG.COMPITI_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
+    if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
+    // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
+    if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
+    const r = await chiamaCompiti(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      aperti: Array.isArray(r.aperti) ? r.aperti : [],
+      storico: Array.isArray(r.storico) ? r.storico : [],
+      // Oltre la pagina dello storico il server lo dice: la scheda non deve credere di vederli tutti.
+      altri: r.altri === true,
+      adesso: Number(r.adesso) || 0,
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
+    };
+  }));
+  on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
+    const v = globalThis.SN_COMPITI.validaNuovo(msg?.compito);
+    if (!v.ok) return { ok: false, error: v.testo };
+    const r = await chiamaCompiti({ op: 'crea', compito: v.compito });
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || '') };
+  }));
+  on(MSG.COMPITO_ANNULLA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!/^C-\d{1,9}$/.test(id)) return { ok: false, error: 'Manca il compito da annullare.' };
+    const r = await chiamaCompiti({ op: 'annulla', id });
+    if (!r.ok) return r;
+    return { ok: true, id };
+  }));
+
+  // I compiti ricorrenti (SPEC-DOMANDE.md §4.1): li scrive solo l'owner. Il main rifà i controlli della scheda
+  // (ricorrenti.js per i campi suoi, SN_COMPITI per le scelte); un ambito non ancora attivo vale: il ricorrente lo aspetta.
+  const NON_ANCORA_RICORRENTI = 'I compiti ricorrenti non sono ancora sul server: arrivano col prossimo aggiornamento del server.';
+  const idRicorrente = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return /^[A-Za-z0-9_.:-]{1,200}$/.test(s) ? s : '';
+  };
+  on(MSG.RICORRENTI_ELENCO, ownerOnly(async () => {
+    const r = await chiamaCompiti({ op: 'ricorrenti' }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      adesso: Number(r.adesso) || 0,
+      ricorrenti: Array.isArray(r.ricorrenti) ? r.ricorrenti : [],
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
+    };
+  }));
+  on(MSG.RICORRENTE_SALVA, ownerOnly(async (msg) => {
+    const raw = msg?.ricorrente;
+    const K = globalThis.SN_COMPITI;
+    const c = globalThis.SN_RICORRENTI.validaCampi(raw);
+    if (!c.ok) return { ok: false, error: K.frase(c.dettaglio) };
+    const s = K.validaScelte(raw, undefined, { spenti: true });
+    if (!s.ok) return { ok: false, error: s.testo };
+    const ricorrente = Object.assign({}, c.campi, s.scelte);
+    if (raw.id !== undefined && raw.id !== null && raw.id !== '') {
+      ricorrente.id = idRicorrente(raw.id);
+      if (!ricorrente.id) return { ok: false, error: 'Il ricorrente da salvare non ha un identificativo valido.' };
+    }
+    const r = await chiamaCompiti({ op: 'ricorrente_salva', ricorrente }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || ricorrente.id || '') };
+  }));
+  on(MSG.RICORRENTE_TOGLI, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da togliere.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_togli', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id };
+  }));
+  on(MSG.RICORRENTE_AVVIA, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da avviare.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_avvia', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id, compitoId: String(r.compitoId || '') };
+  }));
+  // Chi può aggiungere un ambito (sì a una domanda) deve poterlo togliere: gli iniziali e quelli in uso li rifiuta il server.
+  on(MSG.AMBITO_TOGLI, ownerOnly(async (msg) => {
+    const nome = typeof msg?.nome === 'string' ? msg.nome.trim() : '';
+    if (!/^[a-z][a-z_]{2,30}$/.test(nome)) return { ok: false, error: 'Manca l’ambito da togliere.' };
+    const r = await chiamaCompiti({ op: 'ambito_togli', nome }, 'Togliere un ambito non è ancora sul server: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, nome };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
     return { ok: true, result: 'discarded' };
+  }));
+
+  on(MSG.MERGE_APPROVAL_RIAPRI, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la pratica di cui chiedere la fusione.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId });
+    } catch (e) {
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Il server non ha riaperto la richiesta.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non ha riaperto la richiesta.' };
+    // Un esito sconosciuto passa com'è: la pagina lo scrive invece di inventarsi un successo.
+    const out = { ok: true, esito: String(r.esito || r.result || '') };
+    if (r.requestId) out.requestId = String(r.requestId);
+    return out;
   }));
 
   // All'editor servono anche la catena in uso negli slot spostati mai salvati e
@@ -1628,9 +1791,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Ri-valutazione dei feedback "non filtrati": la dashboard (che decifra i
-  // pipeline e quindi sa quali sono bianchi) passa la lista degli id; il backend
-  // ri-esegue SOLO i giudici mancanti di ciascuno. Owner-only.
+  // La dashboard sa quali feedback sono «non filtrati»: manda gli id e il backend ri-esegue
+  // solo i giudici mancanti.
   on(MSG.FEEDBACK_REEVALUATE, ownerOnly(async (msg) => {
     try {
       const feedbackIds = Array.isArray(msg.feedbackIds)
@@ -1648,11 +1810,10 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      // Slot + registro giudici + (eventuale) chiave OpenRouter dei giudici.
       const partial = Object.assign({}, msg.models || {});
       if (msg.judgeRegistry && typeof msg.judgeRegistry === 'object') partial.judgeRegistry = msg.judgeRegistry;
       if (typeof msg.openrouterKey === 'string') partial.openrouterKey = msg.openrouterKey;
-      // Timeout per giudice (ms): solo se passato (PATCH per-campo, non tocca il resto).
+      // Timeout per giudice: si scrive solo se passato, PATCH per-campo che non tocca il resto.
       if (msg.judgeTimeoutMs != null) partial.judgeTimeoutMs = msg.judgeTimeoutMs;
       const models = await perEditor(await SupportModels.update(partial, idToken));
       return { ok: true, models };

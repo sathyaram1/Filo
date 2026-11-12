@@ -1,47 +1,30 @@
-// Rilevamento + regole d'azione geo-block — estratto da tabs.js come livello
-// separato. (vedi src/main/services/geoBlock.js e proxy-per-tab-spec.md §4-§5.)
-// Qui rilevamento (livello 1 deterministico + livello 2 LLM) e regole d'azione
-// (livello decisionale, #151): retry via proxy, proposta inline, escalation.
-//
-// Questi metodi vengono installati sul prototype di TabManager (mixin): `this`
-// è l'istanza TabManager, quindi `this.tabs`, `this.setTabProxy(...)`,
-// `this._geoTextCheck(...)`, `this._readSettings(...)` funzionano identici a
-// quando vivevano inline in tabs.js. Le dipendenze module-scoped (ProxyTab,
-// GeoBlock, GeoBlockRules) erano già `require`ate in tabs.js: qui le ririchiamo
-// dagli stessi moduli services. Il classificatore LLM arriva dal globale
-// SN_GEO_CLASSIFY (caricato dal loader), come prima.
+// Rilevamento geo-block (livello 1 deterministico + livello 2 LLM) e regole d'azione (#151):
+// retry via proxy, proposta inline, escalation. Spec: proxy-per-tab-spec.md §4-§5.
+// Mixin sul prototype di TabManager: `this` è l'istanza, come quando stava in tabs.js.
 
 const ProxyTab = require('../services/proxyTab');
 const GeoBlock = require('../services/geoBlock');
 const GeoBlockRules = require('../services/geoBlockRules');
+const ContatoriHomePagina = require('../services/contatoriHomePagina');
 
 const geoBlockMethods = {
-  // ─── rilevamento geo-block (livello 1 deterministico) ────────────────────
-  // Qui SOLO rilevamento + segnale interno + azione (#151). Un solo segnale per
-  // navigazione: la prima fonte che matcha vince (status > redirect > testo).
+  // Qui solo rilevamento, segnale interno e azione (#151). Un segnale solo per navigazione:
+  // vince la prima fonte che matcha (status > redirect > testo).
 
   _geoBlockDetected(tab, url, source, detail) {
     if (tab.geoBlock && tab.geoBlock.url === url) return; // già segnalato
     let host = '';
     try { host = new URL(url).hostname; } catch (_) {}
     tab.geoBlock = { url, host, source, detail, at: Date.now() };
+    this._contaNavigazione((N) => N.geoRilevato(source));
     GeoBlock.emitDetected({ tabId: tab.id, url, host, source, detail, at: tab.geoBlock.at });
-    // Livello decisionale (regole d'azione, #151). Vive nello stesso TabManager
-    // che possiede il tab: lo chiamiamo diretto invece di passare per il registro
-    // onDetected (che resta per consumatori esterni). La logica PURA della
-    // matrice sta in geoBlockRules.js; qui solo la raccolta degli input reali e
-    // l'azione. Best-effort, mai bloccante.
+    // Il livello decisionale vive nello stesso TabManager che possiede il tab, quindi si chiama
+    // diretto; il registro onDetected resta per i consumatori esterni. Mai bloccante.
     Promise.resolve().then(() => this._geoActOnDetected(tab)).catch(() => {});
   },
 
-  // ─── regole d'azione su geo-block (livello decisionale, #151) ─────────────
-  // (proxy-per-tab-spec.md §5). Dato un geo-block rilevato, decide e agisce:
-  //   - retry silenzioso via datacenter (sito non flaggato, nessun login) → toast
-  //   - proposta inline (login attivo) — MAI retry silenzioso a sessione attiva
-  //   - niente (sito flaggato pericoloso/sospetto: il proxy non aggira la sicurezza)
-  //   - escalation datacenter→residenziale UNA volta se l'IP datacenter è bloccato
-  // L'escalation usa lo stato per-tab tab.geoRetry (per host): la ri-rilevazione
-  // del blocco dopo un retry significa che quell'IP è a sua volta bloccato.
+  // Dato un geo-block: retry silenzioso via datacenter, proposta inline se c'è un login
+  // attivo, niente se il sito è flaggato; escalation a residenziale UNA volta (spec §5).
   async _geoActOnDetected(tab) {
     if (!tab || !tab.geoBlock) return;
     const host = tab.geoBlock.host || '';
@@ -75,6 +58,7 @@ const geoBlockMethods = {
     } catch (_) {}
 
     const decision = GeoBlockRules.decideGeoAction({ flaggedDangerous, hasLoginCookies, proxyConfigured, stage });
+    this._contaNavigazione((N) => N.geoDecisione(decision.reason));
 
     // Paese di destinazione: ultima location usata, altrimenti default, altrimenti USA.
     const p = (settings && settings.proxy) || {};
@@ -96,7 +80,7 @@ const geoBlockMethods = {
     // proxy fallisce del tutto (es. tier non configurato), non c'è retry: si propone.
     const tier = decision.tier;
     let res = { ok: false };
-    try { res = await this.setTabProxy(tab.id, country, { tier }); } catch (_) { res = { ok: false }; }
+    try { res = await this.setTabProxy(tab.id, country, { tier, daSola: 'automazione' }); } catch (_) { res = { ok: false }; }
     if (res && res.ok) {
       // Informare, non chiedere (spec §5): toast discreto. La ri-rilevazione del
       // blocco dopo il reload proxato (se l'IP è bloccato) farà scattare l'escalation.
@@ -109,9 +93,8 @@ const geoBlockMethods = {
     }
   },
 
-  // Etichetta leggibile del paese ('us' → 'Stati Uniti'); fallback al codice
-  // maiuscolo per i paesi fuori dalla lista curata (il linguaggio naturale, #152,
-  // può chiederne altri).
+  // Etichetta leggibile del paese; per quelli fuori dalla lista curata il codice maiuscolo,
+  // perché il linguaggio naturale (#152) può chiederne altri.
   _geoCountryLabel(code) {
     const c = String(code || '').toLowerCase();
     const hit = (ProxyTab.LOCATIONS || []).find((l) => l.code === c);
@@ -120,17 +103,21 @@ const geoBlockMethods = {
 
   // Toast discreto nella shell ("Aperto da {paese}"): informa senza chiedere.
   _geoToast(text) {
-    try { this.win.webContents.send('shell:toast', { text }); } catch (_) {}
+    try { this.win.webContents.send('shell:toast', { text, opts: { tipo: 'aperta_da_paese' } }); } catch (_) {}
   },
 
-  // Proposta inline al content script del tab (login attivo, o retry esaurito):
-  // "Questo contenuto è bloccato in Italia. Lo apro da {paese}? In questa tab non
-  // sarai loggato." con i bottoni Apri/No.
+  // Proposta inline al content script (login attivo, o retry esaurito): l'avviso dice che in
+  // questa scheda non sarà loggato, perché il cookie jar è separato.
   _geoBroadcastPropose(tab, url, country, label) {
     const T = (globalThis.SN_MSG && globalThis.SN_MSG.MSG && globalThis.SN_MSG.MSG.GEO_PROPOSE) || 'geo_propose';
     try {
       tab.view.webContents.send('filo:broadcast', { type: T, url, country, countryLabel: label });
     } catch (_) {}
+    // I contatori (#1473): la risposta, o la pagina che se ne va senza (tabs.js); mai il sito né il paese.
+    if (!tab._proposte) tab._proposte = {};
+    ContatoriHomePagina.misura('propostaMostrata', tab._proposte, 'apri_da_altro_paese', {
+      chiave: url, incognito: !!(this.incognito || (this.win && this.win._filoIncognito)),
+    });
   },
 
   _geoState(tab) {
@@ -149,6 +136,7 @@ const geoBlockMethods = {
     this._geoState(tab);
     if (host) tab.geoDismissed.delete(host);
     tab.geoRetry = { host, stage: 'settled' }; // scelta presa: niente auto-escalation
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'accettata');
     return this.setTabProxy(tabId, country);
   },
 
@@ -162,12 +150,12 @@ const geoBlockMethods = {
     try { host = url ? new URL(url).hostname : (tab.geoBlock ? tab.geoBlock.host : ''); } catch (_) {}
     if (host) tab.geoDismissed.add(host);
     tab.geoRetry = { host, stage: 'settled' };
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'rifiutata');
     return { ok: true };
   },
 
-  // Campiona titolo + testo visibile della pagina e applica i pattern espliciti
-  // noti (geoBlock.js). Best-effort: mai bloccante, ricontrolla che la tab non
-  // abbia navigato altrove nel frattempo.
+  // Campiona titolo e testo visibile e applica i pattern noti. Best-effort, mai bloccante:
+  // ricontrolla che la scheda non abbia navigato altrove nel frattempo.
   _geoTextCheck(tab) {
     const wc = tab.view && tab.view.webContents;
     if (!wc || (wc.isDestroyed && wc.isDestroyed())) return;
@@ -214,6 +202,7 @@ const geoBlockMethods = {
     this.proxyAvailable()
       .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
+        this._contaNavigazione((N) => N.geoClasse(res));
         if (!res || res.skipped) return;
         if (!res.route || !res.route.proxy) return; // solo geo_block agisce
         const wc = tab.view && tab.view.webContents;
@@ -228,7 +217,6 @@ const geoBlockMethods = {
   },
 };
 
-// Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.
 function installGeoBlock(TabManager) {
   Object.assign(TabManager.prototype, geoBlockMethods);
 }

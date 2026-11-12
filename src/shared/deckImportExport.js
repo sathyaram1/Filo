@@ -1,36 +1,19 @@
-// Import/Export testuale del deck builder Commander (DECK-BUILDER-SPEC.md
-// §11, via "Importa…"/"Esporta…" nello switcher, §8.2): parser RIGIDO e
-// DETERMINISTICO (mai LLM — quello vive nel prompt della chat, §3), niente
-// rete, niente storage: solo testo ↔ struttura dati. Unit test:
-// tests/unit/deckImportExport.test.mjs.
-//
-// Formato: una carta per riga, "<quantità> <Nome>" (standard Moxfield/
-// Archidekt, es. "1 Sol Ring"), con un'intestazione opzionale "Commander"
-// prima della riga del comandante (per un export/reimport senza perdite).
-// Righe che non rispettano lo schema (senza quantità, illeggibili) sono
-// SEGNALATE come "sporche", mai indovinate — quello è il lavoro del parser
-// tollerante della chat (§3, parseAgentReply in scryfallQuery.js).
+// Import/Export testuale dei mazzi Commander: parser rigido e deterministico, mai LLM.
+// Formato «<quantità> <Nome>», una carta per riga, come Moxfield: l'export si reimporta.
+// Le righe fuori schema si SEGNALANO, mai indovinate: a indovinare è il parser della chat.
 
 (function (global) {
   'use strict';
 
-  // Intestazioni riconosciute (case-insensitive, ":" finale opzionale, conteggio
-  // finale "(N)" opzionale — formato Archidekt/TappedOut, es. "Commander (1)",
-  // "Deck (99)", "Maybeboard (2)"). Una riga vuota chiude le sezioni "commander"
-  // e "mazzo" riportando alla modalità "mazzo" di default (così un file senza
-  // intestazioni resta tutto mazzo), ma NON una sezione da saltare
-  // (Sideboard/Maybeboard): quella resta attiva finché non arriva una nuova
-  // intestazione esplicita, altrimenti una riga vuota dentro il maybeboard
-  // farebbe rientrare nel mazzo le carte successive.
+  // Intestazioni: case-insensitive, «:» finale e «(N)» in coda opzionali.
+  // Una riga vuota torna al mazzo, ma da una sezione saltata si esce con un'intestazione.
   const COMMANDER_HEADERS = ['commander', 'commanders'];
   const DECK_HEADERS = ['deck', 'mainboard', 'maindeck', 'main', 'library'];
   const SKIP_HEADERS = ['sideboard', 'maybeboard', 'considering', 'considerations'];
 
   const CARD_LINE_RE = /^(\d+)\s*[xX]?\s+(.+)$/;
 
-  // Ripulisce il nome da decorazioni comuni degli export (set/collector number
-  // fra parentesi o quadre, marcatore foil) SENZA toccare il nome vero — sono
-  // sempre in coda alla riga negli export standard.
+  // Le decorazioni degli export (set, numero, foil) stanno sempre in coda: si tolgono da lì.
   function cleanCardName(raw) {
     let s = String(raw || '').trim();
     s = s.replace(/\s*\*[fF]\*\s*$/, '');
@@ -39,16 +22,8 @@
     return s.trim();
   }
 
-  // Analizza un testo incollato (§11.1): { commanderName, entries, dirtyLines }.
-  //   commanderName — nome grezzo sotto l'intestazione "Commander" (solo la
-  //     PRIMA riga: la carta commander è un parametro singolo del mazzo,
-  //     §13.1); eventuali righe successive nella stessa sezione diventano
-  //     entries normali (non si perdono, es. commander in coppia/partner).
-  //   entries        — [{ name, qty }] nell'ordine di apparizione.
-  //   dirtyLines     — righe non vuote/non intestazione che NON rispettano lo
-  //     schema "<qty> <nome>", O con quantità <= 0 (es. "0 Sol Ring", che
-  //     significa "non includere questa carta"): segnalate all'utente, mai
-  //     importate a caso né normalizzate silenziosamente a 1 copia.
+  // commanderName è solo la PRIMA riga sotto «Commander»: il resto diventa entries normali.
+  // dirtyLines: righe fuori schema o con quantità <= 0. Segnalate, mai importate a caso.
   function parseDecklist(text) {
     const lines = String(text || '').split(/\r?\n/);
     let mode = 'deck'; // 'deck' | 'commander' | 'skip'
@@ -61,9 +36,7 @@
       if (!line) { if (mode !== 'skip') mode = 'deck'; continue; }
       if (/^(#|\/\/)/.test(line)) continue;
 
-      // Normalizza la candidata-intestazione: via il ":" finale e l'eventuale
-      // conteggio "(N)" in coda (Archidekt/TappedOut). Le carte vere non
-      // rischiano nulla: il confronto resta sull'elenco chiuso di intestazioni.
+      // Il confronto resta sull'elenco chiuso di intestazioni: le carte vere non rischiano.
       const key = line.toLowerCase()
         .replace(/:\s*$/, '')
         .replace(/\s*\(\d+\)\s*$/, '')
@@ -76,9 +49,8 @@
 
       const m = CARD_LINE_RE.exec(line);
       if (!m) { dirtyLines.push(raw); continue; }
-      // NB: 0 è falsy — un vecchio `parseInt || 1` avrebbe trasformato
-      // "0 Sol Ring" in 1 copia. Una quantità 0 (o negativa/illeggibile)
-      // vuol dire "non includere": va segnalata come riga non valida.
+      // 0 è falsy: un `parseInt || 1` trasformerebbe «0 Sol Ring» in una copia.
+      // Quantità 0, negativa o illeggibile vuol dire «non includere»: riga non valida.
       const qty = parseInt(m[1], 10);
       if (!Number.isFinite(qty) || qty <= 0) { dirtyLines.push(raw); continue; }
       const name = cleanCardName(m[2]);
@@ -91,10 +63,7 @@
     return { commanderName, entries, dirtyLines };
   }
 
-  // Genera il testo nello STESSO formato (§11.1: "export nello stesso
-  // formato"). `entries` = [{ name, qty }] già risolte (nomi reali delle
-  // carte, non scryfall_id): la risoluzione id→nome è compito del chiamante
-  // (main process, ha la cache Scryfall).
+  // `entries` arriva già coi nomi reali: la risoluzione id→nome è del chiamante.
   function formatDecklist({ commanderName, entries } = {}) {
     const lines = [];
     if (commanderName) {

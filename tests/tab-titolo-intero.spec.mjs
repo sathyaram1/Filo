@@ -30,6 +30,9 @@ async function verdettoTitoli(shell) {
   });
 }
 
+// Le prove sulla divisione della fila guardano titoli più larghi del massimo di serie (#1493): lo alzano fuori portata.
+const senzaMassimo = (shell) => shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { themeTokens: { 'tab.larghezza': '1000px' } } }));
+
 const fondoAttiva = (shell) => shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
 const cimaPagina = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
@@ -75,6 +78,7 @@ async function rettangolo(shell, testo) {
 // Le schede si dividono la fila a parti uguali: il titolo più lungo che si accorcia le stringerebbe tutte, e quella
 // sotto il puntatore gli scapperebbe da sotto. Si adattano quando il puntatore lascia la fila.
 test('#429 — un titolo che cambia non sposta la scheda sotto il puntatore, poi la fila si adatta', async ({ app, shell, openTab, testServer }) => {
+  await senzaMassimo(shell);
   await openTab(testServer.html('<title>Gestione</title><body>uno</body>'));
   const url = testServer.html('<title>Una pagina col titolo più lungo di tutti</title><body>due</body>');
   await openTab(url);
@@ -128,7 +132,8 @@ test('#429 — con la fila piena il nome tagliato arriva al bordo, e il mouse no
   await expect.poll(async () => (await dietro()).every((s) => s.posto > 8), { timeout: 10_000 }).toBe(true);
 });
 
-test('#429 — un titolo lungo si legge intero finché la fila ha posto, e l\'attiva resta più larga', async ({ shell, openTab, testServer }) => {
+test('#429 — col massimo lontano un titolo lungo si legge intero finché la fila ha posto, e l\'attiva resta più larga', async ({ shell, openTab, testServer }) => {
+  await senzaMassimo(shell);
   const lungo = 'Previsioni meteo per Milano e tutta la Lombardia aggiornate ogni ora';
   await openTab(testServer.html(`<title>${lungo}</title><body>x</body>`));
   await openTab('filo://manage/manage.html');
@@ -191,6 +196,7 @@ test('#429 — con la fila piena la scheda attiva non taglia il suo nome per un 
 
 // L'attiva si stacca dalle altre solo con lo spazio che avanza: un vuoto suo non taglia il nome della vicina.
 test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato', async ({ app, shell, openTab, testServer }) => {
+  await senzaMassimo(shell);
   await openTab(testServer.html('<title>Meteo Italia previsioni del tempo</title><body>x</body>'));
   await openTab(testServer.html('<title>Previsioni meteo per Milano e tutta la Lombardia aggiornate ogni ora con radar</title><body>x</body>'));
   await openTab('filo://manage/manage.html');

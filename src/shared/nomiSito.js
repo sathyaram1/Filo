@@ -1,5 +1,5 @@
-// Nomi dei siti scritti dall'utente (#590): quando un dominio è valido per una lista, e come
-// si mostra un nome internazionale («xn--mnchen-3ya.de» → «münchen.de»). Logica pura.
+// Nomi dei siti scritti dall'utente (#590): come si riduce quello che incolla, quando un dominio è valido per
+// una lista, e come si mostra un nome internazionale («xn--mnchen-3ya.de» → «münchen.de»). Logica pura.
 // Regole: tests/unit/nomiSito.test.mjs.
 
 (function (global) {
@@ -87,7 +87,99 @@
     } catch (_) { return ''; }
   }
 
-  const api = { valido, leggibile, sitoDi };
+  // Quello che l'utente scrive o incolla al posto di un sito («https://www.Docs.Google.com/x», «*.sito.it», «"sito.it",»)
+  // ridotto al nome con cui il sito si confronta («docs.google.com»); '' se non è un sito. Una sola per tutti gli elenchi (#843).
+  function daScritto(raw) {
+    let s = String(raw == null ? '' : raw).trim().toLowerCase()
+      .replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
+    if (!s) return '';
+    // URL scrive un nome accentato (münchen.de) nella forma ASCII con cui il sito si confronta.
+    try {
+      s = new URL(s.includes('://') ? s : `http://${s}`).hostname;
+    } catch (_) {
+      if (s.includes('://')) return '';
+      s = s.split('/')[0].split('?')[0].split(':')[0];
+    }
+    s = s.replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
+    return valido(s) ? s : '';
+  }
+
+  // Una riga coi siti incollati di fila («a.it, b.com», «a.it b.com»): un pezzo per sito, e quello che sta fra due siti
+  // in un pezzo solo com'era scritto, perché l'avviso lo ridica intero («studio rossi», non «studio» e «rossi»).
+  // Un indirizzo con virgole nei parametri, solo sulla riga, resta uno; con un altro sito accanto
+  // («https://mail.google.com/x, bbc.co.uk») si divide, o il secondo sparirebbe. Le parole di `salta` (le «e» della
+  // chat) separano due pezzi e non ne fanno parte.
+  function pezziDi(riga, salta) {
+    const intera = String(riga == null ? '' : riga).trim();
+    if (!intera) return [];
+    const out = [];
+    let siti = 0;
+    let da = -1;
+    let a = -1;
+    const chiudi = () => { if (da >= 0) out.push(intera.slice(da, a)); da = -1; };
+    for (const m of intera.matchAll(/[^\s,;]+/g)) {
+      if (daScritto(m[0])) { chiudi(); out.push(m[0]); siti++; continue; }
+      if (salta && salta.has(m[0].toLowerCase())) { chiudi(); continue; }
+      if (da < 0) da = m.index;
+      a = m.index + m[0].length;
+    }
+    chiudi();
+    return siti <= 1 && daScritto(intera) ? [intera] : out;
+  }
+
+  // Un elenco scritto a righe: i siti validi (ridotti, senza doppioni) e le righe scartate così com'erano, per dirle;
+  // `scartate` le tiene col posto (quanti siti validi le precedevano), per ridarle dove l'utente le aveva scritte.
+  // `riduci`, se c'è, dà a ogni sito la voce che l'elenco salva ('' la scarta): così fa la casella dei fidati.
+  function elencoDaTesto(raw, riduci) {
+    const valid = [];
+    const invalid = [];
+    const scartate = [];
+    for (const line of String(raw == null ? '' : raw).split('\n')) {
+      for (const riga of pezziDi(line)) {
+        const scritto = daScritto(riga);
+        const sito = scritto && typeof riduci === 'function' ? riduci(scritto) : scritto;
+        if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
+        if (!valid.includes(sito)) valid.push(sito);
+      }
+    }
+    return { valid, invalid, scartate };
+  }
+
+  // Il contrario: i siti come li legge l'utente, una riga ciascuno, con le righe scartate al loro posto.
+  function testoDaElenco(validi, scartate) {
+    const v = (Array.isArray(validi) ? validi : []).filter((r) => typeof r === 'string' && r.trim());
+    const s = (Array.isArray(scartate) ? scartate : [])
+      .map((x) => (typeof x === 'string' ? { riga: x, dopo: v.length } : x))
+      .filter((x) => x && typeof x.riga === 'string' && x.riga.trim());
+    const posto = (x) => Math.max(0, Math.min(v.length, Math.floor(Number(x.dopo)) || 0));
+    const out = [];
+    for (let i = 0; i <= v.length; i++) {
+      for (const x of s) if (posto(x) === i) out.push(x.riga);
+      if (i < v.length) out.push(leggibile(v[i]));
+    }
+    return out.join('\n');
+  }
+
+  // Le voci di un elenco di siti salvato prima che lo si riducesse (#843): ognuna al suo nome, senza doppioni;
+  // quella che non è un sito resta com'è, perché il confronto per nome intero la trova ancora.
+  function ripulisciElenco(elenco) {
+    if (!Array.isArray(elenco)) return elenco;
+    const out = [];
+    for (const x of elenco) {
+      if (typeof x !== 'string' || !x.trim()) continue;
+      const sito = daScritto(x) || x.trim().toLowerCase();
+      if (!out.includes(sito)) out.push(sito);
+    }
+    return out;
+  }
+
+  // La voce dell'elenco copre il sito e i suoi sottodomini: lo stesso confronto del content script.
+  function copre(voce, host) {
+    const h = String(host || '').toLowerCase().replace(/\.+$/, '');
+    return typeof voce === 'string' && !!voce && !!h && (h === voce || h.endsWith(`.${voce}`));
+  }
+
+  const api = { valido, leggibile, sitoDi, daScritto, pezziDi, elencoDaTesto, testoDaElenco, ripulisciElenco, copre };
   global.SN_NOMI_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

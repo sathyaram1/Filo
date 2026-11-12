@@ -2,6 +2,7 @@
 // finti. Il classificatore legge ogni feedback, le richieste partono insieme, i risultati arrivano ordinati per
 // probabilità; se il classificatore non risponde, li ordina il modello della ricerca e la pagina lo dice.
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -314,7 +315,7 @@ test('il classificatore si sceglie in Modelli di supporto e la scelta si salva',
   await preparaOwner(app, { supportDoc: { judge1: 'flash' } });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.filo && window.__mgTest);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 8000 });
   const slot = page.locator('.mg-sm-slot[data-slot="manageSearchClassifier"]');
   await expect(slot.locator('label')).toHaveText('Classificatore della ricerca');

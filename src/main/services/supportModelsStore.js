@@ -43,7 +43,6 @@ const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per desig
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 const SUPPORT_MODELS_DOC = 'config/supportModels';
-// Doc separato per la chiave (segreta) dei giudici. Regole: solo owner.
 const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 
 // Slot validi. Stabile: i backend filo-security li leggono per nome.
@@ -56,10 +55,8 @@ const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judge
 // prima; una stringa vuota invece è una scelta (nessun modello).
 const SLOTS_SPOSTATI = ['manageSearch', 'manageSearchClassifier'];
 
-// Timeout per giudice, salvato in MILLISECONDI nel campo `judgeTimeoutMs` dello
-// stesso doc (lo legge il backend dei giudici). I bound vivono nelle costanti
-// condivise (in secondi); qui clampiamo in ms. Fallback letterali se le costanti
-// non sono caricate su globalThis (robustezza nel main process).
+// I bound del timeout stanno nelle costanti condivise, in SECONDI, mentre il campo salvato
+// è in millisecondi; i letterali sono il ripiego se le costanti non sono su globalThis.
 function timeoutBoundsMs() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
   const s = (v, d) => (Number.isFinite(v) ? v : d) * 1000;
@@ -72,7 +69,6 @@ function clampTimeoutMs(n) {
   return Math.min(max, Math.max(min, v));
 }
 
-// ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
@@ -243,10 +239,8 @@ async function get() {
   return clona(out);
 }
 
-// Scrive (PATCH per-campo) il doc config/supportModels. Richiede ID token admin.
-// Accetta gli slot in SLOTS + `judgeRegistry` (mappa). La chiave OpenRouter dei
-// giudici (`openrouterKey`, segreta) va su un doc separato; si scrive solo se
-// passata e non vuota (vuoto = "non toccare").
+// PATCH per-campo: un valore vuoto vuol dire «non toccare», non «cancella».
+// La chiave dei giudici va sul doc separato.
 async function update(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare i modelli di supporto.');
   partial = partial || {};
@@ -262,7 +256,6 @@ async function update(partial, idToken) {
     fields.judgeRegistry = toFsValue(sanitizeRegistry(partial.judgeRegistry));
     mask.push('judgeRegistry');
   }
-  // Timeout per giudice (ms): si scrive solo se passato un numero valido, clampato.
   if (partial.judgeTimeoutMs != null && Number.isFinite(Number(partial.judgeTimeoutMs))) {
     const ms = clampTimeoutMs(partial.judgeTimeoutMs);
     if (ms != null) {
@@ -272,7 +265,6 @@ async function update(partial, idToken) {
   }
   if (mask.length) await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
 
-  // Chiave giudici (doc separato): scrivi solo se digitata.
   if (typeof partial.openrouterKey === 'string' && partial.openrouterKey.trim()) {
     await patchDoc(
       JUDGE_SECRETS_DOC,
@@ -316,9 +308,8 @@ function sanitize(doc) {
   return out;
 }
 
-// Tiene solo le voci valide del registro giudici: nickname non vuoto →
-// { provider, model } con provider OpenRouter (il backend giudici è OR-only) e
-// model non vuoto. `label` opzionale conservata.
+// Solo voci valide: il backend giudici è OpenRouter-only e il model non può essere vuoto;
+// `label` è opzionale e si conserva.
 function sanitizeRegistry(reg) {
   const out = {};
   if (!reg || typeof reg !== 'object') return out;

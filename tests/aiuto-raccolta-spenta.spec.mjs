@@ -8,6 +8,7 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SITO = 'negozio-felice.it';
@@ -79,8 +80,7 @@ async function apriSito(openTab, testServer) {
   return { page, url: u.href };
 }
 
-// Alt+H come lo preme l'utente: sulle pagine web la sidebar vive nel mondo
-// isolato dei content script, e da lì non la raggiunge nessun evaluate.
+// Alt+H come lo preme l'utente: sulle pagine web l'Aiuto nasce nello strato sopra la scheda (#1509.3).
 function apriAiuto(app) {
   return app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
@@ -109,20 +109,21 @@ test('una sessione dell’Aiuto finita con un passo eseguito non chiede «Ha fun
   await spiaRaccolta(app);
   const { page } = await apriSito(openTab, testServer);
   await apriAiuto(app);
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-  await page.fill('.sn-sidebar-input textarea', DOMANDA);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await paginaDelloStrato(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await aiuto.fill('.sn-sidebar-input textarea', DOMANDA);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 
   // il passo c'è stato davvero: la sezione si è aperta e la chat lo dice
   await expect(page.locator('#avanzate')).toHaveAttribute('open', '', { timeout: 15000 });
-  await expect(page.locator('.sn-sidebar-log').last()).toContainText('sezione aperta');
-  await expect(page.locator('.sn-sidebar-msg-assistant').filter({ hasText: 'Eccole, le ho aperte.' })).toHaveCount(1);
+  await expect(aiuto.locator('.sn-sidebar-log').last()).toContainText('sezione aperta');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').filter({ hasText: 'Eccole, le ho aperte.' })).toHaveCount(1);
 
   // la sessione è finita e la porta ha risposto: a raccolta spenta, no
   await expect.poll(() => app.evaluate(() => globalThis.__porta.length), { timeout: 10000 }).toBeGreaterThan(0);
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-sidebar-feedback')).toHaveCount(0);
-  await expect(page.getByText('Ha funzionato?')).toHaveCount(0);
+  await expect(aiuto.locator('.sn-sidebar-feedback')).toHaveCount(0);
+  await expect(aiuto.getByText('Ha funzionato?')).toHaveCount(0);
   const porta = await app.evaluate(() => globalThis.__porta[0]);
   expect(porta.ok).toBe(false);
   expect(porta.reason).toMatch(/spenta/);
@@ -135,7 +136,7 @@ test('una sessione dell’Aiuto finita con un passo eseguito non chiede «Ha fun
   const agente = chiamate.filter((c) => !c.pulizia).map((c) => c.testo);
   expect(agente.some((t) => t.includes('<<<PERCORSI_CONDIVISI>>>') && t.includes(INTENTO_ALTRUI))).toBe(true);
 
-  await page.screenshot({ path: 'tests/.shots/897-aiuto-senza-domanda.png' });
+  await aiuto.screenshot({ path: 'tests/.shots/897-aiuto-senza-domanda.png' });
 });
 
 test('un save_path arrivato comunque non paga nessun modello e non mette niente in coda', async ({ app, openTab, testServer }) => {

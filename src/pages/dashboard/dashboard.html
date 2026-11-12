@@ -10,40 +10,55 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/aestheticRefiner.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/immaginiChat.js"></script>
+  <script src="filo://shared/schedeInChat.js"></script>
+  <script src="filo://shared/schedaTrascinata.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/urlNav.js"></script>
   <script src="filo://shared/virgoletteShell.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/pannelliApp.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/calcMarkers.js"></script>
   <script src="filo://shared/timeFormat.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/azioniMessaggio.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/nomiFile.js"></script>
   <script src="filo://shared/rinominaUi.js"></script>
   <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/wallet.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
+  <script src="filo://shared/creditiAvvisoUi.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
+  <script src="filo://shared/tabTriage.js"></script>
   <script src="filo://shared/filoApp.js"></script>
+  <script src="filo://shared/rispostaA.js"></script>
+  <script src="filo://shared/restanoAperte.js"></script>
+  <script src="filo://shared/filoCoda.js"></script>
   <script src="filo://shared/carteHome.js"></script>
+  <script src="filo://shared/scaricamentiAvanzamento.js"></script>
   <script src="filo://shared/sistema.js"></script>
   <!-- Il tasto microfono della chat: lo collega dashboard.js, prima che arrivino i content script. -->
   <script src="filo://shared/dictationSegmenter.js"></script>
   <script src="filo://shared/ascolto.js"></script>
   <script src="filo://shared/voceChat.js"></script>
+  <script src="filo://shared/esitoAzione.js"></script>
+  <script src="filo://shared/righeAttivita.js"></script>
+  <script src="filo://shared/contatoriHomePagina.js"></script>
 </head>
 <body data-state="home">
-  <!-- I controlli del browser stanno dentro la home, non in una barra in alto: ogni icona aziona il comando
-     reale della shell via MSG.SHELL_ACTION. -->
-  <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
+    <!-- I controlli del browser stanno dentro la home, in cima alla sola colonna destra (#1491): ogni icona aziona
+         il comando reale della shell via MSG.SHELL_ACTION. Primi nel DOM per restare primi col Tab. -->
+    <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
 
     <!-- A sinistra quello che accade (Filo lo spinge), a destra quello che l'utente tiene: la differenza è di tempo.
          Le carte le disegna dashboard-carte.js. -->
@@ -52,17 +67,16 @@
     </aside>
 
     <section class="dash-center" id="center">
-      <div class="dash-home" id="homeView">
-        <!-- Il congedo in chat dura quanto ci mette la home ad arrivare: senza questa riga, chi non fa in tempo a
-           leggerlo non sa perché Filo ha smesso di presentarsi né che si può rifare. -->
-        <div class="dash-onb-notice" id="onbNotice" hidden></div>
-        <p class="dash-home-msg" id="homeMessage">…</p>
-        <!-- Le conversazioni avute nelle altre app dopo l'ultima qui: righe ripiegate (dashboard-righe.js). -->
-        <div class="dash-righe-app" id="righeApp" hidden></div>
-      </div>
-
-      <div class="dash-thread" id="threadView" hidden>
+      <!-- Cercare nel filo senza passare dalla chat (#869): parole nei messaggi e nelle pagine (dashboard-cerca.js). -->
+      <div class="dash-cerca" id="cercaFilo"></div>
+      <!-- Il centro è la coda del filo (#869): gli ultimi scambi, le azioni, le pagine ripiegate (dashboard-coda.js). -->
+      <div class="dash-thread" id="threadView">
         <div class="dash-bubbles" id="bubbles" role="log" aria-live="polite"></div>
+        <!-- Il congedo dell'accoglienza dura poco: senza questa riga, chi non fa in tempo a leggerlo non sa che si può
+             rifare. Sotto, perché Filo non può rispondere e la strada ai Crediti. -->
+        <div class="dash-onb-notice" id="onbNotice" hidden></div>
+        <p class="dash-senza-modello" id="homeMessage" hidden></p>
+        <div class="dash-righe-app" id="righeApp" hidden></div>
       </div>
     </section>
 
@@ -74,6 +88,8 @@
 
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
       <div class="dash-dir" id="dashDir" hidden></div>
+      <!-- La risposta di Filo a cui si sta rispondendo (#1620): la disegna dashboard-rispondi.js. -->
+      <div class="dash-citazione" id="citazione" hidden></div>
       <div class="dash-img-previews" id="imgPreviews" hidden></div>
       <textarea
         class="dash-input"
@@ -83,7 +99,7 @@
         autofocus
         aria-label="Scrivi a Filo"
       ></textarea>
-      <button class="dash-send" id="sendBtn" type="submit" aria-label="Invia">
+      <button class="dash-send" id="sendBtn" type="submit" aria-label="Invia" title="Invia">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M5 12l14-7-4 14-3-6-7-1z"/>
         </svg>
@@ -101,11 +117,14 @@
   <script src="dashboard-attivita.js"></script>
   <script src="dashboard-cambi.js"></script>
   <script src="dashboard-righe.js"></script>
+  <script src="dashboard-coda.js"></script>
+  <script src="dashboard-cerca.js"></script>
   <script src="dashboard-onboarding.js"></script>
   <script src="dashboard-comandi.js"></script>
   <script src="dashboard-terminale.js"></script>
   <script src="dashboard-carte.js"></script>
   <script src="dashboard-sistema.js"></script>
+  <script src="dashboard-rispondi.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
