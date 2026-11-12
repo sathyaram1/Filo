@@ -59,7 +59,7 @@ function azzera({ chiama = null, memorie = [] } = {}) {
       return JSON.stringify({ ore: [{ testo: '10:00 parlato di gatti e di una ricetta', righe }], memorie });
     }),
   });
-  return { cartella, scritte, chiamate };
+  return { cartella, scritte, fontiScritte, chiamate };
 }
 
 // ── La logica pura ─────────────────────────────────────────────────────────
