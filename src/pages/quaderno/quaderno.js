@@ -247,8 +247,8 @@
 
   async function decidi(it, tieni) {
     const r = await send({ type: MSG.FILO_MEMORIA_PROPOSTA, id: it.id, tieni });
-    const perche = r && r.rifiuto ? `${r.rifiuto[0].toUpperCase()}${r.rifiuto.slice(1)}.` : 'Somiglia a una riga che avevi tolto.';
-    if (r && r.ok) esito(tieni ? (r.scritta ? 'Tenuta in memoria.' : `Non l'ho scritta. ${perche}`) : 'Non la terrò.');
+    const perche = r && r.rifiuto ? r.rifiuto : 'somiglia a una riga che avevi tolto';
+    if (r && r.ok) esito(tieni ? (r.scritta ? 'Tenuta in memoria.' : `Non l'ho scritta: ${perche}.`) : 'Non la terrò.');
     else esito('Non ci sono riuscito: riprova.');
     await carica();
   }
