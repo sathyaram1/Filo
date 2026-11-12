@@ -98,7 +98,7 @@
     },
     'contestoFilo.soglia': {
       nome: 'soglia oltre la quale la chat compatta la conversazione',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     },
     'contestoFilo.cache': {
