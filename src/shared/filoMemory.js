@@ -108,7 +108,7 @@
     const P = global.SN_PREF;
     const l = P ? P.lezioneDaAzione({ testo }) : { testo: String(testo || '').trim() };
     if (l.rifiuto) return { scritta: false, rifiuto: l.rifiuto, riga: null };
-    if (!l.testo) return { scritta: false, riga: null };
+    if (!l.testo) return { scritta: false, vuota: true, riga: null };
     const prima = (await getLessonsBuffer()).length;
     const buf = await appendLesson(l.testo, opzioni);
     const scritta = Array.isArray(buf) && buf.length > prima;
