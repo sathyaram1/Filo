@@ -2688,8 +2688,24 @@
   const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti. Senza, le richieste '
     + 'le pagano i crediti di Filo, e lì i fornitori esclusi restano esclusi';
 
+  // Un pezzo di impostazioni scritto per intero, come l'annullo di un cambio (#1840): abbassa una difesa se uno dei freni
+  // che tocca, giudicato dal suo setter come una richiesta in chat, la allenta. Un freno che non si sa giudicare la abbassa.
+  function allentaParziale(partial, attuali) {
+    for (const s of PREF_SETTERS) {
+      if (typeof s.allenta !== 'function' || !Array.isArray(s.scrive)) continue;
+      for (const p of s.scrive) {
+        const percorso = String(p).replace(/\.\*$/, '');
+        const v = dentro(partial, percorso);
+        if (v === undefined) continue;
+        const r = Array.isArray(v) ? { partial, elenco: { percorso, op: 'sostituisci', voci: v } } : { partial };
+        try { if (s.allenta(r, attuali)) return true; } catch (_) { return true; }
+      }
+    }
+    return false;
+  }
+
   global.SN_PREF = {
-    buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
+    buildPreferencePartial, allentaParziale, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
     SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
