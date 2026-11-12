@@ -145,12 +145,15 @@
   let avvisato = false;
   function dopoScrittura(r) {
     if (r && r.segui === false) { smetti(); return; }
-    // Un testo oltre il tetto non si conserva affatto: chi scrive deve saperlo, una volta per pagina.
+    // Un testo oltre un tetto non si conserva affatto: chi scrive deve saperlo, una volta per pagina.
     if (r && r.troppo > 0 && !avvisato) {
       avvisato = true;
-      try {
-        global.SN_POPUP?.showToast?.(`Questo testo supera ${R.VALORE_MAX.toLocaleString('it-IT')} caratteri: se la pagina si chiude non lo ritrovi.`, { duration: 6000 });
-      } catch (_) {}
+      const n = (x) => x.toLocaleString('it-IT');
+      const perche = r.motivo === 'totale'
+        ? `i testi conservati dai siti arrivano già a ${n(R.TOTALE_MAX)} caratteri (li cancelli in Preferenze)`
+        : r.motivo === 'pagina' ? `in questa pagina ci sono già ${n(R.CAMPI_PER_PAGINA)} campi conservati`
+          : `supera ${n(R.VALORE_MAX)} caratteri`;
+      try { global.SN_POPUP?.showToast?.(`Questo testo non si conserva: ${perche}. Se la pagina si chiude non lo ritrovi.`, { duration: 8000 }); } catch (_) {}
     }
   }
 
