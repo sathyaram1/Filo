@@ -419,3 +419,108 @@ test('fusioni sovrapposte: se la pratica non si rilegge dopo la fusione del serv
     } finally { globalThis.fetch = finta; }
   });
 });
+
+// ── Il passo 5 del finish per intero (#1336.2): i rami veri del server, contati da git accanto al repo ──────────────
+
+const g = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const commitIn = (dir, file, testo) => {
+  mkdirSync(resolve(dir, file, '..'), { recursive: true });
+  writeFileSync(resolve(dir, file), testo, 'utf8');
+  g(dir, 'add', '-A');
+  g(dir, 'commit', '-q', '-m', file);
+};
+
+// App in <base>/work, server in <base>/filo-security col ramo claude/x spinto e non su main, come sul PC dell'owner.
+async function conServerVero(fn) {
+  const base = cartellaTemporanea('filo-finish-server-');
+  const work = resolve(base, 'work');
+  const server = resolve(base, 'filo-security');
+  const origine = resolve(base, 'srv-origin.git');
+  try {
+    mkdirSync(work);
+    mkdirSync(origine);
+    g(origine, 'init', '--bare', '-q', '--initial-branch=main');
+    mkdirSync(server);
+    g(server, 'init', '-q', '-b', 'main');
+    g(server, 'config', 'user.email', 't@t');
+    g(server, 'config', 'user.name', 't');
+    g(server, 'remote', 'add', 'origin', origine);
+    commitIn(server, 'functions/tools/server-fondi.js', '// finto\n');
+    g(server, 'push', '-q', 'origin', 'refs/heads/main:refs/heads/main');
+    g(server, 'checkout', '-q', '-b', 'claude/x');
+    commitIn(server, 'functions/lavoro.js', 'v1\n');
+    g(server, 'push', '-q', 'origin', 'refs/heads/claude/x:refs/heads/claude/x');
+    // server:fondi dal PC: il ramo del server arriva su main di filo-security.
+    const fondiServer = () => g(server, 'push', '-q', 'origin', 'refs/heads/claude/x:refs/heads/main');
+    return await fn({ work, server, fondiServer });
+  } finally { togliCartella(base); }
+}
+
+function finish(work, { ask, prova = null }) {
+  const righe = [];
+  const deps = {
+    of: { ...ofConBearer, annotaPratica: async () => ({ ok: true }) },
+    askServerMerge: ask, registraNelRegistro: async () => [], log: (s) => righe.push(String(s)),
+    ...(prova ? { prova } : {}),
+  };
+  const provaDelRamo = { punta: 'f'.repeat(40), prova: { esito: 'verde', mainSha: 'e'.repeat(40) } };
+  return chiediLaFusione({ root: work, branch: 'claude/x', cur: 'f'.repeat(40), pratica: { id: 'p', seq: 938 }, provaDelRamo }, deps)
+    .then((r) => ({ ...r, testo: righe.join('\n') }));
+}
+
+test('finish per intero: il server arriva su main mentre l’app si fonde, e il finish lo vede dal suo ramo vero e chiude', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  await conServerVero(({ work, fondiServer }) => conRete(docs, async (scritture) => {
+    const chieste = [];
+    const r = await finish(work, {
+      ask: async (a) => {
+        chieste.push(a);
+        fondiServer();
+        fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false });
+        return { ...FUSA_COL_SERVER_FUORI };
+      },
+    });
+    assert.deepEqual(chieste.map((a) => a.pendingParts), [[{ part: 'server', branch: 'claude/x' }]], 'alla richiesta il server era fuori');
+    assert.equal(stato(docs.p), 'done');
+    assert.ok(chiusa(scritture));
+    assert.equal(r.reply.closed, true);
+    assert.match(r.riga, /arrivata su main mentre questa si fondeva: era l'ultima/);
+    assert.match(messageForOwnerMerge(r.reply, 'claude/x', { feedbackId: 'p', feedbackNum: 938 }), /Pratica #938 chiusa\./);
+  }));
+});
+
+test('finish per intero: un seguito del server ancora fuori da main tiene aperta la pratica', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  await conServerVero(({ work, server, fondiServer }) => conRete(docs, async (scritture) => {
+    const r = await finish(work, {
+      ask: async () => {
+        fondiServer();
+        commitIn(server, 'functions/seguito.js', 'v2\n');
+        fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false });
+        return { ...FUSA_COL_SERVER_FUORI };
+      },
+    });
+    assert.equal(chiusa(scritture), false);
+    assert.equal(stato(docs.p), 'working');
+    assert.equal(r.riga, '');
+    assert.match(messageForOwnerMerge(r.reply, 'claude/x', { feedbackId: 'p', feedbackNum: 938 }), /resta aperta: manca la parte del server \(claude\/x\)/);
+  }));
+});
+
+test('finish per intero: main si muove e la prova si rifà, e la nuova richiesta riconta il server arrivato intanto', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  await conServerVero(({ work, fondiServer }) => conRete(docs, async () => {
+    const chieste = [];
+    const r = await finish(work, {
+      prova: () => ({ esito: 'verde', mainSha: 'd'.repeat(40) }),
+      ask: async (a) => {
+        chieste.push(a.pendingParts);
+        if (chieste.length === 1) { fondiServer(); return { outcome: 'main_moved', mainSha: 'd'.repeat(40) }; }
+        return { outcome: 'merged', sha: 'c'.repeat(40), localNum: '938', closed: true };
+      },
+    });
+    assert.deepEqual(chieste, [[{ part: 'server', branch: 'claude/x' }], []]);
+    assert.equal(r.reply.closed, true);
+    assert.match(r.testo, /▸ Chiedo al server di fondere/);
+  }));
+});
