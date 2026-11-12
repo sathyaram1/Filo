@@ -767,8 +767,7 @@ module.exports = function register(on, ctx) {
       const vivo = () => {
         try { return !!(chi && !chi.isDestroyed() && chi.getURL() === allApertura); } catch (_) { return false; }
       };
-      const r = await Outbox.enqueue(payload, msg.rileggi === true
-        ? { dallOwner, trattieni: true } : { dallOwner, attendiMs: ATTESA_CONSEGNA_MS });
+      const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS, trattieni: msg.rileggi === true });
       let tentativo = r?.tentativo;
       if (r?.trattenuta) {
         const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl) });
