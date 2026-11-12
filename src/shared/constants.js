@@ -2955,7 +2955,7 @@
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
     // #1403 — L0: prima che un feedback parta, un modello lo rilegge in cerca di dati sensibili e invii per sbaglio.
-    feedbackL0: { enabled: true },
+    feedbackRilettura: { enabled: true },
     // D61 (#1290) — le sezioni chiuse e nascoste di una pagina: 'subito' le traduce in sottofondo dopo quel che si
     // vede, così aprendole sono già tradotte; 'apertura' le lascia com'erano e le offre quando si aprono.
     traduzionePagina: { nascoste: 'subito' },
