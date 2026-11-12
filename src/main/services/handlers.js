@@ -1181,13 +1181,10 @@ Compattazione.imposta({
     });
     return r && r.text;
   },
-  applicaMemoria: async (testo) => {
-    const l = global.SN_PREF.lezioneDaAzione({ testo });
-    if (l.rifiuto || !l.testo) return false;
-    const buf = await FiloMem.appendLesson(l.testo);
-    const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+  applicaMemoria: async (testo, opts) => {
+    const scritta = await Compattazione.scriviMemoria(testo, opts);
     if (await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
-    return !!ultima && ultima.text === l.testo;
+    return scritta;
   },
 });
 
