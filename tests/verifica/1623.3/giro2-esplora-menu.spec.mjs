@@ -22,7 +22,7 @@ for (const ms of [0, 250, 400]) {
     const voce = menuDi(p).voce('Invia feedback');
     await expect(voce).toBeVisible({ timeout: 10_000 });
     await voce.click();
-    const premi = app.evaluate(async ({ BrowserWindow }, { attesa, u }) => {
+    const premi = app.evaluate(async ({ BrowserWindow, webContents }, { attesa, u }) => {
       const t0 = Date.now();
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
       const tw = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
