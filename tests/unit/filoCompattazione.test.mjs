@@ -609,7 +609,8 @@ test('la soglia vale sopra la parte fissa: sotto di lei la chat non compatta a o
   assert.equal(L.motivo({ token: base + 600, soglia: 40000, base, turno: 300 }), null);
   assert.equal(L.motivo({ token: base + L.SPAZIO_MINIMO + 1, soglia: 40000, base, turno: 300 }), 'soglia');
   // Turni pesanti: lo spazio cresce per tenerne tre dopo il grezzo, sotto il listino.
-  assert.equal(L.limiti({ soglia: 70000, base, turno: 8000 }).spazio, (L.TURNI_LIBERI + 1) * 8000 / L.QUOTA_ANTICIPO);
+  assert.equal(L.limiti({ soglia: 70000, base, turno: 7000 }).spazio, (L.TURNI_LIBERI + 1) * 7000 / L.QUOTA_ANTICIPO);
+  assert.equal(L.limiti({ soglia: 70000, base, turno: 9000 }).spazio, L.LISTINO - L.ESITO_GROSSO - base, 'non oltre il posto per un esito grosso');
   assert.ok(L.limiti({ soglia: 70000, base: 70000, turno: 20000 }).soglia <= L.LISTINO);
 
   require('../../src/shared/stimaCosto.js');
