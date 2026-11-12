@@ -74,8 +74,8 @@ test('Ctrl+V appena aperto il feedback (strato ancora freddo): l\'immagine non v
       }
       if (pronto !== null && premuto !== null) break;
     }
-    console.log('freddo: strato a schermo dopo', pronto, 'ms, Ctrl+V a', premuto, 'ms');
-  }, p.url());
+    return { pronto, premuto };
+  }, p.url()).then((t) => console.log('freddo: tempi', JSON.stringify(t)));
   await expect.poll(() => statoDi(app, p, '.sn-fb-text'), { timeout: 10_000 }).not.toBeNull();
   await p.waitForTimeout(1500);
   const allegati = await conta(app, p, '.sn-fb-thumbs > *');
