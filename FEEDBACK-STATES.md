@@ -382,9 +382,10 @@ senza chiedere la citazione, e mai la propria.
 
 Un **doppione** di un feedback già risolto non ha fusioni che lo citino (#2046): la
 sessione aggiunge `--doppione-di <M>` e il server riceve `doppioneDi`. Lo strumento
-rifiuta un numero storto e una fusione che non porta una citazione di `#M`; il server,
-al posto della citazione del feedback e della nascita, vuole che la fusione citi `#M`,
-che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
+rifiuta solo un numero storto; il server, al posto della citazione del feedback e della
+nascita, vuole che la fusione sia di M (cita `#M`, oppure è lo sha registrato alla
+chiusura di M o nomina il suo ramo: l'approvazione dell'owner fonde «finish: <ramo>»
+senza numero), che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
 dell'ultima riapertura del doppione (riaperto dopo, vuol dire non risolto). Il report
 porta in testa anche la riga «doppione di #M».
 
