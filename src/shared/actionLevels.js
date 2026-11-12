@@ -1612,10 +1612,14 @@
   function fonteDaFuori(out) {
     const l = Array.isArray(out.daFuori) ? out.daFuori.filter((x) => x && String(x.testo || '').trim()) : [];
     if (!l.length) return null;
-    const comando = (global.SN_FILO_CONTESTO && global.SN_FILO_CONTESTO.ESTERNO_COMANDO) || "dall'output di un comando";
-    return l.every((x) => x.fonte === comando)
-      ? { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' }
-      : { classe: 5, campo: 'web', chiave: 'filo:da-fuori', motivo: 'ho letto un testo arrivato da fuori' };
+    const FC = global.SN_FILO_CONTESTO || {};
+    const comando = FC.ESTERNO_COMANDO || "dall'output di un comando";
+    if (l.every((x) => x.fonte === comando)) return { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' };
+    // Il racconto che Filo scrive da sé ha la sua chiave: il costo 4 non lo conta (SN_AUTONOMIA.fontiPerCosto).
+    if (FC.ESTERNO_RACCONTO && l.every((x) => x.fonte === FC.ESTERNO_RACCONTO)) {
+      return { classe: 5, campo: 'web', chiave: 'filo:racconto', motivo: 'ho riletto un mio messaggio che racconta avvisi e download' };
+    }
+    return { classe: 5, campo: 'web', chiave: 'filo:da-fuori', motivo: 'ho letto un testo arrivato da fuori' };
   }
 
   // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
