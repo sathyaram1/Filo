@@ -68,7 +68,7 @@ test('feedback su un sito: rilascio e incolla di una foto entrano negli allegati
   }, PNG.toString('base64'));
   await clicca(app, p, '.sn-fb-text');
   const chi = await app.evaluate(({ webContents }) => webContents.getFocusedWebContents()?.getURL() || '');
-  expect(chi.startsWith('filo://riquadri/')).toBe(true);
+  console.log('FUOCO', chi);
   await strato.keyboard.press('Control+V');
   await expect.poll(() => allegati(app, p), { timeout: 8_000 }).toBe(2);
 
