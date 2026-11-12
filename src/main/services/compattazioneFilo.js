@@ -393,7 +393,7 @@ async function limiti(incognito, { ora = Date.now(), tetti = null } = {}) {
   const inc = inIncognito(incognito);
   const t = tetti || FC().tetti(null, null);
   const lista = await daCompattare(inc, { ora, tetti: t });
-  return { ...limitiDi(lista, inc, t.soglia), tokenTratto: Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0)) };
+  return { ...limitiDi(lista, inc, t.soglia), tokenTratto: pesoDelTratto(lista) };
 }
 
 async function righe(incognito) {
