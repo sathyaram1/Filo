@@ -1436,8 +1436,9 @@
 
   function scriviStatoTestoCampi(r) {
     const n = Number(r && r.campi) || 0;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     $('testoCampiStato').textContent = !n ? 'Nessun testo conservato'
-      : `${n === 1 ? 'Un campo' : `${n.toLocaleString('it-IT')} campi`} in ${r.pagine === 1 ? 'una pagina' : `${Number(r.pagine).toLocaleString('it-IT')} pagine`}`;
+      : `${n === 1 ? 'Un campo' : `${cifre(n)} campi`} in ${r.pagine === 1 ? 'una pagina' : `${cifre(r.pagine)} pagine`}`;
     $('testoCampiCancella').disabled = !n;
   }
 
