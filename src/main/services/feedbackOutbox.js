@@ -173,8 +173,10 @@
     // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
     const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
-    if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
+    const nuova = !queue.some((it) => it.id === id);
+    const trattieni = nuova && !!(opts && opts.trattieni);
+    if (nuova) {
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner, trattenuta: trattieni });
       if (queue.length > MAX_ITEMS) {
         conta('rinuncia', 'troppe', queue.length - MAX_ITEMS);
         queue = queue.slice(-MAX_ITEMS);
