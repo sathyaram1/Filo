@@ -101,9 +101,9 @@
     return a;
   }
 
-  function segue(el, ultimo) {
+  function segue(el, ultimo, data = null) {
     if (seguiti.has(el)) return seguiti.get(el);
-    const firma = firmaDi(el);
+    const firma = data || firmaDi(el);
     if (!firma) return null;
     const s = { firma, ultimo };
     seguiti.set(el, s);
