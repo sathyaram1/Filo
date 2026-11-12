@@ -38,6 +38,13 @@ test('esplora: due bolle dopo il no', async ({ app }) => {
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Non posso' }).first()).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(2500);
     console.log(await dump('dopo-no'));
+    const blocco = page.locator('.dash-activity').last();
+    await expect(blocco).toContainText('Non dimenticato · Dopo aver letto cose scritte da altri non lo faccio');
+    await expect(blocco).toContainText('ho fatto una ricerca sul web');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Non posso, dopo la ricerca.' })).toHaveCount(1);
+    const mem = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
+    expect(mem).toContain('Ha un gatto.');
+    expect(mem).not.toContain('Bologna');
     console.log('giri:', await app.evaluate(() => globalThis.__chatFinta_n ?? null));
   } finally {
     await ripristina(app);
