@@ -23,6 +23,14 @@ async function diSerieConPopupSpenti(app) {
 test('r1 dopo una ricerca, rimettere di serie quando riaccende solo il blocco dei popup non è un no', async ({ app }) => {
   await home(app);
   await diSerieConPopupSpenti(app);
+  const frasi = await app.evaluate(async () => {
+    const K = globalThis.SN_CAMBI;
+    const correnti = await globalThis.SN_STORAGE.getSettings();
+    const serie = globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti);
+    return K.frasi({ tipo: 'impostazioni', cambi: K.cambiImpostazioni(correnti, serie, globalThis.SN_STORAGE.normalizza) });
+  });
+  expect(frasi.length, `il ripristino cambia solo i popup: ${JSON.stringify(frasi)}`).toBe(1);
+  expect(frasi[0]).toMatch(/popup/i);
   const r = await exec(app, { type: 'PULSANTE_PREFERENZE', pulsante: 'ripristina_tutto' }, { contesto: [ricerca], richiesta: 'rimetti tutte le impostazioni di serie' });
   expect(r.no, `riaccendere una protezione stringe un freno: ${JSON.stringify(r).slice(0, 400)}`).toBeFalsy();
   expect(r.needsConfirm, 'chiede come gli altri cambi di sicurezza dopo una lettura').toBeTruthy();
