@@ -151,7 +151,7 @@
     // Un testo oltre un tetto non si conserva affatto: chi scrive deve saperlo, una volta per pagina.
     if (r && r.troppo > 0 && !avvisato) {
       avvisato = true;
-      const n = (x) => x.toLocaleString('it-IT');
+      const n = (x) => x.toLocaleString('it-IT', { useGrouping: true });
       const perche = r.motivo === 'totale'
         ? `i testi conservati dai siti arrivano già a ${n(R.TOTALE_MAX)} caratteri (li cancelli in Preferenze)`
         : r.motivo === 'pagina' ? `in questa pagina ci sono già ${n(R.CAMPI_PER_PAGINA)} campi conservati`
