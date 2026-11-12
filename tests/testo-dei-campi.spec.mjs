@@ -68,6 +68,7 @@ test('alla ricarica il testo torna nei campi com\'era, e il sito lo riceve; cart
   await expect(page.locator('#ricevuto')).toHaveText('Buongiorno, vorrei restituire 😀 il pacco <b>n. 42</b>.');
   expect(await valore(page, '#carta')).toBe('');
   expect(await valore(page, '#otp')).toBe('');
+  expect(await valore(page, '#riferimento')).toBe('');
 });
 
 test('un modulo d\'accesso e una ricerca non si conservano', async ({ app, openTab, testServer }) => {
