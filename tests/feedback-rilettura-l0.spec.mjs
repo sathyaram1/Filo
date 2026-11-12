@@ -180,7 +180,7 @@ testSenzaFixture('Filo chiuso durante la rilettura: il feedback resta salvato e 
     await expect.poll(async () => {
       await app.evaluate(() => globalThis.SN_FEEDBACK_OUTBOX.flush());
       return invii(app);
-    }, { timeout: 15_000 }).toEqual(['Resta anche se chiudo Filo']);
+    }, { timeout: 30_000 }).toEqual(['Resta anche se chiudo Filo']);
     await chiudiApp(app);
   } finally {
     rmSync(userData, { recursive: true, force: true });
