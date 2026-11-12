@@ -419,7 +419,7 @@ describe('lo script da riga di comando', () => {
     assert.equal(r.status, 1, r.stdout + r.stderr);
     const testo = readFileSync(errori, 'utf8');
     assert.match(testo, /^✗ tests\/delta\.spec\.mjs › questo è nuovo\n {4}in tests\/delta\.spec\.mjs:42\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed\n\n {4}Locator: getByText\('Salvato'\)\n {4}Expected: visible$/m);
-    assert.match(testo, /^✗ errore fuori dai casi: Error: Cannot find module x\n {4}Error: Cannot find module x\n {4}at caricaSpec/m);
+    assert.match(testo, /^✗ errore fuori dai casi: Error: Cannot find module x\n {4}Error: Cannot find module x\n {8}at caricaSpec/m);
     assert.doesNotMatch(testo, /rosso noto/, 'un rosso noto non è nel feedback: non è il guasto da cercare');
     assert.doesNotMatch(testo, /\u001b\[/);
   });
