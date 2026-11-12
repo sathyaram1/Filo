@@ -49,7 +49,8 @@ girava: non cita questo feedback e può essere più vecchia della sua nascita.
 Le candidate sono le fusioni arrivate su `main` dopo quel commit:
 
 ```bash
-git fetch origin main && git log --first-parent --merges --format='%H %cI %s' <commitProvato>..origin/main
+git fetch origin main
+git log --first-parent --merges --format='%H %cI %s' <commitProvato>..origin/main
 ```
 
 Prova i rossi dell'allarme sulla punta di `origin/main`. Se sono tutti verdi,
