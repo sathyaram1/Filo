@@ -97,8 +97,9 @@ test('Incolla dal tasto destro nella casella del feedback: entra fra gli allegat
   let r = null;
   await expect.poll(async () => (r = await nelloStrato(app, p, () => {
     const T = globalThis.SN_FILO_UI._test;
-    const el = Array.from(T.trovaTutti('.sn-menu-item')).find((x) => /^\s*Incolla/.test(x.textContent || ''));
-    if (!el) return Array.from(T.trovaTutti('.sn-menu-item')).map((x) => x.textContent).join('|') || null;
+    const tutte = Array.from(T.trovaTutti('.sn-menu-item, .sn-menu-row-btn, .sn-menu-paste-main'));
+    const el = tutte.find((x) => /^\s*Incolla/i.test(x.getAttribute('aria-label') || x.textContent || ''));
+    if (!el) return tutte.map((x) => x.getAttribute('aria-label') || x.textContent).join('|') || null;
     const b = el.getBoundingClientRect();
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   })), { timeout: 10_000 }).toHaveProperty('x');
