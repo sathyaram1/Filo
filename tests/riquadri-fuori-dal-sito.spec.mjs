@@ -397,12 +397,14 @@ async function ctrlVMentreNasce(app, p, apri) {
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
   });
   await p.evaluate(() => { window.__incollati = []; window.addEventListener('paste', (e) => window.__incollati.push(e.clipboardData.files.length), true); });
-  const wcDi = `BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents`;
-  await app.evaluate(({ BrowserWindow }, { u, c }) => new Function('BrowserWindow', 'u', `return ${c}`)(BrowserWindow, u).focus(), { u: p.url(), c: wcDi });
+  const scheda = (u) => app.evaluate(({ BrowserWindow }, url) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => t.view.webContents.getURL() === url).view.webContents.focus();
+  }, u);
+  await scheda(p.url());
   await apri();
-  const giaAschermo = await app.evaluate(async ({ BrowserWindow }, { u, c }) => {
+  const giaAschermo = await app.evaluate(async ({ BrowserWindow }, u) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    const wc = new Function('BrowserWindow', 'u', `return ${c}`)(BrowserWindow, u);
+    const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
     await new Promise((r) => setTimeout(r, 60));
     const s = win._filoTabs.riquadri?.strati?.get(wc);
     wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
