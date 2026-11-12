@@ -160,6 +160,8 @@
     [A.SAFEBROWSE_JUDGE]: 'deepseek-flash',
     [A.GEOBLOCK_CLASSIFY]: 'deepseek-flash',
     [A.FEEDBACK_TITLE]: 'deepseek-flash',
+    [A.FEEDBACK_L0]: 'deepseek-flash',
+    [A.FEEDBACK_L0_IMMAGINI]: 'gemma, glm',
     [A.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
     [A.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',
     [A.MANAGE_SEARCH]: 'deepseek-flash, gemma-lite',

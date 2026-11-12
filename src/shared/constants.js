@@ -265,6 +265,9 @@
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
+    // L0 (#1403): la rilettura del feedback prima dell'invio, il testo e le immagini (servono modelli che le leggono).
+    FEEDBACK_L0: 'feedback_l0',
+    FEEDBACK_L0_IMMAGINI: 'feedback_l0_immagini',
     // Le tre funzioni dell'editor hanno uno slot proprio: con quello di «Spiega» chi cambiava
     // quel modello cambiava anche l'editor, senza saperlo. Qui: titolo di un documento.
     EDITOR_TITLE: 'editor_title',
@@ -403,6 +406,8 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
+    [ACTIONS.FEEDBACK_L0]: 'Rilettura del feedback — testo',
+    [ACTIONS.FEEDBACK_L0_IMMAGINI]: 'Rilettura del feedback — immagini',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
@@ -455,6 +460,8 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: '',
     [ACTIONS.GEOBLOCK_CLASSIFY]: '',
     [ACTIONS.FEEDBACK_TITLE]: '',
+    [ACTIONS.FEEDBACK_L0]: '',
+    [ACTIONS.FEEDBACK_L0_IMMAGINI]: '',
     [ACTIONS.EDITOR_TITLE]: '',
     [ACTIONS.EDITOR_SUMMARY]: '',
     [ACTIONS.MANAGE_SEARCH]: '',
@@ -2947,6 +2954,8 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #1403 — L0: prima che un feedback parta, un modello lo rilegge in cerca di dati sensibili e invii per sbaglio.
+    feedbackRilettura: { enabled: true },
     // D61 (#1290) — le sezioni chiuse e nascoste di una pagina: 'subito' le traduce in sottofondo dopo quel che si
     // vede, così aprendole sono già tradotte; 'apertura' le lascia com'erano e le offre quando si aprono.
     traduzionePagina: { nascoste: 'subito' },

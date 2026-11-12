@@ -31,7 +31,11 @@
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
 //   enqueue(payload, { dallOwner, attendiMs }) -> { id, queued:true, tentativo? }  — accoda + prova subito (payload.name =
-//     titolo già scelto); con attendiMs, `tentativo` è la Promise dell'esito del primo tentativo (vedi attendiTentativo)
+//     titolo già scelto); con attendiMs, `tentativo` è la Promise dell'esito del primo tentativo (vedi attendiTentativo).
+//     Con `trattieni` la voce è salvata ma non parte finché non la si rilascia (la rilettura L0, #1403); il segno
+//     non si salva, così la voce che un riavvio trova ancora trattenuta parte. `nuova` dice se la voce è nata adesso.
+//   rilascia(id, { attendiMs }) -> { tentativo? }            — la voce trattenuta parte
+//   ritira(id) -> Promise<boolean>                           — la voce trattenuta esce dalla coda senza partire
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
@@ -169,20 +173,43 @@
     // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
     const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
-    if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
+    const nuova = !queue.some((it) => it.id === id);
+    const trattieni = nuova && !!(opts && opts.trattieni);
+    if (nuova) {
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner, trattenuta: trattieni });
       if (queue.length > MAX_ITEMS) {
         conta('rinuncia', 'troppe', queue.length - MAX_ITEMS);
         queue = queue.slice(-MAX_ITEMS);
       }
       await persist();
     }
+    if (trattieni) return { id, queued: true, nuova, trattenuta: true };
+    return { ...parti(id, opts), id, queued: true, nuova };
+  }
+
+  function parti(id, opts) {
     const entroMs = Number(opts && opts.attendiMs) || 0;
     const tentativo = entroMs > 0 ? attendiTentativo(id, entroMs) : null;
     // Un invio nuovo si prova adesso, non al giro di backoff fissato per una voce vecchia (fino a mezzo minuto).
     if (timer && !flushing) { clearTimeout(timer); timer = null; }
     scheduleFlush(0);
-    return tentativo ? { id, queued: true, tentativo } : { id, queued: true };
+    return tentativo ? { tentativo } : {};
+  }
+
+  function rilascia(id, opts) {
+    const it = queue.find((x) => x.id === String(id));
+    if (!it) return {};
+    it.trattenuta = false;
+    return parti(it.id, opts);
+  }
+
+  async function ritira(id) {
+    await load();
+    const trovata = queue.some((it) => it.id === String(id) && it.trattenuta);
+    if (!trovata) return false;
+    remove(String(id));
+    await persist();
+    return true;
   }
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
@@ -241,6 +268,7 @@
     try {
       await load();
       for (const it of queue.slice()) {
+        if (it.trattenuta) continue;
         // Voce già rinunciata: non si tenta più di spedirla e non scade, si
         // prova solo a dirlo. Detto, esce dalla coda.
         if (it.rinuncia) {
@@ -340,6 +368,8 @@
   global.SN_FEEDBACK_OUTBOX = {
     init,
     enqueue,
+    rilascia,
+    ritira,
     flush,
     accessoCambiato,
     size: () => queue.length,

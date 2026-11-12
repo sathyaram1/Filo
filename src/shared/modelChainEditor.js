@@ -47,6 +47,8 @@
       [A.SAFEBROWSE_JUDGE, 'options_action_safebrowse_judge'],
       [A.GEOBLOCK_CLASSIFY, 'options_action_geoblock_classify'],
       [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
+      [A.FEEDBACK_L0, 'options_action_feedback_l0'],
+      [A.FEEDBACK_L0_IMMAGINI, 'options_action_feedback_l0_immagini'],
       [A.EDITOR_TITLE, 'options_action_editor_title'],
       [A.EDITOR_SUMMARY, 'options_action_editor_summary'],
       [A.ARCHIVE_EMBED, 'options_action_archive_embed'],

@@ -125,6 +125,7 @@
     'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'feedbackRilettura.enabled': { nome: 'rilettura del feedback prima dell\'invio', valore: ATTIVA, livello: 1 },
     'traduzionePagina.nascoste': {
       nome: 'traduzione delle sezioni chiuse di una pagina',
       valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },

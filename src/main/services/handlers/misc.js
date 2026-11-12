@@ -256,6 +256,13 @@ module.exports = function register(on, ctx) {
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
+  const L0 = require('../feedbackL0').crea({
+    gate: modelGate,
+    azioni: ACTIONS,
+    impostazioni: () => ctx.getEffectiveSettings(),
+    segreti: async () => (typeof ctx.segretiCustoditi === 'function' ? ctx.segretiCustoditi() : []),
+    redTeam: () => require('../redteamGate').visibile(),
+  });
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
   // — l'invio non deve MAI fallire per colpa del titolo.
@@ -690,6 +697,21 @@ module.exports = function register(on, ctx) {
   // Il primo tentativo di solito chiude in pochi secondi (titolo, allegati, scrittura): oltre, il riquadro si chiude
   // dicendo «in partenza» e la coda finisce da sola.
   const ATTESA_CONSEGNA_MS = 12000;
+  // Un tetto alle riletture anticipate: oltre, si rilegge solo all'invio. Chi scrive davvero fa una pausa ogni tanto.
+  const ANTICIPI_ORA = 120;
+  let anticipi = [];
+  on(MSG.FEEDBACK_L0_ANTICIPA, async (msg) => {
+    const ora = Date.now();
+    anticipi = anticipi.filter((t) => ora - t < 3600000);
+    if (anticipi.length >= ANTICIPI_ORA) {
+      console.warn('[Filo L0] riletture anticipate oltre', ANTICIPI_ORA, 'in un\'ora: si rilegge all\'invio');
+      return { ok: true, partita: false };
+    }
+    const testo = String((msg && msg.testo) || '').trim();
+    const partita = await L0.anticipa(testo);
+    if (partita) anticipi.push(ora);
+    return { ok: true, partita };
+  });
   on(MSG.SUBMIT_FEEDBACK, async (msg, sender) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
@@ -740,16 +762,35 @@ module.exports = function register(on, ctx) {
       } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
       // Accoda (persistito) e prova subito. Il riquadro dice «inviato» solo se il primo tentativo consegna entro
       // l'attesa (#1667); altrimenti la coda finisce da sola e ritenta. Il titolo lo genera la coda all'invio.
-      const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS });
-      const esito = r?.tentativo ? await r.tentativo : { esito: 'in_coda' };
+      // Con la rilettura L0 (#1403) la voce aspetta salvata: se Filo si chiude intanto, parte al prossimo avvio.
+      const chi = sender?.strato || sender?.wc;
+      const vivo = () => {
+        try { return !!(chi && !chi.isDestroyed() && chi.getURL() === allApertura); } catch (_) { return false; }
+      };
+      const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS, trattieni: msg.rileggi === true });
+      let tentativo = r?.tentativo;
+      if (r?.trattenuta) {
+        const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl) });
+        if (letto.stato === 'trovato' && await Outbox.ritira(r.id)) {
+          const id = String(payload.submissionId);
+          // Il riquadro si riapre col testo intatto; senza riquadro la segnalazione resta fra le non partite, da rimandare.
+          if (vivo()) {
+            try { globalThis.SN_SEGNALAZIONI_MIE?.togli?.(id)?.catch?.(() => {}); } catch (_) {}
+          } else {
+            try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(id)?.catch?.(() => {}); } catch (_) {}
+            avvisoNellaFinestra('Il tuo feedback non è partito: prima di mandarlo ci ho visto qualcosa da ricontrollare. '
+              + 'Lo ritrovi in «Le tue segnalazioni», da dove puoi rimandarlo.', { errore: 'segnalazione_non_partita' });
+          }
+          return { ok: false, rilettura: letto.esito };
+        }
+        tentativo = Outbox.rilascia(r.id, { attendiMs: ATTESA_CONSEGNA_MS }).tentativo;
+      }
+      const esito = tentativo ? await tentativo : { esito: 'in_coda' };
       if (esito.esito === 'rinuncia') {
         const motivo = String(esito.motivo || 'Il tuo feedback non è partito.');
         // La rinuncia l'ha passata la coda a chi aspettava: il riquadro, se c'è ancora, la dice e resta aperto (niente
         // voce «non partita» nell'elenco); se la sua pagina non c'è più, la dice la cornice.
-        const chi = sender?.strato || sender?.wc;
-        let vivo = false;
-        try { vivo = !!(chi && !chi.isDestroyed() && chi.getURL() === allApertura); } catch (_) {}
-        if (vivo) {
+        if (vivo()) {
           try { globalThis.SN_SEGNALAZIONI_MIE?.togli?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}
         } else {
           try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}

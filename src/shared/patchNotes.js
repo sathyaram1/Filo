@@ -12,8 +12,8 @@
       version: '0.2.276', date: '2026-11-12',
       features: [
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
+        { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
       ],
-      fixes: [],
     },
     {
       version: '0.2.274', date: '2026-11-08',

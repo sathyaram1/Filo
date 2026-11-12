@@ -44,7 +44,7 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 - **I siti pericolosi.** Solo dati sul sito: il nome, l'età del dominio, lo stato del certificato, se la pagina chiede password o pagamenti. Mai il contenuto della pagina. In incognito non parte.
 - **I blocchi geografici.** Quando una pagina d'errore non dice chiaramente perché è bloccata, il dominio, il titolo e poche righe della pagina d'errore.
 - **I contenuti incorporati rotti.** La foto del solo riquadro e il nome del suo sito; come e quando, qui sotto.
-- **I feedback.** Il testo che scrivi, per farne un titolo breve.
+- **I feedback.** Il testo che scrivi, per farne un titolo breve. Prima che il feedback parta, il testo, le immagini allegate e lo screenshot vanno anche a un modello che li rilegge per te in cerca di password, dati di altre persone e cose mandate per sbaglio; il testo già mentre scrivi. Si spegne da Preferenze («Rileggi il feedback prima di mandarlo») o chiedendolo a Filo.
 
 **Quello che parte senza che tu lo chieda.** Sette funzioni mandano a un modello pezzi delle pagine anche quando non stai chiedendo niente:
 

@@ -501,3 +501,34 @@ test('#1681 rinuncia con qualcuno che aspetta: niente secondo avviso; senza ness
   await OB.flush();
   assert.deepEqual(avvisi, ['da-solo']);
 });
+
+// #1403 — durante la rilettura L0 la voce è salvata ma non parte; rilasciata parte, ritirata esce senza partire, e
+// un riavvio con la voce ancora trattenuta la spedisce (il segno non si salva).
+test('#1403 voce trattenuta: salvata, ferma finché la si rilascia o ritira, e un riavvio la spedisce', async () => {
+  const { OB, state, store } = setup();
+  state.online = true;
+  const r = await OB.enqueue({ submissionId: 't1', text: 'ciao' }, { trattieni: true, attendiMs: 5000 });
+  assert.equal(r.trattenuta, true);
+  assert.equal(r.tentativo, undefined, 'nessun tentativo da aspettare finché è trattenuta');
+  assert.deepEqual((store.get('feedbackOutbox') || []).map((x) => x.id), ['t1'], 'salvata su disco');
+  assert.ok(!('trattenuta' in store.get('feedbackOutbox')[0]), 'il segno non si salva');
+  await OB.flush();
+  assert.equal(state.calls.length, 0, 'trattenuta non parte');
+  OB.rilascia('t1');
+  await OB.flush();
+  assert.equal(state.calls.length, 1, 'rilasciata parte');
+
+  await OB.enqueue({ submissionId: 't2', text: 'password' }, { trattieni: true });
+  assert.equal(await OB.ritira('t2'), true);
+  assert.equal(OB.size(), 0);
+  assert.deepEqual(store.get('feedbackOutbox'), []);
+  assert.equal(await OB.ritira('t1'), false, 'una voce non trattenuta non si ritira');
+
+  // Filo chiuso durante la rilettura: alla riapertura la voce si carica senza segno e parte.
+  await OB.enqueue({ submissionId: 't3', text: 'chiuso a metà' }, { trattieni: true });
+  OB._reset();
+  OB._setAuto(false);
+  OB.init({ backoffMin: 999999 });
+  await OB.flush();
+  assert.deepEqual(state.calls.map((p) => p.submissionId), ['t1', 't3']);
+});

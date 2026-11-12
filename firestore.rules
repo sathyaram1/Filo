@@ -1013,7 +1013,7 @@ service cloud.firestore {
         'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
         'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
         'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
-        'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+        'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test', 'feedback-l0', 'feedback-l0-immagini'
       ];
     }
     function chiuse(m, chiavi, tetto, valori) {

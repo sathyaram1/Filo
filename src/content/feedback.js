@@ -39,6 +39,9 @@
   let clientIdCache = null;
   // I testi in viaggio verso il server: un riquadro riaperto mentre aspettano non li ripropone come bozza (#1681).
   const inVolo = new Set();
+  let daRiaprire = null;
+  // L0 (#1403): la rilettura del testo parte dopo questa pausa nello scrivere, così all'invio è già pronta.
+  const ANTICIPO_MS = 1500;
 
   // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
   // pagina.
@@ -75,6 +78,12 @@
     else activeRoot.remove();
     activeRoot = null;
     setShellDim(false);
+    // Un feedback che L0 rimanda indietro mentre è aperto un altro riquadro si riapre quando quello si chiude.
+    if (daRiaprire) {
+      const d = daRiaprire;
+      daRiaprire = null;
+      setTimeout(() => { if (!activeRoot) apriQui(d); else daRiaprire = d; }, 0);
+    }
   }
 
   function blobToDataUrl(blob) {
@@ -222,7 +231,8 @@
     qui();
   }
 
-  function apriQui({ testo: proposta = '' } = {}) {
+  // `ripresa`: il feedback che torna indietro dall'invio (L0 o un errore), con testo, allegati e avviso intatti.
+  function apriQui({ testo: proposta = '', ripresa = null } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -235,7 +245,11 @@
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
         <div class="sn-fb-drag" title="Trascina per spostare il box"><span class="sn-fb-grip"></span></div>
         <div class="sn-fb-body">
-          <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          <div class="sn-fb-l0" role="alert" hidden></div>
+          <div class="sn-fb-campo">
+            <div class="sn-fb-evidenze" aria-hidden="true"></div>
+            <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
+          </div>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
@@ -271,6 +285,8 @@
     const modal = root.querySelector('.sn-fb-modal');
     const dragHandle = root.querySelector('.sn-fb-drag');
     const textEl = root.querySelector('.sn-fb-text');
+    const avvisoEl = root.querySelector('.sn-fb-l0');
+    const evidenzeEl = root.querySelector('.sn-fb-evidenze');
     const thumbsEl = root.querySelector('.sn-fb-thumbs');
     const statusEl = root.querySelector('.sn-fb-status');
     const sendBtn = root.querySelector('.sn-fb-send');
@@ -288,6 +304,9 @@
     const files = [];
     const MAX_FILES = LIMITI.file;
     const MAX_ATTACH_BYTES = LIMITI.byte;
+    // Quello che L0 ha segnato: i pezzi di testo da evidenziare e le immagini da ricontrollare.
+    let pezziSegnati = [];
+    const immaginiSegnate = new Set();
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
@@ -317,18 +336,47 @@
         }).catch(() => {});
       } catch (_) {}
     }
-    textEl.addEventListener('input', () => {
+    // L0: una rilettura per pausa, pagata da un gesto vero nella casella (patterns/una-chiamata-che-spende-parte-da-un-gesto-vero.md).
+    let anticipoTimer = null;
+    let gestoPerAnticipo = false;
+    let anticipato = '';
+    stacchi.push(() => { clearTimeout(anticipoTimer); anticipoTimer = null; });
+    function preparaAnticipo(e) {
+      const G = global.SN_GESTO;
+      const vero = G && typeof G.prendi === 'function'
+        ? G.prendi('feedback-l0', undefined, (l) => !!(l && l.el && (l.el === textEl || textEl.contains(l.el))))
+        : !!(e && e.isTrusted);
+      if (vero) gestoPerAnticipo = true;
+      clearTimeout(anticipoTimer);
+      anticipoTimer = setTimeout(() => {
+        anticipoTimer = null;
+        const t = textEl.value.trim();
+        if (!gestoPerAnticipo || !t || t === anticipato) return;
+        gestoPerAnticipo = false;
+        anticipato = t;
+        try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_L0_ANTICIPA, testo: t })?.catch?.(() => {}); } catch (_) {}
+      }, ANTICIPO_MS);
+    }
+    textEl.addEventListener('input', (e) => {
       // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
+      aggiornaEvidenze();
+      preparaAnticipo(e);
     });
     // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
     const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
-    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
+    if (ripresa) {
+      textEl.value = String(ripresa.testo || '');
+      for (const im of ripresa.images || []) images.push(im);
+      for (const f of ripresa.files || []) files.push(f);
+      if (ripresa.submissionId) submissionId = ripresa.submissionId;
+      saveDraft();
+    } else if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
-      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+      if (DRAFT_KEY && !ripresa) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
@@ -458,18 +506,19 @@
       images.forEach((img, i) => {
         const wrap = document.createElement('div');
         wrap.className = 'sn-fb-thumb';
+        if (immaginiSegnate.has(img)) wrap.classList.add('sn-fb-thumb--l0');
         const imEl = document.createElement('img');
         imEl.src = dataUrlToBlobUrl(img.dataUrl);
         imEl.dataset.snObjurl = '1';
         imEl.alt = '';
-        imEl.title = 'Clicca per ingrandire';
+        imEl.title = immaginiSegnate.has(img) ? 'Da ricontrollare: clicca per ingrandire' : 'Clicca per ingrandire';
         imEl.addEventListener('click', () => openLightbox(img.dataUrl));
         const xBtn = document.createElement('button');
         xBtn.type = 'button';
         xBtn.className = 'sn-fb-thumb-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { images.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
+        xBtn.addEventListener('click', () => { images.splice(i, 1); immaginiSegnate.delete(img); bumpSubmissionId(); renderThumbs(); });
         wrap.appendChild(imEl);
         wrap.appendChild(xBtn);
         thumbsEl.appendChild(wrap);
@@ -500,6 +549,89 @@
         chip.appendChild(xBtn);
         thumbsEl.appendChild(chip);
       });
+    }
+
+    // Le parti segnate da L0 si ritrovano nel testo com'è adesso: corretta una parte, la sua evidenza sparisce. Il
+    // testo dello sfondo è quello dell'utente, scritto come testo e mai come markup.
+    function aggiornaEvidenze() {
+      evidenzeEl.textContent = '';
+      const v = textEl.value;
+      const tratti = [];
+      for (const p of pezziSegnati) {
+        if (!p.testo) continue;
+        let i = v.indexOf(p.testo);
+        let guardia = 0;
+        while (i >= 0 && guardia++ < 200) { tratti.push([i, i + p.testo.length]); i = v.indexOf(p.testo, i + p.testo.length); }
+      }
+      if (!tratti.length) { evidenzeEl.parentElement.classList.remove('sn-fb-campo--evidenze'); return; }
+      tratti.sort((a, b) => a[0] - b[0]);
+      let at = 0;
+      for (const [a, b] of tratti) {
+        if (b <= at) continue;
+        const da = Math.max(a, at);
+        if (da > at) evidenzeEl.appendChild(document.createTextNode(v.slice(at, da)));
+        const m = document.createElement('mark');
+        m.textContent = v.slice(da, b);
+        evidenzeEl.appendChild(m);
+        at = b;
+      }
+      // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
+      evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
+      evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      evidenzeEl.scrollTop = textEl.scrollTop;
+    }
+    textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+
+    // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
+    function mostraRilettura(r) {
+      pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
+      immaginiSegnate.clear();
+      for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      avvisoEl.textContent = '';
+      const titolo = document.createElement('div');
+      titolo.className = 'sn-fb-l0-titolo';
+      titolo.textContent = String(r?.titolo || 'Prima che parta, ricontrolla.');
+      const lista = document.createElement('ul');
+      lista.className = 'sn-fb-l0-frasi';
+      for (const f of Array.isArray(r?.frasi) ? r.frasi : []) {
+        const li = document.createElement('li');
+        li.textContent = String(f);
+        lista.appendChild(li);
+      }
+      const azioni = document.createElement('div');
+      azioni.className = 'sn-fb-l0-azioni';
+      const correggi = document.createElement('button');
+      correggi.type = 'button';
+      correggi.className = 'sn-fb-btn-secondary sn-fb-l0-correggi';
+      correggi.textContent = 'Correggi';
+      correggi.title = 'Torna al testo, sulla prima parte segnata';
+      correggi.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
+        avvisoEl.hidden = true;
+        const v = textEl.value;
+        const primo = pezziSegnati.map((p) => v.indexOf(p.testo)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+        textEl.focus();
+        if (primo !== undefined) {
+          const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
+          try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
+        } else {
+          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+        }
+      });
+      const manda = document.createElement('button');
+      manda.type = 'button';
+      manda.className = 'sn-fb-btn-secondary sn-fb-l0-manda';
+      manda.textContent = 'Manda così';
+      manda.title = 'Manda il feedback com’è, senza rileggerlo';
+      manda.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: false }); });
+      azioni.appendChild(correggi);
+      azioni.appendChild(manda);
+      avvisoEl.appendChild(titolo);
+      avvisoEl.appendChild(lista);
+      avvisoEl.appendChild(azioni);
+      avvisoEl.hidden = false;
+      renderThumbs();
+      aggiornaEvidenze();
     }
 
     function humanSize(n) {
@@ -710,9 +842,11 @@
       await allega(picked);
     });
 
-    // Invio: solo dal clic dell'utente sul tasto (#1071).
-    sendBtn.addEventListener('click', async (e) => {
-      if (!e.isTrusted) return;
+    // Invio: solo dal clic dell'utente sul tasto (#1071). «Manda così» dall'avviso di L0 salta la rilettura.
+    sendBtn.addEventListener('click', (e) => { if (e.isTrusted) invia({ rileggi: true }); });
+    let inviando = false;
+    async function invia({ rileggi }) {
+      if (inviando || activeRoot !== root) return;
       const text = textEl.value.trim();
       const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && files.length === 0 && !wantShot) {
@@ -725,13 +859,23 @@
         if (activeRoot === root) statusEl.textContent = testo;
         else Popup?.showToast?.(testo, { duration: 6000 });
       };
-      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; };
+      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; inviando = false; };
       const testoInviato = textEl.value;
       inVolo.add(testoInviato);
+      inviando = true;
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
       statusEl.classList.add('sn-fb-status--attesa');
+      // Dopo la chiusura il feedback torna indietro intatto, con quello che L0 ha visto o con l'errore (#1403).
+      let partito = null;
+      let attesa = null;
+      const riapri = (extra) => {
+        try { attesa?.close?.(); } catch (_) {}
+        const d = { ripresa: { testo: testoInviato, images: partito.images, files: partito.files, submissionId: partito.submissionId, ...extra } };
+        if (activeRoot) daRiaprire = d;
+        else apriQui(d);
+      };
       try {
         const clientId = await getClientId();
         // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
@@ -807,19 +951,11 @@
           files: files.slice(),
           submissionId,
         };
-        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
-        if (!res?.ok) {
-          const err = new Error(res?.error || 'invio fallito');
-          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
-          // la frase intera per chi legge: mostrarla così com'è.
-          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
-          throw err;
-        }
-        statusEl.textContent = '';
-        statusEl.classList.remove('sn-fb-status--attesa');
+        partito = { images: outImages.slice(), files: files.slice(), submissionId };
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
-        // Chiuso con Esc durante l'attesa, il riquadro aperto adesso è un altro, con un altro testo: resta (#1681).
+        // Il riquadro si chiude subito (#1403): il feedback è al sicuro nella coda del main, e se torna indietro
+        // si riapre intatto. Chiuso con Esc durante lo scatto, il riquadro aperto adesso è un altro: resta (#1681).
         if (activeRoot === root) {
           clearTimeout(saveTimer);
           saveTimer = null;
@@ -828,6 +964,20 @@
         } else {
           clearDraft(testoInviato);
         }
+        attesa = Popup?.showToast?.('Sto inviando il feedback', { duration: 0 }) || null;
+        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload, rileggi: rileggi !== false });
+        if (!res?.ok && res?.rilettura) {
+          riapri({ rilettura: res.rilettura });
+          return;
+        }
+        if (!res?.ok) {
+          const err = new Error(res?.error || 'invio fallito');
+          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
+          // la frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
+          throw err;
+        }
+        try { attesa?.close?.(); } catch (_) {}
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
         // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
         // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
@@ -850,11 +1000,13 @@
       } catch (e) {
         console.error('[SN feedback] submit', e);
         root.style.visibility = '';
-        riprova(e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e)));
+        const frase = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
+        if (partito) riapri({ messaggio: frase });
+        else riprova(frase);
       } finally {
         inVolo.delete(testoInviato);
       }
-    });
+    }
 
     // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un
     // pixel frazionario e sfocherebbe il testo.
@@ -895,6 +1047,11 @@
     updateClearBtn();
     textEl.focus();
     if (proposta) inFondo();
+    if (ripresa) {
+      renderThumbs();
+      if (ripresa.rilettura) mostraRilettura(ripresa.rilettura);
+      if (ripresa.messaggio) statusEl.textContent = String(ripresa.messaggio);
+    }
   }
 
   global.SN_FEEDBACK_UI = { open, close };

@@ -596,7 +596,9 @@
 
     // Invio feedback → Firestore/Storage. Passa dal main perché le CSP delle pagine ospiti
     // bloccano i fetch diretti dal preload.
-    SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
+    SUBMIT_FEEDBACK: 'submit_feedback',           // { payload, rileggi? } — con rileggi passa da L0 (#1403)
+    // L0 (#1403): la rilettura del testo parte mentre si scrive, così all'invio è già pronta. { testo }
+    FEEDBACK_L0_ANTICIPA: 'feedback_l0_anticipa',
     // Broadcast main→content per un toast di sistema (es. esito differito di un invio).
     // Lo mostra solo la scheda in primo piano. { text, duration? }
     SHOW_TOAST: 'show_toast',                      // { text, duration?, rimedio?, segnala? (testo già scritto per «Invia feedback»), avviso? (id in coda) }
