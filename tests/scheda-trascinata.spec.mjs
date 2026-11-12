@@ -237,23 +237,7 @@ test('#2085 nell\'Aiuto sopra un sito: gettone nel campo, pagina letta all\'invi
   // Il campo del sito sotto non ha ricevuto niente.
   expect(await sito.evaluate(() => document.body.innerText.trim())).toBe('un sito qualunque');
 
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-    const P = globalThis.SN_PROVIDERS;
-    globalThis.__visti = [];
-    const risposta = ({ attempts, messages }) => {
-      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
-      return { text: '{"message":"Con un razzo.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-    };
-    P.completeWithFallback = async (o) => risposta(o);
-    P.streamCompleteWithFallback = async (o) => risposta(o);
-  });
+  await aiutoFinto(app);
   await aiuto.locator('.sn-sidebar-input textarea').focus();
   await aiuto.keyboard.press('End');
   await aiuto.keyboard.type('come ha fatto a volare?');
