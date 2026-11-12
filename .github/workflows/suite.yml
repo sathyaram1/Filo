@@ -308,6 +308,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: rilascio
     timeout-minutes: 20
+    # Dalla cloud delle routine gli artifact non si scaricano (#2313): il feedback dice la strada che passa.
+    env:
+      REGISTRI_DALLA_CLOUD: "Dalla cloud delle routine gli artifact di questa esecuzione non si scaricano (il loro indirizzo di scaricamento sta fuori dalla rete delle routine); i registri dei lavori si: gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs elenca i lavori col loro id, gh api repos/${{ github.repository }}/actions/jobs/<id>/logs stampa il registro intero di uno."
     steps:
       - name: Checkout del commit provato (con la storia, per l'elenco dei commit dell'avviso)
         uses: actions/checkout@v4
