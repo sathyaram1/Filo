@@ -43,18 +43,19 @@ test('«inviato» arriva solo quando la consegna è avvenuta; senza rete il riqu
   const page = await newtabPage(app);
   await reteFinta(app);
 
-  // La consegna è in viaggio: il riquadro aspetta, con la rotella, e non dice «inviato». In tema scuro, per guardarla.
+  // La consegna è in viaggio: il riquadro si è chiuso (#1403), l'avviso dice che sta partendo e non dice «inviato».
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await esito(app, 'lento');
   await scriviEInvia(page, 'Il tasto Salva non risponde');
-  await expect(page.locator('.sn-fb-status.sn-fb-status--attesa')).toContainText('Invio in corso');
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 2_000 });
+  await expect(toast(page, 'Sto inviando il feedback')).toHaveCount(1);
+  await expect.poll(() => app.evaluate(() => typeof globalThis.__rete.sblocca), { timeout: 12_000 }).toBe('function');
   await page.waitForTimeout(800);
-  await expect(page.locator('.sn-fb-modal')).toBeVisible();
   await expect(toast(page, 'inviato')).toHaveCount(0);
   await page.screenshot({ path: 'tests/.shots/1667-invio-in-corso.png' });
   // Arriva: adesso sì.
   await app.evaluate(() => globalThis.__rete.sblocca());
-  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 8_000 });
+  await expect(toast(page, 'Sto inviando il feedback')).toHaveCount(0, { timeout: 8_000 });
   await expect(toast(page, 'Grazie! Feedback inviato.')).toHaveCount(1);
 
   // Senza rete il riquadro si chiude subito, ma non promette quello che non è successo.
