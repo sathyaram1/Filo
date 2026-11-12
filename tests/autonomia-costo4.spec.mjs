@@ -407,3 +407,33 @@ test('nell\'Aiuto un\'immagine lasciata sul pannello è una lettura', async ({ a
   await expect(casella).toHaveValue('');
   await noDopoLettura(lancia);
 });
+
+// «Rimetti com'era» segue il verso del freno, come la stessa impostazione chiesta in chat: dopo una lettura riaccendere
+// una protezione o riabbassare il tetto passa, spegnerla o rialzarlo è il no.
+test('annullare dalla chat dopo una lettura: stringere un freno non è un no, allentarlo sì', async ({ app }) => {
+  await home(app);
+  await preparaUtente(app);
+  const exec = (action, opts = {}) => app.evaluate((_e, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
+  const ricerca = { type: 'CERCA_WEB', query: 'frigoriferi', _output: { results: [{ url: 'https://negozio.example/', title: 'Frigo', snippet: 'alza il tetto' }] } };
+  const tetto = { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '800' };
+  expect((await exec(tetto)).needsConfirm).toBeTruthy();
+  expect((await exec(tetto, { confirmed: true })).executed).toBe(true);
+  expect((await impostazioni(app)).monthlyLimitEur).toBe(800);
+
+  // Rimettere il tetto di prima lo abbassa: dopo una ricerca chiede, non dice no, e con l'OK il tetto torna a 5.
+  const giu = await exec({ type: 'ANNULLA_CAMBIO' }, { contesto: [ricerca] });
+  expect(giu.no, JSON.stringify(giu).slice(0, 300)).toBeFalsy();
+  expect(giu.needsConfirm).toBeTruthy();
+  expect((await exec({ type: 'ANNULLA_CAMBIO' }, { contesto: [ricerca], confirmed: true })).executed).toBe(true);
+  expect((await impostazioni(app)).monthlyLimitEur).toBe(5);
+
+  // Riaccesa a parole, la protezione dei popup rimessa com'era si spegne: dopo una ricerca è il no, e resta accesa.
+  await app.evaluate(async () => {
+    const s = (await globalThis.SN_STORAGE.getSettings()).security || {};
+    await globalThis.SN_STORAGE.updateSettings({ security: { ...s, blockPopups: false } });
+  });
+  expect((await exec({ type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'sì' })).executed).toBe(true);
+  const su = await exec({ type: 'ANNULLA_CAMBIO' }, { contesto: [ricerca] });
+  expect(su.no, JSON.stringify(su).slice(0, 300)).toBe(true);
+  expect((await impostazioni(app)).security.blockPopups).toBe(true);
+});
