@@ -2243,7 +2243,7 @@
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { feedbackL0: { enabled: b } }, label: `Rilettura del feedback prima dell'invio → ${b ? 'attiva' : 'spenta'}` };
+        return { partial: { feedbackRilettura: { enabled: b } }, label: `Rilettura del feedback prima dell'invio → ${b ? 'attiva' : 'spenta'}` };
       },
     },
     // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì (tradurle) vale «subito», un no «quando le apro»:
