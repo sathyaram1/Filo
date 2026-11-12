@@ -81,6 +81,7 @@ test('chiusa la scheda per sbaglio e riaperta, il testo è lì', async ({ app, s
   let riaperta = null;
   await expect.poll(async () => Boolean(riaperta = await paginaDellaScheda(app, nuovo, (p) => p.url() === url)), { timeout: 10000 }).toBe(true);
   await expect.poll(() => valore(riaperta, '#messaggio'), { timeout: 10000 }).toBe('Una risposta lunga che non voglio riscrivere');
+  await expect(riaperta.locator('#ricevuto')).toHaveText('Una risposta lunga che non voglio riscrivere');
 });
 
 test('dentro un riquadro di un altro sito il testo torna alla ricarica, senza toccare il riquadro', async ({ app, openTab, testServer }) => {
