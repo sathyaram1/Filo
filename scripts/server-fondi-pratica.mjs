@@ -461,20 +461,29 @@ export async function esegui(argv, deps = {}) {
           : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
       return k;
     }
-    if (tardiva) {
-      log(`Pratica ${chi}: l'ha chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), meno di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore fa: vale per quest'ultima parte.`);
-    } else {
-      if (riapertaDa) {
-        const riaperta = await of.scrivi(r.id, 'todo', NOTE_FISSE.serverRiaperta({ ramo: a.ramo, chiusaDa: riapertaDa.chiusaDa || 'app', quando: riapertaDa.at, ramiApp }), { bearer });
-        if (!riaperta.ok) { err(`La pratica ${chi} non si è riaperta (${riaperta.motivo}): non porto il ramo su main senza.`); return 1; }
-        log(`Pratica ${chi} riaperta: ${perche}`);
+    const filoProve = (deps.filoConLApp || filoConLApp)(deps.radice || ROOT, ramiApp);
+    if (filoProve && filoProve.errore) { err(`server:fondi: ${filoProve.errore}. Non ho toccato niente.`); return 1; }
+    let k;
+    let mainPrima;
+    try {
+      if (tardiva) {
+        log(`Pratica ${chi}: l'ha chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), meno di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore fa: vale per quest'ultima parte.`);
+      } else {
+        if (riapertaDa) {
+          const riaperta = await of.scrivi(r.id, 'todo', NOTE_FISSE.serverRiaperta({ ramo: a.ramo, chiusaDa: riapertaDa.chiusaDa || 'app', quando: riapertaDa.at, ramiApp }), { bearer });
+          if (!riaperta.ok) { err(`La pratica ${chi} non si è riaperta (${riaperta.motivo}): non porto il ramo su main senza.`); return 1; }
+          log(`Pratica ${chi} riaperta: ${perche}`);
+        }
+        const presa = await of.annotaPratica(r.id, NOTE_FISSE.serverInizio({ ramo: a.ramo }), { bearer });
+        if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
+        log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
       }
-      const presa = await of.annotaPratica(r.id, NOTE_FISSE.serverInizio({ ramo: a.ramo }), { bearer });
-      if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
-      log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
+      mainPrima = (deps.mainPrima || mainRemotoServer)(cartella);
+      if (filoProve) log(`Le prove del server leggono main di Filo con ${ramiApp.join(', ')} dell'app.`);
+      k = lanciaFissato(cartella, a.ramo, daFondere, filoProve ? { ...figlio, FILO_PUBLIC_REPO: filoProve.dir } : figlio, fissate);
+    } finally {
+      if (filoProve) filoProve.togli();
     }
-    const mainPrima = (deps.mainPrima || mainRemotoServer)(cartella);
-    let k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
     const dalPc = k === 0;
     if (k === USCITA_SPINTA_RIFIUTATA) {
       const shaCancello = (daFondere && daFondere.server && daFondere.server.sha) || (deps.puntaRamo || puntaRamoServer)(cartella, a.ramo) || '';
