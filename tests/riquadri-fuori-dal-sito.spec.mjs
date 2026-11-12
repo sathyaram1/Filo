@@ -7,7 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
-import { menuDi, menuDelloStratoAperto } from './helpers/menuContestuale.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'zibaldone-segreto-1509 del mio conto';
 
