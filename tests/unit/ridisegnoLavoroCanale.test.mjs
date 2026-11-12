@@ -150,6 +150,40 @@ test('già risolto su main: parte solo con una fusione della linea principale, i
   assert.equal(ricevuti.length, prima, 'nessuna chiusura storta è arrivata al server');
 });
 
+test('un doppione si chiude con la fusione che cita l\'originale, e il numero arriva al server (#2046)', async (t) => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { casa, fusione } = deposito();
+  t.after(() => { srv.close(); togliCartella(casa); });
+  const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa };
+  const base = ['deliver', 'b'.repeat(43), 'status', '--status', 'done', '--reason', 'gia_risolto'];
+  const testi = ['--notes', 'Stessa richiesta di #77, che la fusione ha chiuso.', '--frase', 'Il menu si apre di nuovo.'];
+  for (const [originale, atteso] of [['#77', '77'], ['75', '75']]) {
+    const r = await esegui('routine-channel.mjs', [...base, '--fusione', fusione.slice(0, 10), '--doppione-di', originale, ...testi], env);
+    assert.equal(r.code, 0, r.se);
+    const d = ricevuti.filter((x) => x.url.includes('routineDeliver')).pop().body.data;
+    assert.equal(d.doppioneDi, atteso, 'citato nel ramo fuso (#77) o nel messaggio della fusione (#75)');
+    assert.equal(d.fusione, fusione);
+    assert.equal(d['doppione-di'], undefined, 'un nome solo per il campo');
+  }
+  const senza = await esegui('routine-channel.mjs', [...base, '--fusione', fusione, ...testi], env);
+  assert.equal(senza.code, 0, senza.se);
+  assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).pop().body.data.doppioneDi, undefined);
+  const prima = ricevuti.length;
+  const casi = [
+    [[...base, '--fusione', fusione, '--doppione-di', '76', ...testi], /non porta nessun commit che citi #76/],
+    [[...base, '--fusione', fusione, '--doppione-di', 'il menu', ...testi], /vuole in --doppione-di il numero/],
+    [[...base, '--doppione-di', '77', ...testi], /vuole --fusione/],
+    [['deliver', 'b'.repeat(43), 'status', '--status', 'design', '--reason', 'clarify', '--doppione-di', '77', ...testi], /va con --status done/],
+    [['deliver', 'b'.repeat(43), 'note', '--notes', 'x', '--doppione-di', '77'], /--doppione-di vale solo con deliver status/],
+  ];
+  for (const [argv, atteso] of casi) {
+    const no = await esegui('routine-channel.mjs', argv, env);
+    assert.equal(no.code, 1, `${argv.join(' ')}: ${no.se}`);
+    assert.match(no.se, atteso);
+  }
+  assert.equal(ricevuti.length, prima, 'nessun doppione storto è arrivato al server');
+});
+
 test('la correzione senza motivo non parte; col motivo e in un riallineamento porta motivo e confronto', async (t) => {
   const { srv, ricevuti, port } = await fintoServer();
   const { casa } = deposito();
