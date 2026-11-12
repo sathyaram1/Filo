@@ -2234,6 +2234,18 @@
         return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
+    {
+      scrive: ['feedbackL0.enabled'],
+      aiuto: 'true | false (prima che un feedback parta, Filo lo rilegge in cerca di dati sensibili e cose mandate per sbaglio e, se trova qualcosa, lo mostra prima di mandarlo; spenta, il feedback parte com\'è)',
+      costo: 1,
+      keys: ['rilettura_feedback', 'rilettura del feedback', 'rileggi il feedback', 'controllo del feedback prima dell\'invio',
+        'l0', 'feedbackl0', 'feedbackl0.enabled'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { feedbackL0: { enabled: b } }, label: `Rilettura del feedback prima dell'invio → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
     // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì (tradurle) vale «subito», un no «quando le apro»:
     // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
     {
