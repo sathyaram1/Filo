@@ -25,7 +25,9 @@ for (const ms of [150, 600, 2000]) {
     const premi = app.evaluate(async ({ BrowserWindow }, { attesa, u }) => {
       const t0 = Date.now();
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-      const lascia = !!win._filoTabs.riquadri?.strati?.get(win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents);
+      const tw = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
+      const lascia = !!win._filoTabs.riquadri?.strati?.get(tw);
+      tw.focus();
       if (attesa) await new Promise((r) => setTimeout(r, attesa));
       const wc = win._filoTabs.tabs.find((t) => t.view.webContents.getURL() === u).view.webContents;
       const s = win._filoTabs.riquadri?.strati?.get(wc);
