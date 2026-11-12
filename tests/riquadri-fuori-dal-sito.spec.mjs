@@ -343,3 +343,41 @@ test('feedback su un sito: se l\'invio con lo screenshot non riesce, la tastiera
   await expect.poll(() => app.evaluate(({ webContents }) => String(webContents.getFocusedWebContents()?.getURL() || '')))
     .toMatch(/^filo:\/\/riquadri\//);
 });
+
+// #1623.3: una foto lasciata sul feedback o incollata nella sua casella entra fra gli allegati, e il sito che ascolta
+// rilasci e incolla non la riceve. Il rilascio parte dove lo manda il sistema, sullo strato che copre la pagina.
+test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, e il sito non la riceve', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const file = join(cartellaInCasa('filo-test-1623-3-'), 'estratto conto.png');
+  writeFileSync(file, PNG);
+  const p = await testServer.openReady(openTab, pagina(`<script>
+    window.__file = [];
+    for (const t of ['dragenter', 'dragover', 'drop']) window.addEventListener(t, (e) => {
+      for (const f of (e.dataTransfer && e.dataTransfer.files) || []) window.__file.push(t + ' ' + f.name);
+    }, true);
+    window.addEventListener('paste', (e) => { for (const it of e.clipboardData.items) if (it.getAsFile()) window.__file.push('incolla ' + it.type); }, true);
+  </script>`));
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, p, '.sn-fb-modal')).not.toBeNull();
+  const box = await statoDi(app, p, '.sn-fb-modal');
+  expect(box.nelloStrato).toBe(true);
+
+  const strato = await paginaDelloStrato(app, p);
+  const s = await strato.context().newCDPSession(strato);
+  const data = { items: [], files: [file], dragOperationsMask: 1 };
+  const punto = { x: box.x + box.width / 2, y: box.y + box.height / 3 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, ...punto, data });
+  await s.detach().catch(() => {});
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(1);
+
+  await app.evaluate(async ({ clipboard, nativeImage }, b64) => {
+    clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(b64, 'base64')));
+  }, PNG.toString('base64'));
+  const dove = await clicca(app, p, '.sn-fb-text');
+  await dove.keyboard.press('ControlOrMeta+V');
+  await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(2);
+
+  await p.waitForTimeout(400);
+  expect(await p.evaluate(() => window.__file)).toEqual([]);
+});
