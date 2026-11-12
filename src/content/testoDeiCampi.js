@@ -136,7 +136,8 @@
       campi.push({ firma: s.firma, valore: v });
     }
     if (!seguiti.size && controllo) { clearInterval(controllo); controllo = null; }
-    if (campi.length) send({ fase: 'scrivi', campi }).then(dopoScrittura);
+    // Anche senza niente di nuovo: la chiusura della scheda che aspetta questo testo deve sapere che non c'è altro.
+    if (campi.length || eraSospeso) send({ fase: 'scrivi', campi }).then(dopoScrittura);
   }
 
   let avvisato = false;
