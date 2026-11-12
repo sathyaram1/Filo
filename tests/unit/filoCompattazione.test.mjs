@@ -523,11 +523,12 @@ test('dopo una compattazione entrano almeno tre turni come quelli di adesso prim
       const k = L.puntoDiTaglio(lista, { ora, maxToken: L.grezzoMassimo({ soglia, base, turno }), peso });
       const grezzo = lista.slice(k).reduce((a, m) => a + m.peso, 0);
       let j = 1;
-      while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base })) j++;
-      assert.ok(j > L.TURNI_LIBERI, `turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+      while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base, turno })) j++;
+      assert.ok(j > L.TURNI_LIBERI, `soglia ${soglia}, turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+      assert.ok(L.limiti({ soglia, base, turno }).soglia < L.LISTINO, 'lo spazio che serve si ferma sotto il listino');
     }
   }
-  assert.equal(Math.round(L.grezzoMassimo({ soglia, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
+  assert.equal(Math.round(L.grezzoMassimo({ soglia: 70000, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
   assert.equal(L.pesoTurno([], peso), 0);
 });
 
