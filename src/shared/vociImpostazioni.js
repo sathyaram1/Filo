@@ -64,6 +64,8 @@
         aggiornamentiInstalla: 'aggiornamenti.installa',
         propostaEmailAttiva: 'propostaEmail.attiva',
         propostaEmailIncognito: 'propostaEmail.incognito',
+        testoCampiAttivo: 'testoDeiCampi.attivo',
+        testoCampiGiorni: 'testoDeiCampi.giorni',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         contestoCache: 'contestoFilo.cache',
