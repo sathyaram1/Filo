@@ -906,7 +906,8 @@ async function main() {
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
     const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root: albero.dir });
     const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
-    const motivo = spec.rilancia ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
+    // Il riallineamento senza file risolti l'ha già detto nella sua nota.
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
