@@ -268,6 +268,7 @@
     try {
       await load();
       for (const it of queue.slice()) {
+        if (it.trattenuta) continue;
         // Voce già rinunciata: non si tenta più di spedirla e non scade, si
         // prova solo a dirlo. Detto, esce dalla coda.
         if (it.rinuncia) {
