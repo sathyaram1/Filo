@@ -207,15 +207,26 @@
     if (!segui || !rimasti.length) { fermaAttesa(); return; }
     const presenti = [];
     const campi = [];
+    // L'ordine si conta in un giro solo, per radice: un campo alla volta costerebbe un giro della pagina ciascuno.
+    const contati = new Map();
     for (const el of tuttiICampi(document)) {
-      if (seguiti.has(el) || String(el.value || '') !== '' || !idoneo(el)) continue;
-      const firma = firmaDi(el);
+      const tag = el.tagName.toLowerCase();
+      const tipo = tipoDi(el);
+      let radice = null;
+      try { radice = el.getRootNode(); } catch (_) {}
+      const perRadice = contati.get(radice) || new Map();
+      contati.set(radice, perRadice);
+      const ordine = perRadice.get(`${tag}|${tipo}`) || 0;
+      perRadice.set(`${tag}|${tipo}`, ordine + 1);
+      if (seguiti.has(el) || String(el.value || '') !== '') continue;
+      const firma = R.firmaPulita({ tag, tipo, id: el.id || '', nome: el.getAttribute('name') || '', etichetta: etichettaDi(el), ordine });
       if (!firma) continue;
       presenti.push({ firma, indice: campi.length });
       campi.push(el);
     }
     if (!presenti.length) return;
-    const fatti = R.abbina(rimasti, presenti);
+    // Solo i campi abbinati passano il controllo intero (segreti, ricerca, aspetto): è il pezzo che costa.
+    const fatti = R.abbina(rimasti, presenti).filter((f) => idoneo(campi[f.indice]));
     for (const { indice, valore, da } of fatti) {
       const el = campi[indice];
       scriviNelCampo(el, valore);
