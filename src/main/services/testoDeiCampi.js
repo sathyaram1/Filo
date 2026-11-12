@@ -40,6 +40,8 @@ function carica() {
         letti = {};
       }
       pagine = R.pota(letti, ora(), giorniCorrenti);
+      // Lo scaduto non resta sul disco ad aspettare la prossima scrittura.
+      if (Object.keys(pagine).length !== Object.keys(letti).length || R.pesoTotale(pagine) !== R.pesoTotale(letti)) programma();
       return pagine;
     })().finally(() => { caricamento = null; });
   }
