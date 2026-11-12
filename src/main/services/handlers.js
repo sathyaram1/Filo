@@ -1145,8 +1145,13 @@ async function stimaSogliaCompattazione(valore) {
   };
   const chat = primo(ACTIONS.FILO_CHAT);
   const comp = primo(modelloCheCompatta(settings));
+  // La parte fissa che la chat ha misurato all'ultimo turno; prima del primo, gli stessi pezzi con la parte dell'utente di
+  // adesso (o quella tipica, se non c'è ancora).
   const Tools = globalThis.SN_ACTION_TOOLS;
-  const base = FC.stimaToken(JSON.stringify(Tools ? Tools.definitions() : []) + PROMPTS.filoChatStatic()) + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente;
+  const foto = ContestoFilo.ultimaFotografia(false);
+  const base = Compattazione.base(false) || (foto
+    ? parteFissaChat(Tools ? Tools.definitions() : [], foto.testo)
+    : parteFissaChat(Tools ? Tools.definitions() : [], '') + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente);
   const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
     soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
   });
