@@ -352,10 +352,12 @@ jobs:
             ROSSI="${ROSSI}
           … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno nel registro del lavoro verdetto di questa esecuzione"
           fi
-          # Gia' entro il suo tetto, detto nel testo stesso (suite-verdict.mjs, testoErrori).
+          # Gia' entro il suo tetto (suite-verdict.mjs, testoErrori). Va dopo i commit e prima del verdetto: oltre il tetto
+          # del server build-alarm taglia la coda, e il verdetto ripete l'elenco dei rossi.
           ERRORI=$(cat esiti-suite/rossi-errori.txt 2>/dev/null || true)
           if [ -n "$ERRORI" ]; then
             ERRORI="
+
 
           Errori dei rossi nuovi:
           ${ERRORI}"
