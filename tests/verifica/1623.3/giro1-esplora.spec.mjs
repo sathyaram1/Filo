@@ -28,9 +28,13 @@ const conFile = (app, p) => p.evaluate(() => window.__visti.filter((v) => v.file
 const visti = (p) => p.evaluate(() => window.__visti.map((v) => `${v.t}:${v.files}/${v.items}`));
 
 async function immagineNegliAppunti(app) {
-  await app.evaluate(({ clipboard, nativeImage }, b64) => {
-    clipboard.writeImage(nativeImage.createFromDataURL(`data:image/png;base64,${b64}`));
-  }, PNG_B64);
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const w = 48, h = 32;
+    const px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) px.set([0, 0, 255, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
 }
 
 test('incolla col Ctrl+V nella casella del feedback: entra fra gli allegati e il sito non riceve niente', async ({ app, openTab, testServer }) => {
