@@ -118,6 +118,62 @@
   box-shadow: none !important;
 }
 
+/* L0 (#1403): le parti segnate si evidenziano su uno sfondo che ricalca la casella carattere per carattere; la
+   casella resta sopra, trasparente, e si scrive come sempre. */
+.sn-fb-campo {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+}
+.sn-fb-text { position: relative; z-index: 1; line-height: 1.45; }
+.sn-fb-evidenze {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+  display: none;
+}
+.sn-fb-campo--evidenze { background: var(--sn-bg); }
+.sn-fb-campo--evidenze .sn-fb-evidenze { display: block; }
+.sn-fb-campo--evidenze .sn-fb-text { background: transparent; }
+/* Ambra calda, leggibile sotto il testo in tutti e due i temi. */
+.sn-fb-evidenze mark {
+  color: transparent;
+  background: var(--sn-fb-evidenza, rgba(240, 160, 40, 0.38));
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(240, 160, 40, 0.55);
+}
+
+.sn-fb-l0 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(240, 160, 40, 0.55);
+  background: rgba(240, 160, 40, 0.10);
+  font-size: 13px;
+  animation: sn-fade-in calc(150ms * var(--sn-motion, 1)) ease-out;
+}
+.sn-fb-l0[hidden] { display: none; }
+.sn-fb-l0-titolo { font-weight: 600; }
+.sn-fb-l0-frasi { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.sn-fb-l0-azioni { display: flex; gap: 8px; justify-content: flex-end; }
+.sn-fb-thumb--l0 { border-color: rgba(240, 160, 40, 0.9); box-shadow: 0 0 0 2px rgba(240, 160, 40, 0.45); }
+
 /* Una riga sola di azioni, senza header né footer separati. */
 .sn-fb-actions {
   display: flex;
