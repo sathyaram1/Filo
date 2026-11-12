@@ -144,19 +144,28 @@ async function scrivi(sender, settings, campi) {
   await carica();
   const t = ora();
   let p = pagine[pagina] || null;
-  const troppo = [];
+  delete pagine[pagina];
+  let peso = R.pesoTotale(pagine) + R.pesoTotale({ p });
+  let troppo = 0;
+  let motivo = '';
   for (const c of (Array.isArray(campi) ? campi : []).slice(0, R.CAMPI_PER_PAGINA)) {
     const firma = R.firmaPulita(c && c.firma);
     if (!firma || typeof c.valore !== 'string') continue;
-    // Oltre il tetto non si tiene niente di quel campo, e la pagina lo sa: mai un testo tagliato a metà.
-    const valore = c.valore.length > R.VALORE_MAX ? '' : c.valore;
-    if (c.valore.length > R.VALORE_MAX) troppo.push(firma);
-    p = R.aggiorna(p, firma, /\S/.test(valore) ? valore : '', t);
+    const vecchio = ((p && p.campi) || []).find((x) => R.stessaFirma(x.firma, firma));
+    const valore = /\S/.test(c.valore) ? c.valore : '';
+    peso -= vecchio ? vecchio.valore.length : 0;
+    // Oltre un tetto quel campo non si tiene (nemmeno la sua versione di prima, superata) e la pagina lo dice: mai un
+    // testo tagliato a metà, mai il testo di un altro campo buttato per fargli posto.
+    const oltre = !valore ? '' : valore.length > R.VALORE_MAX ? 'campo' : peso + valore.length > R.TOTALE_MAX ? 'totale'
+      : !vecchio && p && p.campi.length >= R.CAMPI_PER_PAGINA ? 'pagina' : '';
+    if (oltre) { troppo++; motivo = oltre; }
+    p = R.aggiorna(p, firma, oltre ? '' : valore, t);
+    if (valore && !oltre) peso += valore.length;
   }
-  if (p) pagine[pagina] = p; else delete pagine[pagina];
+  if (p) pagine[pagina] = p;
   if (sender.wc) padroni.set(pagina, sender.wc.id);
   programma();
-  return { ok: true, segui: true, troppo: troppo.length };
+  return { ok: true, segui: true, troppo, ...(motivo ? { motivo } : {}) };
 }
 
 // Chiudere una scheda non dà eventi alla pagina: con un testo non ancora spedito la chiusura aspetta che arrivi, col
