@@ -318,6 +318,8 @@ test('la sera di ieri compattata dopo il riassunto del giorno resta nel diario, 
   ieri.setDate(ieri.getDate() - 1);
   const alle = (h, m = 0) => { const d = new Date(ieri); d.setHours(h, m, 0, 0); return d.getTime(); };
   const iso = (t) => new Date(t).toISOString();
+  // Le 9 di oggi, non l'orologio: a mezzanotte e mezza la sera di ieri sta ancora nelle due ore grezze.
+  const stamattina = (() => { const d = new Date(alle(9)); d.setDate(d.getDate() + 1); return d.getTime(); })();
   await scrivi('ab12', 'user', 'scrivo la mail al relatore', iso(alle(10)));
   await scrivi('ab12', 'filo', 'Scritta.', iso(alle(10) + 5000));
   await scrivi('ab12', 'user', 'prenota il volo per Lisbona', iso(alle(23)));
