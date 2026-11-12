@@ -2288,9 +2288,10 @@ if (isMain) {
       data.piano = p.testo;
     }
     // Già risolto su main: chiude senza ramo, con la fusione che lo prova, il report e la frase.
-    // Un doppione (#2046) porta il numero dell'originale: la fusione cita quello, e il server controlla che sia chiuso.
+    // Un doppione (#2046) porta il numero dell'originale. Quale fusione è dell'originale lo decide solo il server, che
+    // legge il suo ramo e la sua chiusura: un'approvazione dell'owner non ne cita il numero.
     if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined || data['doppione-di'] !== undefined)) {
-      const { numeroFeedback, fusioneCita } = await import('./lib/su-main.mjs');
+      const { numeroFeedback } = await import('./lib/su-main.mjs');
       const originale = data['doppione-di'] === undefined ? '' : numeroFeedback(data['doppione-di']);
       const manca = data.status !== 'done' || data.reason !== 'gia_risolto' ? 'va con --status done --reason gia_risolto'
         : typeof data.fusione !== 'string' ? 'vuole --fusione <sha della fusione su main>'
