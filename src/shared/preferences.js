@@ -2239,7 +2239,7 @@
       aiuto: 'true | false (prima che un feedback parta, Filo lo rilegge in cerca di dati sensibili e cose mandate per sbaglio e, se trova qualcosa, lo mostra prima di mandarlo; spenta, il feedback parte com\'è)',
       costo: 1,
       keys: ['rilettura_feedback', 'rilettura del feedback', 'rileggi il feedback', 'controllo del feedback prima dell\'invio',
-        'l0', 'feedbackl0', 'feedbackl0.enabled'],
+        'l0', 'feedbackrilettura', 'feedbackrilettura.enabled'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
