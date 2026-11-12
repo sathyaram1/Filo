@@ -124,7 +124,7 @@ test('Aiuto: Ctrl+V mentre nasce, l\'immagine va fra gli allegati dell\'Aiuto', 
   const strato = await paginaDelloStrato(app, p);
   await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
   await p.waitForTimeout(1500);
-  const n = await strato.evaluate(() => document.querySelectorAll('.sn-sidebar-allegati img').length).catch(() => 'n/d');
-  const n2 = await conta(app, p, '.sn-sidebar-allegati img').catch(() => 'n/d');
+  const n = await allegatiAiuto(app, p);
+  const n2 = '';
   console.log('aiuto', 'sito:', JSON.stringify(await p.evaluate(() => window.__visti)), 'allegati:', n, n2);
 });
