@@ -29,16 +29,24 @@ export async function finestraASchermo(app) {
 }
 
 // Il centro di `sel` in px dello schermo. `doc` è la Page dove sta il nodo (la scheda o lo strato sopra di lei, che ha
-// gli stessi px); `scheda` è la Page della scheda, da cui si prende la posizione.
+// gli stessi px); `scheda` è la Page della scheda, da cui si prende la posizione. La scheda si riconosce dalla sua vista,
+// non dall'indirizzo: con due home la prima per indirizzo era quella dietro, coi limiti a zero (#2285).
 export async function sulloSchermo(app, scheda, doc, sel) {
   const r = await doc.locator(sel).first().boundingBox();
-  const o = await app.evaluate(({ BrowserWindow }, u) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const cb = w.getContentBounds();
-    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL() === u);
-    const vb = t.view.getBounds();
-    return { x: cb.x + vb.x, y: cb.y + vb.y };
-  }, scheda.url());
+  const o = await app.evaluate(({ BrowserWindow }, b) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = (w._filoTabs?.tabs || []).find((x) => {
+        try { return x.view.webContents.getOrCreateDevToolsTargetId() === b; } catch (_) { return false; }
+      });
+      if (!t) continue;
+      const cb = w.getContentBounds();
+      const vb = t.view.getBounds();
+      return { x: cb.x + vb.x, y: cb.y + vb.y, larga: vb.width, alta: vb.height };
+    }
+    return null;
+  }, await bersaglioDi(scheda));
+  if (!o) throw new Error(`sulloSchermo: ${scheda.url()} non è la Page di una scheda di Filo`);
+  if (!o.larga || !o.alta) throw new Error(`sulloSchermo: la scheda di ${scheda.url()} non è a schermo (ce n'è un'altra davanti)`);
   return { x: Math.round(o.x + r.x + r.width / 2), y: Math.round(o.y + r.y + r.height / 2) };
 }
 
