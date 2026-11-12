@@ -905,6 +905,7 @@
     CANCELLA_ARCHIVIO: {
       costo: 4,
       campo: null,
+      dove: 'Le schede archiviate l\'utente le toglie a mano dalla home: le trova nel campo «Cerca nel filo» in cima, e col tasto destro su ognuna «Togli dal filo».',
       describe: (a) => (a && a.tutto === true
         ? ["Svuotare l'archivio: tutte le schede chiuse.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare."]
         : ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
