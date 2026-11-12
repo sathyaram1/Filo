@@ -111,6 +111,10 @@
       'Guarda l\'immagine di un riquadro di un altro sito che resta vuoto o chiede di entrare, solo quando le regole non lo riconoscono, e dice se è rotto per i cookie. Serve un modello che veda le immagini.'),
 
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
+    user('feedback-l0', 'Rilettura del feedback prima dell\'invio: testo', 'Feedback', A.FEEDBACK_L0,
+      'Cerca nel testo dati sensibili, pezzi incollati per sbaglio e tentativi di ingannare chi esamina i feedback. Parte già mentre scrivi; se non risponde entro 8 secondi il feedback parte lo stesso.'),
+    user('feedback-l0-immagini', 'Rilettura del feedback prima dell\'invio: immagini', 'Feedback', A.FEEDBACK_L0_IMMAGINI,
+      'Guarda le immagini allegate e lo screenshot in cerca di dati sensibili o di altre schede aperte. Serve un modello che veda le immagini: senza, le immagini non si rileggono.'),
     owner('manage-search', 'Ricerca fra i feedback', 'Feedback', 'manageSearch',
       'Gira sul computer di chi gestisce Filo, con la chiave che usa nel resto di Filo.', A.MANAGE_SEARCH),
     owner('manage-search-classify', 'Classificatore della ricerca fra i feedback', 'Feedback', 'manageSearchClassifier',
