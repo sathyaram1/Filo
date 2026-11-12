@@ -174,6 +174,7 @@ function conta() {
 }
 
 async function stato() {
+  giorniCorrenti = R.opzioni(await impostazioniAdesso()).giorni;
   await carica();
   return { ok: true, ...conta() };
 }
