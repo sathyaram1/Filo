@@ -205,7 +205,7 @@ test('una memoria tolta dal quaderno non torna dalla compattazione, e tenuta da 
   expect(r.scritte, 'la compattazione non la riscrive').toBe(0);
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('Miso');
 
-  await conversazioneTolta(app, { chat: 'gatti2', sospetta: true });
+  await conversazioneTolta(app, { chat: 'gatti2', sospetta: true, oreFa: 4 });
   const q = await openTab('filo://quaderno/quaderno.html');
   const proposta = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'Miso e Pepe' });
   await expect(proposta).toBeVisible({ timeout: 10000 });
