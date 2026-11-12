@@ -481,6 +481,8 @@
     options_action_safebrowse_judge: 'Rilevamento siti pericolosi — giudizio',
     options_action_geoblock_classify: 'Riconoscimento dei blocchi geografici',
     options_action_feedback_title: 'Titolo automatico dei feedback',
+    options_action_feedback_l0: 'Rilettura del feedback prima dell\'invio (testo)',
+    options_action_feedback_l0_immagini: 'Rilettura del feedback prima dell\'invio (immagini)',
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
