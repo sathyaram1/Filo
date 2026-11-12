@@ -906,7 +906,8 @@
     // === Il testo dei campi che non si perde (#2378, src/content/testoDeiCampi.js) ===
     // Aperto ai siti di proposito: lo manda il content script del frame, e la pagina la ricava il main dal frame che
     // parla, mai dal messaggio. `segui:false` = qui non si conserva niente. `valore` vuoto toglie il campo.
-    TESTO_CAMPI: 'testo_campi',                     // { fase:'leggi' } → { ok, segui, campi:[{ firma, valore }] } | { fase:'scrivi', campi:[{ firma, valore }] } → { ok, segui, troppo }
+    // 'sospeso': testo scritto e non ancora spedito, la chiusura della scheda lo aspetta; 'ce': c'è testo per questo frame?
+    TESTO_CAMPI: 'testo_campi',                     // { fase:'leggi' } → { ok, segui, campi:[{ firma, valore }] } | { fase:'scrivi', campi:[{ firma, valore }] } → { ok, segui, troppo } | { fase:'sospeso' } → { ok, segui } | { fase:'ce' } → { ok, ce }
     // Dalle Preferenze (solo Filo): quanti testi ci sono, e via tutti.
     TESTO_CAMPI_STATO: 'testo_campi_stato',         // {} → { ok, pagine, campi }
     TESTO_CAMPI_CANCELLA: 'testo_campi_cancella',   // {} → { ok, pagine, campi }
