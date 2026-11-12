@@ -125,6 +125,7 @@ test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la u
   await expect(prefs.locator('#contestoSogliaStima')).not.toContainText('token fissi');
   await campo.fill('40000');
   await campo.blur();
+  await expect(prefs.locator('#contestoSogliaStima')).toContainText('token fissi', { timeout: 15000 });
   await prefs.locator('#sec-contesto').screenshot({ path: 'tests/.shots/compattazione-preferenze.png' });
   const tetti = await app.evaluate(async () => globalThis.SN_FILO_CONTESTO.tetti((await globalThis.SN_STORAGE.getSettings()).contestoFilo, null));
   expect(tetti.soglia).toBe(40000);
