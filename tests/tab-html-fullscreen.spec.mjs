@@ -46,11 +46,16 @@ test('la richiesta di fullscreen della pagina porta la view a tutto schermo', as
   await expect.poll(() => fsState(app), { timeout: 8_000 }).toBe(true);
 
   // Uscita: la pagina esce dal fullscreen → leave-html-full-screen → torna false.
-  await app.evaluate(({ BrowserWindow }, tabId) => {
+  const r = await app.evaluate(({ BrowserWindow }, tabId) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const tab = win._filoTabs.tabs.find((t) => t.id === tabId);
-    return tab.view.webContents.executeJavaScript('document.exitFullscreen().catch(()=>{}); true', true);
+    globalThis.__diag.push(`${Date.now() - globalThis.__t0} exit call isFS=${win.isFullScreen()}`);
+    return tab.view.webContents.executeJavaScript('(async () => { const fe = !!document.fullscreenElement; try { await document.exitFullscreen(); return "ok fe=" + fe; } catch (e) { return "rej fe=" + fe + " " + e; } })()', true);
   }, id);
-
-  await expect.poll(() => fsState(app), { timeout: 8_000 }).toBe(false);
+  try {
+    await expect.poll(() => fsState(app), { timeout: 8_000 }).toBe(false);
+  } finally {
+    const d = await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs); return [...globalThis.__diag, `end isFS=${win.isFullScreen()} cf=${win._filoTabs.contentFullscreen} pf=${win._filoTabs.pageFullscreen}`]; });
+    console.log('DIAG', r, JSON.stringify(d));
+  }
 });
