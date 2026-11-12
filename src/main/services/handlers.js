@@ -1232,6 +1232,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   try { require('./bloccoYouTube').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
   try { require('../propostaEmail').impostazioni(merged); } catch (_) {}
+  try { require('./testoDeiCampi').impostazioni(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
   try {
     for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
