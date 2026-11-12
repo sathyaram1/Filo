@@ -71,7 +71,7 @@ test('c\'è da correggere: la risposta resta su file, l\'ultima riga la nomina e
   } });
   try {
     const r = await esegui(['--record-verifier', 'fid-2316',
-      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[0i] caso raro'], ENV(casa, port));
+      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[e] caso raro'], ENV(casa, port));
     assert.equal(r.code, 0, `la critica doveva essere accettata (stderr: ${r.se})`);
     const file = join(consegna, FILE_RISPOSTA_CRITICA);
     const ultima = r.so.trim().split('\n').at(-1);
