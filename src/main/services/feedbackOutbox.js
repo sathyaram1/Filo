@@ -183,12 +183,33 @@
       }
       await persist();
     }
+    if (trattieni) return { id, queued: true, nuova, trattenuta: true };
+    return { ...parti(id, opts), id, queued: true, nuova };
+  }
+
+  function parti(id, opts) {
     const entroMs = Number(opts && opts.attendiMs) || 0;
     const tentativo = entroMs > 0 ? attendiTentativo(id, entroMs) : null;
     // Un invio nuovo si prova adesso, non al giro di backoff fissato per una voce vecchia (fino a mezzo minuto).
     if (timer && !flushing) { clearTimeout(timer); timer = null; }
     scheduleFlush(0);
-    return tentativo ? { id, queued: true, tentativo } : { id, queued: true };
+    return tentativo ? { tentativo } : {};
+  }
+
+  function rilascia(id, opts) {
+    const it = queue.find((x) => x.id === String(id));
+    if (!it) return {};
+    it.trattenuta = false;
+    return parti(it.id, opts);
+  }
+
+  async function ritira(id) {
+    await load();
+    const c'era = queue.some((it) => it.id === String(id) && it.trattenuta);
+    if (!c'era) return false;
+    remove(String(id));
+    await persist();
+    return true;
   }
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
