@@ -2485,7 +2485,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
-  return { ...d, livello, stato: st, perche, nuovaUguale, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
+  return { ...d, livello, stato: st, perche, nuovaUguale, conCosto: (c) => A.decide({ ...ingressi, costo: c, difesa: false, stato: statoPer(c).stato }) };
 }
 // Il contesto di un turno della chat → le letture che avrebbe davanti una conversazione nuova (#1508).
 const LETTURE_DI_UNA_NUOVA = new WeakMap();
