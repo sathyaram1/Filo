@@ -1141,7 +1141,7 @@
     },
     {
       scrive: ['testoDeiCampi.giorni'],
-      aiuto: () => `${global.SN_TESTO_CAMPI.GIORNI.join(' | ')} (per quanti giorni resta il testo scritto nei campi dei siti e non inviato; di serie ${global.SN_TESTO_CAMPI.GIORNI_DI_SERIE})`,
+      aiuto: () => `${testoCampi().GIORNI.join(' | ')} (per quanti giorni resta il testo scritto nei campi dei siti e non inviato; di serie ${testoCampi().GIORNI_DI_SERIE})`,
       keys: ['testo_dei_campi_giorni', 'giorni testo dei campi', 'durata testo dei campi', 'quanto resta il testo dei campi',
         'per quanto conservare il testo', 'scadenza testo dei campi'],
       costo: 1,
