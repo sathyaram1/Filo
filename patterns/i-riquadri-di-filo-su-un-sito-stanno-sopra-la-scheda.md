@@ -60,7 +60,8 @@ lì non c'è codice di altri.
 - **Tastiera ed Esc:** chi apre un riquadro ci scrive, quindi lo strato prende la tastiera; mentre nasce (uno strato
   freddo tarda qualche decimo) i tasti che scrivono battuti sulla pagina si trattengono e gli arrivano dopo, o tornano
   alla pagina se la tastiera resta a lei o l'utente ci clicca; le scorciatoie no, agirebbero due volte (`scrive`,
-  sentinella in `tests/unit/riquadriSopraLaScheda.test.mjs`); quando non ha più niente la rende alla pagina; un riquadro che copre la pagina e torna a vedersi (cambio di scheda, lo scatto del feedback) se la
+  sentinella in `tests/unit/riquadriSopraLaScheda.test.mjs`), tranne l'incolla: lasciato alla pagina le darebbe gli
+  appunti (#1623.3), quindi si trattiene e torna come comando (`incolla`); se lo strato non arriva si perde; quando non ha più niente la rende alla pagina; un riquadro che copre la pagina e torna a vedersi (cambio di scheda, lo scatto del feedback) se la
   riprende, e così lo strato dove l'utente scriveva l'ultima volta (`scriveQui`: la casella dell'Aiuto, tornando da
   un'altra scheda o dalla barra), o i tasti andrebbero al sito. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità (l'Aiuto non si
   chiude con Esc, come nella pagina, e con solo lui aperto il tasto resta della pagina); la scorciatoia che
