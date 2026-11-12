@@ -311,17 +311,11 @@
       try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
       try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
     });
-    // Un testo incollato o trascinato nella casella l'ha scritto qualcun altro: la conversazione ha letto (#1840).
-    // Svuotata e riportata con Annulla o Ripeti, una casella che aveva testo di altri lo ha ancora, come nella home.
+    // Un testo incollato o trascinato nella casella l'ha scritto qualcun altro: la conversazione ha letto (#1840). La
+    // regola è quella della home; senza il modulo ogni testo vale di altri, che chiede di più e mai di meno.
     let testoDiAltri = false;
-    const valoriDiAltri = new Set();
-    const impronta = (t) => `${t.length}:${t.slice(0, 64)}:${t.slice(-64)}`;
-    ta.addEventListener('input', (e) => {
-      if (!ta.value) testoDiAltri = false;
-      else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDiAltri = true;
-      else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && valoriDiAltri.has(impronta(ta.value))) testoDiAltri = true;
-      if (testoDiAltri && ta.value && valoriDiAltri.size < 500) valoriDiAltri.add(impronta(ta.value));
-    });
+    const altri = global.SN_TESTO_DI_ALTRI ? global.SN_TESTO_DI_ALTRI.crea() : { dopoInput: (_t, v) => !!v };
+    ta.addEventListener('input', (e) => { testoDiAltri = altri.dopoInput(e.inputType, ta.value, testoDiAltri); });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
