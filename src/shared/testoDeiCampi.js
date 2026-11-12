@@ -129,7 +129,9 @@
 
   function pesoTotale(dati) {
     let n = 0;
-    for (const p of Object.values(dati || {})) for (const c of (p && p.campi) || []) n += String(c.valore || '').length;
+    for (const p of Object.values(dati && typeof dati === 'object' ? dati : {})) {
+      for (const c of (p && Array.isArray(p.campi) ? p.campi : [])) n += String((c && c.valore) || '').length;
+    }
     return n;
   }
 
