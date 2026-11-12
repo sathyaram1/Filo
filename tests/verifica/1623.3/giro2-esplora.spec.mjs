@@ -90,6 +90,25 @@ for (const [nome, ev, atteso] of [
   });
 }
 
+test('risposta su una parola del campo del sito: Ctrl+V e lettere mentre nasce', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: 'k-test' }, models: { [C.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('The cat.'); return { text: 'The cat.', usage: {} }; } };
+  });
+  const p = await testServer.openReady(openTab, PAGINA.replace('<input id="campo">', '<textarea id="campo">gatto</textarea>'));
+  await app.evaluate(({ clipboard }) => clipboard.writeText('XYZ'));
+  await p.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.setSelectionRange(0, 5); });
+  await focoAllaScheda(app, p.url());
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs); globalThis.__filoShortcuts.dispatch('translate-selection', win); });
+  const gia = await tasti(app, p.url(), 30, [...lettera('a'), ...CTRL_V]);
+  await expect.poll(async () => (await statoDi(app, p, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('The cat');
+  await p.waitForTimeout(1200);
+  console.log('risposta', gia, 'campo del sito:', JSON.stringify(await p.evaluate(() => document.querySelector('#campo').value)), 'casella:', JSON.stringify((await statoDi(app, p, '.sn-popup-input'))?.valore));
+});
+
 test('feedback riaperto (strato caldo): Ctrl+V subito', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const p = await testServer.openReady(openTab, PAGINA);
