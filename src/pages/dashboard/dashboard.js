@@ -2236,10 +2236,7 @@
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', (e) => {
-    if (!inputEl.value) testoDaFuori = false;
-    else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
-    else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && righeDaFuori.has(impronta(inputEl.value))) testoDaFuori = true;
-    if (testoDaFuori && inputEl.value) ricordaDaFuori(inputEl.value);
+    testoDaFuori = testiDiAltri.dopoInput(e.inputType, inputEl.value, testoDaFuori);
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {
