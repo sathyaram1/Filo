@@ -1,7 +1,9 @@
 // Verifica #1623.3 giro 2, esplorazione: altri tasti d'incolla e altri tempi mentre il riquadro sopra il sito nasce.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { statoDi, paginaDelloStrato, conta, nelMondoDiFilo } from '../../helpers/riquadri.mjs';
+import { statoDi, paginaDelloStrato, conta, nelMondoDiFilo, neiRiquadri } from '../../helpers/riquadri.mjs';
+
+const allegatiAiuto = (app, p) => neiRiquadri(app, p, () => (globalThis.__filoSidebarTest?.allegati?.() || []).length);
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:40px;font:16px sans-serif">`
   + `<p>Pagina che ascolta gli incolla.</p><input id="campo"><script>window.__visti = [];
