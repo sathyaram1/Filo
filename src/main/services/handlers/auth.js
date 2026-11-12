@@ -1479,6 +1479,9 @@ module.exports = function register(on, ctx) {
     if (r && Array.isArray(r.newBlocks)) out.newBlocks = r.newBlocks;
     if (r && r.realignReason) out.realignReason = String(r.realignReason);
     if (r && r.reason) out.reason = String(r.reason);
+    // Il seguito di un sì preso dal server (result 'server'): senza, la pagina diceva un «riprende da solo» anche a un lavoro locale.
+    if (r && r.esito) out.esito = String(r.esito).slice(0, 40);
+    if (r && r.detail) out.detail = String(r.detail).slice(0, 600);
     return out;
   }));
 
