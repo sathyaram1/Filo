@@ -343,14 +343,22 @@ jobs:
           COMMIT_PROVATO: ${{ github.sha }}
         shell: bash
         run: |
-          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace, una cartella per parte della suite) stanno negli artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
+          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. L errore di ogni rosso sta qui sotto; il registro di ogni parte della suite lo ha intero. ${REGISTRI_DALLA_CLOUD} Screenshot e trace dei rossi stanno solo negli artifact, per sette giorni: ${ESECUZIONE}"
           # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e il taglio si DICE col numero.
           ROSSI_TUTTE=$(cat esiti-suite/rossi-nuovi.txt 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
           N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
           if [ "${N_TUTTE:-0}" -gt 80 ]; then
             ROSSI="${ROSSI}
-          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
+          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno nel registro del lavoro verdetto di questa esecuzione"
+          fi
+          # Gia' entro il suo tetto, detto nel testo stesso (suite-verdict.mjs, testoErrori).
+          ERRORI=$(cat esiti-suite/rossi-errori.txt 2>/dev/null || true)
+          if [ -n "$ERRORI" ]; then
+            ERRORI="
+
+          Errori dei rossi nuovi:
+          ${ERRORI}"
           fi
           # I sospetti: i commit entrati su main dopo l'ultima suite verde.
           VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
