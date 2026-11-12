@@ -89,15 +89,30 @@
   const inFila = (fn) => (...a) => inCodaMemoria(() => fn(...a));
 
   // `fonti`: gli eventi del filo da cui la lezione è nata (#872). Una lezione che ridice una riga tolta dall'utente,
-  // dallo stesso tratto del filo, non entra.
-  async function appendLesson(lesson, { fonti = [] } = {}) {
+  // dallo stesso tratto del filo, non entra. `origine`: i soli messaggi che dicono la lezione, quando `fonti` porta anche
+  // il resto (la lettura che ha reso sospetta una memoria della compattazione); [] = non si sa, e decide il testo simile.
+  async function appendLesson(lesson, { fonti = [], origine } = {}) {
     const buf = await getLessonsBuffer();
     const text = String(lesson || '').trim();
     const f = Q() ? Q().unisci(fonti) : [];
-    if (f.length && Q() && Q().tornaDaTolta(text, f, (await getFonti()).nascoste)) return buf;
+    const o = origine === undefined ? f : (Q() ? Q().unisci(origine) : []);
+    if ((o.length || origine !== undefined) && Q() && Q().tornaDaTolta(text, o, (await getFonti()).nascoste)) return buf;
     buf.push({ ts: new Date().toISOString(), text, ...(f.length ? { fonti: f } : {}) });
     await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
     return buf;
+  }
+
+  // La strada di ogni lezione (agente delle lezioni, chat, compattazione): tetto e caratteri, poi il buffer con le fonti.
+  // → { scritta, rifiuto, riga }; `scritta` false senza rifiuto = somiglia a una riga tolta dall'utente.
+  async function scriviLezione(testo, opzioni = {}) {
+    const P = global.SN_PREF;
+    const l = P ? P.lezioneDaAzione({ testo }) : { testo: String(testo || '').trim() };
+    if (l.rifiuto) return { scritta: false, rifiuto: l.rifiuto, riga: null };
+    if (!l.testo) return { scritta: false, riga: null };
+    const buf = await appendLesson(l.testo, opzioni);
+    const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+    const scritta = !!ultima && ultima.text === String(l.testo).trim();
+    return { scritta, riga: scritta ? ultima : null };
   }
 
   // ===== Quaderno delle memorie (#872) =====
