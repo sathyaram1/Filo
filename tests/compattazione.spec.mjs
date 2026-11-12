@@ -191,7 +191,12 @@ const conversazioneTolta = (app, { chat, sospetta, oreFa }) => app.evaluate(asyn
   const t0 = Date.now() - oreFa * 60 * 60 * 1000;
   await globalThis.SN_FILO_CHATS.append(chat, { role: 'user', text: 'ho due gatti, Miso e Pepe', ts: new Date(t0).toISOString() });
   const c = await globalThis.SN_FILO_CHATS.append(chat, { role: 'filo', text: 'Che bei nomi.', ts: new Date(t0 + 1000).toISOString(), ...(sospetta ? { classeLetta: 5 } : {}) });
-  const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: c.eids || (await globalThis.SN_IL_FILO.chat(chat, { ids: true })).eids });
+  if (sospetta) {
+    globalThis.SN_CONTESTO_FILO.ricordaEsiti(chat, c.messages.at(-1).ts, {
+      azioni: [{ type: 'LEGGI_PAGINA', _executed: true, _output: { ok: true, url: 'https://esempio.example/gatti', titolo: 'Gatti', testo: 'nomi per gatti' } }],
+    });
+  }
+  const buf = await M.appendLesson('L\'utente ha due gatti, Miso e Pepe.', { fonti: (await globalThis.SN_IL_FILO.chat(chat, { ids: true })).eids });
   const l = buf[buf.length - 1];
   await M.hideLine({ lezione: { ts: l.ts, text: l.text } });
   const vero = C._dip.chiama;
