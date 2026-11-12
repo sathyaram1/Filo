@@ -265,6 +265,9 @@
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
+    // L0 (#1403): la rilettura del feedback prima dell'invio, il testo e le immagini (servono modelli che le leggono).
+    FEEDBACK_L0: 'feedback_l0',
+    FEEDBACK_L0_IMMAGINI: 'feedback_l0_immagini',
     // Le tre funzioni dell'editor hanno uno slot proprio: con quello di «Spiega» chi cambiava
     // quel modello cambiava anche l'editor, senza saperlo. Qui: titolo di un documento.
     EDITOR_TITLE: 'editor_title',
