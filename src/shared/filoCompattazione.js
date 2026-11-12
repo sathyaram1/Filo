@@ -8,8 +8,8 @@
   const ORA_MS = 60 * 60 * 1000;
   // Sopra 100.000 token di prompt Haiku 5.5 costa cinque volte tanto, su tutta la richiesta (SPEC-CONTESTO § Perché).
   const LISTINO = 100000;
-  // Il grezzo che resta dopo la compattazione: le ultime ore o gli ultimi turni, quale dei due è più corto. Quattro turni
-  // da ~3.000 token lasciano spazio fra il grezzo e la soglia di serie (con la parte fissa di oggi, ~38.000 token).
+  // Il grezzo che resta dopo la compattazione: le ultime ore o gli ultimi turni, quale dei due è più corto, entro il tetto
+  // in token della regola dello spazio (`limiti`).
   const ORE_GREZZE = 2;
   const TURNI_GREZZI = 4;
   // Il tratto è «grande» per la compattazione da fermo: a cache fredda riscriverlo costa uguale (SPEC-CONTESTO).
