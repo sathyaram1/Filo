@@ -74,9 +74,15 @@ test('foto lasciata fuori dalla scatola, sul resto del riquadro: il sito non la 
 test('immagine incollata nella casella: entra negli allegati, il sito non riceve niente', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   const strato = await apriSegnalazione(app, page);
-  await app.evaluate(({ clipboard, nativeImage }, b64) => {
-    clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(b64, 'base64')));
+  const chiavi = await app.evaluate((electron, b64) => {
+    const cb = electron.clipboard;
+    const k = Object.keys(cb || {}).concat(Object.getOwnPropertyNames(Object.getPrototypeOf(cb || {}) || {}));
+    const img = electron.nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
+    if (typeof cb.writeImage === 'function') cb.writeImage(img);
+    else if (typeof cb.write === 'function') cb.write({ image: img });
+    return k;
   }, PNG.toString('base64'));
+  console.log('appunti:', chiavi.join(','));
   await strato.locator('.sn-fb-text').click();
   await strato.keyboard.press('Control+V');
   await expect.poll(() => conta(app, page, '.sn-fb-thumb'), { timeout: 10_000 }).toBe(1);
