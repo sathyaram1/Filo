@@ -124,7 +124,7 @@
   const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
   const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio',
-    'smistamento', 'principioContestato']);
+    'smistamento', 'principioContestato', 'assorbite']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
   function validaOpzione(o, i, perOwner) {
