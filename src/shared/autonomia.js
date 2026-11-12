@@ -127,6 +127,14 @@
     return { stato: classe <= soglia ? 'pulito' : 'contaminato', classe, fonte: classe <= soglia ? null : peggiore };
   }
 
+  // Il racconto che Filo scrive da sé nel filo (buongiorno, timer, download) non toglie la parola al costo 4: decide il
+  // riquadro, come per i titoli delle schede (#1840.4, consigliata finché l'owner non sceglie). Ai costi 2 e 3 resta lettura.
+  const FONTI_SENZA_PESO_COSTO_4 = Object.freeze(['filo:racconto']);
+  function fontiPerCosto(fonti, costo) {
+    const l = Array.isArray(fonti) ? fonti : [];
+    return costo >= COSTO_MAX ? l.filter((f) => !(f && FONTI_SENZA_PESO_COSTO_4.includes(f.chiave))) : l;
+  }
+
   function piuStretta(a, b) { return PESO[a] >= PESO[b] ? a : b; }
 
   // Ingressi: livello, stato ('pulito'|'contaminato'), costo 0-4, dentroPerimetro, origine ('chat'|'automazione'),
