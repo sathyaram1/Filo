@@ -200,7 +200,17 @@ async function livelloDi(id) {
   await attesa();
   const lista = await leggiLista();
   const e = daRimettere(bersaglio(lista, id), lista);
-  return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id } : null;
+  return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id, allenta: await annulloAllenta(e) } : null;
+}
+// Il verso del freno lo giudica la regola delle preferenze sul pezzo che l'annullo scriverebbe adesso (#1840): rimettere
+// com'era una protezione la stringe. Senza saperlo giudicare, vale come abbassata.
+async function annulloAllenta(e) {
+  try {
+    const P = globalThis.SN_PREF;
+    if (!P || typeof P.allentaParziale !== 'function') return true;
+    const correnti = await globalThis.SN_STORAGE.getSettings();
+    return P.allentaParziale(K().annulloImpostazioni(e, correnti, globalThis.SN_STORAGE.REPLACE_KEYS), correnti);
+  } catch (_) { return true; }
 }
 
 // Senza id: l'ultimo cambio ancora in piedi che non sia a sua volta un annullo.
