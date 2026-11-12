@@ -109,7 +109,8 @@
 //         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
-//         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
+//         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione). Un doppione aggiunge
+//         `--doppione-di <num>`: la fusione cita l'originale, che il server vuole chiuso (#2046).
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
