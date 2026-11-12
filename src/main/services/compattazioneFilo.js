@@ -436,7 +436,7 @@ function avvia() {
   const giro = () => riassumiGiorni().catch((e) => console.warn('[Filo] giro dei giorni:', e?.message || e));
   timerGiorni = setInterval(giro, GIRO_GIORNI_MS);
   if (timerGiorni.unref) timerGiorni.unref();
-  const primo = setTimeout(giro, 2 * 60 * 1000);
+  const primo = setTimeout(giro, Math.min(2 * 60 * 1000, GIRO_GIORNI_MS));
   if (primo.unref) primo.unref();
 }
 
