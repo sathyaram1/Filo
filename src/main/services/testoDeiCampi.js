@@ -161,6 +161,7 @@ async function scrivi(sender, settings, campi) {
 
 async function daContenuto(msg, sender) {
   const settings = await impostazioniAdesso();
+  giorniCorrenti = R.opzioni(settings).giorni;
   const fase = msg && msg.fase;
   if (fase === 'leggi') return leggi(sender, settings);
   if (fase === 'scrivi') return scrivi(sender, settings, msg.campi);
