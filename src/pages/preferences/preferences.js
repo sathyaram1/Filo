@@ -2005,6 +2005,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    $('feedbackL0').addEventListener('change', persist);
     $('traduzioneNascoste').addEventListener('change', persist);
     $('filoParlaDownload').addEventListener('change', persist);
     $('descriviImmagini').addEventListener('change', persist);
