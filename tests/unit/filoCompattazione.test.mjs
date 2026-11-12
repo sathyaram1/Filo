@@ -52,7 +52,7 @@ function azzera({ chiama = null, memorie = [] } = {}) {
   Comp.imposta({
     cartella: () => join(cartella, 'filo'),
     livello: async () => ({ livello: 'default' }),
-    applicaMemoria: async (t, o) => { scritte.push(t); fontiScritte.push((o && o.fonti) || []); return true; },
+    applicaMemoria: async (t, o) => { scritte.push(t); fontiScritte.push((o && o.fonti) || []); scritte.fonti = [...(scritte.fonti || []), o]; return true; },
     chiama: chiama || (async ({ messages }) => {
       chiamate.push(messages);
       const righe = [...messages[1].content.matchAll(/^\[(\d+)\]/gm)].map((m) => Number(m[1]));
