@@ -75,5 +75,5 @@ test('l\'avviso è fatto di frasi, senza un numero, e propone il Red Team solo q
 
 test('i segreti riconosciuti senza modello si segnano a ogni comparsa', () => {
   const r = L.daValori('chiave sk-abc e ancora sk-abc', ['sk-abc', '']);
-  assert.deepEqual(r.map((x) => [x.inizio, x.fine]), [[7, 13], [24, 30]]);
+  assert.deepEqual(r.map((x) => [x.inizio, x.fine]), [[7, 13], [23, 29]]);
 });
