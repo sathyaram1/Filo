@@ -331,6 +331,31 @@ test('nel benvenuto, dopo un testo incollato, «basta così» chiude senza lezio
   expect(await app.evaluate(() => globalThis.__seen.lesson)).toBe(0);
 });
 
+// Il verso positivo delle due qui sopra, e «basta così» con la stessa regola della chiusura normale (#1840).
+async function bastaCosi(app, shell, { livello = null } = {}) {
+  const page = await apriIntervista(app, shell);
+  if (livello) await app.evaluate((_e, l) => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: l } }), livello);
+  await page.locator('#input').fill('sono Anna, insegno lettere alle medie');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Dimmi pure.' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('#input').fill('basta così');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  await expect(page.locator('.dash-bubble-filo[data-spontaneo="1"]')).toContainText('Buongiorno Anna', { timeout: 40_000 });
+}
+
+test('nel benvenuto pulito, a fine intervista Filo si scrive le lezioni da solo, chiusa da Filo o con «basta così»', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await bastaCosi(app, shell);
+  await expect.poll(() => app.evaluate(() => globalThis.__seen.lesson), { timeout: 15_000 }).toBeGreaterThan(0);
+});
+
+test('nel benvenuto a Conservativo, «basta così» non fa scrivere lezioni da sole, come la chiusura normale', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await bastaCosi(app, shell, { livello: 'conservativo' });
+  expect(await app.evaluate(() => globalThis.__seen.lesson)).toBe(0);
+});
+
 test('nel benvenuto, con un testo trascinato lo stile torna a passare dal riquadro', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const page = await apriIntervista(app, shell);
