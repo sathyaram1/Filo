@@ -923,6 +923,7 @@ test('l\'annullo di un cambio sensibile è una difesa abbassata solo nel verso c
 // #1840 giro 7: il no dopo una lettura dice dove farlo a mano anche per «rimetti com'era» e per il ripristino di serie,
 // e il ripristino toglie un freno solo se le impostazioni di serie ne allentano uno.
 test('«rimetti com\'era» e il ripristino di serie: il verso del freno e la strada a mano', () => {
+  require(join(ROOT, 'src', 'shared', 'pulsantiPreferenze.js'));
   const L = globalThis.SN_ACTION_LEVELS;
   const P = globalThis.SN_PREF;
   assert.match(P.doveSeAllenta({ security: { blockPopups: false } }, { security: { blockPopups: true } }), /Sicurezza/);
