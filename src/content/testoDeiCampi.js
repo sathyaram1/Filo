@@ -38,12 +38,12 @@
     });
   }
 
-  // I riquadri e i menu di Filo nella pagina non sono del sito: il loro testo parte o si butta con loro.
+  // I riquadri e i menu di Filo nella pagina non sono del sito: il loro testo parte o si butta con loro. Lo dice il
+  // marchio che mette chi li disegna, anche oltre il confine di un'ombra aperta.
   function diFilo(el) {
-    let nostre = [];
-    try { nostre = global.SN_FILO_UI?.aperti?.() || []; } catch (_) {}
-    for (let n = el; n && nostre.length;) {
-      if (nostre.some((r) => r === n || (r.contains && r.contains(n)))) return true;
+    const U = global.SN_FILO_UI;
+    for (let n = el, giri = 0; n && U && giri < 16; giri++) {
+      if (U.inside(n)) return true;
       const radice = n.getRootNode && n.getRootNode();
       n = radice && radice.host ? radice.host : null;
     }
