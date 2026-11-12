@@ -293,7 +293,7 @@ test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la 
 
 test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; e da fermo, passata la cache', async ({ app }) => {
   const page = await home(app);
-  await vecchiaDa(app, 29000);
+  await vecchiaDa(app, 32000);
   await modelloFinto(app, [{ text: 'Eccomi.' }]);
   await compattatoreFinto(app, RIGA);
   // Un primo turno con la soglia lontana misura la parte fissa come la misura la chat (strumenti, istruzioni, CONTESTO):
