@@ -671,7 +671,7 @@ class StratoDeiRiquadri {
   _butta(s) {
     clearTimeout(s.timerVuoto);
     clearInterval(s.timerRitorno);
-    this._rilascia(s, s.wc);
+    this._rilascia(s, s.wc, false);
     try { s.vuoto.stacca(); } catch (_) {}
     if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
     for (const chiudi of [...s.attese.values()]) chiudi({ ok: false });
