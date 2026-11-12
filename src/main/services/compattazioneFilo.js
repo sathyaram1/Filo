@@ -310,27 +310,47 @@ async function sezione(incognito) {
   const tutte = await F().chats({ incognito, nascoste: true });
   const chats = new Set(tutte.map((c) => c && c.id));
   const nascoste = new Set(tutte.filter((c) => c && c.nascosta).map((c) => c.id));
-  // Le pagine e gli accaduti si rileggono solo dopo una cancellazione nuova; se non si leggono, non si toglie niente.
-  let eventi = null;
+  const eventi = await eventiDopoCancellazione(s, incognito);
+  await togli(s, incognito, (f) => (chatDellaFonte(f) != null ? chats.has(chatDellaFonte(f)) : (!eventi || eventi.has(f))));
+  const visibile = (f) => !nascoste.has(chatDellaFonte(f));
+  return L().rendiFiloCompattato({ ore: L().senzaCancellate(s.ore, visibile), giorni: L().senzaCancellate(s.giorni, visibile) });
+}
+
+// Le pagine e gli accaduti che il filo ha ancora, riletti solo dopo una cancellazione nuova: null se non ce n'è una o
+// se non si leggono (allora non si toglie niente).
+async function eventiDopoCancellazione(s, incognito) {
   let tolte = null;
-  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { tolte = null; }
-  if (tolte != null && tolte !== s.tolte && s.da) {
-    try {
-      const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
-      eventi = new Set([...acc, ...pag].map((ev) => ev && ev.id));
-      s.tolte = tolte;
-    } catch (_) { eventi = null; }
-  }
-  const vivo = (f) => (chatDellaFonte(f) != null ? chats.has(chatDellaFonte(f)) : (!eventi || eventi.has(f)));
+  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { return null; }
+  if (tolte == null || tolte === s.tolte || !s.da) return null;
+  try {
+    const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
+    s.tolte = tolte;
+    return new Set([...acc, ...pag].map((ev) => ev && ev.id));
+  } catch (_) { return null; }
+}
+
+// Toglie dal diario, anche dal disco, le righe con una fonte che `vivo` non riconosce più.
+async function togli(s, incognito, vivo) {
   const ore = L().senzaCancellate(s.ore, vivo);
   const giorni = L().senzaCancellate(s.giorni, vivo);
-  if (ore.length !== s.ore.length || giorni.length !== s.giorni.length) {
-    s.ore = ore;
-    s.giorni = giorni;
-    try { await salva(incognito); } catch (_) {}
-  }
-  const visibile = (f) => !nascoste.has(chatDellaFonte(f));
-  return L().rendiFiloCompattato({ ore: L().senzaCancellate(ore, visibile), giorni: L().senzaCancellate(giorni, visibile) });
+  const tolte = s.ore.length - ore.length + s.giorni.length - giorni.length;
+  if (!tolte) return 0;
+  s.ore = ore;
+  s.giorni = giorni;
+  try { await salva(incognito); } catch (e) { console.warn('[Filo] diario non salvato dopo una cancellazione:', e?.message || e); }
+  return tolte;
+}
+
+// Una pagina tolta dal filo (Cronologia, chat, «svuota») porta via subito le righe del diario nate da lei, anche dal
+// disco, come una conversazione cancellata: non aspetta il prossimo messaggio a Filo. Il filo lo chiama a ogni pagina
+// entrata o tolta; senza una cancellazione nuova non legge niente.
+async function dimenticaPagine(incognito) {
+  incognito = inIncognito(incognito);
+  const s = await stato(incognito);
+  if (!s.ore.length && !s.giorni.length) return 0;
+  const eventi = await eventiDopoCancellazione(s, incognito);
+  if (!eventi) return 0;
+  return togli(s, incognito, (f) => chatDellaFonte(f) != null || eventi.has(f));
 }
 
 // Una conversazione cancellata (null: tutte) porta via subito le righe del diario nate da lei, anche dal disco, come le
