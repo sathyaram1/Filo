@@ -8,7 +8,8 @@ const TIPI = Object.freeze(['timer', 'download', 'avviso', 'giornata', 'accoglie
 // Gli eventi che arrivano insieme (due timer allo stesso minuto, un download che finisce mentre suona) fanno un giro solo.
 const ATTESA_MS = 1200;
 // Il messaggio nasce leggendo nomi di file, avvisi e sveglie che scrivono altri: riletto, è una lettura (#592.4).
-const ESTERNO = 'dal messaggio con cui Filo racconta avvisi, sveglie e download, i cui nomi li scrivono altri';
+require('../../shared/filoContesto.js');
+const ESTERNO = globalThis.SN_FILO_CONTESTO.ESTERNO_RACCONTO;
 // Una pagina lasciata aperta può far partire un download al secondo mentre l'utente non c'è (#2294): i download aprono
 // un giro al più ogni `ritmoDownloadMs`, e quelli arrivati intanto si contano e si raccontano tutti nel giro dopo.
 const NOMI_RACCONTATI = 5;
