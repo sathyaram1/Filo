@@ -27,11 +27,11 @@ const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
 // Una memoria passa dalla strada delle lezioni con gli eventi del filo da cui nasce: una che ridice una riga tolta
-// dall'utente dallo stesso tratto non entra, e torna falso.
-const scriviMemoria = async (testo, fonti) => (await globalThis.SN_FILO_MEMORY.scriviLezione(testo, fonti)).scritta;
+// dall'utente dallo stesso tratto non entra. → { scritta, rifiuto, riga } come SN_FILO_MEMORY.scriviLezione.
+const scriviMemoria = (testo, fonti) => globalThis.SN_FILO_MEMORY.scriviLezione(testo, fonti);
 
 // `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti, origine })` →
-// scriviMemoria. Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
+// scriviMemoria (o solo true/false). Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
 const _dip = {
   chiama: null,
   applicaMemoria: scriviMemoria,
