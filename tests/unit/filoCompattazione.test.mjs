@@ -291,6 +291,65 @@ test('una pagina visitata e poi cancellata porta via la riga del diario nata con
   assert.equal(await Comp.sezione(false), '', 'la pagina cancellata non torna dal diario');
 });
 
+test('la prima compattazione tiene la riga anche quando il modello non cita il saluto prima della pagina (#1563.3)', async () => {
+  azzera({
+    chiama: async ({ messages }) => {
+      const righe = [...messages[1].content.matchAll(/^\[(\d+)\] (.*)$/gm)].filter((m) => !/ciao/i.test(m[2])).map((m) => Number(m[1]));
+      return JSON.stringify({ ore: [{ testo: '20:00 chiesto cosa mangiare, letta la carbonara', righe }], memorie: [] });
+    },
+  });
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  const iso = (t) => new Date(t).toISOString();
+  await scrivi('cd34', 'user', 'ciao', iso(t0));
+  await scrivi('cd34', 'filo', 'Ciao!', iso(t0 + 1000));
+  const visita = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: iso(t0 + 10 * 60000) }, { incognito: false });
+  await scrivi('cd34', 'user', 'che si mangia stasera?', iso(t0 + 20 * 60000));
+  await scrivi('cd34', 'filo', 'Una carbonara.', iso(t0 + 21 * 60000));
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const [riga] = (await Comp.righe(false)).ore;
+  assert.ok(riga.fonti.includes(visita.id));
+  assert.ok(Date.parse(riga.da) > Date.parse(visita.ts), 'la riga comincia dopo la pagina: il saluto non è citato');
+  assert.equal(Comp.compattato(false).da, iso(t0), 'il pezzo compattato comincia dal saluto');
+  assert.match(await Comp.sezione(false), /letta la carbonara/, 'al messaggio dopo il CONTESTO ha la riga');
+  assert.equal((await Comp.righe(false)).ore.length, 1, 'e il diario sul disco pure');
+  await globalThis.SN_IL_FILO.cancellaVisite([{ ts: visita.ts, url: 'https://ricette.example/carbonara' }], { incognito: false });
+  assert.equal(await Comp.sezione(false), '', 'la pagina cancellata la porta ancora via');
+});
+
+test('le memorie della compattazione portano i messaggi che le dicono, anche dopo il sì nel quaderno (#1563.3)', async () => {
+  const eids = async (chat) => (await globalThis.SN_IL_FILO.chat(chat, { incognito: false, ids: true })).eids;
+  const citando = (memorie) => async ({ messages }) => {
+    const righe = [...messages[1].content.matchAll(/^\[(\d+)\] (.*)$/gm)];
+    const n = (re) => righe.filter((m) => re.test(m[2])).map((m) => Number(m[1]));
+    return JSON.stringify({ ore: [{ testo: '10:00 gatti', righe: righe.map((m) => Number(m[1])) }], memorie: memorie.map(([testo, re]) => ({ testo, righe: re ? n(re) : [] })) });
+  };
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  const pulito = azzera({ chiama: citando([['Ha due gatti, Miso e Pepe.', /Utente: ho due gatti/], ['Lavora da casa.', null]]) });
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(t0).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(t0 + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const [u1, f1] = await eids('ab12');
+  assert.deepEqual(pulito.fontiScritte[0], { fonti: [u1], origine: [u1] });
+  assert.deepEqual(pulito.fontiScritte[1], { fonti: [u1, f1], origine: [] }, 'senza righe citate: tutto il pezzo, provenienza ignota');
+
+  const sosp = azzera({ chiama: citando([['Ha due gatti, Miso e Pepe.', /Utente: ho due gatti/]]) });
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(t0).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(t0 + 1000).toISOString());
+  await scrivi('ab12', 'user', 'leggi la ricetta', new Date(t0 + 60000).toISOString());
+  const c = await scrivi('ab12', 'filo', 'Letta.', new Date(t0 + 61000).toISOString());
+  Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [PAGINA] });
+  const r = await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.equal(r.sospetto, true);
+  const [u, , , letta] = await eids('ab12');
+  const [p] = await Comp.inAttesa();
+  assert.deepEqual(p.fonti, [letta, u], 'chi decide vede la lettura e il messaggio');
+  assert.deepEqual(p.origine, [u]);
+  assert.deepEqual(await Comp.decidi(p.id, true), { ok: true, scritta: true });
+  assert.deepEqual(sosp.fontiScritte, [{ fonti: [letta, u], origine: [u] }], 'dopo il sì la riga le ha ancora');
+});
+
 test('il livello «giorni»: una riga per ogni giorno passato che ha ore, una volta sola', async () => {
   let giri = 0;
   azzera({
