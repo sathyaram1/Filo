@@ -430,10 +430,16 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     assert.ok(existsSync(join(dir, 'suite-risultati.json')), `l'unione non ha scritto il JSON\n${unito.stdout}${unito.stderr}`);
     writeFileSync(join(dir, 'noti.json'), JSON.stringify({ contenitore: { specs: [] } }), 'utf8');
     const v = spawnSync(process.execPath, [CLI, join(dir, 'suite-risultati.json'), '--rossi', join(dir, 'noti.json'),
-      '--out', join(dir, 'nuovi.txt'), '--chiavi', join(dir, 'chiavi.txt'), '--parti', '2', '--esiti', tutti], { encoding: 'utf8' });
+      '--out', join(dir, 'nuovi.txt'), '--chiavi', join(dir, 'chiavi.txt'), '--parti', '2', '--esiti', tutti,
+      '--errori', join(dir, 'errori.txt')], { encoding: 'utf8' });
     assert.equal(v.status, 1, v.stdout + v.stderr);
     const nuovi = readFileSync(join(dir, 'nuovi.txt'), 'utf8');
     assert.match(nuovi, /^tests\/b\.spec\.mjs › rosso$/m, 'il rosso della parte arrivata in fondo');
+    // #2313: l'errore deve arrivare dall'unione vera delle parti, senza colori e con la riga dello spec.
+    const errori = readFileSync(join(dir, 'errori.txt'), 'utf8');
+    assert.match(errori, /^✗ tests\/b\.spec\.mjs › rosso\n {4}in tests\/b\.spec\.mjs:2\n {4}Error: expect\(received\)\.toBe\(expected\)/m, errori);
+    assert.match(errori, /Expected: 2/);
+    assert.doesNotMatch(errori, /\u001b\[/, 'i colori del terminale nel feedback sono rumore');
     assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: [12] casi non sono girati/m, 'a macchina carica il tetto può scadere prima del caso lento');
     assert.deepEqual(readFileSync(join(dir, 'chiavi.txt'), 'utf8').split('\n').filter(Boolean).sort(), ['suite:tests/b.spec.mjs', 'suite:tetto']);
   });
