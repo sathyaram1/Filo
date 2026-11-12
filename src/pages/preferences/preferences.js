@@ -1165,6 +1165,11 @@
     if (vuole('propostaEmail.attiva')) $('propostaEmailAttiva').checked = !(settings.propostaEmail && settings.propostaEmail.attiva === false);
     if (vuole('propostaEmail.incognito')) $('propostaEmailIncognito').checked = !!(settings.propostaEmail && settings.propostaEmail.incognito === true);
     $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+    const testoCampi = window.SN_TESTO_CAMPI.opzioni(settings);
+    if (vuole('testoDeiCampi.attivo')) $('testoCampiAttivo').checked = testoCampi.attivo;
+    if (vuole('testoDeiCampi.giorni')) $('testoCampiGiorni').value = String(testoCampi.giorni);
+    $('testoCampiGiorni').disabled = !$('testoCampiAttivo').checked;
+    caricaStatoTestoCampi();
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
     }
