@@ -245,7 +245,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
       }
       if (!origine.length && !tuttoIlPezzo) tuttoIlPezzo = await eventiDeiMessaggi(pezzo.map((x) => FC().chiave(x)));
       try {
-        if (await _dip.applicaMemoria(m.testo, { fonti: origine.length ? origine : tuttoIlPezzo, origine })) scritte++;
+        if (scritta(await _dip.applicaMemoria(m.testo, { fonti: origine.length ? origine : tuttoIlPezzo, origine }))) scritte++;
       } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
     }
   }
