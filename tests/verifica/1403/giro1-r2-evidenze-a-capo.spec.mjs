@@ -48,8 +48,9 @@ test('r2 testo che scorre: la riga che va a capo nella casella va a capo anche s
       ta.value = base.slice(0, at) + riga + '\n' + base.slice(at);
       ta.dispatchEvent(new Event('input', { bubbles: true }));
       if (ta.scrollHeight !== ev.scrollHeight) {
-        ta.setSelectionRange(ta.value.indexOf(pw), ta.value.indexOf(pw) + pw.length);
-        ta.scrollTop = ta.scrollHeight;
+        // La riga della password a metà della casella, come dopo «Correggi».
+        const prima = ta.value.slice(0, ta.value.indexOf(pw)).split('\n').length + 1;
+        ta.scrollTop = Math.max(0, prima * parseFloat(getComputedStyle(ta).lineHeight) - ta.clientHeight / 2);
         ta.dispatchEvent(new Event('scroll'));
         return { k, casella: ta.scrollHeight, sotto: ev.scrollHeight, barra: ta.offsetWidth - ta.clientWidth };
       }
