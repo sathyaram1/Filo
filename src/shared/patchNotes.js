@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.277', date: '2026-11-12',
+      fixes: [
+        { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
+      ],
+    },
+    {
       version: '0.2.276', date: '2026-11-12',
       features: [
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
@@ -17,7 +23,6 @@
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
-        { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
       ],
     },
     {
