@@ -318,7 +318,7 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
     await expect.poll(() => app.evaluate(() => globalThis.__compattazioni.map((c) => c.motivo)), { timeout: 10000 }).toEqual(['anticipo']);
 
     // Da fermo: il turno lascia il timer della durata della cache più un minuto; scattato, col tratto grande compatta.
-    await chiedi(page, `ci sei? ${'appunto lungo sulle api. '.repeat(3000)}`);
+    await chiedi(page, `ci sei? ${'appunto lungo sulle api. '.repeat(4000)}`);
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(3);
     expect((await chiamateAlModello(app))[2][0].content, 'il messaggio dopo ha il diario').toContain(RIGA);
     expect(await app.evaluate(() => globalThis.__fermo.at(-1).ms)).toBe(61 * 60 * 1000);
