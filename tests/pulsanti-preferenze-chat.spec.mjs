@@ -3,7 +3,7 @@
 // poteva solo spiegare dove cliccare.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
