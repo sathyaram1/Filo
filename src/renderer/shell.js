@@ -2589,11 +2589,7 @@
 
     // `res`: una risposta { items, rev }. Può essere più vecchia di eventi già arrivati: quelli restano (#2307).
     function syncFromList(res) {
-      if (ELENCO) ELENCO.lista(statoElenco, res);
-      else {
-        dls.clear();
-        for (const r of (res && Array.isArray(res.items) ? res.items : [])) dls.set(r.id, r);
-      }
+      ELENCO.lista(statoElenco, res);
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
