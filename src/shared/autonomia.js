@@ -349,7 +349,7 @@
       return {
         breve: `Dopo aver letto cose scritte da altri non lo faccio, a nessun livello: in questo compito ${letto}. `
           + (nuova ? 'Puoi farlo tu, o chiedermelo in una conversazione nuova' : 'Puoi farlo tu'),
-        perModello: `toglie un freno o cancella per sempre, e in questo compito ${letto}: dopo una lettura Filo non lo fa a nessun `
+        perModello: `${seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'}` : 'toglie un freno o cancella per sempre'}, e in questo compito ${letto}: dopo una lettura Filo non lo fa a nessun `
           + `livello di autonomia, nemmeno con la parola «conferma». Dillo all'utente in una riga, con le strade che ha (${strada || 'farlo da sé'}`
           + `${nuova ? '; oppure chiederlo in una conversazione nuova, che non ha ancora letto niente' : ''}). Non riprovare in questa conversazione`,
       };
