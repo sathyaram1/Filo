@@ -1817,6 +1817,7 @@
     disegnaAutonomia();
     mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
+    opzioniTestoCampi();
     preparaShell();
     $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
