@@ -21,6 +21,7 @@ for (const ms of [0, 80, 150]) {
     await p.locator('#t').click({ button: 'right' });
     const voce = menuDi(p).voce('Invia feedback');
     await expect(voce).toBeVisible({ timeout: 10_000 });
+    await voce.click();
     const premi = app.evaluate(async ({ webContents }, attesa) => {
       const t0 = Date.now();
       const lascia = webContents.getFocusedWebContents()?.getURL();
