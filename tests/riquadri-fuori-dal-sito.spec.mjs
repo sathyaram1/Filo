@@ -411,7 +411,7 @@ async function ctrlVMentreNasce(app, p, apri) {
     wc.sendInputEvent({ type: 'char', keyCode: 'v', modifiers: ['control'] });
     wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
     return !!(s && s.pronta && s.visibile);
-  }, { u: p.url(), c: wcDi });
+  }, p.url());
   expect(giaAschermo, 'il riquadro era già a schermo: la prova non prova la nascita').toBe(false);
 }
 
