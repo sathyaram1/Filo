@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report 2>&1 | tee verdetto.log
+          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report --errori rossi-errori.txt 2>&1 | tee verdetto.log
 
       # Dalla cloud registro e allegati non si scaricano: l'elenco si legge dalle annotazioni, con l'API.
       - name: Rossi nuovi come annotazioni
@@ -140,6 +140,14 @@ jobs:
         run: |
           if [ -s rossi-nuovi.txt ]; then node scripts/annotazioni-github.mjs rossi-nuovi.txt "Rossi nuovi della suite"
           else node scripts/annotazioni-github.mjs verdetto.log "Suite senza esito"; fi
+
+      # Un passo suo: GitHub tiene dieci annotazioni per passo, e l'elenco dei rossi le sue non le cede.
+      - name: Errori dei rossi nuovi come annotazioni
+        if: always() && steps.verdetto.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ -s rossi-errori.txt ]; then node scripts/annotazioni-github.mjs rossi-errori.txt "Errori dei rossi nuovi"; fi
 
       # Un allegato che non si carica non dice niente del commit: rosso, farebbe di una suite verde una «non partita».
       # Su main lo legge `avviso`, che apre il feedback su un'altra macchina: anche le chiavi dell'allarme viaggiano qui.
@@ -152,6 +160,7 @@ jobs:
           path: |
             suite-risultati.json
             rossi-nuovi.txt
+            rossi-errori.txt
             verdetto.log
             chiavi-allarme.txt
           if-no-files-found: warn
@@ -164,7 +173,7 @@ jobs:
         if: always() && !cancelled() && (steps.verdetto.outcome == 'failure' || failure())
         shell: bash
         run: |
-          echo "::error::Suite Playwright con rossi nuovi (o non arrivata in fondo) su ${GITHUB_REF}: l'elenco sta nel verdetto qui sopra e nell'artifact. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
+          echo "::error::Suite Playwright con rossi nuovi (o non arrivata in fondo) su ${GITHUB_REF}: l'elenco sta nel verdetto qui sopra, gli errori nelle annotazioni. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
           exit 1
 
   # Il cancello di pubblicazione (release.yml) rifà gli unit test su Windows: un commit rosso lì non uscirà mai, quindi
@@ -299,6 +308,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: rilascio
     timeout-minutes: 20
+    # Dalla cloud delle routine gli artifact non si scaricano (#2313): il feedback dice la strada che passa.
+    env:
+      REGISTRI_DALLA_CLOUD: "Dalla cloud delle routine gli artifact di questa esecuzione non si scaricano (il loro indirizzo di scaricamento sta fuori dalla rete delle routine); i registri dei lavori si: gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs elenca i lavori col loro id, gh api repos/${{ github.repository }}/actions/jobs/<id>/logs stampa il registro intero di uno."
     steps:
       - name: Checkout del commit provato (con la storia, per l'elenco dei commit dell'avviso)
         uses: actions/checkout@v4
@@ -331,14 +343,24 @@ jobs:
           COMMIT_PROVATO: ${{ github.sha }}
         shell: bash
         run: |
-          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace, una cartella per parte della suite) stanno negli artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
+          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. L errore di ogni rosso sta qui sotto; il registro di ogni parte della suite lo ha intero. ${REGISTRI_DALLA_CLOUD} Screenshot e trace dei rossi stanno solo negli artifact, per sette giorni: ${ESECUZIONE}"
           # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e il taglio si DICE col numero.
           ROSSI_TUTTE=$(cat esiti-suite/rossi-nuovi.txt 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
           N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
           if [ "${N_TUTTE:-0}" -gt 80 ]; then
             ROSSI="${ROSSI}
-          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
+          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno nel registro del lavoro verdetto di questa esecuzione"
+          fi
+          # Gia' entro il suo tetto (suite-verdict.mjs, testoErrori). Va dopo i commit e prima del verdetto: oltre il tetto
+          # del server build-alarm taglia la coda, e il verdetto ripete l'elenco dei rossi.
+          ERRORI=$(cat esiti-suite/rossi-errori.txt 2>/dev/null || true)
+          if [ -n "$ERRORI" ]; then
+            ERRORI="
+
+
+          Errori dei rossi nuovi:
+          ${ERRORI}"
           fi
           # I sospetti: i commit entrati su main dopo l'ultima suite verde.
           VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
@@ -370,7 +392,7 @@ jobs:
           ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
 
 
-          ${DOPO_VERDE}
+          ${DOPO_VERDE}${ERRORI}
 
 
           Verdetto:
@@ -416,13 +438,13 @@ jobs:
 
           Gia verdi su Windows sulla punta di main (${PUNTA:0:10}), da non correggere: ${GIA_VERDI}"
           fi
-          PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
+          PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Il registro del lavoro degli unit su Windows ha l errore di ogni rosso. ${REGISTRI_DALLA_CLOUD} Esecuzione: ${ESECUZIONE}"
           ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' esiti-unit/unit.log 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
           N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
           if [ "${N_TUTTE:-0}" -gt 80 ]; then
             ROSSI="${ROSSI}
-          … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro di questa esecuzione (Actions)"
+          … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro del lavoro degli unit su Windows"
           fi
           VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
           if [ -n "$VERDE" ]; then
