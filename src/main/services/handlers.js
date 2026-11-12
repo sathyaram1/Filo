@@ -7625,8 +7625,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (!internal && filo) {
       compattaDaFermo(incognitoTurno, tettiChat);
-      if (tettiChat && ultimaStima > LC.sogliaAnticipo({ soglia: tettiChat.soglia, base: Compattazione.base(incognitoTurno) })) {
-        Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }).catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
+      // L'anticipo si misura col turno appena finito dentro il tratto: la stessa regola della soglia e del taglio.
+      if (tettiChat) {
+        const stima = ultimaStima;
+        Compattazione.limiti(incognitoTurno, { tetti: tettiChat })
+          .then((l) => (stima > l.anticipo ? Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }) : null))
+          .catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
       }
     }
     const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
