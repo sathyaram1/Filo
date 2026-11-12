@@ -963,6 +963,7 @@
     const fonti = ds.map((d) => principioUsato(d)).filter(Boolean).map((id) => { const f = trova(id); return f ? [id, f.principio, f.principioContestato] : [id]; });
     const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.fiducia, d.fidabile, d.fidataDallOwner, d.esito, d.titolo, d.illeggibile, d.smistamento,
       d.principioContestato, ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d), lavoroFermo(d),
+      D.assorbiteDi(d).map((id) => { const x = trova(id); return [id, x ? x.titolo : '']; }),
       allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti,
       parolaSalvata()]);
     if (firma === firmaDettaglio) return;
