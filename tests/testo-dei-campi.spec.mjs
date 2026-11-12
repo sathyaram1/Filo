@@ -96,6 +96,7 @@ test('dentro un riquadro di un altro sito il testo torna alla ricarica, senza to
   await page.reload();
   await expect.poll(() => (riquadro() ? riquadro().locator('textarea').inputValue().catch(() => '') : ''), { timeout: 10000 })
     .toBe('commento scritto nel riquadro');
+  await expect(riquadro().locator('#ricevuto')).toHaveText('commento scritto nel riquadro');
 });
 
 test('inviato il modulo il testo se ne va: tornando sulla pagina il campo è vuoto', async ({ app, openTab, testServer }) => {
