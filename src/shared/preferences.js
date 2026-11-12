@@ -304,6 +304,9 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || (typeof require === 'function' ? require('./nomiSito.js') : null);
   }
+  function testoCampi() {
+    return global.SN_TESTO_CAMPI || (typeof require === 'function' ? require('./testoDeiCampi.js') : null);
+  }
   // La riduzione delle pagine (Sicurezza, Altro): «https://www.Sito.it/x» → «sito.it» (#843).
   function dominioDa(raw) {
     const N = nomiSito();
