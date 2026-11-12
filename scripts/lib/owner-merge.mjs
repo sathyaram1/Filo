@@ -412,7 +412,7 @@ export function classifyServerMerge(status, body) {
   const errMsg = String((b.error && b.error.message) || '');
   if (status === 200 && r.ok === true && ESITI_SERVER.has(String(r.result))) {
     const out = { outcome: String(r.result) };
-    for (const k of ['sha', 'url', 'detail', 'mainSha']) if (r[k]) out[k] = String(r[k]);
+    for (const k of ['sha', 'url', 'detail', 'mainSha', 'app']) if (r[k]) out[k] = String(r[k]);
     return out;
   }
   if (status === 200 && r.ok === true) return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
