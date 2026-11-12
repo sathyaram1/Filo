@@ -511,7 +511,7 @@
         imEl.src = dataUrlToBlobUrl(img.dataUrl);
         imEl.dataset.snObjurl = '1';
         imEl.alt = '';
-        imEl.title = 'Clicca per ingrandire';
+        imEl.title = immaginiSegnate.has(img) ? 'Da ricontrollare: clicca per ingrandire' : 'Clicca per ingrandire';
         imEl.addEventListener('click', () => openLightbox(img.dataUrl));
         const xBtn = document.createElement('button');
         xBtn.type = 'button';
