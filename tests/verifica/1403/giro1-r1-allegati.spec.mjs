@@ -1,8 +1,5 @@
-// Verifica #1403 giro 1: L0 rilegge anche gli allegati di testo, e la rilettura anticipata vale anche sui siti.
+// Verifica #1403 giro 1: L0 rilegge anche gli allegati di testo (un log con una password non parte senza avviso).
 import { test, expect } from '../../fixtures/electron.mjs';
-import { paginaDelloStrato, nelMondoDiFilo, statoDi, clicca } from '../../helpers/riquadri.mjs';
-
-const SHOTS = 'tests/.shots';
 
 async function newtab(app) {
   await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10_000 }).toBe(true);
