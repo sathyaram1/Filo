@@ -216,6 +216,7 @@ test('riavviato Filo, la scheda torna col testo che c\'era', async ({ testServer
     let tornata = null;
     await expect.poll(() => Boolean(tornata = app.windows().find(sulPosto)), { timeout: 20000 }).toBe(true);
     await expect.poll(() => tornata.locator('#messaggio').inputValue().catch(() => ''), { timeout: 15000 }).toBe('scritto prima che Filo si chiudesse');
+    await expect(tornata.locator('#ricevuto')).toHaveText('scritto prima che Filo si chiudesse');
   } finally {
     if (app) await chiudiApp(app);
     togliCartella(userData);
