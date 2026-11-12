@@ -472,10 +472,35 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
   const nuove = perMessaggio.map((c, i) => c.slice(i ? perMessaggio[i - 1].length : 0));
   const con = nuove.map((c, i) => (c.length ? i : -1)).filter((i) => i >= 0);
   expect(con.length, 'la chat compatta').toBeGreaterThan(1);
-  // Con la parte fissa di oggi (~43.000 token) e i ricordi ripescati, un turno qui pesa fino a 8.000 token: sopra la
-  // parte fissa ne stanno tre, quindi ogni due messaggi è il meglio possibile. I tre turni liberi li prova l'unit.
-  for (const i of con) expect(con.includes(i + 1), `compattazioni per messaggio: ${JSON.stringify(nuove)}`).toBe(false);
+  for (let k = 1; k < con.length; k++) {
+    expect(con[k] - con[k - 1], `fra due compattazioni almeno tre messaggi: ${JSON.stringify(nuove)}`).toBeGreaterThanOrEqual(3);
+  }
   expect(nuove.flat().filter((m) => m === 'soglia'), 'nessuna risposta aspetta la compattazione').toEqual([]);
   const ultima = (await chiamateAlModello(app)).at(-1);
-  expect(await tokenDi(app, ultima)).toBeLessThan(70000);
+  expect(await tokenDi(app, ultima), 'lo spazio sopra la parte fissa resta sotto il listino').toBeLessThan(100000);
+});
+
+test('con la soglia scritta sotto la parte fissa la risposta non aspetta una compattazione e lo scambio di prima arriva intero', async ({ app }) => {
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Va bene.' }]);
+  await compattatoreFinto(app, '10:00 parlato di animali');
+  await conSoglia(app, 40000);
+  try {
+    await chiedi(page, 'la mia gatta si chiama Ofelia');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(1);
+    await chiedi(page, 'come si chiama la mia gatta?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(2);
+    const seconda = (await chiamateAlModello(app))[1];
+    expect(JSON.stringify(seconda.slice(1)), 'il messaggio di un attimo prima arriva al modello com\'era').toContain('la mia gatta si chiama Ofelia');
+    await page.waitForTimeout(1500);
+    expect(await app.evaluate(() => globalThis.__compattazioni.map((x) => x.motivo)), 'nessuna compattazione').toEqual([]);
+    // La chat compatta dove dice la regola dello spazio: la parte fissa misurata più lo spazio minimo.
+    const { base, soglia } = await app.evaluate(async () => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: 40000 }, null) });
+      return { base: C.base(false), soglia: l.soglia };
+    });
+    expect(base, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(40000);
+    expect(soglia).toBe(base + 30000);
+  } finally { await rimettiCompattatore(app); await ripristina(app); }
 });
