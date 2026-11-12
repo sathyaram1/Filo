@@ -387,7 +387,7 @@ jobs:
           TESTO="${PREMESSA}
 
           Rossi nuovi (${N_TUTTE:-0}):
-          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
+          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}${ERRORI}
 
 
           ${DOPO_VERDE}
