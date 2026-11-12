@@ -324,6 +324,68 @@ export function dentroBudget(voci, max = ELENCO_MAX_BYTE, maxVoci = ELENCO_MAX_V
   return out;
 }
 
+// ─── I rifiuti di scrittura (#2188) ─────────────────────────────────────────
+// Un Edit o un Write che Claude Code rifiuta è un turno pagato per niente. Il conto viaggia nella nota NOTA_RIFIUTI
+// perché il server rifiuta un rapporto con un campo che non conosce; `rapporti --rifiuti` la rilegge con leggiNotaRifiuti.
+export const STRUMENTI_SCRITTURA = Object.freeze(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+export const NOTA_RIFIUTI = 'rifiuti di scrittura';
+export const RIFIUTO_NON_LETTO = /has not been read yet/i;
+export const RIFIUTO_MODIFICATO = /has been modified since read/i;
+// Le cause, nell'ordine in cui si decidono: letto prima allo stesso percorso (stato perso: una compattazione), letto
+// sotto un'altra cartella (la sessione invece del clone), nominato solo da un comando della shell, mai.
+export const CAUSE_NON_LETTO = Object.freeze([['prima', 'letto prima'], ['altraCartella', 'letto in un\'altra cartella'], ['shell', 'solo dalla shell'], ['mai', 'mai letto']]);
+// Una shell fra l'ultima lettura e il rifiuto è il lavoro di chi scrive; senza, il file l'ha cambiato qualcun altro.
+export const CAUSE_MODIFICATO = Object.freeze([['shell', 'shell in mezzo'], ['senzaShell', 'senza shell in mezzo']]);
+export const rifiutiVuoti = () => ({
+  nonLetto: Object.fromEntries(CAUSE_NON_LETTO.map(([k]) => [k, 0])),
+  modificato: Object.fromEntries(CAUSE_MODIFICATO.map(([k]) => [k, 0])),
+});
+const somma = (o) => Object.values(o || {}).reduce((t, n) => t + (Number(n) || 0), 0);
+const percorsoNorma = (p) => String(p || '').replace(/\\/g, '/').split('/').filter(Boolean);
+
+// I conti stanno sul rapporto fuori dal JSON: nessuna copia del rapporto li porta al server.
+function rifiutiDi(rep) {
+  if (!Object.prototype.hasOwnProperty.call(rep, 'rifiutiScrittura')) {
+    Object.defineProperty(rep, 'rifiutiScrittura', { value: rifiutiVuoti(), enumerable: false, writable: true });
+  }
+  return rep.rifiutiScrittura;
+}
+
+/** Perché `file` non risultava letto, dai percorsi letti e dai comandi della shell venuti prima: una chiave di CAUSE_NON_LETTO. PURA. */
+export function causaNonLetto(file, letti, comandi) {
+  const parti = percorsoNorma(file);
+  if (!parti.length) return 'mai';
+  if (letti.has(parti.join('/'))) return 'prima';
+  const coda = parti.slice(-2).join('/');
+  if (parti.length > 1 && [...letti].some((l) => l === coda || l.endsWith(`/${coda}`))) return 'altraCartella';
+  const nome = parti[parti.length - 1];
+  if (comandi.some((c) => c.includes(nome))) return 'shell';
+  return 'mai';
+}
+
+/** La nota coi rifiuti, '' se non ce ne sono. PURA. */
+export function notaRifiuti(r) {
+  const nl = somma(r && r.nonLetto);
+  const mo = somma(r && r.modificato);
+  if (!nl && !mo) return '';
+  const dettaglio = (cause, conti) => cause.map(([k, etichetta]) => `${etichetta} ${Number(conti && conti[k]) || 0}`).join(', ');
+  return `${NOTA_RIFIUTI}: non letto ${nl} (${dettaglio(CAUSE_NON_LETTO, r.nonLetto)}), modificato dopo la lettura ${mo} (${dettaglio(CAUSE_MODIFICATO, r.modificato)})`;
+}
+
+/** I conti di una nota di notaRifiuti, o null se la nota non è quella. PURA. */
+export function leggiNotaRifiuti(nota) {
+  const t = String(nota || '');
+  if (!t.startsWith(`${NOTA_RIFIUTI}:`)) return null;
+  const r = rifiutiVuoti();
+  const numero = (etichetta) => {
+    const m = new RegExp(`[(,] ?${etichetta.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (\\d+)`).exec(t);
+    return m ? Number(m[1]) : 0;
+  };
+  for (const [k, etichetta] of CAUSE_NON_LETTO) r.nonLetto[k] = numero(etichetta);
+  for (const [k, etichetta] of CAUSE_MODIFICATO) r.modificato[k] = numero(etichetta);
+  return r;
+}
+
 /**
  * Gli elenchi dentro il budget, e la nota quando ne resta fuori qualcosa: i falliti in ordine di tempo, le attese dalla
  * più lunga. Muta `rep`. PURA.
@@ -333,7 +395,9 @@ export function stringiElenchi(rep) {
   const attese = (Array.isArray(rep.attese) ? rep.attese : []).slice().sort((a, b) => (Number(b.s) || 0) - (Number(a.s) || 0));
   rep.falliti = dentroBudget(falliti);
   rep.attese = dentroBudget(attese);
-  rep.notes = (rep.notes || []).filter((n) => !/^(strumenti falliti|attese oltre)/.test(n));
+  rep.notes = (rep.notes || []).filter((n) => !/^(strumenti falliti|attese oltre)/.test(n) && !n.startsWith(`${NOTA_RIFIUTI}:`));
+  const rifiuti = notaRifiuti(rep.rifiutiScrittura);
+  if (rifiuti) rep.notes.push(rifiuti);
   const errori = Math.max(Number(rep.tools && rep.tools.errors) || 0, falliti.length);
   if (errori > rep.falliti.length) rep.notes.push(`strumenti falliti ${errori}, elencati i primi ${rep.falliti.length}`);
   const lunghe = Math.max(Number(rep.atteseOltre30) || 0, attese.length);
@@ -559,6 +623,11 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // Nome, descrizione e forma di ogni chiamata, per i falliti e le attese; i falliti che aspettano la chiamata dopo.
   const chiamate = new Map();
   let senzaSeguito = [];
+  // Per la causa dei rifiuti di scrittura: i percorsi letti o scritti (con l'ordine dell'ultima volta) e i comandi.
+  const letti = new Set();
+  const tocchi = new Map();
+  const comandi = [];
+  let ultimaShell = -1;
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
@@ -616,6 +685,13 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         // Senza descrizione, la prima riga del comando: quaranta prove fallite non devono diventare quaranta «Bash» uguali.
         const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
         const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
+        const ordine = rep.tools.total;
+        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') { comandi.push(input.command); ultimaShell = ordine; }
+        const file = percorsoNorma(typeof input.file_path === 'string' ? input.file_path : input.notebook_path).join('/');
+        if (file && (b.name === 'Read' || STRUMENTI_SCRITTURA.includes(b.name))) {
+          Object.assign(info, { file, ordine });
+          if (b.name !== 'Read') info.scrittura = { causa: causaNonLetto(file, letti, comandi), shellInMezzo: ultimaShell > (tocchi.has(file) ? tocchi.get(file) : -1) };
+        }
         chiamate.set(bid, info);
         for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, info);
         senzaSeguito = [];
@@ -636,6 +712,15 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
           const voce = { strumento: chiamata.nome, ...(chiamata.cosa ? { cosa: chiamata.cosa } : {}), errore: rigaErrore(b.content), dopo: '' };
           rep.falliti.push(voce);
           senzaSeguito.push({ voce, chiamata });
+          if (chiamata.scrittura) {
+            const testo = testoDi(b.content);
+            const r = rifiutiDi(rep);
+            if (RIFIUTO_NON_LETTO.test(testo)) r.nonLetto[chiamata.scrittura.causa] += 1;
+            else if (RIFIUTO_MODIFICATO.test(testo)) r.modificato[chiamata.scrittura.shellInMezzo ? 'shell' : 'senzaShell'] += 1;
+          }
+        } else if (chiamata.file) {
+          letti.add(chiamata.file);
+          tocchi.set(chiamata.file, chiamata.ordine);
         }
         if (Array.isArray(finestreAgent) && Number.isFinite(ms)) {
           const f = finestreAgent.find((x) => x.id === b.tool_use_id);
@@ -860,10 +945,13 @@ export function sommaSottoAgente(rep, sub) {
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
   for (const n of Array.isArray(sub.notes) ? sub.notes : []) {
     // Le note sui tagli degli elenchi si rifanno qui sotto sui conti sommati.
-    if (/^(strumenti falliti|attese oltre)/.test(n)) continue;
+    if (/^(strumenti falliti|attese oltre)/.test(n) || n.startsWith(`${NOTA_RIFIUTI}:`)) continue;
     const nota = `sotto-agente: ${n}`;
     if (!rep.notes.includes(nota)) rep.notes.push(nota);
   }
+  const rifiuti = rifiutiDi(rep);
+  const suoi = sub.rifiutiScrittura || leggiNotaRifiuti((sub.notes || []).find((n) => String(n).startsWith(`${NOTA_RIFIUTI}:`))) || rifiutiVuoti();
+  for (const parte of ['nonLetto', 'modificato']) for (const k of Object.keys(rifiuti[parte])) rifiuti[parte][k] += Number(suoi[parte] && suoi[parte][k]) || 0;
   rep.falliti = [...(rep.falliti || []), ...(Array.isArray(sub.falliti) ? sub.falliti : [])];
   rep.attese = [...(rep.attese || []), ...(Array.isArray(sub.attese) ? sub.attese : [])];
   rep.atteseOltre30 = (Number(rep.atteseOltre30) || 0) + (Number(sub.atteseOltre30) || 0);

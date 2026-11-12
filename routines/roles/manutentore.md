@@ -245,6 +245,7 @@ npm run manutentore -- stato | schede              # stato, segnali e N; tutte l
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]
 npm run manutentore -- rapporti --giorni 7 --cache  # per ruolo: cache scritta, rewarm, attese oltre 5 min, saldo dell'ora
+npm run manutentore -- rapporti --giorni 7 --rifiuti  # per ruolo: Edit e Write rifiutati (non letto, modificato), con la causa
 npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
 npm run manutentore -- ordine                      # com'è adesso, e quali numeri sono ancora aperti
 npm run manutentore -- accendi 812,815,820 | accendi --niente

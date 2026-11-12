@@ -14,7 +14,7 @@ import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './sched
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
-import { famigliaPrezzo, PREZZI } from './session-report.mjs';
+import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -280,8 +280,8 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|
 export const RAPPORTI_PAGINE_MAX = 500;
 
 /**
- * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma | --cache] [--cursore C] [--limite L] [--tutte] [--json]`
- * → { ok, dati (il corpo per il server), tutte, cache, json } | { ok:false, motivo }. PURA.
+ * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma | --cache | --rifiuti] [--cursore C] [--limite L] [--tutte] [--json]`
+ * → { ok, dati (il corpo per il server), tutte, cache, rifiuti, json } | { ok:false, motivo }. PURA.
  */
 export function richiestaRapporti(argv, nowMs = Date.now()) {
   const [n, altro] = senzaOpzioni((argv || []).slice(1));
@@ -300,9 +300,12 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (cursore !== undefined && !String(cursore).trim()) return ko('--cursore è quello stampato dalla pagina prima');
   const somma = argv.includes('--somma');
   const cache = argv.includes('--cache');
-  const tutte = cache || argv.includes('--tutte');
-  if (somma && tutte) return ko(`--somma dà solo il conto, senza pagine: ${cache ? '--cache le legge tutte, va da solo' : '--tutte non serve'}`);
-  if (cache && cursore !== undefined) return ko('--cache legge la finestra intera: il cursore non serve');
+  const rifiuti = argv.includes('--rifiuti');
+  const conto = cache ? '--cache' : (rifiuti ? '--rifiuti' : '');
+  const tutte = Boolean(conto) || argv.includes('--tutte');
+  if (cache && rifiuti) return ko('o --cache o --rifiuti: un conto per volta');
+  if (somma && tutte) return ko(`--somma dà solo il conto, senza pagine: ${conto ? `${conto} le legge tutte, va da solo` : '--tutte non serve'}`);
+  if (conto && cursore !== undefined) return ko(`${conto} legge la finestra intera: il cursore non serve`);
   if (argv.includes('--sottonumeri') && !n) return ko('--sottonumeri vuole il numero del feedback');
   const dati = {};
   if (n) dati.numero = numeroDi(n);
@@ -313,7 +316,7 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (somma) dati.somma = true;
   if (cursore !== undefined) dati.cursore = String(cursore);
   if (limite !== undefined) dati.limite = Number(limite);
-  return { ok: true, dati, tutte, cache, json: argv.includes('--json') };
+  return { ok: true, dati, tutte, cache, rifiuti, json: argv.includes('--json') };
 }
 
 const dollari = (n) => `${(Number(n) || 0).toFixed(2)} $`;
@@ -444,6 +447,80 @@ export function righeCache(conto, finestra = null) {
     riga('TOTALE', conto.totale),
     `Il risparmio è un tetto: il rewarm conta ogni causa, non solo le attese oltre ${SCADENZA_CACHE_S} s.`,
     ...(conto.totale.stimati ? [`${conto.totale.stimati} rapporti senza i dollari della cache (nati prima del campo, o il server non lo tiene): stimati tutti al listino del primo modello, sotto-agenti compresi.`] : []),
+  ];
+}
+
+const STRUMENTO_SCRITTURA_RE = /^(Edit|MultiEdit|Write|NotebookEdit)(:|$)/;
+
+/**
+ * Il conto di `rapporti --rifiuti` (#2188) per ruolo e in totale: gli Edit e i Write rifiutati per file non letto o
+ * modificato dopo la lettura, con la causa dalla nota del rapporto. Un rapporto nato prima della nota si conta dagli
+ * strumenti falliti del biglietto, senza causa (`senzaCausa`) e solo fin dove l'elenco arriva. PURA.
+ */
+export function contoRifiuti(rapporti, finestra = null) {
+  const vuoto = () => {
+    const r = rifiutiVuoti();
+    r.nonLetto.senzaCausa = 0;
+    r.modificato.senzaCausa = 0;
+    return { biglietti: 0, conRapporto: 0, conRifiuti: 0, dalSoloElenco: 0, ...r };
+  };
+  const ruoli = new Map();
+  const totale = vuoto();
+  for (const b of Array.isArray(rapporti) ? rapporti : []) {
+    const rep = b && b.report && typeof b.report === 'object' ? b.report : null;
+    const ruolo = unaRiga((b && (b.ruolo || b.role)) || (rep && rep.role)) || '?';
+    if (!ruoli.has(ruolo)) ruoli.set(ruolo, vuoto());
+    const nota = rep && Array.isArray(rep.notes) ? rep.notes.find((n) => String(n).startsWith(`${NOTA_RIFIUTI}:`)) : null;
+    let r = nota ? leggiNotaRifiuti(nota) : null;
+    let dalSoloElenco = 0;
+    if (!r) {
+      r = vuoto();
+      for (const f of Array.isArray(b && b.strumentiFalliti) ? b.strumentiFalliti : []) {
+        if (!f || !STRUMENTO_SCRITTURA_RE.test(String(f.nome || ''))) continue;
+        if (RIFIUTO_NON_LETTO.test(String(f.errore || ''))) r.nonLetto.senzaCausa += 1;
+        else if (RIFIUTO_MODIFICATO.test(String(f.errore || ''))) r.modificato.senzaCausa += 1;
+      }
+      dalSoloElenco = r.nonLetto.senzaCausa + r.modificato.senzaCausa ? 1 : 0;
+    }
+    const quanti = [r.nonLetto, r.modificato].reduce((t, o) => t + Object.values(o).reduce((s, n) => s + n, 0), 0);
+    for (const g of [ruoli.get(ruolo), totale]) {
+      g.biglietti += 1;
+      g.conRapporto += rep ? 1 : 0;
+      g.conRifiuti += quanti ? 1 : 0;
+      g.dalSoloElenco += dalSoloElenco;
+      for (const parte of ['nonLetto', 'modificato']) for (const [k, n] of Object.entries(r[parte])) g[parte][k] = (g[parte][k] || 0) + n;
+    }
+  }
+  const da = finestra ? Date.parse(finestra.da) : NaN;
+  const a = finestra ? Date.parse(finestra.a) : NaN;
+  const giorni = Number.isFinite(da) && Number.isFinite(a) && a > da ? (a - da) / GIORNO_MS : 0;
+  const chiudi = (g) => {
+    const nonLettoTot = Object.values(g.nonLetto).reduce((s, n) => s + n, 0);
+    const modificatoTot = Object.values(g.modificato).reduce((s, n) => s + n, 0);
+    return Object.assign(g, { nonLettoTot, modificatoTot, nonLettoAlGiorno: giorni ? nonLettoTot / giorni : null });
+  };
+  return {
+    giorni,
+    perRuolo: [...ruoli].map(([ruolo, g]) => ({ ruolo, ...chiudi(g) })).sort((x, y) => y.nonLettoTot + y.modificatoTot - x.nonLettoTot - x.modificatoTot),
+    totale: chiudi(totale),
+  };
+}
+
+/** `rapporti --rifiuti` da leggere: una riga per ruolo col dettaglio delle cause, il totale e la media al giorno. PURA. */
+export function righeRifiuti(conto, finestra = null) {
+  const cause = (elenco, conti) => [...elenco, ['senzaCausa', 'senza causa']]
+    .filter(([k]) => Number(conti[k]) > 0).map(([k, etichetta]) => `${etichetta} ${conti[k]}`).join(', ');
+  const riga = (nome, g) => `  ${nome}: ${g.biglietti} biglietti (${g.conRifiuti} con rifiuti)`
+    + ` · non letto ${g.nonLettoTot}${g.nonLettoTot ? ` (${cause(CAUSE_NON_LETTO, g.nonLetto)})` : ''}`
+    + ` · modificato dopo la lettura ${g.modificatoTot}${g.modificatoTot ? ` (${cause(CAUSE_MODIFICATO, g.modificato)})` : ''}`;
+  const quando = finestra ? ` dal ${finestra.da} al ${finestra.a}` : '';
+  const t = conto.totale;
+  return [
+    `Edit e Write rifiutati${quando}, per ruolo:`,
+    ...conto.perRuolo.map((g) => riga(g.ruolo, g)),
+    riga('TOTALE', t),
+    ...(t.nonLettoAlGiorno !== null ? [`Non letto: ${t.nonLettoAlGiorno.toFixed(1)} al giorno su ${conto.giorni.toFixed(1)} giorni.`] : []),
+    ...(t.dalSoloElenco ? [`${t.dalSoloElenco} rapporti senza la nota dei rifiuti (nati prima): contati dagli strumenti falliti del biglietto, senza causa e fin dove l'elenco arriva.`] : []),
   ];
 }
 
@@ -919,6 +996,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   contesto | sveglia | stato | schede | leggi <N>
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
+  rapporti --rifiuti [--giorni G | --da D [--a D]] [--json] (per ruolo: Edit e Write rifiutati, con la causa)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…> [--server]
@@ -1035,6 +1113,12 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
         const conto = contoCache(r.rapporti);
         if (q.json) stampaJson({ finestra: r.finestra || null, ...conto });
         else console.log(righeCache(conto, r.finestra).join('\n'));
+        return 0;
+      }
+      if (q.rifiuti) {
+        const conto = contoRifiuti(r.rapporti, r.finestra);
+        if (q.json) stampaJson({ finestra: r.finestra || null, ...conto });
+        else console.log(righeRifiuti(conto, r.finestra).join('\n'));
         return 0;
       }
       if (q.dati.somma && !q.json) { console.log(righeCosto(r, leggiSchede(cartella)).join('\n')); return 0; }

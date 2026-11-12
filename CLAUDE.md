@@ -42,7 +42,9 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
 - **Le esplorazioni si delegano** a un sotto-agente; qui resta la conclusione.
   Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
   pestano sui lock del salvataggio automatico.
-- **Si legge la parte, non il file**: intervalli di righe, uscite filtrate.
+- **Si legge la parte, non il file**: intervalli di righe, uscite filtrate. Un
+  file da modificare si legge con Read (`offset` e `limit`): Edit rifiuta quello
+  letto dalla shell, e il rifiuto costa un turno.
 - **Attese.** Un comando che può superare i due minuti si lancia in sottofondo,
   e la sua fine la annuncia l'harness: niente attese scritte nella shell
   (`sleep`, cicli `until`, `tail --pid`), che in cloud chiedono un permesso.

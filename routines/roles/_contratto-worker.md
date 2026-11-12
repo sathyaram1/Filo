@@ -96,6 +96,14 @@ In cloud chiedono un permesso che nessuno approva, e il worker resta fermo in
 silenzio (#1563). Un heredoc che passa un testo a uno script del canale, come
 `segnala` o `risposta`, è un'altra cosa: non scrive file e resta com'è.
 
+**Prima di Edit si legge con Read, in questa sessione**, anche solo l'intervallo
+da cambiare (`offset` e `limit`); lo stesso per un Write che riscrive un file che
+c'è già. Non contano come lettura la shell (`sed -n`, `grep`, `cat`), Grep, un
+sotto-agente, né lo stesso file sotto un'altra cartella: Claude Code rifiuta la
+modifica, e ogni rifiuto è un turno intero pagato per niente (#2188). Dopo una
+compattazione, o un comando che ha riscritto il file (rebase, fusione, un
+generatore), si rilegge. Il rapporto di fine sessione conta i rifiuti con la causa.
+
 ## Sotto-agenti
 
 Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
