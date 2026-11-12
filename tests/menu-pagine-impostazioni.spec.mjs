@@ -129,6 +129,7 @@ test('Modelli: la stessa voce sulle impostazioni della pagina', async ({ openTab
   const page = await openTab('filo://options/options.html');
   const casella = page.locator('#useDefaultModels');
   await expect(casella).toBeAttached({ timeout: 10_000 });
+  await pronta(page);
   await page.locator('label', { has: casella }).first().click({ button: 'right' });
   expect(await etichette(page)).toContain('Rimetti di serie');
 });
