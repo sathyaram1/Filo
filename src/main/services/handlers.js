@@ -8000,6 +8000,7 @@ const handlerCtx = {
   contaHomeVista,
   executeFiloAction,
   chiaveConferma: pendingConfirmKey,
+  segretiCustoditi,
   controllaUscita,
   apriDaFilo,
   sitoDaConfermare,
