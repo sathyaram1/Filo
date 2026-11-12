@@ -78,12 +78,31 @@
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
   }
   // Un lavoro server che nessuna routine prende perché il suo biglietto nascerebbe non fidato (#2036): i motivi li
-  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda.
-  function restaLocale(fb) {
+  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda, e solo coi
+  // lavori server accesi: spenti, il lavoro è in mano locale e il segno rimasto non dice più niente (#2036.1).
+  function restaLocale(fb, { lavoriServer } = {}) {
     const r = fb && fb.restaLocale;
+    if (lavoriServer === false) return null;
     if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
-    return motivi.length ? { motivi, atMs: Number(r.atMs) || 0 } : null;
+    if (!motivi.length) return null;
+    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, fb.branch)))];
+    return { motivi, sblocchi, atMs: Number(r.atMs) || 0 };
+  }
+  // Nessun motivo del fermo passa da solo (#2036.1): uno sporco non torna pulito, un registro bucato lo sana solo
+  // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
+  function sbloccoFermo(motivo, ramo) {
+    const m = String(motivo || '').toLowerCase();
+    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito: lo porta avanti una sessione locale.';
+    if (/ramo|registro/.test(m)) {
+      const server = /server/.test(m);
+      const nome = String(ramo || '').trim() || '<ramo>';
+      return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
+        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, lo porta avanti una sessione locale.`;
+    }
+    if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
+    if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
+    return `«${String(motivo).trim()}» non passa da solo: lo sblocca un tuo gesto o una sessione locale.`;
   }
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
@@ -2176,7 +2195,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, sbloccoFermo, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, chiedeFiduciaPerLaCoda, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,

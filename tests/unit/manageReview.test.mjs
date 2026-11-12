@@ -2139,13 +2139,36 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
 test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
   const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
   const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
-  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], atMs: 5 });
   assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
+  assert.equal(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: false }), null, 'lavori server spenti: in mano locale (#2036.1)');
+  assert.ok(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: true }));
   assert.equal(MR.restaLocale(srv({ restaLocale: null })), null, 'tolto dal server quando il motivo passa');
   assert.equal(MR.restaLocale(srv({ status: 'working', restaLocale: segno })), null, 'partito: non è più fermo');
   assert.equal(MR.restaLocale({ status: 'todo', restaLocale: segno }), null, 'solo un lavoro server');
   assert.equal(MR.restaLocale(srv({ restaLocale: { motivi: [] } })), null);
   assert.equal(MR.restaLocale(null), null);
+});
+
+test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno promette una ripartenza da sola (#2036.1)', () => {
+  const ramo = MR.sbloccoFermo('ramo non pulito', 'worker/x-1');
+  assert.match(ramo, /sanatoria/);
+  assert.match(ramo, /fiducia:sana -- worker\/x-1;/);
+  assert.match(MR.sbloccoFermo('ramo del server non pulito', 'worker/x-1'), /fiducia:sana -- worker\/x-1 --server/);
+  assert.match(MR.sbloccoFermo('ramo non pulito'), /fiducia:sana -- <ramo>/, 'senza ramo noto non inventa un nome');
+  assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito.*sessione locale/);
+  assert.doesNotMatch(MR.sbloccoFermo('ramo scritto da un biglietto sporco'), /sanatoria/, 'uno sporco non si sana');
+  assert.match(MR.sbloccoFermo('feedback non fidato'), /segni fidato/);
+  for (const m of ['note per gli agenti di una domanda non fidata', 'testo di una domanda aperta non fidata']) {
+    assert.match(MR.sbloccoFermo(m), /domanda .*segni fidata in Domande/, 'la fiducia da dare è della domanda, non del feedback');
+  }
+  assert.match(MR.sbloccoFermo('motivo nuovo del server'), /«motivo nuovo del server» non passa da solo/);
+  for (const m of ['ramo non pulito', 'ramo del server non pulito', 'contenuto scritto da un biglietto sporco', 'feedback non fidato', 'altro']) {
+    assert.doesNotMatch(MR.sbloccoFermo(m), /riparte da solo|passa da sé/i, m);
+  }
+  const doppio = { status: 'todo', localOnly: { by: 'owner', at: 1 }, branch: 'b',
+    restaLocale: { motivi: ['contenuto scritto da un biglietto sporco', 'ramo scritto da un biglietto sporco'] } };
+  assert.equal(MR.restaLocale(doppio).sblocchi.length, 1, 'lo stesso gesto si dice una volta');
 });
 
 test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {
