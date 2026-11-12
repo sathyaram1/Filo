@@ -2183,12 +2183,7 @@
       keys: ['soglia_compattazione', 'soglia di compattazione', 'soglia della compattazione', 'compattazione della chat', 'contestofilo.soglia'],
       costo: 2,
       risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
-      build(v) {
-        if (predefinito(v)) return { partial: { contestoFilo: { soglia: null } }, label: 'Soglia di compattazione della chat → come i predefiniti' };
-        const soglia = tettoAParole('soglia', v);
-        if (soglia == null) return null;
-        return { partial: { contestoFilo: { soglia } }, label: `Soglia di compattazione della chat → ${soglia.toLocaleString('it-IT', { useGrouping: true })}` };
-      },
+      build: cambioDelTetto('soglia', 'Soglia di compattazione della chat'),
     },
     {
       scrive: ['contestoFilo.cache'],
