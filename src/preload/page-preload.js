@@ -1047,6 +1047,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
   try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
   try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
+  try { require(path.join(SHARED_DIR, 'testoDeiCampi.js')); } catch (e) { console.error('[Filo CS] testoDeiCampi shared', e); } // #2378 — firma e abbinamento dei campi
+  try { require(path.join(CONTENT_DIR, 'testoDeiCampi.js')); } catch (e) { console.error('[Filo CS] testoDeiCampi', e); } // #2378 — anche nei riquadri: il campo può stare lì
   suRichiesta(['SN_FEEDBACK', 'SN_FEEDBACK_CLIENT_ID_HASH', 'SN_FEEDBACK_ATTACH', 'SN_FEEDBACK_UI'], () => {
     try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
     try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
