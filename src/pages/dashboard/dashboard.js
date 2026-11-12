@@ -85,18 +85,9 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
-  // #892.5 — le righe che il campo ha avuto da fuori: svuotato e riportato con Annulla, un testo incollato lo resta.
-  // Si tengono le impronte, non i testi; un'impronta uguale per caso chiede di più, mai di meno.
-  const righeDaFuori = new Set();
-  const impronta = (s) => {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
-    return `${s.length}:${h >>> 0}`;
-  };
-  const ricordaDaFuori = (s) => {
-    righeDaFuori.add(impronta(s));
-    if (righeDaFuori.size > 2000) righeDaFuori.delete(righeDaFuori.values().next().value);
-  };
+  // #892.5 — svuotato e riportato con Annulla, un testo incollato lo resta: la regola è dell'Aiuto e della home insieme.
+  const testiDiAltri = self.SN_TESTO_DI_ALTRI.crea();
+  const ricordaDaFuori = (s) => testiDiAltri.ricorda(s);
   // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
   let testoIncollato = null;
   const percorsiImmagini = new Map();
