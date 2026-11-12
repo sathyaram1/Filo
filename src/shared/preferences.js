@@ -2235,7 +2235,7 @@
       },
     },
     {
-      scrive: ['feedbackL0.enabled'],
+      scrive: ['feedbackRilettura.enabled'],
       aiuto: 'true | false (prima che un feedback parta, Filo lo rilegge in cerca di dati sensibili e cose mandate per sbaglio e, se trova qualcosa, lo mostra prima di mandarlo; spenta, il feedback parte com\'è)',
       costo: 1,
       keys: ['rilettura_feedback', 'rilettura del feedback', 'rileggi il feedback', 'controllo del feedback prima dell\'invio',
