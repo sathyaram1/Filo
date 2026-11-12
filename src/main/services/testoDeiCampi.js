@@ -159,12 +159,34 @@ async function scrivi(sender, settings, campi) {
   return { ok: true, segui: true, troppo: troppo.length };
 }
 
+// Chiudere una scheda non dà eventi alla pagina: con un testo non ancora spedito la chiusura aspetta che arrivi, col
+// tetto di src/main/tabs/chiusuraConCaselle.js (anche all'uscita da Filo).
+function inSospeso(sender, si) {
+  try { if (sender && sender.wc) require('../tabs/chiusuraConCaselle').segna(sender.wc, si); } catch (_) {}
+}
+
+// Un riquadro monta i content script solo quando lo si usa: se qui c'è testo da rimettere, li monta subito.
+async function daRimettere(sender, settings) {
+  const pagina = paginaAmmessa(sender, settings);
+  if (!pagina) return { ok: true, ce: false };
+  await carica();
+  return { ok: true, ce: !!pagine[pagina] && !padroneAltrove(pagina, sender.wc) };
+}
+
 async function daContenuto(msg, sender) {
   const settings = await impostazioniAdesso();
   giorniCorrenti = R.opzioni(settings).giorni;
   const fase = msg && msg.fase;
   if (fase === 'leggi') return leggi(sender, settings);
-  if (fase === 'scrivi') return scrivi(sender, settings, msg.campi);
+  if (fase === 'ce') return daRimettere(sender, settings);
+  if (fase === 'sospeso') {
+    const si = !!paginaAmmessa(sender, settings);
+    inSospeso(sender, si);
+    return { ok: true, segui: si };
+  }
+  if (fase === 'scrivi') {
+    try { return await scrivi(sender, settings, msg.campi); } finally { inSospeso(sender, false); }
+  }
   return { ok: false };
 }
 
