@@ -26,16 +26,18 @@ const timerFermo = { normale: null, incognito: null };
 const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
-// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo)` → scrive una memoria. Li dà
-// il main all'avvio (handlers.js), le prove li sostituiscono.
+// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti })` → scrive una
+// memoria con gli eventi del filo da cui nasce, falso se non l'ha scritta. Li dà il main all'avvio (handlers.js), le
+// prove li sostituiscono.
 const _dip = {
   chiama: null,
-  applicaMemoria: async (testo) => {
+  applicaMemoria: async (testo, { fonti = [] } = {}) => {
     const P = globalThis.SN_PREF;
     const l = P ? P.lezioneDaAzione({ testo }) : { testo };
     if (l.rifiuto || !l.testo) return false;
-    await globalThis.SN_FILO_MEMORY.appendLesson(l.testo);
-    return true;
+    const buf = await globalThis.SN_FILO_MEMORY.appendLesson(l.testo, { fonti });
+    const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+    return !!ultima && ultima.text === String(l.testo).trim();
   },
   livello: async () => {
     let aut = {};
