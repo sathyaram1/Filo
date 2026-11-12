@@ -6896,6 +6896,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const LC = globalThis.SN_FILO_COMPATTAZIONE;
   let compattazioniNelTurno = 0;
   let ultimaStima = 0;
+  let limitiDelTurno = null;
   const ricomponi = async () => {
     filo = await componiFilo(tettiChat);
     sezioniUtente = await sezioniCon();
