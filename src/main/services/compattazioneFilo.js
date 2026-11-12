@@ -12,7 +12,8 @@ const FC = () => globalThis.SN_FILO_CONTESTO;
 const F = () => globalThis.SN_IL_FILO;
 const CF = () => require('./contestoFilo');
 const FILE = 'livelli.json';
-const GIRO_GIORNI_MS = 60 * 60 * 1000;
+// Le prove lo accorciano per vedere che l'app fa partire davvero il giro dei giorni (tests/compattazione.spec.mjs).
+const GIRO_GIORNI_MS = Number(process.env.FILO_TEST_GIRO_GIORNI_MS) > 0 ? Number(process.env.FILO_TEST_GIRO_GIORNI_MS) : 60 * 60 * 1000;
 
 const vuoto = () => ({ da: null, a: null, ore: [], giorni: [], inAttesa: [], guasto: 0 });
 const stati = { normale: null, incognito: vuoto() };
