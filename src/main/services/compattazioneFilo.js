@@ -269,7 +269,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     } catch (_) {}
   }
   return {
-    fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie, inAttesa, scritte,
+    fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie.map((m) => m.testo), inAttesa, scritte,
     fino: s.a, sospetto,
   };
 }
