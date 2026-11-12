@@ -73,7 +73,8 @@ test('il main numera ogni cambio visto dalle superfici e lo mette nelle risposte
   const fs = require('node:fs');
   const src = fs.readFileSync(join(ROOT, 'src', 'main', 'services', 'downloads.js'), 'utf8');
   // Ogni risposta con l'elenco passa da elenco(): items senza numero tornerebbero a riscrivere gli eventi.
-  assert.equal(/items:\s*listRecords\(/.test(src), false, 'una risposta con items: listRecords( senza il numero');
+  assert.deepEqual(src.match(/items:\s*listRecords\([^)]*\)[^}]*/g), ['items: listRecords(scope), rev: revisione '],
+    'una risposta con items: listRecords( senza il numero');
   assert.match(src, /rec\._rev = \+\+revisione/);
   assert.match(src, /map\(\(\{ velocita, restano, rev, \.\.\.r \}\) => r\)/);
   const misc = fs.readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'misc.js'), 'utf8');
