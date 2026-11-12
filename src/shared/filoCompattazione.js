@@ -336,7 +336,12 @@
     }
     if (!ore.length) return null;
     ore.sort((x, y) => ms(x.da) - ms(y.da));
-    const memorie = (Array.isArray(j.memorie) ? j.memorie : []).filter(stringa).map((m) => unaRiga(m, 1000)).slice(0, MAX_MEMORIE);
+    const memorie = [];
+    for (const m of Array.isArray(j.memorie) ? j.memorie : []) {
+      const t = typeof m === 'string' ? m : (m && m.testo);
+      if (!stringa(t) || memorie.length >= MAX_MEMORIE) continue;
+      memorie.push({ testo: unaRiga(t, 1000), fonti: [...new Set(daDove(m).map((r) => r.fonte))] });
+    }
     return { ore, memorie };
   }
 
