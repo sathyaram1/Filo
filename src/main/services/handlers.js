@@ -1051,14 +1051,12 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
       if (!m) continue;
-      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
-      const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
-      if (l.rifiuto) { scartate += 1; console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (!l.testo) continue;
-      // Una lezione che ripete una riga tolta dalla persona non si scrive (#872): per i contatori è scartata.
-      const buf = await FiloMem.appendLesson(l.testo, { fonti });
-      const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-      if (ultima && ultima.text === String(l.testo).trim()) scritte += 1; else scartate += 1;
+      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592); una che ripete una riga tolta dalla persona
+      // non si scrive (#872): per i contatori è scartata.
+      if (!m[1].trim()) continue;
+      const w = await FiloMem.scriviLezione(m[1], { fonti });
+      if (w.rifiuto) console.warn('[Filo] lezione automatica scartata:', w.rifiuto);
+      if (w.scritta) scritte += 1; else scartate += 1;
     }
     contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
