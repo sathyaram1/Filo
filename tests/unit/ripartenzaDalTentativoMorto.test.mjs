@@ -303,7 +303,7 @@ describe('quale tentativo precedente si riprende', () => {
         git(casa, 'checkout', '-q', 'main');
         git(casa, 'merge', '-q', '--no-ff', '-m', oggetto, `t${i}`);
         const letta = !!fusioniSuMain(casa, { ref: 'main', numeri: { 77: 'id77' } }).id77;
-        assert.equal(letta, propri.slice(0, i + 1).some(Boolean), `«${oggetto}»: la busta e i tentativi dicono lo stesso`);
+        assert.equal(letta, propri[i], `«${oggetto}»: la busta e i tentativi dicono lo stesso`);
         git(casa, 'reset', '-q', '--hard', 'HEAD^');
       }
       assert.equal(fusionePropria('merge-gate: #77 via server', ''), false);
