@@ -6115,7 +6115,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (t) return t;
   }
   if (res.output && res.output.blocked === 'disabled') {
-    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
+    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (impostazioni(imposta) modalita_terminale true) e non riprovare finché non è attiva.';
   }
   if (res.needsConfirm) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
