@@ -5643,7 +5643,7 @@ function pageReadsForPrompt(actions) {
         + `l'utente lo chiede, il seguito si legge con web(leggi), lo stesso url e da: ${finoQui}.]`;
     } else if (out.troncata) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
-        + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
+        + `richiama web(leggi) con lo stesso url e da: ${fino}.]`;
     }
     if (out.lettaInParte || out.scaricataInParte) blocco += `\n${avvisoLettaInParte(out)}`;
     if (out.schedaNonRisponde) {
