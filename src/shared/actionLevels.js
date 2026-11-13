@@ -108,7 +108,7 @@
       const registri = [...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]), ...(testo.match(/\blocalhost\b/gi) || [])];
       return !registri.length || registri.some((h) => !questoComputer(h));
     }
-    if (!RETE.test(testo)) return false;
+    if (!usaLaRete(testo)) return false;
     const altri = [...testo.matchAll(HOST_UTENTE)].map((m) => m[1]);
     if (!dagliIndirizzi.length) altri.push(...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]));
     const nominati = [...dagliIndirizzi, ...altri];
