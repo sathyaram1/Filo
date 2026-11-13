@@ -8,7 +8,7 @@
   if (global.SN_RIQUADRI_IN_ARRIVO) return;
 
   const eRiquadro = (n) => !!n && (n.localName === 'iframe' || n.localName === 'frame');
-  const pdf = (doc) => { try { return String(doc.contentType).toLowerCase() === 'application/pdf'; } catch (_) { return false; } };
+  const pdf = (doc) => { try { return /^chrome-extension:/.test(doc.defaultView.location.ancestorOrigins[0] || ''); } catch (_) { return false; } };
 
   function origineDi(doc) {
     try { const o = new URL(doc.URL).origin; if (o !== 'null') return o; } catch (_) {}
