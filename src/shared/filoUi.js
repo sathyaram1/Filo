@@ -280,7 +280,7 @@
     const out = [];
     try {
       out.push(...document.querySelectorAll(sel));
-      for (const host of document.querySelectorAll('[' + RIQUADRO + ']')) {
+      for (const host of document.querySelectorAll(SELECTOR)) {
         const r = ombre.get(host);
         if (r) out.push(...r.querySelectorAll(sel));
       }
