@@ -319,8 +319,9 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
 });
 
-// #2116.1: la password resa visibile dal sito, su una pagina non delicata, guardata dalla chat senza conferma.
-test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password resa visibile dal sito arriva coperta', async ({ app, openTab, testServer }) => {
+// #2116.1: il campo password fa delicato il sito, quindi la finestra si guarda dopo un OK; anche dopo l'OK al
+// modello la password resa visibile arriva coperta.
+test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password resa visibile dal sito arriva coperta dopo l’OK', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso al negozio</title></head><body style="margin:0">
     <div style="height:120px;background:${tinta(VERDE)}"></div>
