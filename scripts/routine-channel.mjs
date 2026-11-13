@@ -895,7 +895,9 @@ export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = n
  * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
  * → { ok, branch, punta, main, forced } | { ok:false, tipo: 'base'|'ramo'|'spedizione', reason }
  */
-export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+// `presa`: origin/main alla presa in carico. Se main va avanti dopo il rebase (il fetch di finish:check) la punta basta
+// che contenga quello: il cancello la riallinea comunque, e rifare rebase e unit costava un giro a biglietto (#2236).
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main', presa = '' } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
@@ -908,9 +910,16 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   const nomeMain = base.replace(/^refs\/remotes\//, '');
   const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
   if (!main.ok || !main.out) return { ok: false, tipo: 'base', reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
-  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
-    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  const contiene = (sha) => run(['merge-base', '--is-ancestor', sha, punta.out]).ok;
+  const minimo = String(presa || '').trim().toLowerCase();
+  const indietro = !contiene(main.out);
+  if (indietro && !(/^[0-9a-f]{40}$/.test(minimo) && contiene(minimo))) {
+    const daQuale = /^[0-9a-f]{40}$/.test(minimo) ? `né ${nomeMain} della presa in carico (${minimo.slice(0, 9)})` : '';
+    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)})${daQuale ? `, ${daQuale}` : ''}: il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
   }
+  const avanti = indietro
+    ? `${nomeMain} è andata avanti dopo il tuo rebase (ora ${main.out.slice(0, 9)}): la punta contiene quella della presa in carico (${minimo.slice(0, 9)}), e il resto lo riallinea il cancello prima di fondere. Non serve un altro rebase.`
+    : '';
   const p = pushRamoCorrente(root, { exec, env });
   if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
   if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
@@ -924,7 +933,8 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   if (!dopo.ok || su !== dopo.out.toLowerCase()) {
     return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
   }
-  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+  const avviso = [p.avviso, avanti].filter(Boolean).join('\n');
+  return { ok: true, branch: p.branch, punta: dopo.out, main: indietro ? minimo : main.out, forced: !!p.forced, ...(avviso ? { avviso } : {}) };
 }
 
 /** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
@@ -935,7 +945,7 @@ export function testoRiallineamentoNonSpedito(sped) {
     sped.tipo === 'spedizione'
       ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro resta sul suo ramo e riparte quando il manutentore lo sblocca.'
       : sped.tipo === 'base'
-        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
+        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando. Gli unit non li rifai per intero: solo le prove dei file che questo rebase mette in conflitto, se ce ne sono; quelli sulla fusione li rifà il cancello.'
         : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
   ].join('\n');
 }
@@ -2254,9 +2264,10 @@ if (isMain) {
       data.sha = punta;
       if (intento === 'fixed') {
         const { readMarker } = await import('./lib/routine-role.mjs');
-        if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+        const marcatore = readMarker(ROOT);
+        if (consegnaDiRiallineamento(marcatore, { ferma: data.stop, domanda: data.domanda })) {
           await novitaPrimaDiSpedire(ROOT, (r) => console.error(r));
-          const sped = spedisciRiallineamento(ROOT);
+          const sped = spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
           if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
           if (sped.avviso) console.error(sped.avviso);
           data.sha = sped.punta;

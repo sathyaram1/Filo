@@ -28,6 +28,8 @@ un **livello**.
 
 <!-- includi: _cornice-feedback.md -->
 
+<!-- includi: _ramo-vuoto.md -->
+
 ## Passi
 
 1. **Capisci il sintomo** (`feedback.text`, `feedback.documents`, le immagini

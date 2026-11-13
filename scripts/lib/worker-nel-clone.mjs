@@ -78,11 +78,16 @@ export function cloneDelBiglietto(root, ticket, { toolsDir = pinnedDir() } = {})
  * Nel clone, a ramo posizionato: pacchetti collegati a quelli della cartella della sessione, e le righe che aprono le
  * istruzioni del worker. '' fuori da un clone di worker.
  */
-export function preparaIntestazione(root, { allinea = allineaPacchetti } = {}) {
+export function preparaIntestazione(root, { allinea = allineaPacchetti, strumenti = '', delGiro = pinnedDir() } = {}) {
   const m = marcatoreWorker(root);
   if (!m) return '';
   const dir = resolve(root);
   const p = allinea(dir, m.principale, { soloCollegati: true });
+  // Il prompt del lancio nomina la copia di chi guida il giro, queste istruzioni quella del worker: senza dire chi vince
+  // il worker perdeva turni a capirlo (#2236).
+  const copia = strumenti && resolve(strumenti) !== resolve(delGiro)
+    ? ` I comandi qui sotto usano gli strumenti in \`${resolve(strumenti)}\`, la tua copia: quella in \`${resolve(delGiro)}\` che il prompt ti ha fatto lanciare è di chi guida il giro, e da qui non la usi più.`
+    : '';
   const righe = [
     '## La tua cartella',
     '',
@@ -92,6 +97,9 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti } = {}) {
     `e Read, Edit e Write vogliono percorsi sotto \`${dir}\`. Il salvataggio automatico segue il file che modifichi.`,
     `Grep e Glob senza \`path\`, e i sotto-agenti senza la cartella nel compito, cercano nella cartella della sessione:`,
     `un file letto lì per Edit non è letto qui, e la modifica viene rifiutata (#2188).`,
+    '',
+    `Dove il prompt con cui sei partito e queste istruzioni dicono cose diverse, valgono queste.${copia}`,
+    'Il «primo piano» che il prompt chiede vale per il tuo lancio, non per i tuoi comandi: quelli lunghi vanno in sottofondo.',
   ];
   if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {

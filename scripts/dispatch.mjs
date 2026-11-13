@@ -608,6 +608,34 @@ function puntaDellaCartella() {
   }
 }
 
+// Scaricato adesso: una copia vecchia potrebbe essere la base del commit verificato, e la consegna passerebbe senza rebase.
+// '' se non si scarica: la consegna allora chiede l'ultimo main, come prima di #2236.
+export function mainAllaPresa(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['fetch', '--quiet', 'origin', refspecMain(main)], { cwd: root, stdio: 'ignore', timeout: 120000 });
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Il ramo non porta niente rispetto alla sua base con main (#1363): false anche se git non risponde. */
+export function ramoSenzaModifiche(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['diff', '--quiet', `refs/remotes/origin/${main}...HEAD`], { cwd: root, stdio: 'ignore' });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Un lavoro server porta le sue modifiche nel diff del server: lì un'app senza modifiche non dice niente.
+export function segnaRamoVuoto(bucket, ctx, { senzaModifiche = () => ramoSenzaModifiche() } = {}) {
+  const ruolo = bucket && bucket.role;
+  if ((ruolo === 'verifier' || ruolo === 'fixer') && ctx && !ctx.lavoroServer && senzaModifiche()) ctx.ramoVuoto = true;
+  return ctx;
+}
+
 /**
  * `--ferma` da solo non ferma niente: è la domanda che blocca a fermare il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
@@ -1037,6 +1065,12 @@ function testoDiffVuoto({ commitPropri = null, soloMedia = 0 } = {}, diffServer 
   return commitPropri === 0 ? `Il diff è vuoto davvero: ${perche}, quindi non porta nessuna modifica.` : `Il diff è vuoto davvero: ${perche}.`;
 }
 
+// Il fatto sta nel payload, cosa farne nel ruolo (§ «Un ramo che non porta niente», _ramo-vuoto.md).
+export const TESTO_RAMO_VUOTO = 'Il ramo non porta nessuna modifica rispetto a main: vale la sezione «Un ramo che non porta niente» delle tue istruzioni.';
+function conRamoVuoto(ctx) {
+  return ctx && ctx.ramoVuoto === true ? { ramoVuoto: TESTO_RAMO_VUOTO } : {};
+}
+
 // Il piano che una sessione precedente ha scritto per questo lavoro (SPEC-RIDISEGNO-LAVORO.md § 2): chi riprende
 // riparte da lì. Lo conserva e lo rimanda il server.
 function conPiano(ctx) {
@@ -1102,6 +1136,7 @@ export function buildPayload(bucket, ctx = {}) {
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
         ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
+        ...conRamoVuoto(ctx),
       };
     case 'fixer': {
       // La ripresa dopo la risposta dell'owner: il lavoro si era fermato su una
@@ -1129,6 +1164,7 @@ export function buildPayload(bucket, ctx = {}) {
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRamoVuoto(ctx),
       };
     }
     case 'new-work': {
@@ -1827,7 +1863,7 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
   // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
   if (spedisce) {
-    const sped = ch.spedisciRiallineamento(ROOT);
+    const sped = ch.spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
     process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
@@ -2641,6 +2677,7 @@ async function finalizeBucket(bucket, fromServer) {
     if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
   }
   const ctx = serverCtx(bucket, fromServer, diff);
+  segnaRamoVuoto(bucket, ctx);
 
   emit(bucket, ctx);
   return { exit: 0 };
@@ -2683,7 +2720,12 @@ export function emit(bucket, ctx) {
     process.stderr.write(`[dispatch] il commit verificato (${unaRiga(ctx.shaVerificato).slice(0, 12)}) qui non c'è e da origin non è arrivato: alla consegna il confronto lo rifà il server\n`);
   }
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
+  else {
+    writeRole(ROOT, bucket.role, {
+      dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '',
+      main: riallinea ? mainAllaPresa() : '',
+    });
+  }
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
@@ -2697,7 +2739,7 @@ export function emit(bucket, ctx) {
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
-  const cartella = preparaIntestazione(ROOT);
+  const cartella = preparaIntestazione(ROOT, { strumenti: TOOLS_ROOT });
   const instructions = cartella ? `${cartella}\n\n${corpo}` : corpo;
   const stampaCon = (payload, istr = instructions, file = '') => ({
     role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),

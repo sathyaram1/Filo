@@ -38,6 +38,18 @@ test('i file generati sono allineati alla sorgente markdown', () => {
   });
 });
 
+// #2236: html e testo stavano in una riga da 80.000 caratteri, e un diff la ripeteva intera per una frase cambiata.
+test('nel modulo generato ogni riga di un documento sta su una riga sua', () => {
+  const { T } = loadModules();
+  const piuLunga = Math.max(...T.all().flatMap((d) => [d.html, d.text])
+    .flatMap((s) => s.split('\n')).map((r) => JSON.stringify(`${r}\n`).length));
+  const modulo = readFileSync(join(ROOT, 'src', 'shared', 'transparency.js'), 'utf8').split('\n');
+  const lunghe = modulo.map((r, i) => [i + 1, r.length]).filter(([, n]) => n > piuLunga + 20);
+  assert.deepEqual(lunghe, [], `righe più lunghe della riga più lunga di un documento (${piuLunga})`);
+  const privacy = T.get('privacy');
+  assert.ok(privacy.text.split('\n').length > 20 && privacy.html.includes('\n<'), 'il testo ricomposto ha perso gli a capo');
+});
+
 test('il modulo espone i documenti con i campi che le tre superfici usano', () => {
   const { T, UI } = loadModules();
   assert.ok(T, 'SN_TRANSPARENCY non registrato');

@@ -23,7 +23,7 @@ export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti
 // lo strumento torna con status async_launched: il worker lavora ancora (#1480, D-90). Un worker fermo su un permesso
 // non manda mai la notifica di fine: decide la veglia (#1797).
 export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: veglialo col comando veglia del tuo ruolo, in primo piano. Con 5 lavora ancora: rilancia la veglia. Con 0 ha finito: vai avanti come dopo un worker finito. Con 3 era fermo e la veglia ha già rilasciato il biglietto col guasto: chiudi il giro. La notifica di fine del worker non decide niente.';
-export const FIGLIO_IN_SOTTOFONDO = 'Questo sotto-agente lavora in sottofondo. Intanto fai altro, senza controllarlo a ripetizione: ogni controllo è un turno intero. Quando resta solo da aspettarlo, la tua attesa in primo piano è il comando aspetta del canale col tuo biglietto: esce 0 quando nessun tuo processo o sotto-agente lavora più, 5 quando lavorano ancora (rilancialo subito). Prima del rilascio va aspettato.';
+export const FIGLIO_IN_SOTTOFONDO = 'Questo sotto-agente lavora in sottofondo. Intanto fai altro, senza controllarlo a ripetizione: ogni controllo è un turno intero. Quando resta solo da aspettarlo, la tua attesa in primo piano è il comando aspetta del canale col tuo biglietto, scritto come nelle tue istruzioni: esce 0 quando nessun tuo processo o sotto-agente lavora più, 5 quando lavorano ancora (rilancialo subito). Prima del rilascio va aspettato.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_LANCIO = 'Worker in primo piano, con modello e sforzo decisi dal server (quelli della sua definizione se il server non ne ha detti).';
 export const MOTIVO_IMPOSTAZIONI = 'Durante il giro impostazioni e skill restano quelle di partenza: un worker non deve poter spegnere o affiancare il gancio che rende cieco chi guida il giro.';
@@ -80,8 +80,8 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   // Un sotto-agente di un worker resta intatto; se gira in sottofondo il worker riceve come aspettarlo (#2304).
   if (input.agent_id) {
     if (input.hook_event_name !== "PostToolUse" || tornato(input.tool_response)) return null;
-    const attesa = strumenti ? " Comando: node " + strumenti + "/scripts/routine-channel.mjs aspetta <il tuo biglietto>" : "";
-    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO + attesa } };
+    // Nessun percorso qui: `strumenti` è la copia di chi guida il giro, quella del worker la nomina il suo ruolo (#2236).
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO } };
   }
   if (input.hook_event_name === "PreToolUse") {
     if (ti.run_in_background === true) return nega(MOTIVO_SOTTOFONDO);

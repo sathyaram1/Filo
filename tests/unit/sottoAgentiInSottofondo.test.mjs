@@ -98,7 +98,10 @@ test('gancio: un sotto-agente del worker resta intatto; in sottofondo il worker 
   const spostato = { status: 'async_launched', agentId: 'c1', outputFile: '/tmp/x/tasks/c1.output' };
   const h = decidi(dopo(spostato), opz).hookSpecificOutput;
   assert.equal(h.updatedToolOutput, undefined, 'il ritorno del figlio resta quello');
-  assert.equal(h.additionalContext, `${FIGLIO_IN_SOTTOFONDO} Comando: node /tmp/filo-strumenti/scripts/routine-channel.mjs aspetta <il tuo biglietto>`);
+  // La copia della sessione non è quella del worker, che il percorso lo legge nel suo ruolo (#2236).
+  assert.equal(h.additionalContext, FIGLIO_IN_SOTTOFONDO);
+  assert.doesNotMatch(h.additionalContext, /filo-strumenti/);
+  assert.match(FIGLIO_IN_SOTTOFONDO, /scritto come nelle tue istruzioni/);
   assert.equal(decidi(dopo('Async agent launched successfully. The agent is working in the background.'), opz).hookSpecificOutput.additionalContext.slice(0, 40), FIGLIO_IN_SOTTOFONDO.slice(0, 40));
   assert.equal(decidi(dopo({ status: 'completed', content: [{ type: 'text', text: 'trovati 3' }] }), opz), null, 'un figlio finito non riceve niente');
   assert.equal(decidi({ ...dopo(spostato), hook_event_name: 'PreToolUse', tool_input: { prompt: 'cerca', run_in_background: true } }, opz), null, 'il lancio non si tocca');

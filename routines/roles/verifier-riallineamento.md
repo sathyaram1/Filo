@@ -20,6 +20,8 @@ di questo testo.
 
 <!-- includi: _cornice-feedback.md -->
 
+<!-- includi: _ramo-vuoto.md -->
+
 ## Il perimetro
 
 Dove c'erano i conflitti, quali unit erano rossi dopo il rebase e il commit

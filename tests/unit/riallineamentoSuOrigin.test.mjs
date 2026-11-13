@@ -83,6 +83,61 @@ test('senza rebase non parte niente: la punta non contiene main, e il rimedio è
   assert.match(testoRiallineamentoNonSpedito(r), /git rebase origin\/main/);
 });
 
+/** main che va avanti di nuovo dopo il rebase, come fa il fetch di finish:check mentre girano gli unit. */
+function mainAvanti(s) {
+  const altro = join(dirname(s.work), 'altro');
+  git(altro, ['pull', '-q', '--no-rebase', 'origin', 'main']);
+  commit(altro, 'd.js', 'ancora\n', 'arrivato mentre giravano gli unit');
+  git(altro, ['push', '-q', 'origin', 'main']);
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  return git(s.work, ['rev-parse', 'origin/main']);
+}
+
+test('#2236: main avanzata dopo il rebase non rifiuta la consegna se la punta contiene il main della presa in carico', () => {
+  const s = scena();
+  const presa = git(s.work, ['rev-parse', 'origin/main']);
+  git(s.work, ['rebase', '-q', 'origin/main']);
+  const ora = mainAvanti(s);
+  assert.equal(spedisciRiallineamento(s.work, { env: {} }).ok, false, 'senza il main della presa vale ancora l\'ultimo scaricato');
+  const r = spedisciRiallineamento(s.work, { env: {}, presa });
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(r.main, presa);
+  assert.equal(suOrigin(s.origin, 'worker/77'), git(s.work, ['rev-parse', 'HEAD']));
+  assert.match(r.avviso, new RegExp(`ora ${ora.slice(0, 9)}.*riallinea il cancello.*Non serve un altro rebase`));
+});
+
+test('#2236: col main della presa in carico, una punta senza rebase resta rifiutata, e il rimedio non rifà gli unit per intero', () => {
+  const s = scena();
+  const presa = git(s.work, ['rev-parse', 'origin/main']);
+  const r = spedisciRiallineamento(s.work, { env: {}, presa });
+  assert.equal(r.ok, false);
+  assert.equal(r.tipo, 'base');
+  assert.match(r.reason, new RegExp(`della presa in carico \\(${presa.slice(0, 9)}\\)`));
+  assert.equal(suOrigin(s.origin, 'worker/77'), s.verificato);
+  assert.match(testoRiallineamentoNonSpedito(r), /Gli unit non li rifai per intero/);
+});
+
+test('#2236: deliver fixed legge il main della presa dal marcatore che dispatch ha scritto', async (t) => {
+  const { srv, ricevuti, port } = await fintoServer();
+  t.after(() => srv.close());
+  const s = scena();
+  const presa = git(s.work, ['rev-parse', 'origin/main']);
+  git(s.work, ['rebase', '-q', 'origin/main']);
+  mainAvanti(s);
+  const stato = join(s.work, 'stato');
+  mkdirSync(stato, { recursive: true });
+  mkdirSync(join(s.work, '.claude'), { recursive: true });
+  writeFileSync(join(s.work, '.claude', 'routine-role.json'), JSON.stringify({ role: 'fixer', since: new Date().toISOString(), dal: s.verificato, mainAllaPresa: presa }));
+  const env = {
+    FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: s.work, FILO_DISPATCH_STATE_DIR: stato,
+    FILO_ROUTINES_ENABLED: '1', FILO_ROUTINE_TICKET: 'b'.repeat(43), FILO_ROUTINE: '',
+  };
+  const r = await esegui('routine-channel.mjs', ['deliver', 'b'.repeat(43), 'fixed', '--notes', 'Riallineato su main, senza conflitti.', '--motivo', 'conflitto: nessuno'], env, s.work);
+  assert.equal(r.code, 0, r.se);
+  assert.match(r.se, /Non serve un altro rebase/);
+  assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 1);
+});
+
 test('il push respinto (#1589): niente consegna, il ramo su origin resta il commit verificato, il rimedio è il guasto', () => {
   const s = scena();
   git(s.work, ['rebase', '-q', 'origin/main']);
