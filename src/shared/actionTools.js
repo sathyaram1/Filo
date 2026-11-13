@@ -359,7 +359,7 @@
     },
     ESPANDI_FILO: {
       via: ['filo', 'espandi'], risultato: true,
-      description: 'quello che è successo da un\'ora all\'altra, così com\'era (messaggi, pagine, azioni), sotto una riga del diario: da e a istanti ISO.',
+      description: 'il filo com\'era fra due istanti ISO (messaggi, pagine, azioni), sotto le righe del diario.',
       properties: { da: S(), a: S() }, required: ['da'],
     },
     TOGLI_CHAT: {
