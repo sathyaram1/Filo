@@ -385,6 +385,7 @@
     // tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
     async function daiSeguiti() {
       if (typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
+      if (now() - lastSeguitiAt < seguitiMs) return [];
       const dallePagine = typeof seguiti === 'function' ? (seguiti() || []).map(String).filter(Boolean) : [];
       const seguitiDallePagine = new Set(dallePagine);
       const ora = now();
