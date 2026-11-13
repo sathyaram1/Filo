@@ -6285,7 +6285,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Azione ${nome} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
   }
   if (PAGE_ACTIONS.includes(type) && !res.output) {
-    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
+    return `Azione ${nome} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
