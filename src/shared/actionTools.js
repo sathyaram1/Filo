@@ -281,7 +281,7 @@
     },
     SALVA_APPUNTO: {
       via: ['file', 'appunto'],
-      description: 'scrive un appunto nell\'Editor: accoda finché l\'argomento resta quello; nuovo true per un file a parte.',
+      description: 'un appunto nell\'Editor: accoda finché l\'argomento è quello; nuovo: file a parte.',
       properties: { testo: S(), contesto: S(), nuovo: B() }, required: ['testo', 'contesto'],
     },
 
