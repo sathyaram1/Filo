@@ -17,10 +17,12 @@ test('al primo avvio la lettura dei crediti non arriva alla produzione', async (
       globalThis.__richiesteUscite.push(String(request.origin || ''));
     });
   });
-  // La lettura dello stato dei crediti parte quattro secondi dopo l'avvio e chiede prima l'identità anonima.
-  await expect.poll(() => err.join(''), { timeout: 30_000 })
-    .toContain('[test] servizio chiuso: identitytoolkit.googleapis.com');
-  const uscite = await app.evaluate(() => globalThis.__richiesteUscite.slice());
-  const versoFilo = uscite.filter((o) => CHIUSI.some((h) => o.includes(h)));
-  expect(versoFilo, `richieste partite verso i servizi veri: ${versoFilo.join(', ')}`).toEqual([]);
+  // La lettura dello stato dei crediti parte quattro secondi dopo l'avvio e chiede prima l'identità anonima:
+  // si aspetta che ci abbia provato, fermata dalla chiusura o uscita davvero.
+  const versoFilo = async () => (await app.evaluate(() => globalThis.__richiesteUscite.slice()))
+    .filter((o) => CHIUSI.some((h) => o.includes(h)));
+  await expect.poll(async () => err.join('').includes('[test] servizio chiuso: identitytoolkit.googleapis.com')
+    || (await versoFilo()).length > 0, { timeout: 30_000 }).toBe(true);
+  const uscite = await versoFilo();
+  expect(uscite, `richieste partite verso i servizi veri: ${uscite.join(', ')}`).toEqual([]);
 });
