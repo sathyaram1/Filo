@@ -344,7 +344,7 @@ test('le memorie della compattazione portano i messaggi che le dicono, anche dop
   assert.equal(r.sospetto, true);
   const [u, , , letta] = await eids('ab12');
   const [p] = await Comp.inAttesa();
-  assert.deepEqual(p.fonti, [letta, u], 'chi decide vede la lettura e il messaggio');
+  assert.deepEqual(p.fonti, [u, letta], 'chi decide vede il messaggio e la lettura');
   assert.deepEqual(p.origine, [u]);
   assert.deepEqual(await Comp.decidi(p.id, true), { ok: true, scritta: true });
   assert.deepEqual(sosp.fontiScritte, [[u]], 'dopo il sì la riga tiene il punto del filo da cui è nata');
