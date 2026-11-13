@@ -5847,7 +5847,7 @@ function observationsForPrompt(tutte) {
     schedeChiuseForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
+    chatSearchesForPrompt(actions), espansioniForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
   ].filter(Boolean).join('\n\n');
