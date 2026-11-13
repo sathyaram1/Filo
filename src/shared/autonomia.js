@@ -387,7 +387,7 @@
     LIVELLI, LIVELLO_PREDEFINITO, FRASE_COSTO_4, GUARDIANO_REGISTRI, CLASSI, SOGLIA_PULITO, COSTI, COSTO_MAX, COSTO_GUARDIANO,
     TABELLA, CAMPI, MANOPOLE, RISPOSTE, SEGRETI, SENZA_GUARDIANO,
     livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta, indice,
-    costoValido, campoValido, classeValida, costoEffettivo, classeFonte, stato, FONTI_SENZA_PESO_COSTO_4, fontiPerCosto,
+    costoValido, campoValido, classeValida, costoEffettivo, costoReale, classeFonte, stato, FONTI_SENZA_PESO_COSTO_4, fontiPerCosto,
     decide, decideDettaglio, parteSenzaChiedere, richiestaCambioLivello, confermaAlzata, richiestaSpostamentoFonte,
     segreto, segretoDettaglio, frasePerche, fraseSegreto, fraseNo,
   });
