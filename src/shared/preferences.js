@@ -2647,7 +2647,7 @@
     if (!r || !r.setter) {
       return {
         rifiuto: `«${detta}» non è un'impostazione che Filo conosce`,
-        perModello: 'Usa una chiave dell\'elenco di IMPOSTA_PREFERENZA; per cercarla c\'è LEGGI_IMPOSTAZIONI.',
+        perModello: 'Cerca la chiave giusta con impostazioni(leggi): ogni voce porta la sua chiave e i valori ammessi.',
       };
     }
     const aiuto = typeof r.setter.aiuto === 'function' ? r.setter.aiuto({}) : r.setter.aiuto;
