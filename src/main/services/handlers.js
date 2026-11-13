@@ -5988,13 +5988,15 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
   if (res && (res.nonCompare || res.senzaModulo)) return res.error;
-  if (res && res.no) return `Azione ${type} NON fatta: ${res.error}.`;
+  // Il modello conosce le azioni come strumento(azione), non per tipo.
+  const nome = globalThis.SN_ACTION_TOOLS ? globalThis.SN_ACTION_TOOLS.chiamata(type) : type;
+  if (res && res.no) return `Azione ${nome} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
-    return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
+    return `Azione ${nome} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
   if (res.output && res.output.blocked === 'segreto' && res.output.guasto) {
-    return `Azione ${type} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
+    return `Azione ${nome} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
       + 'risposto, e senza di lui niente esce. Non riprovare con un\'altra azione che porta fuori le stesse cose. Di\' '
       + 'all\'utente in una riga che non l\'hai fatto e perché.';
   }
