@@ -503,6 +503,7 @@ test('chat a Normale: dopo una ricerca «dimentica per sempre» è un no che dic
     await expect.poll(() => lezioni(app), { timeout: 8000 }).not.toContain('Bologna');
     expect(await lezioni(app)).toContain('Ha un gatto.');
     expect((await nascoste()).join('\n'), 'il «per sempre» butta il testo anche dal quaderno').not.toContain('Bologna');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Dimenticato.' })).toHaveCount(1, { timeout: 15000 });
 
     // Dopo una ricerca la stessa richiesta è un no che dice le strade: niente riquadro, la riga resta.
     await chiedi(page, 'cerca il meteo');
