@@ -476,15 +476,16 @@
           const resto = `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s`;
           if (perChat) return `- Timer "${t.label}": ${t.paused ? `(in pausa, restano ${resto})` : `finisce alle ${oraAssoluta(t.endsAt, { secondi: true })}`}`;
           return `- Timer "${t.label}": ${t.paused ? '(in pausa)' : `${resto} rimanenti`}`;
-        })));
+        });
+        righe.push(salvati(voci));
       }
-      aggiungi('PROCESSI ATTIVI', righe);
+      aggiungi('PROCESSI ATTIVI', righe, null, daFuori(pulite(voci), 'dai nomi di timer e sveglie'));
     }
     {
       const righe = ['NOTIFICHE NON GESTITE'];
-      if (!state.notifications.length) righe.push('(nessuna)');
-      else righe.push(salvati(state.notifications.map((n) => `- [${perChat ? oraAssoluta(n.ts) : n.ageRel}] ${n.kind}: ${n.text}`)));
-      aggiungi('NOTIFICHE NON GESTITE', righe);
+      const voci = state.notifications.map((n) => `- [${perChat ? oraAssoluta(n.ts) : n.ageRel}] ${n.kind}: ${n.text}`);
+      righe.push(voci.length ? salvati(voci) : '(nessuna)');
+      aggiungi('NOTIFICHE NON GESTITE', righe, null, daFuori(pulite(voci), 'dalle notifiche'));
     }
     // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
     if (state.cambi && !perChat) {
