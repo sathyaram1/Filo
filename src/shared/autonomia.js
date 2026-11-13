@@ -101,6 +101,11 @@
     if (costo >= COSTO_MAX) return COSTO_MAX;
     return Math.min(COSTO_MAX - 1, costo + (manopola(manopole, campo, 'grave') ? 1 : 0));
   }
+  // Il costo che decide: un freno tolto vale 4. Lo usano la decisione e chi sceglie le letture che contano (#1840).
+  function costoReale({ costo, difesa = false, campo = null, manopole = null } = {}) {
+    if (difesa) return COSTO_MAX;
+    return costoValido(costo) ? costoEffettivo(costo, campo, manopole) : null;
+  }
 
   // Una fonte: { classe, campo?, chiave?, motivo }. Lo spostamento scelto dall'utente vale prima della
   // manopola del campo, che può solo abbassare la fiducia.
