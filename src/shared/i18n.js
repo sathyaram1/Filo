@@ -1056,7 +1056,6 @@
     spell_ocra_prima: 'prima: «%s»',
     spell_ocra_controlla: 'Controlla qui',
     spell_ocra_data: '%s è %s.',
-    spell_ocra_data_anni: '%s è %s, %s è %s.',
     spell_ocra_relativa: '%s è %s.',
     spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
     // I segnaposti (#1448)
