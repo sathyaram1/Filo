@@ -14,13 +14,13 @@
         { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
         { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
         { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
+        'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
       ],
     },
     {
       version: '0.2.277', date: '2026-11-12',
       fixes: [
         { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
-        'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
       ],
     },
     {
