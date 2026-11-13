@@ -516,7 +516,7 @@ for (const [nome, html] of [
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer, '{"issues":[]}', html);
     await page.locator('#ta').click();
-    await page.keyboard.type('certo, mercoledì 9 ottobre, pioveva ed era autunno.');
+    await batti(page, 'certo, mercoledì 9 ottobre, pioveva ed era autunno.');
     await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
     const [prompt] = await app.evaluate(() => globalThis.__ocra);
     const v = noveOttobreVicino();
