@@ -2546,7 +2546,8 @@
   }
 
   // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
-  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
+  // CHIEDI_PRIMA è il livello di privacy (#1589) che la ferma prima: per chi scrive è la stessa pagina che non cerca da sola.
+  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', CHIEDI_PRIMA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
 
   // I contatori dei segnaposti (#1586): da dove viene il valore e che fine fa, mai la domanda né il valore. La ricerca
   // che una pagina delicata non lascia partire, e quella chiesta poi col clic, sono anche il costo della privacy.
