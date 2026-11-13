@@ -491,11 +491,11 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     },
   });
   ancore[lato] = f.ancora;
-  // I titoli e le ricerche delle pagine che i preamboli davanti al modello portano, compreso quello della domanda (#2293).
-  const daSiti = [...new Set([
-    ...f.visti.flatMap((m) => sitiDelPreambolo.get(FC().chiave(m)) || []),
-    ...(laDomanda ? eventiDi(laDomanda).eventi.daSiti || [] : []),
-  ])];
+  // Il testo di altri che i preamboli davanti al modello portano, compreso quello della domanda (#2293).
+  const daFuori = TV().unisciDaFuori(
+    ...f.visti.map((m) => fuoriDelPreambolo.get(FC().chiave(m)) || []),
+    (laDomanda && eventiDi(laDomanda).eventi.daFuori) || [],
+  );
   potaFoto(f.vecchi);
   pota(f.vecchi, f.visti, incognito);
   // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
