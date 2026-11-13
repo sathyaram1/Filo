@@ -2058,14 +2058,10 @@
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-<<<<<<< ORIG_HEAD
-    const tutte = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date(), intornoDelCampo(state)) : [];
+    const tutte = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date(), intornoDelCampo(state)) : [];
     const date = tutte.filter((x) => !x.daGiudicare).map(segnoDaData);
     // Le date che il codice non giudica (un altro anno scritto intorno) partono col controllo ragionato, senza segno.
     state.dateDaGiudicare = tutte.filter((x) => x.daGiudicare);
-=======
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date()).map(segnoDaData) : [];
->>>>>>> origin/main
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
