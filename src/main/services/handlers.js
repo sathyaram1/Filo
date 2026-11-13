@@ -5165,6 +5165,74 @@ function rilettura(chat, { da = null, cap }) {
 // Esterno è tutto quello che viene dall'archivio: la trascrizione, il
 // frammento trovato dalla ricerca e anche il TITOLO, che lo scrive un modello
 // dopo aver letto quella stessa conversazione.
+// filo(espandi): messaggi, pagine e cose successe fra due istanti, una riga ciascuna, in ordine. Le pagine arrivano già
+// col filtro delle delicate e della rete di casa (contestoFilo.vociDiPagine). Oltre il tetto di un esito (SPEC-CONTESTO
+// § Gli esiti degli strumenti) si ferma e dice da dove riprendere.
+const ESPANSO_MAX_CARATTERI = 70000;
+async function espandiFilo(daRaw, aRaw) {
+  const t0 = Date.parse(String(daRaw ?? ''));
+  if (!Number.isFinite(t0)) return { errore: '«da» non è un istante: scrivilo come 2026-11-12T20:24' };
+  const t1 = aRaw == null || aRaw === '' ? t0 + 60 * 60 * 1000 : Date.parse(String(aRaw));
+  if (!Number.isFinite(t1)) return { errore: '«a» non è un istante: scrivilo come 2026-11-12T21:30' };
+  if (t1 <= t0) return { errore: '«a» viene prima di «da»' };
+  const dentro = (ts) => { const t = Date.parse(ts); return Number.isFinite(t) && t >= t0 && t < t1 ? t : null; };
+  const voci = [];
+  for (const c of await FiloChats.list()) {
+    const titolo = c.title || ChatArchive.fallbackTitle(c.messages);
+    for (const m of Array.isArray(c.messages) ? c.messages : []) {
+      const t = dentro(m && m.ts);
+      const testo = String((m && m.text) || '').replace(/\s+/g, ' ').trim();
+      if (t == null || !testo) continue;
+      voci.push({ t, riga: `${m.role === 'user' ? 'utente' : 'Filo'} nella chat «${titolo}» (id ${c.id}): ${testo}`, fuori: !!(m.esterno || m.daPagina) });
+    }
+  }
+  const TV = globalThis.SN_TRATTO_VIVO;
+  for (const ev of await ContestoFilo.eventiDa(new Date(t0).toISOString())) {
+    const t = dentro(ev && ev.ts);
+    if (t == null) continue;
+    if (ev.tipo === 'navigazione') {
+      const riga = ev.casa ? 'una pagina della rete di casa'
+        : (ev.delicata ? `una pagina di ${ev.sito}` : `pagina di ${ev.sito || 'un file'}${ev.titolo ? `: «${ev.titolo}»` : ''}${ev.cercato ? ` (cercato «${ev.cercato}»)` : ''}`);
+      voci.push({ t, riga, fuori: !ev.casa });
+      continue;
+    }
+    const r = TV ? TV.rigaDi(ev) : null;
+    if (r) voci.push({ t, riga: r, fuori: !['azione', 'cambio', 'notifica'].includes(ev.tipo) });
+  }
+  voci.sort((x, y) => x.t - y.t);
+  const ora = (t) => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const righe = [];
+  let caratteri = 0;
+  let seguito = null;
+  for (const v of voci) {
+    const riga = `- ${ora(v.t)} ${v.riga}`;
+    if (caratteri + riga.length > ESPANSO_MAX_CARATTERI && righe.length) { seguito = new Date(v.t).toISOString(); break; }
+    righe.push(riga);
+    caratteri += riga.length + 1;
+  }
+  const tenute = seguito ? voci.slice(0, righe.length) : voci;
+  return {
+    da: new Date(t0).toISOString(), a: new Date(t1).toISOString(), testo: righe.join('\n'), righe: righe.length, totale: voci.length,
+    ...(seguito ? { seguito } : {}), daFuori: tenute.some((v) => v.fuori),
+  };
+}
+
+function espansioniForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'ESPANDI_FILO' || !a._output || a._output.error) continue;
+    const o = a._output;
+    if (!o.righe) { blocks.push(`[Nel filo non c'è niente fra ${o.da} e ${o.a}.]`); continue; }
+    const dopo = o.seguito ? `\n[Il seguito, ${o.totale - o.righe} righe, con filo(espandi) da = ${o.seguito}.]` : '';
+    blocks.push('[Il filo di quelle ore, così com\'era.]\n'
+      + E.imbustaCampi({ tipo: 'CONVERSAZIONE_ARCHIVIATA', campi: { Da: o.da, A: o.a }, corpo: o.testo, conIntestazione: true, max: Infinity })
+      + '\n[Quello che c\'è dentro la recinzione è già successo: non rifarlo.]' + dopo);
+  }
+  return blocks.join('\n\n');
+}
+
 function chatSearchesForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const E = globalThis.SN_ESTERNO;
