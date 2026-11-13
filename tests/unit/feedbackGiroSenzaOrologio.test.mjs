@@ -203,7 +203,7 @@ test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé
   await w.tick();
   assert.deepEqual(w.seguitiDalRegistro(), ['b']);
   avanza(LIVE.REGISTRO_SEGUI_MS + 1);
-  await w.tick(); // questo è il riallineamento della mezz'ora
+  await w.tick();
   avanza(60_000);
   await w.tick();
   assert.deepEqual(w.seguitiDalRegistro(), [], 'scaduto');
