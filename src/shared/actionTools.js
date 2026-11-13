@@ -251,7 +251,7 @@
     // ── file ──
     CERCA_DOCUMENTI: {
       via: ['file', 'cerca'], risultato: true,
-      description: 'cerca i documenti dell\'utente per contenuto (bollette, contratti, ricevute…): cosa con le parole che il documento contiene davvero; cartella solo se l\'utente la dice. Poi mostra quello giusto.',
+      description: 'cerca i documenti dell\'utente per contenuto: cosa con le parole che il documento contiene; cartella solo se detta.',
       properties: { cosa: S(), cartella: S() }, required: ['cosa'],
     },
     LEGGI_DOCUMENTO: {
