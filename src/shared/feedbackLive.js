@@ -28,12 +28,21 @@
   // (patterns/un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md).
   const LISTA_IN_USO_MS = 1500;
 
-  // Il riallineamento completo, raro: è l'unica domanda che vede le
-  // cancellazioni e le scritture di chi non firma `updatedAt`.
-  const RECONCILE_MS = 30 * 60 * 1000;
+  // Il riallineamento completo, raro: è l'unica domanda che vede le scritture di chi non firma `updatedAt`.
+  // Ogni mezz'ora rileggeva tutti i feedback, ~50 mila letture al giorno (#2470).
+  const RECONCILE_MS = 6 * 60 * 60 * 1000;
 
-  // Margine sull'ora firmata da chi scrive: le macchine hanno orologi diversi.
-  const OVERLAP_MS = 2 * 60 * 1000;
+  // Il controllo leggero fra due riallineamenti: quanti sono (una lettura ogni mille) e l'ultimo cambiato. Un
+  // conto diverso da quelli in mano è una cancellazione o un arrivo perso, e fa riallineare.
+  const CONTROLLO_MS = 30 * 60 * 1000;
+
+  // Margine sull'ora della lettura PRECEDENTE del server: copre chi firma con un orologio un po' indietro.
+  // Due minuti facevano rileggere ogni cambio tre volte (#2470).
+  const OVERLAP_MS = 20 * 1000;
+
+  // I seguiti costano una lettura ciascuno: si guardano ogni cinque minuti, non a ogni giro (#2470). Chi parte
+  // adesso lo dice il registro dei worker, che si guarda a ogni giro.
+  const SEGUITI_MS = 5 * 60 * 1000;
 
   // Seguiti da vicino (una lettura ciascuno a giro): largo e letto a pezzi;
   // sopra, il giro lo dice e si riallinea (#676.2).
