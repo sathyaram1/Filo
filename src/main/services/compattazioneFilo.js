@@ -411,9 +411,9 @@ async function decidi(idProposta, tieni) {
   const [p] = s.inAttesa.splice(i, 1);
   let w = false;
   if (tieni) {
-    // Una proposta di prima che tenesse l'origine (`origine` assente) si controlla sulle sue fonti, come una lezione.
-    const fonti = { fonti: Array.isArray(p.fonti) ? p.fonti : [], ...(Array.isArray(p.origine) ? { origine: p.origine } : {}) };
-    try { w = await _dip.applicaMemoria(p.testo, fonti); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
+    // Tenuta, la riga resta legata al punto del filo da cui è nata (le proposte di prima ne hanno solo le fonti).
+    const fonti = Array.isArray(p.origine) ? p.origine : (Array.isArray(p.fonti) ? p.fonti : []);
+    try { w = await _dip.applicaMemoria(p.testo, { fonti }); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
   }
   await salva(false);
   return { ok: true, scritta: scritta(w), ...(w && w.rifiuto ? { rifiuto: w.rifiuto } : {}) };
