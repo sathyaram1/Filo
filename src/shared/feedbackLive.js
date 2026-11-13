@@ -528,13 +528,13 @@
       },
       forceReconcile() { lastReconcileAt = 0; },
       seguitiDalRegistro() { return Array.from(daRegistro.keys()); },
-      _state() { return { lastTickAt, lastReconcileAt, inviiVisti, oraServer }; },
+      _state() { return { lastTickAt, lastReconcileAt, lastControlloAt, inviiVisti, oraServer, noti: noti ? noti.size : null }; },
     };
   }
 
   global.SN_FEEDBACK_LIVE = {
     POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
-    RECONCILE_MS, OVERLAP_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
+    RECONCILE_MS, CONTROLLO_MS, OVERLAP_MS, SEGUITI_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
     diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato, fusioniDa, nellaFinestra,
     ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher,
   };
