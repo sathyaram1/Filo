@@ -243,7 +243,6 @@
   // «Il 9 ottobre», «L'8 ottobre», «Il 1° ottobre».
   const ilGiorno = (n, mese) => `${n === 8 || n === 11 ? 'L\'' : 'Il '}${n === 1 ? '1°' : n} ${nomeMese(mese)}`;
   const dataDetta = (d) => `${ilGiorno(d.getDate(), d.getMonth())} ${d.getFullYear()}`;
-  const dataInMezzo = (d) => { const s = dataDetta(d); return s[0].toLowerCase() + s.slice(1); };
 
   function suffissoInglese(n) {
     if (n % 100 >= 11 && n % 100 <= 13) return 'th';
