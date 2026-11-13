@@ -70,9 +70,7 @@
     // caricamento finito, e chi lo ospita lo cerca nei componenti aperti (#1290.2).
     try {
       win.addEventListener('load', (e) => {
-        if (e.target !== win.document || win.parent === win) return;
-        // Dal riquadro interno del visore PDF un postMessage è vietato: Chromium uccide il processo della scheda.
-        if (pdf(win.document)) return;
+        if (e.target !== win.document || win.parent === win || ospiteEstensione(win)) return;
         try { win.parent.postMessage({ filoRiquadroCaricato: 1 }, '*'); } catch (_) {}
       });
       win.addEventListener('message', (e) => {
