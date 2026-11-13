@@ -2324,7 +2324,7 @@
     },
     filoChatFile: (files) =>
       `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
-      `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n`,
+      `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve il contenuto completo di un file, leggilo con file(leggi_editor) e il suo id prima di rispondere; se il riassunto basta, no.\n\n`,
     filoChatCambiValute: (cambi) => (cambi ? `CAMBI:\n${cambi}` : ''),
     // Richiamo finale: le istruzioni stanno in testa, lontano dal punto in cui il modello scrive. Chiude il CONTESTO.
     filoChatRicorda: () => `Ricorda: le azioni sono gli strumenti che hai a disposizione. Prima agisci (gli esiti ti tornano subito), poi scrivi la risposta in prosa, senza JSON.`,
