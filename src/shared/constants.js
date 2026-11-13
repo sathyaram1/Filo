@@ -2147,6 +2147,9 @@
         (String(dopo || '') ? `Testo del campo dopo (solo contesto):\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(dopo), max: 20000 })}\n` : '') +
         (lista.length
           ? `\nCandidati del controllo automatico nel testo: confermali con la loro riga, o dì che sono giusti con [candidato][][motivo][giusto].\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: lista.join('\n') })}\n`
+          : '') +
+        (daGiudicare.length
+          ? `\nDATE DA GIUDICARE, col giorno della settimana esatto in ogni anno possibile (le parti fra « » vengono dal campo e dalla pagina):\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: daGiudicare.join('\n') })}\n`
           : '');
     },
 
