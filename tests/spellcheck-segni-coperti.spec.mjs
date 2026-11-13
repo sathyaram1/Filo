@@ -3,6 +3,8 @@
 // che Electron disegna davvero: sull'intestazione grigia non deve restare nessun pixel caldo dei segni.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { segniDi } from './helpers/segniDelCorrettore.mjs';
+import { batti } from './helpers/tastiera.mjs';
 
 const CE = '<div id="f" contenteditable="true" spellcheck="true" lang="it" style="width:700px;min-height:60px;border:1px solid #999;font:22px sans-serif"></div>';
 const TA = '<textarea id="f" spellcheck="true" lang="it" style="display:block;width:700px;height:60px;font:22px sans-serif"></textarea>';
