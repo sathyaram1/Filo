@@ -75,7 +75,7 @@
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
+      applica: 'Appena lo sai, chiama impostazioni(imposta) con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       // #1188: il livello di autonomia si sceglie qui e in Preferenze, non più dalla casella della home.
