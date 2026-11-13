@@ -895,7 +895,9 @@ export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = n
  * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
  * → { ok, branch, punta, main, forced } | { ok:false, tipo: 'base'|'ramo'|'spedizione', reason }
  */
-export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+// `presa`: origin/main alla presa in carico. Se main va avanti dopo il rebase (il fetch di finish:check) la punta basta
+// che contenga quello: il cancello la riallinea comunque, e rifare rebase e unit costava un giro a biglietto (#2236).
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main', presa = '' } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
