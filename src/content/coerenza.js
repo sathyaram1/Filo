@@ -165,7 +165,7 @@
         .map((x) => voce(x, 'campo', x.fine <= inizio ? inizio - x.fine : x.da - fine)),
       ...detti.prima.map((x) => voce(x, 'prima', x.lontano + inizio)),
       ...detti.dopo.map((x) => voce(x, 'dopo', x.lontano + lunghezza - fine)),
-      ...detti.titolo.map((x) => voce(x, 'titolo', 600)),
+      ...detti.titolo.map((x) => voce(x, 'titolo', RIGA_ANNO_MAX * 5)),
     ].sort((p, q) => p.dist - q.dist);
   }
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
