@@ -2654,7 +2654,7 @@
     const valore = typeof rawVal === 'string' ? rawVal.trim().slice(0, 60) : String(rawVal);
     return {
       rifiuto: `«${valore}» non è un valore che «${nomeVoce(r.setter)}» accetta`,
-      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'vedi l\'elenco di IMPOSTA_PREFERENZA'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
+      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'li dice impostazioni(leggi) con la chiave'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
     };
   }
   function pianoChiave(s) {
