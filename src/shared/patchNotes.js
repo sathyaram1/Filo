@@ -24,6 +24,14 @@
       ],
     },
     {
+      version: '0.2.279', date: '2026-11-13',
+      features: [],
+      fixes: [
+        { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
+        { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
+      ],
+    },
+    {
       version: '0.2.278', date: '2026-11-13',
       features: [],
       fixes: [
