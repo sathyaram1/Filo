@@ -63,13 +63,19 @@ export function isFresh(marker, nowMs = Date.now(), maxAgeMs = MAX_AGE_MS) {
 
 // `dal`: in un giro di riallineamento, il commit che aveva passato la verifica. finish:check
 // sceglie gli spec anche dai file del lavoro che il riallineamento ha toccato: i conflitti.
-export function writeRole(root, role, { dal = '' } = {}) {
+// `main`: origin/main alla presa in carico, il minimo che la punta riallineata deve contenere (#2236).
+export function writeRole(root, role, { dal = '', main = '' } = {}) {
   const r = normalizeRole(role);
   if (!r) return null;
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     const sha = String(dal || '').trim();
-    const marker = { role: r, since: new Date().toISOString(), ...(/^[0-9a-f]{7,40}$/i.test(sha) ? { dal: sha } : {}) };
+    const presa = String(main || '').trim().toLowerCase();
+    const marker = {
+      role: r, since: new Date().toISOString(),
+      ...(/^[0-9a-f]{7,40}$/i.test(sha) ? { dal: sha } : {}),
+      ...(/^[0-9a-f]{40}$/.test(presa) ? { mainAllaPresa: presa } : {}),
+    };
     writeFileSync(roleFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
   } catch (_) {
