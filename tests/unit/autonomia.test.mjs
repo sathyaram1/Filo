@@ -956,3 +956,13 @@ test('il messaggio che Filo scrive da sé conta come lettura, ma non per il cost
   const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
   assert.match(h, /A\.fontiPerCosto\(fonti, c\)/, 'decisioneAutonomia filtra le fonti col costo dell\'azione');
 });
+
+test('il costo che decide si calcola in un punto solo: la decisione e le letture che contano usano lo stesso', () => {
+  assert.equal(A.costoReale({ costo: 1, difesa: true }), 4, 'un freno tolto vale 4');
+  assert.equal(A.costoReale({ costo: 2, campo: 'web', manopole: { web: { grave: true } } }), 3);
+  assert.equal(A.costoReale({ costo: 3, campo: 'web', manopole: { web: { grave: true } } }), 3, 'la manopola non porta al 4');
+  assert.equal(A.costoReale({ costo: 9 }), null);
+  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.doesNotMatch(h, /costoEffettivo\(|difesa \? A\.COSTO_MAX/, 'il main chiede il costo a costoReale, non lo rifà');
+  assert.match(h, /A\.costoReale\(/);
+});
