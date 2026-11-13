@@ -44,3 +44,29 @@ test('r1 una memoria senza righe citate, ritrovata dallo stesso tratto, non rime
   await expect(q.locator('#esito')).toHaveText('Non l\'ho scritta: somiglia a una riga che avevi tolto.', { timeout: 10000 });
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('gatti');
 });
+
+test('r1 da un tratto pulito, una memoria senza righe citate non rimette da sola una riga tolta', async ({ app }) => {
+  const t0 = Date.now() - 5 * 60 * 60 * 1000;
+  const buffer = await app.evaluate(async (_e, t0) => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const C = globalThis.SN_COMPATTAZIONE;
+    const Chats = globalThis.SN_FILO_CHATS;
+    const iso = (t) => new Date(t).toISOString();
+    await Chats.append('gatti2', { role: 'user', text: 'ho due gatti, Miso e Pepe', ts: iso(t0) });
+    const eids = (await globalThis.SN_IL_FILO.chat('gatti2', { incognito: false, ids: true })).eids;
+    await M.appendLesson('Ha due gatti, Miso e Pepe.', { fonti: eids });
+    const [l] = await M.getLessonsBuffer();
+    if (!await M.hideLine({ lezione: { ts: l.ts, text: l.text } })) throw new Error('riga non tolta');
+    await Chats.append('gatti2', { role: 'filo', text: 'Che bei nomi.', ts: iso(t0 + 1000) });
+    await Chats.append('gatti2', { role: 'user', text: 'domani piove?', ts: iso(t0 + 60000) });
+    await Chats.append('gatti2', { role: 'filo', text: 'Sì, porta l\'ombrello.', ts: iso(t0 + 61000) });
+    const vero = C._dip.chiama;
+    C._dip.chiama = async ({ messages }) => {
+      const righe = [...messages[1].content.matchAll(/^\[(\d+)\] (.*)$/gm)].map((m) => Number(m[1]));
+      return JSON.stringify({ ore: [{ testo: '10:00 gatti e pioggia', righe }], memorie: [{ testo: 'Ha due gatti, Miso e Pepe.', righe: [] }] });
+    };
+    try { await C.compatta({ incognito: false, motivo: 'prova', forza: true }); } finally { C._dip.chiama = vero; }
+    return JSON.stringify(await M.getLessonsBuffer());
+  }, t0);
+  expect(buffer).not.toContain('gatti');
+});
