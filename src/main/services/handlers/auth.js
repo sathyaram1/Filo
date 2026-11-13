@@ -477,10 +477,10 @@ module.exports = function register(on, ctx) {
       } else {
         await FB.updateStatus(id, campi, { idToken });
       }
-      // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
-      // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
+      // Il triage cambia la scheda di QUESTO id, e la si scrive subito. Il giro intero forzato a ogni triage
+      // costava ~2.300 letture ad azione (#2470): parte solo se non gira da mezz'ora.
       await syncOneCard(id, idToken);
-      scheduleViewSync({ delayMs: 1500, force: true });
+      scheduleViewSync({ delayMs: 1500 });
       if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
