@@ -68,6 +68,9 @@ fermato prima di consegnare, e il tuo ramo è nato dalla sua punta
 tentativi più vecchi che il tuo ramo non contiene: guardali
 (`git log origin/main..origin/<ramo>`), e se ti serve qualcosa fondilo
 (`git merge origin/<ramo>`), così alla fusione si chiude anche quel ramo.
+Il main di adesso è già dentro, se si fondeva senza conflitti; se no
+`ripartenza.conflittiConMain` elenca i file in conflitto: prima di tutto
+`git merge origin/main`, risolvi quei conflitti e poi lavora.
 
 Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:
 il testo è la spec, con cosa cambia per ognuna e come si verifica. Passa o non
