@@ -37,7 +37,7 @@ const ATTACCO = `<script>
     }
     for (const b of document.querySelectorAll('.sn-fb-send, .sn-popup-send, .sn-editbox-replace, [data-sc], .sn-rt-send')) b.click();
     const nostri = '[class*="sn-fb-"], [class*="sn-popup"], [class*="sn-editbox"], [class*="sn-rt-"]';
-    return { host: !!host, ombra: !!(host && host.shadowRoot), nostri: document.querySelectorAll(nostri).length };
+    return { host: ospiti.length > 0, ombra: ospiti.some((h) => !!h.shadowRoot), nostri: document.querySelectorAll(nostri).length };
   };
 </script>`;
 
