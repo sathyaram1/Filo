@@ -58,8 +58,9 @@ che lo leggono nominano. Se lo strumento non lo trovi, consegna con `--motivo
    che ha toccato quel punto, non indovinarla. Risolto un file, `git add
    <file>`; risolti tutti, `git rebase --continue`. Il push forzato non tocca a
    te: lo fa la consegna, che registra il riallineamento solo se su origin il
-   ramo è alla tua punta e contiene `main`. Se rifiuta, ti dice perché e cosa
-   fare.
+   ramo è alla tua punta e contiene `main` com'era quando hai preso il lavoro:
+   se intanto è andata avanti, il resto lo riallinea il cancello. Se rifiuta,
+   ti dice perché e cosa fare.
 
    Davanti va solo il `cd` nel tuo clone, se la sezione «La tua cartella» lo
    chiede. Nessun'altra forma: i due comandi non si legano fra loro e non
