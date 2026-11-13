@@ -239,7 +239,7 @@ test('#2293 — i titoli delle schede sono testo dei siti salvo quelli delle pag
   };
   try {
     const chat = await FS.assemble({ schedaChat: 1, sistema: false });
-    const daSiti = chat.sezioniChat.find((s) => s.chiave === 'TAB APERTE').daSiti || [];
+    const daSiti = (chat.sezioniChat.find((s) => s.chiave === 'TAB APERTE').daFuori || []).flatMap((g) => g.testi);
     for (const t of ['Alfa detta', 'Vuota detta', 'Blob detto', 'Data detta']) assert.ok(daSiti.includes(t), t);
     assert.ok(!daSiti.includes('Nuova scheda'), 'il titolo della pagina di Filo lo scrive Filo');
   } finally {

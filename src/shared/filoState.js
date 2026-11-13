@@ -295,25 +295,28 @@
     return out;
   }
 
-  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta.
+  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta (`nomi`,
+  // come li legge il modello).
   function righeSistema(sistema) {
     const out = ['SISTEMA (letto dal computer adesso, senza modello: «quanta batteria ho?», «sono online?», «il Bluetooth è acceso?» si rispondono da qui)'];
     const Sis = global.SN_SISTEMA;
     if (!sistema || !Sis) {
       out.push('(il computer non ha risposto: batteria, rete e Bluetooth adesso non li sai, non tirare a indovinare)');
-      return out;
+      return { righe: out, nomi: [] };
     }
     const { righe, nomi } = Sis.righePrompt(sistema);
     out.push(...righe);
-    if (nomi.length) {
-      const E = esterno();
-      out.push(E.imbusta({
-        tipo: 'NOMI_DISPOSITIVI',
-        conIntestazione: true,
-        testo: nomi.map((n) => E.neutralizza(n, { unaRiga: true })).join('\n'),
-      }));
-    }
-    return out;
+    const E = esterno();
+    const puliti = nomi.map((n) => E.neutralizza(n, { unaRiga: true }));
+    if (puliti.length) out.push(E.imbusta({ tipo: 'NOMI_DISPOSITIVI', conIntestazione: true, testo: puliti.join('\n') }));
+    return { righe: out, nomi: puliti };
+  }
+
+  // Il testo di altri che una sezione porta al modello, con la sua fonte: le uscite lo contano come testo di
+  // sconosciuti (#2293, #2305; CONTESTO_DAI_SITI in urlExfil.js). Ogni sezione che recinta un testo lo dichiara qui.
+  function daFuori(testi, fonte) {
+    const t = (Array.isArray(testi) ? testi : []).filter((x) => typeof x === 'string' && x.trim());
+    return t.length ? { daFuori: [{ testi: t, fonte }] } : null;
   }
 
   function sitoDellaScheda(url) {
@@ -350,7 +353,8 @@
     }
     if (state.sistema !== undefined) {
       // Torna alla chat a ogni cambio, batteria compresa: la sezione dice di rispondere da qui a «quanta batteria ho?».
-      aggiungi('SISTEMA', righeSistema(state.sistema));
+      const { righe, nomi } = righeSistema(state.sistema);
+      aggiungi('SISTEMA', righe, null, daFuori(nomi, 'dai nomi di reti e dispositivi'));
     }
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
     // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
@@ -426,8 +430,7 @@
         if (top.some((t) => t.suona || t.audioAt)) righe.push('[SUONA]: sta riproducendo audio adesso. [AUDIO FERMO]: ha suonato ed è ferma, «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.');
         righe.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: elenco.join('\n') }));
       }
-      // `daSiti`: i titoli che il modello legge qui, testo di sconosciuti per le uscite (#2293).
-      aggiungi('TAB APERTE', righe, null, { riservate, ...(daSiti.length ? { daSiti } : {}) });
+      aggiungi('TAB APERTE', righe, null, { riservate, ...daFuori(daSiti, 'dai titoli delle schede aperte') });
     }
     if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       aggiungi('SITI SEMPRE APERTI', [
@@ -451,16 +454,14 @@
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
     // home. Li può aver scritti un modello che leggeva una pagina (#592.4).
-    const salvati = (righe) => E.imbusta({
-      tipo: 'TESTO_SALVATO',
-      conIntestazione: true,
-      testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
-    });
+    const pulite = (righe) => righe.map((r) => E.neutralizza(r, { unaRiga: true }));
+    const salvati = (righe) => E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: pulite(righe).join('\n') });
     {
       const righe = ['PROCESSI ATTIVI'];
+      let voci = [];
       if (!state.timers.length) righe.push('(nessuno)');
       else {
-        righe.push(salvati(state.timers.map((t) => {
+        voci = state.timers.map((t) => {
           if (t.kind === 'alarm') {
             // Le sveglie si descrivono con l'orario assoluto: a ore di distanza un countdown
             // confonde.
@@ -475,15 +476,16 @@
           const resto = `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s`;
           if (perChat) return `- Timer "${t.label}": ${t.paused ? `(in pausa, restano ${resto})` : `finisce alle ${oraAssoluta(t.endsAt, { secondi: true })}`}`;
           return `- Timer "${t.label}": ${t.paused ? '(in pausa)' : `${resto} rimanenti`}`;
-        })));
+        });
+        righe.push(salvati(voci));
       }
-      aggiungi('PROCESSI ATTIVI', righe);
+      aggiungi('PROCESSI ATTIVI', righe, null, daFuori(pulite(voci), 'dai nomi di timer e sveglie'));
     }
     {
       const righe = ['NOTIFICHE NON GESTITE'];
-      if (!state.notifications.length) righe.push('(nessuna)');
-      else righe.push(salvati(state.notifications.map((n) => `- [${perChat ? oraAssoluta(n.ts) : n.ageRel}] ${n.kind}: ${n.text}`)));
-      aggiungi('NOTIFICHE NON GESTITE', righe);
+      const voci = state.notifications.map((n) => `- [${perChat ? oraAssoluta(n.ts) : n.ageRel}] ${n.kind}: ${n.text}`);
+      righe.push(voci.length ? salvati(voci) : '(nessuna)');
+      aggiungi('NOTIFICHE NON GESTITE', righe, null, daFuori(pulite(voci), 'dalle notifiche'));
     }
     // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
     if (state.cambi && !perChat) {
@@ -494,22 +496,22 @@
       if (!state.cambi.righe.length) righe.push('(nessuno)');
       else righe.push(salvati(state.cambi.righe));
       if (state.cambi.tolti > 0) righe.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
-      aggiungi('CAMBI RECENTI', righe);
+      aggiungi('CAMBI RECENTI', righe, null, daFuori(pulite(state.cambi.righe), 'dai cambi recenti'));
     }
     if (state.conversazioni && !perChat) aggiungi('CONVERSAZIONI RECENTI', [testoConversazioni(state.conversazioni, salvati)]);
     // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
-    // Li scrive un modello che ha letto i titoli delle schede e delle pagine salvate: testo dei siti per le uscite (#2293).
+    // Li scrive un modello che ha letto i titoli delle schede e delle pagine salvate (#2293).
     {
       const righe = ['SUGGERIMENTI DELLA HOME'];
-      const daSiti = [];
+      const testi = [];
       if (state.dashboard && state.dashboard.suggestions?.length) {
         const voci = state.dashboard.suggestions.slice(0, 8);
         righe.push(salvati(voci.map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`)));
-        for (const s of voci) if (typeof s.text === 'string' && s.text.trim()) daSiti.push(s.text);
+        for (const s of voci) if (typeof s.text === 'string') testi.push(E.neutralizza(s.text, { unaRiga: true }));
       } else {
         righe.push('(nessuno)');
       }
-      aggiungi('SUGGERIMENTI DELLA HOME', righe, null, daSiti.length ? { daSiti } : null);
+      aggiungi('SUGGERIMENTI DELLA HOME', righe, null, daFuori(testi, 'dai suggerimenti della home'));
     }
     return out;
   }

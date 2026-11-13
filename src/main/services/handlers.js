@@ -6738,8 +6738,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
   const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
   if (dalTratto) azioniViste.push(dalTratto);
-  // Titoli e ricerche delle pagine visitate nei blocchi davanti ai messaggi: testo dei siti senza un'azione (#2293).
-  const dalPreambolo = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{ testi: (filo && filo.daSiti) || [], fonte: 'dalle pagine visitate' }]);
+  // Il testo di altri nei blocchi davanti ai messaggi (pagine visitate, nomi di dispositivi, timer), senza un'azione (#2293).
+  const dalPreambolo = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione((filo && filo.daFuori) || []);
   if (dalPreambolo) azioniViste.push(dalPreambolo);
   // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
   const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
@@ -6902,11 +6902,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       } catch (e) { console.warn('[Filo] tratto non ricomposto dopo la fotografia:', e?.message || e); }
     }
   }
-  // Il testo dei siti che il CONTESTO mostra (titoli delle schede, suggerimenti della home), anche di una fotografia di prima (#2293).
-  const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{
-    testi: fotografia ? fotografia.daSiti : sezioniUtente.flatMap((s) => (s && Array.isArray(s.daSiti) ? s.daSiti : [])),
-    fonte: 'dalle schede aperte e dai suggerimenti della home',
-  }]);
+  // Il testo di altri che il CONTESTO mostra, una fonte per sezione, anche di una fotografia di prima (#2293, #2305).
+  const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione(fotografia
+    ? fotografia.daFuori : TV.unisciDaFuori(...sezioniUtente.map((s) => (s && s.daFuori) || [])));
   if (dalleSchede) {
     azioniViste.push(dalleSchede);
     ricordaLettoInChat([dalleSchede]);

@@ -13,9 +13,27 @@
   }
   const stringa = (s) => typeof s === 'string' && s.length > 0;
 
+  // Gruppi `{ testi, fonte }` del testo di altri, uniti per fonte senza doppioni: l'ingresso di CONTESTO_DAI_SITI
+  // (urlExfil.js), che ogni sezione e ogni preambolo dichiara col suo `daFuori` (#2305).
+  function unisciDaFuori(...liste) {
+    const perFonte = new Map();
+    for (const g of liste.flat()) {
+      if (!g || !Array.isArray(g.testi)) continue;
+      const fonte = String(g.fonte || '');
+      if (!perFonte.has(fonte)) perFonte.set(fonte, new Set());
+      for (const t of g.testi) if (typeof t === 'string' && t.trim()) perFonte.get(fonte).add(t);
+    }
+    return [...perFonte].filter(([, s]) => s.size).map(([fonte, s]) => ({ testi: [...s], fonte }));
+  }
+  const conDaFuori = (...liste) => {
+    const daFuori = unisciDaFuori(...liste.map((l) => (Array.isArray(l) ? l : [])));
+    return daFuori.length ? { daFuori } : {};
+  };
+
   // ── Il CONTESTO dell'utente (blocco 3) ─────────────────────────────────────
   // Una sezione: `chiave`, `testo`, `confronto` (cosa deve cambiare perché la chat la riceva di nuovo), `righe` (la
-  // memoria, che si confronta riga per riga), `perId` (i file, per id), `rifai` (un cambio rifà la fotografia).
+  // memoria, che si confronta riga per riga), `perId` (i file, per id), `rifai` (un cambio rifà la fotografia),
+  // `daFuori` (il testo di altri che porta, per le uscite).
   const RIGHE_NEUTRE = /^(PROFILO UTENTE:|PREFERENZE:|LEZIONI RECENTI:|\(vuoto\))$/;
 
   function righeMemoria({ profilo, preferenze, espansioni, lezioni }) {
@@ -49,13 +67,16 @@
       if (x && stringa(x.chiave)) {
         metti(`STATO:${x.chiave}`, x.testo, {
           stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}),
-          ...(Array.isArray(x.daSiti) && x.daSiti.length ? { daSiti: x.daSiti } : {}),
+          ...conDaFuori(x.daFuori),
         });
       }
     }
     metti('CAMBI', P().filoChatCambiValute(cambi));
     const lista = Array.isArray(filesList) ? filesList.filter((f) => f && stringa(String(f.id || ''))) : null;
-    metti('FILE', P().filoChatFile(files), lista ? { perId: lista.map((f) => [String(f.id), `- [${f.id}] ${f.title}: ${f.summary}`]) } : {});
+    const perId = lista ? lista.map((f) => [String(f.id), `- [${f.id}] ${f.title}: ${f.summary}`]) : null;
+    // Titoli e riassunti dei file dell'Editor: un appunto lo può scrivere un modello che leggeva una pagina (#592.4).
+    const dalleNote = perId ? [{ testi: perId.map(([, r]) => E().neutralizza(r, { unaRiga: true })), fonte: 'dai file dell\'editor' }] : [];
+    metti('FILE', P().filoChatFile(files), { ...(perId ? { perId } : {}), ...conDaFuori(dalleNote) });
     return out;
   }
 
@@ -93,11 +114,10 @@
       const ris = s.riservate || null;
       const giaVisti = v && v.riservate ? v.riservate.visibili : [];
       const visibili = ris ? [...new Set([...giaVisti, ...(ris.visibili || [])])] : null;
-      // Il testo dei siti che la fotografia ha mostrato resta davanti al modello finché lei vive (#2293).
-      const daSiti = [...new Set([...((v && v.daSiti) || []), ...(Array.isArray(s.daSiti) ? s.daSiti : [])])];
+      // Il testo di altri che la fotografia ha mostrato resta davanti al modello finché lei vive (#2293).
       nuove.set(s.chiave, {
         confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}),
-        ...(daSiti.length ? { daSiti } : {}),
+        ...conDaFuori(v && v.daFuori, s.daFuori),
       });
       if (ris && (ris.nascosti || []).some((u) => giaVisti.includes(u))) { rifai = true; continue; }
       if (v && v.confronto === conf) continue;
@@ -121,13 +141,19 @@
       }
       cambiate.push({ sezione: s });
     }
+    // Una sezione tolta resta nel testo della fotografia: il suo testo di altri resta contato (#2305).
+    const tolte = [prima.has(TOLTE) ? prima.get(TOLTE).daFuori : null];
     for (const [k, v] of prima) {
-      if (nuove.has(k)) continue;
+      if (k === TOLTE || nuove.has(k)) continue;
+      tolte.push(v.daFuori);
       if (v.rifai || Array.isArray(v.righe)) rifai = true;
       else cambiate.push({ tolta: k });
     }
+    const resto = conDaFuori(...tolte);
+    if (resto.daFuori) nuove.set(TOLTE, resto);
     return { cambiate, rifai, viste: nuove };
   }
+  const TOLTE = '\u0000tolte';
 
   // Una sezione che non c'è più si dice com'è adesso, non «tolta».
   const SEZIONI_VUOTE = {
@@ -292,7 +318,7 @@
   function rendiPagine(pagine, opts) {
     return pagineResa(pagine, opts).testo;
   }
-  // `daSiti`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
+  // `daFuori`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
   function pagineResa(pagine, { rif = null } = {}) {
     const gruppi = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
@@ -308,7 +334,7 @@
       if (stringa(p.cercato)) g.cercati.push(p.cercato);
       else if (stringa(p.titolo)) g.titoli.push(p.titolo);
     }
-    if (!gruppi.size) return { testo: '', daSiti: [] };
+    if (!gruppi.size) return { testo: '', daFuori: [] };
     const daSiti = [];
     const ultimiDistinti = (lista) => {
       const visti = new Set();
@@ -346,7 +372,7 @@
       righe.unshift(`- (prima di queste, altre ${pagineN(n)} su ${fuori.length} sit${fuori.length === 1 ? 'o' : 'i'}: qui non ci sono)`);
     }
     const busta = E().imbusta({ tipo: 'DATI_PAGINA', conIntestazione: true, testo: righe.join('\n'), max: Infinity });
-    return { testo: `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`, daSiti };
+    return { testo: `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`, daFuori: unisciDaFuori([{ testi: daSiti, fonte: 'dalle pagine visitate' }]) };
   }
 
   // Le righe degli eventi di un messaggio, dentro una busta: con l'ora (e il giorno se non è quello del messaggio) e,
@@ -370,16 +396,14 @@
         return;
       }
       const r = rigaDi(ev);
-      // Il nome di un file scaricato lo sceglie il sito.
-      const sito = ev.tipo === 'download' && stringa(ev.file || ev.scaricamento) ? [campo(ev.file || ev.scaricamento)] : [];
-      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, sito });
+      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, daFuori: daFuoriDi(ev) });
     });
     if (schede.aperte || schede.chiuse) {
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
-      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, sito: [] });
+      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, daFuori: [] });
     }
     const visite = pagineResa(pagine, { rif });
-    if (!righe.length) return { testo: visite.testo, ids, daSiti: visite.daSiti };
+    if (!righe.length) return { testo: visite.testo, ids, daFuori: visite.daFuori };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
@@ -387,8 +411,24 @@
     return {
       testo: [`Successo dal messaggio prima:\n${busta}`, visite.testo].filter(Boolean).join('\n\n'),
       ids,
-      daSiti: [...tenute.flatMap((x) => x.sito), ...visite.daSiti],
+      daFuori: unisciDaFuori(...tenute.map((x) => x.daFuori), visite.daFuori),
     };
+  }
+
+  // Il testo di altri nella riga di un evento, con la sua fonte (#2305): lo stesso pezzo che la riga mostra. Un avviso
+  // di Filo no: le sue parole le scrive Filo (le notifiche salvate, che può scrivere un modello, le dice lo STATO).
+  function daFuoriDi(ev) {
+    const g = (testi, fonte) => [{ testi: testi.filter(Boolean), fonte }];
+    switch (ev.tipo) {
+      case 'download': return stringa(ev.file || ev.scaricamento) ? g([campo(ev.file || ev.scaricamento)], 'dai nomi dei file scaricati') : [];
+      case 'file': return g([campo(ev.titolo || ev.file), stringa(ev.prima) ? campo(ev.prima) : ''], 'dai file dell\'editor');
+      case 'timer.scattato': return g([campo(ev.nome || '')], 'dai nomi di timer e sveglie');
+      case 'sistema':
+        if (ev.cosa === 'rete' && ev.online && stringa(ev.nome)) return g([campo(ev.nome, 80)], 'dai nomi di reti e dispositivi');
+        if (ev.cosa === 'bluetooth') return g([campo(ev.dispositivo, 80)], 'dai nomi di reti e dispositivi');
+        return [];
+      default: return [];
+    }
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
@@ -401,6 +441,6 @@
 
   global.SN_TRATTO_VIVO = {
     MAX_RIGHE_EVENTI, MAX_SITI, MAX_TITOLI, sezioniUtente, parteUtente, confronta, rendiCambiate, turniDi, eventiPerMessaggi,
-    rendiEventi, rendiPagine, rigaDi, preambolo, righeMemoria,
+    rendiEventi, rendiPagine, rigaDi, preambolo, righeMemoria, unisciDaFuori,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

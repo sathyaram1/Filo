@@ -139,7 +139,7 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
       if (segna) f.viste = d.viste;
       f.usata = ora;
       f.ancora = f.ancora || ancora;
-      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false, daSiti: daSitiDi(d.viste) };
+      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false, daFuori: daFuoriDi(d.viste) };
     }
   }
   const nuova = {
@@ -150,12 +150,12 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
     usata: ora,
   };
   fotografie[lato] = nuova;
-  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true, daSiti: daSitiDi(nuova.viste) };
+  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true, daFuori: daFuoriDi(nuova.viste) };
 }
 
-// I titoli scritti dai siti che il CONTESTO ha mostrato (le schede aperte): testo di sconosciuti per le uscite (#2293).
-function daSitiDi(viste) {
-  return [...new Set([...viste.values()].flatMap((v) => (v && Array.isArray(v.daSiti) ? v.daSiti : [])))];
+// Il testo di altri che il CONTESTO ha mostrato, una fonte per sezione: testo di sconosciuti per le uscite (#2293, #2305).
+function daFuoriDi(viste) {
+  return TV().unisciDaFuori(...[...viste.values()].map((v) => (v && v.daFuori) || []));
 }
 
 // La chat riaperta mostra le foto che il modello ha ancora davanti: quello che vede lui, l'utente lo deve vedere.
@@ -422,12 +422,12 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     intervista,
     Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi.filter((r) => r && r.tratto && vivi.chat(r.tratto.chat))) : '',
   ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
-  // Il testo dei siti di ogni preambolo scritto, per messaggio: conta quello dei messaggi rimasti davanti (#2293).
-  const sitiDelPreambolo = new Map();
+  // Il testo di altri di ogni preambolo scritto, per messaggio: conta quello dei messaggi rimasti davanti (#2293).
+  const fuoriDelPreambolo = new Map();
   const preambolo = (m) => {
     if (m.riga || m.seguito) return '';
     const memo = eventiDi(m);
-    sitiDelPreambolo.set(FC().chiave(m), memo.eventi.daSiti || []);
+    fuoriDelPreambolo.set(FC().chiave(m), memo.eventi.daFuori || []);
     return TV().preambolo({
       eventi: memo.eventi.testo,
       stato: memo.stato && memo.stato.epoca === epoca ? memo.stato.testo : '',
@@ -491,11 +491,11 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     },
   });
   ancore[lato] = f.ancora;
-  // I titoli e le ricerche delle pagine che i preamboli davanti al modello portano, compreso quello della domanda (#2293).
-  const daSiti = [...new Set([
-    ...f.visti.flatMap((m) => sitiDelPreambolo.get(FC().chiave(m)) || []),
-    ...(laDomanda ? eventiDi(laDomanda).eventi.daSiti || [] : []),
-  ])];
+  // Il testo di altri che i preamboli davanti al modello portano, compreso quello della domanda (#2293).
+  const daFuori = TV().unisciDaFuori(
+    ...f.visti.map((m) => fuoriDelPreambolo.get(FC().chiave(m)) || []),
+    (laDomanda && eventiDi(laDomanda).eventi.daFuori) || [],
+  );
   potaFoto(f.vecchi);
   pota(f.vecchi, f.visti, incognito);
   // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
@@ -518,7 +518,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     messaggi: f.messaggi,
     visti: f.visti,
     azioni: f.azioni,
-    daSiti,
+    daFuori,
     perUnaNuova: senzaTolti(f.perUnaNuova),
     vecchi: f.vecchi,
     coda: codaGrezza.map((m) => {
