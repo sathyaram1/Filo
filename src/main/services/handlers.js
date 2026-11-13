@@ -5827,7 +5827,7 @@ function schedeChiuseForPrompt(actions) {
       return `- [${p.id}] ${titolo} · ${quandoDetto(p.chiusa)} · ${perche}${extra}\n  ${p.url}${p.riassunto ? `\n  ${E.neutralizza(p.riassunto, { unaRiga: true })}` : ''}`;
     });
     const oltre = o.trovate > o.schede.length ? ` Ne combaciano ${o.trovate}: qui le prime ${o.schede.length}, per le altre restringi con parole, date o motivo.` : '';
-    blocks.push(`[Schede chiuse${filtro ? ` (${filtro})` : ''}: ${o.trovate} su ${o.totale}.${oltre} Per riaprirne una usa RIAPRI_SCHEDA con l'id, non NAVIGA.]\n`
+    blocks.push(`[Schede chiuse${filtro ? ` (${filtro})` : ''}: ${o.trovate} su ${o.totale}.${oltre} Per riaprirne una usa scheda(riapri) con l'id, non scheda(apri).]\n`
       + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
   }
   return blocks.join('\n\n').trim();
