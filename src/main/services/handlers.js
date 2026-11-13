@@ -5303,7 +5303,7 @@ function chatSearchesForPrompt(actions) {
         const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
         return `- ${pg.id ? `[${pg.id}] ` : ''}${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
       });
-      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Una scheda chiusa si riapre com'era con RIAPRI_SCHEDA e il suo id; una pagina visitata con NAVIGA e il suo indirizzo.]\n`
+      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Una scheda chiusa si riapre com'era con scheda(riapri) e il suo id; una pagina visitata con scheda(apri) e il suo indirizzo.]\n`
         + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
     }
     if (cambiTrovati.length) {
