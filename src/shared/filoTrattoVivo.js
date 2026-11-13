@@ -160,7 +160,7 @@
     'STATO:SITI SEMPRE APERTI': 'SITI SEMPRE APERTI\n(nessuno)',
     'STATO:ZOOM DELLA PAGINA': 'ZOOM DELLA PAGINA\n(la scheda davanti non lo dice)',
     MODELLO: 'Il nome del modello che ti sta eseguendo adesso non lo sai.',
-    CAMBI: 'CAMBI:\n(i cambi delle valute adesso non ci sono: cercali con CERCA_WEB)',
+    CAMBI: 'CAMBI:\n(i cambi delle valute adesso non ci sono: cercali con web(cerca))',
     FILE: 'FILE DELL\'EDITOR:\n(nessuno)',
   };
   function sezioneVuota(chiave) {
