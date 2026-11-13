@@ -1,12 +1,6 @@
-// Unit test per src/shared/actionTools.js (SN_ACTION_TOOLS): le azioni della
-// chat come strumenti nativi del modello.
-//
-// La sentinella che conta: il registro dei LIVELLI (actionLevels.js) e
-// l'elenco degli STRUMENTI devono combaciare. Uno strumento senza livello non
-// si esegue mai (il dispatch rifiuta le azioni fuori registro); un livello
-// senza strumento è un potere che il modello non può più chiamare. Il resto
-// fissa la forma delle definizioni, la traduzione chiamata → azione (argomenti
-// rotti compresi) e la tolleranza per il formato vecchio.
+// src/shared/actionTools.js: gli strumenti generali del modello e la strada da strumento(azione) al tipo eseguito.
+// Sentinella: registro dei costi e azioni combaciano (un'azione senza costo non parte, un costo senza azione non si
+// chiama), e ogni azione si raggiunge da uno strumento coi suoi parametri.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
