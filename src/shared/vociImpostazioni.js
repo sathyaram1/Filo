@@ -113,7 +113,7 @@
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_STIMA_SOGLIA: 'legge listino e modelli per stimare costo e attesa accanto alla soglia di compattazione: non salva niente',
         FILO_RESTART_ONBOARDING: 'PULSANTE_PREFERENZE',
-        FILO_ONBOARDING_TOGLI: 'toglie per sempre un’intervista conservata, e cancellare per sempre lo fa solo l’utente: la chat gli apre la pagina lì',
+        FILO_ONBOARDING_TOGLI: 'toglie per sempre un’intervista conservata: per una sola la chat non ha un’azione (tutte insieme vanno con CANCELLA_MEMORIA, che vuole «conferma»), e gli apre la pagina lì',
         RESET_SETTINGS: 'PULSANTE_PREFERENZE',
         TTS_SYNTH: 'PULSANTE_PREFERENZE',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',

@@ -126,8 +126,8 @@ test('a parole: si spegne il riassunto, si cambia il livello di privacy, si aggi
   assert.equal(r.costo, 1);
   const p = P.buildPreferencePartial('pagine_delicate', 'tutto in anticipo', { attuali: livello('delicate') });
   assert.deepEqual(p.partial, { security: { privacy: { livello: 'anticipo' } } });
-  assert.equal(p.costo, 2);
-  assert.equal(p.allenta, true, 'mandare di più abbassa una difesa (#530)');
+  assert.equal(p.costo, 4, 'mandare di più toglie un freno: costo 4 (#1312)');
+  assert.equal(p.allenta, true);
   // Chi alza sa cosa torna ai modelli, e che il pavimento resta.
   for (const cosa of [/posta, banca e sanità/, /correttore/, /password, carte e codici/i]) assert.match(p.risk, cosa);
   const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
@@ -250,6 +250,9 @@ test('a parole: «questo sito» e «scheda: <titolo>» diventano il sito della s
   assert.match(r('aggiungi scheda: Commercialista Bianchi').rifiuto, /nessuna scheda aperta/);
   assert.match(PD.risolviSchede('aggiungi scheda: a', { schede: [schede[0], schede[1]] }).rifiuto, /più schede/);
   assert.deepEqual(r('aggiungi studiorossi.it'), { valore: 'aggiungi studiorossi.it' });
+  // Nel benvenuto Filo vede solo il sito della scheda, non il titolo: la trova anche da lì (#1840).
+  const senzaTitolo = [{ url: 'https://www.studiorossi.it/area-clienti', title: 'Titolo che non dice il sito' }];
+  assert.deepEqual(PD.risolviSchede('aggiungi scheda: studiorossi.it', { schede: senzaTitolo }), { valore: 'aggiungi studiorossi.it' });
 });
 
 test('un sito tolto dai segnati per il campo password non è più delicato per quel motivo, e solo per quello', () => {

@@ -67,14 +67,14 @@ test('SN_PREF mappa il linguaggio naturale sulle preferenze giuste', async ({ ap
   expect(await build(app, 'ore_inattivita', '12 ore')).toMatchObject({ partial: { autoArchive: { idleHours: 12 } } });
   // #146.5 — ora TUTTE le impostazioni sono scrivibili, comprese le sensibili
   // (sicurezza, modelli, provider, chiavi, costi): costano 2, e quelle che
-  // abbassano una difesa lo dicono, così il dispatch vuole «conferma» (#530).
-  expect(await build(app, 'provider', 'openrouter')).toMatchObject({ partial: { provider: 'openrouter' }, costo: 2, allenta: true });
+  // tolgono un freno lo dicono: costo 4, «conferma» a ogni livello; stringerlo è costo 1 (#1312).
+  expect(await build(app, 'provider', 'openrouter')).toMatchObject({ partial: { provider: 'openrouter' }, costo: 4, allenta: true });
   // Google non è più un fornitore di Filo: a parole non si imposta.
   expect(await build(app, 'provider', 'gemini')).toBeNull();
-  expect(await build(app, 'gestione_cookie', 'privacy')).toMatchObject({ partial: { security: { cookies: { mode: 'privacy' } } }, costo: 2, allenta: false });
-  expect(await build(app, 'navigazione_sicura', 'disattiva')).toMatchObject({ partial: { security: { safeBrowse: { enabled: false } } }, costo: 2, allenta: true });
-  expect(await build(app, 'limite_spesa', '12 euro')).toMatchObject({ partial: { monthlyLimitEur: 12 }, costo: 2 });
-  expect(await build(app, 'chiave_openrouter', 'sk-or-v1-SEGRETO1234')).toMatchObject({ partial: { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } }, costo: 2, allenta: true });
+  expect(await build(app, 'gestione_cookie', 'privacy')).toMatchObject({ partial: { security: { cookies: { mode: 'privacy' } } }, costo: 1, allenta: false });
+  expect(await build(app, 'navigazione_sicura', 'disattiva')).toMatchObject({ partial: { security: { safeBrowse: { enabled: false } } }, costo: 4, allenta: true });
+  expect(await build(app, 'limite_spesa', '12 euro')).toMatchObject({ partial: { monthlyLimitEur: 12 }, costo: 4 });
+  expect(await build(app, 'chiave_openrouter', 'sk-or-v1-SEGRETO1234')).toMatchObject({ partial: { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } }, costo: 4, allenta: true });
   expect(await build(app, 'correttore', 'off')).toMatchObject({ partial: { featureFlags: { spellcheck: false } }, costo: 1, allenta: false });
   // 'apiKey' generico resta ambiguo (quale provider?) → non scrivibile: serve
   // dire chiave_openrouter / chiave_tavily.

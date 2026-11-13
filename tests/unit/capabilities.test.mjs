@@ -195,6 +195,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
     FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_AIUTO_NUOVO: 'autonomy-levels',
+    FILO_AIUTO_TESTO_DI_ALTRI: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_CONFIRM_RIFIUTATA: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
@@ -594,9 +595,9 @@ test('il manifesto nomina ogni strumento dell\'Editor che prende una scorciatoia
   }
 });
 
-// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre»: dove promette di
-// non cancellare dati in modo definitivo, nella stessa voce dice che una cosa sola la cancella se la chiedi tu.
-test('dove il manifesto promette di non cancellare mai per sempre, nomina la cancellazione che chiedi tu', () => {
+// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre». Col costo 4 (#1312)
+// cancellare per sempre vuole «conferma», e nessuna voce promette che non si fa mai.
+test('il manifesto non promette di non cancellare mai per sempre: dice che vuole la parola «conferma»', () => {
   const tutto = JSON.stringify(CAP);
   assert.ok(tutto.includes('cancellala per sempre'), 'la voce delle chat dice che si cancellano per sempre');
   const testi = [];
@@ -606,9 +607,8 @@ test('dove il manifesto promette di non cancellare mai per sempre, nomina la can
   };
   giro(CAP);
   assert.ok(!tutto.includes('cancellare dati in modo definitivo'), 'nessuna voce promette di non cancellare mai per sempre');
-  const promesse = testi.filter((t) => /non le fa (mai|a nessun livello)/.test(t) && /per sempre i tuoi dati in blocco/.test(t));
-  assert.ok(promesse.length >= 2, 'le voci dell’elenco fisso dicono che il no vale per le cancellazioni in blocco');
-  for (const t of promesse) {
-    assert.match(t, /per sempre solo se glielo chiedi tu e scrivi «conferma»/, `e nomina l'eccezione: ${t.slice(0, 120)}`);
-  }
+  const promesse = testi.filter((t) => /non le fa (mai|a nessun livello)/.test(t) && /per sempre/.test(t));
+  assert.deepEqual(promesse.map((t) => t.slice(0, 120)), [], 'nessuna voce promette che una cancellazione per sempre non si fa mai');
+  const conLaParola = testi.filter((t) => /cancellare per sempre[^.]*"conferma"/.test(t));
+  assert.ok(conLaParola.length >= 2, 'le voci dell’assistente e dei livelli dicono che cancellare per sempre vuole «conferma»');
 });

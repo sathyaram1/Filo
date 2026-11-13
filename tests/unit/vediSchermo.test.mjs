@@ -30,7 +30,7 @@ function decisione(action, { livello = 'default', stato = 'pulito', origine = 'c
   const ing = AL.ingressi(action, {});
   assert.ok(ing, 'l\'azione è registrata con un costo');
   return A.decideDettaglio({
-    livello, stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa,
+    livello, stato, costo: ing.costo, campo: ing.campo, difesa: ing.difesa, chiesta: ing.chiesta,
     origine, dentroPerimetro: ing.dentroPerimetro,
   });
 }
@@ -287,7 +287,7 @@ test('Wayland: niente elenco delle altre app, si passa dal selettore del sistema
   assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0' }, 'darwin'), false);
 });
 
-test('l\'impostazione si accende con un OK a ogni livello, senza «conferma», e si spegne da sola', () => {
+test('l\'impostazione si accende con un OK a ogni livello (la parola solo dove la tabella la vuole per il costo 2), e si spegne da sola', () => {
   const on = { type: 'IMPOSTA_PREFERENZA', chiave: 'guarda_schermo', valore: 'on' };
   const built = globalThis.SN_PREF.buildPreferencePartial('guarda_schermo', 'on');
   assert.equal(built.costo, 2);
@@ -297,8 +297,11 @@ test('l\'impostazione si accende con un OK a ogni livello, senza «conferma», e
   assert.deepEqual(built.partial, { schermo: { guarda: true } });
   ogniCaso((c) => {
     const d = decisione(on, c);
-    assert.ok(d.risposta === 'chiede', JSON.stringify(c));
-    assert.equal(d.digita, false);
+    // Conservativo dopo una lettura vuole «conferma» per ogni costo 2 (tabella del 30/09, #1312): non è un freno tolto.
+    const parola = c.livello === 'conservativo' && c.stato === 'contaminato';
+    assert.ok(d.risposta === (parola ? 'conferma' : 'chiede'), JSON.stringify(c));
+    assert.equal(d.digita, parola);
+    assert.notEqual(d.regola, 'difesa');
   });
   assert.match(AL.describe(on), /guardare lo schermo/i);
   assert.equal(decisione({ type: 'IMPOSTA_PREFERENZA', chiave: 'guarda_schermo', valore: 'off' }).risposta, 'si');

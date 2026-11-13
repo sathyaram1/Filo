@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -421,6 +421,10 @@ test('git: un programma d\'avvio che una lettura fa partire fa chiedere; quelli 
     }
     assert.equal(C.classify('git status', ctx(dev)), 1, 'un repository con un hook di commit resta una lettura libera');
     // Il programma parte davvero a git status: senza la sonda sarebbe codice qualunque, senza domanda.
+    // L'hook parte solo se git status riscrive l'indice: un'ora diversa sul file tracciato lo obbliga a rinfrescarlo
+    // su ogni sistema, senza contare sull'indice «appena scritto» che su Windows dopo qualche secondo non c'è più.
+    const dopo = new Date(Date.now() + 60_000);
+    utimesSync(join(ostile, 'f'), dopo, dopo);
     segnoVero(ostile, segno);
   } finally {
     togliCartella(base);

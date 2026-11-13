@@ -36,14 +36,20 @@
     return LOCAL_NET_TLDS.has(h.slice(h.lastIndexOf('.') + 1));
   }
 
+  // Il computer stesso, in ogni grafia (anche l'IPv4 dentro l'IPv6, come la scrive un comando o come la riscrive URL):
+  // la sola regola per i link e per i comandi che escono (#1840).
+  function questoComputer(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '0.0.0.0'
+      || /^(?:::ffff:)?127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h) || /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(h);
+  }
+
   // Host che parlano quasi sempre in chiaro (dev, router/IoT su IP privato, rete di casa):
   // per loro lo schema di default è http. Accetta anche la forma IPv6 fra parentesi ([::1]).
   function isLocalHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
-    if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (questoComputer(h)) return true;
     if (isLocalNetworkName(h)) return true;
-    if (h === '::1' || h.startsWith('::ffff:127.')) return true;
-    if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
     if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
     if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
@@ -236,9 +242,40 @@
     return raw;
   }
 
+  // Le ricerche che apre il menu di Filo, costruite solo qui: chi le riconosce (eRicercaDi) usa lo stesso taglio (#1840).
+  const TAGLIO_RICERCA = 500;
+  function indirizzoRicerca(testo) {
+    return `https://www.google.com/search?q=${encodeURIComponent(String(testo == null ? '' : testo).slice(0, TAGLIO_RICERCA))}`;
+  }
+  function indirizzoRicercaImmagine(src) {
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
+  // Le parole che l'indirizzo cerca davvero, se è una ricerca di testo o d'immagine come le costruisce Filo
+  // (qui sopra): null per qualunque altro indirizzo, anche con un parametro in più (#1312).
+  function ricercaDi(url) {
+    let u;
+    try { u = new URL(String(url || '')); } catch (_) { return null; }
+    if (u.protocol !== 'https:' || u.username || u.password || u.port || u.hash) return null;
+    const chiavi = [...u.searchParams.keys()];
+    if (chiavi.length !== 1) return null;
+    if (/^(?:www\.)?google\.com$/i.test(u.hostname) && u.pathname === '/search' && chiavi[0] === 'q') return u.searchParams.get('q');
+    if (/^lens\.google\.com$/i.test(u.hostname) && u.pathname === '/uploadbyurl' && chiavi[0] === 'url') return u.searchParams.get('url');
+    return null;
+  }
+  // L'indirizzo è la ricerca di quelle parole, intere o come le taglia il costruttore?
+  function eRicercaDi(url, parole) {
+    const cercato = ricercaDi(url);
+    if (cercato == null) return false;
+    const norma = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+    const detto = String(parole == null ? '' : parole);
+    return !!norma(cercato) && (norma(cercato) === norma(detto) || norma(cercato) === norma(ricercaDi(indirizzoRicerca(detto))));
+  }
+
   global.SN_URL_NAV = {
-    isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
+    isLocalHost, questoComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
+    indirizzoRicerca, indirizzoRicercaImmagine,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

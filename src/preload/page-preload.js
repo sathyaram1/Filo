@@ -1003,6 +1003,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'schedeInChat.js')); } catch (e) { console.error('[Filo CS] schedeInChat', e); } // #2085 — gettoni delle schede: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'schedaTrascinata.js')); } catch (e) { console.error('[Filo CS] schedaTrascinata', e); } // #2084 — la scheda lasciata qui: PRIMA di content.js e sidebar.js
+  try { require(path.join(SHARED_DIR, 'testoDiAltri.js')); } catch (e) { console.error('[Filo CS] testoDiAltri', e); } // #1840 — il testo incollato è di altri: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo CS] ricercaCampo', e); } // #824 — "è una ricerca?": PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo CS] accessoFisso', e); } // #1808 — la password dell'accesso fisso: PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
