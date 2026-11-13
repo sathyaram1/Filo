@@ -399,6 +399,7 @@
         lastReconcileAt = 0;
       }
       if (ids.length === 0) return [];
+      const inizio = now();
       const vers = await versionsOf(ids);
       const mossi = [];
       for (const v of Array.isArray(vers) ? vers : []) {
@@ -408,11 +409,34 @@
         if (!versioniSeguite.has(id)) versioniSeguite.set(id, t); // primo avvistamento: si prende nota
         else if (versioniSeguite.get(id) !== t) mossi.push([id, t]);
       }
-      if (mossi.length === 0) return [];
-      const rows = await readRows(mossi.map(([id]) => id));
+      const rows = mossi.length ? await readRows(mossi.map(([id]) => id)) : [];
       vedi(rows);
-      // Segnata dopo la rilettura: se fallisce, il giro dopo riprova.
+      // Segnati dopo la rilettura: se fallisce, il giro dopo riprova.
       for (const [id, t] of mossi) versioniSeguite.set(id, t);
+      lastSeguitiAt = inizio;
+      return Array.isArray(rows) ? rows : [];
+    }
+
+    // Il conto dei feedback contro quelli in mano, e l'ultimo cambiato contro la sua versione vista. Non riuscito:
+    // si riprova al giro dopo, e intanto vale quello che si sapeva.
+    async function controllo() {
+      if (typeof controlloLeggero !== 'function' || now() - lastControlloAt < controlloMs) return [];
+      const inizio = now();
+      let c;
+      try { c = await controlloLeggero(); } catch (e) {
+        avvisa(`controllo leggero non riuscito: ${motivo(e)}`);
+        return [];
+      }
+      lastControlloAt = inizio;
+      const n = c && c.count;
+      if (Number.isInteger(n) && (!noti || n !== noti.size)) lastReconcileAt = 0;
+      const u = c && c.ultimo;
+      if (!u || !u._id || !u._updateTime || typeof readRows !== 'function') return [];
+      const id = String(u._id);
+      if (versioniSeguite.get(id) === u._updateTime) return [];
+      const rows = await readRows([id]);
+      vedi(rows);
+      versioniSeguite.set(id, u._updateTime);
       return Array.isArray(rows) ? rows : [];
     }
 
