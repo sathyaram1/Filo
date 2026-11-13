@@ -5311,7 +5311,7 @@ function chatSearchesForPrompt(actions) {
       const conMeno = Array.isArray(out.cambiCercatiCon) && out.cambiCercatiCon.length
         ? ` (nessuno con tutte le parole: trovati cercando "${E.perCanaleSistema(out.cambiCercatiCon.join(' '))}", controlla che siano quelli giusti)`
         : '';
-      blocks.push(`[I cambi del filo che combaciano con "${cercato}"${conMeno}: si rimettono com'erano con ANNULLA_CAMBIO e l'id.]\n`
+      blocks.push(`[I cambi del filo che combaciano con "${cercato}"${conMeno}: si rimettono com'erano con filo(annulla) e l'id.]\n`
         + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
     }
     // #868.1 — l'utente ha cancellato qualcosa che questa ricerca aveva trovato: non c'è più, e non è «niente trovato».
