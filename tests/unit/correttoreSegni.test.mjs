@@ -124,8 +124,8 @@ test('una data che si può leggere in un altro modo non si segna: nel dubbio si 
   // Un orario o un numero che non è un anno non spengono il controllo.
   assert.deepEqual(date('mercoledì 9 ottobre 18:00').map((s) => s.pezzo), ['mercoledì 9 ottobre']);
   assert.deepEqual(date('ci vediamo mercoledì 9 ottobre, porto 2 amici').map((s) => s.pezzo), ['mercoledì 9 ottobre']);
-  // Un anno in un'altra riga non spegne il controllo: è una lettura in più (sotto, gli anni detti intorno).
-  assert.deepEqual(date('nel 2023 era diverso\nci vediamo mercoledì 9 ottobre').map((s) => s.pezzo), ['mercoledì 9 ottobre']);
+  // Un altro anno in un'altra riga: la data la giudica il controllo ragionato (sotto, gli anni detti intorno).
+  assert.deepEqual(date('nel 2023 era diverso\nci vediamo mercoledì 9 ottobre').map((s) => s.pezzo), []);
   // Con l'anno l'abbreviazione ambigua è una data.
   assert.deepEqual(date('venerdì 3 set 2026').map((s) => s.pezzo), ['venerdì 3 set 2026']);
   // Una barra seguita da un orario o da una congiunzione resta una data; il lapsus vicino a oggi resta segnato.
