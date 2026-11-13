@@ -49,6 +49,7 @@ test('r1 una proposta senza righe citate mostra «Vai al punto del filo», e la 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8000 });
   const t0 = Date.now() - 5 * 60 * 60 * 1000;
   expect(await proponi(app, { chat: 'cucina1', t0, utente: 'stasera cucino io', memoria: 'Le piace cucinare.' })).toBe(1);
+  console.log('PROPOSTE', JSON.stringify(await app.evaluate(() => globalThis.SN_COMPATTAZIONE.inAttesa())));
   const q = await openTab('filo://quaderno/quaderno.html');
   const proposta = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'Le piace cucinare.' });
   await expect(proposta).toHaveCount(1, { timeout: 10000 });
