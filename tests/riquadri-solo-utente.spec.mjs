@@ -6,7 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { nelMondoDiFilo, neiRiquadri, nelloStrato, statoDi, conta, clicca, scrivi, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, neiRiquadri, nelloStrato, statoDi, conta, clicca, scrivi, paginaDelloStrato, tastoSullaScheda, riquadriNelSito } from './helpers/riquadri.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
@@ -21,8 +21,8 @@ const ATTACCO = `<script>
   }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   window.cosaVede = () => document.documentElement.outerHTML + ' ' + window.__visti.join(' ');
   window.attacca = () => {
-    const host = document.querySelector('[data-sn-riquadro]');
-    const bersagli = [host, document.activeElement, ...document.querySelectorAll('button, textarea, input')].filter(Boolean);
+    const ospiti = [...document.querySelectorAll('[data-sn-riquadro]')];
+    const bersagli = [...ospiti, document.activeElement, ...document.querySelectorAll('button, textarea, input')].filter(Boolean);
     const file = new File([new Uint8Array([137, 80, 78, 71])], 'finto.png', { type: 'image/png' });
     for (const el of bersagli) {
       if (el.matches && el.matches('textarea, input') && el.id !== 'campo') el.value = 'scritto dal sito';
@@ -37,7 +37,7 @@ const ATTACCO = `<script>
     }
     for (const b of document.querySelectorAll('.sn-fb-send, .sn-popup-send, .sn-editbox-replace, [data-sc], .sn-rt-send')) b.click();
     const nostri = '[class*="sn-fb-"], [class*="sn-popup"], [class*="sn-editbox"], [class*="sn-rt-"]';
-    return { host: !!host, ombra: !!(host && host.shadowRoot), nostri: document.querySelectorAll(nostri).length };
+    return { host: ospiti.length > 0, ombra: ospiti.some((h) => !!h.shadowRoot), nostri: document.querySelectorAll(nostri).length };
   };
 </script>`;
 
@@ -217,8 +217,10 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   // Il tasto destro sulla selezione prepara già la sua spiegazione: si contano le chiamate da qui.
   const prima = await chiamateFerme(app);
 
+  // Sul campo del sito resta la radice chiusa del correttore (#2299), che lo script colpisce come le altre: la Modifica no.
   const esito = await page.evaluate(() => window.attacca());
-  expect(esito).toEqual({ host: false, ombra: false, nostri: 0 });
+  expect({ ombra: esito.ombra, nostri: esito.nostri }).toEqual({ ombra: false, nostri: 0 });
+  expect(await riquadriNelSito(app, page), 'la Modifica non sta nel documento del sito').toEqual([]);
   await page.waitForTimeout(800);
   expect(await chiamate(app)).toBe(prima);
 

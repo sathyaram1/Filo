@@ -3,7 +3,7 @@
 // lavora sulla pagina sotto chiedendo al suo frame principale. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { paginaDelloStrato } from './helpers/riquadri.mjs';
+import { paginaDelloStrato, riquadriNelSito } from './helpers/riquadri.mjs';
 import * as Gesti from './helpers/gestiVeri.mjs';
 
 const DOMANDA = 'zibaldone-segreto-15093 del mio conto';
@@ -69,11 +69,12 @@ const statoNellaBarra = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
   return t && t.aiuto ? t.aiuto.pannello : null;
 }, url);
 
-async function nienteAlSito(sito, parola) {
+async function nienteAlSito(app, sito, parola) {
   await sito.waitForTimeout(400);
   expect(await sito.evaluate(() => window.cosaHaVisto())).not.toContain(parola);
   expect(await sito.evaluate((s) => window.trova(s), parola)).toBe(false);
-  expect(await sito.evaluate(() => document.querySelector('.sn-sidebar, .sn-sidebar-conv, [data-sn-riquadro]')), 'nel documento del sito non entra il pannello').toBeNull();
+  expect(await sito.evaluate(() => document.querySelector('.sn-sidebar, .sn-sidebar-conv')), 'nel documento del sito non entra il pannello').toBeNull();
+  expect(await riquadriNelSito(app, sito), 'nel documento del sito non entra il pannello').toEqual([]);
 }
 
 test('Aiuto su un sito: la domanda scritta, selezionata e copiata e la risposta non le legge il sito', async ({ app, shell, openTab, testServer }) => {
@@ -86,7 +87,7 @@ test('Aiuto su un sito: la domanda scritta, selezionata e copiata e la risposta 
   await strato.keyboard.insertText(DOMANDA);
   await strato.keyboard.press('ControlOrMeta+A');
   await strato.keyboard.press('ControlOrMeta+C');
-  await nienteAlSito(sito, 'zibaldone');
+  await nienteAlSito(app, sito, 'zibaldone');
 
   await strato.keyboard.press('Enter');
   const risposta = strato.locator('.sn-sidebar-msg-assistant', { hasText: 'Risposta-riservata-15093' });
@@ -100,8 +101,8 @@ test('Aiuto su un sito: la domanda scritta, selezionata e copiata e la risposta 
   // La risposta selezionata e copiata: il sito non la vede.
   await risposta.click({ clickCount: 3 });
   await strato.keyboard.press('ControlOrMeta+C');
-  await nienteAlSito(sito, 'Risposta-riservata');
-  await nienteAlSito(sito, 'zibaldone');
+  await nienteAlSito(app, sito, 'Risposta-riservata');
+  await nienteAlSito(app, sito, 'zibaldone');
 
   // Chiuso dal suo ×, la barra laterale lo sa chiuso.
   await strato.locator('.sn-sidebar-close').click();
@@ -132,7 +133,7 @@ test('Aiuto su un sito: Filo apre la sezione sulla pagina, il passo indicato sta
   const n = await nota.boundingBox();
   expect(n.y + n.height <= b.y + 1 || n.y >= b.y + b.height - 1, 'la nota sta sopra o sotto il bottone').toBe(true);
   expect(Math.abs(n.x - Math.max(4, b.x))).toBeLessThan(2);
-  await nienteAlSito(sito, 'Nota-riservata');
+  await nienteAlSito(app, sito, 'Nota-riservata');
   const p = await strato.locator('.sn-sidebar').boundingBox();
   expect(b.x + b.width <= p.x || b.x >= p.x + p.width || b.y + b.height <= p.y || b.y >= p.y + p.height, 'il pannello copre il passo').toBe(true);
 
@@ -165,7 +166,7 @@ test('Aiuto su un sito: il testo proposto per un campo lo vede solo l\'utente, e
   await expect(accetta).toBeVisible({ timeout: 15_000 });
   await expect(strato.locator('.sn-nota-del-passo')).toContainText('Affitto-15093 ottobre');
   // Finché l'utente non accetta, il testo proposto il sito non lo vede.
-  await nienteAlSito(sito, 'Affitto-15093');
+  await nienteAlSito(app, sito, 'Affitto-15093');
   await expect(sito.locator('#causale')).toHaveValue('');
   // Un clic finto sul bottone, da codice, non lo accetta.
   await strato.evaluate(() => document.querySelector('.sn-highlight-accept').click());
