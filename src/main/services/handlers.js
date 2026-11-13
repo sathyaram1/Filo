@@ -5702,7 +5702,7 @@ function vediSchermoPerModello(action, res) {
   const nome = E.perCanaleSistema(String(o.finestra || (action && action._finestra && action._finestra.nome) || action.finestra || ''));
   if (o.spenta) {
     return 'Non ho guardato niente: l\'impostazione «Filo può guardare lo schermo» è spenta, e da spenta Filo non cattura nessuna finestra. '
-      + 'Proponi all\'utente di accenderla chiamando adesso IMPOSTA_PREFERENZA con chiave guarda_schermo e valore true: il sistema gli mostra '
+      + 'Proponi all\'utente di accenderla chiamando adesso impostazioni(imposta) con chiave guarda_schermo e valore true: il sistema gli mostra '
       + 'il popup e gli basta un clic. Non riprovare a guardare finché non è accesa.';
   }
   if (res && res.needsConfirm) {
