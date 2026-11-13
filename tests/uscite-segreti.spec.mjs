@@ -1109,7 +1109,7 @@ test('il codice nel titolo di una scheda aperta, che la chat ha davanti, non esc
   const activity = page.locator('.dash-activity').last();
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
-    .toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto dalle schede aperte/);
+    .toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto dai titoli delle schede aperte/);
   await page.waitForTimeout(500);
   expect(apertoVerso(app, RACCOLTA), 'l’indirizzo col codice del titolo si è aperto').toBe(false);
 });
