@@ -65,7 +65,7 @@
     },
     INSTALLA_AGGIORNAMENTO: {
       via: ['impostazioni', 'aggiorna'], risultato: true,
-      description: 'aggiorna Filo stesso: installa la versione nuova già scaricata, o la cerca e la scarica. Non ricarica la pagina.',
+      description: 'aggiorna Filo stesso alla versione nuova (non la pagina).',
       properties: {}, required: [],
     },
     RIMEDIO_CREDITI: {
