@@ -435,6 +435,6 @@
 
   global.SN_TRATTO_VIVO = {
     MAX_RIGHE_EVENTI, MAX_SITI, MAX_TITOLI, sezioniUtente, parteUtente, confronta, rendiCambiate, turniDi, eventiPerMessaggi,
-    rendiEventi, rendiPagine, rigaDi, preambolo, righeMemoria,
+    rendiEventi, rendiPagine, rigaDi, preambolo, righeMemoria, unisciDaFuori,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
