@@ -393,7 +393,7 @@
   // parte fissa e CONTESTO, la stessa misura della chat; `USO.base` vale per chi non la misura (la stima tipica nelle
   // Opzioni) e la sentinella la tiene vicina agli strumenti di oggi. Fra una compattazione e l'altra il tratto cresce dal
   // grezzo fino alla soglia dell'anticipo.
-  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 42000 });
+  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 11400 });
   // Fra una compattazione e l'altra: il grezzo che resta, quanto cresce il tratto prima della prossima, cosa riceve chi compatta.
   function ciclo({ soglia, base = USO.base, uso = USO } = {}) {
     const u = { ...USO, ...(uso || {}) };
