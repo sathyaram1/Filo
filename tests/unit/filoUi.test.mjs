@@ -137,6 +137,16 @@ test('ombra(): radice chiusa registrata, l\'host lo dice con un attributo, ombra
   assert.equal(UI.ombraDi(elemento(true)), null);
 });
 
+// #2460: l'ombra dei segni del correttore sta nel documento del sito, e lì l'attributo dice «un riquadro fuori dallo strato».
+test('ombra() di uno strato senza campi: registrata, ma l\'host non si dichiara riquadro', () => {
+  const host = elemento(true);
+  const radice = { tipo: 'radice' };
+  host.attachShadow = () => radice;
+  assert.equal(UI.ombra(host, { riquadro: false }), radice);
+  assert.equal(host.getAttribute(UI.RIQUADRO), null);
+  assert.equal(UI.ombraDi(host), radice);
+});
+
 test('bersaglio(): dall\'host scende al nodo sotto il puntatore, o al fuoco se il gesto è da tastiera', () => {
   const campo = { nome: 'campo' };
   const bottone = { nome: 'bottone' };

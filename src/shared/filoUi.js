@@ -157,10 +157,12 @@
   // non vede dentro) che il fuoco lì dentro è in un campo nostro; la radice resta raggiungibile solo da qui.
   const RIQUADRO = 'data-sn-riquadro';
   const ombre = new WeakMap();
-  function ombra(host) {
+  // Uno strato senza campi (i segni del correttore, #2460) non si dichiara riquadro: per gli spec l'attributo nel
+  // documento del sito vuol dire un riquadro fuori dallo strato sopra la scheda.
+  function ombra(host, { riquadro = true } = {}) {
     const radice = host.attachShadow({ mode: 'closed' });
     ombre.set(host, radice);
-    try { host.setAttribute(RIQUADRO, ''); } catch (_) {}
+    if (riquadro) try { host.setAttribute(RIQUADRO, ''); } catch (_) {}
     return radice;
   }
   function ombraDi(el) {
@@ -192,11 +194,11 @@
     try { foglio.replaceSync(testo); } catch (_) {}
     return [foglio];
   }
-  function stratoChiuso(stileHost, fogli) {
+  function stratoChiuso(stileHost, fogli, { riquadro = true } = {}) {
     const host = document.createElement('div');
     mark(host);
     host.style.cssText = stileHost;
-    const radice = ombra(host);
+    const radice = ombra(host, { riquadro });
     try { radice.adoptedStyleSheets = fogli; } catch (_) {}
     return { host, radice };
   }
@@ -278,7 +280,7 @@
     const out = [];
     try {
       out.push(...document.querySelectorAll(sel));
-      for (const host of document.querySelectorAll('[' + RIQUADRO + ']')) {
+      for (const host of document.querySelectorAll(SELECTOR)) {
         const r = ombre.get(host);
         if (r) out.push(...r.querySelectorAll(sel));
       }

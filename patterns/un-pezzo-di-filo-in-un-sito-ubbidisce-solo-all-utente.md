@@ -169,7 +169,8 @@ Il dizionario è uguale su tutti i siti, quindi faceva anche da impronta. Le reg
 - su un sito **gli strati del correttore** (specchio dei segni, valori dei segnaposti, lampi) stanno in un'ombra chiusa
   sola per documento (`casaDegliStrati` in `src/content/spellcheck.js`), fatta come quelle del menu e dei riquadri da
   `SN_FILO_UI.stratoChiuso` e `fogliChiusi`; sulle pagine `filo://` e nello strato dei riquadri restano nel documento,
-  dove non c'è uno script del sito;
+  dove non c'è uno script del sito. Il suo host non porta `data-sn-riquadro` (`{ riquadro: false }`): non ha campi, e
+  gli spec dei riquadri leggono quell'attributo nel documento del sito come un riquadro rimasto fuori dallo strato (#2460);
 - **si controlla solo il testo dell'utente**, non a tempo ma per provenienza (`diSito`, `soloDellUtente`): quello che
   batte (un `insertText` vale solo col carattere del tasto vero appena premuto lì: `execCommand` del sito è
   `isTrusted` anche lui), che incolla o trascina, che fa scrivere a Filo (`scriveFilo`, o un evento `nostro`), e
