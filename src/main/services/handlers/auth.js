@@ -1435,7 +1435,6 @@ module.exports = function register(on, ctx) {
       // per sempre proprio quelle che non ha guardato.
       if (chiusiLetti) await segnaSincroRiuscita();
       if (plan.upsert.length || plan.remove.length) {
-        cardsCache = { at: 0, rows: [] };
         // Le schede sono appena cambiate: anche la cache della lettura completa non vale più.
         if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
         console.log('[feedback] vista pubblica aggiornata:',
