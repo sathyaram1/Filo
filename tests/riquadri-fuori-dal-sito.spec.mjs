@@ -62,7 +62,7 @@ async function nienteAlSito(app, p, sel, testo) {
   await p.waitForTimeout(400);
   expect(await p.evaluate(() => window.cosaHaVisto())).not.toContain(testo.split(' ')[0]);
   expect(await p.evaluate((s) => window.trova(s), testo.split(' ')[0])).toBe(false);
-  expect(await p.evaluate(() => document.querySelector('[data-sn-riquadro]')), 'nel documento del sito non entra niente').toBeNull();
+  expect(await riquadriNelSito(app, p), 'nel documento del sito non entra niente').toEqual([]);
   return strato;
 }
 
