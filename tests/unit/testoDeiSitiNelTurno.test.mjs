@@ -40,7 +40,7 @@ test('un turno con una visita titolata nel blocco ha testo di sconosciuti, e il 
 
 test('i titoli del contesto non cambiano lo stato del compito: quello aspetta la scelta dell\'owner', () => {
   assert.equal(AL.fonteDi(dalBlocco()), null);
-  assert.equal(risposta({ type: 'SALVA_LEZIONE', testo: 'L’utente vuole inoltrare le mail.' }, { azioni: [dalBlocco()] }), 'si');
+  assert.equal(risposta({ type: 'SALVA_LEZIONE', testo: 'L’utente vuole inoltrare le mail.' }, { azioni: [dalBlocco()], guardiano: true }), 'si');
 });
 
 test('dopo un titolo nel blocco, un indirizzo con un blocco di dati codificato è un\'uscita sospetta; prima no', () => {
