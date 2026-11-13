@@ -69,7 +69,7 @@ const statoNellaBarra = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
   return t && t.aiuto ? t.aiuto.pannello : null;
 }, url);
 
-async function nienteAlSito(app, sito,parola) {
+async function nienteAlSito(app, sito, parola) {
   await sito.waitForTimeout(400);
   expect(await sito.evaluate(() => window.cosaHaVisto())).not.toContain(parola);
   expect(await sito.evaluate((s) => window.trova(s), parola)).toBe(false);
