@@ -103,11 +103,6 @@ test('Automazioni: due card, una in volo e l’altra con voci chiuse; rilettura 
       richiesta('d'.repeat(24), 'x2', 1685, { blocks: [{ gate: 'g1', gruppo: 'capacita', label: 'A', voci: vociLunghe(3, 'r'), more: 0 }, { gate: 'g2', gruppo: 'contenuto', label: 'B', voci: vociLunghe(16, 's'), more: 0 }] }),
     ],
   }, 'manuale');
-  await page.evaluate(async () => {
-    const { apriScheda } = { apriScheda: null };
-    return apriScheda;
-  });
-  const { apriScheda } = await import('../../helpers/gestione.mjs');
   await apriScheda(page, 'automation');
   const cards = page.locator('#mgMergeApprovalsOrphans .sn-mac-card, .sn-mac-card');
   const c1 = page.locator('.sn-mac-card[data-request-id="' + 'c'.repeat(24) + '"]').first();
