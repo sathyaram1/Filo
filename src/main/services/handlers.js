@@ -5652,8 +5652,8 @@ function pageReadsForPrompt(actions) {
         + 'Se il dato non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
     }
     if (out.soloJavaScript) {
-      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
-        + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';
+      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con scheda(apri) con '
+        + 'background: true e poi rileggila con web(leggi), che la legge dalla scheda.]';
     }
     if (out.sospetto) {
       blocco += `\n[Il rilevatore di siti pericolosi considera questo sito sospetto (${E.perCanaleSistema(out.sospetto)}): usa i dati `
