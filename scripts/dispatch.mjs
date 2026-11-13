@@ -1151,6 +1151,7 @@ export function buildPayload(bucket, ctx = {}) {
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRamoVuoto(ctx),
       };
     }
     case 'new-work': {
