@@ -2411,8 +2411,9 @@ function segnaTestoNellAiuto(sender, { immagini = false } = {}) {
     : { classe: 5, campo: null, chiave: 'aiuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
 }
 // Una pagina di Filo che l'Aiuto legge vale lettura, salvo quelle che mostrano solo cose di Filo e tue: nomi di file,
-// titoli e segnalazioni li scrivono altri, e una pagina nuova parte sporca finché non entra qui (#1840).
-const PAGINE_DI_FILO_SOLO_TUE = Object.freeze(['preferences', 'options', 'security', 'quaderno', 'editor', 'novita', 'credits', 'transparency', 'menu']);
+// titoli e segnalazioni li scrivono altri, e una pagina nuova parte sporca finché non entra qui (#1840). Sicurezza no:
+// mostra gli appunti copiati e i titoli delle pagine visitate.
+const PAGINE_DI_FILO_SOLO_TUE = Object.freeze(['preferences', 'options', 'quaderno', 'editor', 'novita', 'credits', 'transparency', 'menu']);
 function segnaPaginaDiFiloNellAiuto(sender) {
   const url = String(sender?.tab?.url || sender?.url || '');
   const m = /^filo:\/\/([^/?#]+)/i.exec(url);
