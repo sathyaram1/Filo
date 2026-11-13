@@ -512,9 +512,13 @@
       // però non torna avanti se c'era già: una Gestione nascosta da ore deve
       // ricevere al rientro quello che è cambiato mentre non guardava.
       // `righe` e `readTime` (della prima pagina): al primo allineamento danno l'ora del server e le versioni in mano.
-      allineato(at, righe, readTime) {
+      // `pienoAt`: una lista ricomposta dalla copia su disco più i cambiati vale come controllo, non come
+      // riallineamento: il prossimo completo si conta dall'ultima lettura intera.
+      allineato(at, righe, readTime, pienoAt) {
         const t = Number(at) || now();
-        lastReconcileAt = Math.max(lastReconcileAt, t);
+        lastReconcileAt = Math.max(lastReconcileAt, Number(pienoAt) || t);
+        lastControlloAt = Math.max(lastControlloAt, t);
+        if (Array.isArray(righe) && righe.length) noti = new Set(righe.filter((r) => r && r._id).map((r) => String(r._id)));
         if (lastTickAt) return;
         lastTickAt = t;
         vedi(righe, readTime);
