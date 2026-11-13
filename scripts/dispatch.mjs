@@ -2670,8 +2670,7 @@ async function finalizeBucket(bucket, fromServer) {
     if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
   }
   const ctx = serverCtx(bucket, fromServer, diff);
-  // Un lavoro server porta le sue modifiche nel diff del server: lì un'app senza modifiche non dice niente.
-  if ((bucket.role === 'verifier' || bucket.role === 'fixer') && !ctx.lavoroServer && ramoSenzaModifiche()) ctx.ramoVuoto = true;
+  segnaRamoVuoto(bucket, ctx);
 
   emit(bucket, ctx);
   return { exit: 0 };
