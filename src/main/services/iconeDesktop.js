@@ -711,7 +711,7 @@ function esitoPerModello(o) {
     if (o && o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
     const s = o || spiega('sconosciuto');
     const apri = s.apri ? ' Sotto la tua risposta l\'utente trova il tasto che apre quelle impostazioni: diglielo.' : '';
-    const resto = s.cambio ? ` Qualcosa sul desktop è cambiato lo stesso: si rimette com'era con ANNULLA_CAMBIO, id ${s.cambio}.` : '';
+    const resto = s.cambio ? ` Qualcosa sul desktop è cambiato lo stesso: si rimette com'era con filo(annulla), id ${s.cambio}.` : '';
     return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${apri} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
   }
   if (o.vuoto) return 'Sul desktop non ci sono icone: niente da mettere in ordine.';
