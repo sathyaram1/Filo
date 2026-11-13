@@ -99,7 +99,7 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti, strument
     `un file letto lì per Edit non è letto qui, e la modifica viene rifiutata (#2188).`,
     '',
     `Dove il prompt con cui sei partito e queste istruzioni dicono cose diverse, valgono queste.${copia}`,
-    'Il «primo piano» che il prompt chiede è il tuo lancio: i tuoi comandi lunghi vanno in sottofondo, come dice «Comandi lunghi».',
+    'Il «primo piano» che il prompt chiede vale per il tuo lancio, non per i tuoi comandi: quelli lunghi vanno in sottofondo.',
   ];
   if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {
