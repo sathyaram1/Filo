@@ -2299,7 +2299,7 @@
         + `- Ma un «no grazie», «magari dopo», «non ora» che risponde a una tua PROPOSTA (l'accesso Google, il tema scuro, un approfondimento) rifiuta QUELLA proposta, non l'accoglienza: prendine atto in mezza riga, spunta la voce e vai avanti con quelle che restano. NON chiudere.\n`
         + `- Quando l'elenco è finito, chiudi con filo_su_di_se(intervista) {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
         + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 7}. All'ultimo chiudi, a meno che sia l'utente a voler continuare.\n`
-        + `Lo strumento ONBOARDING vale solo adesso (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true, quella della privacy con privacy: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
+        + `filo_su_di_se(intervista) vale solo adesso (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true, quella della privacy con privacy: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
     // Le parti del CONTESTO della chat (blocco 3), una funzione per sezione: le mette in fila e le confronta
