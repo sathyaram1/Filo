@@ -7,6 +7,7 @@ import { clickConfirm, confirmText, CONFIRM_HOST, fillConfirmInput, scrollConfir
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
@@ -34,9 +35,6 @@ async function modelliFinti(app) {
 }
 
 const mandato = (app) => app.evaluate(() => globalThis.__mandato.slice());
-// Il livello di privacy (#1589) come lo scrive Sicurezza.
-const livelloPrivacy = (app, livello, altro = {}) => app.evaluate(({}, p) => globalThis.SN_STORAGE.updateSettings({ security: { privacy: p } }),
-  { livello, ...altro });
 // Nel mondo dei content script della scheda (quello del preload): come lo chiama Filo dopo uno screenshot o una copia.
 const nelContenutoDi = (app, titolo, codice) => app.evaluate(async ({ BrowserWindow }, { titolo, codice }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;

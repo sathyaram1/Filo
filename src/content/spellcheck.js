@@ -2546,7 +2546,8 @@
   }
 
   // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
-  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
+  // CHIEDI_PRIMA è il livello di privacy (#1589) che la ferma prima: per chi scrive è la stessa pagina che non cerca da sola.
+  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', CHIEDI_PRIMA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
 
   // I contatori dei segnaposti (#1586): da dove viene il valore e che fine fa, mai la domanda né il valore. La ricerca
   // che una pagina delicata non lascia partire, e quella chiesta poi col clic, sono anche il costo della privacy.
@@ -2579,7 +2580,8 @@
           pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}),
           ...(cerca.prima ? { giaLette: { domanda: cerca.prima.domanda, dove: cerca.prima.dove } } : {}),
         },
-      }, { giorno: new Date().toDateString() });
+        // Il clic è un gesto: anche fuori, perché livello di privacy e tetto delle automatiche guardano lì (#2466).
+      }, { giorno: new Date().toDateString(), suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, segnaposto:', err);
     }

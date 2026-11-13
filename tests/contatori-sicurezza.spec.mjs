@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera } from './helpers/avvisoSito.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const sicurezza = (app) => app.evaluate(async () => {
@@ -107,7 +108,8 @@ test('un sito sospetto: «Continua» si conta col livello dell’avviso', async 
   expect(await statoContatori(app)).not.toContain('area-riservata-contatori');
 });
 
-test('chiusa una pagina con un campo password, il riassunto fermato si conta sotto «campi»', async ({ app, shell, openTab, testServer }) => {
+test('a «Chiedi sulle delicate», chiusa una pagina con un campo password, il riassunto fermato si conta sotto «campi»', async ({ app, shell, openTab, testServer }) => {
+  await livelloPrivacy(app, 'delicate');
   await testServer.openReady(openTab,
     '<!doctype html><html><head><title>Il mio conto</title></head><body><p>Saldo</p><form><input name="u"><input type="password" name="pw"></form></body></html>',
     { pubblico: true });
