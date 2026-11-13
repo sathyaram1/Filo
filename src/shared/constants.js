@@ -2297,7 +2297,7 @@
         + `- Ogni volta che hai scoperto o detto una voce, chiama nello STESSO turno filo_su_di_se(intervista) con {"spunta": ["id", …]}. Se non la spunti, te la ritrovi davanti al turno dopo.\n`
         + `- Se l'utente chiede di CHIUDERE l'accoglienza («basta così», «salta», «non ho voglia di rispondere a queste domande»), chiudi SUBITO con filo_su_di_se(intervista) {"fine": true}: niente insistenze, i valori predefiniti vanno benissimo.\n`
         + `- Ma un «no grazie», «magari dopo», «non ora» che risponde a una tua PROPOSTA (l'accesso Google, il tema scuro, un approfondimento) rifiuta QUELLA proposta, non l'accoglienza: prendine atto in mezza riga, spunta la voce e vai avanti con quelle che restano. NON chiudere.\n`
-        + `- Quando l'elenco è finito, chiudi con ONBOARDING {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
+        + `- Quando l'elenco è finito, chiudi con filo_su_di_se(intervista) {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
         + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 7}. All'ultimo chiudi, a meno che sia l'utente a voler continuare.\n`
         + `Lo strumento ONBOARDING vale solo adesso (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true, quella della privacy con privacy: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
