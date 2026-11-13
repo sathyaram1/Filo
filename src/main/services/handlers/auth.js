@@ -1415,8 +1415,8 @@ module.exports = function register(on, ctx) {
       const scartate = decifrati.length !== feedbacks.length;
       const complete = !scartate && (schedeCoperte || base.length < FB.LIST_PAGE_SIZE);
       const plan = V.planSync(published, feedbacks, { complete });
-      for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
-      for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
+      for (const { id, card } of plan.upsert) { await FB.publishPublicCard(id, card, { idToken }); schedeInMano.scritta(id, card); }
+      for (const id of plan.remove) { await FB.unpublishPublicCard(id, { idToken }); schedeInMano.tolta(id); }
 
       // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
       // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
