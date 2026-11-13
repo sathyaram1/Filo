@@ -1057,6 +1057,8 @@ module.exports = function register(on, ctx) {
       // Letti dal modulo, non dalle sue costanti: gli spec accorciano i tempi.
       pollMs: LIVE.POLL_MS,
       reconcileMs: LIVE.RECONCILE_MS,
+      controlloMs: LIVE.CONTROLLO_MS,
+      seguitiMs: LIVE.SEGUITI_MS,
       onWarn: (m) => console.warn('[feedback] giro:', m),
       seguiti: () => {
         const out = new Set();
