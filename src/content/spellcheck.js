@@ -801,7 +801,7 @@
       primaDelGesto: null, intento: null, taglio: 0,
       proprietari: new Map(), proprietariCaratteri: 0,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
-      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
+      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null, dateDaGiudicare: [],
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
       baseRapido: '', baseRagionato: '',
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
