@@ -46,12 +46,7 @@
     },
     IMPOSTA_ESTETICA: {
       via: ['impostazioni', 'aspetto'],
-      description: () => {
-        const T = modulo('SN_THEME_TOKENS', './themeTokens.js');
-        const nomi = T && typeof T.names === 'function' ? T.names().join(', ') : '';
-        return 'un token estetico dell\'interfaccia di Filo, subito. Scegli tu un valore concreto: colore #rrggbb, misura "8px", opacità 0-1, durata "450ms", motion moltiplicatore 0-3 ("0" toglie le animazioni), font "Georgia, serif"; "predefinito" torna di serie.'
-          + (nomi ? ` Token: ${nomi}.` : '');
-      },
+      description: 'un token dell\'aspetto di Filo (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Scegli tu un valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
       properties: { token: S(), valore: S() }, required: ['token', 'valore'],
     },
     PULSANTE_PREFERENZE: {
