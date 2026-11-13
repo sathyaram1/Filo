@@ -5960,7 +5960,7 @@ function dopoPulsante(o) {
   if (o.sistema) return ' La frase la legge adesso la pagina della chat con la voce di riserva del sistema, con velocità e tono salvati.';
   if (o.voce) {
     return ' La frase la legge adesso la pagina della chat; se la voce naturale non è disponibile si sente quella del '
-      + 'sistema e un avviso dice perché. Per sceglierla si usa IMPOSTA_PREFERENZA voce_modello.';
+      + 'sistema e un avviso dice perché. Per sceglierla si usa impostazioni(imposta) voce_modello.';
   }
   if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con IMPOSTA_PREFERENZA.';
   if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (IMPOSTA_PREFERENZA suono_notifiche).';
