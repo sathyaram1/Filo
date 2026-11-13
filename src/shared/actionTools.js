@@ -70,7 +70,7 @@
     },
     RIMEDIO_CREDITI: {
       via: ['impostazioni', 'crediti'], risultato: true,
-      description: 'i rimedi dell\'avviso crediti: modello (modelli più economici) o automatiche (spegne le funzioni automatiche che consumano). elenca dice la situazione e quanto consuma cosa.',
+      description: 'i rimedi dell\'avviso crediti: modello (più economici) o automatiche (spente); elenca dice chi consuma.',
       properties: { operazione: S({ enum: ['applica', 'annulla', 'elenca'] }), rimedio: S({ enum: ['modello', 'automatiche'] }) },
       required: ['operazione'],
     },
