@@ -484,8 +484,8 @@
         }
       } else if (type === 'BLUETOOTH' || type === 'WIFI') {
         // I nomi di reti e dispositivi li sceglie chi li possiede, anche un vicino (#2305): come nella sezione SISTEMA.
-        const nomi = [out.dispositivo, out.rete, ...(Array.isArray(out.candidati) ? out.candidati : []),
-          ...(Array.isArray(out.elenco) ? out.elenco.map((x) => x && x.nome) : [])].map(testo).filter((t) => t.trim());
+        if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
+        const nomi = global.SN_SISTEMA.nomiLetti(out);
         if (nomi.length) { nonFidato = true; daFuori(nomi.join('\n'), 'dai nomi di reti e dispositivi'); }
       } else if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
