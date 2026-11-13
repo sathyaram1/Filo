@@ -285,7 +285,7 @@ describe('quale tentativo precedente si riprende', () => {
       const c = chiudiSuperatiOvunque({ root: casa, num: '#1141', id: conCancello });
       assert.equal(c.ok, true, c.errore);
       assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', conFinish), ramo('20261012T000000Z', conCancello), ramo('20261013T000000Z', conCancello)].sort());
-      assert.equal(git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*').split('\t')[0], vivo, 'resta solo il lavoro vivo');
+      assert.equal(git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*'), `${vivo}\trefs/heads/${ramo('20261101T000000Z')}`, 'resta solo il lavoro vivo');
     } finally { togliCartella(base); }
   });
 
