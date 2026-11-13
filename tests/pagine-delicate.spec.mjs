@@ -7,6 +7,7 @@ import { clickConfirm, confirmText, CONFIRM_HOST, fillConfirmInput, scrollConfir
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
