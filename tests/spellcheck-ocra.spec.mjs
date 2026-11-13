@@ -486,8 +486,7 @@ for (const [nome, campo] of [
 
 // #1115.2, risposta dell'owner a D-152: con un altro anno scritto nella pagina la data la giudica il controllo ragionato,
 // che riceve il calendario di ogni anno possibile. Il 9 ottobre 2024 era mercoledì; vicino a oggi il 9 ottobre non lo è.
-// «perchè» si segna subito come errore: quando c'è, il controllo delle date è già passato sullo stesso testo.
-const errore = (page) => page.locator('.sn-spell-overlay .sn-errore');
+// Quando il controllo ragionato parte, il codice ha già guardato lo stesso testo.
 const NOMI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 // Il 9 ottobre più vicino a oggi, come lo legge il codice.
 function noveOttobreVicino() {
