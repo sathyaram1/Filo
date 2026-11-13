@@ -88,16 +88,24 @@ Un biglietto nuovo dopo un tentativo morto prima di consegnare non porta ramo
 dalla punta dell'ultimo tentativo `worker/<id>-*` rimasto su origin con commit
 fuori da main, e la busta lo dice al lavoratore (`payload.ripartenza`). Il ramo
 superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
+Il ramo ripartito porta dentro subito il main di adesso, se si fonde senza
+conflitti; se no la busta elenca i file in conflitto
+(`ripartenza.conflittiConMain`) e chi lavora li risolve per primi (#2152.1).
 Un tentativo più vecchio dell'ultimo lavoro dello stesso feedback arrivato su
 main è superato anche se nessuno l'ha fuso (un feedback riaperto): non si
 riprende. Arrivato è un tentativo fuso con commit suoi (uno nato da main e mai
-scritto ha la punta sulla linea principale e non conta) o la fusione
-`merge-gate: #N` letta su main, che regge anche dopo la potatura del ramo fuso.
-A ogni lavoro nuovo dispatch toglie da origin i superati di tutti i feedback,
-anche di quelli chiusi che non ripartiranno. La regola è una sola
-(`scripts/lib/tentativi.mjs`), con la scelta del tentativo vivo: l'elenco dei
-rami in corso del manutentore mostra quello che la ripresa sceglierebbe.
-Se origin non risponde, guasto temporaneo: non si rifà da main.
+scritto ha la punta sulla linea principale e non conta) o una fusione letta su
+main (`fusioniSuMain` in `scripts/lib/su-main.mjs`), che regge anche dopo la
+potatura del ramo fuso: `finish: worker/<id>-<stampo>` nomina il tentativo,
+`merge-gate: #N` solo il numero, che si traduce in id dove lo si conosce (il
+feedback che riparte; nell'elenco del manutentore, l'indice dei feedback aperti).
+A ogni lavoro nuovo dispatch toglie da origin i superati di tutti i feedback
+con la stessa regola. Resta fuori un feedback chiuso fuso con `merge-gate`
+il cui ramo fuso è già potato: da qui il suo id non si ricava, lo sa il server.
+La regola è una sola (`scripts/lib/tentativi.mjs`), con la scelta del
+tentativo vivo: l'elenco dei rami in corso del manutentore mostra quello che la
+ripresa sceglierebbe. Se origin non risponde, guasto temporaneo: non si rifà da
+main.
 
 ### Niente worktree separati nelle routine
 
