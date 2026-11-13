@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera } from './helpers/avvisoSito.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const sicurezza = (app) => app.evaluate(async () => {
