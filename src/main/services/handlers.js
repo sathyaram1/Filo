@@ -5357,7 +5357,7 @@ function chatSearchesForPrompt(actions) {
         testo: lines.join('\n'),
         conIntestazione: true,
       })
-      + '\n[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]',
+      + '\n[Per rileggerne una per intero richiama filo(cerca) con il suo id.]',
     );
   }
   return blocks.join('\n\n').trim();
