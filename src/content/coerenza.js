@@ -108,9 +108,12 @@
     const dopo = intero.slice(fine, fine + 80).split(FINE_FRASE)[0];
     return INDIZIO_ANNO.test(prima) || INDIZIO_ANNO.test(dopo) || ANNO_ATTACCATO.test(dopo);
   }
-  // Gli anni che dice la pagina intorno a una data senza anno (un'altra riga del campo, la conversazione, il titolo):
-  // giusta in uno di loro non si segna, e il più vicino entro ANNO_VICINO è la prima lettura proposta (#1115.2).
-  const ANNO_VICINO = 600;
+  // Gli anni che dice la pagina intorno a una data senza anno (un'altra riga del campo, la conversazione, il titolo).
+  // Uno diverso da quello di oggi può dire l'anno della data («Diario 2024») o altro («Menu autunno 2023»): lo distingue
+  // solo chi legge la frase, quindi il codice tace e la data va al controllo ragionato (#1115.2, risposta a D-152).
+  // Al modello vanno gli ANNI_AL_MODELLO più vicini alla data, ognuno con la riga della pagina che lo dice.
+  const ANNI_AL_MODELLO = 8;
+  const RIGA_ANNO_MAX = 120;
   // Non è l'anno di una data l'anno dei diritti nel piè di pagina («© 2024»), quello da cui parte o fin dove arriva un
   // periodo («dal 1999», «2015-2024»): la pagina lo dice per altro (#1115.2).
   const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(?<![€$£]\s)(?<!(?:(?<!\p{L})(?:dal|since|desde|depuis|seit|until|till|fino al)|©|\(c\)|copyright)\s*)(?<!\d{4}\s*[-–—/]\s*)(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*[-–—/]\s*\d{4}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
