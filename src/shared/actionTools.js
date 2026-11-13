@@ -325,7 +325,7 @@
     },
     LEGGI_PAGINA: {
       via: ['web', 'leggi'], risultato: true,
-      description: 'il testo di una pagina (url, o scheda: il numero di una scheda aperta), anche quello chiuso in pannelli; da per il seguito di una pagina lunga; cerca_nel_sito come per scheda apri.',
+      description: 'il testo di una pagina (url, o scheda aperta per numero), anche le parti chiuse; da: il seguito.',
       properties: { url: S(), scheda: I(), da: I(), cerca_nel_sito: S() }, required: [],
     },
 
