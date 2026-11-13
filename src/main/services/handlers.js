@@ -6091,7 +6091,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const o = res.output;
     if (o.nessuna) return 'Niente messo in pausa: nessuna scheda sta suonando. Dillo all\'utente in una riga.';
     if (o.error) return `Niente messo in pausa: ${o.error}.`;
-    return conTitolo('Messa in pausa. Dillo in una riga; «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.', o.titolo);
+    return conTitolo('Messa in pausa. Dillo in una riga; «rimettimi la musica» la fa ripartire con scheda(riprendi_audio).', o.titolo);
   }
   if (type === 'MOSTRA_SCHEDA' && res.output && !res.needsConfirm) {
     const o = res.output;
