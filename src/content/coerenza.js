@@ -359,7 +359,7 @@
         const letture = [[secondo, primo], [primo, secondo]]
           .filter(([g, m]) => Number(g) >= 1 && Number(g) <= 31 && Number(m) >= 1 && Number(m) <= 12)
           .map(([g, m]) => verifica({ ...base, numero: [g, 0, ''], mese: Number(m) - 1 }));
-        if (letture.length && letture.every(Boolean)) out.push({ ...letture[0], correzioni: [] });
+        if (letture.length && letture.every(Boolean)) out.push(letture.find((l) => l.daGiudicare) || { ...letture[0], correzioni: [] });
       }
       if (motore.relativa) {
         for (const m of testo.matchAll(motore.relativa)) {
