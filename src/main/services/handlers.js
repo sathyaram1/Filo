@@ -5725,7 +5725,7 @@ function vediSchermoPerModello(action, res) {
   }
   if (Array.isArray(o.elenco)) {
     return `Finestre che si possono guardare adesso:\n${finestre(o.elenco)}${nota}\n`
-      + 'Richiama VEDI_SCHERMO con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
+      + 'Richiama computer(guarda) con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
       + 'chiediglielo elencando le candidate.';
   }
   if (o.errore) return `Non ho potuto guardare «${nome}»: ${E.perCanaleSistema(o.errore)}. Dillo all'utente in una riga, senza inventare cosa c'era.`;
