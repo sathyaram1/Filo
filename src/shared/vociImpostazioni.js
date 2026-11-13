@@ -285,13 +285,15 @@
   }
 
   // ── Le voci per la chat ────────────────────────────────────────────────────
-  // Come la chat la cambia: la chiave di IMPOSTA_PREFERENZA, o il token di IMPOSTA_ESTETICA.
+  // Come la chat la cambia: la chiave di impostazioni(imposta) coi valori ammessi, o il token di impostazioni(aspetto).
   function chiaveDi(percorso) {
-    if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false };
-    if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
+    if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false, ammessi: '' };
+    if (percorso.startsWith('themeTokens.')) return { come: `impostazioni(aspetto) token ${percorso.slice(12)}`, chiave: '', conferma: false, ammessi: '' };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
+    if (!s) return { come: '', chiave: '', conferma: false, ammessi: '' };
+    const aiuto = typeof s.aiuto === 'function' ? s.aiuto({}) : s.aiuto;
+    return { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2, ammessi: String(aiuto || '') };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);
