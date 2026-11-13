@@ -608,6 +608,27 @@ function puntaDellaCartella() {
   }
 }
 
+// Scaricato adesso: una copia vecchia potrebbe essere la base del commit verificato, e la consegna passerebbe senza rebase.
+// '' se non si scarica: la consegna allora chiede l'ultimo main, come prima di #2236.
+export function mainAllaPresa(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['fetch', '--quiet', 'origin', refspecMain(main)], { cwd: root, stdio: 'ignore', timeout: 120000 });
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Il ramo non porta niente rispetto alla sua base con main (#1363): false anche se git non risponde. */
+export function ramoSenzaModifiche(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['diff', '--quiet', `refs/remotes/origin/${main}...HEAD`], { cwd: root, stdio: 'ignore' });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /**
  * `--ferma` da solo non ferma niente: è la domanda che blocca a fermare il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
