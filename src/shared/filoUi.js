@@ -194,11 +194,11 @@
     try { foglio.replaceSync(testo); } catch (_) {}
     return [foglio];
   }
-  function stratoChiuso(stileHost, fogli) {
+  function stratoChiuso(stileHost, fogli, { riquadro = true } = {}) {
     const host = document.createElement('div');
     mark(host);
     host.style.cssText = stileHost;
-    const radice = ombra(host);
+    const radice = ombra(host, { riquadro });
     try { radice.adoptedStyleSheets = fogli; } catch (_) {}
     return { host, radice };
   }
