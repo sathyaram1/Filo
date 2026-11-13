@@ -105,7 +105,7 @@
       kind: 'scoprire',
       label: 'Se Filo può mandare numeri senza contenuto per migliorare',
       detail: 'Quante volte si usa ogni funzione, quanto si aspetta, cosa non va: solo numeri, mai testi, indirizzi o nomi di file, con uno pseudonimo che cambia ogni mese. Spenti, non esce niente.',
-      applica: 'Diglielo in una riga con parole tue e nello stesso turno emetti ONBOARDING con "contatori": true: sotto la tua risposta compaiono Sì e No, e sceglie lui con un clic, che ti arriva come suo messaggio già applicato. Se invece risponde a parole, applica tu quello che ha detto con IMPOSTA_PREFERENZA, chiave "contatori" e valore true o false; se non si capisce, rimostra la scelta. Spunta la voce quando ha scelto, col clic o a parole, non nel turno in cui mostri la scelta.',
+      applica: 'Diglielo in una riga con parole tue e nello stesso turno chiama filo_su_di_se(intervista) con "contatori": true: sotto la tua risposta compaiono Sì e No, e sceglie lui con un clic, che ti arriva come suo messaggio già applicato. Se invece risponde a parole, applica tu quello che ha detto con impostazioni(imposta), chiave "contatori" e valore true o false; se non si capisce, rimostra la scelta. Spunta la voce quando ha scelto, col clic o a parole, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'modelli',
