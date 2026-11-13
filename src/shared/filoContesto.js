@@ -175,7 +175,7 @@
     const coda = s.slice(-Math.floor(max * 0.4));
     const tolti = s.length - testa.length - coda.length;
     const id = /^[\w.:-]{1,80}$/.test(String(chat || '')) ? String(chat) : '';
-    const come = id ? `CERCA_CHAT con id "${id}", a pezzi con \`da\`` : 'CERCA_CHAT';
+    const come = id ? `filo(cerca) con id "${id}", a pezzi con \`da\`` : 'filo(cerca)';
     return `${testa}\n…(${tolti} caratteri di questo messaggio non sono qui: si rileggono interi con ${come})…\n${coda}`;
   }
 
