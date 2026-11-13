@@ -63,7 +63,7 @@
       if (x && stringa(x.chiave)) {
         metti(`STATO:${x.chiave}`, x.testo, {
           stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}),
-          ...(unisciDaFuori(x.daFuori || []).length ? { daFuori: unisciDaFuori(x.daFuori) } : {}),
+          ...conDaFuori(x.daFuori),
         });
       }
     }
@@ -71,8 +71,8 @@
     const lista = Array.isArray(filesList) ? filesList.filter((f) => f && stringa(String(f.id || ''))) : null;
     const perId = lista ? lista.map((f) => [String(f.id), `- [${f.id}] ${f.title}: ${f.summary}`]) : null;
     // Titoli e riassunti dei file dell'Editor: un appunto lo può scrivere un modello che leggeva una pagina (#592.4).
-    const dalleNote = perId ? unisciDaFuori([{ testi: perId.map(([, r]) => E().neutralizza(r, { unaRiga: true })), fonte: 'dai file dell\'editor' }]) : [];
-    metti('FILE', P().filoChatFile(files), { ...(perId ? { perId } : {}), ...(dalleNote.length ? { daFuori: dalleNote } : {}) });
+    const dalleNote = perId ? [{ testi: perId.map(([, r]) => E().neutralizza(r, { unaRiga: true })), fonte: 'dai file dell\'editor' }] : [];
+    metti('FILE', P().filoChatFile(files), { ...(perId ? { perId } : {}), ...conDaFuori(dalleNote) });
     return out;
   }
 
