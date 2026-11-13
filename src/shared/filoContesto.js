@@ -217,7 +217,7 @@
     const dove = r.ts || r.chat ? ` ${intestazione(r.ts, r.chat)}` : '';
     const di = r.role === 'user' ? 'a un suo messaggio' : 'al tuo messaggio';
     if (r.esterno) {
-      const come = r.chat ? `: si rilegge con CERCA_CHAT e l'id "${r.chat}"` : '';
+      const come = r.chat ? `: si rilegge con filo(cerca) e l'id "${r.chat}"` : '';
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
