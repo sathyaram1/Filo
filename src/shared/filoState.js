@@ -295,8 +295,8 @@
     return out;
   }
 
-  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta.
-  // `nomi`: quelli in busta, come li legge il modello.
+  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta (`nomi`,
+  // come li legge il modello).
   function righeSistema(sistema) {
     const out = ['SISTEMA (letto dal computer adesso, senza modello: «quanta batteria ho?», «sono online?», «il Bluetooth è acceso?» si rispondono da qui)'];
     const Sis = global.SN_SISTEMA;
