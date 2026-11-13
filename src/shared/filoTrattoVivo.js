@@ -13,9 +13,23 @@
   }
   const stringa = (s) => typeof s === 'string' && s.length > 0;
 
+  // Gruppi `{ testi, fonte }` del testo di altri, uniti per fonte senza doppioni: l'ingresso di CONTESTO_DAI_SITI
+  // (urlExfil.js), che ogni sezione e ogni preambolo dichiara col suo `daFuori` (#2305).
+  function unisciDaFuori(...liste) {
+    const perFonte = new Map();
+    for (const g of liste.flat()) {
+      if (!g || !Array.isArray(g.testi)) continue;
+      const fonte = String(g.fonte || '');
+      if (!perFonte.has(fonte)) perFonte.set(fonte, new Set());
+      for (const t of g.testi) if (typeof t === 'string' && t.trim()) perFonte.get(fonte).add(t);
+    }
+    return [...perFonte].filter(([, s]) => s.size).map(([fonte, s]) => ({ testi: [...s], fonte }));
+  }
+
   // ── Il CONTESTO dell'utente (blocco 3) ─────────────────────────────────────
   // Una sezione: `chiave`, `testo`, `confronto` (cosa deve cambiare perché la chat la riceva di nuovo), `righe` (la
-  // memoria, che si confronta riga per riga), `perId` (i file, per id), `rifai` (un cambio rifà la fotografia).
+  // memoria, che si confronta riga per riga), `perId` (i file, per id), `rifai` (un cambio rifà la fotografia),
+  // `daFuori` (il testo di altri che porta, per le uscite).
   const RIGHE_NEUTRE = /^(PROFILO UTENTE:|PREFERENZE:|LEZIONI RECENTI:|\(vuoto\))$/;
 
   function righeMemoria({ profilo, preferenze, espansioni, lezioni }) {
