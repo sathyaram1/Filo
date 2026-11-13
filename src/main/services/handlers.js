@@ -6902,11 +6902,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       } catch (e) { console.warn('[Filo] tratto non ricomposto dopo la fotografia:', e?.message || e); }
     }
   }
-  // Il testo dei siti che il CONTESTO mostra (titoli delle schede, suggerimenti della home), anche di una fotografia di prima (#2293).
-  const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{
-    testi: fotografia ? fotografia.daSiti : sezioniUtente.flatMap((s) => (s && Array.isArray(s.daSiti) ? s.daSiti : [])),
-    fonte: 'dalle schede aperte e dai suggerimenti della home',
-  }]);
+  // Il testo di altri che il CONTESTO mostra, una fonte per sezione, anche di una fotografia di prima (#2293, #2305).
+  const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione(fotografia
+    ? fotografia.daFuori : TV.unisciDaFuori(...sezioniUtente.map((s) => (s && s.daFuori) || [])));
   if (dalleSchede) {
     azioniViste.push(dalleSchede);
     ricordaLettoInChat([dalleSchede]);
