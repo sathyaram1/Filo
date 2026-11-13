@@ -31,6 +31,9 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
   const vive = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   const normali = vive.filter((w) => w._filoTabs && !w._filoIncognito);
   const normale = normali[0];
+  // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
+  const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const davanti = normale && normale._filoTabs.tabs.find((t) => t.id === normale._filoTabs.activeId);
   return {
     normali: normali.length,
     incognito: vive.filter((w) => w._filoIncognito).length,
@@ -38,8 +41,8 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
     accesso: base ? vive.filter((w) => { try { return !w._filoTabs && w.webContents.getURL().startsWith(base); } catch (_) { return false; } }).length : 0,
     normale: normale ? {
       visibile: normale.isVisible(),
-      // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
-      schede: normale._filoTabs.tabs.map((t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } }),
+      schede: normale._filoTabs.tabs.map(url),
+      davanti: davanti ? url(davanti) : null,
     } : null,
     errori: globalThis.__errori1606 || [],
   };
@@ -138,13 +141,21 @@ test('rimasta solo una finestra incognito, la seconda copia ridà una finestra n
   expect(s.errori).toEqual([]);
 });
 
+// Le schede salvate tornano, e davanti c'è Crediti con l'esito del riscatto, non la scheda attiva alla chiusura (#2031.1).
+async function creditiDavanti(app, accesso, negozio, perche) {
+  await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: perche, timeout: 15000 })
+    .toEqual(expect.arrayContaining([negozio, expect.stringMatching(/^filo:\/\/credits\//)]));
+  // Dopo la riapertura nessuno passa più davanti: Crediti resta la scheda che si vede.
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await stato(app, accesso)).normale.davanti, `${perche}: Crediti è finita dietro le schede riaperte`).toMatch(/^filo:\/\/credits\//);
+}
+
 test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da tutte e due le strade', async ({ app, shell, openTab, testServer }) => {
-  const { accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+  const { accesso, negozio } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
   // Windows e Linux: il link arriva fra gli argomenti della seconda apertura. Il codice storto non chiede niente al
   // server, e la pagina dice perché: basta a vedere che Crediti si è aperta in una finestra viva.
   await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://invito/ABCD'], process.cwd()); });
-  await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'l\'invito non ha aperto Crediti', timeout: 15000 })
-    .toContainEqual(expect.stringMatching(/^filo:\/\/credits\//));
+  await creditiDavanti(app, accesso, negozio, 'l\'invito non ha aperto Crediti');
   const crediti = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/'), 'la pagina Crediti non è nata');
   await expect(crediti.locator('#walletNote')).toContainText('otto caratteri', { timeout: 15000 });
 
@@ -153,8 +164,7 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app, accesso)).normale, { timeout: 10000 }).toBeNull();
   await app.evaluate(({ app: a }) => { a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'); });
-  await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'su Mac l\'invito non ha aperto Crediti', timeout: 15000 })
-    .toContainEqual(expect.stringMatching(/^filo:\/\/credits\//));
+  await creditiDavanti(app, accesso, negozio, 'su Mac l\'invito non ha aperto Crediti');
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 
