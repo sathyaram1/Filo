@@ -106,7 +106,7 @@ export function isProtectedBranch(name, mainBranch = '') {
  * nomi di ramo validi e ordina cronologicamente come stringa.
  */
 export function attemptStamp(nowMs = Date.now()) {
-  return new Date(nowMs).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  return stampoDi(nowMs);
 }
 
 /**
