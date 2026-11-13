@@ -30,7 +30,7 @@ async function preparaEChiudi(app, shell, openTab, testServer, n, { crediti = fa
     await app.evaluate(({ BrowserWindow }, i) => {
       const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
       const t = w._filoTabs.tabs.filter((x) => !String(x.url || '').startsWith('filo://newtab'))[i];
-      w._filoTabs.activateTab(t.id);
+      w._filoTabs.activate(t.id);
     }, attivaIndice);
   }
   await expect.poll(() => sessioneSalvata(app), { timeout: 10000 }).toEqual(expect.arrayContaining(urls.filter((u) => !CREDITI.test(u))));
