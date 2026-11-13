@@ -251,7 +251,8 @@ export function allineaAMain({ root, mainBranch = 'main' }) {
     return { ok: false, errore: rigaDiErrore(String((e && e.stderr) || ''), String((e && e.message) || e)) };
   }
   if (conflitti.length) return { ok: true, head: headSha(root), fuso: false, conflitti };
-  const chi = g(['config', 'user.email']).out ? [] : ['-c', 'user.name=claude-routine', '-c', 'user.email=claude@routine'];
+  const io = g(['config', 'user.email']);
+  const chi = io.ok && io.out ? [] :['-c', 'user.name=claude-routine', '-c', 'user.email=claude@routine'];
   const r = g([...chi, 'merge', '--no-ff', '--no-edit', '-m', `ripartenza: dentro il ${mainBranch} di adesso`, main]);
   if (!r.ok) {
     g(['merge', '--abort']);
