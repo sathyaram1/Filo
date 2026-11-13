@@ -16,7 +16,6 @@
         { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
         'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
         { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
-<<<<<<< ORIG_HEAD
         { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
         { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
 =======
