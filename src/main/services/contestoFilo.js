@@ -139,7 +139,7 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
       if (segna) f.viste = d.viste;
       f.usata = ora;
       f.ancora = f.ancora || ancora;
-      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false, daSiti: daSitiDi(d.viste) };
+      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false, daFuori: daFuoriDi(d.viste) };
     }
   }
   const nuova = {
@@ -150,12 +150,12 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
     usata: ora,
   };
   fotografie[lato] = nuova;
-  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true, daSiti: daSitiDi(nuova.viste) };
+  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true, daFuori: daFuoriDi(nuova.viste) };
 }
 
-// I titoli scritti dai siti che il CONTESTO ha mostrato (le schede aperte): testo di sconosciuti per le uscite (#2293).
-function daSitiDi(viste) {
-  return [...new Set([...viste.values()].flatMap((v) => (v && Array.isArray(v.daSiti) ? v.daSiti : [])))];
+// Il testo di altri che il CONTESTO ha mostrato, una fonte per sezione: testo di sconosciuti per le uscite (#2293, #2305).
+function daFuoriDi(viste) {
+  return TV().unisciDaFuori(...[...viste.values()].map((v) => (v && v.daFuori) || []));
 }
 
 // La chat riaperta mostra le foto che il modello ha ancora davanti: quello che vede lui, l'utente lo deve vedere.
