@@ -5607,7 +5607,7 @@ function pageReadsForPrompt(actions) {
         blocks.push(schedaMuta('la copia scaricata a parte è senza testo'));
       } else {
         blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
-          + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
+          + 'Se il dato serve, aprila con scheda(apri) con background: true e poi rileggila con web(leggi), che la legge dalla scheda; '
           + 'altrimenti prova un\'altra fonte. Non inventare il contenuto.]');
       }
       continue;
