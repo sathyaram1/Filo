@@ -277,18 +277,22 @@
   //   submissionCount()           → intero | null
   //   avviiRoutine()              → [{ startedAt, num, role }]; lancia se illeggibile
   //   idDelNumero(num)            → id del feedback | null
+  //   controlloLeggero()          → { count: intero | null, ultimo: { _id, _updateTime } | null }
   function makeWatcher({
     listChangedSince, listVersions,
     seguiti = null, versionsOf = null, readRows = null, submissionCount = null,
-    avviiRoutine = null, idDelNumero = null,
-    now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
+    avviiRoutine = null, idDelNumero = null, controlloLeggero = null,
+    now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS, controlloMs = CONTROLLO_MS,
     overlapMs = OVERLAP_MS, seguitiTetto = SEGUITI_TETTO, registroSeguiMs = REGISTRO_SEGUI_MS,
-    onWarn = null,
+    seguitiMs = SEGUITI_MS, onWarn = null,
   } = {}) {
     let lastTickAt = 0;
     let lastReconcileAt = 0;
+    let lastControlloAt = 0;
+    let lastSeguitiAt = 0;
     let inFlight = null;
     let versioniSeguite = new Map();   // id → `_updateTime` visto
+    let noti = null;                   // id che esistono sul server, per il conto del controllo; null = non so
     let inviiVisti = null;
     let avviiVisti = null;             // chiavi del registro già viste; null = mai letto
     const daRegistro = new Map();      // id → quando il registro l'ha indicato
