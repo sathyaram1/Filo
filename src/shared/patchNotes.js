@@ -9,10 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.278', date: '2026-11-13',
+      fixes: [
+        { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
+      ],
+    },
+    {
       version: '0.2.277', date: '2026-11-12',
       fixes: [
         { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
-        { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
       ],
     },
     {
