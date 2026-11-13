@@ -6,7 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { nelMondoDiFilo, neiRiquadri, nelloStrato, statoDi, conta, clicca, scrivi, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, neiRiquadri, nelloStrato, statoDi, conta, clicca, scrivi, paginaDelloStrato, tastoSullaScheda, riquadriNelSito } from './helpers/riquadri.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
