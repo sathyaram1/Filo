@@ -142,7 +142,7 @@
     },
     PROXY_TAB: {
       via: ['scheda', 'paese'],
-      description: 'apre la scheda web davanti da un altro paese (country: codice di 2 lettere).',
+      description: 'la scheda web davanti esce da un altro paese (codice di 2 lettere).',
       properties: { country: S() }, required: ['country'],
     },
     RIMUOVI_PROXY: {
