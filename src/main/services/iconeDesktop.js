@@ -722,7 +722,7 @@ function esitoPerModello(o) {
   if (o.fuoriPosto) parti.push(`${o.fuoriPosto} icone non sono finite al loro posto: dillo all'utente.`);
   if (o.mancanti) parti.push(`${o.mancanti} icone sono sparite dal desktop durante lo spostamento.`);
   if (o.nascoste) parti.push('Le icone del desktop sono nascoste: si vedono rimettendo la spunta su «Mostra icone del desktop» (tasto destro sul desktop → Visualizza). Diglielo.');
-  if (o.cambio) parti.push(`Per rimetterle dov'erano: ANNULLA_CAMBIO con id ${o.cambio}.`);
+  if (o.cambio) parti.push(`Per rimetterle dov'erano: filo(annulla) con id ${o.cambio}.`);
   return parti.join(' ');
 }
 
