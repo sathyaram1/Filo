@@ -154,7 +154,7 @@
     const lv = livelloDa(livello);
     if (!costoValido(costo)) return { risposta: 'no', digita: false, regola: 'costo', cella: 'no' };
     const automazione = origine === 'automazione';
-    const c = difesa ? COSTO_MAX : costoEffettivo(costo, campo, manopole);
+    const c = costoReale({ costo, difesa, campo, manopole });
     // Il costo 4 non parte mai da un'automazione, né per un segreto che l'utente non ha scritto lui.
     if (c === COSTO_MAX && (!chiesta || automazione)) return { risposta: 'no', digita: false, regola: 'chiesta', cella: 'no' };
     const contaminato = st !== 'pulito';
