@@ -1857,8 +1857,8 @@ function rifiutoNonCompare(type) {
   const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
   return `Azione ${type} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
     + 'nei risultati, nelle pagine lette o nei loro link, nelle schede, nella cronologia). Non l\'ho ' + verbo + '. Trovalo: '
-    + 'cercalo con CERCA_WEB o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
-    + 'usare la sua home o la sua ricerca (vedi la descrizione di LEGGI_PAGINA), oppure cerca_nel_sito con la home del sito '
+    + 'cercalo con web(cerca) o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
+    + 'usare la sua home o la sua ricerca, oppure cerca_nel_sito con la home del sito '
     + 'che l\'utente ha nominato. Se richiami lo stesso indirizzo, lo chiedo all\'utente. Se non lo trovi, diglielo: '
     + 'sotto la risposta resta il bottone per aprirlo lui, se vuole.';
 }
