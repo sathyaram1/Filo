@@ -447,10 +447,12 @@
       if (!versions) throw new Error('versioni non lette');
       if (out.complete === false) avvisa('riallineamento: lettura interrotta dal freno sulle pagine');
       versioniSeguite = new Map(versions.map((v) => [String(v._id), v._updateTime || null]));
+      noti = out.complete === false ? null : new Set(versions.map((v) => String(v._id)));
       vedi(versions, out.readTime);
       inviiVisti = await contaInvii(inviiVisti);
       await nuoviAvvii();
       lastReconcileAt = startedAt;
+      lastControlloAt = startedAt;
       lastTickAt = startedAt;
       return { kind: 'reconcile', versions, complete: out.complete !== false };
     }
