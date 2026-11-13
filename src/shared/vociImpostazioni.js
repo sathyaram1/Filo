@@ -234,7 +234,7 @@
   const ALTROVE = {
     permessiSiti: {
       nome: 'permessi dei siti (risposte ricordate)',
-      come: 'TOGLI_PERMESSO_SITO per toglierne una',
+      come: 'impostazioni(togli_permesso) per toglierne una',
       parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete file cartelle consentito negato',
     },
     // #947.3 — le cartelle fuori elenco in cui l'utente ha cercato: l'indice ne tiene i documenti già letti.
