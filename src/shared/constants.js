@@ -1892,8 +1892,8 @@
         ? '[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): rispondi col JSON normale aggiungendo "file": <il suo numero>, '
           + 'e di\' in una frase perché è quello. L\'utente lo vede come un bottone che apre il documento e che può trascinare nella pagina, '
           + 'per esempio sul campo per caricare un file. Se nessuno è quello giusto, dillo. Non inventare quello che il testo non dice.'
-        : '[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con APRI_FILE col suo percorso e di\' in una '
-          + 'frase perché è quello. Se due si somigliano, leggili con LEGGI_DOCUMENTO prima di scegliere. Non inventare quello che il testo non dice.';
+        : '[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con file(mostra) col suo percorso e di\' in una '
+          + 'frase perché è quello. Se due si somigliano, leggili con file(leggi) prima di scegliere. Non inventare quello che il testo non dice.';
       return `[Ricerca fra i documenti dell'utente: "${cercato}". Ho guardato ${conti} ${dove}. I candidati, dal più probabile:]\n`
         + E.imbusta({ tipo: 'DOCUMENTI_TROVATI', testo: righe.join('\n'), conIntestazione: true })
         + `\n${scegli}${coda}]`;
