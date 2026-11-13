@@ -77,9 +77,10 @@
   }
 
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
-  // si è già collegato, classe 3 come i mittenti fidati.
+  // si è già collegato, classe 3 come i mittenti fidati. Quali nomi: SN_SISTEMA.nomiLetti, la stessa regola delle uscite.
   function nomiDiSistema(out, cosa) {
-    if (!Array.isArray(out.elenco) || !out.elenco.length) return null;
+    if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
+    if (!global.SN_SISTEMA.nomiLetti(out).length) return null;
     return cosa === 'wifi'
       ? { classe: 3, campo: null, chiave: 'sistema:wifi', motivo: 'ho letto i nomi delle reti Wi-Fi, che non hai scritto tu' }
       : { classe: 3, campo: null, chiave: 'sistema:bluetooth', motivo: 'ho letto i nomi dei dispositivi Bluetooth, che non hai scritto tu' };
