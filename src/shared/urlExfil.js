@@ -447,9 +447,10 @@
   // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
   // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6), `salvate` = le pagine di «Aperti per
   // dopo» lette (#845).
-  // Il testo che i siti scrivono nel contesto di un turno senza passare da un'azione (#2293): titoli e ricerche delle
-  // pagine visitate nei preamboli, i titoli delle schede aperte. Accende testo di sconosciuti, ma non è una fonte del
-  // compito: contarlo nei livelli di autonomia è una scelta dell'owner (domanda aperta su #2293).
+  // Il testo di altri che il contesto di un turno porta senza passare da un'azione (#2293, #2305): titoli delle pagine e
+  // delle schede, nomi di reti e dispositivi, testi salvati. Un gruppo per sezione, con la sua fonte (`daFuori` di
+  // filoState.js e filoTrattoVivo.js). Accende testo di sconosciuti, ma non è una fonte del compito: contarlo nei
+  // livelli di autonomia è una scelta dell'owner (domanda aperta su #2293).
   const DAI_SITI = 'CONTESTO_DAI_SITI';
   function testoDeiSitiComeAzione(gruppi) {
     const dalContesto = (Array.isArray(gruppi) ? gruppi : [])
