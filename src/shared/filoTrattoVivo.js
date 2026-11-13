@@ -372,7 +372,7 @@
       righe.unshift(`- (prima di queste, altre ${pagineN(n)} su ${fuori.length} sit${fuori.length === 1 ? 'o' : 'i'}: qui non ci sono)`);
     }
     const busta = E().imbusta({ tipo: 'DATI_PAGINA', conIntestazione: true, testo: righe.join('\n'), max: Infinity });
-    return { testo: `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`, daFuori: unisciDaFuori([{ testi: daSiti, fonte: 'dalle pagine visitate' }]) };
+    return { testo: `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova filo(cerca)):\n${busta}`, daFuori: unisciDaFuori([{ testi: daSiti, fonte: 'dalle pagine visitate' }]) };
   }
 
   // Le righe degli eventi di un messaggio, dentro una busta: con l'ora (e il giorno se non è quello del messaggio) e,
