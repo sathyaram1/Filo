@@ -1894,7 +1894,7 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
         senzaModulo: true,
         error: `Azione ${type} NON fatta: cerca_nel_sito vale per i siti comuni e per i siti che l'utente ha nominato, e ${home} `
           + 'non è fra questi. Se serve, scrivi tu l\'indirizzo della ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. '
-          + 'Oppure cerca la pagina con CERCA_WEB.',
+          + 'Oppure cerca la pagina con web(cerca).',
         output: { senzaModulo: true, url: home },
       };
     }
