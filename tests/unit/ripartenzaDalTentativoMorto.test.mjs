@@ -11,10 +11,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
-import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, chiudiTentativi, chiudiSuperatiOvunque } from '../../scripts/lib/branch-integrity.mjs';
+import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, chiudiTentativi, chiudiSuperatiOvunque, rigaDiErrore } from '../../scripts/lib/branch-integrity.mjs';
 import { leggiTentativo, tentativiSuperati } from '../../scripts/lib/tentativi.mjs';
-import { ramiInCorso } from '../../scripts/lib/su-main.mjs';
-import { conNumeri } from '../../scripts/manutentore.mjs';
+import { fusionePropria, fusioniSuMain, ramiInCorso } from '../../scripts/lib/su-main.mjs';
+import { conNumeri, numeriDellIndice } from '../../scripts/manutentore.mjs';
+import { segnaProprie } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ID = 'fid-2152';
