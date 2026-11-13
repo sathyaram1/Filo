@@ -6287,7 +6287,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (PAGE_ACTIONS.includes(type) && !res.output) {
     return `Azione ${nome} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
-  return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
+  return `Azione ${nome} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
