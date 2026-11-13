@@ -6267,7 +6267,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     }
     const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
     if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
-    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
+    return `Azione ${nome} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
