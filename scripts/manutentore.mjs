@@ -627,6 +627,20 @@ export function righeStato(st) {
     `Ultimo guasto: ${s.ultimoGuasto ? `${new Date(s.ultimoGuasto.ms).toISOString()}${s.ultimoGuasto.testo ? ` ${unaRiga(s.ultimoGuasto.testo).slice(0, 300)}` : ''}` : 'nessuno'}.`,
     `Segnali non letti (${segnali.length}):`,
     ...segnali.map((x) => `- ${unaRiga(x.id)} ${unaRiga(x.tipo)} ${x.atMs ? new Date(x.atMs).toISOString() : ''}${x.dettaglio ? ` ${unaRiga(JSON.stringify(x.dettaglio)).slice(0, 400)}` : ''}`),
+    ...righeCorseFerme(s.corseFerme),
+  ];
+}
+
+/** Le corse di Actions in coda senza lavori oltre la soglia (#2417), come le legge il server. PURA. */
+export function righeCorseFerme(cf) {
+  if (!cf || typeof cf !== 'object') return ['Corse in coda senza lavori: il server non le elenca ancora.'];
+  const corse = Array.isArray(cf.corse) ? cf.corse : [];
+  const errori = Array.isArray(cf.errori) ? cf.errori : [];
+  return [
+    `Corse in coda senza lavori da più di ${Number(cf.sogliaMin) || '?'} minuti (${corse.length}):`,
+    ...corse.map((c) => `- ${unaRiga(c.repo)} ${unaRiga(c.workflow)} ${unaRiga(c.sha).slice(0, 12)} corsa ${Number(c.id) || '?'}, in coda da ${Number(c.minuti) || 0} min, `
+      + `${c.feedback ? `la aspetta #${unaRiga(c.feedback)}` : 'nessun feedback la aspetta'}${c.url ? ` ${unaRiga(c.url)}` : ''}`),
+    ...errori.map((e) => `- non lette: ${unaRiga(e).slice(0, 200)}`),
   ];
 }
 

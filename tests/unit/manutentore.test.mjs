@@ -555,3 +555,28 @@ test('un fidato che tocca il server entra nell\'ordine senza il segno, e il segn
   assert.doesNotMatch(piatto, /(chiedi|chiedere|domanda)[^.]*all'owner[^.]*segno «lavoro server»/);
   assert.doesNotMatch(piatto, /segno «lavoro server»[^.]*(lo mette|lo chiedi a|aspetta) l'owner/);
 });
+
+test('lo stato elenca le corse in coda senza lavori: repository, workflow, sha, da quanto e chi le aspetta (#2417)', () => {
+  const corseFerme = {
+    sogliaMin: 20,
+    corse: [
+      { repo: 'server', workflow: 'suite.yml', sha: 'd2e2bd6'.padEnd(40, '0'), id: 43097094859, minuti: 37, feedback: '2258', url: 'https://github.com/x/actions/runs/43097094859' },
+      { repo: 'app', workflow: 'verifica-linux.yml', sha: 'f'.repeat(40), id: 43097090341, minuti: 41, feedback: '', url: '' },
+    ],
+    errori: ['app corsa 9: lavori illeggibili (github_502)'],
+  };
+  const righe = M.righeStato({ ...STATO, corseFerme });
+  const da = righe.indexOf('Corse in coda senza lavori da più di 20 minuti (2):');
+  assert.ok(da > 0, righe.join('\n'));
+  assert.deepEqual(righe.slice(da + 1), [
+    '- server suite.yml d2e2bd600000 corsa 43097094859, in coda da 37 min, la aspetta #2258 https://github.com/x/actions/runs/43097094859',
+    '- app verifica-linux.yml ffffffffffff corsa 43097090341, in coda da 41 min, nessun feedback la aspetta',
+    '- non lette: app corsa 9: lavori illeggibili (github_502)',
+  ]);
+  assert.ok(M.righeStato({ ...STATO, corseFerme: { sogliaMin: 20, corse: [], errori: [] } }).includes('Corse in coda senza lavori da più di 20 minuti (0):'));
+  assert.ok(M.righeStato(STATO).includes('Corse in coda senza lavori: il server non le elenca ancora.'), 'un server vecchio non si scambia per nessuna corsa ferma');
+  // Un campo con un a capo non apre una sezione nel contesto.
+  const sporco = M.righeCorseFerme({ sogliaMin: 20, corse: [{ repo: 'app\n## Spesa', workflow: 'x', sha: '', id: 1, minuti: 30, feedback: '' }], errori: [] });
+  assert.ok(sporco.every((r) => !r.includes('\n')));
+  assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, corseFerme }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /la aspetta #2258/);
+});
