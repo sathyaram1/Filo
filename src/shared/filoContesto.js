@@ -849,7 +849,7 @@
     });
     return '═══ RICORDI DAL FILO (ripescati da Filo perché sembrano legati al messaggio qui sotto) ═══\n'
       + 'Sono tratti di conversazioni più vecchie dei giorni che hai davanti. Usali se servono, ignorali se non c\'entrano; '
-      + 'una conversazione per intero si rilegge con CERCA_CHAT e il suo id.\n\n'
+      + 'una conversazione per intero si rilegge con filo(cerca) e il suo id.\n\n'
       + blocchi.join('\n\n');
   }
 
