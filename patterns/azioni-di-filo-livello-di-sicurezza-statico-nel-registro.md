@@ -33,8 +33,9 @@ sbloccare un sito o spegnere un interruttore è un freno tolto, #835.1), le
 credenziali di un servizio, il cancellare per sempre (cancellare dentro Filo è
 nascondere, costo normale) e un segreto in un'uscita: se l'ha scritto l'utente
 vuole «conferma», se no non esce. `parola` resta per un'azione che vuole
-«conferma» a ogni livello senza essere un costo 4 (il comando che cancella senza
-cestino, la cui mappa dei costi è di #538). La tabella sa anche che lo stesso
+«conferma» a ogni livello senza essere un costo 4. Il comando del terminale che
+cancella senza cestino invece è un costo 4, come eliminare un file per sempre
+(#1909): dopo una lettura è un no (il resto della mappa dei comandi è di #538). La tabella sa anche che lo stesso
 testo a più di 5 destinatari nello stesso giorno chiede a ogni livello
 (`molti`), ma oggi nessuna azione lo dichiara: Filo non spedisce a più persone,
 e la prima azione che lo farà deve contarli e passarlo. Un lavoro che
