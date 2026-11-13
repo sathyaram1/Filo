@@ -96,11 +96,12 @@ test('le righe dei blocchi davanti ai messaggi: dispositivi, reti, timer, avvisi
   assert.deepEqual(TV.rendiEventi([{ tipo: 'sistema', cosa: 'batteria', livello: 10, soglia: 20, ts, id: 'c' }], { rif: ts }).daFuori, []);
 });
 
-test('gli esiti di BLUETOOTH e WIFI portano nomi scelti da altri: testo di sconosciuti, come la sezione SISTEMA', () => {
+test('gli esiti di BLUETOOTH e WIFI che elencano nomi scelti da altri: testo di sconosciuti, e la stessa regola per l\'autonomia', () => {
+  const AL = globalThis.SN_ACTION_LEVELS;
   const fonte = 'dai nomi di reti e dispositivi';
   const casi = [
     { type: 'BLUETOOTH', _output: { ok: true, cosa: 'bluetooth', elenco: [{ nome: `Cuffie ${CODICE}`, collegato: true }] } },
-    { type: 'WIFI', _output: { ok: true, cosa: 'wifi', rete: `Casa ${CODICE}`, confermato: true } },
+    { type: 'WIFI', _output: { ok: true, cosa: 'wifi', elenco: [{ nome: `Casa ${CODICE}`, attiva: true }] } },
     { type: 'BLUETOOTH', _output: { ok: false, cosa: 'bluetooth', errore: 'ambiguo', candidati: [`Cuffie ${CODICE}`, 'Cuffie 2'] } },
   ];
   for (const a of casi) {
@@ -110,7 +111,12 @@ test('gli esiti di BLUETOOTH e WIFI portano nomi scelti da altri: testo di scono
     const v = X.valutaUscita(USCITA, { azioni: [a] });
     assert.equal(v.blocca, true, a.type);
     assert.match(v.frase, new RegExp(`${fonte}$`));
+    assert.equal(AL.fonteDi(a).classe, 3, `${a.type}: il compito lo legge come le uscite`);
   }
-  assert.equal(X.contestoDaAzioni([{ type: 'VOLUME', _output: { ok: true, cosa: 'volume', volume: 40 } }]).nonFidato, false, 'il volume non ha nomi');
-  assert.equal(X.contestoDaAzioni([{ type: 'WIFI', _output: { ok: true, cosa: 'wifi', acceso: true } }]).nonFidato, false, 'acceso o spento è di Filo');
+  // Il nome di un collegamento è quello che l'utente ha chiesto; acceso, spento e il volume li dice Filo.
+  for (const out of [{ ok: true, cosa: 'wifi', rete: 'Casa', confermato: true }, { ok: true, cosa: 'wifi', acceso: true }]) {
+    assert.equal(X.contestoDaAzioni([{ type: 'WIFI', _output: out }]).nonFidato, false);
+    assert.equal(AL.fonteDi({ type: 'WIFI', _output: out }), null);
+  }
+  assert.equal(X.contestoDaAzioni([{ type: 'VOLUME', _output: { ok: true, cosa: 'volume', volume: 40 } }]).nonFidato, false);
 });
