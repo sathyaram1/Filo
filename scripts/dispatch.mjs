@@ -2733,7 +2733,7 @@ export function emit(bucket, ctx) {
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
-  const cartella = preparaIntestazione(ROOT);
+  const cartella = preparaIntestazione(ROOT, { strumenti: TOOLS_ROOT });
   const instructions = cartella ? `${cartella}\n\n${corpo}` : corpo;
   const stampaCon = (payload, istr = instructions, file = '') => ({
     role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
