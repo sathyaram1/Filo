@@ -1856,7 +1856,7 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
   // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
   if (spedisce) {
-    const sped = ch.spedisciRiallineamento(ROOT);
+    const sped = ch.spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
     process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
