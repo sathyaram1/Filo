@@ -1000,6 +1000,17 @@
     PULSANTE_PREFERENZE: 'Uso le Preferenze…',
     CHIUDI_SCHEDE: 'Chiudo le schede…',
     ACCOUNT: 'Sistemo l\'accesso…',
+    // Gli strumenti generali (SPEC-CONTESTO § Gli strumenti): all'inizio arriva il nome, l'azione dopo con gli argomenti.
+    IMPOSTAZIONI: 'Guardo le impostazioni…',
+    SCHEDA: 'Mi occupo delle schede…',
+    HOME: 'Sistemo la home…',
+    PROMEMORIA: 'Preparo un promemoria…',
+    FILE: 'Guardo i tuoi file…',
+    COMPUTER: 'Chiedo al computer…',
+    WEB: 'Cerco sul web…',
+    MEMORIA: 'Guardo cosa ricordo…',
+    FILO: 'Cerco nel filo…',
+    FILO_SU_DI_SE: 'Verifico cosa so fare…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
