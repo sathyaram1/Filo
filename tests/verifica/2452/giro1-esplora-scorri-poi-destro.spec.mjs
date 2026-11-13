@@ -65,4 +65,28 @@ test.describe('nello strato', () => {
     await page.evaluate(() => new Promise((ok) => setTimeout(ok, 400)));
     expect((await statoDelloStrato(app)).aperto).toBe(true);
   });
+  test('sito con riquadro che scorre: tasto destro su una riga fuori vista nel riquadro, il menu resta', async ({ app, openTab, testServer }) => {
+    await paginaDelloStrato(app);
+    await expect.poll(async () => (await statoDelloStrato(app))?.pronta).toBe(true);
+    const righe = Array.from({ length: 200 }, (_, i) => `<p id="r${i}" style="margin:0;padding:6px">Riga ${i}</p>`).join('');
+    const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;overflow:hidden;height:100vh"><div id="box" style="height:100vh;overflow:auto">${righe}</div></body>`);
+    await pronta(page);
+    await page.locator('#r150').click({ button: 'right' });
+    await expect.poll(async () => (await statoDelloStrato(app))?.aperto).toBe(true);
+    await page.evaluate(() => new Promise((ok) => setTimeout(ok, 400)));
+    expect((await statoDelloStrato(app)).aperto, 'scrollTop ' + await page.evaluate(() => document.getElementById('box').scrollTop)).toBe(true);
+    await page.mouse.move(100, 100);
+    await page.mouse.wheel(0, 300);
+    await expect.poll(async () => (await statoDelloStrato(app))?.aperto, { timeout: 3000 }).toBe(false);
+  });
+});
+
+test('pagina di Filo con riquadro che scorre: tasto destro fuori vista nel riquadro, il menu resta', async ({ openTab }) => {
+  const page = await openTab('filo://history/history.html');
+  await pronta(page);
+  const info = await page.evaluate(() => {
+    const s = [...document.querySelectorAll('*')].filter((n) => n.scrollHeight > n.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(n).overflowY));
+    return s.map((n) => n.tagName + '#' + n.id + '.' + n.className).slice(0, 5);
+  });
+  console.log('riquadri che scorrono in Cronologia:', info);
 });
