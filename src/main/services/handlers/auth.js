@@ -1069,6 +1069,7 @@ module.exports = function register(on, ctx) {
         return mergeCardFields(rows, { mirate: true });
       },
       submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await liveToken() }),
+      controlloLeggero: async () => FB.controlloLeggero({ timeoutMs: 20000, idToken: await liveToken() }),
       avviiRoutine: async () => Defaults.getWorkerLog(await liveToken(), { severo: true }),
       idDelNumero: async (num) => FB.idDelNumero(num, { timeoutMs: 20000, idToken: await liveToken() }),
       listVersions: async () => {
