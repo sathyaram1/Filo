@@ -288,7 +288,7 @@
     // ── computer ──
     ESEGUI_COMANDO: {
       via: ['computer', 'comando'], risultato: true,
-      description: 'un comando shell per chiamata (la cartella resta); spiegazione: cosa fa, in prima persona, per chi non conosce il terminale.',
+      description: 'un comando shell per chiamata (la cartella resta); spiegazione: cosa fa, in prima persona, per chi non conosce il terminale. Per cancellare file c\'è file(elimina).',
       properties: { comando: S(), spiegazione: S() }, required: ['comando', 'spiegazione'],
     },
     VEDI_SCHERMO: {
