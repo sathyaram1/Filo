@@ -147,7 +147,7 @@
     },
     RIMUOVI_PROXY: {
       via: ['scheda', 'paese_via'],
-      description: 'riporta la scheda davanti alla connessione diretta.',
+      description: 'connessione diretta per la scheda davanti.',
       properties: {}, required: [],
     },
     RIMUOVI_PROXY_TUTTE: {
