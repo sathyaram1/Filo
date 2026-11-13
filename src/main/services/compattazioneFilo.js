@@ -238,7 +238,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     for (const m of letto.memorie) {
       const origine = m.fonti.length ? await eventiDeiMessaggi(m.fonti) : [];
       if (sospetto) {
-        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: globalThis.SN_QUADERNO.unisci(lette, origine), origine };
+        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: globalThis.SN_QUADERNO.unisci(origine, lette), origine };
         s.inAttesa.push(p);
         inAttesa.push(p);
         continue;
