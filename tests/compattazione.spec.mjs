@@ -294,13 +294,12 @@ test('una proposta sola lo dice al singolare; una riga tolta non torna, e dopo i
   await expect(q.locator('#esito')).toHaveText('Non l\'ho scritta: somiglia a una riga che avevi tolto.', { timeout: 10000 });
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('gatti');
 
-  // Una proposta diversa: dopo il sì la riga porta ancora al punto del filo, come la proposta.
-  expect(await compattaConProposte(app, { chat: 'cucina1', t0: t0 + 10 * 60000, utente: 'stasera cucino io', memorie: [['Le piace cucinare.', null]] })).toBe(1);
+  // Una proposta diversa: dopo il sì la riga porta al messaggio da cui è nata.
+  expect(await compattaConProposte(app, { chat: 'cucina1', t0: t0 + 10 * 60000, utente: 'stasera cucino io', memorie: [['Le piace cucinare.', 'stasera cucino']] })).toBe(1);
   await q.reload();
   const cucina = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'Le piace cucinare.' });
   await cucina.locator('.qd-testo').click({ button: 'right' });
   const menu = menuDi(q);
-  await expect(menu.voce('Vai al punto del filo')).toBeVisible();
   await menu.voce('Tienila in memoria').click();
   await expect(q.locator('#esito')).toHaveText('Tenuta in memoria.', { timeout: 10000 });
   const tenuta = q.locator('[data-gruppo="lezioni"] .qd-riga').filter({ hasText: 'Le piace cucinare.' });
