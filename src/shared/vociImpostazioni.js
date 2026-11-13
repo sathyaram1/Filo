@@ -240,7 +240,7 @@
     // #947.3 — le cartelle fuori elenco in cui l'utente ha cercato: l'indice ne tiene i documenti già letti.
     cartelleCercate: {
       nome: 'cartelle dei documenti dove hai cercato una volta (Filo tiene i documenti già letti)',
-      come: 'IMPOSTA_PREFERENZA chiave cartelle_documenti, valore "togli <cartella>" per fargliele dimenticare',
+      come: 'impostazioni(imposta) chiave cartelle_documenti, valore "togli <cartella>" per fargliele dimenticare',
       parole: 'cartelle cartella documenti ricerca cercato cercata indice archivio letti dimentica',
     },
   };
