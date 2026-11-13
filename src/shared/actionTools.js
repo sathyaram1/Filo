@@ -103,7 +103,7 @@
     },
     SCHEDE_CHIUSE: {
       via: ['scheda', 'chiuse'], risultato: true,
-      description: 'cerca fra le schede chiuse o archiviate per contenuto, data (da, a: ISO o AAAA-MM-GG) e motivo (mano, filo, pulizia, doppione, pagina).',
+      description: 'cerca fra le schede chiuse o archiviate; da e a ISO o AAAA-MM-GG.',
       properties: { cerca: S(), da: S(), a: S(), motivo: S({ enum: ['mano', 'filo', 'pulizia', 'doppione', 'pagina'] }) }, required: [],
     },
     RIAPRI_SCHEDA: {
