@@ -2264,9 +2264,10 @@ if (isMain) {
       data.sha = punta;
       if (intento === 'fixed') {
         const { readMarker } = await import('./lib/routine-role.mjs');
-        if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+        const marcatore = readMarker(ROOT);
+        if (consegnaDiRiallineamento(marcatore, { ferma: data.stop, domanda: data.domanda })) {
           await novitaPrimaDiSpedire(ROOT, (r) => console.error(r));
-          const sped = spedisciRiallineamento(ROOT);
+          const sped = spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
           if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
           if (sped.avviso) console.error(sped.avviso);
           data.sha = sped.punta;
