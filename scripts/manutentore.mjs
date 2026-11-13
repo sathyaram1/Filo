@@ -1046,7 +1046,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const r = rami();
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indice), indice, r.fuori);
+    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
     if (cmd === 'rami') { console.log([lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n')); return 0; }
     const num = String(arg).replace(/^#/, '');
     const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
