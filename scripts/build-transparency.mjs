@@ -370,11 +370,24 @@ function buildNav(docs) {
   return voci.sort((a, b) => a.order - b.order).map(({ order, ...v }) => v);
 }
 
+// Un testo a più righe si scrive una riga per riga: in un solo letterale una frase cambiata rifà nel diff una riga
+// da 80.000 caratteri, che chi controlla deve ricostruire a mano (#2236).
+const SEGNAPOSTO_RIGHE = /^( *)(.*)"@@righe:(\d+)@@"/gm;
+function aRighe(testi, sorgente) {
+  return sorgente.replace(SEGNAPOSTO_RIGHE, (_, rientro, prima, i) => {
+    const righe = testi[Number(i)].split(/(?<=\n)/);
+    if (righe.length < 2) return `${rientro}${prima}${JSON.stringify(testi[Number(i)])}`;
+    return `${rientro}${prima}[\n${righe.map((r) => `${rientro}  ${JSON.stringify(r)}`).join(',\n')}\n${rientro}].join('')`;
+  });
+}
+
 function emitModule({ docs, glossary }) {
   const NAV = buildNav(docs);
+  const testi = [];
+  const segna = (s) => `@@righe:${testi.push(String(s)) - 1}@@`;
   const payload = docs.map((d) => ({
     id: d.id, title: d.title, subtitle: d.subtitle, updated: d.updated,
-    sections: d.sections, sources: d.sources, html: d.html, text: d.text,
+    sections: d.sections, sources: d.sources, html: segna(d.html), text: segna(d.text),
   }));
   return `// GENERATO da scripts/build-transparency.mjs — NON modificare a mano.
 // La sorgente sono i markdown in transparency/. Per rigenerare:
