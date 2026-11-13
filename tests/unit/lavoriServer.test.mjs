@@ -64,7 +64,8 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
 
 test('#2190: le prove del giro sul server hanno un nome che il cancello riconosce, ed escono dal ramo del server anche dopo un pass', () => {
   const t = testoLavoroServer({ clone: '/home/user/filo-security' });
-  assert.match(t, /functions\/test\/verifica-<numero>-giro<k>-r<n>-<cosa>\.test\.js/, 'il nome porta giro e rilievi, come nell\'app');
+  // Come si nomina una prova del giro lo dice un testo solo (testiDiRuolo.test.mjs): qui solo il prefisso del server.
+  assert.match(t, /nome e i titoli dei\s+casi delle prove del giro dell'app, preceduti da `verifica-<numero>-` e con `\.test\.js` in fondo/);
   const pulizia = t.slice(t.indexOf('si tolgono come quelle dell\'app'));
   assert.match(pulizia, /anche dopo un pass/, 'dopo il verdetto superato si toglie anche dal ramo del server');
   assert.match(pulizia, /commit\s+che toglie solo quelle[^]*ramo-server/, 'commit di sola rimozione, poi spinta e registro');
