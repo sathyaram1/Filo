@@ -123,7 +123,7 @@
     },
     ZOOM_PAGINA: {
       via: ['scheda', 'zoom'],
-      description: 'ingrandisce o rimpicciolisce la pagina davanti: percentuale (25-500) o verso (in, out, reset). Dura finché Filo resta aperto.',
+      description: 'lo zoom della pagina davanti: percentuale 25-500 o verso; vale finché Filo resta aperto.',
       properties: { percentuale: I(), verso: S({ enum: ['in', 'out', 'reset'] }) }, required: [],
     },
     STILE_PAGINA: {
