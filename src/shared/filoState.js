@@ -440,7 +440,7 @@
     // rispondeva a naso. È un dato di Filo, non del sito: fuori dalla busta.
     const davanti = state.tabs.find((t) => t.active) || state.tabs[0];
     if (davanti && typeof davanti.zoomPercent === 'number') {
-      aggiungi('ZOOM DELLA PAGINA', ['ZOOM DELLA PAGINA', `Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`]);
+      aggiungi('ZOOM DELLA PAGINA', ['ZOOM DELLA PAGINA', `Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con scheda(zoom))`]);
     }
     if (state.autonomia) {
       aggiungi('AUTONOMIA DI FILO', [
