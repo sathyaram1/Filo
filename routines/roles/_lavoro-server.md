@@ -59,9 +59,9 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
 
 - Le prove del server: `npm ci` la prima volta, poi `npm test` in `<CLONE>/functions`, con `FILO_PUBLIC_REPO` uguale
   al checkout di Filo. Se il lavoro tocca anche l'app, le prove dell'app come sempre.
-- Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo, col giro e i numeri dei
-  rilievi nel nome come quelle dell'app (`functions/test/verifica-<numero>-giro<k>-r<n>-<cosa>.test.js`, il titolo di
-  ogni caso che comincia con `r<n>`): è così che il cancello le riconosce come prove del giro.
+- Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo, col nome e i titoli dei
+  casi delle prove del giro dell'app, preceduti da `verifica-<numero>-` e con `.test.js` in fondo: è così che il
+  cancello le riconosce come prove del giro.
 - Le prove del giro sul server si tolgono come quelle dell'app, e nello stesso momento: quelle che escono in ogni esito
   nel commit della critica, quelle che la risposta del server elenca (anche dopo un pass) appena la leggi. La
   suite di GitHub del server le corre tutte, e una rossa lasciata lì la tiene rossa per sempre. Nel clone un commit
