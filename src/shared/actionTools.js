@@ -243,7 +243,7 @@
     },
     EVENTO_CALENDARIO: {
       via: ['promemoria', 'evento'],
-      description: 'propone un evento: in chat compare il bottone che lo mette nel calendario. data e data_fine "AAAA-MM-GG", ora e ora_fine "HH:MM" (senza ora tutto il giorno), durata_min.',
+      description: 'propone un evento col bottone per il calendario: date "AAAA-MM-GG", ore "HH:MM" (senza ora: tutto il giorno).',
       properties: { data: S(), titolo: S(), ora: S(), dettagli: S(), luogo: S(), durata_min: I(), data_fine: S(), ora_fine: S() },
       required: ['data', 'titolo'],
     },
