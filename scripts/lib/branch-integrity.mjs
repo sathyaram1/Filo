@@ -252,7 +252,7 @@ export function allineaAMain({ root, mainBranch = 'main' }) {
   }
   if (conflitti.length) return { ok: true, head: headSha(root), fuso: false, conflitti };
   const io = g(['config', 'user.email']);
-  const chi = io.ok && io.out ? [] :['-c', 'user.name=claude-routine', '-c', 'user.email=claude@routine'];
+  const chi = io.ok && io.out ? [] : ['-c', 'user.name=claude-routine', '-c', 'user.email=claude@routine'];
   const r = g([...chi, 'merge', '--no-ff', '--no-edit', '-m', `ripartenza: dentro il ${mainBranch} di adesso`, main]);
   if (!r.ok) {
     g(['merge', '--abort']);
