@@ -187,3 +187,19 @@ test('cassa col campo della carta dentro un componente aperto', async ({ app, op
   expect(await pixelDelColore(app, immagine, VERDE)).toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero nel componente si legge nella foto').toBeLessThan(20);
 });
+
+test('cassa ingrandita al 150% e scorsa fino al campo della carta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const html = `<!doctype html><html><head><title>Cassa ingrandita</title></head><body style="margin:0">
+    <div style="height:900px;background:#eee"></div><div style="height:120px;background:${tinta(VERDE)}"></div>
+    <form style="padding:20px"><input id="c" style="width:420px;${CAMPO}"></form><div style="height:900px"></div>
+    </body></html>`;
+  const immagine = await fotoDallaChat(app, openTab, testServer, 'Cassa ingrandita', html, async (page) => {
+    await app.evaluate(({ webContents }, u) => webContents.getAllWebContents().find((w) => w.getURL() === u).setZoomFactor(1.5), page.url());
+    await page.fill('#c', '4111 1111 1111 1111');
+    await page.locator('#c').scrollIntoViewIfNeeded();
+    await page.locator('#c').blur();
+  });
+  expect(await pixelDelColore(app, immagine, VERDE)).toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero nella cassa ingrandita si legge nella foto').toBeLessThan(20);
+});
