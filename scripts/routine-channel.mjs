@@ -933,7 +933,8 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   if (!dopo.ok || su !== dopo.out.toLowerCase()) {
     return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
   }
-  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+  const avviso = [p.avviso, avanti].filter(Boolean).join('\n');
+  return { ok: true, branch: p.branch, punta: dopo.out, main: indietro ? minimo : main.out, forced: !!p.forced, ...(avviso ? { avviso } : {}) };
 }
 
 /** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
