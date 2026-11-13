@@ -10,6 +10,9 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.279', date: '2026-11-13',
+      features: [
+        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
+      ],
       fixes: [
         { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
         { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
@@ -38,7 +41,6 @@
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
         { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
         { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
-        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
