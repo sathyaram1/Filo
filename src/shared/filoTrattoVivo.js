@@ -415,7 +415,8 @@
     };
   }
 
-  // Il testo di altri nella riga di un evento, con la sua fonte (#2305): lo stesso pezzo che la riga mostra.
+  // Il testo di altri nella riga di un evento, con la sua fonte (#2305): lo stesso pezzo che la riga mostra. Un avviso
+  // di Filo no: le sue parole le scrive Filo (le notifiche salvate, che può scrivere un modello, le dice lo STATO).
   function daFuoriDi(ev) {
     const g = (testi, fonte) => [{ testi: testi.filter(Boolean), fonte }];
     switch (ev.tipo) {
