@@ -5721,7 +5721,7 @@ function vediSchermoPerModello(action, res) {
   }
   if (o.nessuna) {
     return `Nessuna finestra aperta si chiama «${E.perCanaleSistema(o.richiesta)}». Queste sono quelle che si possono guardare:\n${finestre(o.elenco)}${nota}\n`
-      + 'Se una è chiaramente quella che intende l\'utente, richiama VEDI_SCHERMO col suo nome esatto; se non si capisce, chiediglielo.';
+      + 'Se una è chiaramente quella che intende l\'utente, richiama computer(guarda) col suo nome esatto; se non si capisce, chiediglielo.';
   }
   if (Array.isArray(o.elenco)) {
     return `Finestre che si possono guardare adesso:\n${finestre(o.elenco)}${nota}\n`
