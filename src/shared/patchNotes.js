@@ -12,6 +12,8 @@
       version: '0.2.278', date: '2026-11-13',
       fixes: [
         { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
+        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
+        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
       ],
     },
     {
@@ -68,8 +70,6 @@
       fixes: [
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
-        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
-        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
       ],
     },
     {
