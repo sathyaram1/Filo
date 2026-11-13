@@ -1123,6 +1123,7 @@ export function buildPayload(bucket, ctx = {}) {
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
         ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
+        ...conRamoVuoto(ctx),
       };
     case 'fixer': {
       // La ripresa dopo la risposta dell'owner: il lavoro si era fermato su una
