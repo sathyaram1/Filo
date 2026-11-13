@@ -6100,7 +6100,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   }
   if (type === 'RIAPRI_SCHEDA' && res.output && !res.needsConfirm && !res.output.nonRaggiungibile && !res.output.tagliato) {
     const o = res.output;
-    if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con SCHEDE_CHIUSE e usa l\'id che ti torna.';
+    if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con scheda(chiuse) e usa l\'id che ti torna.';
     if (!o.riaperta) return `Scheda NON riaperta${o.error ? `: ${o.error}` : ''}.`;
     return conTitolo('Scheda riaperta com\'era. Dillo in una riga.', o.titolo);
   }
