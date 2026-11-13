@@ -2683,7 +2683,12 @@ export function emit(bucket, ctx) {
     process.stderr.write(`[dispatch] il commit verificato (${unaRiga(ctx.shaVerificato).slice(0, 12)}) qui non c'è e da origin non è arrivato: alla consegna il confronto lo rifà il server\n`);
   }
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
+  else {
+    writeRole(ROOT, bucket.role, {
+      dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '',
+      main: riallinea ? mainAllaPresa() : '',
+    });
+  }
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
