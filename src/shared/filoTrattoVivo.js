@@ -328,7 +328,7 @@
       if (stringa(p.cercato)) g.cercati.push(p.cercato);
       else if (stringa(p.titolo)) g.titoli.push(p.titolo);
     }
-    if (!gruppi.size) return { testo: '', daSiti: [] };
+    if (!gruppi.size) return { testo: '', daFuori: [] };
     const daSiti = [];
     const ultimiDistinti = (lista) => {
       const visti = new Set();
