@@ -288,7 +288,7 @@
     // ── computer ──
     ESEGUI_COMANDO: {
       via: ['computer', 'comando'], risultato: true,
-      description: 'un comando della shell, uno per chiamata; la cartella resta fra un comando e l\'altro. spiegazione: cosa fa, in prima persona, per chi non sa cos\'è un terminale. Serve la modalità terminale.',
+      description: 'un comando shell per chiamata (la cartella resta); spiegazione: cosa fa, in prima persona, per chi non conosce il terminale.',
       properties: { comando: S(), spiegazione: S() }, required: ['comando', 'spiegazione'],
     },
     VEDI_SCHERMO: {
