@@ -383,23 +383,24 @@
     // Seguiti: quelli delle pagine (in mano alle routine) più quelli indicati
     // dal registro, finché la pagina non li segue da sé o non scadono. Sopra il
     // tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
+    // Quelli del registro (appena presi da un worker, pochi) a ogni giro; quelli delle pagine ogni `seguitiMs`.
     async function daiSeguiti() {
       if (typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
-      if (now() - lastSeguitiAt < seguitiMs) return [];
       const dallePagine = typeof seguiti === 'function' ? (seguiti() || []).map(String).filter(Boolean) : [];
       const seguitiDallePagine = new Set(dallePagine);
       const ora = now();
       for (const [id, da] of daRegistro) {
         if (seguitiDallePagine.has(id) || ora - da > registroSeguiMs) daRegistro.delete(id);
       }
-      const tutti = Array.from(new Set([...dallePagine, ...daRegistro.keys()]));
+      const tocca = ora - lastSeguitiAt >= seguitiMs;
+      const tutti = Array.from(new Set([...(tocca ? dallePagine : []), ...daRegistro.keys()]));
       const ids = tutti.slice(0, seguitiTetto);
       if (tutti.length > ids.length) {
         avvisa(`seguiti: ${tutti.length} sopra il tetto di ${seguitiTetto}, riallineamento completo al giro dopo`);
         lastReconcileAt = 0;
       }
       if (ids.length === 0) return [];
-      const inizio = now();
+      const inizio = tocca ? ora : lastSeguitiAt;
       const vers = await versionsOf(ids);
       const mossi = [];
       for (const v of Array.isArray(vers) ? vers : []) {
