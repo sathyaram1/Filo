@@ -931,13 +931,64 @@
       }
       let b = `• ${c.title} [${c.id}]\n  Cosa fa: ${c.desc}\n  Come si attiva: ${c.invoke}`;
       if (c.doesNot) b += `\n  Limiti: ${c.doesNot}`;
+      const s = STRUMENTO[c.id];
+      if (s) b += s === SOLO_A_MANO ? '\n  Dalla chat: nessuno strumento la comanda, si spiega all\'utente.' : `\n  Dalla chat: ${s}.`;
       blocks.push(b);
     }
     return blocks.join('\n\n');
   }
 
+  // Lo strumento della chat che arriva a ogni capacità (SPEC-CONTESTO § Gli strumenti: quello che l'utente fa in Filo lo
+  // fa anche Filo). SOLO_A_MANO: un gesto dell'interfaccia che nessuno strumento comanda, e che la chat sa spiegare.
+  // Sentinella: tests/unit/capacitaStrumenti.test.mjs (ogni voce ne ha uno, e lo strumento esiste).
+  const SOLO_A_MANO = 'filo_su_di_se(capacita)';
+  const STRUMENTO = Object.freeze({
+    'new-tab': 'scheda(apri)', 'close-tab': 'scheda(chiudi)', 'reopen-closed-tab': 'scheda(riapri)',
+    'navigate-back-forward': SOLO_A_MANO, 'switch-tab-by-number': 'scheda(mostra)', 'switch-tab-next-prev': 'scheda(mostra)',
+    reload: SOLO_A_MANO, home: 'scheda(finestra)', 'address-bar': 'scheda(apri)', incognito: SOLO_A_MANO,
+    fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
+    'pannello-strumenti': 'home(pannello)', 'page-zoom': 'scheda(zoom)', 'network-error-page': SOLO_A_MANO,
+    'auto-archive': 'scheda(riordina)', 'restore-tabs': SOLO_A_MANO, 'reorder-tabs': SOLO_A_MANO, 'drag-tab': SOLO_A_MANO,
+    'tab-preview': 'impostazioni(imposta)', 'open-in-background': 'scheda(apri)', 'explain-selection': SOLO_A_MANO,
+    'translate-selection': SOLO_A_MANO, 'edit-selection': SOLO_A_MANO, 'read-aloud': SOLO_A_MANO, dictate: SOLO_A_MANO,
+    'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
+    'email-nei-siti': 'impostazioni(imposta)', 'testo-dei-campi': 'impostazioni(imposta)', 'spellcheck-manage': 'scheda(apri)',
+    editor: 'file(leggi_editor)', 'translate-page': SOLO_A_MANO, 'explain-image': SOLO_A_MANO,
+    'copy-download-image': SOLO_A_MANO, 'search-image': SOLO_A_MANO, 'video-audio-controls': 'scheda(pausa_audio)',
+    'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
+    ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
+    'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': SOLO_A_MANO,
+    'open-for-later': 'scheda(salvate)', archive: 'scheda(chiuse)', 'chat-archive': 'filo(cerca)',
+    'visited-pages': 'filo(cancella_pagine)', 'filo-accaduti': 'filo(espandi)', 'chat-archive-recall': 'filo(cerca)',
+    'response-length': 'impostazioni(imposta)', 'app-chats-in-filo': 'filo(cerca)', 'chat-conti-cambi': 'web(cerca)',
+    history: 'scheda(apri)', 'downloads-list': 'scheda(apri)', 'help-sidebar': 'scheda(finestra)',
+    'chat-schede-trascinate': SOLO_A_MANO, 'chat-immagini-trascinate': SOLO_A_MANO, 'voice-chat': SOLO_A_MANO,
+    'web-search-assistant': 'web(cerca)', feedback: 'filo_su_di_se(feedback)', 'transparency-docs': 'filo_su_di_se(documento)',
+    'filo-assistant': SOLO_A_MANO, 'read-user-documents': 'file(leggi)', 'find-user-documents': 'file(cerca)',
+    'file-names': 'file(rinomina)', 'delete-files': 'file(elimina)', 'terminal-mode': 'computer(comando)',
+    'read-web-pages': 'web(leggi)', 'look-at-screen': 'computer(guarda)', 'generate-dashboard': 'impostazioni(imposta)',
+    'agent-actions': 'scheda(apri)', 'autonomy-levels': 'impostazioni(imposta)', 'filo-memory': 'memoria(correggi)',
+    'filo-notes': 'file(appunto)', 'filo-timers': 'promemoria(timer)', 'filo-alarms': 'promemoria(sveglia)',
+    'filo-calendar-event': 'promemoria(evento)', 'filo-notifications': 'home(carta)', 'system-status': 'computer(volume)',
+    'system-control': 'computer(volume)', 'desktop-icons': 'computer(ordina_desktop)', 'home-page': 'scheda(finestra)',
+    'home-filo': 'filo(cerca)', 'home-cards': 'home(carta)', 'patch-notes': 'scheda(apri)', 'segnalazioni-mie': 'scheda(apri)',
+    'auto-update': 'impostazioni(aggiorna)', 'options-models': 'impostazioni(imposta)', 'model-cost-estimate': SOLO_A_MANO,
+    'open-weights-only': 'impostazioni(imposta)', 'own-key-all-providers': 'impostazioni(imposta)',
+    'host-order': 'impostazioni(imposta)', 'model-usage-census': SOLO_A_MANO, preferences: 'impostazioni(pulsante)',
+    'settings-by-chat': 'impostazioni(imposta)', 'undo-changes': 'filo(annulla)', security: 'impostazioni(imposta)',
+    'google-account': 'impostazioni(account)', 'accesso-ai-siti': SOLO_A_MANO, 'dangerous-sites': 'impostazioni(imposta)',
+    'cookie-banners': 'impostazioni(imposta)', 'stay-signed-in': 'impostazioni(imposta)', 'cookie-embed': 'impostazioni(imposta)',
+    'cookie-embed-broken': 'impostazioni(imposta)', 'ad-block': 'impostazioni(imposta)', 'video-ad-skip': 'impostazioni(imposta)',
+    'youtube-ad-block': 'impostazioni(imposta)', 'site-permissions': 'impostazioni(togli_permesso)',
+    'site-own-menu': 'impostazioni(imposta)', 'filo-off-on-site': 'impostazioni(imposta)', 'data-export-import': SOLO_A_MANO,
+    'data-wipe-all': 'scheda(apri)', 'pagine-delicate': 'impostazioni(imposta)', 'auto-feedback': 'impostazioni(imposta)',
+    'contatori-anonimi': 'impostazioni(imposta)', 'filo-shortcuts': 'impostazioni(imposta)', theme: 'impostazioni(imposta)',
+    'aspetto-su-misura': 'impostazioni(aspetto)', onboarding: 'impostazioni(pulsante)', credits: 'impostazioni(crediti)',
+    'credits-warning': 'impostazioni(imposta)', invites: 'scheda(apri)',
+  });
+
   global.SN_CAPABILITIES = {
     CATEGORIES, CAPABILITIES, index, get, byCategory, all,
-    renderIndexForPrompt, renderDetailForPrompt,
+    renderIndexForPrompt, renderDetailForPrompt, STRUMENTO, SOLO_A_MANO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
