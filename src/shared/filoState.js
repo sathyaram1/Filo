@@ -454,16 +454,14 @@
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
     // home. Li può aver scritti un modello che leggeva una pagina (#592.4).
-    const salvati = (righe) => E.imbusta({
-      tipo: 'TESTO_SALVATO',
-      conIntestazione: true,
-      testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
-    });
+    const pulite = (righe) => righe.map((r) => E.neutralizza(r, { unaRiga: true }));
+    const salvati = (righe) => E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: pulite(righe).join('\n') });
     {
       const righe = ['PROCESSI ATTIVI'];
+      let voci = [];
       if (!state.timers.length) righe.push('(nessuno)');
       else {
-        righe.push(salvati(state.timers.map((t) => {
+        voci = state.timers.map((t) => {
           if (t.kind === 'alarm') {
             // Le sveglie si descrivono con l'orario assoluto: a ore di distanza un countdown
             // confonde.
