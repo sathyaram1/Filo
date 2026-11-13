@@ -1,6 +1,6 @@
 // Le pagine delicate (#1004): posta, banche, sanità, pubblica amministrazione, i siti dell'utente e quelli che hanno
-// mostrato un campo password o carta. Di queste i lavori automatici non mandano niente a un modello. Logica pura: i campi
-// visti li ricorda src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
+// mostrato un campo password o carta. Qui solo COSA una pagina è; cosa ne parte da solo lo decidono i livelli di privacy
+// (livelliPrivacy.js). Logica pura: i campi visti li ricorda src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
 
 (function (global) {
   'use strict';
@@ -48,8 +48,11 @@
   // Come si chiama il motivo in una riga per un modello o per l'utente.
   const NOMI = {
     posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'pubblica amministrazione', campi: 'password o carta',
-    utente: 'scelta da te',
+    utente: 'scelta da te', sempre: 'riservata', incognito: 'incognito',
   };
+  // Quello che `classifica` può dire di una pagina con l'elenco di serie: il resto (riservata, incognito) è una decisione
+  // dei livelli, non una classe, e su una scheda archiviata non vale come tale.
+  const CLASSI = Object.freeze(['utente', ...Object.keys(PREDEFINITI), 'campi']);
 
   // L'host di un indirizzo web, come si confronta con gli elenchi: minuscolo, senza «www.» e senza punto finale.
   function host(url) {
@@ -84,11 +87,6 @@
     return out;
   }
 
-  function attivo(settings) {
-    const p = settings && settings.security && settings.security.pagineDelicate;
-    return !(p && p.enabled === false);
-  }
-
   function sitiUtente(settings) {
     const p = settings && settings.security && settings.security.pagineDelicate;
     return pulisci(p && p.siti);
@@ -102,9 +100,7 @@
 
   // Il motivo per cui una pagina è delicata ('utente', una categoria dell'elenco, 'campi'), o null. `campi(host)` dice se
   // il sito ha mostrato un campo password o carta.
-  function classifica(url, { attivo: acceso = true, sitiUtente: propri = [], elenco: categorie = PREDEFINITI, campi = null,
-    nonDelicati: tolti = [] } = {}) {
-    if (!acceso) return null;
+  function classifica(url, { sitiUtente: propri = [], elenco: categorie = PREDEFINITI, campi = null, nonDelicati: tolti = [] } = {}) {
     const h = host(url);
     if (!h) return null;
     if (dentro(h, pulisci(propri))) return 'utente';
@@ -152,6 +148,6 @@
     return NOMI[motivo] || String(motivo || '');
   }
 
-  global.SN_PAGINE_DELICATE = { PREDEFINITI, host, elenco, attivo, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
+  global.SN_PAGINE_DELICATE = { PREDEFINITI, CLASSI, host, elenco, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAGINE_DELICATE;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

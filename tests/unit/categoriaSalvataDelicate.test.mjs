@@ -34,8 +34,12 @@ const TITOLO = 'Posta in arrivo (3) - mario.rossi@gmail.com';
 const ESTRATTO = 'Saldo disponibile 12.345,67 euro. IBAN IT60X0542811101000000123456';
 const DESCRIZIONE = 'Le tue email di Gmail';
 
+// I livelli di privacy (#1589): qui di norma «Chiedi sulle delicate»; di serie la posta parte in anticipo.
+const CHIEDI_DELICATE = { security: { privacy: { livello: 'delicate' } } };
+const TUTTO = { security: { privacy: { livello: 'anticipo', chiedi: [] } } };
+
 // Salva una pagina come fa il tasto destro (SAVE_PAGE) o un link (SAVE_LINK), e aspetta la categoria.
-async function salva({ settings = {}, incognito = false, tipo = MSG.SAVE_PAGE, page, sender = null }) {
+async function salva({ settings = CHIEDI_DELICATE, incognito = false, tipo = MSG.SAVE_PAGE, page, sender = null }) {
   for (const k of Object.keys(disco)) delete disco[k];
   const chiamate = [];
   const pagine = [];
@@ -83,8 +87,8 @@ test('un link a una banca salvato dal menu: anche lì solo il tipo', async () =>
   assert.ok(!chiamate[0].prompt.includes('intesasanpaolo') && !chiamate[0].prompt.includes('Il mio conto'));
 });
 
-test('una pagina della rete di casa non parte verso il modello, nemmeno a regola delle delicate spenta', async () => {
-  for (const settings of [{}, { security: { pagineDelicate: { enabled: false } } }]) {
+test('una pagina della rete di casa non parte verso il modello, nemmeno a «Tutto in anticipo»', async () => {
+  for (const settings of [CHIEDI_DELICATE, TUTTO]) {
     const { chiamate, voce } = await salva({ settings, page: { url: 'http://192.168.1.1/', title: 'Router TIM', excerpt: 'Password Wi-Fi: segreta' } });
     assert.equal(chiamate.length, 0);
     assert.ok(voce, 'la pagina resta salvata');
@@ -101,11 +105,13 @@ test('una pagina normale manda titolo ed estratto come prima', async () => {
   assert.equal(voce.category, 'Comunicazioni');
 });
 
-test('con le pagine delicate spente la posta va al modello come oggi', async () => {
-  const { chiamate } = await salva({ settings: { security: { pagineDelicate: { enabled: false } } }, page: posta });
-  assert.equal(chiamate.length, 1);
-  assert.match(chiamate[0].prompt, /Posta in arrivo/);
-  assert.match(chiamate[0].prompt, /IBAN/);
+test('col livello di serie, e a «Tutto in anticipo», la posta va al modello come una pagina qualunque', async () => {
+  for (const settings of [{}, TUTTO]) {
+    const { chiamate } = await salva({ settings, page: posta });
+    assert.equal(chiamate.length, 1);
+    assert.match(chiamate[0].prompt, /Posta in arrivo/);
+    assert.match(chiamate[0].prompt, /IBAN/);
+  }
 });
 
 test('un sito aggiunto dall\'utente fra i delicati vale come la posta', async () => {

@@ -233,11 +233,11 @@ async function guarda(c, segno) {
   const quando = funziona.get(chiaveFunziona(c));
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
-  // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
+  // Da dove il livello di privacy chiede prima (#1589), o col campo password o carta, la foto non parte.
   const Sicurezza = require('./contatoriSicurezza');
   const perContatori = { incognito: !!c.incognito };
   try {
-    const delicata = await globalThis.SN_DELICATE.filtro();
+    const delicata = await globalThis.SN_DELICATE.filtro(null, { tipo: 'immagine' });
     const motivo = delicata(c.urlTop) || delicata(c.urlFrame);
     if (motivo) {
       conta(idServizio(c.urlFrame), 'pagina_delicata', c.incognito);

@@ -44,6 +44,7 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (!win || !win._filoTabs || !sender?.tab?.id || !sender.url) return { ok: false };
     if (!msg || !(msg.hasPassword || msg.hasPayment)) return { ok: true };
+    globalThis.SN_DELICATE?.mostraCampi?.(sender.wc, sender.url);
     await globalThis.SN_DELICATE?.segnaCampi(sender.url, { incognito: !!win._filoTabs.incognito })?.catch?.(() => {});
     return { ok: true };
   });
