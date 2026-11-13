@@ -271,7 +271,7 @@
     },
     RINOMINA_FILE: {
       via: ['file', 'rinomina'], risultato: true,
-      description: 'dà nomi sensati ai file (percorsi, o i file dal nome vuoto di una cartella; tutti anche gli altri); nome per quello detto dall\'utente. L\'estensione resta.',
+      description: 'nomi sensati ai file (percorsi, o quelli dal nome vuoto di una cartella; tutti: anche gli altri); nome: quello detto dall\'utente.',
       properties: { percorsi: LISTA(), cartella: S(), tutti: B(), nome: S() }, required: [],
     },
     ELIMINA_FILE: {
