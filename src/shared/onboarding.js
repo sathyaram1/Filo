@@ -68,7 +68,7 @@
       kind: 'scoprire',
       label: 'Chi è l’utente e a cosa gli serve il computer',
       detail: 'Lavoro, studio, svago, quali siti frequenta.',
-      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
+      applica: 'Appena lo sai, chiama memoria(impara) con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       id: 'stile',
