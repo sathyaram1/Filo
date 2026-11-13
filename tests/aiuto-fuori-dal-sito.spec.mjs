@@ -73,7 +73,8 @@ async function nienteAlSito(app, sito,parola) {
   await sito.waitForTimeout(400);
   expect(await sito.evaluate(() => window.cosaHaVisto())).not.toContain(parola);
   expect(await sito.evaluate((s) => window.trova(s), parola)).toBe(false);
-  expect(await sito.evaluate(() => document.querySelector('.sn-sidebar, .sn-sidebar-conv, [data-sn-riquadro]')), 'nel documento del sito non entra il pannello').toBeNull();
+  expect(await sito.evaluate(() => document.querySelector('.sn-sidebar, .sn-sidebar-conv')), 'nel documento del sito non entra il pannello').toBeNull();
+  expect(await riquadriNelSito(app, sito), 'nel documento del sito non entra il pannello').toEqual([]);
 }
 
 test('Aiuto su un sito: la domanda scritta, selezionata e copiata e la risposta non le legge il sito', async ({ app, shell, openTab, testServer }) => {
