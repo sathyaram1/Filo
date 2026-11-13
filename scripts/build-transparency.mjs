@@ -402,7 +402,7 @@ function emitModule({ docs, glossary }) {
 
   const NAV = ${JSON.stringify(NAV, null, 2).replace(/\n/g, '\n  ')};
   const GLOSSARY = ${JSON.stringify(glossary, null, 2).replace(/\n/g, '\n  ')};
-  const DOCS = ${JSON.stringify(payload, null, 2).replace(/\n/g, '\n  ')};
+  const DOCS = ${aRighe(testi, JSON.stringify(payload, null, 2).replace(/\n/g, '\n  '))};
 
   function all() { return DOCS.slice(); }
   // Una sezione si chiede col nome interno, con quello della barra o col titolo:
