@@ -83,7 +83,7 @@
     // ── scheda ──
     NAVIGA: {
       via: ['scheda', 'apri'],
-      description: 'apre un sito in una scheda nuova; background true la lascia dietro (musica, «non cambiare scheda»). Per cercare dentro un sito: url la sua home e cerca_nel_sito le parole. Per proporre siti scrivi i link nel testo.',
+      description: 'apre un sito in una scheda nuova (background: dietro). Per cercare dentro un sito: url la home e cerca_nel_sito le parole.',
       properties: { url: S(), etichetta: S(), background: B(), cerca_nel_sito: S() }, required: ['url'],
     },
     MOSTRA_SCHEDA: {
