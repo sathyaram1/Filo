@@ -75,14 +75,14 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
   lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
-import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
+import { fileRiscritti, fusionePropria, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
   proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
@@ -1095,9 +1095,7 @@ function suMainDi(bucket, ctx) {
 
 /** Segna `propria` la fusione del lavoro stesso del feedback («merge-gate: #N …»). PURA. */
 export function segnaProprie(fusioni, num) {
-  const n = numeroFeedback(num);
-  const propria = new RegExp(`^merge-gate: #${n.replace('.', '\\.')}\\b(?!\\.\\d)`);
-  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (n && propria.test(String(f.oggetto || '')) ? { ...f, propria: true } : f));
+  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (fusionePropria(f.oggetto, num) ? { ...f, propria: true } : f));
 }
 
 export function buildPayload(bucket, ctx = {}) {
@@ -2401,18 +2399,27 @@ function positionOnBranch(bucket) {
       : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
   }
   if (isNew) {
-    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH });
+    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH, num: bucket.num, id: bucket.id });
     if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
     if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
   }
   const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
   if (ripartito) {
     const { scelto, altri } = precedenti;
+    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
+    const a = allineaAMain({ root: ROOT, mainBranch: MAIN_BRANCH });
+    if (!a.ok) return { ok: false, kind: 'transient', message: `${branch}: non riesco a portare dentro il ${MAIN_BRANCH} di adesso, e senza si lavorerebbe sul codice di quando ${scelto.ramo} era partito: ${a.errore}` };
+    if (a.fuso) {
+      res.head = a.head;
+      process.stderr.write(`[dispatch] ${branch}: dentro anche il ${MAIN_BRANCH} di adesso, fuso senza conflitti\n`);
+    } else if (a.conflitti.length) {
+      process.stderr.write(`[dispatch] ${branch}: il ${MAIN_BRANCH} di adesso va in conflitto in ${a.conflitti.join(', ')}: non fuso, lo risolve per primo chi lavora\n`);
+    }
     bucket.ripartenza = {
       ramo: scelto.ramo, commit: scelto.propri,
       ...(altri.length ? { altri: altri.map((t) => ({ ramo: t.ramo, commit: t.propri })) } : {}),
+      ...(a.conflitti.length ? { conflittiConMain: a.conflitti } : {}),
     };
-    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
   }
   const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {

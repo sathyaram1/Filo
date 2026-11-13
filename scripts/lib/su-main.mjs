@@ -3,7 +3,7 @@
 // Test: tests/unit/suMain.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
 
 const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepath=off', ...args], {
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
@@ -58,10 +58,29 @@ export function lineaPrincipale(root, ref = 'origin/main') {
   return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
 }
 
-/** La data (ISO) della fusione più recente del lavoro stesso di #N su `ref` («merge-gate: #N …»), '' se non c'è. */
-export function ultimaFusionePropria(root, num, { ref = 'origin/main' } = {}) {
-  if (!numeroFeedback(num)) return '';
-  return git(root, ['log', '--first-parent', ref, '-E', `--grep=^merge-gate: ${regexCitazione(num)}`, '-n1', '--format=%cI']).trim();
+/** L'oggetto è la fusione del lavoro stesso di #N («merge-gate: #N …»), non di un altro che lo cita. PURA. */
+export function fusionePropria(oggetto, num) {
+  return !!numeroFeedback(num) && new RegExp(`^merge-gate: ${regexCitazione(num)}`).test(String(oggetto || ''));
+}
+
+/**
+ * Il lavoro di ogni feedback arrivato su `ref`, letto sulla linea principale: regge anche dopo la potatura del ramo
+ * fuso. «finish: worker/<id>-<stampo>» nomina il tentativo; «merge-gate: #N» solo il numero, che `numeri`
+ * ({ N: id }) traduce. → { id: stampo del più recente } per tentativiSuperati.
+ */
+export function fusioniSuMain(root, { ref = 'origin/main', numeri = {} } = {}) {
+  const perNumero = Object.entries(numeri || {}).filter(([n, id]) => numeroFeedback(n) && id);
+  const out = {};
+  const arriva = (id, stampo) => { if (id && stampo && !(out[id] >= stampo)) out[id] = stampo; };
+  const righe = git(root, ['log', '--first-parent', ref, '-E', '--grep=^(merge-gate|finish): ', '--format=%cI%x09%s']).split('\n');
+  for (const riga of righe.filter(Boolean)) {
+    const [data, ...o] = riga.split('\t');
+    const oggetto = o.join('\t');
+    const nominato = leggiTentativo((/^(?:merge-gate|finish): (\S+)/.exec(oggetto) || [])[1]);
+    if (nominato) { arriva(nominato.id, nominato.stampo); continue; }
+    for (const [n, id] of perNumero) if (fusionePropria(oggetto, n)) arriva(id, stampoDi(Date.parse(data)));
+  }
+  return out;
 }
 
 /**
@@ -137,9 +156,10 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
  * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
  * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
  * sessione si guarda chi lavora già sugli stessi file. Sono rami di lavoro solo `worker/` e `claude/`; `fuori`, se
- * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge.
+ * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge. `numeri` ({ N: id }) come
+ * in fusioniSuMain.
  */
-export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null } = {}) {
+export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = {} } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
@@ -150,7 +170,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
   const linea = lineaPrincipale(root, base);
-  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })));
+  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })),
+    { fusioni: fusioniSuMain(root, { ref: base, numeri }) });
   const perId = new Map();
   for (const t of tutti) {
     const l = leggiTentativo(t.ramo);

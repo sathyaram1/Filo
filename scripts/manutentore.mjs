@@ -99,6 +99,11 @@ export function conNumeri(rami, indice) {
   });
 }
 
+/** { N: id } dall'indice, per leggere su main le fusioni «merge-gate: #N» dei worker (ramiInCorso). PURA. */
+export function numeriDellIndice(indice) {
+  return Object.fromEntries((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.num), String(f.id)]));
+}
+
 /**
  * Toglie i rami i cui feedback citati sono tutti chiusi secondo l'indice (arrivati su main da un altro ramo, o
  * archiviati): non arriveranno su main. Un numero oltre l'ultimo dell'indice può essere nato dopo: resta. Senza indice
@@ -1046,7 +1051,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const r = rami();
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indice), indice, r.fuori);
+    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
     if (cmd === 'rami') { console.log([lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n')); return 0; }
     const num = String(arg).replace(/^#/, '');
     const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
@@ -1130,7 +1135,8 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
       const r = rami();
-      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indiceDalServer(sc.schede)), indiceDalServer(sc.schede), r.fuori);
+      const indice = indiceDalServer(sc.schede);
+      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
       const dirRuoli = join(ROOT, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;

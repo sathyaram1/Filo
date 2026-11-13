@@ -38,8 +38,8 @@ import { senzaToken, cartellaCloneServer } from './git-server.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
-import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
-import { lineaPrincipale, numeroFeedback, ultimaFusionePropria } from './su-main.mjs';
+import { leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { fileInConflitto, fusioniSuMain, lineaPrincipale, numeroFeedback } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -106,7 +106,7 @@ export function isProtectedBranch(name, mainBranch = '') {
  * nomi di ramo validi e ordina cronologicamente come stringa.
  */
 export function attemptStamp(nowMs = Date.now()) {
-  return new Date(nowMs).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  return stampoDi(nowMs);
 }
 
 /**
@@ -153,13 +153,7 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
   if (!f.ok) return f;
   const main = `origin/${mainBranch}`;
   const conFusi = statoDeiTentativi(root, g, main, rami);
-  // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
-  let fusioni = {};
-  try {
-    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
-    if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
-  } catch (_) { /* senza la storia di main resta la regola sui rami */ }
-  const superati = tentativiSuperati(conFusi, { fusioni });
+  const superati = tentativiSuperati(conFusi, { fusioni: fusioniLette(root, main, numeriDi(num, safe)) });
   const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
     const n = g(['rev-list', '--count', `${main}..${t.head}`]);
     return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
@@ -193,36 +187,78 @@ function statoDeiTentativi(root, g, main, rami) {
   return rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main), vuoto: linea.has(t.head) }));
 }
 
+function numeriDi(num, id) {
+  const n = numeroFeedback(num);
+  const safe = idNelRamo(id);
+  return n && safe ? { [n]: safe } : {};
+}
+
+/** Senza la storia di main resta la regola sui rami: un «non so» qui non chiude e non riapre niente. */
+function fusioniLette(root, main, numeri) {
+  try { return fusioniSuMain(root, { ref: main, numeri }); } catch (_) { return {}; }
+}
+
 /**
- * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: va fatto mentre il ramo
- * fuso c'è ancora, prima che la potatura lo tolga, e un feedback chiuso non riparte più (#2152). Best-effort.
+ * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: un feedback chiuso non
+ * riparte più (#2152). La fusione letta su main conta anche qui, così regge dopo la potatura del ramo fuso; `num` e
+ * `id`, il feedback che riparte, traducono anche la sua fusione dal numero. Best-effort.
  */
-export function chiudiSuperatiOvunque({ root, mainBranch = 'main' }) {
+export function chiudiSuperatiOvunque({ root, mainBranch = 'main', num = '', id = '' }) {
   const elenco = tentativiSuOrigin(root, 'refs/heads/worker/*');
   if (!elenco.ok) return { ok: false, chiusi: [], errore: elenco.errore };
+  const g = gitIn(root);
+  const main = `origin/${mainBranch}`;
+  const m = scaricaTentativi(g, mainBranch, []);
+  if (!m.ok) return { ok: false, chiusi: [], errore: m.errore };
+  const fusioni = fusioniLette(root, main, numeriDi(num, id));
   const perId = new Map();
   for (const t of elenco.rami) {
     const l = leggiTentativo(t.ramo);
     if (l) perId.set(l.id, [...(perId.get(l.id) || []), t]);
   }
-  const candidati = [...perId.values()].filter((v) => v.length > 1).flat();
+  // Un tentativo solo può essere superato solo da una fusione letta su main: il fratello fuso non c'è più.
+  const candidati = [...perId].filter(([i, v]) => v.length > 1 || fusioni[i]).flatMap(([, v]) => v);
   if (!candidati.length) return { ok: true, chiusi: [] };
-  const g = gitIn(root);
   const f = scaricaTentativi(g, mainBranch, candidati);
   if (!f.ok) return { ok: false, chiusi: [], errore: f.errore };
-  const superati = tentativiSuperati(statoDeiTentativi(root, g, `origin/${mainBranch}`, candidati));
+  const superati = tentativiSuperati(statoDeiTentativi(root, g, main, candidati), { fusioni });
   return chiudiTentativi({ root, rami: [...superati] });
 }
 
 /**
  * Toglie da origin i tentativi superati: lasciati lì nessuno li fonde, e la potatura dei fusi non li vede mai (#2152).
- * Best-effort: un no di origin lascia i rami come sono, e lo dice.
+ * Best-effort: un no di origin lascia i rami come sono, e lo dice. La negoziazione non serve a una cancellazione, e
+ * su HTTP la sua riga «fatal» copriva il vero motivo del no.
  */
 export function chiudiTentativi({ root, rami }) {
   const elenco = (Array.isArray(rami) ? rami : []).filter((r) => leggiTentativo(r));
   if (!elenco.length) return { ok: true, chiusi: [] };
-  const p = gitIn(root)(['push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
+  const p = gitIn(root)(['-c', 'push.negotiate=false', 'push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
   return p.ok ? { ok: true, chiusi: elenco } : { ok: false, chiusi: [], errore: rigaDiErrore(p.out, 'push fallito') };
+}
+
+/**
+ * Porta dentro il ramo ripartito il main di adesso: nato dalla punta di un tentativo morto, lavorerebbe sul codice di
+ * quando quello era partito (#2152.1). Con conflitti non fonde: li dice, e chi lavora li risolve per primi.
+ * → { ok: true, head, fuso, conflitti: [] } | { ok: false, errore }
+ */
+export function allineaAMain({ root, mainBranch = 'main' }) {
+  const g = gitIn(root);
+  const main = `origin/${mainBranch}`;
+  if (antenato(g, main, 'HEAD')) return { ok: true, head: headSha(root), fuso: false, conflitti: [] };
+  let conflitti;
+  try { conflitti = fileInConflitto(root, { prima: 'HEAD', base: main }); } catch (e) {
+    return { ok: false, errore: rigaDiErrore(String((e && e.stderr) || ''), String((e && e.message) || e)) };
+  }
+  if (conflitti.length) return { ok: true, head: headSha(root), fuso: false, conflitti };
+  const io = g(['config', 'user.email']);
+  const chi = io.ok && io.out ? [] : ['-c', 'user.name=claude-routine', '-c', 'user.email=claude@routine'];
+  const r = g([...chi, 'merge', '--no-ff', '--no-edit', '-m', `ripartenza: dentro il ${mainBranch} di adesso`, main]);
+  if (!r.ok) {
+    g(['merge', '--abort']);
+    return { ok: false, errore: rigaDiErrore(r.out, 'merge fallito') };
+  }
+  return { ok: true, head: headSha(root), fuso: true, conflitti: [] };
 }
 
 // (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature
@@ -739,7 +775,9 @@ function scaricaDaOrigin(root, ref, noto = null) {
 
 /** La riga di git che dice il motivo, da ricopiare dentro le virgolette di `--guasto "…"` (il guasto di halt). PURA. */
 export function rigaDiErrore(testo, riserva = '') {
-  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean);
+  // La negoziazione di un push fallisce da sola e git prosegue: la sua riga «fatal» non è il motivo del no.
+  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean)
+    .filter((r) => !/--negotiate-only|push negotiation failed/.test(r));
   const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || riserva);
   return riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
 }
