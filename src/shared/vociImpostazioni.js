@@ -285,6 +285,8 @@
   }
 
   // ── Le voci per la chat ────────────────────────────────────────────────────
+  // Le shell di ogni sistema: quelle valide qui le dice la parte dell'utente, perché le voci sono uguali per tutti.
+  const SHELL_AMMESSE = '"powershell" | "cmd" | "bash" | "sh" (quelle valide su questo computer le dice IL COMPUTER DELL\'UTENTE)';
   // Come la chat la cambia: la chiave di impostazioni(imposta) coi valori ammessi, o il token di impostazioni(aspetto).
   function chiaveDi(percorso) {
     if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false, ammessi: '' };
