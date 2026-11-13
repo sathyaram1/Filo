@@ -303,7 +303,7 @@
     },
     WIFI: {
       via: ['computer', 'wifi'],
-      description: 'il Wi-Fi: acceso, collegarsi a una rete conosciuta, dimentica una rete, elenca.',
+      description: 'il Wi-Fi e le reti conosciute.',
       properties: { acceso: B(), rete: S(), dimentica: B(), elenca: B() }, required: [],
     },
     BLUETOOTH: {
