@@ -157,7 +157,7 @@
     },
     REGOLA_PROXY_DOMINIO: {
       via: ['scheda', 'regola_paese'],
-      description: 'apri sempre un dominio da un paese (senza dominio: quello della scheda davanti).',
+      description: 'un dominio si apre sempre da un paese (senza dominio: la scheda davanti).',
       properties: { country: S(), dominio: S() }, required: ['country'],
     },
     RIMUOVI_REGOLA_PROXY: {
