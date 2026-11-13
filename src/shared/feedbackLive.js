@@ -480,12 +480,14 @@
       for (const r of tutte) {
         if (!r || !r._id) continue;
         const id = String(r._id);
+        if (noti) noti.add(id);
         if (r._updateTime && versioniSeguite.get(id) === r._updateTime) continue;
         versioniSeguite.set(id, r._updateTime || null);
         perId.set(id, r);
       }
       for (const r of await dalRegistro()) if (r && r._id) perId.set(String(r._id), r);
       for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
+      for (const r of await controllo()) if (r && r._id) perId.set(String(r._id), r);
       lastTickAt = startedAt;
       return { kind: 'changed', rows: Array.from(perId.values()) };
     }
