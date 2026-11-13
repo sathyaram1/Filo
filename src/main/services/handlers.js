@@ -8054,7 +8054,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (tipo === 'aggiungi') return no('la carta è già nella home');
   if (tipo === 'togli') {
     if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
-      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+      return no('un timer o una sveglia si tolgono con promemoria(cancella)');
     }
     let avvisi = 0;
     for (const v of voci) {
