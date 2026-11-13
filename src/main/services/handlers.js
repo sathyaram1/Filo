@@ -2462,7 +2462,8 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   const A = globalThis.SN_AUTONOMIA;
   const aut = (impostazioni && impostazioni.autonomia) || {};
   const livello = A.livelloAttivo(aut.livello);
-  const costo = ing.difesa ? A.COSTO_MAX : (A.costoValido(ing.costo) ? A.costoEffettivo(ing.costo, ing.campo, aut.manopole) : 0);
+  const costoDi = (c) => A.costoReale({ costo: c, difesa: ing.difesa, campo: ing.campo, manopole: aut.manopole }) ?? 0;
+  const costo = costoDi(ing.costo);
   const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
   const statoPer = (c) => A.stato({ fonti: A.fontiPerCosto(fonti, c), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const st = statoPer(costo);
