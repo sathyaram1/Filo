@@ -313,7 +313,7 @@
     },
     ORDINA_DESKTOP: {
       via: ['computer', 'ordina_desktop'],
-      description: 'mette in ordine le icone del desktop: ordine nome, tipo, data o dimensione; verso righe o colonne; al_contrario; cartelle_prima.',
+      description: 'mette in ordine le icone del desktop (ordine nome|tipo|data|dimensione, verso righe|colonne).',
       properties: { ordine: S(), verso: S(), al_contrario: B(), cartelle_prima: B() }, required: [],
     },
 
