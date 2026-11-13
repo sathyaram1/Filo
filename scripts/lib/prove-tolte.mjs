@@ -355,25 +355,25 @@ export function rilieviMessiDaParte(rilievi, daCorreggere) {
 }
 
 /**
- * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, un vicino col `?`, o un interno col `?`
- * di livello 0 o 1 (un 2 col `?` si corregge con la consigliata, #1202).
+ * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno (anche il vicino dello stato vecchio), o
+ * un interno di livello 1 col `?` senza `!` (un 2 col `?` si corregge con la consigliata, #1202; un `?!` ferma).
  * La sua prova esce PRIMA del verdetto, col commit della critica (#1555; il perché: routines/roles/_critica-e-livelli.md). PURA.
  */
 export function esceInOgniEsito(f) {
   const sede = String((f && f.sede) || 'i').toLowerCase();
-  if (sede === 'e') return true;
-  return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
+  if (sede === 'e' || sede === 'v') return true;
+  return !!(f && f.decision) && f.irreversibile !== true && Number(f.level) <= 1;
 }
 
 /**
- * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202). La
- * domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o col `!` a ogni livello (#1202,
+ * #2339). La domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
  * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
  */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
     && String(f.sede || 'i').toLowerCase() === 'i'
-    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
+    && (Number(f.level) >= 3 || f.irreversibile === true));
 }
 
 // I titoli dei casi (anche dei describe) scritti come testo: un titolo composto a runtime non si legge, e non ferma.

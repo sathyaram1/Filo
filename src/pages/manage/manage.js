@@ -39,8 +39,8 @@
   const mgRiservatiTettoSave = document.getElementById('mgRiservatiTettoSave');
   const mgRiservatiTettoMsg  = document.getElementById('mgRiservatiTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
-  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
-  // per i soli 0; più il testo in coda alla risposta (fixInstructions).
+  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1; più il
+  // testo in coda alla risposta (fixInstructions).
   const mgCap3     = document.getElementById('mgCap3');
   const mgCap3Save = document.getElementById('mgCap3Save');
   const mgCap3Msg  = document.getElementById('mgCap3Msg');
@@ -50,9 +50,6 @@
   const mgCap1     = document.getElementById('mgCap1');
   const mgCap1Save = document.getElementById('mgCap1Save');
   const mgCap1Msg  = document.getElementById('mgCap1Msg');
-  const mgCap0     = document.getElementById('mgCap0');
-  const mgCap0Save = document.getElementById('mgCap0Save');
-  const mgCap0Msg  = document.getElementById('mgCap0Msg');
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
@@ -375,7 +372,6 @@
   const CAP3_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP3) || 'filo_automation_cap3';
   const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
-  const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
   // Nessun default dei bilanci nel codice: i numeri stanno solo nel documento del server; un
   // campo che lì non c'è si mostra vuoto, e lo si dice.
@@ -677,7 +673,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgRiservatiSwitch) mgRiservatiSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
       mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
@@ -687,8 +683,8 @@
   }
 
   // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
-  // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+  // Quattro campi sul doc Firestore config/routines (feedback #561, §4; #2339):
+  //   cap3/cap2/cap1  giri per i rilievi di livello 3/2/1 (come si
   //         spendono: decideRound in verifierRound.js);
   //   fixInstructions  il testo che il server aggiunge in coda alla risposta
   //         a una critica (vuoto = il testo del server).
@@ -711,7 +707,6 @@
     cap3: { input: mgCap3, save: mgCap3Save, msg: mgCap3Msg, cacheKey: CAP3_KEY, min: AUTOMATION.CAP_MIN },
     cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
     cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
-    cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
   };
 
   function setCapMsg(field, text, kind) {

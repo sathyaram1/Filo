@@ -109,7 +109,7 @@ const indice = (righe, re) => righe.findIndex((r) => re.test(r));
 test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, rilievi aperti come feedback, worktree tolti', async () => {
   let filo = null;
   const b = banco({
-    verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }],
+    verdetti: ['fixed', 'pass'], derived: [{ level: null, sede: 'e', text: 'altro lavoro Z' }],
     risposte: [[/server-fondi-pratica/, (riga, o) => { filo = o.env && o.env.FILO_PUBLIC_REPO; }]],
   });
   const fine = await b.motore.avvia();
@@ -123,7 +123,7 @@ test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, r
   assert.equal(filo, '/r/.claude/worktrees/sette');
   const r = b.righe();
   // Prima l'app, poi il server, come dal cancello: la pubblicazione incorpora main di Filo con la parte dell'app (#1222).
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --richiesta-owner --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --richiesta-owner --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs altro lavoro Z - --non-locale$/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
@@ -548,17 +548,21 @@ test('regolaFile e siSovrappongono', () => {
 test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
   const p = { num: 7, slug: 'sette', derivatiAperti: [] };
   const der = [
-    { level: 2, sede: 'e', text: 'esterno uno' },
-    { level: 1, sede: 'i', text: 'interno A' },
-    { level: 0, sede: 'v', text: 'vicino B' },
+    { level: null, sede: 'e', text: 'esterno uno' },
+    { level: 2, sede: 'i', text: 'interno A' },
+    // Lo stato scritto con la scala a quattro livelli (#2339): uno 0 interno vale 1, un vicino è esterno.
+    { level: 0, sede: 'i', text: 'interno zero' },
+    { level: 1, sede: 'v', text: 'vicino B' },
     { level: 1, sede: 'i', decision: true, text: 'scelta C?' },
   ];
   const d = derivatiDaAprire(p, der);
-  assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
-  assert.deepEqual(d.map((x) => x.priorita), [1, 1, 1], 'un 2 nasce a 1: la 2 la mette solo il manutentore');
+  assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'vicino B', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
+  assert.deepEqual(d.map((x) => x.priorita), [null, null, 1, 1], 'gli esterni nascono senza priorità; un 2 nasce a 1: la 2 la mette solo il manutentore');
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
+  assert.match(d[0].testo, /- \[e\] esterno uno/);
+  assert.match(d[3].testo, /- \[2i\] interno A\n- \[1i\] interno zero/);
   p.derivatiAperti.push({ chiave: d[0].chiave });
-  assert.equal(derivatiDaAprire(p, der).length, 2);
+  assert.equal(derivatiDaAprire(p, der).length, 3);
 });
 
 test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuovo, anche dopo pratiche registrate col solo gruppo', () => {
@@ -572,6 +576,16 @@ test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuov
   assert.doesNotMatch(dopo[0].testo, /ALFA/);
   const vecchia = { num: 7, slug: 'sette', derivatiAperti: [{ chiave: primo.chiave }] };
   assert.deepEqual(derivatiDaAprire(vecchia, [alfa, beta]).map((d) => d.titolo), ['coda BETA disordinata']);
+});
+
+test('chiavi registrate con la scala a quattro (#2339): «2e:», «1v:», «0i:» valgono come esterno ed 1, e non riaprono', () => {
+  const p = { num: 7, slug: 'sette', derivatiAperti: [{ chiavi: ['2e:esterno vecchio', '1v:vicino vecchio', '0i:raro vecchio'] }] };
+  const der = [
+    { level: null, sede: 'e', text: 'esterno vecchio' },
+    { level: 1, sede: 'v', text: 'vicino vecchio' },
+    { level: 0, sede: 'i', text: 'raro vecchio' },
+  ];
+  assert.deepEqual(derivatiDaAprire(p, der), []);
 });
 
 test('giro intero con un rimasto messo da parte a ogni giro: ogni rilievo in un feedback solo', async () => {
@@ -951,7 +965,7 @@ test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slu
 });
 
 test('esterni e messi da parte diventano feedback appena la critica li registra, anche se il lavoro si ferma; mai due volte', async () => {
-  const esterno = { level: 1, sede: 'e', text: 'altro lavoro Z' };
+  const esterno = { level: null, sede: 'e', text: 'altro lavoro Z' };
   const fermata = ({ cwd, per }) => {
     per[cwd] = { entry: { ...per[cwd].entry, verdict: 'fail', critique: '- [2i?] scegli A o B', derived: [esterno], at: 'giro-fermo', sha: 1 } };
     return { ok: true, testo: 'fatto', costo: 0 };
@@ -968,14 +982,16 @@ test('esterni e messi da parte diventano feedback appena la critica li registra,
 
 test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso solo; gli altri non si riaprono', async () => {
   const p = nuovaPratica({ num: 7, slug: 'sette' });
-  const derived = [{ level: 1, sede: 'e', text: 'altro lavoro Z' }, { level: 0, sede: 'e', text: 'altro lavoro W' }];
+  const derived = [{ level: null, sede: 'e', text: 'altro lavoro Z' }, { level: 1, sede: 'i', text: 'altro lavoro W' }];
   let rete = false;
   const righe = [];
+  const comandi = [];
   const dep = {
     percorsi: { wt: (s) => `/r/.claude/worktrees/${s}` },
     verifica: () => ({ entry: { derived } }),
     esegui: async (cmd, args) => {
       righe.push(args[1]);
+      comandi.push(args.slice(2).join(' '));
       return /Z/.test(args[1]) || rete ? { code: 0, out: 'Aperto #1001' } : { code: 1, out: 'fetch failed' };
     },
   };
@@ -985,6 +1001,9 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
   rete = true;
   assert.equal(await apriDerivatiDi(dep, p), 0);
   assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
+  // L'esterno nasce senza priorità (#2339): «--priorita null» farebbe respingere il feedback dallo strumento.
+  assert.equal(comandi[0], '- --non-locale');
+  assert.equal(comandi[1], '- --non-locale --priorita 1');
   assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
 });
 

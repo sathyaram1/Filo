@@ -2800,10 +2800,10 @@
             <div class="mg-auto-col">
               <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
               <section class="mg-auto-block" id="mgCap3Block">
-                <label class="mg-auto-field-label" for="mgCap3">Correzioni per i difetti gravi (livello 3)</label>
+                <label class="mg-auto-field-label" for="mgCap3">Correzioni per i lavori che non risolvono (livello 3)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte un difetto di sicurezza, di soldi o che rende Filo
-                  inutilizzabile può tornare indietro per essere corretto. Finito il
+                  Quante volte torna indietro un lavoro che non risolve il problema
+                  nella maggior parte dei casi, o che ne porta uno più grave. Finito il
                   bilancio, usa quelli dei livelli sotto; finiti anche quelli, il
                   lavoro si ferma e decidi tu.
                 </p>
@@ -2816,14 +2816,14 @@
               </section>
 
               <section class="mg-auto-block" id="mgCap2Block">
-                <label class="mg-auto-field-label" for="mgCap2">Correzioni per le funzioni rotte (livello 2)</label>
+                <label class="mg-auto-field-label" for="mgCap2">Correzioni per i lavori a metà (livello 2)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte un difetto che impedisce di ottenere la cosa chiesta
-                  nel caso normale può tornare indietro per essere corretto. Finito
-                  il bilancio, usa quelli dei livelli sotto; finiti anche quelli, il
-                  lavoro passa e i difetti rimasti diventano feedback a parte, figli
-                  del lavoro, a priorità 1: li porta nella rosa il manutentore, se
-                  contano oggi.
+                  Quante volte torna indietro un lavoro che risolve in meno dell'80%
+                  dei casi, o che porta un problema nuovo meno grave dell'originale.
+                  Finito il bilancio, usa quello del livello 1; finito anche quello, il
+                  lavoro passa e i difetti rimasti diventano un feedback a parte,
+                  figlio del lavoro, a priorità 1: lo porta nella rosa il
+                  manutentore, se conta oggi.
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgCap2" class="mg-auto-number"
@@ -2834,34 +2834,19 @@
               </section>
 
               <section class="mg-auto-block" id="mgCap1Block">
-                <label class="mg-auto-field-label" for="mgCap1">Correzioni per i rilievi minori (livello 1)</label>
+                <label class="mg-auto-field-label" for="mgCap1">Correzioni per i casi rari (livello 1)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte cosmetica e attrito fuori dal cammino principale
-                  possono tornare indietro per essere corretti. Finito il bilancio, usa
-                  quello del livello 0; finito anche quello, il lavoro passa e i
-                  rilievi rimasti diventano un feedback a parte, figlio del lavoro.
+                  Quante volte torna indietro un lavoro per un caso molto raro, un
+                  miglioramento incerto o un problema raro. A zero non si correggono
+                  da soli: vanno nel feedback a parte, e si correggono quando nello
+                  stesso giro c'è altro da correggere. Lo usano anche i livelli sopra,
+                  quando hanno finito il loro.
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgCap1" class="mg-auto-number"
                     min="0" max="10" step="1" inputmode="numeric" />
                   <button type="button" class="sn-btn" id="mgCap1Save">Salva</button>
                   <span class="mg-action-msg" id="mgCap1Msg" role="status"></span>
-                </div>
-              </section>
-
-              <section class="mg-auto-block" id="mgCap0Block">
-                <label class="mg-auto-field-label" for="mgCap0">Correzioni per i soli casi rari (livello 0)</label>
-                <p class="mg-auto-block-desc">
-                  A zero, i casi rari trovati da soli non si correggono mai: vanno nel
-                  feedback a parte. Si correggono comunque quando nello stesso giro
-                  c'è altro da correggere. Lo usano anche i livelli sopra, quando
-                  hanno finito il loro.
-                </p>
-                <div class="mg-auto-field-row">
-                  <input type="number" id="mgCap0" class="mg-auto-number"
-                    min="0" max="10" step="1" inputmode="numeric" />
-                  <button type="button" class="sn-btn" id="mgCap0Save">Salva</button>
-                  <span class="mg-action-msg" id="mgCap0Msg" role="status"></span>
                 </div>
               </section>
 

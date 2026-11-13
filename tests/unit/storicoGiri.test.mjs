@@ -61,6 +61,20 @@ test('i totali contano per livello e per esito, e non inventano niente', () => {
   assert.deepEqual(mod.totali(undefined), mod.totali([]));
 });
 
+test('scala a tre (#2339): un esterno senza livello ha la sua riga, mai quella dello 0, che sparisce se è vuota', () => {
+  const lavori = [{ feedbackId: 'f', seq: 2339, subSeq: 0, chiusoMs: 0, rounds: [
+    { at: '2026-11-11T09:00:00.000Z', found: [2, null], external: [null], fixed: [2], consumed: 'cap2', outcome: 'corregge' },
+  ] }];
+  const t = mod.totali(lavori);
+  assert.deepEqual(t.perLivello[0], { trovati: 0, esterni: 0, corretti: 0, pagati: 0 });
+  assert.deepEqual(t.perLivello.e, { trovati: 1, esterni: 1, corretti: 0, pagati: 0 });
+  const testo = mod.formatta({ lavori }, { da: 0, a: Date.parse('2026-12-01T00:00:00Z'), quando });
+  const righe = testo.split('\n');
+  assert.ok(righe.some((r) => /^ {2}1 +2026-11-11T09:00 +2 e +e +2 +dei 2 +corregge$/.test(r)), testo);
+  assert.ok(righe.some((r) => /^ {2}senza livello +1 +1 +0 +0$/.test(r)), testo);
+  assert.ok(!righe.some((r) => /^ {2}0 +/.test(r)), testo);
+});
+
 test('nessun lavoro nella finestra: lo dice, e i totali sono a zero', () => {
   const t = mod.formatta({ lavori: [] }, { da: 0, a: 1000, quando });
   assert.match(t, /: 0$/m);

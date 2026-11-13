@@ -15,9 +15,9 @@ l'avanzamento non si vede; quella intera la leggi dal file del comando in
 sottofondo. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
-- Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
-  l'ha rotto il ramo (il confronto con `main` lo dice), con l'elenco esatto
-  degli spec rotti. I rossi d'ambiente sono scritti in
+- Un rosso **fuori dai rossi noti** che ha rotto il ramo (il confronto con
+  `main` lo dice) è un rilievo interno di livello 2, con l'elenco esatto degli
+  spec rotti; uno che c'era già è esterno. I rossi d'ambiente sono scritti in
   `tests/rossi-noti.json` (`contenitore.specs` per i contenitori delle routine,
   `specs` per la macchina di chi sviluppa). Un rosso nato mentre giravano
   insieme anche le tue prove può essere solo macchina carica: rilancia quello
@@ -43,10 +43,10 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
 [2i] Il salvataggio parte solo dal titolo: col titolo vuoto non salva né il pulsante «Salva» né la scorciatoia.
     Passi: apri l'editor, lascia il titolo vuoto, scrivi, premi Salva: il file non compare.
     Con la scorciatoia di salvataggio, uguale.
-[2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
-[1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
+[e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
+[e] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
 [1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto; consiglio caldo.
-[0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
+[1i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
 
 - **Una famiglia con una causa sola è UN rilievo**: la causa nella riga con
@@ -67,11 +67,11 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
   porta è chiusa e le togli il segno. Una prova che era solo esplorazione
   (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
-  quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
-  nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
+  quella di un rilievo **esterno**, o di un `[1i?]` (senza `!`), nello stesso
+  commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
   sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
-  Se la critica ha un `[3i?]` o un `[2i?!]` il lavoro si ferma e i `?` restano
+  Se la critica ha un `[3i?]` o un `?!` il lavoro si ferma e i `?` restano
   a chi riprende: lì esce solo la prova degli esterni.
   A una prova che copre anche un rilievo che resta togli solo il caso di quello
   che esce, e il suo numero dal nome (`git mv`).
@@ -121,7 +121,7 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
 [1i?] …
-[0e] …" [--domanda <file.json>]
+[e] …" [--domanda <file.json>]
 ```
 
 <!-- includi: _segnala.md -->
@@ -138,11 +138,11 @@ domanda. Un difetto non va lì: è un rilievo col suo livello.
 
 Se il lavoro si ferma lo decidono il livello e il segno, mai la domanda: su un
 rilievo `blocca` non si scrive, e la critica che lo porta non parte. Fermano
-i rilievi interni col `?` di livello 3 o col `!` (`[2i?!]`): il lavoro aspetta
-l'owner in ogni esito, e i rilievi da correggere restano davanti a chi
-riprende dopo la sua risposta. Un `[2i?]` va avanti: chi corregge applica
-l'opzione che consigli, e la sua domanda esce in un feedback derivato. Un 1 col
-`?`, un vicino col `?` o un esterno di qualunque livello va avanti in un
+i rilievi interni col `?` di livello 3, che aspettano l'owner, e quelli col `!`
+a qualunque livello (`[2i?!]`), che vanno al manutentore; in ogni esito i
+rilievi da correggere restano davanti a chi riprende dopo la risposta. Un
+`[2i?]` va avanti: chi corregge applica l'opzione che consigli, e la sua
+domanda esce in un feedback derivato. Un `[1i?]` o un `[e?]` va avanti in un
 feedback derivato con la sua domanda, che l'owner decide a parte. Una scelta
 che non deve fermare il lavoro si scrive col segno che non lo ferma.
 

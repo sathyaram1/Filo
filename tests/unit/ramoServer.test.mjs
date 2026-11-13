@@ -23,7 +23,7 @@ import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 sessione.biglietto = async () => PULITO;
 
 const VL = await import('../../scripts/verify-local.mjs');
-const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2 };
 const A = 'a'.repeat(40);
 const S1 = '1'.repeat(40);
 const S2 = '2'.repeat(40);

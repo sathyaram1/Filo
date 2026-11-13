@@ -1,6 +1,6 @@
 // I bilanci, uno per livello (2026-09-23): finito il suo, un rilievo paga col più alto aperto
-// sotto (D88, #744); un 3 senza più bilanci ferma, un 2 esce nel feedback dei rimasti; i quattro
-// nomi sono gli stessi nella regola, nelle tabelle e in dashboard.
+// sotto (D88, #744); un 3 senza più bilanci ferma, un 2 esce nel feedback dei rimasti; i tre
+// nomi (dal #2339) sono gli stessi nella regola, nelle tabelle e in dashboard.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ const C = globalThis.SN_CONST;
 
 // I bilanci di QUESTI test (quelli decisi dall'owner il 2026-09-23 stanno
 // solo in config/routines: qui non c'è un default).
-const CAPS = { cap3: 5, cap2: 4, cap1: 1, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 4, cap1: 1 };
 const f = (level, sede, text, decision = false) => ({ level, sede, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
 const livelli = (list) => list.map((x) => `${x.level}${x.sede}`);
@@ -44,25 +44,25 @@ test('un 3 interno paga il bilancio dei 3; finiti il suo e quelli sotto ferma il
   assert.deepEqual(fermo.fix, []);
   assert.deepEqual(fermo.derived, [], 'fermandosi non si mette da parte niente');
   assert.equal(fermo.consume, null, 'fermarsi non paga');
-  assert.equal(decide([f(3, 'i', 'x')], {}, { cap3: 0, cap2: 0, cap1: 0, cap0: 0 }).stop, true, 'tutti a zero: il primo 3 ferma subito');
+  assert.equal(decide([f(3, 'i', 'x')], {}, { cap3: 0, cap2: 0, cap1: 0 }).stop, true, 'tutti a zero: il primo 3 ferma subito');
 });
 
 // D88 (#744): un rilievo di livello X col bilancio di X finito paga col più alto
 // ancora aperto sotto X, anche se nient'altro fa partire il giro.
-test('D88: un 3 a bilancio dei 3 finito non ferma finché c\'è un bilancio sotto: paga cap2, poi cap1, poi cap0', () => {
-  const caps = { ...CAPS, cap0: 1 };
-  const due = decide([f(3, 'i', 'perde i dati')], { count3: 5 }, caps);
+test('D88: un 3 a bilancio dei 3 finito non ferma finché c\'è un bilancio sotto: paga cap2, poi cap1', () => {
+  const due = decide([f(3, 'i', 'perde i dati')], { count3: 5 });
   assert.equal(due.stop, false);
   assert.deepEqual(livelli(due.fix), ['3i']);
   assert.equal(due.consume, 'cap2');
   assert.deepEqual([due.counts.count3, due.counts.count2], [5, 1], 'cap3 resta al suo tetto');
-  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4 }, caps).consume, 'cap1');
-  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 }, caps).consume, 'cap0');
-  const fermo = decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1, count0: 1 }, caps);
-  assert.equal(fermo.stop, true, 'finiti tutti: il 3 ferma come prima');
+  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4 }).consume, 'cap1');
+  const fermo = decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 });
+  assert.equal(fermo.stop, true, 'finiti tutti e tre: il 3 ferma, sotto l\'1 non c\'è più un bilancio');
+  // Un cap0 rimasto nel documento dalla scala a quattro livelli non paga più niente.
+  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 }, { ...CAPS, cap0: 3 }).stop, true);
 });
 
-test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1, poi cap0; finiti tutti esce a priorità 1 e il giro passa', () => {
+test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1; finiti tutti esce a priorità 1 e il giro passa', () => {
   const d = decide([f(2, 'i', 'non salva')], { count2: 4 });
   assert.equal(d.stop, false);
   assert.deepEqual(livelli(d.fix), ['2i'], 'nessun altro rilievo fa partire il giro, si corregge lo stesso');
@@ -71,9 +71,9 @@ test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1, p
   assert.deepEqual([d.counts.count2, d.counts.count1], [4, 1], 'il 2 non va oltre il suo tetto: paga l\'1');
   assert.equal(d.budgets.cap1.left, 0);
 
-  const zeroAperto = decide([f(2, 'i', 'non salva')], FINITI[2], { ...CAPS, cap0: 2 });
-  assert.equal(zeroAperto.consume, 'cap0');
-  assert.deepEqual(livelli(zeroAperto.fix), ['2i']);
+  const zeroVecchio = decide([f(2, 'i', 'non salva')], FINITI[2], { ...CAPS, cap0: 2 });
+  assert.equal(zeroVecchio.consume, null, 'un cap0 rimasto dalla scala vecchia si ignora');
+  assert.deepEqual(zeroVecchio.fix, []);
 
   const finito = decide([f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], FINITI[2]);
   assert.equal(finito.stop, false, 'un 2 a bilanci finiti non ferma');
@@ -88,7 +88,7 @@ test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1, p
 
   const nota = R.roundNote({ summary: 'il resto regge', findings: [f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], decision: finito });
   assert.match(nota, /Nessun rilievo interno da correggere adesso/);
-  assert.match(nota, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
+  assert.match(nota, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
   assert.match(nota, /I 2 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1/);
   assert.doesNotMatch(nota, /Il lavoro si ferma|Il giro lo paga/);
   const uno = R.roundNote({ summary: '', findings: [f(2, 'i', 'non salva')], decision: zero });
@@ -101,7 +101,7 @@ test('D88, il caso di #744: un 2 a bilancio finito e un 1 si correggono insieme,
   assert.deepEqual(livelli(d.fix), ['2i', '1i'], 'nell\'ordine della critica');
   assert.deepEqual(d.derived, [], 'nessun feedback a parte per il 2');
   assert.equal(d.consume, 'cap1');
-  assert.deepEqual([d.counts.count2, d.counts.count1, d.counts.count0], [4, 1, 0]);
+  assert.deepEqual(d.counts, { count3: 0, count2: 4, count1: 1 });
   // Il giro dopo, con cap1 finito anche lui: escono tutti e due, il lavoro passa.
   const dopo = decide([f(2, 'i', 'non salva ancora'), f(1, 'i', 'bordo')], d.counts);
   assert.deepEqual(dopo.fix, []);
@@ -114,14 +114,18 @@ test('D88: il giro paga il bilancio più alto che i rilievi possono pagare, e ch
   const insieme = decide([f(3, 'i', 'a'), f(2, 'i', 'b')], { count3: 5 });
   assert.equal(insieme.consume, 'cap2');
   assert.deepEqual([insieme.counts.count3, insieme.counts.count2], [5, 1]);
-  // Un 1 e uno 0 senza più bilanci salgono sul giro del 2, come prima.
-  const sale = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], { count1: 1 });
-  assert.deepEqual(livelli(sale.fix), ['2i', '1i', '0i']);
+  // Due 1 senza più bilanci salgono sul giro del 2, come prima.
+  const sale = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')], { count1: 1 });
+  assert.deepEqual(livelli(sale.fix), ['2i', '1i', '1i']);
   assert.equal(sale.consume, 'cap2');
-  // Un vicino non paga e non fa partire niente, nemmeno con cap0 aperto.
-  const vicino = decide([f(2, 'v', 'accanto')], {}, { ...CAPS, cap0: 1 });
-  assert.deepEqual(vicino.fix, []);
-  assert.deepEqual(livelli(vicino.derived), ['2v']);
+  // Un esterno non paga e non fa partire niente; nemmeno un vicino dello stato vecchio, che ora è esterno.
+  for (const fuori of [f(null, 'e', 'altrove'), f(2, 'v', 'accanto')]) {
+    const d = decide([fuori]);
+    assert.deepEqual(d.fix, []);
+    assert.deepEqual(d.derived, []);
+    assert.equal(d.consume, null);
+    assert.deepEqual(d.external.map((x) => [x.level, x.sede, x.priority]), [[null, 'e', null]]);
+  }
   // Un 1 col ? resta fuori anche se il giro parte.
   const domanda = decide([f(2, 'i', 'non salva'), f(1, 'i', 'A o B?', true)], { count2: 4 });
   assert.deepEqual(livelli(domanda.fix), ['2i']);
@@ -135,12 +139,13 @@ test('D88: la nota del giro dice quale bilancio ha pagato quando non è quello d
   assert.match(nota, /Il giro lo paga il bilancio del livello 1: quello del livello 2 è finito\./);
   assert.doesNotMatch(nota, /feedback dei rimasti|non corretti in questo giro/);
   const tre = [f(3, 'i', 'perde i dati')];
-  assert.match(R.roundNote({ findings: tre, decision: decide(tre, { count3: 5, count2: 4 }, { ...CAPS, cap1: 0, cap0: 1 }) }),
-    /Il giro lo paga il bilancio del livello 0: quelli dei livelli da 3 a 1 sono finiti\./);
+  assert.match(R.roundNote({ findings: tre, decision: decide(tre, { count3: 5, count2: 4 }) }),
+    /Il giro lo paga il bilancio del livello 1: quelli dei livelli da 3 a 2 sono finiti\./);
   // Chi paga col suo bilancio, o un 1 che sale sul giro di un 2: la riga non c'è.
   assert.doesNotMatch(R.roundNote({ findings: list, decision: decide(list) }), /Il giro lo paga/);
-  const vicino = [f(1, 'i', 'qui'), f(3, 'v', 'accanto')];
-  assert.doesNotMatch(R.roundNote({ findings: vicino, decision: decide(vicino) }), /Il giro lo paga/);
+  // Un esterno non ha livello: non è «il rilievo più grave» del giro.
+  const esterno = [f(1, 'i', 'qui'), f(null, 'e', 'accanto')];
+  assert.doesNotMatch(R.roundNote({ findings: esterno, decision: decide(esterno) }), /Il giro lo paga/);
 });
 
 test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner non dipende dal bilancio (#1202)', () => {
@@ -148,7 +153,10 @@ test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner no
   const d = decide([irr], { count2: 4 });
   assert.equal(d.stop, true);
   assert.deepEqual(livelli(d.blocking), ['2i']);
-  assert.match(R.roundNote({ summary: '', findings: [irr], decision: d }), /di livello 3 o su una scelta difficile da disfare/);
+  assert.equal(d.blocking[0].destinatario, 'manutentore');
+  const nota = R.roundNote({ summary: '', findings: [irr], decision: d });
+  assert.match(nota, /Il lavoro si ferma su una scelta difficile da disfare .*: la decide il manutentore/);
+  assert.doesNotMatch(nota, /rilievo interno di livello 3/, 'non è un 3: la riga dell\'owner non c\'è');
   // Senza il segno, a bilanci finiti il 2 col ? va da parte con la domanda, senza fermare.
   const q = decide([f(2, 'i', 'A o B?', true)], FINITI[2]);
   assert.equal(q.stop, false);
@@ -171,36 +179,37 @@ test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilanci finiti;
   assert.deepEqual(livelli(fermo.sospesi), ['2i']);
 });
 
-test('gli 1 e gli 0: con un 2 corretto entrano; finiti i bilanci dal 2 in giù escono tutti', () => {
-  const insieme = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')]);
-  assert.deepEqual(livelli(insieme.fix), ['2i', '1i', '0i']);
+test('gli 1: con un 2 corretto entrano; finiti i bilanci dal 2 in giù escono tutti', () => {
+  const insieme = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')]);
+  assert.deepEqual(livelli(insieme.fix), ['2i', '1i', '1i']);
   assert.equal(insieme.consume, 'cap2');
-  const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], FINITI[2]);
+  const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(1, 'i', 'c')], FINITI[2]);
   assert.deepEqual(tuttoFinito.fix, []);
-  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 0]);
+  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 1]);
   assert.equal(tuttoFinito.consume, null);
-  // Gli esterni come prima: fuori dal conto, con la priorità del livello (un 2 nasce a 1).
-  const conEsterno = decide([f(2, 'e', 'altrove'), f(3, 'e', 'grave altrove')], FINITI[2]);
+  // Gli esterni fuori dal conto, senza livello né priorità (#2339): li classifica chi classifica ogni feedback.
+  const conEsterno = decide([f(null, 'e', 'altrove'), f(null, 'e', 'grave altrove')], FINITI[2]);
   assert.equal(conEsterno.stop, false);
-  assert.deepEqual(conEsterno.external.map((x) => x.priority), [1, 3]);
+  assert.deepEqual(conEsterno.external.map((x) => [x.level, x.priority]), [[null, null], [null, null]]);
 });
 
-test('senza uno dei quattro bilanci si ferma e dice quale manca: nessun default', () => {
-  assert.throws(() => R.decideRound({ findings: [f(2, 'i', 'x')], caps: { cap2: 4, cap1: 1, cap0: 0 } }), /bilanci del verificatore mancanti: cap3/);
-  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
+test('senza uno dei tre bilanci si ferma e dice quale manca: nessun default; un cap0 si ignora', () => {
+  assert.throws(() => R.decideRound({ findings: [f(2, 'i', 'x')], caps: { cap2: 4, cap1: 1, cap0: 0 } }), /bilanci del verificatore mancanti: cap3 —/);
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /mancanti: cap3, cap2, cap1 —/);
   assert.deepEqual(R.missingCaps(CAPS), []);
-  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 4, cap1: 1 }), ['cap0']);
+  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 4, cap1: 1 }), [], 'senza cap0 non manca niente');
   assert.equal(R.capKeyOf(3), 'cap3');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
-  assert.equal(R.capKeyOf(0), 'cap0');
+  assert.equal(R.capKeyOf(0), 'cap1', 'uno 0 dello stato vecchio vale 1');
   assert.equal(R.countKeyOf(3), 'count3');
-  assert.deepEqual(R.normalizeCaps({ cap3: 99, cap2: -1 }, CAPS), { cap3: 10, cap2: 0, cap1: 1, cap0: 0 });
-  assert.deepEqual(R.normalizeCounts({ count3: '2' }), { count3: 2, count2: 0, count1: 0, count0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap3: 99, cap2: -1, cap0: 7 }, CAPS), { cap3: 10, cap2: 0, cap1: 1 });
+  assert.deepEqual(R.normalizeCounts({ count3: '2', count0: 3 }), { count3: 2, count2: 0, count1: 0 });
 });
 
 test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle, nella cache e nella dashboard', () => {
-  assert.deepEqual(R.CAP_KEYS, ['cap3', 'cap2', 'cap1', 'cap0']);
+  assert.deepEqual(R.CAP_KEYS, ['cap3', 'cap2', 'cap1']);
+  assert.equal(C.STORAGE_KEYS.AUTOMATION_CAP0, undefined, 'il bilancio dello 0 non c\'è più (#2339)');
   assert.deepEqual(T.VERIFIER_CAP_KEYS, R.CAP_KEYS, 'feedbackTransitions.js e verifierRound.js: una lista sola');
   for (const k of R.CAP_KEYS) {
     assert.equal(C.STORAGE_KEYS[`AUTOMATION_${k.toUpperCase()}`], `filo_automation_${k}`, `manca la chiave di cache di ${k}`);
@@ -234,28 +243,29 @@ test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle
   for (const c of condizioni) assert.equal(c, '!isAdmin', `un controllo dipende da altro che l'essere owner: ${c}`);
 });
 
-test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 messi da parte', async () => {
+test('le stampe del giro locale e delle routine dicono i tre bilanci e i 2 messi da parte', async () => {
   const VL = await import('../../scripts/verify-local.mjs');
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const finito = decide([f(2, 'i', 'non salva')], FINITI[2]);
-  assert.equal(VL.bilanciResiduiText(finito.budgets), 'cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1 · cap0: 0 giri residui su 0');
+  assert.equal(VL.bilanciResiduiText(finito.budgets), 'cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1');
   assert.equal(VL.bilanciResiduiText(null), '');
-  assert.match(VL.dueDaParteText(finito.derived), /^I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\.$/);
-  assert.equal(VL.dueDaParteText([f(1, 'i', 'x'), f(2, 'e', 'y')]), '', 'un 1 messo da parte o un 2 esterno non sono il caso');
-  // La coda della fase 2 in locale: quattro bilanci.
+  assert.match(VL.dueDaParteText(finito.derived), /^I bilanci delle correzioni dei livelli 2 e 1 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\.$/);
+  assert.equal(VL.dueDaParteText([f(1, 'i', 'x'), f(null, 'e', 'y')]), '', 'un 1 messo da parte o un esterno non sono il caso');
+  // La coda della fase 2 in locale: tre bilanci.
   const fix = decide([f(3, 'i', 'perde i dati'), f(2, 'i', 'a')], { count2: 4 });
   const coda = VL.codaText({ findings: fix.fix, derived: fix.derived, external: [], budgets: fix.budgets, branch: 'claude/x', instructions: 'CODA' });
-  assert.match(coda, /Bilanci: cap3: 4 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
-  // La risposta del server stampata dalle routine: pass coi 2 usciti, e i quattro bilanci.
+  assert.match(coda, /Bilanci: cap3: 4 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1(?! ·)/);
+  assert.doesNotMatch(coda, /cap0/);
+  // La risposta del server stampata dalle routine: pass coi 2 usciti, e i tre bilanci.
   const pass = verifierReplyText({ outcome: 'pass', derived: [{ level: 2, sede: 'i', text: 'non salva', priority: 2, num: '#7.1' }], budgets: finito.budgets });
   assert.match(pass, /#7\.1, priorità 2, rimasti del giro: 1 rilievo \(\[2i\]\)/);
-  assert.match(pass, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro/);
-  assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1 · cap0: 0 giri residui su 0/);
+  assert.match(pass, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti: il rilievo interno di livello 2 rimasto non ferma il lavoro/);
+  assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 0 giri residui su 1(?! ·)/);
   const stop = verifierReplyText({ outcome: 'stop', motivo: 'loop', blocking: [f(3, 'i', 'perde i dati')], sospesi: [], derived: [], budgets: decide([f(3, 'i', 'x')], FINITI[3]).budgets });
-  assert.match(stop, /un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3 o su una scelta difficile da disfare/);
+  assert.match(stop, /un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3\): decide l'owner\. Una scelta difficile da disfare ferma anche lei, e va al manutentore/);
   assert.match(stop, /Bilanci: cap3: 0 giri residui su 5/);
   const fase2 = verifierReplyText({ outcome: 'fix', phase2: { findings: [f(1, 'i', 'bordo')], derived: [{ level: 2, sede: 'i', text: 'a', priority: 2, num: '#7.2' }], budgets: finito.budgets, instructions: 'FASE 2' } });
-  assert.match(fase2, /I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti/);
+  assert.match(fase2, /I bilanci delle correzioni dei livelli 2 e 1 sono finiti/);
   assert.ok(fase2.indexOf('I bilanci delle correzioni dei livelli') < fase2.indexOf('FASE 2'), 'prima delle istruzioni');
 });
 

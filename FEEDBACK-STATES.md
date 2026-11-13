@@ -127,18 +127,19 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
-  correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
-  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12
-  (#1202) entra nella correzione solo se il giro parte comunque per gli interni,
-  altrimenti va da parte col livello scritto, e non paga nessun bilancio. Ciò che
-  il lavoro non corregge diventa SUBITO un feedback derivato,
-  figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
-  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
-  Pipeline); UNO solo per tutti gli altri (interni messi da parte
-  dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
-  fra loro, con la stessa regola sul 2); —critica con rilievi
+  correggere→ `revision_security` (dal #2339, 08/11/2026, scala a tre livelli
+  misurata sull'obiettivo: un livello, `[3i]`/`[2i]`/`[1i]`, lo prende solo un
+  difetto che riguarda l'obiettivo del feedback o che il ramo ha introdotto; tutto
+  il resto è esterno, `[e]`, senza livello; la sede «vicino» e il livello 0 non ci
+  sono più e la critica che li porta si respinge col perché; lo stato scritto prima
+  si legge con 0 → 1 e vicino → esterno). Ciò che il lavoro non corregge diventa
+  SUBITO un feedback, aperto dal server in ogni esito: ogni esterno un feedback
+  nuovo senza livello, classificato dopo come ogni altro; per ogni interno col `?` un
+  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, a
+  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore
+  (quello col `?` aspetta la risposta alla sua domanda: sopra, Pipeline); UNO solo per
+  tutti gli altri interni messi da parte dal bilancio, a priorità = il livello
+  scritto più alto fra loro, con la stessa regola sul 2); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
@@ -147,8 +148,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (esauriti il bilancio dei 3 e quelli sotto)→ `design` (`statusReason: loop`); un 2
   nello stesso caso NON ferma: entra nel feedback derivato dei rimasti e il lavoro passa
   se non c'è altro (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
-  decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
-  utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
+  decisione, di livello 3 o su una scelta difficile da disfare (`?!` a ogni livello:
+  dati degli utenti, formati su disco; dal #2339 va al manutentore, non all'owner)→
+  `design` (`statusReason: decisione`); un `[2i?]`
   NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
   feedback derivato con la domanda (dal 2026-10-12, #1202), che aspetta il lavoro e si
   chiude con la sua fusione (§4c); `blocca` sulla domanda di un rilievo si respinge: la
@@ -923,8 +925,8 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
-  stanno in `src/shared/verifierRound.js`, incorporato dal server; i quattro
-  bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
+  stanno in `src/shared/verifierRound.js`, incorporato dal server; i tre
+  bilanci `cap3/cap2/cap1`, uno per livello (quattro fino al #2339), li scrivono l'owner e il manutentore in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
   *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri

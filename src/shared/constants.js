@@ -152,13 +152,12 @@
     AUTO_MODE: 'filo_auto_mode',
     // Cache locali dei bilanci dei giri di correzione, uno per livello (tab
     // Automazioni, feedback #561). La FONTE DI VERITÀ è il doc Firestore
-    // config/routines (campi `cap3`, `cap2`, `cap1`, `cap0`; li applica il
+    // config/routines (campi `cap3`, `cap2`, `cap1`; li applica il
     // server quando registra la critica): queste chiavi servono solo a
     // mostrare subito un valore all'avvio / come ripiego offline.
     AUTOMATION_CAP3: 'filo_automation_cap3', // giri per i rilievi di livello 3
     AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 2
     AUTOMATION_CAP1: 'filo_automation_cap1', // giri per i rilievi di livello 1
-    AUTOMATION_CAP0: 'filo_automation_cap0', // giri per i soli rilievi di livello 0
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
@@ -168,8 +167,8 @@
   // nomi dei campi stanno in `src/shared/feedbackTransitions.js`
   // (VERIFIER_CAP_KEYS).
   const AUTOMATION = {
-    // Lo 0 è un valore valido per tutti (per cap0 è il default: i casi rari da
-    // soli non si correggono mai); con cap3 a 0 il primo rilievo di livello 3
+    // Lo 0 è un valore valido per tutti (per cap1 è quello di partenza: gli 1
+    // da soli non si correggono); con cap3 a 0 il primo rilievo di livello 3
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,

@@ -128,18 +128,18 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
 // lo ritrova chi ha mandato la critica.
 test('la risposta del server si stampa coi numeri dei rilievi nella critica', async () => {
   const { numeraRisposta, verifierReplyText, VERIFIER_ROUND } = await import('../../scripts/dispatch.mjs');
-  const critica = VERIFIER_ROUND.parseFindings('Provato.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo?\n[1e] un altro lavoro.').findings;
+  const critica = VERIFIER_ROUND.parseFindings('Provato.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo?\n[e] un altro lavoro.').findings;
   const r = numeraRisposta({
     outcome: 'fix',
     phase2: {
       findings: [{ level: 2, sede: 'i', text: 'la cosa a non funziona.' }],
-      derived: [{ level: 1, sede: 'e', text: 'un altro lavoro.', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'il bordo è freddo?', decision: true, priority: 1, num: '#9.2' }],
+      derived: [{ level: null, sede: 'e', text: 'un altro lavoro.', priority: null, num: '#9.1' }, { level: 1, sede: 'i', text: 'il bordo è freddo?', decision: true, priority: 1, num: '#9.2' }],
     },
   }, critica);
   assert.deepEqual(r.phase2.derived.map((f) => f.n), [3, 2]);
   const t = verifierReplyText(r, 'X');
   assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
-  assert.match(t, /- r3 \[1e\] un altro lavoro/);
+  assert.match(t, /- r3 \[e\] un altro lavoro/);
   // Un `?` di livello 1 esce in ogni esito: la sua prova è già uscita col commit della critica (#1555).
   assert.match(t, /\[1i\?\] il bordo è freddo\?\n {2}→ feedback #9\.2/);
   assert.doesNotMatch(t, /le prove con r2 nel nome/);

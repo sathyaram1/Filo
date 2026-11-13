@@ -18,17 +18,19 @@ import { verifierReplyText } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-test('escono in ogni esito gli esterni e i `?` che contano al più 1; gli altri dipendono dai bilanci', () => {
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'e' }), true);
+test('escono in ogni esito gli esterni e i `?` di livello 1 senza `!`; gli altri dipendono dai bilanci o fermano', () => {
+  assert.equal(esceInOgniEsito({ level: null, sede: 'e' }), true);
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true }), true);
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino col ? esce sempre');
+  assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true, irreversibile: true }), false, '#2339: un 1 col ?! ferma, la prova resta a chi riprende');
   assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? si corregge con la consigliata: la prova resta');
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i' }), false, 'un 1 si corregge o esce secondo il bilancio');
-  assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), false);
+  // Lo stato scritto con la scala vecchia: il vicino è esterno, qualunque livello e segno porti.
+  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true);
+  assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), true);
 });
 
 test('fra le prove scritte escono intere quelle coi soli numeri di rilievi che escono comunque; a una mista si toglie il caso e il numero', () => {
-  const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }, { level: 0, sede: 'i', decision: true }];
+  const findings = [{ level: 2, sede: 'i' }, { level: null, sede: 'e' }, { level: 1, sede: 'i', decision: true }];
   const fuori = proveDaToglierePrimaDelVerdetto([
     'tests/verifica/42/giro1-r1-salva.spec.mjs',
     'tests/verifica/42/giro1-r2-esterno.spec.mjs',
@@ -52,7 +54,7 @@ test('fra le prove scritte escono intere quelle coi soli numeri di rilievi che e
 });
 
 test('rinominata senza il numero, una prova che ha ancora il caso di un rilievo che esce non passa; tolto il caso, passa', () => {
-  const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }];
+  const findings = [{ level: 2, sede: 'i' }, { level: null, sede: 'e' }];
   const prova = 'tests/verifica/42/giro1-r1-misto.spec.mjs';
   const conCaso = "test('r1 col titolo vuoto non salva', () => {});\ntest(\"r2 il menu delle schede si chiude\", () => {});\n";
   const fuori = proveDaToglierePrimaDelVerdetto([prova], findings, { [prova]: conCaso });
@@ -86,12 +88,14 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   require('../../src/shared/feedbackTransitions.js');
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  const caps = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
+  const caps = { cap3: 10, cap2: 10, cap1: 1 };
   for (const critica of [
-    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
-    'Provato.\n[3i?] I dati escono?\n[2v?] Il titolo accanto è tagliato?\n[1e] Fuori.',
+    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[e] Fuori.',
+    'Provato.\n[3i?] I dati escono?\n[2i?] Il titolo accanto è tagliato?\n[e] Fuori.',
+    'Provato.\n[1i?!] Il formato del registro cambia?\n[1i?] Il bordo è grigio?\n[e] Fuori.',
   ]) {
-    const { findings } = V.parseFindings(critica);
+    const { findings, rifiutati } = V.parseFindings(critica);
+    assert.deepEqual(rifiutati, []);
     const esito = V.decideRound({ findings, caps, counts: {} });
     assert.equal(esito.stop, true);
     assert.equal(esito.sospesi.length, 1, 'il secondo rilievo resta al lavoro');
@@ -104,7 +108,7 @@ test('la pulizia prima del verdetto decide la fermata con la stessa regola del g
   const require = createRequire(import.meta.url);
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  for (const level of [0, 1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
+  for (const level of [1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
     const f = { level, sede: 'i', decision, irreversibile };
     assert.equal(fermaDiSicuro([f]), V.decisioneFerma(f), JSON.stringify(f));
     assert.equal(fermaDiSicuro([{ ...f, sede: 'e' }]), false);
@@ -116,8 +120,8 @@ test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa crit
   const require = createRequire(import.meta.url);
   require('../../src/shared/verifierRound.js');
   const V = globalThis.SN_VERIFIER_ROUND;
-  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[1e] Fuori.');
-  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[e] Fuori.');
+  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1 }, counts: {} });
   assert.equal(esito.stop, false);
   assert.deepEqual(esito.fix.map((f) => f.level), [2]);
   const fuori = proveDaToglierePrimaDelVerdetto([
@@ -159,7 +163,7 @@ test('le prove scritte dalla verifica sono quelle aggiunte o rinominate dopo l\'
   assert.deepEqual(proveScritteDa(avvio, casa).sort(), ['tests/verifica/901/giro2-r1-nuova.spec.mjs', 'tests/verifica/901/giro2-r2-rinominata.spec.mjs']);
 });
 
-function fintoServer(reply = { outcome: 'pass', derived: [{ level: 1, sede: 'e', text: 'esterno', num: '#901.1' }] }) {
+function fintoServer(reply = { outcome: 'pass', derived: [{ level: null, sede: 'e', text: 'esterno', priority: null, num: '#901.1' }] }) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
@@ -187,7 +191,7 @@ test('la prova di un esterno ancora nel ramo ferma la critica prima del server; 
   t.after(() => togliCartella(casa));
   const { srv, ricevuti, port } = await fintoServer();
   t.after(() => srv.close());
-  const critica = 'Provato il salvataggio da menu e scorciatoia: regge.\n[1e] Il menu delle schede si chiude da solo, fuori da questo lavoro.';
+  const critica = 'Provato il salvataggio da menu e scorciatoia: regge.\n[e] Il menu delle schede si chiude da solo, fuori da questo lavoro.';
   const fermo = await esegui(['--record-verifier', 'fid-901', critica], casa, port);
   assert.notEqual(fermo.code, 0);
   assert.match(fermo.out, /giro2-r1-esterno\.spec\.mjs: il rilievo 1 è esterno/);
@@ -254,11 +258,11 @@ test('#1555.1 una prova che copre un interno e un esterno perde prima del verdet
     outcome: 'fix',
     phase2: {
       findings: [{ level: 2, sede: 'i', text: 'Col titolo vuoto il salvataggio non parte.' }],
-      derived: [{ level: 1, sede: 'e', text: 'Il menu delle schede si chiude da solo.', num: '#901.1' }],
+      derived: [{ level: null, sede: 'e', text: 'Il menu delle schede si chiude da solo.', priority: null, num: '#901.1' }],
     },
   });
   t.after(() => srv.close());
-  const critica = 'Provato il salvataggio da menu e da scorciatoia, col titolo vuoto e lungo.\n[2i] Col titolo vuoto il salvataggio non parte.\n[1e] Il menu delle schede si chiude da solo.';
+  const critica = 'Provato il salvataggio da menu e da scorciatoia, col titolo vuoto e lungo.\n[2i] Col titolo vuoto il salvataggio non parte.\n[e] Il menu delle schede si chiude da solo.';
   const fermo = await esegui(['--record-verifier', 'fid-901', critica], casa, port);
   assert.notEqual(fermo.code, 0, fermo.out);
   assert.match(fermo.out, /giro2-r1-r2-misto\.spec\.mjs: il rilievo 2 è esterno; copre anche r1, che resta/);
@@ -284,7 +288,7 @@ test('dopo un pass si tolgono solo le prove dei rilievi che il bilancio ha messo
   const testo = verifierReplyText({
     outcome: 'pass',
     derived: [
-      { level: 2, sede: 'e', text: 'esterno.', n: 1, num: '#42.1' },
+      { level: null, sede: 'e', text: 'esterno.', priority: null, n: 1, num: '#42.1' },
       { level: 1, sede: 'i', text: 'domanda.', decision: true, n: 2, num: '#42.2' },
       { tipo: 'rimasti', num: '#42.3', findings: [{ level: 1, sede: 'i', text: 'rimasto.', n: 3 }] },
     ],

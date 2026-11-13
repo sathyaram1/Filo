@@ -99,7 +99,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict'
     ? { reply: { outcome: 'fix', phase2: {
       findings: [{ level: 2, text: 'il pulsante non salva', decision: false }],
-      derived: [{ level: 0, text: 'caso raro', decision: false }],
+      derived: [{ level: 1, text: 'caso raro', decision: false }],
       budgets: { cap2: { cap: 5, used: 1, left: 4 } },
       instructions: 'FASE 2 — SEGRETO DEL SERVER: correggi solo questo.',
     } } }
@@ -107,7 +107,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   try {
     const r = await esegui([
       '--record-verifier', 'fid-901',
-      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[0i] caso raro',
+      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[1i] caso raro',
     ], ENV(casa, port));
     assert.equal(r.code, 0, `la critica doveva essere accettata (stderr: ${r.se})`);
 
@@ -115,7 +115,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.ok(consegna, 'la critica deve arrivare al server');
     assert.equal(consegna.body.intent, 'verdict');
     const d = consegna.body.data || {};
-    assert.deepEqual(d.findings.map((f) => [f.level, f.decision]), [[2, false], [0, false]], 'i rilievi arrivano STRUTTURATI, coi livelli');
+    assert.deepEqual(d.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false]], 'i rilievi arrivano STRUTTURATI, coi livelli');
     assert.match(d.findings[0].text, /Passi: titolo vuoto/, 'la continuazione resta attaccata al suo rilievo');
     assert.match(String(d.summary), /Provato: incolla/, 'il riassunto viaggia a parte');
     assert.match(String(d.critique), /\[2i\] il pulsante non salva/, 'la critica intera, com\'è stata scritta');
@@ -126,7 +126,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.match(r.so, /esito=fix/);
     assert.match(r.so, /SEGRETO DEL SERVER/, 'le istruzioni della fase 2 vengono stampate come arrivano');
     assert.match(r.so, /\[2i\] il pulsante non salva/);
-    assert.match(r.so, /\[0i\] caso raro/);
+    assert.match(r.so, /\[1i\] caso raro/);
     assert.match(r.so, /cap2: 4 giri residui su 5/);
 
     // Lo specchio locale dice che c'e' una correzione in sospeso.
@@ -194,6 +194,14 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
     assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
 
+    // La scala vecchia (#2339): uno 0, un vicino, un esterno col livello si respingono dicendo cosa è cambiato.
+    for (const [riga, motivo] of [['[0i] raro', /il livello 0 non c'è più/], ['[1v] accanto', /la sede «vicino» non c'è più/], ['[2e] altrove', /un rilievo esterno non prende livello/]]) {
+      const vecchia = await esegui(['--record-verifier', 'fid-901', `Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare la scheda in un'altra finestra.\n${riga}`], ENV(casa, port));
+      assert.equal(vecchia.code, 1, riga);
+      assert.match(vecchia.se, motivo, riga);
+    }
+    assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+
     // Una critica vuota non arriva più fin qui: la ferma il pavimento al
     // motivo, perché senza rilievi l'esito calcolato è «superata» (#565).
     const vuota = await esegui(['--record-verifier', 'fid-901', ''], ENV(casa, port));
@@ -212,11 +220,11 @@ test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4
   const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass', derived: null } }));
   try {
     const riassunto = `Provato ${'x'.repeat(4500)}.`;
-    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2i] in fondo\n[0i] raro`], ENV(casa, port));
+    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2i] in fondo\n[e] altrove`], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
-    assert.ok(inviato.critique.endsWith('[2i] in fondo\n[0i] raro'), 'il testo arriva intero');
-    assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
+    assert.ok(inviato.critique.endsWith('[2i] in fondo\n[e] altrove'), 'il testo arriva intero');
+    assert.deepEqual(inviato.findings.map((f) => [f.level, f.sede]), [[2, 'i'], [null, 'e']]);
   } finally { srv.close(); togliCartella(casa); }
 });
 

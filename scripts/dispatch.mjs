@@ -136,7 +136,7 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 const ROUTINES_DOC = 'config/routines';
 
 // I bilanci dei giri di correzione, uno per livello (feedback #561: cap3 per
-// i rilievi di livello 3, cap2 per i 2, cap1, cap0) li CONSUMA il SERVER quando
+// i rilievi di livello 3, cap2 per i 2, cap1 per gli 1) li CONSUMA il SERVER quando
 // registra la critica, coi numeri che l'owner scrive in config/routines: qui
 // non esistono, nemmeno come riferimento (fino al 2026-09-16 c'era una copia
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
@@ -158,12 +158,12 @@ export const VERIFIER_ROUND = (() => {
     parseFindings(text) {
       const findings = [];
       for (const line of String(text || '').split('\n')) {
-        const m = /^\s*\[\s*([0-3])\s*([ievIEV])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
-        if (m) findings.push({ level: Number(m[1]), sede: m[2].toLowerCase(), text: m[4].trim(), decision: m[3] === '?' });
+        const m = /^\s*\[\s*(?:([1-3])\s*[iI]|([eE]))\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: m[1] ? Number(m[1]) : null, sede: m[2] ? 'e' : 'i', text: m[4].trim(), decision: m[3] === '?' });
       }
       return { summary: '', findings, rifiutati: [] };
     },
-    formatFinding(f) { return `- [${f.level}${f.sede === 'e' || f.sede === 'v' ? f.sede : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
+    formatFinding(f) { return `- [${f.sede === 'e' ? 'e' : `${f.level}i`}${f.decision ? '?' : ''}] ${f.text}`; },
     formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
     primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
     groupLabel(g) { return g.tipo; },
@@ -577,7 +577,7 @@ export function rilieviConDomanda(findings, domande) {
   const lista = Array.isArray(findings) ? findings.map((f) => ({ ...f })) : [];
   const conSegno = lista.map((f, i) => ({ f, n: i + 1 })).filter((x) => x.f.decision);
   const d = Array.isArray(domande) ? domande : [];
-  const riga = (x) => `[${x.f.level}${x.f.sede}?] ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
+  const riga = (x) => `${typeof VERIFIER_ROUND.findingTag === 'function' ? VERIFIER_ROUND.findingTag(x.f) : `[${x.f.sede === 'e' ? 'e' : `${x.f.level}i`}?]`} ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
   if (conSegno.length > d.length) {
     const senza = conSegno.slice(d.length);
     return { ok: false, errore: `${senza.length === 1 ? `il rilievo ${senza[0].n}` : `i rilievi ${senza.map((x) => x.n).join(', ')}`} col «?» `
@@ -1640,7 +1640,9 @@ export function derivatiAperti(derived) {
     if (!f || typeof f !== 'object') continue;
     const rilievi = Array.isArray(f.findings) ? f.findings.filter((x) => x && typeof x === 'object') : [f];
     const num = String(f.num || '').trim();
-    const priorita = Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null);
+    // Un esterno nasce senza livello né priorità (#2339): Number(null) varrebbe 0, una priorità inventata.
+    const numero = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+    const priorita = numero(f.priority) ?? numero(f.level);
     const gia = num ? perNumero.get(num) : null;
     if (gia) {
       gia.rilievi.push(...rilievi);
@@ -1672,7 +1674,9 @@ function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
     const gruppo = { tipo: d.tipo, priority: d.priority, decision: d.rilievi.some((f) => f.decision === true), findings: d.rilievi };
-    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}` : ''}`;
+    const etichetta = d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}`
+      : d.esterno ? `, ${VERIFIER_ROUND.groupLabel(gruppo)}, senza livello: lo classifica chi classifica ogni feedback` : '';
+    const dove = `feedback ${d.num || '(numero non comunicato)'}${etichetta}`;
     const conTesto = d.rilievi.filter((f) => f.text);
     return conTesto.length ? `${conTesto.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n')}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
@@ -1705,7 +1709,7 @@ export function verifierReplyText(reply, id = '<id>') {
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
   // server non manda (un server vecchio) non si inventa.
-  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1', 'cap0'];
+  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1'];
   const budgets = b && typeof b === 'object'
     ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
@@ -1758,6 +1762,9 @@ export function verifierReplyText(reply, id = '<id>') {
         ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : VERIFIER_ROUND.RILIEVI_CHE_FERMANO,
       perSegnalazione ? null : fmt(r.blocking),
+      // Il destinatario lo calcola il server (destinatarioDelFermo, #2339): qui si dice a chi è andata la domanda.
+      !perSegnalazione && Array.isArray(r.blocking) && r.blocking.some((f) => f && f.destinatario === 'manutentore')
+        ? 'La scelta difficile da disfare va al manutentore: risponde lui con una nota, o la porta all\'owner.' : null,
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       budgets ? `Bilanci: ${budgets}` : null,
@@ -2165,7 +2172,7 @@ export function usageText() {
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
+    '                         con livello e sede davanti ([2i] …, [1i] …; [e] … senza livello = esterno; [1i?] = chiede una decisione,',
     '                         [2i?!] = una scelta difficile da disfare; ognuna porta la sua domanda: --domanda con',
     '                         una, o un elenco nell\'ordine dei rilievi col «?»);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',

@@ -220,7 +220,12 @@ export function serveDeploy(p, fileApp) {
 }
 export function toccaRegole(fileApp) { return (fileApp || []).some((f) => FILE_REGOLE.includes(f)); }
 
-const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}`;
+const chiaveRilievo = (f) => `${ROUND.livelloMostrato(f) ?? ''}${ROUND.sedeDi(f.sede)}:${String(f.text).slice(0, 80)}`;
+// Una chiave registrata con la scala a quattro livelli («2e:», «1v:», «0i:») si rilegge con la regola condivisa.
+const chiaveDiOggi = (k) => {
+  const m = /^(\d*)([iev]):([\s\S]*)$/.exec(String(k));
+  return m ? chiaveRilievo({ level: m[1] === '' ? null : Number(m[1]), sede: m[2], text: m[3] }) : String(k);
+};
 
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
@@ -230,7 +235,7 @@ export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
  * Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
  */
 export function derivatiDaAprire(p, derived) {
-  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
+  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))).map(chiaveDiOggi));
   const nuovi = ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
   return ROUND.derivedGroups(nuovi).map((g) => {
     const chiavi = g.findings.map(chiaveRilievo);
@@ -389,7 +394,9 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   p.derivatiAperti = p.derivatiAperti || [];
   let falliti = 0;
   for (const d of derivatiDaAprire(p, entry.derived)) {
-    const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
+    // Un esterno nasce senza priorità (#2339): la mette chi classifica ogni feedback nuovo.
+    const priorita = d.priorita == null ? [] : ['--priorita', String(d.priorita)];
+    const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, ...priorita], { cwd: wt, input: d.testo });
     const m = /#(\d+)/.exec(String(r.out || ''));
     if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, chiavi: d.chiavi, titolo: d.titolo, num: m ? Number(m[1]) : null });
     else { falliti += 1; avvisaUnaVolta(p, `feedback non aperto per «${d.titolo}»: ${coda(r.out, 2)}`); }
