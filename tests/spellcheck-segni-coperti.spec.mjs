@@ -29,6 +29,8 @@ async function apri(app, openTab, testServer, html) {
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       featureFlags: { spellcheck: true, spellcheckContext: true },
+      // «perchè» deve restare un errore da vedere, non correggersi da sé.
+      correttore: { automatica: false },
     });
     const finto = async () => ({ text: '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
