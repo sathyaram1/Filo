@@ -152,6 +152,22 @@ export async function statoDi(app, page, sel, frame = null) {
   return su ? { ...su, nelloStrato: true } : null;
 }
 
+// Le radici chiuse di Filo nel documento del sito che portano qualcosa oltre agli strati del correttore, ognuna con le
+// classi di ciò che contiene. Il correttore sta lì per forza, sopra il campo del sito, e ne ripete solo il testo (#2299):
+// «nel sito non entra niente» vale per tutto il resto. [] quando non c'è niente.
+export async function riquadriNelSito(app, page, frame = null) {
+  return nelMondoDiFilo(app, page, () => {
+    const UI = globalThis.SN_FILO_UI;
+    const out = [];
+    for (const host of document.querySelectorAll(`[${UI.RIQUADRO}]`)) {
+      const r = UI.ombraDi(host);
+      const pezzi = r ? [...r.children].map((c) => String(c.getAttribute('class') || c.tagName)) : ['(radice non nostra)'];
+      if (!pezzi.every((c) => /^sn-spell-/.test(c))) out.push(pezzi.join(' + '));
+    }
+    return out;
+  }, null, frame);
+}
+
 export async function conta(app, page, sel, frame = null) {
   const CONTA = (s) => {
     const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
