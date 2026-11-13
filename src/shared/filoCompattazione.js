@@ -377,7 +377,7 @@
       if (daG < gg.length) parti.push(`GIORNI:\n${gg.slice(daG).map(rigaGiorno).join('\n')}`);
       if (daO < oo.length) parti.push(`ORE:\n${oo.slice(daO).map((r, i, l) => rigaOra(r, l[i - 1])).join('\n')}`);
       const mancano = daG + daO;
-      if (mancano) parti.unshift(`(${mancano} righe più vecchie del diario non sono qui per stare nel contesto: le conversazioni si cercano con CERCA_CHAT)`);
+      if (mancano) parti.unshift(`(${mancano} righe più vecchie del diario non sono qui per stare nel contesto: le conversazioni si cercano con filo(cerca))`);
       return parti.join('\n\n');
     };
     let t = testo();
