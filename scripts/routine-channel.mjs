@@ -910,9 +910,16 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   const nomeMain = base.replace(/^refs\/remotes\//, '');
   const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
   if (!main.ok || !main.out) return { ok: false, tipo: 'base', reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
-  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
-    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  const contiene = (sha) => run(['merge-base', '--is-ancestor', sha, punta.out]).ok;
+  const minimo = String(presa || '').trim().toLowerCase();
+  const indietro = !contiene(main.out);
+  if (indietro && !(/^[0-9a-f]{40}$/.test(minimo) && contiene(minimo))) {
+    const daQuale = /^[0-9a-f]{40}$/.test(minimo) ? `né ${nomeMain} della presa in carico (${minimo.slice(0, 9)})` : '';
+    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)})${daQuale ? `, ${daQuale}` : ''}: il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
   }
+  const avanti = indietro
+    ? `${nomeMain} è andata avanti dopo il tuo rebase (ora ${main.out.slice(0, 9)}): la punta contiene quella della presa in carico (${minimo.slice(0, 9)}), e il resto lo riallinea il cancello prima di fondere. Non serve un altro rebase.`
+    : '';
   const p = pushRamoCorrente(root, { exec, env });
   if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
   if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
