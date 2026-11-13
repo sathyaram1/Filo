@@ -5640,7 +5640,7 @@ function pageReadsForPrompt(actions) {
     if (parziale) {
       blocco += `\n[Letto fino al carattere ${finoQui} su ${totale}: il resto non stava nella memoria del modello insieme alle altre `
         + 'letture di questo turno. Rispondi con quello che hai e, se il dato manca, dillo; non rileggerla in questo turno: se '
-        + `l'utente lo chiede, il seguito si legge con LEGGI_PAGINA, lo stesso url e da: ${finoQui}.]`;
+        + `l'utente lo chiede, il seguito si legge con web(leggi), lo stesso url e da: ${finoQui}.]`;
     } else if (out.troncata) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
