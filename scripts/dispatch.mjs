@@ -1061,9 +1061,7 @@ function suMainDi(bucket, ctx) {
 
 /** Segna `propria` la fusione del lavoro stesso del feedback («merge-gate: #N …»). PURA. */
 export function segnaProprie(fusioni, num) {
-  const n = numeroFeedback(num);
-  const propria = new RegExp(`^merge-gate: #${n.replace('.', '\\.')}\\b(?!\\.\\d)`);
-  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (n && propria.test(String(f.oggetto || '')) ? { ...f, propria: true } : f));
+  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (fusionePropria(f.oggetto, num) ? { ...f, propria: true } : f));
 }
 
 export function buildPayload(bucket, ctx = {}) {
