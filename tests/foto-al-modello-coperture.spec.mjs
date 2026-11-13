@@ -7,7 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
-import { clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const ROSA = [0xc9, 0x25, 0x85];
 const VERDE = [0x12, 0xab, 0x34];
