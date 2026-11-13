@@ -114,6 +114,7 @@
   // Al modello vanno gli ANNI_AL_MODELLO più vicini alla data, ognuno con la riga della pagina che lo dice.
   const ANNI_AL_MODELLO = 8;
   const RIGA_ANNO_MAX = 120;
+  const TITOLO_LONTANO = 600; // il titolo conta come la pagina a qualche riga dal campo
   // Non è l'anno di una data l'anno dei diritti nel piè di pagina («© 2024»), quello da cui parte o fin dove arriva un
   // periodo («dal 1999», «2015-2024»): la pagina lo dice per altro (#1115.2).
   const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(?<![€$£]\s)(?<!(?:(?<!\p{L})(?:dal|since|desde|depuis|seit|until|till|fino al)|©|\(c\)|copyright)\s*)(?<!\d{4}\s*[-–—/]\s*)(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*[-–—/]\s*\d{4}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
