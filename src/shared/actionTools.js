@@ -405,7 +405,7 @@
     },
     INVIA_FEEDBACK: {
       via: ['filo_su_di_se', 'feedback'],
-      description: 'manda una segnalazione a chi sviluppa Filo (titolo di 2-6 parole), anche quando ammetti che Filo non sa fare una cosa.',
+      description: 'una segnalazione a chi sviluppa Filo (titolo 2-6 parole), anche quando Filo non sa fare una cosa.',
       properties: { testo: S(), titolo: S() }, required: ['testo', 'titolo'],
     },
     // Vale solo nella conversazione dell'intervista di benvenuto (#524): fuori la ferma executeFiloAction.
