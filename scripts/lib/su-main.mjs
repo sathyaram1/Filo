@@ -170,7 +170,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
   const linea = lineaPrincipale(root, base);
-  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })));
+  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })),
+    { fusioni: fusioniSuMain(root, { ref: base, numeri }) });
   const perId = new Map();
   for (const t of tutti) {
     const l = leggiTentativo(t.ramo);
