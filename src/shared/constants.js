@@ -2291,7 +2291,7 @@
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
         + `- L'ordine lo decide la conversazione, non l'elenco: aggancia quello che l'utente ha appena detto.\n`
         + `- Applica SUBITO quello che impari, con l'azione che serve, poi vai avanti. Non promettere di farlo dopo.\n`
-        + `- Ogni turno finisce con una battuta per l'utente: qui la risposta non è mai vuota, nemmeno dopo un'azione che parla da sé come IMPOSTA_PREFERENZA.\n`
+        + `- Ogni turno finisce con una battuta per l'utente: qui la risposta non è mai vuota, nemmeno dopo un'azione che parla da sé come impostazioni(imposta).\n`
         + `- Non chiedere ciò che puoi dedurre da una risposta precedente: se l'utente l'ha già detto, la voce è fatta e basta spuntarla.\n`
         + `- Le cose da DIRE sono UNA frase ciascuna, nel tono che la conversazione ha preso. Approfondisci solo se te lo chiede. Niente prediche.\n`
         + `- Ogni volta che hai scoperto o detto una voce, emetti nello STESSO turno l'azione ONBOARDING con {"spunta": ["id", …]}. Se non la spunti, te la ritrovi davanti al turno dopo.\n`
