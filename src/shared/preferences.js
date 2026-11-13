@@ -2215,7 +2215,7 @@
       keys: ['bluetooth_preferiti', 'dispositivi bluetooth preferiti', 'preferiti bluetooth'],
       scrive: ['bluetoothPreferiti'],
       aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth in qualunque forma, '
-        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
+        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa computer(bluetooth) con dispositivo e preferito)',
       costo: 1,
       risk: 'Cambia quali dispositivi Bluetooth stanno in cima all\'elenco della home.',
       build(v) {
