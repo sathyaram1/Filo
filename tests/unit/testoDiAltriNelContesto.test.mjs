@@ -86,14 +86,17 @@ test('le righe dei blocchi davanti ai messaggi: dispositivi, reti, timer, avvisi
     { tipo: 'sistema', cosa: 'rete', online: true, nome: 'Rete del vicino', ts, id: 'b' },
     { tipo: 'sistema', cosa: 'batteria', livello: 10, soglia: 20, ts, id: 'c' },
     { tipo: 'timer.scattato', genere: 'timer', nome: 'Pasta', ts, id: 'd' },
-    { tipo: 'notifica', testo: 'Avviso dal modello', ts, id: 'e' },
     { tipo: 'file', titolo: 'Note prese da una pagina', azione: 'creato', ts, id: 'f' },
   ], { rif: ts });
   const per = Object.fromEntries(daFuori.map((g) => [g.fonte, g.testi]));
-  assert.deepEqual(Object.keys(per).sort(), ['dai file dell\'editor', 'dai nomi di reti e dispositivi', 'dai nomi di timer e sveglie', 'dalle notifiche']);
+  assert.deepEqual(Object.keys(per).sort(), ['dai file dell\'editor', 'dai nomi di reti e dispositivi', 'dai nomi di timer e sveglie']);
   assert.deepEqual(per['dai nomi di reti e dispositivi'], [`Cuffie ${CODICE}`, 'Rete del vicino']);
   assert.equal(esce(daFuori).blocca, true);
-  assert.deepEqual(TV.rendiEventi([{ tipo: 'sistema', cosa: 'batteria', livello: 10, soglia: 20, ts, id: 'c' }], { rif: ts }).daFuori, []);
+  // La batteria e gli avvisi di Filo li scrive Filo: un turno con solo questi resta pulito.
+  assert.deepEqual(TV.rendiEventi([
+    { tipo: 'sistema', cosa: 'batteria', livello: 10, soglia: 20, ts, id: 'c' },
+    { tipo: 'notifica', testo: 'Filo salva in chiaro le chiavi che gli hai dato.', ts, id: 'e' },
+  ], { rif: ts }).daFuori, []);
 });
 
 test('gli esiti di BLUETOOTH e WIFI che elencano nomi scelti da altri: testo di sconosciuti, e la stessa regola per l\'autonomia', () => {
