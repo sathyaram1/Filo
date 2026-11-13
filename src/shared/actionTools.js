@@ -426,16 +426,16 @@
 
   // L'apertura di ogni strumento; le azioni le elenca il codice dalle righe di TOOLS.
   const STRUMENTI = {
-    impostazioni: 'Le impostazioni di Filo (Preferenze, Sicurezza, Modelli, Altro), l\'aspetto e l\'account.',
-    scheda: 'Le schede e la finestra di Filo. Una scheda si indica col suo numero in TAB APERTE.',
-    home: 'La home di Filo, la barra laterale, la fila del tasto destro e il pannello delle app.',
-    promemoria: 'Timer, sveglie ed eventi del calendario.',
-    file: 'I file del computer dell\'utente e quelli dell\'Editor. I percorsi nella forma di IL COMPUTER DELL\'UTENTE, o con ~.',
-    computer: 'Il computer dell\'utente: shell, schermo, volume, rete, Bluetooth, desktop.',
+    impostazioni: 'Impostazioni, aspetto e account di Filo.',
+    scheda: 'Schede e finestra di Filo; una scheda è il suo numero in TAB APERTE.',
+    home: 'Home, barra laterale, fila del tasto destro, pannello delle app.',
+    promemoria: 'Timer, sveglie, calendario.',
+    file: 'File del computer (percorsi come in IL COMPUTER DELL\'UTENTE, o con ~) e dell\'Editor.',
+    computer: 'Il computer dell\'utente.',
     web: 'Il web.',
     memoria: 'Quello che Filo ricorda dell\'utente.',
-    filo: 'Il filo: tutto quello che l\'utente ha fatto con Filo, conversazioni e pagine comprese.',
-    filo_su_di_se: 'Filo che parla di sé: trasparenza, capacità, segnalazioni, intervista di benvenuto.',
+    filo: 'Il filo: quello che l\'utente ha fatto con Filo, conversazioni e pagine comprese.',
+    filo_su_di_se: 'Filo su di sé.',
   };
   const NOMI_STRUMENTI = Object.keys(STRUMENTI);
 
