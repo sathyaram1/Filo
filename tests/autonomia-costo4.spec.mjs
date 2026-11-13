@@ -156,7 +156,9 @@ test('#835.1: «sblocca example.org» e «spegni il giudizio AI» chiedono la pa
       ['sblocca example.org', { chiave: 'siti_bloccati', valore: 'togli example.org' }, async () => !(await sicurezza()).siteBlock.blacklist.includes('example.org')],
       ['spegni il giudizio AI', { chiave: 'giudizio_ai_siti', valore: 'off' }, async () => (await sicurezza()).safeBrowse.llmJudge === false],
     ].entries()) {
-      await modelloFinto(app, [chiamata(`p${i}`, 'IMPOSTA_PREFERENZA', args), { text: 'Serve la tua conferma.' }]);
+      // Il secondo giro è la ripresa dopo la parola: finché non è arrivato, il copione dopo non si monta.
+      const ripresa = `Fatto ${i}.`;
+      await modelloFinto(app, [chiamata(`p${i}`, 'IMPOSTA_PREFERENZA', args), { text: ripresa }]);
       await chiedi(page, frase);
       await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
       expect((await confirmState(page)).hasInput, frase).toBe(true);
@@ -165,6 +167,8 @@ test('#835.1: «sblocca example.org» e «spegni il giudizio AI» chiedono la pa
       await scrollConfirmToEnd(page);
       await clickConfirm(page, 'danger');
       await expect.poll(fatto, { timeout: 8000, message: frase }).toBe(true);
+      await expect(page.locator('.dash-bubble-filo', { hasText: ripresa })).toHaveCount(1, { timeout: 15000 });
+      await expect(page.locator('#sendBtn')).toBeVisible();
     }
     expect((await sicurezza()).siteBlock.blacklist).toContain('altro.example');
 
