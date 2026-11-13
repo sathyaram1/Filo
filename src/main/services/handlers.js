@@ -6144,7 +6144,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const titolo = nomiSalvati([action._titolo || 'senza titolo']);
     if (o.cancellata) return `Cancellata per sempre: non c'è più nel filo né sul computer.\n${titolo}`;
     if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (filo(rimetti_chat)).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
-    if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con CERCA_CHAT e l'id ${action.id}.\n${titolo}`;
+    if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con filo(cerca) e l'id ${action.id}.\n${titolo}`;
     return 'Conversazione NON toccata.';
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
