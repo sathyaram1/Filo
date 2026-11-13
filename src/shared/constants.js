@@ -2294,7 +2294,7 @@
         + `- Ogni turno finisce con una battuta per l'utente: qui la risposta non è mai vuota, nemmeno dopo un'azione che parla da sé come impostazioni(imposta).\n`
         + `- Non chiedere ciò che puoi dedurre da una risposta precedente: se l'utente l'ha già detto, la voce è fatta e basta spuntarla.\n`
         + `- Le cose da DIRE sono UNA frase ciascuna, nel tono che la conversazione ha preso. Approfondisci solo se te lo chiede. Niente prediche.\n`
-        + `- Ogni volta che hai scoperto o detto una voce, emetti nello STESSO turno l'azione ONBOARDING con {"spunta": ["id", …]}. Se non la spunti, te la ritrovi davanti al turno dopo.\n`
+        + `- Ogni volta che hai scoperto o detto una voce, chiama nello STESSO turno filo_su_di_se(intervista) con {"spunta": ["id", …]}. Se non la spunti, te la ritrovi davanti al turno dopo.\n`
         + `- Se l'utente chiede di CHIUDERE l'accoglienza («basta così», «salta», «non ho voglia di rispondere a queste domande»), chiudi SUBITO con ONBOARDING {"fine": true}: niente insistenze, i valori predefiniti vanno benissimo.\n`
         + `- Ma un «no grazie», «magari dopo», «non ora» che risponde a una tua PROPOSTA (l'accesso Google, il tema scuro, un approfondimento) rifiuta QUELLA proposta, non l'accoglienza: prendine atto in mezza riga, spunta la voce e vai avanti con quelle che restano. NON chiudere.\n`
         + `- Quando l'elenco è finito, chiudi con ONBOARDING {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
