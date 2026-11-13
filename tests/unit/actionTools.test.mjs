@@ -33,40 +33,87 @@ test('sentinella: ogni azione del registro dei livelli è uno strumento, e vicev
   assert.deepEqual(tools, levels, 'registro dei livelli e strumenti divergono');
 });
 
-test('le definizioni hanno la forma che il fornitore capisce', () => {
+test('le definizioni sono una decina di strumenti generali, ognuno con la sua azione (SPEC-CONTESTO § Gli strumenti)', () => {
   const defs = Tools.definitions();
-  assert.ok(defs.length > 20);
+  assert.ok(defs.length >= 8 && defs.length <= 12, `strumenti: ${defs.length}`);
   for (const d of defs) {
     assert.equal(d.type, 'function');
-    assert.match(d.function.name, /^[A-Z_]+$/, `nome non valido: ${d.function.name}`);
+    assert.match(d.function.name, /^[a-z_]+$/, `nome non valido: ${d.function.name}`);
     assert.ok(d.function.description.length > 20, `descrizione vuota: ${d.function.name}`);
-    assert.equal(d.function.parameters.type, 'object');
-    assert.ok(Array.isArray(d.function.parameters.required));
-    for (const r of d.function.parameters.required) {
-      assert.ok(r in d.function.parameters.properties, `${d.function.name}: obbligatorio "${r}" senza schema`);
+    const p = d.function.parameters;
+    assert.equal(p.type, 'object');
+    assert.deepEqual(p.required, ['azione']);
+    assert.deepEqual(p.properties.azione.enum, Object.keys(Tools.AZIONI[d.function.name]));
+    for (const a of p.properties.azione.enum) {
+      assert.ok(d.function.description.includes(`\n- ${a}(`), `${d.function.name}: l'azione ${a} non è descritta`);
     }
   }
-  // ONBOARDING c'è sempre: gli strumenti sono uguali per ogni ruolo, e fuori dall'intervista lo ferma il main.
-  assert.ok(defs.some((d) => d.function.name === 'ONBOARDING'));
 });
 
-test('ONBOARDING: le voci da spuntare sono quelle dell’intervista, e c’è la scelta dell’autonomia (#1188)', () => {
-  const onb = Tools.definitions().find((d) => d.function.name === 'ONBOARDING');
-  const props = onb.function.parameters.properties;
+test('ogni azione di oggi si raggiunge da uno strumento generale, con tutti i suoi parametri', () => {
+  const defs = Object.fromEntries(Tools.definitions().map((d) => [d.function.name, d.function.parameters.properties]));
+  const viste = new Set();
+  for (const tipo of Tools.NAMES) {
+    const [s, a] = Tools.TOOLS[tipo].via;
+    assert.equal(Tools.AZIONI[s][a], tipo, `${tipo}: ${s}(${a}) non porta qui`);
+    assert.ok(!viste.has(`${s}(${a})`), `${s}(${a}) è di due azioni`);
+    viste.add(`${s}(${a})`);
+    const props = Tools.TOOLS[tipo].properties;
+    for (const k of Object.keys(typeof props === 'function' ? props({}) : props)) {
+      assert.ok(k in defs[s], `${tipo}: il parametro ${k} manca in ${s}`);
+    }
+  }
+});
+
+// Un valore d'esempio per ogni tipo di parametro, così la chiamata nuova e la vecchia portano gli stessi campi.
+function esempio(sch) {
+  const t = sch.anyOf ? sch.anyOf[0] : sch;
+  if (t.enum) return t.enum[0];
+  if (t.type === 'integer' || t.type === 'number') return 3;
+  if (t.type === 'boolean') return true;
+  if (t.type === 'array') return [esempio(t.items || { type: 'string' })];
+  if (t.type === 'object') return { selettore: 'h1', css: 'color:red' };
+  return 'x';
+}
+
+test('i parametri di oggi arrivano agli stessi gestori: strumento(azione) dà la stessa azione del nome vecchio', () => {
+  for (const tipo of Tools.NAMES) {
+    const t = Tools.TOOLS[tipo];
+    const props = typeof t.properties === 'function' ? t.properties({}) : t.properties;
+    const args = Object.fromEntries(Object.entries(props).map(([k, sch]) => [k, esempio(sch)]));
+    const [nuova] = Tools.toolCallsToActions([{ id: 'n', name: t.via[0], arguments: JSON.stringify({ azione: t.via[1], ...args }) }]);
+    const [vecchia] = Tools.toolCallsToActions([{ id: 'n', name: tipo, arguments: JSON.stringify(args) }]);
+    assert.deepEqual(nuova, vecchia, tipo);
+    assert.ok(!nuova._argsError, `${tipo}: ${nuova._argsError}`);
+    assert.ok(Levels.REGISTRY[nuova.type], `${tipo}: il registro dei costi non la conosce`);
+  }
+});
+
+test('azione mancante, sconosciuta o senza i suoi campi: l\'errore torna al modello e l\'azione non parte', () => {
+  const [senza, ignota, monca, ok] = Tools.toolCallsToActions([
+    { id: 'a', name: 'scheda', arguments: '{"url":"https://example.com"}' },
+    { id: 'b', name: 'scheda', arguments: '{"azione":"vola"}' },
+    { id: 'c', name: 'promemoria', arguments: '{"azione":"timer","etichetta":"Pasta"}' },
+    { id: 'd', name: 'promemoria', arguments: '{"azione":"timer","secondi":600}' },
+  ]);
+  assert.match(senza._argsError, /manca l'azione in scheda: scegli fra apri, /);
+  assert.match(ignota._argsError, /l'azione «vola» non c'è in scheda/);
+  assert.match(monca._argsError, /per promemoria\(timer\) manca secondi/);
+  assert.deepEqual(ok, { type: 'TIMER', secondi: 600, _callId: 'd' });
+  assert.equal(Tools.chiamata('CERCA_CHAT'), 'filo(cerca)');
+});
+
+test('intervista: le voci da spuntare sono quelle dell’intervista, e c’è la scelta dell’autonomia (#1188)', () => {
+  const props = Tools.definitions().find((d) => d.function.name === 'filo_su_di_se').function.parameters.properties;
   assert.deepEqual(props.spunta.items.enum, globalThis.SN_ONBOARDING.ITEM_IDS, 'una voce nuova dell’intervista arriva da sola allo strumento');
   assert.ok(props.spunta.items.enum.includes('autonomia'));
   assert.equal(props.autonomia.type, 'boolean');
 });
 
 test('gli strumenti sono gli stessi su ogni sistema: shell e percorsi di questo computer li dice la parte dell\'utente', () => {
-  const pref = Tools.definitions().find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  for (const sh of ['powershell', 'cmd', 'bash', 'sh']) assert.ok(pref.includes(`"${sh}"`), `manca la shell ${sh}`);
-  assert.ok(pref.includes("IL COMPUTER DELL'UTENTE"));
-  for (const nome of ['LEGGI_DOCUMENTO', 'RINOMINA_FILE']) {
-    const d = Tools.definitions().find((x) => x.function.name === nome).function.description;
-    assert.ok(!/C:\\|\/Users\/|\/home\//.test(d), `${nome}: un esempio di percorso di un sistema solo`);
-    assert.ok(d.includes("IL COMPUTER DELL'UTENTE"), `${nome}: manca il rimando al computer dell'utente`);
-  }
+  const defs = Tools.definitions();
+  for (const d of defs) assert.ok(!/C:\\|\/Users\/|\/home\//.test(d.function.description), `${d.function.name}: un percorso di un sistema solo`);
+  assert.ok(defs.find((d) => d.function.name === 'file').function.description.includes("IL COMPUTER DELL'UTENTE"));
 });
 
 test('il prompt della chat non descrive più il formato JSON, ma spiega gli strumenti', () => {
