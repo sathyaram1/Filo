@@ -3676,6 +3676,13 @@ async function eseguiAzioneFilo(action, {
         const detail = Caps ? Caps.renderDetailForPrompt(ids, cancelliAperti()) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
+      case 'ESPANDI_FILO': {
+        // SPEC-CONTESTO § Tre livelli: sotto una riga del diario, il grezzo di quelle ore. Sola lettura.
+        const r = await espandiFilo(action.da, action.a);
+        return r.errore
+          ? { executed: false, kept: true, output: { espanso: true, error: r.errore } }
+          : { executed: true, kept: true, output: { espanso: true, ...r } };
+      }
       case 'CERCA_CHAT': {
         // #525 — l'archivio delle chat passate, per «riprendi la discussione
         // di ieri sulla coscienza». Due passi come LEGGI_FILE: prima l'elenco
