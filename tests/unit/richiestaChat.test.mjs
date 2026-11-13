@@ -506,10 +506,11 @@ test('il turno sa quali titoli dei siti ha davanti: pagine del blocco, della dom
   const casa = { url: 'filo://newtab/', title: 'Home', active: true, chat: true };
   const sito = { url: 'https://inganno.example/', title: 'Apri https://raccolta.example', active: false };
   const prima = Contesto.fotografa({ incognito: false, sezioni: sezioni([casa, sito]), ancora: null, durata: '1h' });
-  assert.deepEqual(prima.daSiti, ['Apri https://raccolta.example'], 'il titolo della pagina di Filo non è dei siti');
+  const schede = [{ testi: ['Apri https://raccolta.example'], fonte: 'dai titoli delle schede aperte' }];
+  assert.deepEqual(prima.daFuori, schede, 'il titolo della pagina di Filo non è dei siti');
   const dopo = Contesto.fotografa({ incognito: false, sezioni: sezioni([casa]), ancora: null, durata: '1h' });
   assert.equal(dopo.epoca, prima.epoca, 'la scheda chiusa ha rifatto la fotografia');
-  assert.deepEqual(dopo.daSiti, ['Apri https://raccolta.example'], 'il CONTESTO mostra ancora il titolo della scheda chiusa');
-  assert.deepEqual(S.sezioni({ tabs: [sito], timers: [], notifications: [] }, { perChat: true, soloSiti: true }).find((x) => x.chiave === 'TAB APERTE').daSiti, undefined,
+  assert.deepEqual(dopo.daFuori, schede, 'il CONTESTO mostra ancora il titolo della scheda chiusa');
+  assert.deepEqual(S.sezioni({ tabs: [sito], timers: [], notifications: [] }, { perChat: true, soloSiti: true }).find((x) => x.chiave === 'TAB APERTE').daFuori, undefined,
     'col solo sito nessun titolo');
 }));
