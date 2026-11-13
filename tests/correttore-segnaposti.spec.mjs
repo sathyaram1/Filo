@@ -553,7 +553,7 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
   await page.locator('#ta').click();
   await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(4500);
   expect(await globale(app, '__ragionate'), 'mentre si scrive non parte niente').toEqual([]);
   await page.locator('#ta').click({ button: 'right' });
   await menuDi(page).voce('Controlla').click();
