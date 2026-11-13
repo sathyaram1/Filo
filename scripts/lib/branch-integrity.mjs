@@ -775,7 +775,9 @@ function scaricaDaOrigin(root, ref, noto = null) {
 
 /** La riga di git che dice il motivo, da ricopiare dentro le virgolette di `--guasto "…"` (il guasto di halt). PURA. */
 export function rigaDiErrore(testo, riserva = '') {
-  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean);
+  // La negoziazione di un push fallisce da sola e git prosegue: la sua riga «fatal» non è il motivo del no.
+  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean)
+    .filter((r) => !/--negotiate-only|push negotiation failed/.test(r));
   const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || riserva);
   return riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
 }
