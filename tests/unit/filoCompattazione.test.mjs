@@ -347,7 +347,7 @@ test('le memorie della compattazione portano i messaggi che le dicono, anche dop
   assert.deepEqual(p.fonti, [letta, u], 'chi decide vede la lettura e il messaggio');
   assert.deepEqual(p.origine, [u]);
   assert.deepEqual(await Comp.decidi(p.id, true), { ok: true, scritta: true });
-  assert.deepEqual(sosp.fontiScritte, [{ fonti: [letta, u], origine: [u] }], 'dopo il sì la riga le ha ancora');
+  assert.deepEqual(sosp.fontiScritte, [[u]], 'dopo il sì la riga tiene il punto del filo da cui è nata');
 });
 
 test('il livello «giorni»: una riga per ogni giorno passato che ha ore, una volta sola', async () => {
