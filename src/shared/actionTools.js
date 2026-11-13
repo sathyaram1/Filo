@@ -256,7 +256,7 @@
     },
     LEGGI_DOCUMENTO: {
       via: ['file', 'leggi'], risultato: true,
-      description: 'il testo di un documento dal disco: PDF, Word, LibreOffice, testo.',
+      description: 'il testo di un documento dal disco: PDF (solo così, non col terminale), Word, LibreOffice, testo.',
       properties: { percorso: S() }, required: ['percorso'],
     },
     LEGGI_FILE: {
