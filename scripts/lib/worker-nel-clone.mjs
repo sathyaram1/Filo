@@ -97,6 +97,9 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti, strument
     `e Read, Edit e Write vogliono percorsi sotto \`${dir}\`. Il salvataggio automatico segue il file che modifichi.`,
     `Grep e Glob senza \`path\`, e i sotto-agenti senza la cartella nel compito, cercano nella cartella della sessione:`,
     `un file letto lì per Edit non è letto qui, e la modifica viene rifiutata (#2188).`,
+    '',
+    `Dove il prompt con cui sei partito e queste istruzioni dicono cose diverse, valgono queste.${copia}`,
+    'Il «primo piano» che il prompt chiede è il tuo lancio: i tuoi comandi lunghi vanno in sottofondo, come dice «Comandi lunghi».',
   ];
   if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {
