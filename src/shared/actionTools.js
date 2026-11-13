@@ -354,7 +354,7 @@
     // ── filo ──
     CERCA_CHAT: {
       via: ['filo', 'cerca'], risultato: true,
-      description: 'cerca in tutto il filo: conversazioni di ogni scheda e giorno, pagine visitate, cambi; con id rilegge una conversazione intera (da per il seguito).',
+      description: 'conversazioni di ogni giorno, pagine visitate, cambi; con id rilegge una conversazione (da: il seguito).',
       properties: { query: S(), id: S(), da: I() }, required: [],
     },
     ESPANDI_FILO: {
