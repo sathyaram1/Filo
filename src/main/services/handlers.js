@@ -6081,7 +6081,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'RIPRENDI_AUDIO' && res.output && !res.needsConfirm) {
     const o = res.output;
     if (o.giaSuona) return conTitolo('Niente da far ripartire: c\'è già una scheda che suona. Chiedi all\'utente se intende un\'altra musica.', o.titolo);
-    if (o.nessuna) return 'Niente da far ripartire: nessuna scheda, aperta o chiusa, ha suonato. Chiedi all\'utente cosa vuole ascoltare, o cercalo con NAVIGA (background: true).';
+    if (o.nessuna) return 'Niente da far ripartire: nessuna scheda, aperta o chiusa, ha suonato. Chiedi all\'utente cosa vuole ascoltare, o cercalo con scheda(apri) (background: true).';
     if (o.error) return `Musica NON ripartita: ${o.error}.`;
     const dove = o.numero ? ` la scheda ${o.numero}` : ' la scheda';
     if (o.nonPartita) return conTitolo(`${o.riaperta ? 'Ho riaperto' : 'Ho trovato'}${dove}, ma l'audio non è ripartito da solo (la pagina non ha un lettore pronto o l'ha rifiutato). Di' all'utente in una riga di premere play lì.`, o.titolo);
