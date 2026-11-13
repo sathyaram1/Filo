@@ -504,6 +504,49 @@ test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è l
   }
 });
 
+test('giro vero, il main di adesso va in conflitto col tentativo morto: non si fonde, e la busta dice dove (#2152.1)', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    git(casa, 'checkout', '-q', '-B', ramo('20261101T000000Z'), main);
+    const morto = commit(casa, 'segnaposto.txt', 'il tentativo\n');
+    git(casa, 'push', '-q', 'origin', `${ramo('20261101T000000Z')}:refs/heads/${ramo('20261101T000000Z')}`);
+    git(casa, 'checkout', '-q', 'main');
+    commit(casa, 'segnaposto.txt', 'un altro feedback\n');
+    git(casa, 'push', '-q', 'origin', 'main');
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(git(casa, 'rev-parse', 'HEAD'), morto, 'niente fusione a metà: il ramo resta sulla punta del tentativo');
+    assert.equal(git(casa, 'status', '--porcelain', '--untracked-files=no'), '', 'nessun conflitto lasciato nella cartella');
+    assert.deepEqual(r.json.payload.ripartenza, { ramo: ramo('20261101T000000Z'), commit: 1, conflittiConMain: ['segnaposto.txt'] });
+    assert.match(r.json.instructions || '', /conflittiConMain/, 'il ruolo dice cosa farne');
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
+test('giro vero: a ogni lavoro nuovo se ne vanno da origin i superati degli altri feedback, anche col ramo fuso già potato', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    const altro = 'fid-1140';
+    tentativo(casa, ramo('20261012T000000Z', altro), main, 3);
+    const fuso = tentativo(casa, ramo('20261014T000000Z', altro), main, 1);
+    git(casa, 'merge', '-q', '--no-ff', '-m', `finish: ${ramo('20261014T000000Z', altro)} via server`, fuso);
+    git(casa, 'push', '-q', 'origin', 'main', `:refs/heads/${ramo('20261014T000000Z', altro)}`);
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/worker/${altro}-*`), '', 'il tentativo superato dell\'altro feedback è chiuso');
+    assert.match(r.se, /tentativi di altri feedback superati .*tolti da origin: worker\/fid-1140-20261012T000000Z/);
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
 test('giro vero, biglietto legato a un ramo mai spinto: nasce con quel nome dalla punta del tentativo precedente', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const legato = ramo('20261102T000000Z');
