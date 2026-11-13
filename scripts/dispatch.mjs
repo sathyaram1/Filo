@@ -1058,6 +1058,12 @@ function testoDiffVuoto({ commitPropri = null, soloMedia = 0 } = {}, diffServer 
   return commitPropri === 0 ? `Il diff è vuoto davvero: ${perche}, quindi non porta nessuna modifica.` : `Il diff è vuoto davvero: ${perche}.`;
 }
 
+// Il fatto sta nel payload, cosa farne nel ruolo (§ «Un ramo che non porta niente», _ramo-vuoto.md).
+export const TESTO_RAMO_VUOTO = 'Il ramo non porta nessuna modifica rispetto a main: vale la sezione «Un ramo che non porta niente» delle tue istruzioni.';
+function conRamoVuoto(ctx) {
+  return ctx && ctx.ramoVuoto === true ? { ramoVuoto: TESTO_RAMO_VUOTO } : {};
+}
+
 // Il piano che una sessione precedente ha scritto per questo lavoro (SPEC-RIDISEGNO-LAVORO.md § 2): chi riprende
 // riparte da lì. Lo conserva e lo rimanda il server.
 function conPiano(ctx) {
