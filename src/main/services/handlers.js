@@ -6143,7 +6143,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai filo(cerca) e usa un id preso da lì, mai inventato.';
     const titolo = nomiSalvati([action._titolo || 'senza titolo']);
     if (o.cancellata) return `Cancellata per sempre: non c'è più nel filo né sul computer.\n${titolo}`;
-    if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (RIMETTI_CHAT).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
+    if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (filo(rimetti_chat)).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
     if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con CERCA_CHAT e l'id ${action.id}.\n${titolo}`;
     return 'Conversazione NON toccata.';
   }
