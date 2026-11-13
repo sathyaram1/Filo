@@ -374,7 +374,7 @@
     },
     CANCELLA_PAGINE: {
       via: ['filo', 'cancella_pagine'],
-      description: 'cancella pagine visitate: periodo (ultima_ora, oggi, ieri, tutto), ore, giorni, da e a, sito.',
+      description: 'cancella pagine visitate per periodo, ore, giorni, da/a o sito.',
       properties: { periodo: S({ enum: ['ultima_ora', 'oggi', 'ieri', 'tutto'] }), ore: I(), giorni: I(), da: S(), a: S(), sito: S() }, required: [],
     },
     CANCELLA_ARCHIVIO: {
