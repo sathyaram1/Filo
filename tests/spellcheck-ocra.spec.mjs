@@ -551,7 +551,7 @@ test('un anno detto per altro sopra il modulo: decide il controllo ragionato, e 
   const page = await apri(app, openTab, testServer, giudicato(`${sbagliato} 9 ottobre`, `${v.giorno} 9 ottobre`, `Il 9 ottobre ${v.anno} è ${v.giorno}.`),
     PAGINA_ANNO({ dentro: '<p>Trattoria da Mario, fondata nel 1999</p><h2>Prenota un tavolo</h2>' }));
   await page.locator('#ta').click();
-  await page.keyboard.type(`vorrei un tavolo per ${sbagliato} 9 ottobre, siamo in 4.`);
+  await batti(page, `vorrei un tavolo per ${sbagliato} 9 ottobre, siamo in 4.`);
   await expect(ocra(page)).toHaveText([sbagliato], { timeout: 12_000 });
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).toContain('(anno scritto nella pagina prima del campo: «Trattoria da Mario, fondata nel 1999»)');
