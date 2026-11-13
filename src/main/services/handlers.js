@@ -5482,7 +5482,7 @@ function consiglioPaginaNonLetta(out) {
   const stato = Number(out.stato) || 0;
   switch (out.errore) {
     case 'rete-locale':
-      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando LEGGI_PAGINA con lo stesso indirizzo lo leggi da lì.';
+      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando web(leggi) con lo stesso indirizzo lo leggi da lì.';
     case 'pericoloso':
       return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
     case 'schema':
