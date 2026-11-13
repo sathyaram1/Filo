@@ -547,7 +547,8 @@
           argsError = `${azione ? `l'azione «${azione}» non c'è` : 'manca l\'azione'} in ${nome.toLowerCase()}: scegli fra ${Object.keys(strumento).join(', ')}`;
         }
       }
-      if (!argsError && TOOLS[type]) {
+      // Lo schema generale non può dire i campi obbligatori di ogni azione: li controlla qui, prima del gestore.
+      if (strumento && !argsError && TOOLS[type]) {
         const manca = (TOOLS[type].required || []).filter((k) => campi[k] === undefined || campi[k] === null);
         if (manca.length) argsError = `per ${chiamata(type)} manca ${manca.join(', ')}`;
       }
