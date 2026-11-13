@@ -41,7 +41,7 @@
     },
     IMPOSTA_PREFERENZA: {
       via: ['impostazioni', 'imposta'],
-      description: 'una chiave per chiamata. Frequenti: tema (sistema|chiaro|scuro), dimensione_testo (piccolo|normale|grande|molto grande|enorme), blocco_pubblicita, gestione_cookie (manuale|automatico|privacy), modalita_terminale, guarda_schermo, stile_agente (testo), autonomia (solo se l\'utente lo chiede). Le altre chiavi e i loro valori li dà leggi.',
+      description: 'una chiave per chiamata. Frequenti: tema (sistema|chiaro|scuro), dimensione_testo, blocco_pubblicita, gestione_cookie, modalita_terminale, guarda_schermo, stile_agente, autonomia (solo se l\'utente lo chiede). Chiavi e valori ammessi con leggi.',
       properties: { chiave: S(), valore: { anyOf: [S(), { type: 'number' }, B()] } }, required: ['chiave', 'valore'],
     },
     IMPOSTA_ESTETICA: {
