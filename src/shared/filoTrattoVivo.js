@@ -390,16 +390,14 @@
         return;
       }
       const r = rigaDi(ev);
-      // Il nome di un file scaricato lo sceglie il sito.
-      const sito = ev.tipo === 'download' && stringa(ev.file || ev.scaricamento) ? [campo(ev.file || ev.scaricamento)] : [];
-      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, sito });
+      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, daFuori: daFuoriDi(ev) });
     });
     if (schede.aperte || schede.chiuse) {
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
-      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, sito: [] });
+      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, daFuori: [] });
     }
     const visite = pagineResa(pagine, { rif });
-    if (!righe.length) return { testo: visite.testo, ids, daSiti: visite.daSiti };
+    if (!righe.length) return { testo: visite.testo, ids, daFuori: visite.daFuori };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
@@ -407,8 +405,24 @@
     return {
       testo: [`Successo dal messaggio prima:\n${busta}`, visite.testo].filter(Boolean).join('\n\n'),
       ids,
-      daSiti: [...tenute.flatMap((x) => x.sito), ...visite.daSiti],
+      daFuori: unisciDaFuori(...tenute.map((x) => x.daFuori), visite.daFuori),
     };
+  }
+
+  // Il testo di altri nella riga di un evento, con la sua fonte (#2305): lo stesso pezzo che la riga mostra.
+  function daFuoriDi(ev) {
+    const g = (testi, fonte) => [{ testi: testi.filter(Boolean), fonte }];
+    switch (ev.tipo) {
+      case 'download': return stringa(ev.file || ev.scaricamento) ? g([campo(ev.file || ev.scaricamento)], 'dai nomi dei file scaricati') : [];
+      case 'file': return g([campo(ev.titolo || ev.file), stringa(ev.prima) ? campo(ev.prima) : ''], 'dai file dell\'editor');
+      case 'timer.scattato': return g([campo(ev.nome || '')], 'dai nomi di timer e sveglie');
+      case 'notifica': return g([campo(ev.testo, 400)], 'dalle notifiche');
+      case 'sistema':
+        if (ev.cosa === 'rete' && ev.online && stringa(ev.nome)) return g([campo(ev.nome, 80)], 'dai nomi di reti e dispositivi');
+        if (ev.cosa === 'bluetooth') return g([campo(ev.dispositivo, 80)], 'dai nomi di reti e dispositivi');
+        return [];
+      default: return [];
+    }
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
