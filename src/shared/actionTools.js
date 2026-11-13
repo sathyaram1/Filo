@@ -298,7 +298,7 @@
     },
     VOLUME: {
       via: ['computer', 'volume'],
-      description: 'il volume del computer: livello 0-100, verso su o giu (di 10), muto.',
+      description: 'il volume del computer (livello 0-100, verso su|giu).',
       properties: { livello: I(), verso: S(), muto: B() }, required: [],
     },
     WIFI: {
