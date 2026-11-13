@@ -187,7 +187,7 @@
     },
     COMANDO_FINESTRA: {
       via: ['scheda', 'finestra'],
-      description: 'un controllo della finestra di Filo: fullscreen, minimize, home, settings, apps, account (apre il menu), sidebar, sidebar_close, sidebar_lock, sidebar_unlock, aiuto.',
+      description: 'un controllo della finestra di Filo (account apre solo il menu).',
       properties: { comando: S({ enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar', 'sidebar_close', 'sidebar_lock', 'sidebar_unlock', 'aiuto'] }) },
       required: ['comando'],
     },
