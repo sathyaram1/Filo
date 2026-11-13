@@ -338,6 +338,8 @@ test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password res
 
   await chatCheGuarda(app, 'Accesso al negozio');
   await chiedi(chat, 'cosa c’è nella finestra del negozio?');
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'prima dell’OK la foto non deve partire').toBe(0);
   await scrollConfirmToEnd(chat);
   await clickConfirm(chat, 'ok');
   await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
