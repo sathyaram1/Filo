@@ -528,14 +528,15 @@ for (const [nome, html] of [
       giudicato('martedì 9 ottobre', 'mercoledì 9 ottobre', 'Il 9 ottobre 2024 è mercoledì.'));
     await page.keyboard.press('Enter');
     await page.keyboard.type('e martedì 9 ottobre?');
-    await expect(ocra(page)).toHaveText(['martedì 9 ottobre'], { timeout: 12_000 });
+    // Il segno sta sulla sola parola che cambia.
+    await expect(ocra(page)).toHaveText(['martedì'], { timeout: 12_000 });
     const ultimo = (await app.evaluate(() => globalThis.__ocra)).at(-1);
     expect(ultimo).toContain('«martedì 9 ottobre»: il 9 ottobre');
     const menu = await tastoDestroSu(page, ocra(page).first());
     await expect(menu.locator('.sn-menu-segno')).toContainText('Il 9 ottobre 2024 è mercoledì');
-    await expect(menu.locator('.sn-menu-correction').first()).toHaveText('mercoledì 9 ottobre');
+    await expect(menu.locator('.sn-menu-correction').first()).toContainText('mercoledì');
     await page.screenshot({ path: 'tests/.shots/1115-2-data-anno-della-pagina.png' }).catch(() => {});
-    await menu.locator('.sn-menu-correction-main', { hasText: 'mercoledì 9 ottobre' }).first().click();
+    await menu.locator('.sn-menu-correction-main', { hasText: 'mercoledì' }).first().click();
     await expect(page.locator('#ta')).toHaveValue('certo, mercoledì 9 ottobre, pioveva ed era autunno.\ne mercoledì 9 ottobre?');
     await expect(ocra(page)).toHaveCount(0);
   });
