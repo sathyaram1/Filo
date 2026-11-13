@@ -422,12 +422,12 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     intervista,
     Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi.filter((r) => r && r.tratto && vivi.chat(r.tratto.chat))) : '',
   ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
-  // Il testo dei siti di ogni preambolo scritto, per messaggio: conta quello dei messaggi rimasti davanti (#2293).
-  const sitiDelPreambolo = new Map();
+  // Il testo di altri di ogni preambolo scritto, per messaggio: conta quello dei messaggi rimasti davanti (#2293).
+  const fuoriDelPreambolo = new Map();
   const preambolo = (m) => {
     if (m.riga || m.seguito) return '';
     const memo = eventiDi(m);
-    sitiDelPreambolo.set(FC().chiave(m), memo.eventi.daSiti || []);
+    fuoriDelPreambolo.set(FC().chiave(m), memo.eventi.daFuori || []);
     return TV().preambolo({
       eventi: memo.eventi.testo,
       stato: memo.stato && memo.stato.epoca === epoca ? memo.stato.testo : '',
