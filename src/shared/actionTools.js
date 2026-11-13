@@ -167,7 +167,7 @@
     },
     TIENI_APERTA: {
       via: ['scheda', 'tieni_aperta'],
-      description: 'la pulizia delle schede non archivia mai questo sito.',
+      description: 'la pulizia non archivia mai questo sito.',
       properties: { dominio: S() }, required: [],
     },
     NON_TENERE_APERTA: {
