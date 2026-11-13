@@ -1178,7 +1178,8 @@ module.exports = function register(on, ctx) {
   let syncTimer = null;
   let syncing = false;
   let lastSyncAt = 0;
-  const SYNC_MIN_GAP_MS = 60_000;
+  // Il giro intero non forzato: la scheda toccata dal triage la scrive syncOneCard, il resto può aspettare (#2470).
+  const SYNC_MIN_GAP_MS = 30 * 60 * 1000;
 
   // ── Da quando ricontrollare le chiusure ──────────────────────────────────
   //
