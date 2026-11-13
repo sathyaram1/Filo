@@ -446,7 +446,7 @@
       aggiungi('AUTONOMIA DI FILO', [
         'AUTONOMIA DI FILO',
         `Livello scelto dall'utente: ${state.autonomia.nome}. ${state.autonomia.frase}`,
-        'Si cambia solo se l\'utente lo chiede: in Preferenze sotto «Autonomia di Filo», o dalla chat con IMPOSTA_PREFERENZA (chiave autonomia; alzarlo vuole che l\'utente scriva «conferma»).',
+        'Si cambia solo se l\'utente lo chiede: in Preferenze sotto «Autonomia di Filo», o dalla chat con impostazioni(imposta) (chiave autonomia; alzarlo vuole che l\'utente scriva «conferma»).',
       ]);
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
