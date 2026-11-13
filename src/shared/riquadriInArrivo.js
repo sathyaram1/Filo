@@ -67,6 +67,7 @@
       win.addEventListener('load', (e) => {
         if (e.target !== win.document || win.parent === win) return;
         if (String(win.location && win.location.protocol) === 'chrome-extension:') return;
+        return;
         try { win.parent.postMessage({ filoRiquadroCaricato: 1 }, '*'); } catch (_) {}
       });
       win.addEventListener('message', (e) => {
