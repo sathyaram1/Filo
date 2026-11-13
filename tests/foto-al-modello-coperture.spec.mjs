@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
+import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const ROSA = [0xc9, 0x25, 0x85];
 const VERDE = [0x12, 0xab, 0x34];
@@ -316,6 +317,35 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del pagamento').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
+});
+
+// #2116.1: il campo password fa delicato il sito, quindi la finestra si guarda dopo un OK; anche dopo l'OK al
+// modello la password resa visibile arriva coperta.
+test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password resa visibile dal sito arriva coperta dopo l’OK', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso al negozio</title></head><body style="margin:0">
+    <div style="height:120px;background:${tinta(VERDE)}"></div>
+    <form style="padding:20px"><div>Hasło</div><input id="c" name="haslo" type="password" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
+    <button type="button" id="occhio" onclick="c.type = c.type === 'password' ? 'text' : 'password'">Mostra</button></form>
+    </body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', 'Gatto.Rosso.77');
+  await page.click('#occhio');
+  await expect(page.locator('#c')).toHaveAttribute('type', 'text');
+  await page.locator('#c').blur();
+
+  const chat = await secondaFinestraConChat(app);
+
+  await chatCheGuarda(app, 'Accesso al negozio');
+  await chiedi(chat, 'cosa c’è nella finestra del negozio?');
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'prima dell’OK la foto non deve partire').toBe(0);
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del negozio').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'la password si legge nella foto').toBeLessThan(20);
 });
 
 // Lo Screenshot dal menu della scheda «Conto»: torna la foto che l'utente scarica.
