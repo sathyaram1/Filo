@@ -275,7 +275,8 @@ describe('quale tentativo precedente si riprende', () => {
       const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
       git(casa, 'fetch', '-q', '--prune', 'origin');
 
-      const numeri = { 1141: conCancello };
+      // Come lo chiama il manutentore: i numeri dall'indice dei feedback.
+      const numeri = numeriDellIndice([{ id: conCancello, num: '1141' }, { num: '9' }]);
       assert.deepEqual(ramiInCorso(casa, { giorni: 0, numeri }).map((x) => x.ramo), [ramo('20261101T000000Z')],
         'nell\'elenco del manutentore restano solo i lavori vivi');
       assert.equal(ramiInCorso(casa, { giorni: 0 }).filter((x) => x.ramo.includes(conFinish)).length, 0,
