@@ -423,7 +423,6 @@
       case 'download': return stringa(ev.file || ev.scaricamento) ? g([campo(ev.file || ev.scaricamento)], 'dai nomi dei file scaricati') : [];
       case 'file': return g([campo(ev.titolo || ev.file), stringa(ev.prima) ? campo(ev.prima) : ''], 'dai file dell\'editor');
       case 'timer.scattato': return g([campo(ev.nome || '')], 'dai nomi di timer e sveglie');
-      case 'notifica': return g([campo(ev.testo, 400)], 'dalle notifiche');
       case 'sistema':
         if (ev.cosa === 'rete' && ev.online && stringa(ev.nome)) return g([campo(ev.nome, 80)], 'dai nomi di reti e dispositivi');
         if (ev.cosa === 'bluetooth') return g([campo(ev.dispositivo, 80)], 'dai nomi di reti e dispositivi');
