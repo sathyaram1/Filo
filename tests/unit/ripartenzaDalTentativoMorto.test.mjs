@@ -520,7 +520,8 @@ test('giro vero, il main di adesso va in conflitto col tentativo morto: non si f
     assert.equal(git(casa, 'rev-parse', 'HEAD'), morto, 'niente fusione a metà: il ramo resta sulla punta del tentativo');
     assert.equal(git(casa, 'status', '--porcelain', '--untracked-files=no'), '', 'nessun conflitto lasciato nella cartella');
     assert.deepEqual(r.json.payload.ripartenza, { ramo: ramo('20261101T000000Z'), commit: 1, conflittiConMain: ['segnaposto.txt'] });
-    assert.match(r.json.instructions || '', /conflittiConMain/, 'il ruolo dice cosa farne');
+    const ruolo = r.json.istruzioniFile ? readFileSync(r.json.istruzioniFile, 'utf8') : String(r.json.instructions || '');
+    assert.match(ruolo, /conflittiConMain/, 'il ruolo dice cosa farne');
   } finally {
     srv.close();
     togliCartella(base);
