@@ -66,10 +66,17 @@ test('il CONTESTO tiene una fonte per sezione, anche i file dell\'Editor, e le u
   assert.equal(esce(fonti).blocca, true, 'il codice nel riassunto di un file non esce');
   assert.deepEqual(TV.unisciDaFuori([{ testi: ['a', 'b'], fonte: 'x' }], [{ testi: ['b', ' ', 'c'], fonte: 'x' }], [{ testi: [], fonte: 'y' }]),
     [{ testi: ['a', 'b', 'c'], fonte: 'x' }]);
-  // Il testo di altri mostrato da una fotografia resta finché lei vive, anche se la sezione dopo non ce l'ha più.
+  // Il testo di altri mostrato da una fotografia resta finché lei vive, anche quando la sezione sparisce.
+  const resta = (viste) => TV.unisciDaFuori(...[...viste.values()].map((v) => v.daFuori || [])).some((g) => g.testi.some((t) => t.includes('Cuffie di Anna')));
   const viste = TV.confronta(new Map(), sezioni).viste;
-  const dopo = TV.confronta(viste, TV.sezioniUtente({ sistema: 'linux', statoSezioni: S.sezioni(vuoto, { perChat: true }) })).viste;
-  assert.ok(TV.unisciDaFuori(...[...dopo.values()].map((v) => v.daFuori || [])).some((g) => g.testi.includes('Cuffie di Anna')));
+  const senza = () => TV.sezioniUtente({ sistema: 'linux', statoSezioni: S.sezioni(vuoto, { perChat: true }) });
+  const dopo = TV.confronta(viste, senza());
+  assert.equal(dopo.rifai, false);
+  assert.ok(dopo.cambiate.some((c) => c.tolta === 'STATO:SISTEMA'), 'la sezione tolta si dice');
+  assert.ok(resta(dopo.viste));
+  const ancora = TV.confronta(dopo.viste, senza());
+  assert.deepEqual(ancora.cambiate, [], 'detta una volta sola');
+  assert.ok(resta(ancora.viste), 'e il suo testo resta contato anche al turno dopo');
 });
 
 test('le righe dei blocchi davanti ai messaggi: dispositivi, reti, timer, avvisi e file con la loro fonte', () => {
