@@ -136,6 +136,13 @@
     else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
     return contestoFilo().numeroDelTetto(k, n);
   }
+  // Il cambio a parole di un tetto in token e la sua riga nella cronologia: uno per tutti i tetti, come i campi.
+  const cambioDelTetto = (k, nome) => (v) => {
+    if (predefinito(v)) return { partial: { contestoFilo: { [k]: null } }, label: `${nome} → come i predefiniti` };
+    const n = tettoAParole(k, v);
+    if (n == null) return null;
+    return { partial: { contestoFilo: { [k]: n } }, label: `${nome} → ${n.toLocaleString('it-IT', { useGrouping: true })}` };
+  };
   const limitiDelTetto = (k) => contestoFilo().LIMITI[k].map((n) => n.toLocaleString('it-IT', { useGrouping: true })).join('-');
 
   function lunghezzaRisposte() {
@@ -2168,12 +2175,7 @@
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
       costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
-      build(v) {
-        if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
-        const token = tettoAParole('token', v);
-        if (token == null) return null;
-        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
-      },
+      build: cambioDelTetto('token', 'Tetto in token della chat'),
     },
     {
       scrive: ['contestoFilo.soglia'],
@@ -2181,12 +2183,7 @@
       keys: ['soglia_compattazione', 'soglia di compattazione', 'soglia della compattazione', 'compattazione della chat', 'contestofilo.soglia'],
       costo: 2,
       risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
-      build(v) {
-        if (predefinito(v)) return { partial: { contestoFilo: { soglia: null } }, label: 'Soglia di compattazione della chat → come i predefiniti' };
-        const soglia = tettoAParole('soglia', v);
-        if (soglia == null) return null;
-        return { partial: { contestoFilo: { soglia } }, label: `Soglia di compattazione della chat → ${soglia.toLocaleString('it-IT', { useGrouping: true })}` };
-      },
+      build: cambioDelTetto('soglia', 'Soglia di compattazione della chat'),
     },
     {
       scrive: ['contestoFilo.cache'],

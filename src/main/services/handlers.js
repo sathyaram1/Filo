@@ -1051,14 +1051,12 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
       if (!m) continue;
-      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
-      const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
-      if (l.rifiuto) { scartate += 1; console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (!l.testo) continue;
-      // Una lezione che ripete una riga tolta dalla persona non si scrive (#872): per i contatori è scartata.
-      const buf = await FiloMem.appendLesson(l.testo, { fonti });
-      const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-      if (ultima && ultima.text === String(l.testo).trim()) scritte += 1; else scartate += 1;
+      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592); una che ripete una riga tolta dalla persona
+      // non si scrive (#872): per i contatori è scartata.
+      const w = await FiloMem.scriviLezione(m[1], { fonti });
+      if (w.vuota) continue;
+      if (w.rifiuto) console.warn('[Filo] lezione automatica scartata:', w.rifiuto);
+      if (w.scritta) scritte += 1; else scartate += 1;
     }
     contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
@@ -1181,10 +1179,10 @@ Compattazione.imposta({
     });
     return r && r.text;
   },
-  applicaMemoria: async (testo, opts) => {
-    const scritta = await Compattazione.scriviMemoria(testo, opts);
-    if (await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
-    return scritta;
+  applicaMemoria: async (testo, fonti) => {
+    const w = await FiloMem.scriviLezione(testo, fonti);
+    if (w.scritta && await FiloMem.lessonsBufferShouldCompact()) maybeRunCompactor().catch(() => {});
+    return w;
   },
 });
 
@@ -3412,9 +3410,8 @@ async function eseguiAzioneFilo(action, {
           try {
             let fonte = '';
             try { fonte = chatId ? await globalThis.SN_IL_FILO.ultimaDomanda(chatId) : ''; } catch (_) {}
-            const buf = await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
-            const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-            if (ultima && ultima.text === l.testo) nuova = { ts: ultima.ts, text: ultima.text };
+            const w = await FiloMem.scriviLezione(l.testo, { fonti: fonte ? [fonte] : [] });
+            if (w.riga) nuova = { ts: w.riga.ts, text: w.riga.text };
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));

@@ -51,6 +51,9 @@
     return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
   }
 
+  // Un numero di token che può tornare ai predefiniti: tetti del contesto e lunghezze delle risposte lo dicono uguale.
+  const tokenOPredefiniti = (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`);
+
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
@@ -90,12 +93,12 @@
     },
     'contestoFilo.token': {
       nome: 'tetto in token di quello che la chat ricorda',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     },
     'contestoFilo.soglia': {
       nome: 'soglia oltre la quale la chat compatta la conversazione',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     },
     'contestoFilo.cache': {
@@ -109,7 +112,7 @@
       ['brevi', 'brevi (spiegazioni, titoli, correttore)'],
     ].map(([f, di]) => [`lunghezzaRisposte.${f}`, {
       nome: `lunghezza massima delle risposte ${di}`,
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     }])),
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },

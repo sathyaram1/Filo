@@ -26,19 +26,12 @@ const timerFermo = { normale: null, incognito: null };
 const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
-// Scrive una memoria con gli eventi del filo da cui nasce, come le lezioni: una che ridice una riga tolta dall'utente
-// dallo stesso tratto non entra, e torna falso.
-async function scriviMemoria(testo, { fonti = [] } = {}) {
-  const P = globalThis.SN_PREF;
-  const l = P ? P.lezioneDaAzione({ testo }) : { testo };
-  if (l.rifiuto || !l.testo) return false;
-  const buf = await globalThis.SN_FILO_MEMORY.appendLesson(l.testo, { fonti });
-  const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-  return !!ultima && ultima.text === String(l.testo).trim();
-}
+// Una memoria passa dalla strada delle lezioni con gli eventi del filo da cui nasce: una che ridice una riga tolta
+// dall'utente dallo stesso tratto non entra. → { scritta, rifiuto, riga } come SN_FILO_MEMORY.scriviLezione.
+const scriviMemoria = (testo, fonti) => globalThis.SN_FILO_MEMORY.scriviLezione(testo, fonti);
 
-// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti })` → scriviMemoria.
-// Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
+// `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo, { fonti, origine })` →
+// scriviMemoria (o solo true/false). Li dà il main all'avvio (handlers.js), le prove li sostituiscono.
 const _dip = {
   chiama: null,
   applicaMemoria: scriviMemoria,
@@ -229,25 +222,31 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   } catch (_) {}
   const prima = { a: s.a, da: s.da };
   s.ore.push(...letto.ore);
-  s.da = s.da || letto.ore[0].da;
+  // Il pezzo comincia dal suo primo messaggio, citato o no: le pagine attaccate sopra stanno da lì, e `sezione` le
+  // cerca da `da` (una pagina prima di `da` farebbe uscire la riga come cancellata).
+  s.da = s.da || new Date(Math.min(Date.parse(pezzo[0].ts), Date.parse(letto.ore[0].da))).toISOString();
   s.a = lista[fine] ? lista[fine].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
-  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna. Ognuna
-  // porta i messaggi da cui nasce (`origine`), come le lezioni: il punto del filo nel quaderno, e il controllo che non
-  // lascia tornare una riga tolta. Una proposta mostra anche i messaggi che hanno reso sospetto il pezzo.
-  if (!incognito && letto.memorie.length) {
-    const fontiSospette = sospetto ? await eventiDeiMessaggi(sospette) : [];
+  // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna.
+  // Ogni memoria tiene i messaggi che la dicono (`origine`: il controllo delle righe tolte guarda quelli); una proposta
+  // anche la lettura che l'ha resa sospetta, per chi decide. Senza messaggi citati, le fonti sono tutto il pezzo.
+  if (!incognito) {
+    const lette = sospetto && letto.memorie.length ? await eventiDeiMessaggi(sospette) : [];
+    let tuttoIlPezzo = null;
     for (const m of letto.memorie) {
-      const origine = await eventiDeiMessaggi(m.fonti);
+      const origine = m.fonti.length ? await eventiDeiMessaggi(m.fonti) : [];
       if (sospetto) {
-        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: [...new Set([...origine, ...fontiSospette])], origine };
+        const p = { id: id(), testo: m.testo, ts: new Date(ora).toISOString(), fonti: globalThis.SN_QUADERNO.unisci(origine, lette), origine };
         s.inAttesa.push(p);
         inAttesa.push(p);
-      } else {
-        try { if (await _dip.applicaMemoria(m.testo, { fonti: origine })) scritte++; } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
+        continue;
       }
+      if (!origine.length && !tuttoIlPezzo) tuttoIlPezzo = await eventiDeiMessaggi(pezzo.map((x) => FC().chiave(x)));
+      try {
+        if (scritta(await _dip.applicaMemoria(m.testo, { fonti: origine.length ? origine : tuttoIlPezzo, origine }))) scritte++;
+      } catch (e) { console.warn('[Filo] memoria della compattazione non scritta:', e?.message || e); }
     }
   }
   try { await salva(incognito); } catch (e) {
@@ -410,15 +409,16 @@ async function decidi(idProposta, tieni) {
   const i = s.inAttesa.findIndex((p) => p && p.id === idProposta);
   if (i < 0) return { ok: false };
   const [p] = s.inAttesa.splice(i, 1);
-  let scritta = false;
+  let w = false;
   if (tieni) {
     // Tenuta, la riga resta legata al punto del filo da cui è nata (le proposte di prima ne hanno solo le fonti).
     const fonti = Array.isArray(p.origine) ? p.origine : (Array.isArray(p.fonti) ? p.fonti : []);
-    try { scritta = await _dip.applicaMemoria(p.testo, { fonti }); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
+    try { w = await _dip.applicaMemoria(p.testo, { fonti }); } catch (e) { s.inAttesa.splice(i, 0, p); throw e; }
   }
   await salva(false);
-  return { ok: true, scritta };
+  return { ok: true, scritta: scritta(w), ...(w && w.rifiuto ? { rifiuto: w.rifiuto } : {}) };
 }
+function scritta(w) { return w === true || !!(w && w.scritta); }
 
 // ── Le porte che non sono una richiesta: fermo e giorni ─────────────────────
 // `fn` null: un turno è cominciato, la compattazione da fermo non parte sotto di lui. Un timer per lato: un messaggio in

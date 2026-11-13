@@ -82,6 +82,17 @@ test('quello che legge l\'utente: tetto in token e limite di spesa col punto del
   const P = globalThis.SN_PREF;
   const K = globalThis.SN_CAMBI;
   assert.equal(P.buildPreferencePartial('token_ricordati', '4000').label, 'Tetto in token della chat → 4.000');
+  // Soglia e tetto in token si leggono e si raccontano allo stesso modo (#1563.3): a parole come nel campo.
+  for (const [chiave, k, nome] of [['token_ricordati', 'token', 'Tetto in token della chat'], ['soglia_compattazione', 'soglia', 'Soglia di compattazione della chat']]) {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    const atteso = FC.numeroDelTetto(k, 50000);
+    const r = P.buildPreferencePartial(chiave, '50 mila');
+    assert.equal(r.partial.contestoFilo[k], atteso);
+    assert.equal(r.label, `${nome} → ${atteso.toLocaleString('it-IT', { useGrouping: true })}`);
+    assert.equal(P.buildPreferencePartial(chiave, '2 milioni').partial.contestoFilo[k], FC.numeroDelTetto(k, 2000000));
+    assert.equal(P.buildPreferencePartial(chiave, 'predefinito').label, `${nome} → come i predefiniti`);
+    assert.equal(K.fraseCambio({ chiave: `contestoFilo.${k}`, prima: null, dopo: 50000 }).split(': ')[1], 'come i predefiniti → 50.000 token');
+  }
   assert.equal(P.buildPreferencePartial('limite_spesa', '2.500,50 euro').label, 'Limite di spesa mensile → 2.500,50 €');
   assert.equal(P.buildPreferencePartial('limite_spesa', '1500').label, 'Limite di spesa mensile → 1.500 €');
   assert.equal(K.fraseCambio({ chiave: 'contestoFilo.token', prima: 2000, dopo: 4000 }), 'tetto in token di quello che la chat ricorda: 2.000 token → 4.000 token');

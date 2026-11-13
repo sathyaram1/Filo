@@ -109,6 +109,24 @@ test('una riga corretta prende il posto della vecchia, tiene le fonti e il compa
   assert.equal(await M.editLine({ modulo: 'PREFERENZE', riga: 'È vegano' }, 'a\nb'), false);
 });
 
+test('una memoria della compattazione entra con le sue fonti e non rimette una riga tolta dallo stesso tratto (#1563.3)', async () => {
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: '' });
+  await M.appendLesson('Ha due gatti, Miso e Pepe.', { fonti: ['ev-u1', 'ev-f1'] });
+  const [l] = await M.getLessonsBuffer();
+  assert.ok(await M.hideLine({ lezione: { ts: l.ts, text: l.text } }));
+  // Proposta da un tratto sospetto: le fonti portano anche la lettura, il controllo guarda i messaggi che la dicono.
+  assert.deepEqual(await M.scriviLezione('Ha due gatti, Miso e Pepe.', { fonti: ['ev-letta', 'ev-u1'], origine: ['ev-u1'] }), { scritta: false, riga: null });
+  // Senza messaggi citati decide il testo simile.
+  assert.equal((await M.scriviLezione('Ha due gatti, Miso e Pepe.', { fonti: ['ev-u1', 'ev-f1', 'ev-u2'], origine: [] })).scritta, false);
+  assert.deepEqual(await M.getLessonsBuffer(), []);
+  const si = await M.scriviLezione('Le piace cucinare.', { fonti: ['ev-letta', 'ev-u3'], origine: ['ev-u3'] });
+  assert.equal(si.scritta, true);
+  assert.deepEqual(si.riga.fonti, ['ev-letta', 'ev-u3'], 'la riga tiene il punto del filo da cui viene');
+  // Un messaggio nuovo che la ridice la riporta, come per ogni lezione.
+  assert.equal((await M.scriviLezione('Ha due gatti, Miso e Pepe.', { fonti: ['ev-u7'], origine: ['ev-u7'] })).scritta, true);
+});
+
 test('una riga tolta resta fra le nascoste, non torna dallo stesso tratto, torna se il filo la ridice', async () => {
   disco();
   await M.setMemory({ PROFILO: '', PREFERENZE: '' });
