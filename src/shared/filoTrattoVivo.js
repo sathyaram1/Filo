@@ -312,7 +312,7 @@
   function rendiPagine(pagine, opts) {
     return pagineResa(pagine, opts).testo;
   }
-  // `daSiti`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
+  // `daFuori`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
   function pagineResa(pagine, { rif = null } = {}) {
     const gruppi = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
