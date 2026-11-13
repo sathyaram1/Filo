@@ -9,6 +9,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 import { voceOggi as voceOra, chiestiOggi } from './helpers/riquadriOggi.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 // I modelli finti nel main: le risposte a pezzi si fermano finché la prova non le libera, se `__ferma`.
 async function modelliFinti(app) {
