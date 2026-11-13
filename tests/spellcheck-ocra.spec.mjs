@@ -527,7 +527,7 @@ for (const [nome, html] of [
     await app.evaluate((_e, r) => { globalThis.__ocraRisposta = r; },
       giudicato('martedì 9 ottobre', 'mercoledì 9 ottobre', 'Il 9 ottobre 2024 è mercoledì.'));
     await page.keyboard.press('Enter');
-    await page.keyboard.type('e martedì 9 ottobre?');
+    await batti(page, 'e martedì 9 ottobre?');
     // Il segno sta sulla sola parola che cambia.
     await expect(ocra(page)).toHaveText(['martedì'], { timeout: 12_000 });
     const ultimo = (await app.evaluate(() => globalThis.__ocra)).at(-1);
