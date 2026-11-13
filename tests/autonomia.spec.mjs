@@ -478,6 +478,8 @@ test('chat a Normale: dopo una ricerca «dimentica per sempre» è un no che dic
   try {
     await modelloFinto(app, [
       { toolCalls: [{ id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: 'Bologna', per_sempre: true }) }] },
+      // La ripresa da sola dopo la «conferma» è un giro del modello: ha il suo, o si prende quello della ricerca.
+      { text: 'Dimenticato.' },
       { toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'meteo' }) }] },
       { text: 'Sole.' },
       { toolCalls: [{ id: 'f2', name: 'DIMENTICA', arguments: JSON.stringify({ testo: 'gatto', per_sempre: true }) }] },
