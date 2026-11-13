@@ -54,7 +54,7 @@
     const E = global.SN_ESTERNO;
     const s = E && typeof E.neutralizza === 'function' ? E.neutralizza(soggetto(c.soggetto), { unaRiga: true }).trim() : soggetto(c.soggetto);
     return `(conversazione ${a.nel}${s ? ` su «${s}»` : ''}: ${quantiMessaggi(n)} fra l'utente e Filo. `
-      + `Il testo non è qui: si rilegge con CERCA_CHAT e id "${c.id}")`;
+      + `Il testo non è qui: si rilegge con filo(cerca) e id "${c.id}")`;
   }
 
   // Le parole scritte nell'Aiuto sopra un sito le vede il sito (#1508): rilette sono testo da fuori. Un archivio di prima
