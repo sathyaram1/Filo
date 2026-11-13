@@ -431,7 +431,7 @@
     }
     if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       aggiungi('SITI SEMPRE APERTI', [
-        'SITI SEMPRE APERTI (la pulizia delle schede non li archivia; si tolgono con NON_TENERE_APERTA)',
+        'SITI SEMPRE APERTI (la pulizia delle schede non li archivia; si tolgono con scheda(non_tenere_aperta))',
         state.sempreAperte.join(', '),
       ]);
     }
