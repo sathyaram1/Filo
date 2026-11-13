@@ -12,19 +12,6 @@
       version: '0.2.280', date: '2026-11-13',
       features: [
         'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
-      ],
-    },
-    {
-      version: '0.2.279', date: '2026-11-13',
-      features: [],
-      fixes: [
-        { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
-        { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
-      ],
-    },
-    {
-      version: '0.2.278', date: '2026-11-13',
-      features: [
         { testo: 'Il livello di autonomia lo cambi anche chiedendolo a Filo, per esempio «mettiti a Conservativo». Abbassarlo vale subito. Alzarlo vuole che tu scriva «conferma», come alzare il limite di spesa, sbloccare un sito o spegnere una protezione.', segnalazione: 1312 },
         { testo: 'Puoi chiedere a Filo di cancellare tutta la sua memoria in un colpo: ti fa scrivere «conferma» e la svuota.', segnalazione: 1312 },
       ],
