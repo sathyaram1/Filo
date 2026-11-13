@@ -6001,7 +6001,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       + 'all\'utente in una riga che non l\'hai fatto e perché.';
   }
   if (res.output && res.output.blocked === 'segreto') {
-    return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
+    return `Azione ${nome} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
       + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
       + '(spezzato, codificato, in un altro campo o con un\'altra azione). Di\' all\'utente in una riga cosa hai '
       + 'fermato, senza ripetere il dato: se vuole mandarlo davvero, lo fa lui a mano.';
