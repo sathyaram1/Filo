@@ -313,7 +313,8 @@
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
-    const tipi = Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : [];
+    const T = global.SN_ACTION_TOOLS;
+    const tipi = (Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : []).map((t) => (T ? T.chiamata(t) : t));
     // I ricordi ripescati da soli stanno nel messaggio dell'utente del loro turno, non qui.
     const azioni = esito && Array.isArray(esito.azioni) ? esito.azioni.filter((a) => !(a && a._auto)) : [];
     const oss = azioni.length && typeof osserva === 'function' ? osserva(azioni) : '';
