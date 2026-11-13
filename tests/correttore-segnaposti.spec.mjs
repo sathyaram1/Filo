@@ -545,11 +545,17 @@ test('un dato precisato dopo la pausa («al picco delle dot-com») o un nome cam
   expect(await globale(app, '__webChieste')).toEqual(['Nasdaq average P/E ratio', 'Popolazione dell\'Iran', 'Popolazione dell\'Iraq']);
 });
 
+// #1589 — a «Chiedi sulle delicate» anche il controllo aspetta «Controlla»; la ricerca del dato, poi, aspetta il suo clic.
 test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice, e «Cerca il dato» lo trova', async ({ app, openTab, testServer }) => {
+  await livelloPrivacy(app, 'delicate');
   const page = await apri(app, openTab, testServer, P_E);
   await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
   await page.locator('#ta').click();
   await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
+  await page.waitForTimeout(3000);
+  expect(await globale(app, '__ragionate'), 'mentre si scrive non parte niente').toEqual([]);
+  await page.locator('#ta').click({ button: 'right' });
+  await menuDi(page).voce('Controlla').click();
   await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
   await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
