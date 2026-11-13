@@ -98,7 +98,7 @@ for (const tema of ['light', 'dark']) {
 }
 
 test('Automazioni: due card, una in volo e l’altra con voci chiuse; rilettura a metà volo', async ({ openTab }) => {
-  const page = await apri(openTab, [fb('x1', 1867, { status: 'design', statusReason: 'l5' }), fb('x2', 1685, { status: 'design', statusReason: 'l5' })], {
+  const page = await apri(openTab, [], {
     pending: [
       richiesta('c'.repeat(24), 'x1', 1867, { blocks: [{ gate: 'g1', gruppo: 'capacita', label: 'A', voci: vociLunghe(13, 'p'), more: 0 }, { gate: 'g2', gruppo: 'contenuto', label: 'B', voci: vociLunghe(27, 'q'), more: 0 }] }),
       richiesta('d'.repeat(24), 'x2', 1685, { blocks: [{ gate: 'g1', gruppo: 'capacita', label: 'A', voci: vociLunghe(3, 'r'), more: 0 }, { gate: 'g2', gruppo: 'contenuto', label: 'B', voci: vociLunghe(16, 's'), more: 0 }] }),
