@@ -5250,7 +5250,7 @@ function chatSearchesForPrompt(actions) {
         continue;
       }
       if (out.nascosta) {
-        blocks.push(`[La conversazione "${quale}" l'ha nascosta l'utente: il testo non torna. Se vuole riprenderla, rimettila con RIMETTI_CHAT e quell'id, poi rileggila.]\n`
+        blocks.push(`[La conversazione "${quale}" l'ha nascosta l'utente: il testo non torna. Se vuole riprenderla, rimettila con filo(rimetti_chat) e quell'id, poi rileggila.]\n`
           + E.imbusta({ tipo: 'TESTO_SALVATO', testo: `Titolo: ${E.neutralizza(out.title || 'senza titolo', { unaRiga: true })}`, conIntestazione: true }));
         continue;
       }
