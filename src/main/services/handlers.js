@@ -5279,7 +5279,7 @@ function chatSearchesForPrompt(actions) {
       if (righe.length) {
         blocks.push('[Tratti di conversazioni più vecchie che Filo ha ripescato da solo per questa domanda.]\n'
           + E.imbusta({ tipo: 'CONVERSAZIONE_ARCHIVIATA', testo: righe.join('\n'), conIntestazione: true })
-          + '\n[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]');
+          + '\n[Per rileggerne una per intero richiama filo(cerca) con il suo id.]');
       }
       continue;
     }
