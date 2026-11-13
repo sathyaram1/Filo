@@ -1142,7 +1142,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const aggiornato = senzaFetch ? '' : aggiornaCloneServer(c.dir);
     const fuoriServer = {};
     try {
-      const delServer = senzaChiusi(conNumeri(ramiInCorso(c.dir, { giorni, fuori: fuoriServer }), indice), indice, fuoriServer);
+      const delServer = senzaChiusi(conNumeri(ramiInCorso(c.dir, { giorni, fuori: fuoriServer, numeri }), indice), indice, fuoriServer);
       const resto = rigaFuori(fuoriServer, giorni);
       const avviso = [aggiornato, resto ? `Sul server. ${resto}` : ''].filter(Boolean).join('\n');
       return { lista: [...app, ...delServer.map((r) => ({ ...r, repo: 'server' }))], fuori, server: { avviso } };
