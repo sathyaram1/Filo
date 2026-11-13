@@ -128,7 +128,7 @@
     },
     STILE_PAGINA: {
       via: ['scheda', 'stile'],
-      description: 'cambia l\'aspetto della pagina web davanti con regole CSS [{selettore, css}] (niente url() né @import); un ricaricamento lo toglie.',
+      description: 'regole CSS [{selettore, css}] sulla pagina web davanti, senza url() né @import; ricaricando se ne vanno.',
       properties: {
         regole: LISTA({ type: 'object', properties: { selettore: S(), css: S() }, required: ['selettore', 'css'] }),
         descrizione: S(),
