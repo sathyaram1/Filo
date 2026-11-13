@@ -2229,7 +2229,7 @@
         const s = String(v == null ? '' : v).trim();
         const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
         if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
-          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con BLUETOOTH' };
+          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con computer(bluetooth)' };
         }
         const o = opElenco(v, null, indirizzo);
         if (!o || o.rifiuto) return o;
