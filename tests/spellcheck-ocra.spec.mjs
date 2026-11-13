@@ -567,7 +567,7 @@ test('su una pagina delicata gli anni della pagina non partono col controllo del
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: true, siti: ['sito-pubblico.test'] } } }));
   const page = await apri(app, openTab, testServer, '{"issues":[]}', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' }));
   await page.locator('#ta').click();
-  await page.keyboard.type('certo, martedì 9 ottobre, pioveva.');
+  await batti(page, 'certo, martedì 9 ottobre, pioveva.');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).toContain('certo, martedì 9 ottobre, pioveva.');
