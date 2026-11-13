@@ -217,8 +217,10 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   // Il tasto destro sulla selezione prepara già la sua spiegazione: si contano le chiamate da qui.
   const prima = await chiamateFerme(app);
 
+  // Sul campo del sito resta la radice chiusa del correttore (#2299), che lo script colpisce come le altre: la Modifica no.
   const esito = await page.evaluate(() => window.attacca());
-  expect(esito).toEqual({ host: false, ombra: false, nostri: 0 });
+  expect({ ombra: esito.ombra, nostri: esito.nostri }).toEqual({ ombra: false, nostri: 0 });
+  expect(await riquadriNelSito(app, page), 'la Modifica non sta nel documento del sito').toEqual([]);
   await page.waitForTimeout(800);
   expect(await chiamate(app)).toBe(prima);
 
