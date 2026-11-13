@@ -337,6 +337,7 @@
     if (!el || !el.isConnected) return;
     // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
     try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE], { el, x: null, y: null, tasto: '' }); } catch (_) {}
+    try { global.SN_SPELLCHECK?.scriveFilo?.(el, text); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;

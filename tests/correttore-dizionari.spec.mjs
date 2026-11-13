@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 
 test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli alla rete, e correggono l\'italiano', async ({ app, openTab, testServer }) => {
   const prima = await app.evaluate(({ app: a }) => ({
@@ -135,7 +135,7 @@ test('col browser senza italiano, come su Windows: «andatto» ha il segno anche
   await page.locator('#ta').click();
   // Le parole con l'apostrofo in fondo («va'», «be'») sono giuste come senza.
   await page.keyboard.type("sono andatto al mare, poi sono andato via; di' la verità, va' via, be' ");
-  const segni = page.locator('.sn-spell-overlay .sn-errore');
+  const segni = segniDi(page, '.sn-spell-overlay .sn-errore');
   await expect(segni.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
   await expect(segni).toHaveCount(1);
 
@@ -182,7 +182,7 @@ test('in un editor col corpo modificabile, dentro un riquadro, il correttore seg
   const TESTO = 'sono andatto al mare con mia sorella';
   await page.keyboard.type(TESTO);
   await expect(corpo).toHaveText(TESTO);
-  const segno = page.frameLocator('#ifr').locator('.sn-spell-overlay .sn-errore');
+  const segno = segniDi(page, '.sn-spell-overlay .sn-errore', { iframe: '#ifr' });
   await expect(segno.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-overlay, .sn-spell-valori') === null)).toBe(true);
   // Il segno sta sotto la parola, dentro il riquadro.

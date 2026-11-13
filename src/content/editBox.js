@@ -239,6 +239,7 @@
         el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
       }
     } else if (savedCtx.kind === 'ce') {
+      try { global.SN_SPELLCHECK?.scriveFilo?.(savedCtx.el || document.activeElement, testo); } catch (_) {}
       try { document.execCommand('insertText', false, testo); } catch (_) {}
     }
     Popup.modificaDiFilo(savedCtx.el || document.activeElement, 'modifica-testo');

@@ -74,7 +74,8 @@ test('ci sono tutti i content script che page-preload.js carica', () => {
 
 test('i fogli che i pannelli chiusi dei content script leggono viaggiano nel pacchetto', () => {
   const nomi = new Set(readdirSync(join(ROOT, 'src', 'styles')));
-  for (const f of ['src/content/menu.js', 'src/content/popup.js']) {
+  // I riquadri leggono l'elenco unico degli strati, che sta in filoUi.js.
+  for (const f of ['src/content/menu.js', 'src/shared/filoUi.js']) {
     const fogli = [...leggi(f).matchAll(/'([\w-]+\.css)'/g)].map((m) => m[1]).filter((n) => nomi.has(n));
     assert.ok(fogli.length >= 2, `${f}: nessun foglio letto, la prova non guarda più niente`);
     for (const n of fogli) assert.ok(pacchetto.testi.includes(`src/styles/${n}`), `${f} legge ${n}, che non è nel pacchetto`);

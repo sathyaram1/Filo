@@ -160,6 +160,45 @@ scelto lo strato (D-205): microfono, documento e caselle di Aiuto, feedback e sp
 fuori dalla portata dello script, e la guardia della regola 3 resta del menu. Nel ripiego senza strato tornano
 scoperti, come il testo nel limite noto qui sotto.
 
+## I segni del correttore
+
+Il caso (#2299): un segno che manca è un'informazione. Lo script del sito scriveva da sé una lista di parole nel suo
+campo e guardava quali restavano senza onda: erano nel dizionario personale, fra i nomi noti o fra le parole imparate.
+Il dizionario è uguale su tutti i siti, quindi faceva anche da impronta. Le regole:
+
+- su un sito **gli strati del correttore** (specchio dei segni, valori dei segnaposti, lampi) stanno in un'ombra chiusa
+  sola per documento (`casaDegliStrati` in `src/content/spellcheck.js`), fatta come quelle del menu e dei riquadri da
+  `SN_FILO_UI.stratoChiuso` e `fogliChiusi`; sulle pagine `filo://` e nello strato dei riquadri restano nel documento,
+  dove non c'è uno script del sito;
+- **si controlla solo il testo dell'utente**, non a tempo ma per provenienza (`diSito`, `soloDellUtente`): quello che
+  batte (un `insertText` vale solo col carattere del tasto vero appena premuto lì: `execCommand` del sito è
+  `isTrusted` anche lui), che incolla o trascina, che fa scrivere a Filo (`scriveFilo`, o un evento `nostro`), e
+  quello che c'era quando è entrato nella casella con un gesto vero, una volta per ingresso. Ogni altro cambio è del
+  sito: le sue parole non arrivano al dizionario né alla correzione da sé, e il modello non le segna. Il giro 2 ha
+  mostrato perché non basta una finestra di tempo dopo il gesto: il sito riscrive la casella dentro l'evento del tasto
+  stesso, prima di Filo, e misura;
+- **un gesto vero spiega solo il testo che porta, mai un cambio intero** (giro 3): un incolla o un trascinamento
+  senza testo (un'immagine) non spiega niente, e AltGr (Ctrl+Alt su Windows) è un carattere, non un comando.
+  L'annulla e il rifai non scrivono testo nuovo: riportano un testo già visto coi proprietari che aveva
+  (`proprietariDi`), chiunque li lanci. Prima un annulla con Ctrl premuto valeva tutto dell'utente, e il sito ci
+  faceva passare la pila che aveva preparato, anche con un Ctrl rimasto «premuto» dopo un Ctrl+clic fuori;
+- **fra le parole trovate entrando una ripetuta conta una volta per il dizionario**, contata come la conta lui
+  (`parole` di `correttoreRegole`): mille copie della stessa parola moltiplicavano la differenza di costo fino a
+  renderla misurabile, e «1_zanzottera», «2_zanzottera» erano copie diverse per chi contava e uguali per il dizionario
+  (giro 4);
+- **il testo trovato entrando è fragile** (giro 4). Si adotta solo quello che c'era prima del gesto, fotografato da un
+  ascolto in cattura su `window` messo prima di quelli della pagina (`primaDelGesto`): il sito non ce lo mette al clic.
+  Al primo cambio che né l'utente né Filo spiegano torna del sito, anche nei testi ricordati per l'annulla
+  (`revocaVisti`): prima, un clic bastava al sito per cancellare, misurare e annullare quante volte voleva. Una
+  cancellatura del sito (non un Backspace, un Canc o un taglia veri) fa sua la parola che ricompone con lettere
+  dell'utente («le zanzare di otto terra» → «le zanzottera»). La correzione da sé tocca solo parole battute;
+- **un editor che ferma il tasto e lo scrive da sé** (Lexical: la prima lettera di un paragrafo, l'incolla) non manda
+  `input`: il cambio subito dopo un `beforeinput` o un `paste` veri vale quanto il loro testo (`siAspettaDallUtente`);
+- resta una misura per ingresso sulla somma delle parole diverse trovate entrando, troppo piccola per leggerla.
+
+Gli spec li leggono con `segniDi` (`tests/helpers/segniDelCorrettore.mjs`), che si usa come un Locator anche dentro
+`expect`; l'attacco sta in `tests/correttore-segni-fuori-dalla-pagina.spec.mjs`.
+
 ## Provarlo
 
 Il velo, il velo tolto all'ultimo istante, il foglio che abbassa il menu e i

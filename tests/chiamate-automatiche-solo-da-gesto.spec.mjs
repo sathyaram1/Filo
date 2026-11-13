@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { segniDi } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
@@ -546,13 +547,13 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   await app.evaluate(() => { globalThis.__segnaXq = true; });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi xqprima1 frase ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1'], { timeout: 6000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1'], { timeout: 6000 });
   await page.locator('#cerca').click();
   await pausa(500);
   // Rientra col fuoco dato dalla pagina (come dopo un «Rispondi»): scrivere deve bastare.
   await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; });
   await page.keyboard.type(' poi xqseconda2 ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
 });
 
 test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tasto destro sì', async ({ app, openTab, testServer }) => {

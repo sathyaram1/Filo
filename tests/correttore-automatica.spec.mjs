@@ -10,7 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
+import { batti } from './helpers/tastiera.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
@@ -59,7 +60,7 @@ async function apri(app, openTab, testServer, { errori = null, correttore = {} }
   return page;
 }
 
-const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
+const errore = (page, testo) => segniDi(page, '.sn-spell-overlay .sn-errore', { hasText: testo });
 const valore = (page) => page.locator('#ta').inputValue();
 const cursore = (page) => page.evaluate(() => document.getElementById('ta').selectionStart);
 const magazzino = (app, chiave) => app.evaluate(async (_e, k) => (await globalThis.chrome.storage.local.get(k))[k] ?? null, chiave);
@@ -101,12 +102,12 @@ async function puntoNelCampo(page, da, a) {
 test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subito dopo lo riporta col cursore dopo lo spazio', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè');
+  await batti(page, 'ok perchè');
   expect(await valore(page), 'mentre si scrive la parola non cambia').toBe('ok perchè');
   await page.keyboard.type(' ');
   expect(await valore(page)).toBe('ok perché ');
   expect(await cursore(page)).toBe(10);
-  const lampo = page.locator('.sn-spell-lampo');
+  const lampo = segniDi(page, '.sn-spell-lampo');
   await expect(lampo.first()).toBeVisible();
   const colore = await lampo.first().evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(colore).not.toBe('rgba(0, 0, 0, 0)');
@@ -128,7 +129,7 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
 test('un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   expect(await valore(page)).toBe('ok perché ');
   await page.keyboard.press('Control+z');
   expect(await valore(page)).toBe('ok perchè ');
@@ -140,7 +141,7 @@ test('un secondo annulla toglie quello che si era scritto, non rimette la correz
 test('nel campo modificabile il cursore resta dopo lo spazio, e la punteggiatura chiude la parola subito', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();
-  await page.keyboard.type('un pò di tempo, perchè? ');
+  await batti(page, 'un pò di tempo, perchè? ');
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? ');
   await page.keyboard.type('fine');
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? fine');
@@ -164,7 +165,7 @@ test('«marco» prende la maiuscola dove chi scrive usa le maiuscole, e non dove
   await page.waitForTimeout(400);
   await expect(errore(page, 'marco')).toHaveCount(0);
   // Gli errori fissi invece si correggono anche lì.
-  await page.keyboard.type('perchè ');
+  await batti(page, 'perchè ');
   expect(await valore(page)).toBe('ciao come va. tutto bene. domani vedo marco perché ');
   // Dentro un indirizzo o un nome di file niente.
   await svuota(page);
@@ -220,7 +221,7 @@ test('una correzione annullata due volte non torna; la pagina del correttore la 
 test('l\'annulla della barra dei menu del Mac riporta indietro la correzione come Ctrl+Z', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   expect(await valore(page)).toBe('ok perché ');
   const host = new URL(page.url()).host;
   await app.evaluate(({ webContents }, h) => {
@@ -242,18 +243,18 @@ test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole 
   await expect(errore(page, 'ciuruglio')).toHaveCount(0, { timeout: 4000 });
   for (let i = 0; i < 3; i++) {
     await svuota(page);
-    await page.keyboard.type('qual\'è ');
+    await batti(page, 'qual\'è ');
     expect(await valore(page), `«qual'è» scritto ${i + 1} volte`).toBe('qual è ');
   }
   // Annullata due volte non torna da sé, ma resta un errore: non si impara mai.
   for (let i = 0; i < 2; i++) {
     await svuota(page);
-    await page.keyboard.type('qual\'è ');
+    await batti(page, 'qual\'è ');
     await page.keyboard.press('Control+z');
     expect(await valore(page)).toBe('qual\'è ');
   }
   await svuota(page);
-  await page.keyboard.type('qual\'è ');
+  await batti(page, 'qual\'è ');
   expect(await valore(page)).toBe('qual\'è ');
   await expect(errore(page, 'qual')).toHaveCount(1, { timeout: 4000 });
 
@@ -294,7 +295,7 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
   const page = await apri(app, openTab, testServer, { errori: { propio: ['proprio', 'Refuso: «proprio».'] } });
   for (let i = 0; i < 3; i++) {
     await svuota(page);
-    await page.keyboard.type('è propio bello ');
+    await batti(page, 'è propio bello ');
     expect(await valore(page)).toBe('è propio bello ');
     const segno = errore(page, 'propio');
     await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
@@ -307,7 +308,7 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
   }
   await expect.poll(() => magazzino(app, 'sn_autocorrect')).toEqual({ propio: 'proprio' });
   await svuota(page);
-  await page.keyboard.type('è propio ');
+  await batti(page, 'è propio ');
   expect(await valore(page)).toBe('è proprio ');
 });
 
@@ -322,7 +323,7 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await expect.poll(() => page.evaluate(() => 1)).toBe(1);
   await page.waitForTimeout(300);
-  await page.keyboard.type('ok perchè marco ');
+  await batti(page, 'ok perchè marco ');
   expect(await valore(page)).toBe('ok perchè marco ');
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
@@ -362,7 +363,7 @@ test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ta');
-  await page.keyboard.type('Ciao marco perchè ');
+  await batti(page, 'Ciao marco perchè ');
   await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché ');
 
   // Acceso mentre il cursore è già nel campo, vale da subito.
@@ -373,7 +374,7 @@ test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic
   await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: true } } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(500);
-  await page.keyboard.type('perchè ');
+  await batti(page, 'perchè ');
   await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché poi perché ');
 });
 
@@ -438,7 +439,7 @@ test('nell\'editor Lexical la parola dopo una correzione resta staccata, e l\'an
   const page = await apriEditore(app, openTab, testServer, editore('lexical', 'avviaLX'));
   const testo = () => page.evaluate(() => window.lxText().replace(/ /g, ' '));
   await page.locator('#m').click();
-  await page.keyboard.type('Ciao marco come va, non so perchè ');
+  await batti(page, 'Ciao marco come va, non so perchè ');
   await expect.poll(testo).toBe('Ciao Marco come va, non so perché ');
   await page.keyboard.press('Control+z');
   await expect.poll(testo).toBe('Ciao Marco come va, non so perchè ');
@@ -457,11 +458,34 @@ test('nell\'editor Lexical la parola dopo una correzione resta staccata, e l\'an
   await expect.poll(testo).toBe('Ciao marco come va, non so perchè ok');
 });
 
+// #2299, giro 4: Lexical ferma la prima lettera di un paragrafo e l'incolla, e li scrive da sé senza `input`: il testo
+// resta dell'utente, e la sua prima parola e quello che incolla ricevono i segni.
+test('nell\'editor Lexical la prima parola del paragrafo e il testo incollato ricevono i segni', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: false },
+    });
+  });
+  const page = await testServer.openReady(openTab, editore('lexical', 'avviaLX'), { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  await page.locator('#m').click();
+  await batti(page, 'zqwerta oggi ');
+  const errori = segniDi(page, '.sn-spell-overlay .sn-errore');
+  await expect(errori).toHaveText(['zqwerta'], { timeout: 6000 });
+  await app.evaluate(({ clipboard }) => clipboard.writeText('poi qwzerta '));
+  await page.keyboard.press('Control+v');
+  await expect.poll(() => page.evaluate(() => window.lxText())).toContain('qwzerta');
+  await batti(page, 'ok ');
+  await expect(errori).toHaveText(['zqwerta', 'qwzerta'], { timeout: 6000 });
+});
+
 test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la parola com\'era, e quello dopo non la rimette', async ({ app, openTab, testServer }) => {
   const page = await apriEditore(app, openTab, testServer, editore('prosemirror', 'avviaPM'));
   const testo = () => page.evaluate(() => window.pmView.state.doc.textContent.replace(/ /g, ' '));
   await page.locator('#m .ProseMirror').click();
-  await page.keyboard.type('Domani vedo marco perchè ');
+  await batti(page, 'Domani vedo marco perchè ');
   await expect.poll(testo).toBe('Domani vedo Marco perché ');
   await page.keyboard.press('Control+z');
   await expect.poll(testo).toBe('Domani vedo Marco perchè ');
@@ -474,7 +498,7 @@ test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la p
 test('nel campo modificabile semplice un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   await expect(page.locator('#ce')).toHaveText('ok perché ');
   await page.keyboard.press('Control+z');
   await expect(page.locator('#ce')).toHaveText('ok perchè ');
@@ -551,10 +575,10 @@ test('nell\'editor col corpo modificabile di un riquadro il lampo della correzio
       srcdoc="<body contenteditable=true lang=it style='margin:8px;min-height:100px;font:22px monospace'></body>"></iframe></body>`, { pubblico: true });
   const corpo = page.frameLocator('#ifr').locator('body');
   await corpo.click();
-  await page.keyboard.type('ok perchè');
+  await batti(page, 'ok perchè');
   await page.keyboard.type(' ');
   await expect(corpo).toHaveText('ok perché');
-  const lampo = page.frameLocator('#ifr').locator('.sn-spell-lampo');
+  const lampo = segniDi(page, '.sn-spell-lampo', { iframe: '#ifr' });
   await expect(lampo.first()).toBeAttached({ timeout: 1000 });
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-lampo'))).toBe(null);
   expect(await corpo.evaluate((b) => b.innerHTML.replace(/&nbsp;/g, ' ').trim())).toBe('ok perché');

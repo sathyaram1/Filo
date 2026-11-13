@@ -355,6 +355,10 @@
     const pos = cursoreNelCampo(el);
     const fine = A().fineDellaParola(testo, pos);
     if (fine < 0) return;
+    // Si corregge e si conta solo una parola battuta dall'utente: una messa dal sito, anche prima che l'utente entrasse,
+    // rimessa con la maiuscola gli direbbe che è nel dizionario.
+    const chiusa = A().parolaPrima(testo, fine);
+    if (chiusa && (toccaPezzi(state.diSito, chiusa.start, fine) || toccaPezzi(state.visti, chiusa.start, fine))) return;
     seguiIlTesto(state);
     if (automaticaAttiva() && !state.rifiutateQui.some((x) => x.end === fine && testo.slice(x.start, x.end) === x.segment)) {
       const c = A().correzioneAFineParola(testo, fine, {
@@ -446,12 +450,15 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     state.annullando = u;
-    try { document.execCommand('undo'); } catch (_) {}
-    const ora = getEditableText(el);
-    if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
-    state.annullando = null;
-    if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
-    if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    state.filoScrive = TUTTO;
+    try {
+      try { document.execCommand('undo'); } catch (_) {}
+      const ora = getEditableText(el);
+      if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
+      state.annullando = null;
+      if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
+      if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    } finally { seguiIlTesto(state); state.filoScrive = null; }
   }
 
   // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
@@ -702,8 +709,30 @@
 
   // Dentro il campo uno strato prende il cursore e il testo dell'utente, e parte col modulo: col corpo modificabile
   // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
+  // Su un sito gli strati stanno in un'ombra chiusa (#2299): un segno che manca dice che la parola è nel dizionario
+  // personale, fra i nomi noti o fra le imparate, e dal documento lo script del sito lo leggerebbe.
+  const PAGINA_DI_FILO = !!global.SN_FILO_UI?.paginaDiFilo;
+  // `filoScrive` mentre Filo annulla col tasto: quello che il browser riporta è comunque dell'utente.
+  const TUTTO = {};
+  let ombraDegliStrati = null;
   function casaDegliStrati(el) {
-    return radiceDi(el) || (el === document.body || el === document.documentElement ? document.documentElement : document.body);
+    const qui = radiceDi(el);
+    if (qui) return qui;
+    const padre = el === document.body || el === document.documentElement ? document.documentElement : document.body;
+    if (PAGINA_DI_FILO || !padre) return padre || document.documentElement;
+    if (!ombraDegliStrati) {
+      const UI = global.SN_FILO_UI;
+      const stile = 'all:initial!important;display:contents!important;';
+      // Lo specchio tiene il font del campo, che ripete il testo del sito: generici solo i valori sopra le x.
+      if (UI?.stratoChiuso) ombraDegliStrati = UI.stratoChiuso(stile, UI.fogliChiusi(['spellcheck.css'], { ambito: '.sn-spell-valori' }));
+      else {
+        const host = document.createElement('div');
+        host.style.cssText = stile;
+        ombraDegliStrati = { host, radice: host.attachShadow({ mode: 'closed' }) };
+      }
+    }
+    if (ombraDegliStrati.host.parentNode !== padre) padre.appendChild(ombraDegliStrati.host);
+    return ombraDegliStrati.radice;
   }
 
   // ============================================================================
@@ -764,6 +793,10 @@
     if (state) return state;
     state = {
       el, overlay: null, ro: null, attivo: false, riquadro: null,
+      // Da dove viene il testo (#2299): i pezzi scritti dal sito, quelli trovati entrando, l'ultimo tasto premuto qui.
+      diSito: [], visti: [], entrato: false, tasto: null, tastoPrima: '', filoScrive: null,
+      primaDelGesto: null, intento: null, taglio: 0,
+      proprietari: new Map(), proprietariCaratteri: 0,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
       testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
@@ -798,8 +831,40 @@
         if (!vivo) return;
         if (vivo.attivo) seguiIlTesto(vivo);
         primaDellAnnulla(vivo, e);
+        if (e.isTrusted) siAspettaDallUtente(vivo, e, ammessoDa(vivo, e, { consuma: false }));
       }, true);
+      // Un editor ricco (Lexical) ferma l'incolla e scrive da sé il testo degli appunti, senza `beforeinput`.
+      el.addEventListener('paste', (e) => {
+        const vivo = monitored.get(el);
+        if (!vivo || !e.isTrusted) return;
+        let t = null;
+        try { t = e.clipboardData && e.clipboardData.getData('text/plain'); } catch (_) { t = null; }
+        if (t) siAspettaDallUtente(vivo, e, (pezzo) => senzaSpazi(t).includes(senzaSpazi(pezzo)));
+      }, true);
+      el.addEventListener('cut', (e) => { const vivo = monitored.get(el); if (vivo && e.isTrusted) vivo.taglio = Date.now(); }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
+      // Il tasto spiega il carattere che l'`input` dopo scrive (ammessoDa). Si entra col clic, anche in una casella che
+      // aveva il fuoco da script, o col rilascio di Tab, che cade già sulla casella nuova.
+      for (const tipo of ['pointerdown', 'keydown', 'keyup']) {
+        el.addEventListener(tipo, (e) => {
+          const vivo = monitored.get(el);
+          if (!vivo || !e.isTrusted) return;
+          if (tipo === 'keydown') {
+            // Su Windows AltGr arriva come Ctrl+Alt, e scrive @ # [ ] €: è un carattere, non un comando.
+            vivo.tasto = { key: String(e.key || ''), mod: !!(e.metaKey || (e.ctrlKey && !e.altKey)), morto: vivo.tastoPrima === 'Dead' };
+            vivo.tastoPrima = vivo.tasto.key;
+            // Anche il primo tasto battuto nella casella è un ingresso: chi ci arriva col fuoco già dentro (Modifica, una
+            // bozza ripristinata) e scrive solo con la tastiera ritrova i segni sul testo che c'era.
+            entra(vivo);
+            return;
+          }
+          if (tipo === 'keyup') {
+            if (vivo.tasto && vivo.tasto.key === e.key) vivo.tasto = null;
+            if (e.key !== 'Tab') return;
+          }
+          entra(vivo);
+        }, true);
+      }
     }
     if (!state.ro) {
       try {
@@ -808,9 +873,11 @@
       } catch (_) {}
     }
     state.attivo = true;
+    state.entrato = false;
     activeEl = el;
     ensureOverlay(state);
     seguiIlTesto(state);
+    entra(state);
     aggiornaCodice(state, { senzaDisegno: true });
     syncOverlay(state);
     // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
@@ -838,6 +905,12 @@
   }
 
   function suInput(state, evento) {
+    // Un `input` finto su un testo che non è cambiato non ha niente da rifare: ripetuto, darebbe al sito una misura.
+    if (evento && !evento.isTrusted && !global.SN_FILO_UI?.veroONostro?.(evento) && state.codiceTesto != null
+      && getEditableText(state.el) === state.codiceTesto && getEditableText(state.el) === state.testo) return;
+    const storia = !!evento && (evento.inputType === 'historyUndo' || evento.inputType === 'historyRedo');
+    seguiIlTesto(state, ammessoDa(state, evento), { storia });
+    if (evento && evento.isTrusted) state.intento = null;
     if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
     fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
@@ -892,6 +965,8 @@
 
   function ensureOverlay(state) {
     if (state.overlay && state.overlay.isConnected) return;
+    // Staccato con l'ombra dal sito, tornerebbe col nuovo quando l'ombra rientra.
+    if (state.overlay) state.overlay.remove();
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
@@ -1298,11 +1373,35 @@
   // ============================================================================
   // Chi cambia il testo perde i segni del modello che il cambio tocca: gli altri restano dov'erano finché un controllo
   // non li rinnova (#1111), sugli offset giusti per «Correggi».
-  function seguiIlTesto(state) {
+  // `ammesso(pezzo)`: il pezzo nuovo l'ha scritto l'utente (ammessoDa). Un cambio che né lui né Filo spiegano è del sito.
+  function seguiIlTesto(state, ammesso = null, { storia = false } = {}) {
     const ora = getEditableText(state.el);
     if (ora === state.testo) return;
     const prima = state.testo;
     state.testo = ora;
+    if (!PAGINA_DI_FILO && !radiceDi(state.el)) {
+      const c = cambio(prima, ora);
+      const nuovo = ora.slice(c.p, c.fineNuovo);
+      const f = state.filoScrive;
+      const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
+      // Il tasto che un editor ricco ha fermato per scriverlo da sé (siAspettaDallUtente).
+      const i = state.intento;
+      if (!ammesso && i && Date.now() - i.alle < INTENTO_MS) ammesso = i.ammesso;
+      if (i && ammesso === i.ammesso) state.intento = null;
+      const spiegato = !storia && (daFilo || !!(ammesso && ammesso(nuovo)));
+      const riportato = storia ? proprietariDi(state, ora) : null;
+      if (riportato) {
+        state.diSito = riportato.diSito;
+        state.visti = riportato.visti;
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = [];
+      } else {
+        state.diSito = scorriPezzi(state.diSito, c);
+        state.visti = scorriPezzi(state.visti, c);
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = scorriPezzi(state.primaDelGesto.pezzi, c);
+        if (!spiegato) cambioDelSito(state, prima, ora, c, nuovo);
+      }
+      ricordaProprietari(state);
+    }
     // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora», e dice come si scrive
     // in questa pagina.
     if (!ora.trim()) {
@@ -1357,18 +1456,13 @@
     if (!z) return null;
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineVecchio = vecchio.length - s;
+    const { p, fineVecchio, fineNuovo } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     let a;
     let b;
     if (z.end <= p) { a = z.start; b = z.end; } else if (z.start >= fineVecchio) { a = z.start + delta; b = z.end + delta; } else {
       a = Math.min(z.start, p);
-      b = Math.max(z.end + delta, nuovo.length - s);
+      b = Math.max(z.end + delta, fineNuovo);
     }
     a = Math.max(0, Math.min(nuovo.length, a));
     b = Math.max(a, Math.min(nuovo.length, b));
@@ -1408,12 +1502,7 @@
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
     if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineCambio = vecchio.length - s;
+    const { p, fineVecchio: fineCambio } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     const out = [];
     for (const it of lista) {
@@ -1458,23 +1547,295 @@
     return nuovo;
   }
 
+  // Su un sito si controlla solo il testo dell'utente (#2299): quello che scrive coi suoi tasti o tramite Filo, e quello
+  // che c'era quando è entrato nella casella. Il resto lo ha scritto il sito, e i segni, la correzione da sé o la durata
+  // del controllo gli direbbero cosa c'è nel dizionario personale. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
+  function cambio(prima, ora) {
+    const corto = Math.min(prima.length, ora.length);
+    let p = 0;
+    while (p < corto && prima[p] === ora[p]) p++;
+    let s = 0;
+    while (s < corto - p && prima[prima.length - 1 - s] === ora[ora.length - 1 - s]) s++;
+    return { p, fineVecchio: prima.length - s, fineNuovo: ora.length - s };
+  }
+  // Un pezzo che il cambio tocca perde solo la parte cambiata: quello che resta ai lati resta di chi era.
+  function scorriPezzi(lista, { p, fineVecchio, fineNuovo }) {
+    const delta = fineNuovo - fineVecchio;
+    const out = [];
+    for (const z of lista) {
+      if (z.end <= p) out.push(z);
+      else if (z.start >= fineVecchio) out.push({ start: z.start + delta, end: z.end + delta });
+      else {
+        if (z.start < p) out.push({ start: z.start, end: p });
+        if (z.end > fineVecchio) out.push({ start: fineNuovo, end: z.end + delta });
+      }
+    }
+    return unisciPezzi(out);
+  }
+  function unisciPezzi(lista) {
+    const out = [];
+    for (const z of [...lista].filter((x) => x.end > x.start).sort((a, b) => a.start - b.start)) {
+      const u = out[out.length - 1];
+      if (u && z.start <= u.end) u.end = Math.max(u.end, z.end); else out.push({ start: z.start, end: z.end });
+    }
+    return out;
+  }
+  function toccaPezzi(lista, a, b) { return lista.some((z) => a < z.end && b > z.start); }
+  // Gli spazi non dicono niente del dizionario, e un campo modificabile scrive lo spazio in fondo come unificatore e lo
+  // riscrive al tasto dopo: chi ha scritto un pezzo si giudica senza.
+  function senzaSpazi(s) { return String(s).replace(/[\s ]/g, ''); }
+
+  // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
+  // testo, la composizione il suo. Mai un cambio intero: un gesto vero senza testo (un'immagine incollata) non spiega
+  // quello che il sito ci mette nello stesso evento. Uno script ha `isTrusted` anche con execCommand. L'annulla e il
+  // rifai non scrivono niente di nuovo: riportano un testo già visto, coi suoi proprietari (proprietariDi).
+  function ammessoDa(state, e, { consuma = true } = {}) {
+    if (!e) return null;
+    if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
+    const tipo = e.inputType || '';
+    const dentro = (fonte) => (typeof fonte === 'string' && fonte
+      ? (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo))
+      : (pezzo) => !senzaSpazi(pezzo));
+    const k = state.tasto;
+    // Cancella l'utente col suo tasto o col suo taglia; una cancellatura che non spiegano è del sito (cambioDelSito).
+    if (tipo.startsWith('delete')) {
+      const tasto = !!k && ['Backspace', 'Delete', 'Unidentified', 'Process'].includes(k.key);
+      const taglio = tipo === 'deleteByCut' && Date.now() - state.taglio < INTENTO_MS;
+      if (!tasto && !taglio) return null;
+      if (consuma) { if (tasto) state.tasto = null; else state.taglio = 0; }
+      return dentro(null);
+    }
+    if (tipo === 'insertText') {
+      if (consuma) state.tasto = null;
+      if (!k || k.mod || typeof e.data !== 'string') return null;
+      const libero = k.morto || k.key === 'Unidentified' || k.key === 'Process';
+      const suo = [...k.key].length === 1 && e.data === k.key;
+      return suo || (libero && [...e.data].length <= 3) ? dentro(e.data) : null;
+    }
+    if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => !senzaSpazi(pezzo);
+    if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return dentro(e.data);
+    if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop' || tipo === 'insertFromPasteAsQuotation') {
+      let fonte = typeof e.data === 'string' ? e.data : null;
+      if (!fonte) { try { fonte = e.dataTransfer?.getData?.('text/plain'); } catch (_) { fonte = null; } }
+      return dentro(fonte);
+    }
+    return null;
+  }
+
+  // Un gesto vero che l'editor ferma per scrivere da sé (Lexical: la prima lettera di un paragrafo, l'incolla) non
+  // porta un `input`: il cambio che arriva subito dopo vale quanto quello che il gesto spiega, e niente di più.
+  const INTENTO_MS = 1000;
+  function siAspettaDallUtente(state, e, ammesso) {
+    if (!ammesso || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    state.intento = { ammesso, alle: Date.now() };
+    setTimeout(() => {
+      if (!e.defaultPrevented || !state.attivo || state.intento?.ammesso !== ammesso) return;
+      if (getEditableText(state.el) !== state.testo) suInput(state, null);
+    }, 0);
+  }
+
+  // Un cambio che né l'utente né Filo spiegano. Quello che il sito scrive è suo; una parola che il sito ricompone
+  // cancellando o spezzando lettere dell'utente («le zanzare di otto terra» → «le zanzottera») è sua anche lei. E il
+  // testo trovato entrando torna del sito: tenerlo dell'utente gli darebbe, cancellando e annullando, una misura a
+  // piacere (#2299, giro 4).
+  const DI_PAROLA = /[\p{L}\p{N}\p{M}'’_-]/u;
+  function cambioDelSito(state, prima, ora, c, nuovo) {
+    const tolto = prima.slice(c.p, c.fineVecchio);
+    const tocca = DI_PAROLA.test(ora[c.p - 1] || '') && DI_PAROLA.test(ora[c.fineNuovo] || '');
+    if (!senzaSpazi(nuovo) && !senzaSpazi(tolto) && !(nuovo && tocca)) return;
+    const pezzi = [];
+    if (senzaSpazi(nuovo)) pezzi.push({ start: c.p, end: c.fineNuovo });
+    else {
+      let a = c.p;
+      let b = c.fineNuovo;
+      while (a > 0 && DI_PAROLA.test(ora[a - 1])) a--;
+      while (b < ora.length && DI_PAROLA.test(ora[b])) b++;
+      if (b > a) pezzi.push({ start: a, end: b });
+    }
+    state.diSito = unisciPezzi([...state.diSito, ...pezzi]);
+    revocaVisti(state);
+  }
+  function revocaVisti(state) {
+    if (!state.visti.length && ![...state.proprietari.values()].some((g) => g.visti.length)) return;
+    state.diSito = unisciPezzi([...state.diSito, ...state.visti]);
+    state.visti = [];
+    for (const g of state.proprietari.values()) {
+      if (!g.visti.length) continue;
+      g.diSito = unisciPezzi([...g.diSito, ...g.visti]);
+      g.visti = [];
+    }
+  }
+
+  // Il testo che c'era nella casella prima del gesto che ci porta l'utente, fotografato prima che la pagina lo veda
+  // (ascolto in cattura su window, messo prima dei suoi): quello che il sito ci mette durante il gesto non si adotta.
+  const FOTO_MS = 2000;
+  function primaDelGesto(e) {
+    try {
+      if (!e || !e.isTrusted || PAGINA_DI_FILO || !settings || !attivo()) return;
+      for (const el of new Set([activeEl, editabileDellEvento(e)])) {
+        if (!el || radiceDi(el)) continue;
+        const state = statoDi(el);
+        if (state.attivo && state.entrato) continue;
+        seguiIlTesto(state);
+        state.primaDelGesto = { alle: Date.now(), pezzi: state.diSito.map((z) => ({ ...z })) };
+      }
+    } catch (_) {}
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'keydown']) window.addEventListener(tipo, primaDelGesto, true);
+  }
+  function intersezione(a, b) {
+    const out = [];
+    for (const x of a) for (const y of b) {
+      const s = Math.max(x.start, y.start);
+      const t = Math.min(x.end, y.end);
+      if (t > s) out.push({ start: s, end: t });
+    }
+    return unisciPezzi(out);
+  }
+  function sottraiPezzi(a, b) {
+    let out = unisciPezzi(a);
+    for (const y of b) {
+      out = out.flatMap((x) => [
+        ...(x.start < y.start ? [{ start: x.start, end: Math.min(x.end, y.start) }] : []),
+        ...(x.end > y.end ? [{ start: Math.max(x.start, y.end), end: x.end }] : []),
+      ]);
+    }
+    return unisciPezzi(out);
+  }
+
+  // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
+  // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. L'impronta trova, il testo
+  // intero conferma: un'impronta corta il sito la falsificherebbe. Un testo dimenticato torna come del sito.
+  const PROPRIETARI_MAX = 2000;
+  const PROPRIETARI_CARATTERI = 4_000_000;
+  function improntaDi(t) {
+    let a = 0x811c9dc5;
+    let b = 0x9747b28c;
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      a = Math.imul(a ^ c, 0x01000193);
+      b = Math.imul(b ^ c, 0x5bd1e995);
+    }
+    return `${t.length}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
+  }
+  function ricordaProprietari(state) {
+    if (PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const m = state.proprietari;
+    const testo = state.testo;
+    const k = improntaDi(testo);
+    const vecchio = m.get(k);
+    if (vecchio) { m.delete(k); state.proprietariCaratteri -= vecchio.testo.length; }
+    m.set(k, { testo, diSito: state.diSito.map((z) => ({ ...z })), visti: state.visti.map((z) => ({ ...z })) });
+    state.proprietariCaratteri += testo.length;
+    while (m.size > 1 && (m.size > PROPRIETARI_MAX || state.proprietariCaratteri > PROPRIETARI_CARATTERI)) {
+      const primo = m.keys().next().value;
+      state.proprietariCaratteri -= m.get(primo).testo.length;
+      m.delete(primo);
+    }
+  }
+  function proprietariDi(state, testo) {
+    const g = state.proprietari.get(improntaDi(testo));
+    if (!g || g.testo !== testo) return null;
+    return { diSito: g.diSito.map((z) => ({ ...z })), visti: g.visti.map((z) => ({ ...z })) };
+  }
+
+  // Il gesto vero che porta l'utente nella casella (il clic, il rilascio di Tab) fa suo il testo che c'è: una volta per
+  // ingresso, non a ogni clic, perché ogni misura in più è una parola letta.
+  function entra(state) {
+    if (state.entrato || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const G = global.SN_GESTO;
+    if (!G || !G.prendi('codice', undefined, G.dentro(state.el))) return;
+    state.entrato = true;
+    seguiIlTesto(state);
+    const foto = state.primaDelGesto;
+    state.primaDelGesto = null;
+    const adottati = foto && Date.now() - foto.alle < FOTO_MS ? intersezione(state.diSito, foto.pezzi) : state.diSito;
+    if (!adottati.length) return;
+    state.visti = unisciPezzi([...state.visti, ...adottati]);
+    state.diSito = sottraiPezzi(state.diSito, adottati);
+    ricordaProprietari(state);
+    if (state.attivo) aggiornaCodice(state);
+  }
+
+  // Filo scrive `testo` nella casella (una correzione, l'Incolla del menu, la dettatura): vale come scritto dall'utente.
+  // Gli editor che rifanno il testo dopo l'evento lo mostrano al giro dopo: lì si guarda ancora, poi si chiude.
+  function scriveFilo(el, testo) {
+    let state = el ? monitored.get(el) : null;
+    // Chi scrive in un editor ricco può avere in mano un nodo dentro il campo, o il campo dentro il nodo.
+    if (!state && el && activeEl && (activeEl.contains(el) || (typeof el.contains === 'function' && el.contains(activeEl)))) state = monitored.get(activeEl);
+    if (!state && el) { const campo = findSupportedEditable(el); if (campo) state = statoDi(campo); }
+    if (!state) return;
+    // Quello che il sito aveva cambiato prima resta suo.
+    seguiIlTesto(state);
+    const t = String(testo ?? '');
+    state.filoScrive = t;
+    setTimeout(() => {
+      if (state.filoScrive !== t) return;
+      seguiIlTesto(state);
+      state.filoScrive = null;
+      if (state.attivo) aggiornaCodice(state);
+    }, 0);
+  }
+
+  // Il testo da controllare con le parole del sito spente (spazi, gli a capo restano): fuori dai controlli, e uguali
+  // nel costo qualunque cosa dica il dizionario. Per il dizionario (`ripetute` falso), fra le parole trovate entrando
+  // una ripetuta conta una volta: mille copie della stessa non moltiplicano la differenza.
+  function soloDellUtente(state, d, { ripetute = true } = {}) {
+    if (PAGINA_DI_FILO || radiceDi(state.el) || (!state.diSito.length && !state.visti.length)) return d.testo;
+    const n = d.testo.length;
+    const sito = new Uint8Array(n);
+    const visto = new Uint8Array(n);
+    for (const [lista, segna] of [[state.diSito, sito], [state.visti, visto]]) {
+      for (const z of lista) {
+        const a = Math.max(0, d.verso(z.start));
+        const b = Math.min(n, z.end >= state.testo.length ? n : d.verso(z.end));
+        for (let i = a; i < b; i++) segna[i] = 1;
+      }
+    }
+    const out = d.testo.split('');
+    const giaViste = new Set();
+    for (const m of d.testo.matchAll(/[\p{L}\p{N}\p{M}'’_-]+/gu)) {
+      const a = m.index;
+      const b = a + m[0].length;
+      let delSito = false;
+      let vista = false;
+      for (let i = a; i < b; i++) { if (sito[i]) delSito = true; if (visto[i]) vista = true; }
+      // Contate come le conta il dizionario: «1_zanzottera» e «2_zanzottera» sono la stessa parola.
+      if (!delSito && vista && !ripetute) {
+        const parole = R() ? R().parole(m[0]) : [{ start: 0, end: m[0].length, parola: m[0] }];
+        for (const w of parole) {
+          const chiave = w.parola.toLowerCase();
+          if (!giaViste.has(chiave)) { giaViste.add(chiave); continue; }
+          for (let i = a + w.start; i < a + w.end; i++) out[i] = ' ';
+        }
+      }
+      if (delSito) for (let i = a; i < b; i++) out[i] = ' ';
+    }
+    for (let i = 0; i < n; i++) if (sito[i] && out[i] !== '\n') out[i] = ' ';
+    return out.join('');
+  }
+
   function calcolaCodice(state) {
+    seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     const Rg = R();
-    if (!Rg) { state.codice = []; return false; }
+    if (!Rg) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
+    const testo = soloDellUtente(state, d);
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
-    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
+    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
-    const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
+    const perDizionario = soloDellUtente(state, d, { ripetute: false });
+    const pareri = erroriAttivi() ? pareriDelTesto(perDizionario) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
-      ...Rg.erroriFissi(d.testo),
-      ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
-      ...Rg.candidatiDizionario(d.testo, {
+      ...Rg.erroriFissi(testo),
+      ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
+      ...Rg.candidatiDizionario(perDizionario, {
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
+    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date()).map(segnoDaData) : [];
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
@@ -1548,7 +1909,8 @@
       ...delModello.filter((m) => m.tipo === 'segnaposto' && valido(m)),
     ] : [];
     const sulleX = (x) => x.segno === 'errore' && xVolute.some((s) => x.start < s.end && x.end > s.start);
-    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo)
+    // Nemmeno il modello segna il testo del sito (soloDellUtente).
+    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo) && !toccaPezzi(state.diSito, x.start, x.end)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
       && !(scrive && x.start < scrive.end && x.end > scrive.start);
     const ordina = (k) => [
@@ -2070,6 +2432,7 @@
   // clic; e i lampi. Sta fuori dallo specchio, che taglia ai bordi del campo e lascia passare il mouse.
   function strato(state) {
     if (state.valori && state.valori.isConnected) return state.valori;
+    if (state.valori) state.valori.remove();
     const v = document.createElement('div');
     v.className = 'sn-spell-valori';
     global.SN_FILO_UI?.mark(v);
@@ -2781,6 +3144,7 @@
   // Falso se il campo è rimasto com'era: allora lo si riscrive.
   function sostituisciComeBattuta(el, range, testo, cursorMode) {
     testo = String(testo ?? '');
+    scriveFilo(el, testo);
     const prima = el.value;
     const caret = el.selectionEnd;
     // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
@@ -2805,6 +3169,7 @@
 
   // Una correzione applicata da Filo: Ctrl/Cmd+Z subito dopo la disfa, e i contatori lo sanno (#1461).
   function applyFix(el, range, replacement, opts = {}) {
+    scriveFilo(el, replacement);
     const prima = getEditableText(el);
     const r = applicaCorrezione(el, range, replacement, opts);
     try {
@@ -3078,6 +3443,7 @@
   // Scrive `pezzo` in un punto, come una battuta: `dove` è la posizione in una casella, il punto del documento in un
   // campo modificabile.
   function scriviNelPunto(el, dove, pezzo) {
+    scriveFilo(el, pezzo);
     const prima = getEditableText(el);
     const doc = el.ownerDocument || document;
     const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
@@ -3204,6 +3570,7 @@
     sostituisciNelCampo,
     rimettiNelCampo,
     sostituisciComeBattuta,
+    scriveFilo,
     riallineaIssues,
     addToDictionary,
     isInDictionary,

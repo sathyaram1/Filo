@@ -72,6 +72,22 @@ async function nelRiquadro(page, frame, code) {
   return result.value;
 }
 
+// Come nelMondoDiFilo, ma basta la Page: il mondo si cerca col protocollo di debug, anche nel frame principale. Un frame
+// che ha cambiato pagina ha un mondo nuovo, e si cerca di nuovo. `fn` può essere anche il suo sorgente.
+export async function nelMondoDelFrame(page, frame, fn, arg = null) {
+  const f = frame || page.mainFrame();
+  const code = `(${String(fn)})(${JSON.stringify(arg)})`;
+  if (f.url().startsWith('filo://')) return f.evaluate(code);
+  try {
+    return await nelRiquadro(page, f, code);
+  } catch (_) {
+    const m = sessioni.get(f);
+    sessioni.delete(f);
+    if (m) await m.s.detach().catch(() => {});
+    return nelRiquadro(page, f, code);
+  }
+}
+
 // Esegue `fn(arg)` nel mondo dei content script dello strato dei riquadri sopra la scheda di `page`.
 // undefined se la scheda non ne ha uno (o è una pagina di Filo, dove i riquadri restano nel documento).
 export async function nelloStrato(app, page, fn, arg = null) {
