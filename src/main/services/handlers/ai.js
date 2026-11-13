@@ -135,7 +135,11 @@ module.exports = function register(on, ctx) {
     if (delicata) {
       ContatoriSicurezza.misura('paginaDelicata', motivo, 'contesto_correttore');
       const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
-      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
+      // Delle date da giudicare restano solo gli anni scritti nel campo.
+      const date = (Array.isArray(msg.payload.date) ? msg.payload.date : [])
+        .map((d) => (d && typeof d === 'object' ? { ...d, anni: (Array.isArray(d.anni) ? d.anni : []).filter((a) => a && a.dove === 'campo') } : null))
+        .filter((d) => d && d.anni.length);
+      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {}, date };
     }
     return delicata;
   }
