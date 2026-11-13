@@ -5619,7 +5619,7 @@ function pageReadsForPrompt(actions) {
       blocks.push('[Pagina web letta ma lasciata fuori: con le altre letture di questo turno non stava nella memoria del modello. '
         + 'Restano titolo e indirizzo, il testo non lo hai davanti: non inventarlo e rispondi con quello che hai. Non rileggerla in '
         + 'questo turno; sotto la tua risposta Filo dice all\'utente quali pagine ha lasciato fuori, e se lui lo chiede la rileggi con '
-        + `LEGGI_PAGINA e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
+        + `web(leggi) e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
         + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi, conIntestazione: true }));
       continue;
     }
