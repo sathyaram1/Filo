@@ -126,11 +126,20 @@
     [new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2}|${Object.keys(QUANTI).join('|')})\\s+(?:ann[oi]\\s+fa|years?\\s+ago)(?!\\p{L})`, 'giu'),
       (m) => -(QUANTI[m[1].toLowerCase()] || Number(m[1]))],
   ];
+  // La riga di `s` che contiene [da, fine), accorciata intorno all'anno se è lunga.
+  function rigaDi(s, da, fine) {
+    const a = s.lastIndexOf('\n', da - 1) + 1;
+    const b = s.indexOf('\n', fine);
+    const riga = s.slice(a, b < 0 ? s.length : b);
+    if (riga.length <= RIGA_ANNO_MAX) return riga.trim();
+    const centro = Math.max(0, Math.min(riga.length - RIGA_ANNO_MAX, da - a - RIGA_ANNO_MAX / 2));
+    return `…${riga.slice(centro, centro + RIGA_ANNO_MAX).trim()}…`;
+  }
   function anniIn(s, oggi) {
     const out = [];
     if (typeof s !== 'string' || !s) return out;
     const y = oggi.getFullYear();
-    const metti = (anno, m) => out.push({ anno, da: m.index, fine: m.index + m[0].length });
+    const metti = (anno, m) => out.push({ anno, da: m.index, fine: m.index + m[0].length, riga: rigaDi(s, m.index, m.index + m[0].length) });
     for (const m of s.matchAll(ANNO_DETTO)) if (Number(m[1]) <= y + 50) metti(Number(m[1]), m);
     for (const m of s.matchAll(ANNO_APOSTROFO)) metti(2000 + Number(m[1]) <= y + 10 ? 2000 + Number(m[1]) : 1900 + Number(m[1]), m);
     for (const [re, quanti] of ANNO_RELATIVO) for (const m of s.matchAll(re)) metti(y + quanti(m), m);
@@ -142,20 +151,21 @@
     const prima = typeof c.prima === 'string' ? c.prima : '';
     return {
       campo: anniIn(testo, oggi),
-      prima: anniIn(prima, oggi).map((x) => ({ anno: x.anno, lontano: prima.length - x.fine })),
-      dopo: anniIn(c.dopo, oggi).map((x) => ({ anno: x.anno, lontano: x.da })),
-      titolo: anniIn(c.titolo, oggi).map((x) => x.anno),
+      prima: anniIn(prima, oggi).map((x) => ({ ...x, lontano: prima.length - x.fine })),
+      dopo: anniIn(c.dopo, oggi).map((x) => ({ ...x, lontano: x.da })),
+      titolo: anniIn(c.titolo, oggi),
     };
   }
-  // Dal più vicino alla data [inizio, fine) di un campo lungo `lunghezza`; il titolo sta al limite del vicino.
+  // Dal più vicino alla data [inizio, fine) di un campo lungo `lunghezza`; il titolo viene dopo la pagina vicina.
   function anniVicini(detti, inizio, fine, lunghezza) {
     if (!detti) return [];
+    const voce = (x, dove, dist) => ({ anno: x.anno, dove, riga: x.riga, dist });
     return [
       ...detti.campo.filter((x) => x.fine <= inizio || x.da >= fine)
-        .map((x) => ({ anno: x.anno, dist: x.fine <= inizio ? inizio - x.fine : x.da - fine })),
-      ...detti.prima.map((x) => ({ anno: x.anno, dist: x.lontano + inizio })),
-      ...detti.dopo.map((x) => ({ anno: x.anno, dist: x.lontano + lunghezza - fine })),
-      ...detti.titolo.map((anno) => ({ anno, dist: ANNO_VICINO })),
+        .map((x) => voce(x, 'campo', x.fine <= inizio ? inizio - x.fine : x.da - fine)),
+      ...detti.prima.map((x) => voce(x, 'prima', x.lontano + inizio)),
+      ...detti.dopo.map((x) => voce(x, 'dopo', x.lontano + lunghezza - fine)),
+      ...detti.titolo.map((x) => voce(x, 'titolo', 600)),
     ].sort((p, q) => p.dist - q.dist);
   }
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
