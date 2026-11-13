@@ -485,8 +485,9 @@
         versioniSeguite.set(id, r._updateTime || null);
         perId.set(id, r);
       }
-      for (const r of await dalRegistro()) if (r && r._id) perId.set(String(r._id), r);
-      for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
+      for (const r of [...await dalRegistro(), ...await daiSeguiti()]) {
+        if (r && r._id) { perId.set(String(r._id), r); if (noti) noti.add(String(r._id)); }
+      }
       for (const r of await controllo()) if (r && r._id) perId.set(String(r._id), r);
       lastTickAt = startedAt;
       return { kind: 'changed', rows: Array.from(perId.values()) };
