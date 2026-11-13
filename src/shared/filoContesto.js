@@ -820,7 +820,7 @@
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
-    return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con CERCA_CHAT e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
+    return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con filo(cerca) e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
   }
 
   // I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
