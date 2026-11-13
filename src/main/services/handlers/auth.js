@@ -1248,19 +1248,23 @@ module.exports = function register(on, ctx) {
       if (!row) return; // cancellato nel frattempo: se ne occupa il giro generale
       const fb = await decryptFeedbackObject(row, priv);
       const card = V.cardFor(fb);
+      // La scheda in mano si aggiorna qui: buttarle via tutte faceva rileggere la bacheca intera a ogni triage (#2470).
       if (!card) {
         await FB.unpublishPublicCard(key, { idToken });
+        schedeInMano.tolta(key);
       } else {
         // Voti e riaperture stanno sulla scheda: la maschera non li tocca, ma quelli rimasti sul
         // documento vanno portati dentro come fa il giro generale.
         let before = null;
         try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
         const carry = V.carryUserFields(fb, before);
-        await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
+        const scritta = Object.keys(carry).length ? { ...card, ...carry } : card;
+        await FB.publishPublicCard(key, scritta, { idToken });
+        schedeInMano.scritta(key, { ...(before || {}), ...scritta });
       }
-      cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
       if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
     } catch (e) {
+      schedeInMano.dimentica();
       console.warn('[feedback] scheda singola non aggiornata:', e?.message || e);
     }
   }
