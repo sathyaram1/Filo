@@ -933,20 +933,31 @@ module.exports = function register(on, ctx) {
 
   // Voti e riaperture stanno sulla SCHEDA pubblica, l'unico documento che chi vota può aprire:
   // si riuniscono qui, e la scheda vince solo dove ha qualcosa da dire.
-  let cardsCache = { at: 0, rows: [] };
-  const CARDS_TTL_MS = 30_000;
+  // TUTTE le schede: una finestra sui più recenti lascerebbe in bacheca come risolti i fix vecchi tornati in
+  // lavorazione. Tutte una volta, poi le cambiate dal segnalibro (#2470: ogni apertura le rileggeva tutte).
+  const ListaGestione = require('../listaGestione');
+  const fileGestione = (nome) => {
+    try { return require('node:path').join(require('electron').app.getPath('userData'), nome); } catch (_) { return ''; }
+  };
+  const discoDi = (nome) => ({
+    leggiFile: () => { const f = fileGestione(nome); return f ? require('../scritturaAtomica').leggiSync(f) : null; },
+    scriviFile: (testo) => { const f = fileGestione(nome); return f ? require('../scritturaAtomica').scrivi(f, testo, { mode: 0o600 }) : null; },
+    togliFile: () => { const f = fileGestione(nome); if (f) require('node:fs').rmSync(f, { force: true }); },
+  });
+  const schedeInMano = ListaGestione.creaSchede({
+    leggiTutte: async () => {
+      const FB = FEEDBACK();
+      return FB.listAllPublic
+        ? FB.listAllPublic({ timeoutMs: 20000, fresh: true })
+        : FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+    },
+    leggiCambiate: async ({ since }) => FEEDBACK().listPublicChangedSince({ since, pageSize: FEEDBACK().LIST_PAGE_SIZE, timeoutMs: 20000 }),
+    ...discoDi('gestione-schede.json'),
+  });
 
   async function publicCards({ fresh = false } = {}) {
-    const FB = FEEDBACK();
-    if (!FB) return [];
-    if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
-    // TUTTE le schede, paginate: una finestra sui più recenti lascerebbe in bacheca come risolti
-    // i fix vecchi tornati in lavorazione, votabili e riapribili a pagamento.
-    const rows = FB.listAllPublic
-      ? await FB.listAllPublic({ timeoutMs: 20000, fresh })
-      : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
-    cardsCache = { at: Date.now(), rows };
-    return rows;
+    if (!FEEDBACK()) return [];
+    return schedeInMano.tutte({ fresh });
   }
 
   // Per pochi feedback si chiedono le loro sole schede: il giro della Gestione
