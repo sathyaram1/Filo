@@ -6740,7 +6740,6 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (dalTratto) azioniViste.push(dalTratto);
   // Il testo di altri nei blocchi davanti ai messaggi (pagine visitate, nomi di dispositivi, avvisi), senza un'azione (#2293).
   const dalPreambolo = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione((filo && filo.daFuori) || []);
-  console.warn('[DEBUG2305]', JSON.stringify(dalPreambolo), JSON.stringify(azioniViste.map((a) => a && a.type)));
   if (dalPreambolo) azioniViste.push(dalPreambolo);
   // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
   const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
