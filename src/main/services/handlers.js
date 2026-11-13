@@ -6906,7 +6906,6 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const dalleSchede = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione(fotografia
     ? fotografia.daFuori : TV.unisciDaFuori(...sezioniUtente.map((s) => (s && s.daFuori) || [])));
   if (dalleSchede) {
-    console.warn('[DEBUG2305]', JSON.stringify(dalleSchede._output), JSON.stringify((filo && filo.daFuori) || []));
     azioniViste.push(dalleSchede);
     ricordaLettoInChat([dalleSchede]);
   }
