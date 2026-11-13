@@ -2370,11 +2370,20 @@ function positionOnBranch(bucket) {
   const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
   if (ripartito) {
     const { scelto, altri } = precedenti;
+    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
+    const a = allineaAMain({ root: ROOT, mainBranch: MAIN_BRANCH });
+    if (!a.ok) return { ok: false, kind: 'transient', message: `${branch}: non riesco a portare dentro il ${MAIN_BRANCH} di adesso, e senza si lavorerebbe sul codice di quando ${scelto.ramo} era partito: ${a.errore}` };
+    if (a.fuso) {
+      res.head = a.head;
+      process.stderr.write(`[dispatch] ${branch}: dentro anche il ${MAIN_BRANCH} di adesso, fuso senza conflitti\n`);
+    } else if (a.conflitti.length) {
+      process.stderr.write(`[dispatch] ${branch}: il ${MAIN_BRANCH} di adesso va in conflitto in ${a.conflitti.join(', ')}: non fuso, lo risolve per primo chi lavora\n`);
+    }
     bucket.ripartenza = {
       ramo: scelto.ramo, commit: scelto.propri,
       ...(altri.length ? { altri: altri.map((t) => ({ ramo: t.ramo, commit: t.propri })) } : {}),
+      ...(a.conflitti.length ? { conflittiConMain: a.conflitti } : {}),
     };
-    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
   }
   const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {
