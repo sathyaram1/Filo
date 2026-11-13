@@ -42,6 +42,25 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
   come sempre e scrivi il motivo del rifiuto nel report;
 - se la fusione ne copre solo una parte, lavori il resto e lo dici nel report.
 
+`payload.commitProvato`, se c'è, dice che il feedback è un allarme della
+suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
+averlo già corretto la fusione di un altro feedback, arrivata mentre la suite
+girava: non cita questo feedback e può essere più vecchia della sua nascita.
+Le candidate sono le fusioni arrivate su `main` dopo quel commit:
+
+```bash
+git fetch origin main
+git log --first-parent --merges --format='%H %cI %s' <commitProvato>..origin/main
+```
+
+Prova i rossi dell'allarme sulla punta di `origin/main`. Se sono tutti verdi,
+cerca la fusione che li ha corretti (quella che tocca il file rosso o il codice
+che prova) e chiudi con lei, con lo stesso comando qui sopra; nel report scrivi
+quale prova hai rilanciato e dove. Il server accetta una fusione sulla linea
+principale che il commit provato non contiene, successiva all'ultima
+riapertura e diversa da quella del lavoro stesso. Se anche un solo rosso resta,
+lavori il feedback.
+
 **Il feedback si lavora intero.** Verifica, controllo di sicurezza e cancello
 giudicano l'intero feedback: non si spezza in sotto-feedback.
 

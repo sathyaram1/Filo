@@ -1077,6 +1077,12 @@ function conPiano(ctx) {
   return typeof ctx.piano === 'string' && ctx.piano.trim() ? { piano: ctx.piano } : {};
 }
 
+// Un allarme della suite: il commit su cui ha dato il rosso, scritto dal server (FEEDBACK-STATES.md, Già risolto su main).
+function conCommitProvato(ctx) {
+  const c = String((ctx && ctx.commitProvato) || '').toLowerCase();
+  return /^[0-9a-f]{40}$/.test(c) ? { commitProvato: c } : {};
+}
+
 /**
  * Le fusioni su main che citano il feedback, dopo la sua nascita (regola 5): quelle che il server ha già trovato, o
  * quelle che dice git qui. `propria`: la fusione del suo stesso lavoro, cioè un feedback riaperto dall'owner.
@@ -1171,7 +1177,7 @@ export function buildPayload(bucket, ctx = {}) {
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
       if (bucket.ripartenza) out.ripartenza = bucket.ripartenza;
-      return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}) };
+      return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
     case 'risposta': {
       const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
@@ -2595,6 +2601,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // riallinea lo sha che aveva passato la verifica (la base del confronto alla consegna).
       ...(role !== 'verifier' && typeof (payload && payload.piano) === 'string' ? { piano: payload.piano } : {}),
       ...(role === 'new-work' && Array.isArray(payload && payload.suMain) ? { suMain: payload.suMain } : {}),
+      ...(role === 'new-work' ? conCommitProvato(payload) : {}),
       ...(role === 'fixer' && /^[0-9a-f]{40}$/i.test(String((payload && payload.shaVerificato) || '')) ? { shaVerificato: payload.shaVerificato } : {}),
       // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
       ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),

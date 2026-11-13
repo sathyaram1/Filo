@@ -226,6 +226,17 @@ test('il primo lavoro riceve il piano di chi l\'ha preceduto e le fusioni su mai
   assert.equal(ripresa.piano, 'p', 'anche chi riprende dopo una risposta riceve il piano');
 });
 
+test('#2148.1: il primo lavoro di un allarme riceve dal server il commit su cui la suite ha dato il rosso', async () => {
+  const { buildPayload, serverCtx } = await import('../../scripts/dispatch.mjs');
+  const bucket = { role: 'new-work', id: 'x', num: '#50' };
+  const C = 'C'.repeat(40);
+  const dal = (b, payload) => buildPayload(b, serverCtx(b, { payload: { feedback: { text: 't' }, ...payload } }));
+  const p = dal(bucket, { suMain: [], commitProvato: C });
+  assert.equal(p.commitProvato, C.toLowerCase(), 'le fusioni arrivate dopo di lui sono le candidate del «già risolto»');
+  for (const storto of [undefined, 'abc', 'c'.repeat(41)]) assert.equal('commitProvato' in dal(bucket, { commitProvato: storto }), false);
+  assert.equal('commitProvato' in dal({ role: 'fixer', id: 'x', num: '#50' }, { commitProvato: C }), false);
+});
+
 test('il motivo è obbligatorio per il correttore e per nessun altro ruolo, come sul server', async () => {
   const { motivoDellaConsegna } = await import('../../scripts/dispatch.mjs');
   assert.deepEqual(motivoDellaConsegna(undefined, 'verifier'), { ok: true, motivo: null });
