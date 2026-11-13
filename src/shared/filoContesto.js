@@ -324,8 +324,8 @@
     const voci = ES ? ES.daRaccontare(m.esiti, !!oss) : [];
     const storia = ES && !m.confermaDopo && voci.length ? ES.perModello(voci) : '';
     if (oss) parti.push(oss);
-    else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
-    else if (tipi.length && esitiTolti) parti.push(`(azioni di questo turno: ${tipi.join(', ')}; i loro esiti sono stati tolti per stare nel contesto: se ti servono, rifai l'azione o rileggi la conversazione con CERCA_CHAT e l'id "${m.chat}")`);
+    else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con filo(cerca) e l'id ${m.chat})`);
+    else if (tipi.length && esitiTolti) parti.push(`(azioni di questo turno: ${tipi.join(', ')}; i loro esiti sono stati tolti per stare nel contesto: se ti servono, rifai l'azione o rileggi la conversazione con filo(cerca) e l'id "${m.chat}")`);
     else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
     if (storia) parti.push(storia);
     // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
