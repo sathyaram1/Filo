@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste, minutiFraDownload } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste, NASCOSTE_TRADUZIONE, minutiFraDownload } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -1926,6 +1926,8 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // I valori della tendina li scrive constants.js: la pagina nomina solo quale dei due (#1290.2).
+    for (const o of $('traduzioneNascoste').options) o.value = NASCOSTE_TRADUZIONE[o.dataset.modo];
     // Prima di ogni altro ascoltatore: quando parte persist() il campo è già segnato.
     for (const [id, k] of Object.entries(CAMPO_DI)) {
       const el = $(id);

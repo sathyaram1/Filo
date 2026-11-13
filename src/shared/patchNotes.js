@@ -15,6 +15,7 @@
         { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
         { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
         'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
+        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {

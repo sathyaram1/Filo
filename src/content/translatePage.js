@@ -67,6 +67,10 @@
   let modoUltimo = global.SN_CONST.nascosteDellaTraduzione(null);
   // Un riquadro che si carica mentre il giro lavora: il giro gli aveva già passato parola prima che ci fosse (#1290).
   let riquadroNelGiro = false;
+  // I riquadri a cui l'ultimo giro ha passato parola prima che finissero di caricarsi (immagini e script arrivano dopo
+  // il testo): il loro load non è un riquadro nuovo, se il giro li ha sentiti rispondere. `risposto` null finché il giro
+  // aspetta le risposte; `arrivati` quanti load sono venuti nel frattempo (#1290.2).
+  let caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
   // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
   // cose succede, la risposta di prima vale ancora.
   let revealedDirty = true;
@@ -150,6 +154,8 @@
 
   async function translatePage(opts) {
     const quiet = !!(opts && opts.quiet);
+    // La sezione aperta che si traduce da sola (forseAperta): continua l'uso di prima, e parla solo se c'è da sapere.
+    const daSola = !quiet && !!(opts && opts.daSola);
     const frameRunId = (opts && opts.runId) || '';
     const fuoriConto = !!(opts && opts.fuoriConto);
     const riferisci = (data) => reportToHost(frameRunId, data, fuoriConto);
@@ -160,20 +166,21 @@
       return;
     }
     pageTranslating = true;
+    clearTimeout(aperturaTimer);
     ripiegoDelGiro = '';
     // Ripresa o nuovo giro: chi continua non è tornato all'originale.
-    if (!quiet) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
+    if (!quiet && !daSola) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
     // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
     // riquadri incorporati) contano solo se si guastano (#969).
-    usoContato = quiet;
+    usoContato = quiet || daSola;
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
-    const progress = quiet
+    const progress = quiet || daSola
       ? silentToast()
       : Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
-    if (!quiet) progressToast = progress;
+    if (!quiet && !daSola) progressToast = progress;
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e quel
     // testo resterebbe in lingua originale. Le nostre sostituzioni nascono già marcate.
     newContentSeen = false;
@@ -203,6 +210,8 @@
       // la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
+      caricoAtteso.risposto = frames.tutti !== false;
+      if (caricoAtteso.arrivati && !caricoAtteso.risposto) riquadroNelGiro = true;
       // Arrivato a giro avviato, il riquadro è testo nuovo come quello che il sito aggiunge dopo: l'avviso lo dice e
       // l'icona offre di tradurlo.
       if (riquadroNelGiro) newContentSeen = true;
@@ -213,8 +222,11 @@
         pageComplete = true;
       }
       progress.close();
-      showResultToast(result, newContentSeen, frames);
-      contaEsito(result, newContentSeen, frames);
+      if (!daSola) {
+        showResultToast(result, newContentSeen, frames);
+        contaEsito(result, newContentSeen, frames);
+      } else if (daDire(result, frames)) showResultToast(result, false, frames);
+      if (result && result.kind === 'done') rimastiPrima = { chiusi: Number(result.unreachable || 0), riquadri: frames.left || 0 };
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
@@ -224,6 +236,7 @@
       // nostro, e toccarlo vorrebbe dire spegnere il lavoro di qualcun altro.
       if (myRun === runSeq) {
         pageTranslating = false;
+        if (aperturaInSospeso && !quiet) { aperturaInSospeso = false; forseAperta(); }
         // Nessuna traduzione in piedi: niente da continuare, e nessun motivo di
         // tenere una sentinella addosso alla pagina.
         if (!pageHasTranslation) {
@@ -374,6 +387,17 @@
     return { kind: 'stopped', applied, total: grandTotal, reason: reasonFor(lastError), errore: lastError };
   }
 
+  // Quanto era rimasto fuori alla fine dell'ultimo giro completo: la sezione aperta che si traduce da sola lo ridice
+  // solo se è cresciuto, cioè se proprio lei ha portato un pezzo che non si traduce.
+  let rimastiPrima = { chiusi: 0, riquadri: 0 };
+  function daDire(result, frames) {
+    if (!result) return false;
+    if (result.kind === 'done') {
+      return Number(result.unreachable || 0) > rimastiPrima.chiusi || ((frames && frames.left) || 0) > rimastiPrima.riquadri;
+    }
+    return result.kind === 'failed' || result.kind === 'stopped' || result.kind === 'batch';
+  }
+
   // `moreArrived` è l'unica cosa che chi ha fatto il lavoro non può sapere: il sito ha
   // aggiunto testo anche durante l'ultimo giro, e si è smesso di rincorrerlo.
   function showResultToast(result, moreArrived, frames) {
@@ -460,21 +484,15 @@
     if (isInsideFiloUi(f)) return 'skip';
     const nascosto = frameHidden(f);
     if (nascosto) {
-      // Un pixel di tracciamento nascosto resta un pixel; uno senza misura (scheda spenta) non si sa, e si traduce.
-      if (modo === Extract.NASCOSTE.TRADUCI) return pixel(f) ? 'skip' : 'background';
+      // Trasparente fuori dallo schermo: il testo accanto si traduce come visibile, e il riquadro con lui, fuori conto
+      // perché l'avviso non cambi con lo scorrimento (#1290.2).
+      if (modo === Extract.NASCOSTE.TRADUCI || nascosto === 'trasparente') return frameTooSmall(f, true) ? 'skip' : 'background';
       return 'folded';
     }
     // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
     // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
     if (frameTooSmall(f)) return 'skip';
     return 'shown';
-  }
-
-  function pixel(f) {
-    try {
-      const r = f.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H);
-    } catch (_) { return false; }
   }
 
   // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
@@ -507,25 +525,38 @@
     } catch (_) { return null; }
   }
 
-  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono.
+  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono: true, 'trasparente' (solo da
+  // una trasparenza fuori dallo schermo, vedi Extract.isHiddenFromUser) o false.
   function frameHidden(f) {
     if (!(Extract && typeof Extract.isHiddenFromUser === 'function')) return false;
+    let esito = false;
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
-      if (Extract.isHiddenFromUser(el)) return true;
+      const h = Extract.isHiddenFromUser(el);
+      if (h === true) return true;
+      if (h) esito = h;
     }
-    return false;
+    return esito;
   }
 
   // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere. Conta la finestra
   // da cui si vede, non il rettangolo: un riquadro grande dietro una finestrella da un pixel è un francobollo.
-  function frameTooSmall(f) {
+  // `nascosto`: spento, un riquadro non ha misura; vale quella che il sito gli scrive in pixel (il pixel di tracciamento
+  // spento). Senza, è la sezione chiusa (la scheda spenta): non si sa, e si traduce.
+  function frameTooSmall(f, nascosto) {
     const misura = (el) => {
       if (Extract && typeof Extract.clippedExtent === 'function') return Extract.clippedExtent(el);
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
+    const px = (v) => { const m = /^(\d+(?:\.\d+)?)px$/.exec(String(v || '')); return m ? Number(m[1]) : NaN; };
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
       const m = misura(el);
+      if (nascosto && !(m.w > 0 && m.h > 0)) {
+        let cs = null;
+        try { cs = (el.ownerDocument.defaultView || window).getComputedStyle(el); } catch (_) {}
+        if (px(cs && cs.width) < FRAME_MIN_W || px(cs && cs.height) < FRAME_MIN_H) return true;
+        continue;
+      }
       if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
     }
     return false;
@@ -602,15 +633,21 @@
     const { shown, skipped, folded, background } = embeddedFrames(modo);
     hiddenFrames = folded;
     const expected = shown.length;
+    caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
     if (!expected && !background.length) return null;
     const runId = 'r' + myRun;
     tellFrames(runId, skipped, false);
     tellFrames(runId, shown, true);
     tellFrames(runId, background, true, true);
+    for (const f of shown.concat(background)) {
+      if (global.SN_RIQUADRI_IN_ARRIVO?.caricato(f) === false) caricoAtteso.riquadri.add(f);
+    }
     // Chi non si farà vivo resta nel conto: `expected` sono i riquadri che si
     // VEDONO, e un rettangolo visibile che nessuno script raggiunge è
     // esattamente ciò che l'avviso finale deve confessare. Quelli tradotti in sottofondo hanno un conto a parte.
-    frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0, extraAcked: 0, extraEnded: 0 });
+    frameRuns.set(runId, {
+      expected, acked: 0, ended: 0, applied: 0, left: 0, extraExpected: background.length, extraAcked: 0, extraEnded: 0,
+    });
     try {
       await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
     } catch (_) {}
@@ -638,7 +675,9 @@
     }
     const unfinished = Math.max(0, st.acked - st.ended);
     frameRuns.delete(runId);
-    return { left: silent + unfinished + st.left, applied: st.applied };
+    // `tutti`: ogni riquadro a cui si è passata parola ha risposto, quindi ognuno stava già traducendo il suo documento.
+    const tutti = !silent && st.extraAcked >= st.extraExpected;
+    return { left: silent + unfinished + st.left, applied: st.applied, tutti };
   }
 
   function onFrameReport(msg) {
@@ -647,6 +686,7 @@
     // Un riquadro fuori conto non copre il silenzio di uno contato: i suoi passi vanno nella colonna a parte.
     const fuori = !!msg.fuoriConto;
     if (msg.phase === 'ack') {
+      st.extraExpected += Number(msg.fuori) || 0;
       if (fuori) { st.extraAcked++; return; }
       st.acked++;
       st.expected += Number(msg.frames) || 0;
@@ -672,7 +712,8 @@
     tellFrames(runId, skipped, false);
     tellFrames(runId, shown, true, fuori);
     tellFrames(runId, background, true, true);
-    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length }, fuori);
+    // `fuori`: quanti dei suoi risponderanno fuori conto, perché chi aspetta sappia se hanno risposto tutti.
+    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length, fuori: (fuori ? shown.length : 0) + background.length }, fuori);
     // Nascosto, un riquadro non ha misura: il francobollo si riconosce solo da uno che si vede.
     if (!fuori && !worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
     translatePage({ quiet: true, runId, fuoriConto: fuori });
@@ -731,6 +772,11 @@
       nuovo = !!(body && HAS_LETTER.test(body.textContent || ''));
     }
     if (!nuovo) return;
+    if (caricoAtteso.riquadri.has(f)) {
+      caricoAtteso.riquadri.delete(f);
+      if (caricoAtteso.risposto === null) { caricoAtteso.arrivati++; return; }
+      if (caricoAtteso.risposto) return;
+    }
     if (pageTranslating) riquadroNelGiro = true;
     else newContentSeen = true;
   }
@@ -742,13 +788,39 @@
     revealWatchOn = true;
     // Il tasto di fuga chiude, non apre: è quello con cui si esce dal menu, e sporcare lì la risposta vorrebbe
     // dire rifare la camminata a ogni apertura, cioè proprio dove il risparmio serve.
-    const tocco = (e) => { if (!e || e.type !== 'keyup' || (e.key !== 'Escape' && e.key !== 'Esc')) revealedDirty = true; };
+    const tocco = (e) => {
+      if (e && e.type === 'keyup' && (e.key === 'Escape' || e.key === 'Esc')) return;
+      revealedDirty = true;
+      forseAperta();
+    };
     try {
       // Il tasto destro non entra: è lui ad aprire il menu, e segnarlo sporco a ogni apertura annullerebbe il
       // risparmio proprio dove serve.
       document.addEventListener('click', tocco, true);
       document.addEventListener('keyup', tocco, true);
     } catch (_) {}
+  }
+
+  // «Solo quando le apro» (D61): la sezione che l'utente apre si traduce da sola appena si vede, invece di aspettare
+  // un clic su Traduci (#1290.2). Si riguarda qualche volta perché il sito la apre spesso con un'animazione.
+  const APERTURA_MS = [250, 900, 1800];
+  let aperturaTimer = null;
+  // Un tocco a giro in corso si riguarda a giro finito: la sezione aperta mentre si traduce non resta in inglese.
+  let aperturaInSospeso = false;
+  function forseAperta() {
+    if (pageTranslating && isTopFrame()) { aperturaInSospeso = true; return; }
+    const vale = () => modoUltimo === Extract.NASCOSTE.RIMANDA && isTopFrame() && pageHasTranslation && pageComplete
+      && !pageTranslating && (hiddenSkipped.length > 0 || hiddenFrames.length > 0);
+    if (!vale()) return;
+    clearTimeout(aperturaTimer);
+    let i = 0;
+    const guarda = () => {
+      aperturaTimer = null;
+      if (!vale()) return;
+      if (scoperto()) { translatePage({ daSola: true }); return; }
+      if (++i < APERTURA_MS.length) aperturaTimer = setTimeout(guarda, APERTURA_MS[i] - APERTURA_MS[i - 1]);
+    };
+    aperturaTimer = setTimeout(guarda, APERTURA_MS[0]);
   }
 
   // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno per
@@ -1033,6 +1105,9 @@
     newContentSeen = false;
     hiddenSkipped = [];
     hiddenFrames = [];
+    caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
+    clearTimeout(aperturaTimer);
+    aperturaInSospeso = false;
     revealedDirty = true;
     revealedAnswer = false;
     // Il lavoro ancora in volo smette di essere quello buono: quando le
@@ -1106,9 +1181,14 @@
     // apre più spesso: si rifà solo se da allora la pagina è cambiata o l'utente l'ha toccata (#505).
     if (!revealedDirty) return revealedAnswer;
     revealedDirty = false;
-    revealedAnswer = !!(Extract && typeof Extract.hasRevealedText === 'function'
-      && Extract.hasRevealedText(hiddenSkipped)) || framesRevealed();
+    revealedAnswer = scoperto();
     return revealedAnswer;
+  }
+
+  // Una sezione rimandata adesso si vede: la domanda dell'icona e della traduzione da sola all'apertura è una.
+  function scoperto() {
+    return !!(Extract && typeof Extract.hasRevealedText === 'function' && Extract.hasRevealedText(hiddenSkipped))
+      || framesRevealed();
   }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.

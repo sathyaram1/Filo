@@ -37,16 +37,20 @@
 
   function osserva(win) {
     if (stato || !win || !win.document) return;
-    stato = { doc: win.document, arrivatoA: new WeakMap() };
+    stato = { doc: win.document, arrivatoA: new WeakMap(), caricati: new WeakSet() };
     win.addEventListener('load', (e) => arrivato(e.target), true);
+    // Il load di un elemento non sale alla finestra: chi vuole sapere se un riquadro ha finito lo ascolta sul documento.
+    try { win.document.addEventListener('load', (e) => { if (eRiquadro(e.target)) stato.caricati.add(e.target); }, true); } catch (_) {}
     // Rimesso nella pagina, un riquadro ricarica da capo: l'arrivo di prima non vale più.
     try {
       new win.MutationObserver((giri) => {
         for (const g of giri) {
           for (const n of g.addedNodes) {
             if (n.nodeType !== 1) continue;
-            if (eRiquadro(n)) stato.arrivatoA.delete(n);
-            else if (n.firstElementChild) for (const f of n.getElementsByTagName('iframe')) stato.arrivatoA.delete(f);
+            if (eRiquadro(n)) { stato.arrivatoA.delete(n); stato.caricati.delete(n); }
+            else if (n.firstElementChild) {
+              for (const f of n.getElementsByTagName('iframe')) { stato.arrivatoA.delete(f); stato.caricati.delete(f); }
+            }
           }
         }
       }).observe(win.document, { childList: true, subtree: true });
@@ -57,6 +61,41 @@
       const su = el && win.parent && win.parent.SN_RIQUADRI_IN_ARRIVO;
       if (su && su !== API && typeof su.arrivato === 'function') su.arrivato(el);
     } catch (_) {}
+    // Il load di un riquadro dentro un componente del sito non esce dal componente: lo dice il riquadro stesso, a
+    // caricamento finito, e chi lo ospita lo cerca nei componenti aperti (#1290.2).
+    try {
+      win.addEventListener('load', (e) => {
+        if (e.target !== win.document || win.parent === win) return;
+        try { win.parent.postMessage({ filoRiquadroCaricato: 1 }, '*'); } catch (_) {}
+      });
+      win.addEventListener('message', (e) => {
+        if (!e || !e.data || e.data.filoRiquadroCaricato !== 1 || !e.source) return;
+        const f = riquadroInOmbra(e.source);
+        if (f) stato.caricati.add(f);
+      });
+    } catch (_) {}
+  }
+
+  // Il riquadro di questo documento, dentro un componente aperto, la cui finestra è `w`. Uno della stessa origine si
+  // riconosce da `frameElement`; degli altri si chiede la finestra, che d'altra origine non toglie il preload (#1560).
+  function riquadroInOmbra(w) {
+    try {
+      const el = w.frameElement;
+      if (eRiquadro(el)) return el.ownerDocument === stato.doc && el.getRootNode() !== stato.doc ? el : null;
+    } catch (_) {}
+    const radici = [];
+    try { for (const el of stato.doc.querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot); } catch (_) { return null; }
+    while (radici.length) {
+      const r = radici.pop();
+      let tutti = [];
+      try { tutti = r.querySelectorAll('*'); } catch (_) { continue; }
+      for (const el of tutti) {
+        if (el.shadowRoot) radici.push(el.shadowRoot);
+        if (!eRiquadro(el) || indirizzo(el)) continue;
+        try { if (el.contentWindow === w) return el; } catch (_) {}
+      }
+    }
+    return null;
   }
 
   function inArrivo(f) {
@@ -76,6 +115,13 @@
       altro = w && w !== global ? w.SN_RIQUADRI_IN_ARRIVO : null;
     } catch (_) { altro = null; }
     return !!(altro && altro !== API && typeof altro.inArrivo === 'function' && altro.inArrivo(f));
+  }
+
+  // Il riquadro ha finito di caricarsi (immagini e script compresi) dall'ultima volta che è entrato nella pagina; dentro
+  // un componente lo sa da quando l'ha detto lui. null se da qui non si sa: un documento più sotto ha il suo Filo.
+  function caricato(f) {
+    if (!stato || !eRiquadro(f) || f.ownerDocument !== stato.doc) return null;
+    return stato.caricati.has(f);
   }
 
   // Anche più sotto: chi tocca alla cieca (uno script in ogni frame figlio) raggiunge pure i riquadri dei riquadri.
@@ -115,6 +161,6 @@
     return null;
   }
 
-  const API = { osserva, arrivato, inArrivo, qualcunoInArrivo, finestra, documento, riquadroDi };
+  const API = { osserva, arrivato, inArrivo, caricato, qualcunoInArrivo, finestra, documento, riquadroDi };
   global.SN_RIQUADRI_IN_ARRIVO = API;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

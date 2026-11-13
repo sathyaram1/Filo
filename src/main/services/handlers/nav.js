@@ -364,6 +364,7 @@ module.exports = function register(on, ctx) {
     runId: String(msg?.runId || ''),
     phase: String(msg?.phase || 'end'),
     frames: Number(msg?.frames) || 0,
+    fuori: Number(msg?.fuori) || 0,
     applied: Number(msg?.applied) || 0,
     left: Number(msg?.left) || 0,
     fuoriConto: msg?.fuoriConto ? 1 : 0,

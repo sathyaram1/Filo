@@ -174,14 +174,8 @@
   // «Traduci la pagina» vuol dire TUTTA la pagina: qualsiasi elemento con testo VISIBILE,
   // comunque il sito l'abbia scritto. Unità = elemento con un text node figlio DIRETTO.
 
-  // Sottoalberi mai traducibili: niente prosa, o testo che è codice o valore e tradurlo lo
-  // romperebbe. SELECT non c'è perché si scende fino alle OPTION; DATALIST sì.
-  const TRANSLATE_SKIP_TAGS = new Set([
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
-    'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
-    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'OPTION',
-    'DATALIST', 'HEAD', 'TITLE',
-  ]);
+  // Sottoalberi mai traducibili: l'elenco sta in constants.js, perché lo legge anche la sonda dei componenti chiusi.
+  const TRANSLATE_SKIP_TAGS = new Set(global.SN_CONST.TAG_SENZA_PROSA);
 
   const HAS_LETTER = /\p{L}/u;
 
@@ -200,27 +194,10 @@
   // La riga di confine è netta: si traduce ciò che l'utente LEGGE, mai ciò che
   // il sito RIMANDA INDIETRO. Perciò niente `value` (viene inviato col modulo),
   // niente `href`/`src`/`name`/`id`, niente voci di `datalist` (finiscono
-  // dentro al campo come testo digitato).
-  const TRANSLATABLE_ATTRS_ANY = ['title', 'aria-label'];
-  const TRANSLATABLE_ATTRS_BY_TAG = {
-    INPUT: ['placeholder', 'alt'],
-    TEXTAREA: ['placeholder'],
-    IMG: ['alt'],
-    AREA: ['alt'],
-    // Una voce a tendina si traduce scrivendo `label`, mai il testo: quello di una <option>
-    // senza `value` è proprio ciò che il modulo invia.
-    OPTION: ['label'],
-    OPTGROUP: ['label'],
-  };
-
-  // Sui bottoni dei moduli la scritta è `value`: si traduce solo se il bottone non rimanda
-  // niente (niente `name`, o non è di quelli che inviano). `type=image` usa `alt`.
-  function inputValueIsLabel(el) {
-    const type = String(el.getAttribute('type') || '').toLowerCase();
-    if (type === 'button' || type === 'reset') return true;
-    if (type !== 'submit') return false;
-    return !el.hasAttribute('name');
-  }
+  // dentro al campo come testo digitato). Gli elenchi stanno in constants.js: li legge anche la sonda dei componenti chiusi.
+  const TRANSLATABLE_ATTRS_ANY = global.SN_CONST.ETICHETTE_TRADOTTE.ovunque;
+  const TRANSLATABLE_ATTRS_BY_TAG = global.SN_CONST.ETICHETTE_TRADOTTE.perTag;
+  const inputValueIsLabel = global.SN_CONST.valoreEtichetta;
 
   // Valore di partenza di un attributo traducibile. Per l'etichetta di una
   // <option> che non ce l'ha, il testo che si legge è il suo contenuto.
@@ -247,7 +224,7 @@
       const raw = attrSourceValue(el, attr, tag);
       if (raw === null) continue;
       const text = raw.replace(/\s+/g, ' ').trim();
-      if (text.length < 2 || !HAS_LETTER.test(text)) continue;
+      if (!global.SN_CONST.testoDaTradurre(text)) continue;
       // `textContent` si paga solo quando un'etichetta c'è davvero: sulla
       // stragrande maggioranza degli elementi non si arriva fin qui.
       if (canMirror && visible === undefined) visible = visibleTextOf(el);
@@ -289,9 +266,7 @@
   }
 
   function hardSkipForTranslation(el) {
-    if (el.isContentEditable) return true;                  // testo dell'utente
-    if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
-    if (el.classList && el.classList.contains('notranslate')) return true;
+    if (global.SN_CONST.nonDaTradurre(el)) return true;
     if (isFiloOwnUi(el)) return true;
     const nascosto = isVisibilityHidden(el);
     return nascosto ? (nascosto === 'visibility' ? 'visibility' : 'hidden') : false;
@@ -796,9 +771,15 @@
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
   // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo. Trasparente sì,
   // dovunque stia: il conto dell'avviso non può cambiare con lo scorrimento (#503.2, #503.3).
+  // 'trasparente': nascosto solo da una trasparenza fuori dallo schermo, che per il testo vale visibile (#1290.2).
   function isHiddenFromUser(el) {
+    if (!nascostoAllUtente(el, true)) return false;
+    return nascostoAllUtente(el, false) ? true : 'trasparente';
+  }
+
+  function nascostoAllUtente(el, ovunque) {
     try {
-      if (isVisibilityHidden(el, true)) return true;
+      if (isVisibilityHidden(el, ovunque)) return true;
       if (el.ownerDocument === document) {
         const r = el.getBoundingClientRect();
         if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
@@ -808,7 +789,7 @@
       let cur = parentOrHost(el);
       for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
         // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
-        if (isVisibilityHidden(cur, true) === true) return true;
+        if (isVisibilityHidden(cur, ovunque) === true) return true;
         cur = parentOrHost(cur);
       }
       return false;
@@ -830,17 +811,10 @@
     return null;
   }
 
-  // Il <details> chiuso più esterno che contiene `el`, attraverso i componenti aperti; null se nessuno.
-  function fisarmonicaChiusaAttorno(el) {
-    let trovata = null;
-    for (let cur = parentOrHost(el), hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; cur = parentOrHost(cur), hops++) {
-      if (cur.tagName === 'DETAILS' && !cur.open) trovata = cur;
-    }
-    return trovata;
-  }
-
   // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
-  function isClosedComponent(el, fuoriConto) {
+  // `sezione`: la cima della sezione nascosta che il giro sta traducendo in sottofondo e che contiene `el`, o null.
+  // 'sezione': conta solo se la sezione ha anche testo che il giro traduce, e lo decide chi cammina.
+  function isClosedComponent(el, fuoriConto, sezione) {
     if (fuoriConto) return false;
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
@@ -855,11 +829,13 @@
       // Una decorazione non conta mai: la sonda nel mondo della pagina lo sa (#472).
       const dentro = ombraChiusa(el);
       if (dentro === 'vuoto') return false;
-      // Testo chiuso in una fisarmonica del browser: è la sezione che la pagina dichiara da aprire, e aprendola il
-      // testo sarebbe in inglese. Gli altri modi di nascondere li usano anche gli spazi pubblicitari (#503): lì no.
-      if (dentro === 'testo') {
-        const sezione = fisarmonicaChiusaAttorno(el);
-        if (sezione) return !isInvisibleToUser(sezione) && isReachableByUser(sezione, sezione.getBoundingClientRect());
+      // Testo chiuso in una sezione che il giro traduce: aprendola, il resto sarebbe in italiano e lui no, comunque il
+      // sito l'abbia chiusa (#1290.2). Una sezione senza altro testo è lo spazio pubblicitario nascosto di #503, che
+      // non conta; la fisarmonica del browser sì, perché la pagina la dichiara da aprire.
+      if (dentro === 'testo' && sezione) {
+        const attorno = parentOrHost(sezione);
+        if (!attorno || isInvisibleToUser(attorno) || !isReachableByUser(attorno, attorno.getBoundingClientRect())) return false;
+        return attorno.tagName === 'DETAILS' ? true : 'sezione';
       }
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
@@ -905,8 +881,8 @@
   const MAX_HIDDEN = 5000;
 
   // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
-  // `nascosti` segna i figli come parte di una sezione nascosta.
-  function pushKids(el, stack, shadowRoots, nascosti) {
+  // `nascosti` segna i figli come parte della sezione nascosta `sezione`.
+  function pushKids(el, stack, shadowRoots, nascosti, sezione) {
     const kids = [];
     const shadow = el.shadowRoot;
     if (shadow) {
@@ -915,7 +891,7 @@
     }
     for (const c of el.children) kids.push(c);
     for (let i = kids.length - 1; i >= 0; i--) {
-      if (nascosti) nascosti.add(kids[i]);
+      if (nascosti) nascosti.set(kids[i], sezione);
       stack.push(kids[i]);
     }
   }
@@ -928,7 +904,11 @@
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
     const tutto = nascoste === NASCOSTE.TRADUCI;
-    const dentroNascosto = new WeakSet();
+    // Elemento → la cima della sezione nascosta che lo contiene.
+    const dentroNascosto = new WeakMap();
+    // Le sezioni nascoste con testo da tradurre, e quelle con un componente chiuso che ne ha (isClosedComponent).
+    const sezioniConTesto = new WeakSet();
+    const chiusiInSezione = [];
     // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
     const visti = [];
     const vistiAttr = [];
@@ -976,12 +956,16 @@
     const stack = [root];
     while (stack.length) {
       const el = stack.pop();
-      let nascosto = dentroNascosto.has(el);
+      let sezione = dentroNascosto.get(el) || null;
+      let nascosto = !!sezione;
       // La radice non passa dal filtro: un <body> translate=no o nascosto spegnerebbe tutta la
       // pagina. Il filtro vale da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
       // Si traduce tutto: la sezione nascosta si legge come il resto, solo dopo.
-      if (tutto && (skip === 'hidden' || skip === 'visibility')) nascosto = true;
+      if (tutto && (skip === 'hidden' || skip === 'visibility')) {
+        if (!sezione) sezione = el;
+        nascosto = true;
+      }
       // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
       // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
       else if (skip === 'visibility') {
@@ -1002,7 +986,7 @@
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
             if (inner) {
-              if (nascosto) dentroNascosto.add(inner);
+              if (nascosto) dentroNascosto.set(inner, sezione);
               stack.push(inner);
               // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
               // pagina deve tenere d'occhio pure questo documento.
@@ -1022,19 +1006,24 @@
       if (!(el.dataset && el.dataset.snTranslated)) {
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
-        if (txt.length >= 2 && HAS_LETTER.test(txt)) {
+        if (global.SN_CONST.testoDaTradurre(txt)) {
           // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
           // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
           const proprioNascosto = isOwnTextHidden(el);
           if (proprioNascosto && !tutto) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
-          } else if (nascosto || proprioNascosto) nascostiTesto.push({ el, text: txt, nascosto: true });
-          else visti.push({ el, text: txt });
+          } else if (nascosto || proprioNascosto) {
+            nascostiTesto.push({ el, text: txt, nascosto: true });
+            if (sezione) sezioniConTesto.add(sezione);
+          } else visti.push({ el, text: txt });
         }
-      }
-      if (isClosedComponent(el, fuoriConto) && !el.shadowRoot) unreachable++;
-      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
+      } else if (sezione) sezioniConTesto.add(sezione);
+      const chiuso = isClosedComponent(el, fuoriConto, sezione);
+      if (chiuso === 'sezione') chiusiInSezione.push(sezione);
+      else if (chiuso && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null, sezione);
     }
+    for (const s of chiusiInSezione) if (sezioniConTesto.has(s)) unreachable++;
     let posto = maxBlocks;
     const prendi = (da, a) => {
       for (const x of da) {

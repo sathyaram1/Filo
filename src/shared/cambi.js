@@ -133,7 +133,9 @@
     'feedbackRilettura.enabled': { nome: 'rilettura del feedback prima dell\'invio', valore: ATTIVA, livello: 1 },
     'traduzionePagina.nascoste': {
       nome: 'traduzione delle sezioni chiuse di una pagina',
-      valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },
+      // I due valori li dice constants.js: qui si chiede solo quale dei due è (#1290.2).
+      valore: (v) => (global.SN_CONST.modoNascoste(v) === global.SN_CONST.NASCOSTE_TRADUZIONE.RIMANDA
+        ? 'solo quando le apri' : 'subito, insieme al resto'),
       livello: 1,
     },
     'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },

@@ -31,7 +31,9 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   riquadro in arrivo non perde niente: non ha ancora un documento che ascolti, e
   chi lo seguiva lo riprende quando arriva. Restano come prima i riquadri in una
   radice ombra e quelli dentro un documento che la pagina si è scritta da sé, di
-  cui da qui l'arrivo non si vede. Vale anche per il main (#1429): codice
+  cui da qui l'arrivo non si vede. Il caricamento finito (`caricato`, immagini e
+  script compresi) di un riquadro in un componente aperto lo dice lui stesso a
+  chi lo ospita, con un messaggio al suo load (#1290.2). Vale anche per il main (#1429): codice
   eseguito in un riquadro prima del suo primo commit fa lo stesso danno, e chi
   esegue nei riquadri chiede `riquadroArrivato(f)`
   (`src/main/services/riquadroArrivato.js`: prima del commit `url` è vuoto).
