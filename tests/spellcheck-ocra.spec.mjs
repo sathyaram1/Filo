@@ -484,9 +484,19 @@ for (const [nome, campo] of [
   });
 }
 
-// #1115.2: l'anno lo dice la pagina intorno. Il 9 ottobre 2024 era mercoledì; vicino a oggi il 9 ottobre non lo è.
+// #1115.2, risposta dell'owner a D-152: con un altro anno scritto nella pagina la data la giudica il controllo ragionato,
+// che riceve il calendario di ogni anno possibile. Il 9 ottobre 2024 era mercoledì; vicino a oggi il 9 ottobre non lo è.
 // «perchè» si segna subito come errore: quando c'è, il controllo delle date è già passato sullo stesso testo.
 const errore = (page) => page.locator('.sn-spell-overlay .sn-errore');
+const NOMI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+// Il 9 ottobre più vicino a oggi, come lo legge il codice.
+function noveOttobreVicino() {
+  const oggi = new Date();
+  const y = oggi.getFullYear();
+  const d = [y - 1, y, y + 1].map((a) => new Date(a, 9, 9)).sort((p, q) => Math.abs(p - oggi) - Math.abs(q - oggi))[0];
+  return { anno: d.getFullYear(), giorno: NOMI[d.getDay()] };
+}
+const giudicato = (testo, correzione, spiegazione) => JSON.stringify({ issues: [{ tipo: 'suggerimento', testo, correzione, spiegazione }] });
 const PAGINA_ANNO = ({ fuori = '', dentro = '', titolo = 'Chat' }) => `<!doctype html><meta charset="utf-8"><title>${titolo}</title>
 <body style="margin:0;padding:20px;font:16px sans-serif">
 ${fuori}
