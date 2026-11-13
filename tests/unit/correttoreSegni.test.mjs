@@ -24,7 +24,8 @@ const E = globalThis.SN_ESTERNO;
 const TT = globalThis.SN_THEME_TOKENS;
 
 const OGGI = new Date(2026, 9, 14); // mercoledì 14 ottobre 2026
-const date = (testo, oggi = OGGI) => C.dateDi(testo, oggi).map((s) => ({ pezzo: s.segment, perche: s.spiegazione, correzioni: s.correzioni }));
+const date = (testo, oggi = OGGI) => C.dateDi(testo, oggi).filter((s) => !s.daGiudicare)
+  .map((s) => ({ pezzo: s.segment, perche: s.spiegazione, correzioni: s.correzioni }));
 
 // ── date e giorni ────────────────────────────────────────────────────────────
 
