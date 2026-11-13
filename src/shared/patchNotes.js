@@ -29,17 +29,23 @@
         { testo: 'Puoi chiedere a Filo di cancellare tutta la sua memoria in un colpo: ti fa scrivere «conferma» e la svuota.', segnalazione: 1312 },
       ],
       fixes: [
+        { testo: 'Togliere una protezione di Filo dalla chat, come alzare il tetto di spesa o il livello o sbloccare un sito, chiede sempre di scrivere «conferma». Una pagina letta non può chiederlo al posto tuo: dopo che Filo ha letto cose scritte da altri, lo fai tu a mano.', segnalazione: 1312 },
+        { testo: 'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.', segnalazione: 1312 },
+        { testo: 'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.', segnalazione: 1312 },
+        { testo: 'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.', segnalazione: 1312 },
+        { testo: 'Un testo o un\'immagine incollati in chat o nell\'Aiuto, un suggerimento della home, la domanda partita dall\'avviso di un sito pericoloso, le pagine di Filo che mostrano nomi scelti dai siti (come Scaricamenti), i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
+      ],
+    },
+    {
+      version: '0.2.278', date: '2026-11-13',
+      features: [],
+      fixes: [
         { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
         { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
         { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
         'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
         { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
         { testo: 'I segni del correttore li vedi solo tu: un sito non li legge più, e non può scoprire quali parole hai nel tuo dizionario personale.', segnalazione: 2299 },
-        { testo: 'Togliere una protezione di Filo dalla chat, come alzare il tetto di spesa o il livello o sbloccare un sito, chiede sempre di scrivere «conferma». Una pagina letta non può chiederlo al posto tuo: dopo che Filo ha letto cose scritte da altri, lo fai tu a mano.', segnalazione: 1312 },
-        { testo: 'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.', segnalazione: 1312 },
-        { testo: 'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.', segnalazione: 1312 },
-        { testo: 'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.', segnalazione: 1312 },
-        { testo: 'Un testo o un\'immagine incollati in chat o nell\'Aiuto, un suggerimento della home, la domanda partita dall\'avviso di un sito pericoloso, le pagine di Filo che mostrano nomi scelti dai siti (come Scaricamenti), i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
       ],
     },
     {
