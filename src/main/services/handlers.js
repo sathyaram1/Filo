@@ -5942,7 +5942,7 @@ function esitoChiusuraPerModello(action, o) {
     return `Nessuna scheda chiusa: ${perche}.${coda}`;
   }
   const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
-    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con SCHEDE_CHIUSE e riaprila con RIAPRI_SCHEDA.';
+    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con scheda(chiuse) e riaprila con scheda(riapri).';
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
