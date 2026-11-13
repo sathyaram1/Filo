@@ -1442,6 +1442,7 @@ module.exports = function register(on, ctx) {
       }
       return { ok: true, published: plan.upsert.length, removed: plan.remove.length };
     } catch (e) {
+      schedeInMano.dimentica();
       console.warn('[feedback] sincronizzazione della vista pubblica non riuscita:', e?.message || e);
       return { ok: false, error: e?.message || String(e) };
     } finally {
