@@ -1756,6 +1756,19 @@
     return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
+  // Il documento in mano alla pagina è stato scritto prima di `atMs`? L'ora firmata da chi scrive (`updatedAt`), se no
+  // quella di Firestore (`_updateTime`); senza nessuna delle due non si sa, e vale no.
+  function documentoDiPrima(fb, atMs) {
+    const at = Number(atMs);
+    if (!isFinite(at) || at <= 0) return false;
+    const valore = (v) => {
+      const ms = typeof v === 'number' ? v : Date.parse(String(v || ''));
+      return isFinite(ms) && ms > 0 ? ms : 0;
+    };
+    const doc = valore(fb && fb.updatedAt) || valore(fb && fb._updateTime);
+    return doc > 0 && doc < at;
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
@@ -1778,11 +1791,13 @@
     const ferme = pending.concat(failed);
     if (!ferme.length && fermaDaStato) {
       // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
-      // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
+      // adesso. Un lavoro server dopo il sì passa in revisione: è ancora fusa finché il documento che la pagina conosce
+      // è di prima della fusione (#2250); cambiato dopo e ancora qui, l'ha fermata il cancello del server.
       const ultima = lista('recent').slice().sort((a, b) => (Number(b.createdAtMs) || 0) - (Number(a.createdAtMs) || 0))[0];
       const ramo = String(fb.branch || '');
-      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
-        && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
+      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged'
+        && (!ramo || !ultima.branch || String(ultima.branch) === ramo)
+        && (!isLocalOnly(fb) || documentoDiPrima(fb, ultima.decidedAtMs));
       if (fusa) {
         return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
           titolo,

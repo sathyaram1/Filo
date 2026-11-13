@@ -1687,6 +1687,31 @@ test('approvata e fusa, stato non ancora aggiornato: non aspetta l’owner (#104
   assert.ok(MR.ownerActions(fb, opts).some((a) => a.to === 'archived'));
 });
 
+// #2250: un lavoro server appena fuso non torna rosso nel minuto in cui il documento nuovo non è ancora arrivato.
+test('lavoro server fuso: «fusa» finché il documento è di prima della fusione, «senza» se è cambiato dopo', () => {
+  const FUSA_ALLE = Date.parse('2026-11-07T10:48:58Z');
+  const server = (extra) => ({
+    _id: 'f1249', seq: 1249, status: 'design', statusReason: 'l5', branch: 'claude/x',
+    localOnly: { by: 'owner@x', at: 1790000000000 }, ...extra,
+  });
+  const opts = { fusioniLette: true, fusioni: { recent: [
+    { id: 'r0', feedbackId: 'f1249', used: true, outcome: 'merged', branch: 'claude/x', createdAtMs: FUSA_ALLE - 3600e3, decidedAtMs: FUSA_ALLE - 3000e3 },
+    { id: 'r1', feedbackId: 'f1249', used: true, outcome: 'merged', branch: 'claude/x', createdAtMs: FUSA_ALLE - 600e3, decidedAtMs: FUSA_ALLE },
+  ] } };
+  const prima = server({ updatedAt: '2026-11-07T10:44:00Z' });
+  assert.equal(MR.statoFusione(prima, opts), 'fusa');
+  assert.equal(MR.fusioneInAttesa(prima, opts), false);
+  assert.notEqual(MR.livelloL5(prima, opts).colore, MR.REASONS.attack.color);
+  // Scritto dopo la fusione e ancora in l5: l'ha fermata il cancello del server.
+  assert.equal(MR.statoFusione(server({ updatedAt: '2026-11-07T10:49:14Z' }), opts), 'senza');
+  // Senza `updatedAt` vale l'ora di Firestore; senza nessuna delle due non si sa, e resta ferma.
+  assert.equal(MR.statoFusione(server({ _updateTime: '2026-11-07T10:44:00.123456Z' }), opts), 'fusa');
+  assert.equal(MR.statoFusione(server({ _updateTime: '2026-11-07T10:50:00Z' }), opts), 'senza');
+  assert.equal(MR.statoFusione(server({}), opts), 'senza');
+  // Una fusa di un altro ramo non conta.
+  assert.equal(MR.statoFusione(server({ updatedAt: '2026-11-07T10:44:00Z', branch: 'claude/y' }), opts), 'senza');
+});
+
 // #1327 punto 4 (#928): finché c'è una fusione da decidere, o il ramo approvato non è in main, la riga non chiude.
 test('ownerActions: niente Risolto né chiusure mentre una fusione aspetta (#928)', () => {
   const chiusure = (acts) => acts.filter((a) => ['done', 'archived', 'attack_confirmed', 'spam_confirmed'].includes(a.to));
