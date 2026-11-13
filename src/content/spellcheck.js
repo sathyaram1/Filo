@@ -3396,7 +3396,7 @@
   }
 
   // Il titolo scritto in un campo sopra il corpo (la casella del titolo di una nota, «Diario 2024»): l'ultimo campo prima
-  // di questo, salendo di pochi livelli. Resta qui: serve solo all'anno delle date, non va al modello.
+  // di questo, salendo di pochi livelli. Serve solo all'anno delle date: al modello va la sola riga con l'anno.
   const TIPI_TITOLO = new Set(['text', 'search', '']);
   function campoTitoloSopra(el) {
     let a = el.parentElement;
