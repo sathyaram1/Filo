@@ -985,6 +985,8 @@
     'contatori-anonimi': 'impostazioni(imposta)', 'filo-shortcuts': 'impostazioni(imposta)', theme: 'impostazioni(imposta)',
     'aspetto-su-misura': 'impostazioni(aspetto)', onboarding: 'impostazioni(pulsante)', credits: 'impostazioni(crediti)',
     'credits-warning': 'impostazioni(imposta)', invites: 'scheda(apri)',
+    // Dietro un cancello: valgono quando il cancello si apre.
+    'deck-builder': 'scheda(apri)', 'red-team': 'scheda(apri)', board: 'scheda(apri)',
   });
 
   global.SN_CAPABILITIES = {
