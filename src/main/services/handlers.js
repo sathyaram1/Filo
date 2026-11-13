@@ -5776,7 +5776,7 @@ function salvateTrovateForPrompt(actions) {
       ? ` Nessuna conteneva tutte le parole: queste arrivano cercando "${E.perCanaleSistema(o.cercatoCon.join(' '))}", controlla che siano quelle giuste.` : '';
     blocks.push(`[Le pagine di «Aperti per dopo» ${quali} (${o.trovate} su ${o.totale}).${oltre}${largo} `
       + 'Nella risposta nomina quelle giuste col titolo così com\'è: sotto la risposta diventano bottoni che le aprono. '
-      + 'Per aprirne una adesso usa APRI_SALVATA con l\'id.]\n'
+      + 'Per aprirne una adesso usa scheda(apri_salvata) con l\'id.]\n'
       + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
   }
   return blocks.join('\n\n').trim();
