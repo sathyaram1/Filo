@@ -80,9 +80,8 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   // Un sotto-agente di un worker resta intatto; se gira in sottofondo il worker riceve come aspettarlo (#2304).
   if (input.agent_id) {
     if (input.hook_event_name !== "PostToolUse" || tornato(input.tool_response)) return null;
-    // Qui `strumenti` è la copia di chi guida il giro: al worker il percorso giusto lo dà il ruolo (#2236).
-    const attesa = strumenti ? " Comando: routine-channel.mjs aspetta <il tuo biglietto>, dalla copia degli strumenti che nominano le tue istruzioni." : "";
-    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO + attesa } };
+    // Nessun percorso qui: `strumenti` è la copia di chi guida il giro, quella del worker la nomina il suo ruolo (#2236).
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: FIGLIO_IN_SOTTOFONDO } };
   }
   if (input.hook_event_name === "PreToolUse") {
     if (ti.run_in_background === true) return nega(MOTIVO_SOTTOFONDO);
