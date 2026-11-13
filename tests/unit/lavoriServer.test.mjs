@@ -62,6 +62,17 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
   assert.ok(t.includes(conta), `il conto delle prove col clone vero: ${conta}`);
 });
 
+test('#2190: le prove del giro sul server hanno un nome che il cancello riconosce, ed escono dal ramo del server anche dopo un pass', () => {
+  const t = testoLavoroServer({ clone: '/home/user/filo-security' });
+  assert.match(t, /functions\/test\/verifica-<numero>-giro<k>-r<n>-<cosa>\.test\.js/, 'il nome porta giro e rilievi, come nell\'app');
+  const pulizia = t.slice(t.indexOf('si tolgono come quelle dell\'app'));
+  assert.match(pulizia, /anche dopo un pass/, 'dopo il verdetto superato si toglie anche dal ramo del server');
+  assert.match(pulizia, /commit\s+che toglie solo quelle[^]*ramo-server/, 'commit di sola rimozione, poi spinta e registro');
+  assert.match(pulizia, /prima di registrare la critica/, 'quelle che escono in ogni esito stanno fuori dalla punta verificata');
+  // Il cancello confronta la punta del server col verdetto (#1222): la pulizia non lo fa decadere, un'aggiunta sì.
+  assert.match(t, /toglie soltanto prove del giro, file interi o casi, e niente aggiunge o cambia/);
+});
+
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
   const server = testoLavoroServer({ clone: '/home/user/filo-security' });
   // Chi verifica consegna uno stato solo per attacco o spam (#1358): ogni altro gli sarebbe rifiutato.
