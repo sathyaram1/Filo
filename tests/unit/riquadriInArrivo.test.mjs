@@ -179,6 +179,24 @@ test('#1290.2 — un riquadro, finito di caricarsi, lo dice a chi lo ospita', ()
   assert.equal(JSON.stringify(inviati), JSON.stringify([{ filoRiquadroCaricato: 1 }]));
 });
 
+test('#2459 — ospitato da una pagina d\'estensione (il visore PDF) non scrive al padre: Chromium ucciderebbe la scheda', () => {
+  const inviatiDa = (ancestorOrigins) => {
+    const R = carica();
+    const inviati = [];
+    const ascolti = [];
+    const doc = { URL: 'http://127.0.0.1/manuale.pdf', baseURI: 'http://127.0.0.1/manuale.pdf', addEventListener() {} };
+    R.osserva({
+      document: doc, location: { ancestorOrigins }, parent: { postMessage: (m) => inviati.push(m) },
+      addEventListener(tipo, fn, cattura) { ascolti.push({ tipo, fn, cattura }); },
+      MutationObserver: class { observe() {} },
+    });
+    for (const a of ascolti) if (a.tipo === 'load' && !a.cattura) a.fn({ target: doc });
+    return inviati.length;
+  };
+  assert.equal(inviatiDa(['chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai', 'http://127.0.0.1']), 0);
+  assert.equal(inviatiDa(['https://sito.example']), 1);
+});
+
 test('in una radice ombra il load non si vede: si fa come prima, e lo dice', () => {
   const R = carica();
   const win = finestraFinta();

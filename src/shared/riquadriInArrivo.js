@@ -8,6 +8,11 @@
   if (global.SN_RIQUADRI_IN_ARRIVO) return;
 
   const eRiquadro = (n) => !!n && (n.localName === 'iframe' || n.localName === 'frame');
+  // Ospitato da una pagina d'estensione, non da un sito: nessuno ascolta, e dal riquadro interno del visore PDF un
+  // postMessage al padre è vietato, Chromium uccide il processo della scheda (#2459).
+  const ospiteEstensione = (win) => {
+    try { return /^chrome-extension:/i.test(String(win.location.ancestorOrigins[0] || '')); } catch (_) { return false; }
+  };
 
   function origineDi(doc) {
     try { const o = new URL(doc.URL).origin; if (o !== 'null') return o; } catch (_) {}
@@ -65,7 +70,7 @@
     // caricamento finito, e chi lo ospita lo cerca nei componenti aperti (#1290.2).
     try {
       win.addEventListener('load', (e) => {
-        if (e.target !== win.document || win.parent === win) return;
+        if (e.target !== win.document || win.parent === win || ospiteEstensione(win)) return;
         try { win.parent.postMessage({ filoRiquadroCaricato: 1 }, '*'); } catch (_) {}
       });
       win.addEventListener('message', (e) => {
