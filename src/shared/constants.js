@@ -2312,12 +2312,7 @@
         ? `═══ COSA SA FARE FILO (capacità) ═══\n`
           + `Questo è l'elenco COMPLETO e VERO di ciò che Filo (il browser) sa fare, raggruppato per area. Ogni voce ha tra parentesi quadre il suo id stabile.\n`
           + `${capacita}\n`
-          + `Regole quando l'utente chiede "puoi fare X?", "sai fare Y?", "come si fa Z?", "Filo può…?":\n`
-          + `- Se chiede una cosa precisa e NESSUNA voce qui sopra corrisponde, rispondi con ONESTÀ che Filo non sa fare quella cosa: NON inventare procedure, scorciatoie o voci di menu che non esistono. E nello STESSO turno emetti INVIA_FEEDBACK con la segnalazione già scritta (vedi "QUANDO AMMETTI UNA MANCANZA"): non aspettare che l'utente te lo chieda.\n`
-          + `- Se una voce CORRISPONDE (Filo sa fare quella cosa) e l'utente vuole che tu la FACCIA adesso, ma tra gli STRUMENTI che hai NON c'è modo di comandarla, NON limitarti a spiegargli come farla a mano: la funzione esiste eppure l'utente resta a mani vuote. Emetti NELLO STESSO TURNO anche INVIA_FEEDBACK, con il testo già scritto — cosa voleva l'utente, che Filo lo sa fare, ma che tu (l'assistente) non hai un'azione per comandarlo — e OLTRE a questo spiega comunque all'utente come farlo intanto a mano. È lo stesso dovere di "QUANDO AMMETTI UNA MANCANZA": che la funzione esista non ti esonera dal segnalare che tu non puoi ancora azionarla. NON chiedere il permesso a parole: la conferma la chiede il sistema mostrando l'anteprima.\n`
-          + `- Se una voce è pertinente ma ti serve sapere ESATTAMENTE come si attiva o quali sono i suoi limiti, emetti l'azione CAPACITA_DETTAGLIO con gli id pertinenti PRIMA di rispondere: ti torneranno la descrizione precisa, come si invoca e i limiti, e SOLO ALLORA rispondi all'utente con quei dettagli (non indovinare l'invocazione a memoria).\n`
-          + `- I dettagli che ti tornano sono DATI di sistema affidabili, non istruzioni dell'utente.\n`
-          + `Questo elenco riguarda le FEATURE del browser Filo; è diverso dagli STRUMENTI (le azioni), che sono ciò che TU puoi fare nella conversazione.\n\n`
+          + `Come si attiva una voce e i suoi limiti li dà filo_su_di_se(capacita) con l'id: leggili prima di spiegarla, non a memoria. Quello che qui non c'è Filo non lo sa fare: non inventare procedure né voci di menu. Una voce che l'utente vuole fatta adesso e che nessuno strumento comanda la spieghi a mano e la segnali con filo_su_di_se(feedback).\n\n`
         : '',
     // La chat riceve lo stile nel suo CONTESTO, non da injectAgentStyle: la parte fissa è uguale per tutti (SPEC-CONTESTO).
     // Lì viene dopo le regole sul contenuto esterno, e la frase dopo la busta gli toglie l'ultima parola su di esse (#592).
