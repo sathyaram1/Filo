@@ -496,7 +496,7 @@
       if (!state.cambi.righe.length) righe.push('(nessuno)');
       else righe.push(salvati(state.cambi.righe));
       if (state.cambi.tolti > 0) righe.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
-      aggiungi('CAMBI RECENTI', righe);
+      aggiungi('CAMBI RECENTI', righe, null, daFuori(pulite(state.cambi.righe), 'dai cambi recenti'));
     }
     if (state.conversazioni && !perChat) aggiungi('CONVERSAZIONI RECENTI', [testoConversazioni(state.conversazioni, salvati)]);
     // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
