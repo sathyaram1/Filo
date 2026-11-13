@@ -122,6 +122,13 @@ test('punti 2 e 3: il riallineamento di un lavoro server dice quale ramo col reb
   assert.match(t, /commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server`/);
 });
 
+test('punto 3: a chi verifica un riallineamento col commit verificato uguale alla punta si dice quale diff leggere', async () => {
+  const { perimetroNote } = await import('../../scripts/lib/verifier-scope.mjs');
+  const testo = perimetroNote('riallineamento', { shaVerificato: 'a'.repeat(40), reportRebase: 'conflitto in b.js' }, undefined, { scartato: 'punta' });
+  assert.match(testo, /Il confronto manca: dichiaralo nella critica/);
+  assert.match(testo, /Al suo posto leggi il lavoro intero sopra main, `git diff origin\/main\.\.\.HEAD`, a cominciare dai file che il report/);
+});
+
 test('punto 4: chi riallinea parte col main scaricato alla presa in carico, non con la copia vecchia della cartella', () => {
   assert.notEqual(git(work, ['rev-parse', 'origin/main']), MAIN_NUOVO, 'la scena parte con la copia vecchia');
   const bucket = { role: 'fixer', id: 'x', num: '#9', branch: 'worker/x' };
