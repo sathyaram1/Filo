@@ -574,6 +574,8 @@ test('su una pagina delicata gli anni della pagina non partono col controllo del
   const page = await apri(app, openTab, testServer, '{"issues":[]}', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' }));
   await page.locator('#ta').click();
   await batti(page, 'certo, martedì 9 ottobre, pioveva.');
+  await page.waitForTimeout(4500);
+  expect(await chiamate(app), 'mentre si scrive non parte niente').toBe(0);
   await page.locator('#ta').click({ button: 'right' });
   await menuDi(page).voce('Controlla').click();
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
