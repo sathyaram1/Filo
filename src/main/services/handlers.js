@@ -6140,7 +6140,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if ((type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') && res.output && !res.needsConfirm) {
     const o = res.output;
     if (o.giaInVista) return 'Quella conversazione non è nascosta: è già nel filo. Niente da rimettere.';
-    if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai CERCA_CHAT e usa un id preso da lì, mai inventato.';
+    if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai filo(cerca) e usa un id preso da lì, mai inventato.';
     const titolo = nomiSalvati([action._titolo || 'senza titolo']);
     if (o.cancellata) return `Cancellata per sempre: non c'è più nel filo né sul computer.\n${titolo}`;
     if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (RIMETTI_CHAT).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
