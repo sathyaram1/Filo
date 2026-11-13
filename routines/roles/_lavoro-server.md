@@ -44,9 +44,16 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
 - Verifica o correzione: `node "<CANALE>" git-server fetch "<CLONE>" <ramo>` e
   `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`. Se sul server il ramo non c'è (git: «couldn't find remote
   ref»), il lavoro sta tutto nell'app.
-- Riallineamento del server (lo dice la critica): `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
+- Riallineamento, se sei chi rifà la base: le parti sono due, e ognuna ha la sua regola. Il ramo di Filo si
+  riallinea col rebase del tuo ruolo, anche quando la critica parla solo del server: la consegna lo vuole sopra main.
+  Il ramo del server, quando la critica lo nomina, si allinea con un merge, e il divieto di `git merge` del ruolo vale
+  per il ramo di Filo, non per questo: `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
   `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
   e spinta come sotto.
+- Suite di GitHub del server rossa senza niente da cambiare nel server (provava il ramo di Filo com'era prima del
+  rebase, o il rosso non si ripete nelle prove del server qui): la suite riparte solo con una spinta nuova, quindi
+  `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server` come sotto. Un
+  rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel report, e lo giudica chi verifica.
 
 ### Prove, spinta, registro
 
