@@ -238,7 +238,7 @@
     },
     CANCELLA_SVEGLIA: {
       via: ['promemoria', 'cancella'],
-      description: 'toglie sveglie o timer: etichetta (una parola o l\'orario), tutte, tipo sveglia o timer.',
+      description: 'toglie sveglie o timer (etichetta: una parola o l\'orario).',
       properties: { etichetta: S(), tutte: B(), tipo: S({ enum: ['sveglia', 'timer'] }) }, required: [],
     },
     EVENTO_CALENDARIO: {
