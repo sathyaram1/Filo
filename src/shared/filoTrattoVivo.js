@@ -141,13 +141,19 @@
       }
       cambiate.push({ sezione: s });
     }
+    // Una sezione tolta resta nel testo della fotografia: il suo testo di altri resta contato (#2305).
+    const tolte = [prima.has(TOLTE) ? prima.get(TOLTE).daFuori : null];
     for (const [k, v] of prima) {
-      if (nuove.has(k)) continue;
+      if (k === TOLTE || nuove.has(k)) continue;
+      tolte.push(v.daFuori);
       if (v.rifai || Array.isArray(v.righe)) rifai = true;
       else cambiate.push({ tolta: k });
     }
+    const resto = conDaFuori(...tolte);
+    if (resto.daFuori) nuove.set(TOLTE, resto);
     return { cambiate, rifai, viste: nuove };
   }
+  const TOLTE = '\u0000tolte';
 
   // Una sezione che non c'è più si dice com'è adesso, non «tolta».
   const SEZIONI_VUOTE = {
