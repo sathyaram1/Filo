@@ -3,7 +3,7 @@
 // lavora sulla pagina sotto chiedendo al suo frame principale. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { paginaDelloStrato } from './helpers/riquadri.mjs';
+import { paginaDelloStrato, riquadriNelSito } from './helpers/riquadri.mjs';
 import * as Gesti from './helpers/gestiVeri.mjs';
 
 const DOMANDA = 'zibaldone-segreto-15093 del mio conto';
