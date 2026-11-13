@@ -5493,7 +5493,7 @@ function consiglioPaginaNonLetta(out) {
     case 'http':
       if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
       if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
-        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con NAVIGA con background: true e poi rileggilo con LEGGI_PAGINA, che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
+        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con scheda(apri) con background: true e poi rileggilo con web(leggi), che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
       }
       return 'Prova un\'altra fonte, o riprova una volta. Non inventare il contenuto.';
     case 'tempo':
