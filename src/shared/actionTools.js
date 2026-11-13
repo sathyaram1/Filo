@@ -152,7 +152,7 @@
     },
     RIMUOVI_PROXY_TUTTE: {
       via: ['scheda', 'paese_via_tutte'],
-      description: 'riporta tutte le schede alla connessione diretta.',
+      description: 'connessione diretta per tutte.',
       properties: {}, required: [],
     },
     REGOLA_PROXY_DOMINIO: {
