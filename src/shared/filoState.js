@@ -353,7 +353,8 @@
     }
     if (state.sistema !== undefined) {
       // Torna alla chat a ogni cambio, batteria compresa: la sezione dice di rispondere da qui a «quanta batteria ho?».
-      aggiungi('SISTEMA', righeSistema(state.sistema));
+      const { righe, nomi } = righeSistema(state.sistema);
+      aggiungi('SISTEMA', righe, null, daFuori(nomi, 'dai nomi di reti e dispositivi'));
     }
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
     // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
