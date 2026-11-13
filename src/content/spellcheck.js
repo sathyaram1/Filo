@@ -2579,7 +2579,8 @@
           pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}),
           ...(cerca.prima ? { giaLette: { domanda: cerca.prima.domanda, dove: cerca.prima.dove } } : {}),
         },
-      }, { giorno: new Date().toDateString() });
+        // Il clic è un gesto: anche fuori, perché livello di privacy e tetto delle automatiche guardano lì (#2466).
+      }, { giorno: new Date().toDateString(), suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, segnaposto:', err);
     }
