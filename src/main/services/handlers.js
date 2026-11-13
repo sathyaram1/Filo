@@ -6135,7 +6135,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (res.output.rifiuto) return `Non corretta: ${res.output.error}`;
     return res.output.trovate > 1
       ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
-      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
+      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa memoria(impara).';
   }
   if ((type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') && res.output && !res.needsConfirm) {
     const o = res.output;
