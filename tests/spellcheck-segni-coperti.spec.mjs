@@ -42,9 +42,9 @@ async function apri(app, openTab, testServer, html) {
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await page.locator('#f').click();
   // Due segni senza modello: «perchè» è un errore sicuro, e il 9 ottobre 2024 era mercoledì.
-  await page.keyboard.type('perchè martedì 9 ottobre 2024');
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['perchè'], { timeout: 5000 });
-  await expect(page.locator('.sn-spell-overlay .sn-suggerimento')).toHaveText(['martedì 9 ottobre 2024'], { timeout: 5000 });
+  await batti(page, 'perchè martedì 9 ottobre 2024');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['perchè'], { timeout: 5000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-suggerimento')).toHaveText(['martedì 9 ottobre 2024'], { timeout: 5000 });
   return page;
 }
 
