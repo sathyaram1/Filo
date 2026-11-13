@@ -256,7 +256,8 @@
     return tabella.get(k);
   }
 
-  // Una data scritta con il suo giorno della settimana: torna il segno se non tornano, altrimenti null.
+  // Una data scritta con il suo giorno della settimana: torna il segno se non tornano, altrimenti null. Senza anno e con
+  // un altro anno scritto intorno torna la data `daGiudicare`, senza segno, col calendario per il controllo ragionato.
   // `parti`: { inizio, testo, intero (il testo del campo), detti (anniDetti), giorno: [testo, posizione], numero: [testo, posizione, suffisso], mese, anno, oggi, motore }
   function verifica(parti) {
     const { motore, testo, inizio, oggi } = parti;
