@@ -25,6 +25,10 @@
     }
     return [...perFonte].filter(([, s]) => s.size).map(([fonte, s]) => ({ testi: [...s], fonte }));
   }
+  const conDaFuori = (...liste) => {
+    const daFuori = unisciDaFuori(...liste.map((l) => (Array.isArray(l) ? l : [])));
+    return daFuori.length ? { daFuori } : {};
+  };
 
   // ── Il CONTESTO dell'utente (blocco 3) ─────────────────────────────────────
   // Una sezione: `chiave`, `testo`, `confronto` (cosa deve cambiare perché la chat la riceva di nuovo), `righe` (la
