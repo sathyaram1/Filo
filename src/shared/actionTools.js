@@ -93,7 +93,7 @@
     },
     CHIUDI_SCHEDE: {
       via: ['scheda', 'chiudi'],
-      description: 'chiude schede (numeri), tutte quelle di un sito, o tutte; tranne: i numeri da lasciare. Con tutte o sito la scheda di questa chat resta aperta.',
+      description: 'chiude schede per numero, per sito o tutte, tranne quelle in tranne; tutte e sito lasciano aperta questa chat.',
       properties: { schede: LISTA(I()), sito: S(), tutte: B(), tranne: LISTA(I()) }, required: [],
     },
     PULISCI_TAB: {
