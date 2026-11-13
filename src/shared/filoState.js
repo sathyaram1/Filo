@@ -296,24 +296,27 @@
   }
 
   // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta.
+  // `nomi`: quelli in busta, come li legge il modello.
   function righeSistema(sistema) {
     const out = ['SISTEMA (letto dal computer adesso, senza modello: «quanta batteria ho?», «sono online?», «il Bluetooth è acceso?» si rispondono da qui)'];
     const Sis = global.SN_SISTEMA;
     if (!sistema || !Sis) {
       out.push('(il computer non ha risposto: batteria, rete e Bluetooth adesso non li sai, non tirare a indovinare)');
-      return out;
+      return { righe: out, nomi: [] };
     }
     const { righe, nomi } = Sis.righePrompt(sistema);
     out.push(...righe);
-    if (nomi.length) {
-      const E = esterno();
-      out.push(E.imbusta({
-        tipo: 'NOMI_DISPOSITIVI',
-        conIntestazione: true,
-        testo: nomi.map((n) => E.neutralizza(n, { unaRiga: true })).join('\n'),
-      }));
-    }
-    return out;
+    const E = esterno();
+    const puliti = nomi.map((n) => E.neutralizza(n, { unaRiga: true }));
+    if (puliti.length) out.push(E.imbusta({ tipo: 'NOMI_DISPOSITIVI', conIntestazione: true, testo: puliti.join('\n') }));
+    return { righe: out, nomi: puliti };
+  }
+
+  // Il testo di altri che una sezione porta al modello, con la sua fonte: le uscite lo contano come testo di
+  // sconosciuti (#2293, #2305; CONTESTO_DAI_SITI in urlExfil.js). Ogni sezione che recinta un testo lo dichiara qui.
+  function daFuori(testi, fonte) {
+    const t = (Array.isArray(testi) ? testi : []).filter((x) => typeof x === 'string' && x.trim());
+    return t.length ? { daFuori: [{ testi: t, fonte }] } : null;
   }
 
   function sitoDellaScheda(url) {
