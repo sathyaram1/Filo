@@ -552,13 +552,14 @@ test('un anno detto per altro sopra il modulo: decide il controllo ragionato, e 
     PAGINA_ANNO({ dentro: '<p>Trattoria da Mario, fondata nel 1999</p><h2>Prenota un tavolo</h2>' }));
   await page.locator('#ta').click();
   await page.keyboard.type(`vorrei un tavolo per ${sbagliato} 9 ottobre, siamo in 4.`);
-  await expect(ocra(page)).toHaveText([`${sbagliato} 9 ottobre`], { timeout: 12_000 });
+  await expect(ocra(page)).toHaveText([sbagliato], { timeout: 12_000 });
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).toContain('(anno scritto nella pagina prima del campo: «Trattoria da Mario, fondata nel 1999»)');
   const menu = await tastoDestroSu(page, ocra(page).first());
   await expect(menu.locator('.sn-menu-segno')).toContainText(`Il 9 ottobre ${v.anno} è ${v.giorno}`);
   await expect(menu.locator('.sn-menu-segno')).not.toContainText('1999');
-  await expect(menu.locator('.sn-menu-correction').first()).toHaveText(`${v.giorno} 9 ottobre`);
+  await menu.locator('.sn-menu-correction-main', { hasText: v.giorno }).first().click();
+  await expect(page.locator('#ta')).toHaveValue(`vorrei un tavolo per ${v.giorno} 9 ottobre, siamo in 4.`);
 });
 
 test('su una pagina delicata gli anni della pagina non partono col controllo delle date', async ({ app, openTab, testServer }) => {
