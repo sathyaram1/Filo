@@ -16,7 +16,7 @@ const C = globalThis.SN_CONST;
 
 test('si registra su globalThis con la sua API', () => {
   assert.ok(Tools, 'SN_ACTION_TOOLS assente');
-  for (const fn of ['definitions', 'toolCallsToActions', 'legacyEnvelope', 'assistantMessage', 'toolMessage', 'haRisultato']) {
+  for (const fn of ['definitions', 'toolCallsToActions', 'legacyEnvelope', 'assistantMessage', 'toolMessage', 'haRisultato', 'chiamata']) {
     assert.equal(typeof Tools[fn], 'function', `manca ${fn}()`);
   }
 });
