@@ -105,7 +105,12 @@ async function fotoDallaChat(app, openTab, testServer, titolo, html, riempi) {
   const chat = await secondaFinestraConChat(app);
   await chatCheGuarda(app, titolo);
   await chiedi(chat, 'guarda la finestra di Filo e dimmi cosa vedi');
-  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const conferma = chat.locator(CONFIRM_HOST);
+  await expect.poll(async () => (await app.evaluate(() => globalThis.__occhio.length + (globalThis.__chat.length > 1 ? 1 : 0)))
+    + (await conferma.isVisible().catch(() => false) ? 1 : 0), { timeout: 30_000 }).toBeGreaterThan(0);
+  const stato = await app.evaluate(() => ({ foto: globalThis.__occhio.length, secondo: String(globalThis.__chat[1] || '').slice(-1500) }));
+  expect(await conferma.isVisible().catch(() => false), 'la finestra si guarda dopo un OK').toBe(false);
+  expect(stato.foto, `al modello non è partita la foto: ${stato.secondo}`).toBe(1);
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   return immagine;
 }
