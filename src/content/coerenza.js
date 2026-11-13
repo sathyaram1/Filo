@@ -292,7 +292,7 @@
           daGiudicare: {
             anni: altri.map((d) => ({ anno: d.anno, giorno: giorno(d.anno), dove: d.dove, riga: d.riga })),
             vicini: proprie.map((a) => ({ anno: a, giorno: giorno(a) })),
-            data: ilGiorno(n, mese).replace(/^Il /, 'il ').replace(/^L'/, 'l\''),
+            data: ilGiorno(n, mese),
           },
         };
       }
