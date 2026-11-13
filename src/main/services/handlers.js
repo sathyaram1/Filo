@@ -5963,7 +5963,7 @@ function dopoPulsante(o) {
       + 'sistema e un avviso dice perché. Per sceglierla si usa impostazioni(imposta) voce_modello.';
   }
   if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con impostazioni(imposta).';
-  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (IMPOSTA_PREFERENZA suono_notifiche).';
+  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (impostazioni(imposta) suono_notifiche).';
   return '';
 }
 
