@@ -320,9 +320,10 @@
       for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r) - overlapMs);
     }
 
+    // Con l'ora del server in mano il PC non conta: indietro di minuti, faceva rileggere minuti di cambi a ogni giro.
     function since() {
       const locale = (lastTickAt || (now() - overlapMs)) - overlapMs;
-      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer) : locale)).toISOString();
+      return new Date(Math.max(0, oraServer || locale)).toISOString();
     }
 
     async function contaInvii(precedente) {
