@@ -1130,7 +1130,8 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
       const r = rami();
-      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indiceDalServer(sc.schede)), indiceDalServer(sc.schede), r.fuori);
+      const indice = indiceDalServer(sc.schede);
+      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
       const dirRuoli = join(ROOT, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
