@@ -99,6 +99,11 @@ export function conNumeri(rami, indice) {
   });
 }
 
+/** { N: id } dall'indice, per leggere su main le fusioni «merge-gate: #N» dei worker (ramiInCorso). PURA. */
+export function numeriDellIndice(indice) {
+  return Object.fromEntries((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.num), String(f.id)]));
+}
+
 /**
  * Toglie i rami i cui feedback citati sono tutti chiusi secondo l'indice (arrivati su main da un altro ramo, o
  * archiviati): non arriveranno su main. Un numero oltre l'ultimo dell'indice può essere nato dopo: resta. Senza indice
