@@ -331,8 +331,8 @@ test('le memorie della compattazione portano i messaggi che le dicono, anche dop
   await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(t0 + 1000).toISOString());
   await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
   const [u1, f1] = await eids('ab12');
-  assert.deepEqual(pulito.fontiScritte[0], { fonti: [u1], origine: [u1] });
-  assert.deepEqual(pulito.fontiScritte[1], { fonti: [u1, f1], origine: [] }, 'senza righe citate: tutto il pezzo, provenienza ignota');
+  assert.deepEqual(pulito.opzioniScritte[0], { fonti: [u1], origine: [u1] });
+  assert.deepEqual(pulito.opzioniScritte[1], { fonti: [u1, f1], origine: [u1, f1] }, 'senza righe citate: tutto il pezzo');
 
   const sosp = azzera({ chiama: citando([['Ha due gatti, Miso e Pepe.', /Utente: ho due gatti/]]) });
   await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(t0).toISOString());
