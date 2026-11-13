@@ -89,7 +89,7 @@
       id: 'estetica',
       kind: 'dire',
       label: 'L’aspetto si cambia parlando',
-      detail: 'Una frase, tipo «preferisci il tema scuro? dimmelo». Se te lo chiede, applicalo subito con IMPOSTA_PREFERENZA o IMPOSTA_ESTETICA.',
+      detail: 'Una frase, tipo «preferisci il tema scuro? dimmelo». Se te lo chiede, applicalo subito con impostazioni(imposta) o impostazioni(aspetto).',
     },
     {
       // #1589: quanto Filo manda ai modelli dalle pagine si sceglie qui una volta, e si rivede in Impostazioni → Sicurezza.
