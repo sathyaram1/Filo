@@ -724,7 +724,7 @@
       const UI = global.SN_FILO_UI;
       const stile = 'all:initial!important;display:contents!important;';
       // Lo specchio tiene il font del campo, che ripete il testo del sito: generici solo i valori sopra le x.
-      if (UI?.stratoChiuso) ombraDegliStrati = UI.stratoChiuso(stile, UI.fogliChiusi(['spellcheck.css'], { ambito: '.sn-spell-valori' }));
+      if (UI?.stratoChiuso) ombraDegliStrati = UI.stratoChiuso(stile, UI.fogliChiusi(['spellcheck.css'], { ambito: '.sn-spell-valori' }), { riquadro: false });
       else {
         const host = document.createElement('div');
         host.style.cssText = stile;
