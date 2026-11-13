@@ -21,8 +21,8 @@ const ATTACCO = `<script>
   }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   window.cosaVede = () => document.documentElement.outerHTML + ' ' + window.__visti.join(' ');
   window.attacca = () => {
-    const host = document.querySelector('[data-sn-riquadro]');
-    const bersagli = [host, document.activeElement, ...document.querySelectorAll('button, textarea, input')].filter(Boolean);
+    const ospiti = [...document.querySelectorAll('[data-sn-riquadro]')];
+    const bersagli = [...ospiti, document.activeElement, ...document.querySelectorAll('button, textarea, input')].filter(Boolean);
     const file = new File([new Uint8Array([137, 80, 78, 71])], 'finto.png', { type: 'image/png' });
     for (const el of bersagli) {
       if (el.matches && el.matches('textarea, input') && el.id !== 'campo') el.value = 'scritto dal sito';
