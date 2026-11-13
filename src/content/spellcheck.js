@@ -2363,6 +2363,8 @@
     const payload = {
       prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      date: soloSegnaposti ? [] : (state.dateDaGiudicare || []).filter((x) => x.start >= g.start && x.end <= g.end)
+        .map((x) => ({ pezzo: x.segment, ...x.daGiudicare })),
       contesto,
       ripetizioni: ripetizioniAttive(),
       segnaposti: segnapostiAttivi(),
