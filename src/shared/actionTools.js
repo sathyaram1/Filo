@@ -308,7 +308,7 @@
     },
     BLUETOOTH: {
       via: ['computer', 'bluetooth'],
-      description: 'il Bluetooth: acceso, collega o scollega un dispositivo abbinato, dimentica, preferito, elenca.',
+      description: 'il Bluetooth e i dispositivi già abbinati.',
       properties: { acceso: B(), dispositivo: S(), collega: B(), dimentica: B(), preferito: B(), elenca: B() }, required: [],
     },
     ORDINA_DESKTOP: {
