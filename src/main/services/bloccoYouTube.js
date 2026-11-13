@@ -45,6 +45,33 @@ function usa(nuovo, quando) {
   if (v !== versione) {
     versione = v;
     spente.clear();
+    offri();
+  }
+}
+
+// ─── schede aperte ──────────────────────────────────────────────────────────
+
+// Le schede vere vengono da Electron; i test di logica, che girano senza, ne danno di finte.
+let schede = {
+  daId(id) { try { return require('electron').webContents.fromId(id) || null; } catch (_) { return null; } },
+  tutte() { try { return require('electron').webContents.getAllWebContents(); } catch (_) { return []; } },
+};
+const viva = (wc) => { try { return !!wc && !wc.isDestroyed(); } catch (_) { return false; } };
+const frameDi = (wc) => { try { return wc.mainFrame.framesInSubtree || []; } catch (_) { return []; } };
+const suYouTube = (f) => { try { return !!f && R.hostYouTube(R.hostDi(String(f.url || ''))); } catch (_) { return false; } };
+
+// I frame di YouTube più in alto della scheda: ricaricarli ricarica anche quelli di YouTube che contengono.
+function cimeYouTube(wc) {
+  const padre = (f) => { try { return f.parent; } catch (_) { return null; } };
+  return frameDi(wc).filter((f) => suYouTube(f) && !suYouTube(padre(f)));
+}
+
+// Ai frame di YouTube rimasti senza regole: ce ne sono di nuove. Chi le ha già le ignora.
+function offri() {
+  if (!acceso) return;
+  for (const wc of schede.tutte()) {
+    if (!viva(wc)) continue;
+    for (const f of frameDi(wc)) if (suYouTube(f)) { try { f.send(R.CANALE_PRONTE); } catch (_) {} }
   }
 }
 
@@ -132,6 +159,7 @@ async function init(settings) {
 function configureFromSettings(settings) {
   const era = acceso;
   acceso = attivo(settings);
+  if (acceso && !era) offri();
   if (inTest() || !acceso || era) return;
   seguiOgniGiorno();
   if (!aggiornateIl || Date.now() - aggiornateIl >= OGNI_MS) inSottofondo().catch(() => {});
@@ -144,7 +172,11 @@ function regolePer(href, wc) {
   const host = R.hostDi(href);
   if (!acceso || !R.hostYouTube(host)) return [];
   const id = wc && typeof wc.id === 'number' ? wc.id : null;
-  if (id !== null && spente.get(id) === versione) return [];
+  if (id !== null && spente.get(id) === versione) {
+    // Tornata su YouTube, la scheda spenta riprende ad aspettare le regole nuove.
+    if (!inTest()) ricontrolla();
+    return [];
+  }
   const out = R.perHost(insieme, host);
   if (out.length && id !== null) conRegole.add(id);
   return out;
@@ -152,7 +184,8 @@ function regolePer(href, wc) {
 
 /**
  * Il preload di un frame di YouTube vede il video rotto. La scheda torna al solo «Salta» finché le regole non cambiano;
- * il frame si ricarica una volta. Ritorna cosa ha fatto, per i test e per chi chiama.
+ * si ricaricano una volta tutti i suoi frame di YouTube, perché hanno le stesse regole (due video in un articolo), e
+ * l'articolo che li contiene no. Ritorna cosa ha fatto, per i test e per chi chiama.
  */
 function rotto(wc, frame, motivo, { avvisa = avvisoDiRipiego, ricarica = ricaricaFrame } = {}) {
   const id = wc && typeof wc.id === 'number' ? wc.id : null;
@@ -164,9 +197,22 @@ function rotto(wc, frame, motivo, { avvisa = avvisoDiRipiego, ricarica = ricaric
   spente.set(id, versione);
   conRegole.delete(id);
   try { avvisa(motivo); } catch (_) {}
-  try { ricarica(wc, frame); } catch (_) {}
+  const cime = cimeYouTube(wc);
+  for (const f of cime.length ? cime : [frame]) { try { ricarica(wc, f); } catch (_) {} }
   if (!inTest()) { cercaRegoleNuove(); ricontrolla(); }
   return { fatto: true };
+}
+
+// Aspettano le regole nuove solo le schede spente ancora aperte su YouTube: una chiusa esce, una andata altrove resta
+// spenta ma non fa scaricare niente finché non ci torna.
+function inAttesa() {
+  let su = 0;
+  for (const id of [...spente.keys()]) {
+    const wc = schede.daId(id);
+    if (!viva(wc)) { spente.delete(id); continue; }
+    if (frameDi(wc).some(suYouTube)) su++;
+  }
+  return su;
 }
 
 function cercaRegoleNuove() {
@@ -180,7 +226,7 @@ let ricontrolli = null;
 function ricontrolla() {
   if (ricontrolli) return;
   ricontrolli = setInterval(() => {
-    if (!spente.size || !acceso) { clearInterval(ricontrolli); ricontrolli = null; return; }
+    if (!acceso || !inAttesa()) { clearInterval(ricontrolli); ricontrolli = null; return; }
     cercaRegoleNuove();
   }, FORZATO_MS);
   if (ricontrolli.unref) ricontrolli.unref();
@@ -210,11 +256,12 @@ function impostaListePerTest(testi) {
 
 function spentaPerTest(id) { return spente.get(id) === versione; }
 
-// Solo per i test di logica: la rete finta, senza Electron.
+// Solo per i test di logica: la rete e le schede finte, senza Electron.
 function impostaPrendiPerTest(fn) { prendiListe = fn; }
+function impostaSchedePerTest(finte) { schede = finte; }
 
 module.exports = {
   CARTELLA_LISTE, SORGENTI, OGNI_MS, FORZATO_MS, TESTO_RIPIEGO,
   attivo, init, configureFromSettings, aggiorna, regolePer, rotto, status, impostaListePerTest, spentaPerTest,
-  impostaPrendiPerTest,
+  impostaPrendiPerTest, impostaSchedePerTest,
 };

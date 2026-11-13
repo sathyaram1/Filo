@@ -9,8 +9,10 @@ const { sorgente } = require('./youtube-scriptlet.js');
 const AVVISO = 'ytd-enforcement-message-view-model';
 // Dal «play» al primo passo avanti del video: oltre, il lettore è fermo.
 const PARTENZA_MS = 8000;
-// Il video che arriva alla fine entro così poco dal suo inizio ci è stato mandato.
+// Il video che arriva alla fine entro così poco dal suo inizio, e più avanti di quanto il tempo gli permetteva, ci è
+// stato mandato.
 const FINE_ENTRO_MS = 5000;
+const SALTO_S = 2;
 const DURATA_MIN_S = 30;
 // Un gesto dell'utente o una pubblicità appena finita spiegano da soli un salto.
 const GESTO_MS = 1500;
@@ -66,31 +68,49 @@ function guarda({ window: w, segnala, partenzaMs = PARTENZA_MS, ora = () => Date
     attendi(v);
   }, true);
 
-  doc.addEventListener('playing', (e) => { const v = video(e); if (v && !inizio.has(v)) inizio.set(v, ora()); }, true);
+  doc.addEventListener('playing', (e) => {
+    const v = video(e);
+    if (v && !inizio.has(v)) inizio.set(v, { t: ora(), pos: Number(v.currentTime) || 0 });
+  }, true);
   for (const t of ['loadstart', 'emptied']) doc.addEventListener(t, (e) => { const v = video(e); if (v) inizio.delete(v); }, true);
 
+  // Si conta da dove il video è partito: uno aperto a pochi secondi dalla fine (un indirizzo col minuto dentro) ci
+  // arriva a passo normale.
   const allaFine = (e) => {
     const v = video(e);
     if (!v || detto || spiegato(v)) return;
-    const t0 = inizio.get(v);
+    const s = inizio.get(v);
     const d = v.duration;
-    if (t0 === undefined || !Number.isFinite(d) || d < DURATA_MIN_S || ora() - t0 > FINE_ENTRO_MS) return;
-    if (v.currentTime >= d - 1) di('fine');
+    if (s === undefined || !Number.isFinite(d) || d < DURATA_MIN_S || ora() - s.t > FINE_ENTRO_MS) return;
+    const passati = ((ora() - s.t) / 1000) * Math.max(1, Number(v.playbackRate) || 1);
+    if (v.currentTime >= d - 1 && v.currentTime - s.pos > passati + SALTO_S) di('fine');
   };
   doc.addEventListener('timeupdate', allaFine, true);
   doc.addEventListener('ended', allaFine, true);
 }
 
-/** Dal preload: regole dal main, eseguite nel mondo della pagina, e la guardia se ce n'erano. */
+/**
+ * Dal preload: regole dal main, eseguite nel mondo della pagina, e la guardia se ce n'erano. Senza regole (scheda
+ * tornata al solo «Salta», regole non ancora scaricate, interruttore spento) le richiede quando il main dice che ce ne
+ * sono di nuove: YouTube passa al video dopo senza ricaricare la pagina.
+ */
 function avvia({ ipcRenderer, webFrame, window: w, href }) {
   if (!R.hostYouTube(R.hostDi(href))) return false;
-  let regole = [];
-  try { regole = ipcRenderer.sendSync('filo:youtube-regole', href) || []; } catch (_) { regole = []; }
-  const src = sorgente(regole);
-  if (!src) return false;
-  webFrame.executeJavaScript(src, false).catch(() => {});
-  guarda({ window: w, segnala: (motivo) => { try { ipcRenderer.send('filo:youtube-rotto', motivo); } catch (_) {} } });
-  return true;
+  const prova = () => {
+    let qui = href;
+    try { qui = (w.location && w.location.href) || href; } catch (_) {}
+    let regole = [];
+    try { regole = ipcRenderer.sendSync('filo:youtube-regole', qui) || []; } catch (_) { regole = []; }
+    const src = sorgente(regole);
+    if (!src) return false;
+    webFrame.executeJavaScript(src, false).catch(() => {});
+    guarda({ window: w, segnala: (motivo) => { try { ipcRenderer.send('filo:youtube-rotto', motivo); } catch (_) {} } });
+    return true;
+  };
+  if (prova()) return true;
+  const pronte = () => { if (prova()) ipcRenderer.removeListener(R.CANALE_PRONTE, pronte); };
+  try { ipcRenderer.on(R.CANALE_PRONTE, pronte); } catch (_) {}
+  return false;
 }
 
 module.exports = { avvia, guarda, AVVISO, PARTENZA_MS, FINE_ENTRO_MS };
