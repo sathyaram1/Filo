@@ -58,10 +58,29 @@ export function lineaPrincipale(root, ref = 'origin/main') {
   return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
 }
 
-/** La data (ISO) della fusione più recente del lavoro stesso di #N su `ref` («merge-gate: #N …»), '' se non c'è. */
-export function ultimaFusionePropria(root, num, { ref = 'origin/main' } = {}) {
-  if (!numeroFeedback(num)) return '';
-  return git(root, ['log', '--first-parent', ref, '-E', `--grep=^merge-gate: ${regexCitazione(num)}`, '-n1', '--format=%cI']).trim();
+/** L'oggetto è la fusione del lavoro stesso di #N («merge-gate: #N …»), non di un altro che lo cita. PURA. */
+export function fusionePropria(oggetto, num) {
+  return !!numeroFeedback(num) && new RegExp(`^merge-gate: ${regexCitazione(num)}`).test(String(oggetto || ''));
+}
+
+/**
+ * Il lavoro di ogni feedback arrivato su `ref`, letto sulla linea principale: regge anche dopo la potatura del ramo
+ * fuso. «finish: worker/<id>-<stampo>» nomina il tentativo; «merge-gate: #N» solo il numero, che `numeri`
+ * ({ N: id }) traduce. → { id: stampo del più recente } per tentativiSuperati.
+ */
+export function fusioniSuMain(root, { ref = 'origin/main', numeri = {} } = {}) {
+  const perNumero = Object.entries(numeri || {}).filter(([n, id]) => numeroFeedback(n) && id);
+  const out = {};
+  const arriva = (id, stampo) => { if (id && stampo && !(out[id] >= stampo)) out[id] = stampo; };
+  const righe = git(root, ['log', '--first-parent', ref, '-E', '--grep=^(merge-gate|finish): ', '--format=%cI%x09%s']).split('\n');
+  for (const riga of righe.filter(Boolean)) {
+    const [data, ...o] = riga.split('\t');
+    const oggetto = o.join('\t');
+    const nominato = leggiTentativo((/^(?:merge-gate|finish): (\S+)/.exec(oggetto) || [])[1]);
+    if (nominato) { arriva(nominato.id, nominato.stampo); continue; }
+    for (const [n, id] of perNumero) if (fusionePropria(oggetto, n)) arriva(id, stampoDi(Date.parse(data)));
+  }
+  return out;
 }
 
 /**
