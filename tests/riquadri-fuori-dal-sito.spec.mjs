@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
-import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda, riquadriNelSito } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'zibaldone-segreto-1509 del mio conto';
