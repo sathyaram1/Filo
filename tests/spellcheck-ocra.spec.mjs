@@ -513,24 +513,66 @@ for (const [nome, html] of [
   ['la casella del titolo della nota dice l\'anno', PAGINA_ANNO({ dentro: '<input id="titolo" value="Diario 2024" style="font:28px sans-serif;border:0">' })],
   ['il titolo modificabile della nota dice l\'anno', PAGINA_ANNO({ dentro: '<div contenteditable="true" style="font:28px sans-serif">Diario 2024</div>' })],
 ]) {
-  test(`${nome}: una data giusta di quell'anno non si segna, una sbagliata propone il giorno di quell'anno`, async ({ app, openTab, testServer }) => {
+  test(`${nome}: la data non si segna da sola, il controllo ragionato la riceve col calendario e la sua proposta si applica`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer, '{"issues":[]}', html);
     await page.locator('#ta').click();
-    await page.keyboard.type('certo, mercoledì 9 ottobre, pioveva perchè era autunno');
+    await page.keyboard.type('certo, mercoledì 9 ottobre, pioveva perchè era autunno.');
     await expect(errore(page)).toHaveText(['perchè'], { timeout: 5000 });
-    await page.waitForTimeout(300);
+    await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
+    const [prompt] = await app.evaluate(() => globalThis.__ocra);
+    const v = noveOttobreVicino();
+    expect(prompt).toContain(`«mercoledì 9 ottobre»: il 9 ottobre ${v.anno} è ${v.giorno} (vicino a oggi); il 9 ottobre 2024 è mercoledì (anno scritto`);
     await expect(ocra(page)).toHaveCount(0);
 
+    // Il modello capisce che la data è del 2024: la sua proposta è un suggerimento come gli altri.
+    await app.evaluate((_e, r) => { globalThis.__ocraRisposta = r; },
+      giudicato('martedì 9 ottobre', 'mercoledì 9 ottobre', 'Il 9 ottobre 2024 è mercoledì.'));
     await page.keyboard.press('Enter');
     await page.keyboard.type('e martedì 9 ottobre?');
-    await expect(ocra(page)).toHaveText(['martedì 9 ottobre'], { timeout: 5000 });
+    await expect(ocra(page)).toHaveText(['martedì 9 ottobre'], { timeout: 12_000 });
+    const ultimo = (await app.evaluate(() => globalThis.__ocra)).at(-1);
+    expect(ultimo).toContain('«martedì 9 ottobre»: il 9 ottobre');
     const menu = await tastoDestroSu(page, ocra(page).first());
     await expect(menu.locator('.sn-menu-segno')).toContainText('Il 9 ottobre 2024 è mercoledì');
     await expect(menu.locator('.sn-menu-correction').first()).toHaveText('mercoledì 9 ottobre');
     await page.screenshot({ path: 'tests/.shots/1115-2-data-anno-della-pagina.png' }).catch(() => {});
     await menu.locator('.sn-menu-correction-main', { hasText: 'mercoledì 9 ottobre' }).first().click();
-    await expect(page.locator('#ta')).toHaveValue('certo, mercoledì 9 ottobre, pioveva perchè era autunno\ne mercoledì 9 ottobre?');
+    await expect(page.locator('#ta')).toHaveValue('certo, mercoledì 9 ottobre, pioveva perchè era autunno.\ne mercoledì 9 ottobre?');
     await expect(ocra(page)).toHaveCount(0);
   });
 }
+
+// L'anno detto per altro («fondata nel 1999»): il codice tace lo stesso, e il modello che lo capisce propone il giorno
+// vicino a oggi.
+test('un anno detto per altro sopra il modulo: decide il controllo ragionato, e la sua proposta vale per quest\'anno', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const v = noveOttobreVicino();
+  const sbagliato = NOMI[[1, 2, 3, 4, 5, 6, 0].find((g) => NOMI[g] !== v.giorno && g !== new Date(1999, 9, 9).getDay())];
+  const page = await apri(app, openTab, testServer, giudicato(`${sbagliato} 9 ottobre`, `${v.giorno} 9 ottobre`, `Il 9 ottobre ${v.anno} è ${v.giorno}.`),
+    PAGINA_ANNO({ dentro: '<p>Trattoria da Mario, fondata nel 1999</p><h2>Prenota un tavolo</h2>' }));
+  await page.locator('#ta').click();
+  await page.keyboard.type(`vorrei un tavolo per ${sbagliato} 9 ottobre perchè siamo in 4.`);
+  await expect(errore(page)).toHaveText(['perchè'], { timeout: 5000 });
+  await expect(ocra(page)).toHaveText([`${sbagliato} 9 ottobre`], { timeout: 12_000 });
+  const [prompt] = await app.evaluate(() => globalThis.__ocra);
+  expect(prompt).toContain('(anno scritto nella pagina prima del campo: «Trattoria da Mario, fondata nel 1999»)');
+  const menu = await tastoDestroSu(page, ocra(page).first());
+  await expect(menu.locator('.sn-menu-segno')).toContainText(`Il 9 ottobre ${v.anno} è ${v.giorno}`);
+  await expect(menu.locator('.sn-menu-segno')).not.toContainText('1999');
+  await expect(menu.locator('.sn-menu-correction').first()).toHaveText(`${v.giorno} 9 ottobre`);
+});
+
+test('su una pagina delicata gli anni della pagina non partono col controllo delle date', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: true, siti: ['sito-pubblico.test'] } } }));
+  const page = await apri(app, openTab, testServer, '{"issues":[]}', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' }));
+  await page.locator('#ta').click();
+  await page.keyboard.type('certo, martedì 9 ottobre, pioveva.');
+  await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
+  const [prompt] = await app.evaluate(() => globalThis.__ocra);
+  expect(prompt).toContain('certo, martedì 9 ottobre, pioveva.');
+  expect(prompt).not.toContain('Diario 2024');
+  expect(prompt).not.toContain('DATE DA GIUDICARE');
+  await expect(ocra(page)).toHaveCount(0);
+});
