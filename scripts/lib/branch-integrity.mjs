@@ -153,13 +153,7 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
   if (!f.ok) return f;
   const main = `origin/${mainBranch}`;
   const conFusi = statoDeiTentativi(root, g, main, rami);
-  // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
-  let fusioni = {};
-  try {
-    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
-    if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
-  } catch (_) { /* senza la storia di main resta la regola sui rami */ }
-  const superati = tentativiSuperati(conFusi, { fusioni });
+  const superati = tentativiSuperati(conFusi, { fusioni: fusioniLette(root, main, numeriDi(num, safe)) });
   const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
     const n = g(['rev-list', '--count', `${main}..${t.head}`]);
     return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
