@@ -40,7 +40,9 @@ function rigaVerificato(sha, scartato) {
   if (!sha) return 'Commit che aveva passato la verifica: non comunicato.';
   if (scartato === 'punta') {
     return `Commit che aveva passato la verifica: il server ha mandato \`${sha}\`, che è la punta di questo ramo: `
-      + 'il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica.';
+      + 'il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica. '
+      // Senza un commit da cui partire chi verifica restava fermo (#1514, #2236): gli si dà il diff che c'è.
+      + 'Al suo posto leggi il lavoro intero sopra main, `git diff origin/main...HEAD`, a cominciare dai file che il report qui sotto nomina in conflitto.';
   }
   if (scartato === 'assente') {
     return `Commit che aveva passato la verifica: \`${sha}\`, ma in questa copia non c'è e da origin non è arrivato. `
