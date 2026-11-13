@@ -430,9 +430,13 @@ test('biglietto nuovo dopo un tentativo morto: si riparte dalla sua punta, e all
     assert.equal(r2.json && r2.json.role, 'new-work', `il giro ripartito lavora (uscita ${r2.code}): ${r2.se}`);
     const nuovo = git(seconda, 'rev-parse', '--abbrev-ref', 'HEAD');
     assert.notEqual(nuovo, morto, 'il tentativo nuovo ha il suo nome');
-    assert.equal(git(seconda, 'rev-parse', 'HEAD'), fatto, 'il lavoro del tentativo morto non si rifà: si riparte da lì');
+    assert.equal(git(seconda, 'rev-parse', 'HEAD^1'), fatto, 'il lavoro del tentativo morto non si rifà: si riparte da lì');
+    assert.equal(git(seconda, 'rev-parse', 'HEAD^2'), git(seconda, 'rev-parse', 'origin/main'),
+      'e dentro c\'è il main di adesso, con la fusione arrivata dopo la morte del tentativo (#2152.1)');
+    assert.equal(git(seconda, 'show', 'HEAD:altro.txt'), 'un altro lavoro fuso');
     assert.deepEqual(r2.json.payload.ripartenza, { ramo: morto, commit: 2 }, 'chi lavora sa da dove riparte');
     assert.match(r2.se, /nasce dalla punta .* del tentativo precedente/);
+    assert.match(r2.se, /dentro anche il main di adesso, fuso senza conflitti/);
     assert.equal(mondo.legato, nuovo, 'la presa in carico è sul ramo nuovo');
     assert.ok(mondo.consegne.every((c) => !c.rifiutata));
 
