@@ -76,7 +76,7 @@
     },
     ACCOUNT: {
       via: ['impostazioni', 'account'],
-      description: 'l\'account di Filo: accedi (con Google), collega_google (YouTube, Gmail e Drive nelle schede), esci.',
+      description: 'accedi (con Google), collega_google (YouTube, Gmail, Drive nelle schede), esci.',
       properties: { cosa: S({ enum: ['accedi', 'collega_google', 'esci'] }) }, required: ['cosa'],
     },
 
