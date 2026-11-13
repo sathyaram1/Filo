@@ -118,7 +118,7 @@
     },
     APRI_SALVATA: {
       via: ['scheda', 'apri_salvata'],
-      description: 'apre una pagina salvata per id e la toglie dalla lista (tieni true la lascia).',
+      description: 'apre una pagina salvata e la toglie dalla lista (tieni: resta).',
       properties: { id: S(), tieni: B() }, required: ['id'],
     },
     ZOOM_PAGINA: {
