@@ -4369,7 +4369,9 @@ async function eseguiAzioneFilo(action, {
         const target = D ? D.zonaDellAzione(action) : '';
         if (!D || !D.esiste(id) || !target) {
           const serveContesto = dove === 'fila' || dove === 'altro_fila';
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
+          // Gli id non stanno nello strumento (tetto degli strumenti, SPEC-CONTESTO): li dà l'esito di un id sbagliato.
+          const icone = D && !D.esiste(id) ? [...Object.keys(D.ICONE), ...Object.keys(D.AZIONI || {})].map((i) => `${i} (${D.nome(i)})`).join(', ') : null;
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(icone ? { icone } : {}), ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
         }
         if (!D.ammessa(id, target)) {
           return { executed: false, kept: false, output: { icona: 'invalid', id, dove, contesto: D.contestoDiZona(target), motivo: `«${D.nome(id)}» è un'azione ${D.CONTESTI[D.AZIONI[id].contesto].su}: resta nella sua fila o nel suo «Altro…»` } };
