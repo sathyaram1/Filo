@@ -292,7 +292,7 @@
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
     if (!s) return { come: '', chiave: '', conferma: false, ammessi: '' };
-    const aiuto = typeof s.aiuto === 'function' ? s.aiuto({}) : s.aiuto;
+    const aiuto = typeof s.aiuto === 'function' ? s.aiuto({ shellPref: SHELL_AMMESSE }) : s.aiuto;
     return { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2, ammessi: String(aiuto || '') };
   }
   function minuscola(s) {
