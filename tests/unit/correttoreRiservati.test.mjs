@@ -23,10 +23,12 @@ test('ogni parte della richiesta che porta testo passa dal segnaposto, anche la 
   const p = R.richiestaSenzaRiservati({
     prima: `carta ${carta}`, nuovo: `ancora ${carta}`, dopo: carta, candidati: [{ pezzo: carta, perche: 'x' }],
     luogo: { sito: 'banca.example', titolo: carta, conversazione: carta }, contesto: { prima: carta, dopo: carta },
+    date: [{ pezzo: `martedì 9 ottobre ${carta}`, data: 'Il 9 ottobre', anni: [{ anno: 2024, giorno: 'mercoledì', dove: 'titolo', riga: `2024 ${carta}` }] }],
   });
   assert.ok(!JSON.stringify(p).includes(carta));
   assert.equal(p.luogo.sito, 'banca.example');
   assert.equal(p.candidati[0].perche, 'x');
+  assert.deepEqual(p.date[0].anni[0], { anno: 2024, giorno: 'mercoledì', dove: 'titolo', riga: '2024 [dato riservato]' });
 });
 
 // La parola che presenta il dato e il dato possono partire in pezzi diversi, o la parola restare fuori dai pezzi: si

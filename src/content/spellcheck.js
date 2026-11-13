@@ -21,6 +21,9 @@
   const PRIMA_MAX = 4000;
   // Il testo sopra il campo che resta al main, dove si cerca chi chiede una password (correttoreRiservati.js).
   const CONVERSAZIONE_MAX = 1500;
+  // La pagina intorno al campo in cui si cercano gli anni detti, per le date senza anno.
+  const INTORNO_MAX = 1500;
+  const INTORNO_MS = 1500;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
   // Il lampo sul valore che Filo ha appena messo al posto delle x: si vede dove è cambiato il testo, poi sfuma.
@@ -798,7 +801,7 @@
       primaDelGesto: null, intento: null, taglio: 0,
       proprietari: new Map(), proprietariCaratteri: 0,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
-      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
+      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null, dateDaGiudicare: [],
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
       baseRapido: '', baseRagionato: '',
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
@@ -806,7 +809,7 @@
       riaperte: { rapido: null, ragionato: null },
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), inVista: [],
+      rimandati: new Set(), inVista: [], intorno: null, ritaglio: '', fotogrammi: 0,
       // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
       valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
@@ -874,6 +877,7 @@
     }
     state.attivo = true;
     state.entrato = false;
+    state.intorno = null;
     activeEl = el;
     ensureOverlay(state);
     seguiIlTesto(state);
@@ -1020,6 +1024,223 @@
     renderOverlayContent(state);
   }
 
+  // I segni si vedono solo dove si vede il campo: non oltre i contenitori che lo tagliano (la colonna di una mail che
+  // scorre) né sopra quello che la pagina gli mette davanti (un'intestazione fissa, un menu a tendina) (#1115.2).
+  const PUNTI_RITAGLIO_MAX = 160;
+  const RITAGLIO_OGNI = 6;
+  const genitoreDi = (n) => n.assignedSlot || n.parentElement || (n.getRootNode && n.getRootNode().host) || null;
+  function contiene(p, n) {
+    for (let x = n, i = 0; x && i < 200; x = genitoreDi(x), i++) if (x === p) return true;
+    return false;
+  }
+
+  // Un DOM che non risponde come ci si aspetta lascia lo strato com'era: il ritaglio non deve fermare il disegno.
+  function ritaglia(state) {
+    try { ritagliaOra(state); } catch (e) { console.warn('[SN] correttore, ritaglio dei segni:', e); }
+  }
+
+  function ritagliaOra(state) {
+    const o = state.overlay;
+    const el = state.el;
+    const u = state.riquadro;
+    if (!o || !el || !u) return;
+    if (!state.inVista.length) {
+      if (state.ritaglio) { state.ritaglio = ''; o.style.clipPath = ''; }
+      return;
+    }
+    const box = { l: u.left, t: u.top, r: u.left + u.width, b: u.top + u.height + SPORGENZA_SEGNI };
+    const v = { ...box };
+    let vuoto = false;
+    const radiceDoc = document.documentElement;
+    // Chi è posato in assoluto non lo taglia un antenato statico fino al suo contenitore; chi è fissato, nessuno.
+    let fuga = window.getComputedStyle(el).position;
+    for (let p = fuga === 'fixed' ? null : genitoreDi(el); p && !vuoto; p = genitoreDi(p)) {
+      // L'overflow di html e body taglia la finestra, che taglia già lo strato.
+      if (p === radiceDoc || p === document.body) break;
+      let cs;
+      try { cs = window.getComputedStyle(p); } catch (_) { break; }
+      const posato = cs.position !== 'static';
+      const x = cs.overflowX !== 'visible';
+      const y = cs.overflowY !== 'visible';
+      if ((x || y) && (fuga !== 'absolute' || posato)) {
+        const q = p.getBoundingClientRect();
+        const l = q.left + p.clientLeft;
+        const t = q.top + p.clientTop;
+        if (x) { v.l = Math.max(v.l, l); v.r = Math.min(v.r, l + p.clientWidth); }
+        if (y) { v.t = Math.max(v.t, t); v.b = Math.min(v.b, t + p.clientHeight); }
+        vuoto = v.r <= v.l || v.b <= v.t;
+      }
+      if (cs.position === 'fixed') break;
+      if (posato) fuga = cs.position;
+    }
+    const coperti = vuoto ? [] : copertiSuiSegni(state, v, u.top + u.height);
+    let clip = '';
+    if (vuoto) clip = 'inset(50%)';
+    else if (coperti.length || v.l > box.l || v.t > box.t || v.r < box.r || v.b < box.b) {
+      let pezzi = [v];
+      for (const c of coperti) pezzi = senza(pezzi, c);
+      const n = (k) => Math.round(k * 10) / 10;
+      clip = pezzi.length
+        ? `path('${pezzi.map((p) => `M${n(p.l - box.l)} ${n(p.t - box.t)}H${n(p.r - box.l)}V${n(p.b - box.t)}H${n(p.l - box.l)}Z`).join('')}')`
+        : 'inset(50%)';
+    }
+    if (clip !== state.ritaglio) {
+      state.ritaglio = clip;
+      o.style.clipPath = clip;
+    }
+  }
+
+  // Si chiede alla pagina chi sta in cima nei punti dei segni (la parola e i suoi puntini), dentro il campo: quello che
+  // non è il campo lo copre, con tutto il suo strato.
+  function copertiSuiSegni(state, v, fondo) {
+    const el = state.el;
+    const radice = el.getRootNode();
+    const q = radice && typeof radice.elementFromPoint === 'function' ? radice : document;
+    const UI = global.SN_FILO_UI;
+    const coperti = [];
+    let punti = 0;
+    const prova = (x, y) => {
+      if (punti >= PUNTI_RITAGLIO_MAX || x < v.l || x >= v.r || y < v.t || y >= Math.min(v.b, fondo)) return;
+      if (coperti.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) return;
+      punti++;
+      let h = null;
+      try { h = q.elementFromPoint(x, y); } catch (_) { h = null; }
+      if (!h || contiene(el, h) || contiene(h, el) || (UI && UI.inside(h))) {
+        const velo = veli.find((w) => x >= w.l && x < w.r && y >= w.t && y < w.b);
+        if (velo) dubbi.push({ x, y, velo });
+        return;
+      }
+      const c = stratoDi(h, el).getBoundingClientRect();
+      if (c.width > 0 && c.height > 0) coperti.push({ l: c.left, t: c.top, r: c.right, b: c.bottom });
+    };
+    const veli = veliDipinti().map((e) => { const c = e.getBoundingClientRect(); return { e, l: c.left, t: c.top, r: c.right, b: c.bottom }; })
+      .filter((w) => w.r > v.l && w.l < v.r && w.b > v.t && w.t < v.b);
+    const dubbi = [];
+    for (const s of state.overlay.querySelectorAll('.sn-errore, .sn-suggerimento')) {
+      for (const r of s.getClientRects()) {
+        if (!r.width || r.right <= v.l || r.left >= v.r || r.bottom <= v.t || r.top >= v.b) continue;
+        const passi = Math.min(6, Math.max(1, Math.ceil(r.width / 16)));
+        for (const y of [r.top + r.height / 2, r.bottom + 4]) {
+          for (let i = 0; i <= passi; i++) prova(r.left + 1 + ((r.width - 2) * i) / passi, y);
+        }
+      }
+    }
+    if (dubbi.length) for (const w of veliSopraIlCampo(state, dubbi)) coperti.push(w);
+    return coperti;
+  }
+
+  // Un velo fissato che lascia passare il mouse (un'intestazione con pointer-events:none) non risponde a elementFromPoint:
+  // quelli dipinti si cercano a parte, nel tempo libero e al più ogni VELI_MS. Uno trasparente (il contenitore degli
+  // avvisi di un sito) non copre niente e non si conta.
+  const VELI_MS = 1500;
+  let veliVisti = { t: 0, v: [], inCorso: false };
+  function veliDipinti() {
+    if (!veliVisti.inCorso && Date.now() - veliVisti.t >= VELI_MS) {
+      veliVisti.inCorso = true;
+      const cerca = () => {
+        const v = [];
+        try {
+          const UI = global.SN_FILO_UI;
+          const tutti = document.body ? document.body.getElementsByTagName('*') : [];
+          for (let i = 0; i < tutti.length; i++) {
+            const e = tutti[i];
+            // Solo chi è fissato ha offsetParent null (con chi non è disegnato): la lettura costosa resta a pochi.
+            if (e.offsetParent !== null || (UI && UI.inside(e))) continue;
+            const cs = window.getComputedStyle(e);
+            if (cs.position !== 'fixed' || cs.pointerEvents !== 'none' || cs.visibility === 'hidden') continue;
+            if (coperturaDelVelo(e, cs) >= 0.5) v.push(e);
+          }
+        } catch (_) {}
+        veliVisti = { t: Date.now(), v, inCorso: false };
+      };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(cerca, { timeout: 1000 }); else setTimeout(cerca, 0);
+    }
+    return veliVisti.v.filter((e) => e.isConnected);
+  }
+
+  // Quanto un velo nasconde quello che sta sotto, da 0 a 1. La grana leggera, una vignettatura trasparente al centro o
+  // un velo in fusione lasciano leggere la parola: non coprono i segni (#1115.2).
+  const alfaDi = (c) => {
+    if (c === 'transparent') return 0;
+    const m = /^rgba?\(([^)]+)\)$/.exec(c);
+    return m ? Number(m[1].split(/[,\s/]+/)[3] ?? '1') : 0;
+  };
+  function coperturaDelVelo(e, cs) {
+    if (cs.mixBlendMode && cs.mixBlendMode !== 'normal') return 0;
+    let opacita = 1;
+    for (let x = e; x && x.nodeType === 1; x = x.parentElement) {
+      opacita *= Number((x === e ? cs : window.getComputedStyle(x)).opacity);
+      if (!(opacita > 0)) return 0;
+    }
+    let immagine = 0;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') {
+      // Un'immagine non si legge: copre. Un gradiente copre ovunque solo se nessuna sua tappa è trasparente.
+      if (/url\(/.test(cs.backgroundImage)) immagine = 1;
+      else {
+        const tappe = cs.backgroundImage.match(/rgba?\([^)]*\)|transparent/g) || [];
+        immagine = tappe.length ? Math.min(...tappe.map(alfaDi)) : 1;
+      }
+    }
+    return opacita * Math.max(alfaDi(cs.backgroundColor), immagine);
+  }
+
+  // I punti dei segni sotto un velo: si chiede alla pagina, per un attimo senza veli, cosa sta sopra al campo.
+  const SENZA_VELI = typeof CSSStyleSheet === 'function' ? (() => {
+    try { const s = new CSSStyleSheet(); s.replaceSync('*:not(.sn-spell-overlay):not(.sn-spell-overlay *) { pointer-events: auto !important; }'); return s; } catch (_) { return null; }
+  })() : null;
+  function veliSopraIlCampo(state, dubbi) {
+    const out = [];
+    if (!SENZA_VELI) return out;
+    const el = state.el;
+    const prima = document.adoptedStyleSheets;
+    try {
+      document.adoptedStyleSheets = [...prima, SENZA_VELI];
+      for (const { x, y, velo } of dubbi) {
+        if (out.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) continue;
+        for (const h of document.elementsFromPoint(x, y)) {
+          if (h === state.overlay || state.overlay.contains(h)) continue;
+          if (contiene(el, h) || contiene(h, el)) break;
+          if (contiene(velo.e, h)) { out.push({ l: velo.l, t: velo.t, r: velo.r, b: velo.b }); break; }
+        }
+      }
+    } catch (_) {
+    } finally {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== SENZA_VELI);
+    }
+    return out;
+  }
+
+  // Lo strato di chi copre: il primo antenato fissato o posato sopra la pagina (l'intestazione intera, non il suo logo),
+  // senza salire a chi contiene il campo né oltre un velo che lascia passare il mouse.
+  function stratoDi(h, el) {
+    let n = h;
+    for (let i = 0; i < 40; i++) {
+      let cs;
+      try { cs = window.getComputedStyle(n); } catch (_) { return h; }
+      if (cs.position === 'fixed' || cs.position === 'sticky' || cs.position === 'absolute') return n;
+      const p = genitoreDi(n);
+      if (!p || p === document.documentElement || p === document.body || contiene(p, el)) return h;
+      try { if (window.getComputedStyle(p).pointerEvents === 'none') return n; } catch (_) { return h; }
+      n = p;
+    }
+    return h;
+  }
+
+  // Un rettangolo meno un altro: i pezzi che restano, senza sovrapporsi.
+  function senza(pezzi, c) {
+    const out = [];
+    for (const p of pezzi) {
+      if (c.r <= p.l || c.l >= p.r || c.b <= p.t || c.t >= p.b) { out.push(p); continue; }
+      if (c.t > p.t) out.push({ l: p.l, t: p.t, r: p.r, b: c.t });
+      if (c.b < p.b) out.push({ l: p.l, t: c.b, r: p.r, b: p.b });
+      const t = Math.max(p.t, c.t);
+      const b = Math.min(p.b, c.b);
+      if (c.l > p.l) out.push({ l: p.l, t, r: c.l, b });
+      if (c.r < p.r) out.push({ l: c.r, t, r: p.r, b });
+    }
+    return out;
+  }
+
   // Svuotare e riempire lo specchio lo riporta in cima: ogni disegno riprende lo scorrimento della casella. Sul campo
   // modificabile i segni sono già dove si vedono le parole: lo specchio non scorre.
   function allineaScorrimento(state) {
@@ -1112,6 +1333,7 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
+    ritaglia(state);
     disegnaValori(state);
     seguiIlCampo();
     passaggiInCorso(state);
@@ -1196,9 +1418,9 @@
     proposte.delete(el);
   }
 
-  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
-  // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
-  // Anche il testo: una chat che svuota la casella da script all'invio non manda input, e lo strato terrebbe il vecchio.
+  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra) o fargli scendere sopra
+  // un'intestazione: finché il campo attivo ha segni, a ogni fotogramma il riquadro si confronta con l'ultimo disegno, e
+  // ogni RITAGLIO_OGNI si ritaglia. Anche il testo: una chat che svuota la casella da script all'invio non manda input.
   const SEGUI_TESTO_DOPO_TASTO_MS = 10000;
   let seguendo = false;
   function seguiIlCampo() {
@@ -1221,6 +1443,7 @@
       const r = state.el.getBoundingClientRect();
       const u = state.riquadro;
       if (!u || r.left !== u.left || r.top !== u.top || r.width !== u.width || r.height !== u.height) syncOverlay(state);
+      else if (++state.fotogrammi % RITAGLIO_OGNI === 0) ritaglia(state);
       requestAnimationFrame(giro);
     };
     requestAnimationFrame(giro);
@@ -1835,7 +2058,10 @@
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date()).map(segnoDaData) : [];
+    const tutte = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date(), intornoDelCampo(state)) : [];
+    const date = tutte.filter((x) => !x.daGiudicare).map(segnoDaData);
+    // Le date che il codice non giudica (un altro anno scritto intorno) partono col controllo ragionato, senza segno.
+    state.dateDaGiudicare = tutte.filter((x) => x.daGiudicare);
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
@@ -2139,6 +2365,8 @@
     const payload = {
       prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      date: soloSegnaposti ? [] : (state.dateDaGiudicare || []).filter((x) => x.start >= g.start && x.end <= g.end)
+        .map((x) => ({ pezzo: x.segment, ...x.daGiudicare })),
       contesto,
       ripetizioni: ripetizioniAttive(),
       segnaposti: segnapostiAttivi(),
@@ -3068,7 +3296,8 @@
     return el.ownerDocument.body || el.ownerDocument.documentElement;
   }
 
-  function contestoDelCampo(el, { soloPrima = 0 } = {}) {
+  // `intorno`: solo i primi caratteri prima e dopo il campo, per le date (intornoDelCampo).
+  function contestoDelCampo(el, { soloPrima = 0, intorno = 0 } = {}) {
     const vuoto = { prima: '', dopo: '', troncato: false };
     // Nei riquadri di Filo intorno c'è Filo, non la pagina.
     if (!el || radiceDi(el)) return vuoto;
@@ -3122,10 +3351,11 @@
         }
         return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
       };
-      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, CONTESTO_DOPO_MAX);
+      const tettoDopo = intorno || CONTESTO_DOPO_MAX;
+      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, tettoDopo);
       let testoDopo = cuci(dopo.pezzi);
-      if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
-      const tettoPrima = soloPrima || CONTESTO_MAX - testoDopo.length;
+      if (testoDopo.length > tettoDopo) testoDopo = testoDopo.slice(0, tettoDopo);
+      const tettoPrima = soloPrima || intorno || CONTESTO_MAX - testoDopo.length;
       const prima = raccogli(false, tettoPrima);
       let testoPrima = cuci(prima.pezzi.reverse());
       if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
@@ -3134,6 +3364,56 @@
       console.warn('[SN] coerenza — contesto non letto:', e);
       return vuoto;
     }
+  }
+
+  // La pagina intorno per le date senza anno (coerenza.dateDi): si rilegge al più ogni INTORNO_MS, non a ogni tasto.
+  function intornoDelCampo(state) {
+    const ora = Date.now();
+    if (state.intorno && ora - state.intorno.t < INTORNO_MS) return state.intorno.v;
+    const c = contestoDelCampo(state.el, { intorno: INTORNO_MAX });
+    const titolo = radiceDi(state.el) ? '' : titoliSopra(state.el);
+    state.intorno = { t: ora, v: { prima: c.prima, dopo: c.dopo, titolo } };
+    return state.intorno.v;
+  }
+
+  // Il titolo della pagina e l'ultima intestazione prima del campo, anche fuori dal contenitore del contesto.
+  function titoliSopra(el) {
+    const pezzi = [];
+    try {
+      pezzi.push(String(document.title || '').slice(0, 300));
+      let cima = el;
+      for (let i = 0; i < 32; i++) { const h = cima.getRootNode && cima.getRootNode().host; if (!h) break; cima = h; }
+      const UI = global.SN_FILO_UI;
+      let h1 = null;
+      let altra = null;
+      for (const h of document.querySelectorAll('h1, h2, h3, [role="heading"]')) {
+        if (!(h.compareDocumentPosition(cima) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (UI && UI.inside(h)) continue;
+        if (h.tagName === 'H1') h1 = h; else altra = h;
+      }
+      for (const h of [h1, altra]) if (h) pezzi.push(String(h.textContent || '').slice(0, 300));
+      pezzi.push(campoTitoloSopra(el).slice(0, 300));
+    } catch (_) {}
+    return pezzi.join('\n');
+  }
+
+  // Il titolo scritto in un campo sopra il corpo (la casella del titolo di una nota, «Diario 2024»): l'ultimo campo prima
+  // di questo, salendo di pochi livelli. Serve solo all'anno delle date: al modello va la sola riga con l'anno.
+  const TIPI_TITOLO = new Set(['text', 'search', '']);
+  function campoTitoloSopra(el) {
+    let a = el.parentElement;
+    for (let i = 0; a && i < 6 && a !== document.body && a !== document.documentElement; i++, a = a.parentElement) {
+      let ultimo = null;
+      for (const c of a.querySelectorAll('input, textarea, [contenteditable]')) {
+        if (c === el || el.contains(c) || c.contains(el)) continue;
+        if (!(c.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (c.tagName === 'INPUT' ? !TIPI_TITOLO.has(c.type) : (c.tagName !== 'TEXTAREA' && (!c.isContentEditable || (c.parentElement && c.parentElement.isContentEditable)))) continue;
+        if (typeof c.checkVisibility === 'function' && !c.checkVisibility({ visibilityProperty: true })) continue;
+        ultimo = c;
+      }
+      if (ultimo) return String((ultimo.isContentEditable ? ultimo.textContent : ultimo.value) || '');
+    }
+    return '';
   }
 
   // ============================================================================

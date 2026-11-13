@@ -108,6 +108,67 @@
     const dopo = intero.slice(fine, fine + 80).split(FINE_FRASE)[0];
     return INDIZIO_ANNO.test(prima) || INDIZIO_ANNO.test(dopo) || ANNO_ATTACCATO.test(dopo);
   }
+  // Gli anni che dice la pagina intorno a una data senza anno (un'altra riga del campo, la conversazione, il titolo).
+  // Uno diverso da quello di oggi può dire l'anno della data («Diario 2024») o altro («Menu autunno 2023»): lo distingue
+  // solo chi legge la frase, quindi il codice tace e la data va al controllo ragionato (#1115.2, risposta a D-152).
+  // Al modello vanno gli ANNI_AL_MODELLO più vicini alla data, ognuno con la riga della pagina che lo dice.
+  const ANNI_AL_MODELLO = 8;
+  const RIGA_ANNO_MAX = 120;
+  const TITOLO_LONTANO = 600; // il titolo conta come la pagina a qualche riga dal campo
+  // Non è l'anno di una data l'anno dei diritti nel piè di pagina («© 2024»), quello da cui parte o fin dove arriva un
+  // periodo («dal 1999», «2015-2024»): la pagina lo dice per altro (#1115.2).
+  const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(?<![€$£]\s)(?<!(?:(?<!\p{L})(?:dal|since|desde|depuis|seit|until|till|fino al)|©|\(c\)|copyright)\s*)(?<!\d{4}\s*[-–—/]\s*)(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*[-–—/]\s*\d{4}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
+  const ANNO_APOSTROFO = /(?<![\p{L}\p{N}])['’‘](\d\d)(?![\p{N}%])/gu;
+  const QUANTI = { a: 1, an: 1, one: 1, un: 1, uno: 1, due: 2, two: 2, tre: 3, three: 3, quattro: 4, four: 4, cinque: 5,
+    five: 5, sei: 6, six: 6, sette: 7, seven: 7, otto: 8, eight: 8, nove: 9, nine: 9, dieci: 10, ten: 10 };
+  const ANNO_RELATIVO = [
+    [/(?<!\p{L})(?:l['’]anno (?:scorso|passato)|lo scorso anno|last year)(?!\p{L})/giu, () => -1],
+    [/(?<!\p{L})(?:l['’]anno prossimo|il prossimo anno|next year)(?!\p{L})/giu, () => 1],
+    [new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2}|${Object.keys(QUANTI).join('|')})\\s+(?:ann[oi]\\s+fa|years?\\s+ago)(?!\\p{L})`, 'giu'),
+      (m) => -(QUANTI[m[1].toLowerCase()] || Number(m[1]))],
+  ];
+  // La riga di `s` che contiene [da, fine), accorciata intorno all'anno se è lunga.
+  function rigaDi(s, da, fine) {
+    const a = s.lastIndexOf('\n', da - 1) + 1;
+    const b = s.indexOf('\n', fine);
+    const riga = s.slice(a, b < 0 ? s.length : b);
+    if (riga.length <= RIGA_ANNO_MAX) return riga.trim();
+    const centro = Math.max(0, Math.min(riga.length - RIGA_ANNO_MAX, da - a - RIGA_ANNO_MAX / 2));
+    return `…${riga.slice(centro, centro + RIGA_ANNO_MAX).trim()}…`;
+  }
+  function anniIn(s, oggi) {
+    const out = [];
+    if (typeof s !== 'string' || !s) return out;
+    const y = oggi.getFullYear();
+    const metti = (anno, m) => out.push({ anno, da: m.index, fine: m.index + m[0].length, riga: rigaDi(s, m.index, m.index + m[0].length) });
+    for (const m of s.matchAll(ANNO_DETTO)) if (Number(m[1]) <= y + 50) metti(Number(m[1]), m);
+    for (const m of s.matchAll(ANNO_APOSTROFO)) metti(2000 + Number(m[1]) <= y + 10 ? 2000 + Number(m[1]) : 1900 + Number(m[1]), m);
+    for (const [re, quanti] of ANNO_RELATIVO) for (const m of s.matchAll(re)) metti(y + quanti(m), m);
+    return out;
+  }
+  // `intorno`: { prima, dopo, titolo }, il testo della pagina subito prima e subito dopo il campo e il titolo della pagina.
+  function anniDetti(testo, intorno, oggi) {
+    const c = intorno && typeof intorno === 'object' ? intorno : {};
+    const prima = typeof c.prima === 'string' ? c.prima : '';
+    return {
+      campo: anniIn(testo, oggi),
+      prima: anniIn(prima, oggi).map((x) => ({ ...x, lontano: prima.length - x.fine })),
+      dopo: anniIn(c.dopo, oggi).map((x) => ({ ...x, lontano: x.da })),
+      titolo: anniIn(c.titolo, oggi),
+    };
+  }
+  // Dal più vicino alla data [inizio, fine) di un campo lungo `lunghezza`; il titolo viene dopo la pagina vicina.
+  function anniVicini(detti, inizio, fine, lunghezza) {
+    if (!detti) return [];
+    const voce = (x, dove, dist) => ({ anno: x.anno, dove, riga: x.riga, dist });
+    return [
+      ...detti.campo.filter((x) => x.fine <= inizio || x.da >= fine)
+        .map((x) => voce(x, 'campo', x.fine <= inizio ? inizio - x.fine : x.da - fine)),
+      ...detti.prima.map((x) => voce(x, 'prima', x.lontano + inizio)),
+      ...detti.dopo.map((x) => voce(x, 'dopo', x.lontano + lunghezza - fine)),
+      ...detti.titolo.map((x) => voce(x, 'titolo', TITOLO_LONTANO)),
+    ].sort((p, q) => p.dist - q.dist);
+  }
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const alternative = (liste) => liste.flat(2).filter(Boolean).sort((a, b) => b.length - a.length).map(esc).join('|');
 
@@ -196,8 +257,9 @@
     return tabella.get(k);
   }
 
-  // Una data scritta con il suo giorno della settimana: torna il segno se non tornano, altrimenti null.
-  // `parti`: { inizio, testo, intero (il testo del campo), giorno: [testo, posizione], numero: [testo, posizione, suffisso], mese, anno, oggi, motore }
+  // Una data scritta con il suo giorno della settimana: torna il segno se non tornano, altrimenti null. Senza anno e con
+  // un altro anno scritto intorno torna la data `daGiudicare`, senza segno, col calendario per il controllo ragionato.
+  // `parti`: { inizio, testo, intero (il testo del campo), detti (anniDetti), giorno: [testo, posizione], numero: [testo, posizione, suffisso], mese, anno, oggi, motore }
   function verifica(parti) {
     const { motore, testo, inizio, oggi } = parti;
     const g = valeLaParola(motore, parti.giorno[0], motore.giorni);
@@ -214,10 +276,30 @@
     let anno = scrittoAnno;
     if (!anno) {
       if (annoIntorno(parti.intero, inizio, inizio + testo.length)) return null;
+      const vale = (a) => n <= giorniNelMese(a, mese) && new Date(a, mese, n).getDay() === g.indice;
       const letture = lettureSenzaAnno(n, mese, oggi);
+      const lontana = letture.length > 0 && letture[0].dist > VICINA_GIORNI * GIORNO_MS;
+      const proprie = (lontana ? letture : letture.slice(0, 1)).map((l) => l.a);
+      const altri = [];
+      for (const d of anniVicini(parti.detti, inizio, inizio + testo.length, parti.intero.length)) {
+        if (d.anno === oggi.getFullYear() || proprie.includes(d.anno) || altri.some((x) => x.anno === d.anno)) continue;
+        if (altri.length < ANNI_AL_MODELLO) altri.push(d);
+      }
+      if (altri.length) {
+        if ([...altri.map((d) => d.anno), ...proprie].every(vale)) return null;
+        const giorno = (a) => (n <= giorniNelMese(a, mese) ? nomeGiorno(new Date(a, mese, n).getDay()) : '');
+        return {
+          start: inizio, end: inizio + testo.length, segment: testo, fonte: 'data',
+          daGiudicare: {
+            anni: altri.map((d) => ({ anno: d.anno, giorno: giorno(d.anno), dove: d.dove, riga: d.riga })),
+            vicini: proprie.map((a) => ({ anno: a, giorno: giorno(a) })),
+            data: ilGiorno(n, mese),
+          },
+        };
+      }
       if (!letture.length) return null; // il 29 febbraio senza anno, lontano da un bisestile: non si sa quale
+      if (vale(letture[0].a) || (lontana && letture.some((l) => vale(l.a)))) return null;
       anno = letture[0].a;
-      if (letture[0].dist > VICINA_GIORNI * GIORNO_MS && letture.some((l) => new Date(l.a, mese, n).getDay() === g.indice)) return null;
     }
     const data = new Date(anno, mese, n);
     if (data.getDay() === g.indice) return null;
@@ -242,15 +324,17 @@
   // Dove sta un gruppo della corrispondenza, dentro il testo trovato: la prima volta che compare dopo `da`.
   const posizione = (testo, pezzo, da = 0) => testo.indexOf(pezzo, da);
 
-  function dateDi(testo, oggi) {
+  // `intorno` (facoltativo): { prima, dopo, titolo } della pagina intorno al campo, per le date senza anno.
+  function dateDi(testo, oggi, intorno) {
     const out = [];
+    const detti = anniDetti(testo, intorno, oggi);
     for (const motore of MOTORI) {
       for (const m of testo.matchAll(motore.giornoMese)) {
         const [tutto, giorno, numero, suffisso, mese, anno] = m;
         const pm = valeLaParola(motore, mese, motore.mesi);
         if (!pm || (!anno && motore.L.ambigue && motore.L.ambigue.has(mese.toLowerCase()))) continue;
         const pn = posizione(tutto, numero, giorno.length);
-        out.push(verifica({ motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
+        out.push(verifica({ motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
       }
       if (motore.meseGiorno) {
         for (const m of testo.matchAll(motore.meseGiorno)) {
@@ -258,7 +342,7 @@
           const pm = valeLaParola(motore, mese, motore.mesi);
           if (!pm) continue;
           const pn = posizione(tutto, numero, giorno.length + mese.length);
-          out.push(verifica({ motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
+          out.push(verifica({ motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
         }
       }
       for (const m of testo.matchAll(motore.numerica)) {
@@ -267,7 +351,7 @@
         const anno = annoBarra || annoAltro;
         if (!anno && !DOPO_NUMERICA.test(testo.slice(m.index + tutto.length))) continue;
         const pn = posizione(tutto, primo, giorno.length);
-        const base = { motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [primo, pn, ''], anno };
+        const base = { motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [primo, pn, ''], anno };
         if (motore.lingua !== 'en') {
           out.push(verifica({ ...base, mese: Number(secondo) - 1 }));
           continue;
@@ -276,7 +360,7 @@
         const letture = [[secondo, primo], [primo, secondo]]
           .filter(([g, m]) => Number(g) >= 1 && Number(g) <= 31 && Number(m) >= 1 && Number(m) <= 12)
           .map(([g, m]) => verifica({ ...base, numero: [g, 0, ''], mese: Number(m) - 1 }));
-        if (letture.length && letture.every(Boolean)) out.push({ ...letture[0], correzioni: [] });
+        if (letture.length && letture.every(Boolean)) out.push(letture.find((l) => l.daGiudicare) || { ...letture[0], correzioni: [] });
       }
       if (motore.relativa) {
         for (const m of testo.matchAll(motore.relativa)) {

@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.279', date: '2026-11-13',
+      fixes: [
+        { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
+        { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
+      ],
+    },
+    {
       version: '0.2.278', date: '2026-11-13',
       fixes: [
         { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
