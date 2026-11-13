@@ -255,6 +255,65 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
+  test('feedback chiuso, ramo fuso già potato: la pulizia generale e l\'elenco del manutentore leggono la fusione su main (#2152.1)', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      // Due feedback chiusi coi tentativi morti nati da main; il fuso di ognuno l'ha già tolto la potatura.
+      const conFinish = 'fid-1140';
+      const conCancello = 'fid-1141';
+      tentativo(casa, ramo('20261012T000000Z', conFinish), main, 4);
+      const fusoF = tentativo(casa, ramo('20261014T000000Z', conFinish), main, 1);
+      tentativo(casa, ramo('20261012T000000Z', conCancello), main, 3);
+      tentativo(casa, ramo('20261013T000000Z', conCancello), main, 2);
+      const fusoC = tentativo(casa, ramo('20261014T000000Z', conCancello), main, 1);
+      git(casa, 'merge', '-q', '--no-ff', '-m', `finish: ${ramo('20261014T000000Z', conFinish)} via server (approvazione dell’owner)`, fusoF);
+      git(casa, 'merge', '-q', '--no-ff', '-m', 'merge-gate: #1141 via server', fusoC);
+      git(casa, 'push', '-q', 'origin', 'main');
+      git(casa, 'push', '-q', 'origin', `:refs/heads/${ramo('20261014T000000Z', conFinish)}`, `:refs/heads/${ramo('20261014T000000Z', conCancello)}`);
+      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
+      git(casa, 'fetch', '-q', '--prune', 'origin');
+
+      const numeri = { 1141: conCancello };
+      assert.deepEqual(ramiInCorso(casa, { giorni: 0, numeri }).map((x) => x.ramo), [ramo('20261101T000000Z')],
+        'nell\'elenco del manutentore restano solo i lavori vivi');
+      assert.equal(ramiInCorso(casa, { giorni: 0 }).filter((x) => x.ramo.includes(conFinish)).length, 0,
+        'la fusione che nomina il tentativo non ha bisogno del numero');
+
+      const c = chiudiSuperatiOvunque({ root: casa, num: '#1141', id: conCancello });
+      assert.equal(c.ok, true, c.errore);
+      assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', conFinish), ramo('20261012T000000Z', conCancello), ramo('20261013T000000Z', conCancello)].sort());
+      assert.equal(git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*').split('\t')[0], vivo, 'resta solo il lavoro vivo');
+    } finally { togliCartella(base); }
+  });
+
+  test('la fusione propria si riconosce con una regola sola, per la busta e per i tentativi superati (#2152.1)', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const oggetti = ['merge-gate: #77 via server', 'merge-gate: #77_bis via server', 'merge-gate: #77. via server',
+        'merge-gate: #770 via server', 'merge-gate: #77.1 via server', 'merge-gate: #75 via server (anche #77)', 'finish: #77 via server'];
+      const propri = segnaProprie(oggetti.map((oggetto) => ({ oggetto })), '77').map((f) => !!f.propria);
+      assert.deepEqual(propri, [true, true, true, false, false, false, false]);
+      for (const [i, oggetto] of oggetti.entries()) {
+        git(casa, 'checkout', '-q', main);
+        git(casa, 'checkout', '-q', '-B', `t${i}`);
+        commit(casa, `t${i}.txt`, `${i}\n`);
+        git(casa, 'checkout', '-q', 'main');
+        git(casa, 'merge', '-q', '--no-ff', '-m', oggetto, `t${i}`);
+        const letta = !!fusioniSuMain(casa, { ref: 'main', numeri: { 77: 'id77' } }).id77;
+        assert.equal(letta, propri.slice(0, i + 1).some(Boolean), `«${oggetto}»: la busta e i tentativi dicono lo stesso`);
+        git(casa, 'reset', '-q', '--hard', 'HEAD^');
+      }
+      assert.equal(fusionePropria('merge-gate: #77 via server', ''), false);
+    } finally { togliCartella(base); }
+  });
+
+  test('un no di origin alla cancellazione dice il suo motivo, non la riga della negoziazione', () => {
+    const testo = 'fatal: --negotiate-only needs one or more --negotiation-tip=*\nwarning: push negotiation failed; proceeding anyway with push\nremote: Permission denied\nerror: failed to push some refs to \'origin\'';
+    assert.equal(rigaDiErrore(testo), 'error: failed to push some refs to \'origin\'');
+  });
+
   test('il manutentore vede in corso lo stesso tentativo che la ripresa sceglierebbe', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
