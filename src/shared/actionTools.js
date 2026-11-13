@@ -411,7 +411,7 @@
     // Vale solo nella conversazione dell'intervista di benvenuto (#524): fuori la ferma executeFiloAction.
     ONBOARDING: {
       via: ['filo_su_di_se', 'intervista'],
-      description: 'l\'intervista di benvenuto: spunta le voci fatte nello stesso turno; autonomia, privacy o contatori mostrano la scelta con un clic; fine la chiude.',
+      description: 'intervista di benvenuto: spunta le voci fatte, nello stesso turno; autonomia, privacy, contatori mostrano la scelta; fine la chiude.',
       properties: () => {
         const O = modulo('SN_ONBOARDING', './onboarding.js');
         return {
