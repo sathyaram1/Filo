@@ -1333,8 +1333,8 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
-    disegnaValori(state);
     ritaglia(state);
+    disegnaValori(state);
     seguiIlCampo();
     passaggiInCorso(state);
     allineaProposte(state);
@@ -1418,10 +1418,9 @@
     proposte.delete(el);
   }
 
-  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
-  // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
-  // Anche quello che lo copre si muove da sé (un'intestazione che scende): il ritaglio si rifà ogni RITAGLIO_OGNI.
-  // Anche il testo: una chat che svuota la casella da script all'invio non manda input, e lo strato terrebbe il vecchio.
+  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra) o fargli scendere sopra
+  // un'intestazione: finché il campo attivo ha segni, a ogni fotogramma il riquadro si confronta con l'ultimo disegno, e
+  // ogni RITAGLIO_OGNI si ritaglia. Anche il testo: una chat che svuota la casella da script all'invio non manda input.
   const SEGUI_TESTO_DOPO_TASTO_MS = 10000;
   let seguendo = false;
   function seguiIlCampo() {
@@ -2059,7 +2058,14 @@
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date(), intornoDelCampo(state)).map(segnoDaData) : [];
+<<<<<<< ORIG_HEAD
+    const tutte = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date(), intornoDelCampo(state)) : [];
+    const date = tutte.filter((x) => !x.daGiudicare).map(segnoDaData);
+    // Le date che il codice non giudica (un altro anno scritto intorno) partono col controllo ragionato, senza segno.
+    state.dateDaGiudicare = tutte.filter((x) => x.daGiudicare);
+=======
+    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date()).map(segnoDaData) : [];
+>>>>>>> origin/main
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
