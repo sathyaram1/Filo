@@ -338,9 +338,8 @@ test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password res
 
   await chatCheGuarda(app, 'Accesso al negozio');
   await chiedi(chat, 'cosa c’è nella finestra del negozio?');
-  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBeGreaterThan(1).catch(() => {});
-  console.log('DEBUG2116', await app.evaluate(() => globalThis.__chat.length), (await chat.locator('body').innerText()).slice(-1500));
-  console.log('DEBUG2116B', String(await app.evaluate(() => globalThis.__chat.at(-1)) || '').slice(-1500));
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
   await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del negozio').toBeGreaterThan(20_000);
