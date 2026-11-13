@@ -629,6 +629,13 @@ export function ramoSenzaModifiche(root = ROOT, main = MAIN_BRANCH) {
   }
 }
 
+// Un lavoro server porta le sue modifiche nel diff del server: lì un'app senza modifiche non dice niente.
+export function segnaRamoVuoto(bucket, ctx, { senzaModifiche = () => ramoSenzaModifiche() } = {}) {
+  const ruolo = bucket && bucket.role;
+  if ((ruolo === 'verifier' || ruolo === 'fixer') && ctx && !ctx.lavoroServer && senzaModifiche()) ctx.ramoVuoto = true;
+  return ctx;
+}
+
 /**
  * `--ferma` da solo non ferma niente: è la domanda che blocca a fermare il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
