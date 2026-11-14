@@ -51,6 +51,7 @@ import os from 'node:os';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marcatoreWorker } from './lib/dati-worker.mjs';
+import '../src/shared/cmdClassify.js';
 
 // Una riga dell'assistente col modello «<synthetic>» è una richiesta interrotta o un errore dell'API, non un turno.
 export const rigaSintetica = (msg) => /^<[^>]*>$/.test(String((msg && msg.model) || ''));
