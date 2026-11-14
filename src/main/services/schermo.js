@@ -415,36 +415,28 @@ function crea({ sistema = null } = {}) {
     return immagineDa(trovata.immagine);
   }
 
+  function sulloSchermo() {
+    const s = S();
+    if (typeof s.sulloSchermo === 'function') return s.sulloSchermo();
+    return s.finestreFilo().filter((w) => w.wc && w.vista);
+  }
+
   // Lo schermo, o quello che si sceglie nel selettore: dentro possono esserci finestre di Filo (#2116.5). Le finestre
   // delle altre app no, perché le finestre di Filo non stanno nel loro elenco.
   async function catturaConFilo(f) {
+    if (f.tipo === SELETTORE) return catturaColSelettore();
     const s = S();
-    const selettore = f.tipo === SELETTORE;
-    const inVista = () => s.finestreFilo().filter((w) => w.wc && w.vista);
-    const prima = inVista();
-    const wcs = prima.map((w) => w.wc);
-    // Nel selettore non si sa dove finiscono le finestre di Filo: se una ha qualcosa da coprire non lo si apre nemmeno.
-    if (selettore && prima.length && (await Foto.copertureIntorno(wcs, async () => true)).pagine.some(Foto.daCoprire)) {
-      return { errore: FRASE_SELETTORE };
-    }
+    const prima = sulloSchermo();
     let sc = null;
-    const { img, pagine } = await Foto.copertureIntorno(wcs, async () => {
-      const fonti = await s.fonti({ tipi: selettore ? ['window', 'screen'] : ['screen'], lato: latoCattura() });
-      sc = selettore
-        ? fonti.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()))
-        : fonti.find((x) => x.id === f.id);
+    const { img, pagine } = await Foto.copertureIntorno(prima.map((w) => w.wc), async () => {
+      const fonti = await s.fonti({ tipi: ['screen'], lato: latoCattura() });
+      sc = fonti.find((x) => x.id === f.id);
       return sc ? sc.immagine : null;
     });
-    if (!sc) return { errore: selettore ? 'nel selettore del sistema non è stato scelto niente' : 'non è più aperta' };
-    const nome = selettore ? { nome: sc.nome } : {};
+    if (!sc) return { errore: 'non è più aperta' };
     const no = senzaImmagine(img);
-    if (no) return { ...no, ...nome };
-    const dopo = inVista();
-    if (selettore) {
-      const nuova = dopo.some((w) => !prima.some((p) => p.wc === w.wc));
-      if (nuova || pagine.some(Foto.daCoprire)) return { errore: FRASE_SELETTORE, ...nome };
-      return { ...immagineDa(img), ...nome };
-    }
+    if (no) return no;
+    const dopo = sulloSchermo();
     const { width, height } = img.getSize();
     let info = {};
     try { info = s.schermi() || {}; } catch (_) {}
