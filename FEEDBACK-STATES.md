@@ -276,14 +276,20 @@ all'owner, il freno.
 - **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
   manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
   Gestione → Automazioni). Senza N vale il freno.
-- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché una
-  nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
-  vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
-  il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
+- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché
+  `sblocca` del manutentore o dell'owner, una loro nota o un'attesa sulla correzione non lo sbloccano; gli altri
+  lavori vanno avanti. Lo sblocco del manutentore su un guasto, anche scritto come nota, non scrive nelle note (il testo resta nello stato,
+  `ultimoSblocco`), quindi non sporca chi riprende (#2215). Una **domanda di processo** nel rilascio (`--processo`)
+  ferma il lavoro allo stesso modo e sveglia il manutentore, non l'owner; la sua risposta è una nota, che chi
+  riprende legge; col manutentore spento resta nelle note e il lavoro non si ferma.
 - **Lavori server che restano locali (#2036).** Un lavoro server il cui biglietto nascerebbe non fidato (ramo non
   pulito, contenuto sporco…) non è lavoro pronto per nessuna voce: niente accensioni, niente posto nel sondaggio. Il
   server scrive sul feedback `restaLocale { motivi, ruolo, atMs }`, che Gestione mostra come «Fermo: resta locale»
-  col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce.
+  col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce. Le schede del manutentore lo
+  mostrano come fermo `resta_locale`, e un lavoro fidato che ci resta più di un'ora lo sveglia (segnale
+  `resta_locale`, #2215). Il contenuto scritto da un biglietto sporco o dal manutentore conta solo per i ruoli che
+  leggono le note: il controllo di sicurezza nasce pulito lo stesso. Le note del manutentore che l'owner ha letto le
+  copre lui: `npm run fiducia:copri -- <N> [--dal-vero]`.
 - **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner

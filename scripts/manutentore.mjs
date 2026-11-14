@@ -529,6 +529,12 @@ export function righeRifiuti(conto, finestra = null) {
   ];
 }
 
+/** La riga dopo `nota` o `sblocca`: lo sblocco di un guasto nelle note non scrive (#2215). PURA. */
+export function rigaNotaOSblocco(x) {
+  if (x.notaScritta === false) return `#${x.numero}: sbloccato (${x.sbloccato}), nelle note non ho scritto niente: il lavoro riparte con chi lo prende dopo.`;
+  return `#${x.numero}: nota scritta${x.sbloccato ? `, il lavoro fermo (${x.sbloccato}) riparte con chi lo prende dopo` : ''}.`;
+}
+
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
   const [n, ...resto] = senzaOpzioni(args);
@@ -1223,10 +1229,10 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return fatto;
     }
     case 'nota': case 'sblocca': {
-      const testo = cmd === 'nota' ? (await leggiStdin()).trim() : (richiestaSblocca(argv.slice(1)).testo || 'Sbloccato dal manutentore: riprendi.');
-      if (!testo) { console.error('RIFIUTATO: la nota vuole il testo da stdin (nota 812 - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
-      const r = await chiama(cred, cmd, { numero: numeroDi(arg), testo });
-      return esito(r, (x) => `#${x.numero}: nota scritta${x.sbloccato ? `, il lavoro fermo (${x.sbloccato}) riparte con chi lo prende dopo` : ''}.`);
+      const testo = cmd === 'nota' ? (await leggiStdin()).trim() : richiestaSblocca(argv.slice(1)).testo;
+      if (!testo && cmd === 'nota') { console.error('RIFIUTATO: la nota vuole il testo da stdin (nota 812 - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
+      const r = await chiama(cred, cmd, { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
+      return esito(r, rigaNotaOSblocco);
     }
     case 'archivia': { const r = await chiama(cred, 'archivia', { numero: numeroDi(arg), doppioneDi: numeroDi(argv[2]) }); return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`); }
     case 'taccuino': {
