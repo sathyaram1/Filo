@@ -199,6 +199,24 @@
     return t && t !== d.etichetta ? t : id;
   }
 
+  // L'icona detta col nome del menu («Screenshot», «Chiudi pagina») o col suo id: il modello gli id non li vede (tetto
+  // degli strumenti, SPEC-CONTESTO). Un nome di più azioni del tasto destro vale con il contesto; ambiguo, nessuna.
+  function risolvi(detta, contesto = '') {
+    const t = String(detta ?? '').trim();
+    if (esiste(t)) return t;
+    const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[«»"'’.…]/g, '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+    const q = norm(t);
+    if (!q) return '';
+    const ctx = String(contesto || '').trim().toLowerCase();
+    const uguali = [...Object.keys(ICONE), ...Object.keys(AZIONI)].filter((id) => norm(nome(id)) === q || norm(id) === q);
+    const delContesto = ctx ? uguali.filter((id) => tiene(AZIONI, id) && AZIONI[id].contesto === ctx) : [];
+    if (delContesto.length === 1) return delContesto[0];
+    const dellaBarra = uguali.filter((id) => !tiene(AZIONI, id));
+    if (!ctx && dellaBarra.length === 1) return dellaBarra[0];
+    return uguali.length === 1 ? uguali[0] : '';
+  }
+
   // Come una frase dice una zona: «nella barra laterale», «nella fila del tasto destro sul testo selezionato».
   function nomeZona(z) {
     if (z === 'bar') return { nome: 'barra laterale', in: 'nella' };
