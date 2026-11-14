@@ -81,11 +81,24 @@ export function registra(file, { sessionId, lettura: vista, nowMs = Date.now() }
   return out;
 }
 
-/** Ora di inviare? Al massimo ogni cinque minuti, contando anche i tentativi. PURA a meno della lettura. */
-export function daInviare(fileInvio, nowMs = Date.now()) {
+// Coi numeri fermi l'invio parte lo stesso ogni tanto: il server sa così che la barra gira (#2470: ogni 5 minuti
+// anche senza niente di nuovo erano centinaia di chiamate al giorno).
+export const INVIO_COMUNQUE_MS = 30 * 60 * 1000;
+
+function firmaLettura(l) {
+  return l ? [l.pct7d, l.reset7dAtS, l.pct5h ?? '', l.reset5hAtS ?? ''].join('|') : '';
+}
+
+/**
+ * Ora di inviare? Al massimo ogni cinque minuti, contando anche i tentativi; e solo se `ultima` non è quella già
+ * arrivata, o l'ultimo invio non è arrivato, o è passata mezz'ora. PURA a meno della lettura del file.
+ */
+export function daInviare(fileInvio, nowMs = Date.now(), ultima = null) {
   const v = leggiJson(fileInvio) || {};
   const ultimo = Math.max(Number(v.tentatoAtMs) || 0, Number(v.atMs) || 0);
-  return nowMs - ultimo >= INVIO_OGNI_MS;
+  if (nowMs - ultimo < INVIO_OGNI_MS) return false;
+  if (v.ok !== true || !ultima || firmaLettura(ultima) !== v.inviata) return true;
+  return nowMs - (Number(v.inviataAtMs) || 0) >= INVIO_COMUNQUE_MS;
 }
 
 /** Il giro della barra: legge, registra, stampa, e se è ora lancia l'invio staccato. Non lancia mai. */
