@@ -34,7 +34,7 @@ test('la chat sa che le rupie sono INR e che il conto si ordina col marker', () 
   assert.ok(statico.includes('rupie = INR'));
   assert.ok(statico.includes('[[calc: X/<tasso> | eur]]'), 'manca la regola da valuta a euro');
   assert.ok(statico.includes('| valuta]]'), 'manca la regola da euro (o da un\'altra valuta) a valuta');
-  assert.ok(/CERCA_WEB/.test(statico.slice(statico.indexOf('CONTI E CAMBI'))), 'una valuta fuori elenco non ha una strada');
+  assert.ok(/web\(cerca\)/.test(statico.slice(statico.indexOf('Conti:'))), 'una valuta fuori elenco non ha una strada');
 });
 
 test('senza cambi la chat non scrive un blocco CAMBI vuoto', () => {
