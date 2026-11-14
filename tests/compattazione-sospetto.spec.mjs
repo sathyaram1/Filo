@@ -70,8 +70,13 @@ test('una pagina ostile nel tratto: dopo la compattazione il riassunto non porta
     expect(await memorie(app), 'la memoria proposta da un tratto sospetto non entra da sola').not.toContain(DESTINATARIO);
     expect(await FASE_4.inAttesa(app), 'e aspetta la conferma dell’utente').toContainEqual(expect.stringContaining(DESTINATARIO));
 
-    // Il testo della pagina è uscito dal tratto, e il riassunto non porta sospetto: una lezione a Normale parte da sola.
+    // Il testo della pagina è uscito dal tratto, e il riassunto non porta sospetto: una lezione (costo 2) a Normale chiede
+    // l'OK di ogni compito senza guardiano, senza dare come perché la pagina letta (#1840).
     await chiedi(page, 'ricordati che voglio le risposte in maiuscolo');
+    await expect.poll(() => confirmText(page), { timeout: 15000 }).toContain('maiuscolo');
+    expect(await confirmText(page)).not.toContain('Te lo chiedo perché');
+    await scrollConfirmToEnd(page).catch(() => {});
+    await clickConfirm(page, 'ok');
     await expect.poll(async () => (await memorie(app)).includes('maiuscolo'), { timeout: 15000 }).toBe(true);
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   } finally {
