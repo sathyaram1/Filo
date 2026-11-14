@@ -1514,7 +1514,8 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
+    fusioniCambiate();
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') }).finally(fusioniCambiate);
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
     // Alla pagina arriva tutto l'esito, non solo esito e sha: senza riallineamento e motivo
     // diceva «la richiesta decade» a un riallineamento riuscito.
