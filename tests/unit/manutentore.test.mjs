@@ -281,7 +281,9 @@ test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segna
 });
 
 test('la scheda del server dice perché un lavoro non parte: resta locale coi motivi e l’ora, attesa del server, domande (#2258)', () => {
-  const ferma = schedaServer(1160, 1, { lavoroServer: true, restaLocale: { motivi: ['ramo non pulito', 'contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-07T10:26:00Z') } });
+  // Il fermo come lo scrive la scheda del server (fermoDellaScheda): tipo, ora, motivi uniti nel gruppo e uno per uno.
+  const motivi = ['ramo non pulito', 'contenuto scritto da un biglietto sporco'];
+  const ferma = schedaServer(1160, 1, { lavoroServer: true, fermo: { tipo: 'resta_locale', atMs: Date.parse('2026-11-07T10:26:00Z'), gruppo: motivi.join('; '), motivi, ruolo: 'new-work' } });
   assert.match(M.rigaSchedaServer(ferma), /^#1160 · p1 · todo · RESTA LOCALE \(ramo non pulito; contenuto scritto da un biglietto sporco; visto 2026-11-07 10:26\) · lavoro server/);
   assert.match(M.rigaSchedaServer(schedaServer(1140, 1, { stato: 'revision_security', attesa: 'suite_server' })), / · aspetta il server \(suite_server\)/);
   assert.match(M.rigaSchedaServer(schedaServer(1384, 1, { domandeBloccanti: ['D-12'] })), / · fermo sulle domande D-12/);
