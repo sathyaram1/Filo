@@ -17,12 +17,12 @@ require(join(ROOT, 'src/shared/tabColor.js'));
 require(join(ROOT, 'src/shared/constants.js'));
 require(join(ROOT, 'src/shared/preferences.js'));
 require(join(ROOT, 'src/shared/actionTools.js'));
+require(join(ROOT, 'src/shared/cambi.js'));
+require(join(ROOT, 'src/shared/vociImpostazioni.js'));
 
 const { PREF_SETTERS, buildPreferencePartial } = globalThis.SN_PREF;
-const strumento = globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA;
-const ELENCO = typeof strumento.description === 'function'
-  ? strumento.description({ sistema: {} })
-  : strumento.description;
+const LETTURA = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, {}).righe.join('\n');
+const ELENCO = `${globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA.description}\n${LETTURA}`;
 
 // La chiave va cercata come parola intera: "voce" dentro "velocita_voce" non è
 // una dichiarazione di "voce".
