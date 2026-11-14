@@ -318,7 +318,7 @@ export async function letturaCloud(ticket, opz = {}) {
     illeggibili: voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato && !v.schedaNonFidata)).length,
     // Zero illeggibili vale «i feedback non ne hanno» solo se la risposta porta un segno della scheda (una scheda, il segno
     // di illeggibile, l'ora di scrittura anche vuota): senza, da qui non si distingue un server che non le manda (#2181).
-    distingue: r.voci.some((v) => v.scheda || 'schedaIllegibile' in v || (v.riga && 'schedaAt' in v.riga)),
+    distingue: voci.some((v) => v.scheda || 'schedaIllegibile' in v || (v.riga && 'schedaAt' in v.riga)),
   };
 }
 
