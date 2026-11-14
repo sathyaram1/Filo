@@ -76,7 +76,10 @@ async function fingiFirestore(app, docs) {
 const conta = (app) => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.__conta)));
 
 async function apriGestione(openTab, n) {
-  const page = await openTab(URL);
+  return pronta(await openTab(URL), n);
+}
+
+async function pronta(page, n) {
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setAdmin(true));
