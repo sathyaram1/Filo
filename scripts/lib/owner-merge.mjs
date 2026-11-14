@@ -368,7 +368,8 @@ async function statoDalDeposito({ id, idToken, fetchImpl, listUrl }) {
   const lettura = () => fetchImpl(listUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data: { op: 'list' } }),
+    // Decisa o scartata si legge nelle parti che il server dà solo a richiesta.
+    body: JSON.stringify({ data: { op: 'list', parti: ['recent', 'preapproved'] } }),
     ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}),
   });
   try {
