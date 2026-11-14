@@ -351,12 +351,14 @@ function loadTools() {
   return globalThis.SN_ACTION_TOOLS;
 }
 
+// filo_su_di_se(documento): la sua riga nella descrizione dello strumento e il parametro `doc`.
 function toolTrasparenza() {
   const Tools = loadTools();
-  const def = Tools.definitions()
-    .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
-  assert.ok(def, 'LEGGI_TRASPARENZA non è più uno strumento del modello');
-  return def.function;
+  const def = Tools.definitions().find((d) => d.function.name === 'filo_su_di_se');
+  assert.ok(def, 'filo_su_di_se non è più uno strumento del modello');
+  const riga = def.function.description.split('\n').find((r) => r.startsWith('- documento('));
+  assert.ok(riga, 'filo_su_di_se(documento) non c\'è più');
+  return { description: riga, parameters: { properties: { doc: { description: '', ...def.function.parameters.properties.doc } } } };
 }
 
 test('lo strumento della chat promette esattamente i documenti che esistono', () => {
