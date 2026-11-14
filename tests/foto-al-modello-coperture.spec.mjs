@@ -377,7 +377,19 @@ async function schermoFinto(app, { wayland = false } = {}) {
             src.copy(buf, (ty * d.width + tx) * 4, (y * sw + x) * 4, (y * sw + x) * 4 + 4);
           }
         }
+        // I veli che Filo posa sopra la pagina li disegnerebbe il sistema: qui li disegna la prova.
+        for (const v of w.contentView.children.filter((x) => x._filoVelo)) {
+          globalThis.__schermo.veli += 1;
+          const r = v.getBounds();
+          for (let y = Math.max(0, c.y + r.y - d.y); y < Math.min(d.height, c.y + r.y + r.height - d.y); y++) {
+            for (let x = Math.max(0, c.x + r.x - d.x); x < Math.min(d.width, c.x + r.x + r.width - d.x); x++) {
+              const i = (y * d.width + x) * 4;
+              buf[i] = 0x80; buf[i + 1] = 0x80; buf[i + 2] = 0x80; buf[i + 3] = 255;
+            }
+          }
+        }
       }
+      if (globalThis.__schermo.durante) await globalThis.__schermo.durante();
       const foto = nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
       globalThis.__schermo.grezza = foto.toDataURL();
       return foto;
