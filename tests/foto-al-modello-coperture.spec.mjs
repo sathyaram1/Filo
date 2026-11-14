@@ -469,8 +469,9 @@ test('#2116.5: Wayland, una carta scritta mentre il selettore è aperto ferma la
   await schermoFinto(app, { wayland: true });
   await app.evaluate(({ BrowserWindow }, rosa) => {
     globalThis.__schermo.durante = async () => {
-      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.title === 'Cassa del negozio'))._filoTabs;
-      const tab = tm.tabs.find((t) => t.title === 'Cassa del negozio');
+      // La cassa in vista: la seconda finestra può averne ripristinata una copia dietro la chat.
+      const tab = BrowserWindow.getAllWindows().filter((w) => w._filoTabs)
+        .map((w) => w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId)).find((t) => t && t.title === 'Cassa del negozio');
       await tab.view.webContents.executeJavaScript(`(() => { const i = document.createElement('input'); i.name = 'q2';
         i.style.cssText = 'position:absolute;left:20px;top:260px;width:420px;font:bold 34px monospace;color:${rosa};background:#fff;border:1px solid #999;caret-color:transparent;outline:0';
         document.body.appendChild(i); i.focus(); })()`);
