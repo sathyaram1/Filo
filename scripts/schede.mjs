@@ -307,11 +307,15 @@ export async function letturaCloud(ticket, opz = {}) {
   const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
   const r = await leggiDalServer(ticket, { numeri: 'aperti', schede: true, testi: false }, opz);
   if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
+  // Al manutentore fidato un non fidato arriva senza scheda né testi (#2337): fuori dal censimento, ne decide la perizia.
+  const voci = r.voci.filter((v) => !v.nonFidato);
   return {
-    ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),
-    segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
-    // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita.
-    illeggibili: r.voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato)).length,
+    ok: true, righe: voci.filter((v) => v.riga).map((v) => v.riga), schede: voci.filter((v) => v.scheda).map((v) => v.scheda),
+    segnalati: new Map(voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
+    nonFidati: r.voci.length - voci.length,
+    // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita. Una
+    // scheda non fidata data al fidato senza contenuto c'è, e non si riscrive.
+    illeggibili: voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato && !v.schedaNonFidata)).length,
     // Zero illeggibili vale «i feedback non ne hanno» solo se la risposta porta un segno della scheda (una scheda, il segno
     // di illeggibile, l'ora di scrittura anche vuota): senza, da qui non si distingue un server che non le manda (#2181).
     distingue: r.voci.some((v) => v.scheda || 'schedaIllegibile' in v || (v.riga && 'schedaAt' in v.riga)),
