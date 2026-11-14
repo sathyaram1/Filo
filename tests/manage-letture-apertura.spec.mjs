@@ -98,6 +98,8 @@ test('riaperta, la Gestione chiede i cambiati e il conto; le statistiche contano
     globalThis.__docs.push({ ...globalThis.__docs[0], _id: 'nuovo', seq: 999, name: 'Arrivato adesso', _updateTime: 't1', updatedAt: ora });
   });
   const seconda = await apriGestione(openTab, 41).catch(async (e) => {
+    const pagine = app.windows ? null : null;
+    void pagine;
     throw new Error(`${e.message}\nconta: ${JSON.stringify(await conta(app))}`);
   });
   await expect(seconda.locator('.mg-item-title', { hasText: 'Riscritto mentre era chiusa' })).toHaveCount(1);
