@@ -1946,6 +1946,10 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
+    // Una copia del main può non avere ancora la richiesta appena aperta dal server: la si richiede quando scade.
+    if (r.daCopia && Number(r.scadeTraMs) > 0 && !fusioniRiletturaTimer) {
+      fusioniRiletturaTimer = setTimeout(() => { fusioniRiletturaTimer = null; loadMergeApprovals(); }, Number(r.scadeTraMs) + 500);
+    }
     // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
     // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
