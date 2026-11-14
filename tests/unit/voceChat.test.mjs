@@ -43,9 +43,8 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
   assert.equal(auto(false), false);
   assert.equal(auto('boh'), undefined);
   assert.equal(P.buildPreferencePartial('invio_vocale', true).costo, 1, 'reversibile e innocua: niente conferma');
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  assert.match(desc, /invio_vocale/, 'il modello non sa che la chiave esiste');
+  const desc = letturaPerIlModello('invio vocale');
+  assert.match(desc, /\[chiave invio_vocale; valori: /, 'il modello non sa che la chiave esiste');
   assert.equal(globalThis.SN_CONST.DEFAULT_SETTINGS.dictation.autoSend, true, 'di serie la richiesta parte da sola');
   const frase = globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.autoSend', prima: true, dopo: false });
   assert.equal(frase, 'invio di quello che detti nelle chat: da solo → a mano, dopo averlo corretto');
