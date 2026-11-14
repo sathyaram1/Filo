@@ -31,7 +31,7 @@ const toolTrasparenza = (app) => app.evaluate(() => {
 test('il prompt dichiara al modello solo i documenti che esistono davvero', async ({ app, openTab }) => {
   await openTab(NEWTAB);
   const { def, esistenti, previsti, conNota } = await toolTrasparenza(app);
-  expect(def, 'LEGGI_TRASPARENZA non arriva più al modello').toBeTruthy();
+  expect(def, 'filo_su_di_se(documento) non arriva più al modello').toBeTruthy();
   expect(esistenti.length).toBeGreaterThan(0);
   // Le sezioni non scritte con la loro nota si leggono come un documento (#888).
   expect(def.parameters.properties.doc.enum).toEqual(esistenti.concat(conNota));
