@@ -2506,14 +2506,6 @@
     },
   ];
 
-  // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
-  // così una voce nuova arriva alla chat da sola (#949).
-  function righeDescrizione(ctx = {}) {
-    return PREF_SETTERS.map((s) => {
-      const aiuto = typeof s.aiuto === 'function' ? s.aiuto(ctx) : s.aiuto;
-      return `• ${s.keys[0]}: ${aiuto}${s.costo >= 2 ? ' [conferma]' : ''}`;
-    });
-  }
 
   // Il nome con cui la pagina mostra la voce di un setter: è quello che legge l'utente, la chiave è per il modello.
   function nomeVoce(setter) {
