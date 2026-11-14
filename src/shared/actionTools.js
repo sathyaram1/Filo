@@ -545,6 +545,10 @@
       if (strumento && !argsError && TOOLS[type]) {
         const manca = (TOOLS[type].required || []).filter((k) => campi[k] === undefined || campi[k] === null);
         if (manca.length) argsError = `per ${chiamata(type)} manca ${manca.join(', ')}`;
+        const unoDi = TOOLS[type].unoDi || [];
+        if (!argsError && unoDi.length && unoDi.every((k) => campi[k] === undefined || campi[k] === null)) {
+          argsError = `per ${chiamata(type)} serve almeno uno fra ${unoDi.join(', ')}`;
+        }
       }
       const action = { ...campi, type, _callId: String(c.id || '') };
       if (argsError) action._argsError = argsError;
