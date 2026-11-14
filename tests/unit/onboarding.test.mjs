@@ -394,7 +394,7 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
   // L'azione è uno strumento nativo (actionTools.js) che c'è sempre ma vale solo durante l'intervista: il prompt
   // deve dirlo, altrimenti il modello non sa che può usarlo adesso.
-  assert.match(conOnb, /strumento ONBOARDING vale solo adesso/, 'senza l’azione non può spuntare niente');
+  assert.match(conOnb, /filo_su_di_se\(intervista\) vale solo adesso/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
   // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
   // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
