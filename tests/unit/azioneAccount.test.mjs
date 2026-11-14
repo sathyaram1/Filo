@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const SHARED = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared');
+require(join(SHARED, 'constants.js'));
 require(join(SHARED, 'actionLevels.js'));
 require(join(SHARED, 'actionTools.js'));
 const AL = globalThis.SN_ACTION_LEVELS;
