@@ -347,17 +347,18 @@ test('foto dello schermo: il campo della carta di una finestra di Filo si copre 
   assert.deepEqual(r.puntini, [60, 60, 60]);
 });
 
-test('foto dello schermo: una finestra di Filo che non si può coprire la ferma, una su un altro monitor no', () => {
+test('foto dello schermo: una finestra di Filo che non si può misurare si copre intera e il resto dello schermo arriva (#2116.5 giro 1)', () => {
   const area = { left: 0, top: 0, width: 1000, height: 500 };
   const wc = {};
   const prima = [{ wc, vista: { left: 100, top: 100, width: 300, height: 200 } }];
-  assert.deepEqual(Schermo.copertureDelloSchermo({ prima, dopo: prima, misure: [{ no: 'segreti' }], area, larghezza: 1000, altezza: 500 }), { no: 'segreti' });
+  const intera = (c) => c.lista.map((r) => [r.left, r.top, r.width, r.height]);
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima, dopo: prima, misure: [{ no: 'segreti' }], area, larghezza: 1000, altezza: 500 })), [[100, 100, 300, 200], [100, 100, 300, 200]]);
   const altrove = [{ wc, vista: { left: 1200, top: 100, width: 300, height: 200 } }];
   assert.deepEqual(Schermo.copertureDelloSchermo({ prima: altrove, dopo: altrove, misure: [{ no: 'segreti' }], area, larghezza: 1000, altezza: 500 }), { lista: [] });
   // Spostata sul monitor fotografato durante lo scatto: conta anche la posizione di dopo.
-  assert.deepEqual(Schermo.copertureDelloSchermo({ prima: altrove, dopo: prima, misure: [{ no: 'riquadri' }], area, larghezza: 1000, altezza: 500 }), { no: 'riquadri' });
-  // Una scheda passata in vista durante lo scatto non ha la misura di prima.
-  assert.deepEqual(Schermo.copertureDelloSchermo({ prima, dopo: [{ wc: {}, vista: prima[0].vista }], misure: [{ lista: [], vista: { w: 300, h: 200 } }], area, larghezza: 1000, altezza: 500 }), { no: 'misura' });
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima: altrove, dopo: prima, misure: [{ no: 'riquadri' }], area, larghezza: 1000, altezza: 500 })), [[100, 100, 300, 200]]);
+  // Una scheda passata in vista durante lo scatto non ha la misura di prima: si copre intera, a metà risoluzione.
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima, dopo: [{ wc: {}, vista: prima[0].vista }], misure: [{ lista: [], vista: { w: 300, h: 200 } }], area, larghezza: 500, altezza: 250 })), [[50, 50, 150, 100]]);
   // Senza sapere dove sta il monitor, con Filo in vista non si copre a caso.
   assert.deepEqual(Schermo.copertureDelloSchermo({ prima, dopo: prima, misure: [{ lista: [], vista: { w: 300, h: 200 } }], area: null, larghezza: 1000, altezza: 500 }), { no: 'misura' });
   assert.deepEqual(Schermo.copertureDelloSchermo({ prima: [], dopo: [], misure: [], area: null, larghezza: 1000, altezza: 500 }), { lista: [] });
