@@ -116,11 +116,11 @@ test('i canali dei pulsanti della pagina Preferenze hanno la loro strada dalla c
 });
 
 test('la chat non manda l\'utente a cercare in Preferenze ciò che sceglie solo lui: gli apre la pagina sul punto', () => {
-  const prompt = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
-  assert.match(prompt, /PULSANTE_PREFERENZE/);
-  assert.match(prompt, /filo:\/\/preferences\/preferences\.html#restartOnboarding/);
+  const T = globalThis.SN_ACTION_TOOLS.TOOLS;
+  assert.deepEqual(T.PULSANTE_PREFERENZE.via, ['impostazioni', 'pulsante']);
+  assert.match(T.PULSANTE_PREFERENZE.description, /filo:\/\/preferences\/preferences\.html#restartOnboarding/);
   // Il livello di autonomia si cambia anche dalla chat (#1312): alzarlo vuole la parola, non la pagina.
-  assert.match(prompt, /livello di autonomia si cambia così \(chiave autonomia\)/);
+  assert.match(T.IMPOSTA_PREFERENZA.description, /autonomia \(solo se l'utente lo chiede\)/);
   const html = readFileSync(join(ROOT, 'src', 'pages', 'preferences', 'preferences.html'), 'utf8');
   for (const id of ['autonomia', 'restartOnboarding']) assert.match(html, new RegExp(`id="${id}"`), `#${id} non c'è più nella pagina`);
 });
