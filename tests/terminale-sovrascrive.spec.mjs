@@ -1,5 +1,6 @@
 // #892.2 — un comando che sovrascrive o svuota un file che c'è già chiede prima di partire, scritto a mano nella home
-// come proposto da Filo: il contenuto di prima non torna. Sul file nuovo la copia parte come prima, senza domande.
+// come proposto da Filo: il contenuto di prima non torna, e la domanda lo dice. Sul file nuovo la copia è costo 2: a
+// Normale, finché manca il guardiano, chiede un OK semplice, senza il rischio di sovrascrivere (#1840).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm } from './helpers/confirm.mjs';
