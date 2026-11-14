@@ -102,7 +102,7 @@ test('i rami in corso danno al manutentore i file in forma di percorso, mai un n
     assert.deepEqual([r.file, r.fileStorti], [['docs/nota.md'], 1]);
     assert.doesNotMatch(rigaRamo(r), /ignora/);
     assert.match(rigaRamo(r), /docs\/nota\.md, 1 file con un nome che non è un percorso del repo/);
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('il censimento delle schede lascia fuori il non fidato che il server dà al fidato senza contenuto', async () => {
