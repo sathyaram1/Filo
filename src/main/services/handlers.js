@@ -5169,60 +5169,17 @@ function rilettura(chat, { da = null, cap }) {
 // Esterno è tutto quello che viene dall'archivio: la trascrizione, il
 // frammento trovato dalla ricerca e anche il TITOLO, che lo scrive un modello
 // dopo aver letto quella stessa conversazione.
-// filo(espandi): messaggi, pagine e cose successe fra due istanti, una riga ciascuna, in ordine. Le pagine arrivano già
-// col filtro delle delicate e della rete di casa (contestoFilo.vociDiPagine). Oltre il tetto di un esito (SPEC-CONTESTO
-// § Gli esiti degli strumenti) si ferma e dice da dove riprendere.
-const ESPANSO_MAX_CARATTERI = 70000;
+// filo(espandi): messaggi, pagine e cose successe fra due istanti (il calcolo: SN_TRATTO_VIVO.rileggi). Le pagine
+// arrivano già col filtro delle delicate e della rete di casa (contestoFilo.vociDiPagine).
 async function espandiFilo(daRaw, aRaw) {
   const t0 = Date.parse(String(daRaw ?? ''));
   if (!Number.isFinite(t0)) return { errore: '«da» non è un istante: scrivilo come 2026-11-12T20:24' };
-  const t1 = aRaw == null || aRaw === '' ? t0 + 60 * 60 * 1000 : Date.parse(String(aRaw));
-  if (!Number.isFinite(t1)) return { errore: '«a» non è un istante: scrivilo come 2026-11-12T21:30' };
-  if (t1 <= t0) return { errore: '«a» viene prima di «da»' };
-  const dentro = (ts) => { const t = Date.parse(ts); return Number.isFinite(t) && t >= t0 && t < t1 ? t : null; };
-  const FC = globalThis.SN_FILO_CONTESTO;
-  const voci = [];
-  for (const c of await FiloChats.list()) {
-    const titolo = c.title || ChatArchive.fallbackTitle(c.messages);
-    for (const m of Array.isArray(c.messages) ? c.messages : []) {
-      const t = dentro(m && m.ts);
-      const testo = String((m && m.text) || '').replace(/\s+/g, ' ').trim();
-      if (t == null || !testo) continue;
-      // Una risposta nata da testo di altri resta sospetta come quando la si rilegge con filo(cerca) (#1508).
-      const classe = FC ? FC.classeDelMessaggio(m, c.fonti) : 1;
-      voci.push({ t, riga: `${m.role === 'user' ? 'utente' : 'Filo'} nella chat «${titolo}» (id ${c.id}): ${testo}`, fuori: !!(m.esterno || m.daPagina), classe });
-    }
-  }
-  const TV = globalThis.SN_TRATTO_VIVO;
-  for (const ev of await ContestoFilo.eventiDa(new Date(t0).toISOString())) {
-    const t = dentro(ev && ev.ts);
-    if (t == null) continue;
-    if (ev.tipo === 'navigazione') {
-      const riga = ev.casa ? 'una pagina della rete di casa'
-        : (ev.delicata ? `una pagina di ${ev.sito}` : `pagina di ${ev.sito || 'un file'}${ev.titolo ? `: «${ev.titolo}»` : ''}${ev.cercato ? ` (cercato «${ev.cercato}»)` : ''}`);
-      voci.push({ t, riga, fuori: !ev.casa });
-      continue;
-    }
-    const r = TV ? TV.rigaDi(ev) : null;
-    if (r) voci.push({ t, riga: r, fuori: !['azione', 'cambio', 'notifica'].includes(ev.tipo) });
-  }
-  voci.sort((x, y) => x.t - y.t);
-  const ora = (t) => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  const righe = [];
-  let caratteri = 0;
-  let seguito = null;
-  for (const v of voci) {
-    const riga = `- ${ora(v.t)} ${v.riga}`;
-    if (caratteri + riga.length > ESPANSO_MAX_CARATTERI && righe.length) { seguito = new Date(v.t).toISOString(); break; }
-    righe.push(riga);
-    caratteri += riga.length + 1;
-  }
-  const tenute = seguito ? voci.slice(0, righe.length) : voci;
-  return {
-    da: new Date(t0).toISOString(), a: new Date(t1).toISOString(), testo: righe.join('\n'), righe: righe.length, totale: voci.length,
-    ...(seguito ? { seguito } : {}), esterno: tenute.some((v) => v.fuori),
-    classeLetta: tenute.reduce((n, v) => Math.max(n, v.classe || 1), 1),
-  };
+  return globalThis.SN_TRATTO_VIVO.rileggi({
+    da: daRaw, a: aRaw,
+    chat: (await FiloChats.list()).map((c) => ({ ...c, title: c.title || ChatArchive.fallbackTitle(c.messages) })),
+    eventi: await ContestoFilo.eventiDa(new Date(t0).toISOString()),
+    classeDelMessaggio: globalThis.SN_FILO_CONTESTO && globalThis.SN_FILO_CONTESTO.classeDelMessaggio,
+  });
 }
 
 function espansioniForPrompt(actions) {
