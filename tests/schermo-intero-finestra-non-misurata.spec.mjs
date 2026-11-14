@@ -171,7 +171,7 @@ endstream endobj
 trailer<</Root 1 0 R>>
 %%EOF`;
 
-test('r1 guardando lo schermo intero con un PDF aperto in una finestra di Filo, la foto arriva', async ({ app, openTab }) => {
+test('#2116.5: guardando lo schermo intero con un PDF aperto in una finestra di Filo, la foto arriva con quella finestra coperta', async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await servi(app, { 'documenti-finti.it/bolletta.pdf': { corpo: PDF, tipo: 'application/pdf' } });
   await openTab('https://documenti-finti.it/bolletta.pdf').catch(() => null);
