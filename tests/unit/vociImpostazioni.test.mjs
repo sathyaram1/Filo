@@ -115,7 +115,7 @@ test('i permessi dei siti si leggono (anche cercando il permesso o il sito) e la
   const altrove = { permessiSiti: ['meet.google.com · microfono: consentito', 'xn--mnchen-3ya.de · posizione: negato'] };
   const riga = (r) => r.righe.find((x) => x.startsWith('- permessi dei siti')) || '';
   for (const cerca of ['microfono', 'quali siti possono usare la fotocamera?', 'permessi dei siti', 'meet.google.com']) {
-    assert.match(riga(V.righePerModello(S, { cerca, altrove })), /2 voci.*meet\.google\.com · microfono: consentito, münchen\.de · posizione: negato.*\[TOGLI_PERMESSO_SITO/, cerca);
+    assert.match(riga(V.righePerModello(S, { cerca, altrove })), /2 voci.*meet\.google\.com · microfono: consentito, münchen\.de · posizione: negato.*\[impostazioni\(togli_permesso\)/, cerca);
   }
   assert.match(riga(V.righePerModello(S, { altrove: { permessiSiti: [] } })), /: elenco vuoto \[/);
   // Senza chi le tiene non si inventa un «nessuno».
