@@ -143,24 +143,43 @@ function areaDelloSchermo(rettangoli, displayId, rapporto) {
 
 /** Le coperture delle finestre di Filo in una foto dello schermo `larghezza`×`altezza` che ritrae `area`: `prima` e `dopo`
  *  sono le finestre in vista ai due lati dello scatto (`{ wc, vista }`), `misure[i]` le coperture di `prima[i]`.
- *  `{ lista }` in pixel della foto, o `{ no }` quando una finestra sulla foto non si può coprire. PURA. */
+ *  `{ lista }` in pixel della foto, o `{ no }` quando non si sa dove la foto mette le finestre. Una finestra che non si
+ *  misura, o arrivata durante lo scatto senza la misura di prima, si copre per intero. PURA. */
 function copertureDelloSchermo({ prima, dopo, misure, area, larghezza, altezza }) {
   if (!prima.length && !dopo.length) return { lista: [] };
   if (!area) return { no: 'misura' };
   const kx = larghezza / area.width, ky = altezza / area.height;
   const sulla = (v) => !!(v && interseca(v, area));
   const nellaFoto = (v) => ({ left: (v.left - area.left) * kx, top: (v.top - area.top) * ky, width: v.width * kx, height: v.height * ky });
-  // Una scheda arrivata durante lo scatto non ha la misura di prima: la foto può averla presa scoperta.
-  if (dopo.some((w) => sulla(w.vista) && !prima.some((p) => p.wc === w.wc))) return { no: 'misura' };
+  const intera = (v) => ({ ...nellaFoto(v), colore: Foto.GRIGIO });
   const lista = [];
+  for (const w of dopo) if (sulla(w.vista) && !prima.some((p) => p.wc === w.wc)) lista.push(intera(w.vista));
   for (let i = 0; i < prima.length; i++) {
     const posti = [prima[i].vista, ...dopo.filter((w) => w.wc === prima[i].wc).map((w) => w.vista)].filter(sulla);
-    if (!posti.length) continue;
-    if (misure[i].no) return { no: misure[i].no };
-    for (const v of posti) lista.push(...Foto.copertureNellaFoto(misure[i], nellaFoto(v), 2));
+    for (const v of posti) lista.push(...(misure[i].no ? [intera(v)] : Foto.copertureNellaFoto(misure[i], nellaFoto(v), 2)));
   }
   return { lista };
 }
+
+/** I veli da posare dentro una finestra di Filo, in punti della finestra: `dentro` è dove la pagina sta nella finestra,
+ *  `misura` la sua da copertureIntorno. Una pagina che non si misura si vela intera. PURA. */
+function veliDellaFinestra(misura, dentro) {
+  const tutta = { left: dentro.x, top: dentro.y, width: dentro.width, height: dentro.height };
+  if (!misura || misura.no) return [tutta];
+  return Foto.copertureNellaFoto(misura, tutta, 2);
+}
+
+/** Vero se ogni copertura di `dopo` sta sotto un velo posato per `prima` sulla stessa pagina, alla stessa grandezza. PURA. */
+function velataGia(prima, dopo) {
+  if (!prima || prima.no) return true;
+  if (!dopo || dopo.no) return false;
+  if (!prima.vista || !dopo.vista || prima.vista.w !== dopo.vista.w || prima.vista.h !== dopo.vista.h) return false;
+  const dentro = (r, v) => r.left >= v.left - 1 && r.top >= v.top - 1
+    && r.left + r.width <= v.left + v.width + 1 && r.top + r.height <= v.top + v.height + 1;
+  return (dopo.lista || []).every((r) => (prima.lista || []).some((v) => dentro(r, v)));
+}
+
+const stessoPosto = (a, b) => !!(a && b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
 
 function sistemaVero() {
   const electron = require('electron');
