@@ -49,7 +49,7 @@ test('le altre cose successe portano testo di fuori come nel blocco di ogni mess
   const rete = rileggi([{ tipo: 'sistema', ts: ts(5), cosa: 'rete', online: true, nome: 'Casa Rossi' }]);
   assert.equal(rete.esterno, true);
   // La stessa regola dice cosa conta nel blocco normale: le due strade non possono più rispondere diverso.
-  for (const ev of [{ tipo: 'download', file: 'x.pdf', stato: 'finito' }, { tipo: 'scheda.aperta', interna: 'filo://preferences/x' }]) {
+  for (const ev of [{ tipo: 'download', scaricamento: 'd1', file: 'x.pdf', stato: 'finito' },{ tipo: 'scheda.aperta', interna: 'filo://preferences/x' }]) {
     const blocco = TV.rendiEventi([{ ...ev, ts: ts(1) }]);
     assert.equal(blocco.daFuori.length > 0, rileggi([{ ...ev, ts: ts(1) }]).esterno, ev.tipo);
   }
