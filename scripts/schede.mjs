@@ -272,7 +272,7 @@ export async function letturaLocale(dip = {}) {
     for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
     const { decryptFeedbackList, decryptJsonField } = await import('./lib/decrypt-feedback-fields.mjs');
     leggiRighe = leggiRighe || (async () => {
-      const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: await acquireBearer(), fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
+      const r = await righeDaIndicizzare({ FB: globalThis.SN_FEEDBACK, idToken: await acquireBearer(), fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
       return { rows: await decryptFeedbackList(r.rows), complete: r.complete };
     });
     apri = apri || ((v) => decryptJsonField(v));
