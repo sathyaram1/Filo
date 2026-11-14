@@ -177,7 +177,7 @@
     },
     RIPRENDI_AUDIO: {
       via: ['scheda', 'riprendi_audio'],
-      description: 'fa ripartire l\'audio di prima (senza scheda: l\'ultima che ha suonato); vai: ci porta l\'utente.',
+      description: 'riparte l\'audio di prima (senza scheda: l\'ultima che ha suonato); vai: ci porta l\'utente.',
       properties: { scheda: I(), vai: B() }, required: [],
     },
     PAUSA_AUDIO: {
