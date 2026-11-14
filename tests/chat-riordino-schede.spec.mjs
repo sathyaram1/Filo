@@ -37,7 +37,15 @@ async function schedeDaRiordinare(openTab, testServer, shell) {
   await tornaAllaHome(shell);
 }
 
-const giudizioCheArchivia = (app, titolo) => app.evaluate((_e, t) => {
+// Riordinare è costo 2: a Normale, finché manca il guardiano, chiede col bottone come a Conservativo (#1840).
+async function alBottone(page) {
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  await expect(btn).toHaveText(/Riordina e archivia/, { timeout: 15_000 });
+  await btn.click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+}
+
+const giudizioCheArchivia =(app, titolo) => app.evaluate((_e, t) => {
   globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
     decisions: tabs.map((x, i) => ({ i, action: x.title === t ? 'archive' : 'keep', reason: 'test' })),
   });
