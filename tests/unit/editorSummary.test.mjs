@@ -107,8 +107,8 @@ test('il prompt di chat di Filo inietta i riassunti dei file, non il testo integ
   assert.ok(prompt.includes("FILE DELL'EDITOR"));
   assert.ok(prompt.includes('Un racconto di fantasia su un viaggio.'));
   assert.ok(prompt.includes('Elenco di ricette di cucina italiana.'));
-  // …e descrive l'azione LEGGI_FILE per leggere un file per intero on-demand.
-  assert.ok(prompt.includes('LEGGI_FILE'));
+  // …e dice con quale strumento si legge un file per intero on-demand.
+  assert.ok(prompt.includes('file(leggi_editor)'));
   // Ma NON il testo integrale dei documenti.
   assert.ok(!prompt.includes('ALFA0'));
   assert.ok(!prompt.includes('BETA0'));
