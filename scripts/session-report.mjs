@@ -711,7 +711,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
         const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
         const ordine = rep.tools.total;
-        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') { comandi.push(input.command); ultimaShell = ordine; }
+        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') {
+          comandi.push(input.command);
+          ultimaShell = ordine;
+          // Il server ritira la fiducia del manutentore a ogni strumento fuori dall'elenco pulito (#2337): la rete della shell conta a parte.
+          if (chiamaLaRete(input.command)) rep.tools.byName[STRUMENTO_RETE] = (rep.tools.byName[STRUMENTO_RETE] || 0) + 1;
+        }
         const file = percorsoNorma(typeof input.file_path === 'string' ? input.file_path : input.notebook_path).join('/');
         if (file && (b.name === 'Read' || STRUMENTI_SCRITTURA.includes(b.name))) {
           Object.assign(info, { file, ordine });
