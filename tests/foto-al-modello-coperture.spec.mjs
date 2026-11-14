@@ -436,8 +436,8 @@ test('#2116.5: Wayland, con una cassa compilata in una finestra di Filo il selet
   await guardaDopoOk(app, chat, SELETTORE);
   await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
   const secondo = await app.evaluate(() => globalThis.__chat[1]);
-  expect(secondo).toContain('mostra cose da coprire');
-  expect(secondo).toContain('Filo da sola');
+  expect(secondo).toContain('mostra dati da coprire');
+  expect(secondo).toContain('guardala da sola o riducila a icona');
   expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(0);
   expect(await app.evaluate(() => globalThis.__occhio.length)).toBe(0);
 });
