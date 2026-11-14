@@ -641,13 +641,13 @@ test('con la soglia scritta sotto la parte fissa la risposta non aspetta una com
     await page.waitForTimeout(1500);
     expect(await app.evaluate(() => globalThis.__compattazioni.map((x) => x.motivo)), 'nessuna compattazione').toEqual([]);
     // La chat compatta dove dice la regola dello spazio: la parte fissa misurata più lo spazio minimo.
-    const { base, soglia } = await app.evaluate(async () => {
+    const { fissa, soglia } = await app.evaluate(async (_e, scritta) => {
       const C = globalThis.SN_COMPATTAZIONE;
-      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: 40000 }, null) });
-      return { base: C.base(false), soglia: l.soglia };
-    });
-    expect(base, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(40000);
-    expect(soglia).toBe(base + 30000);
+      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: scritta }, null) });
+      return { fissa: C.base(false), soglia: l.soglia };
+    }, scritta);
+    expect(fissa, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(scritta);
+    expect(soglia).toBe(fissa + 30000);
   } finally { await rimettiCompattatore(app); await ripristina(app); }
 });
 
