@@ -203,17 +203,18 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
     const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
     const file = new Set();
+    const storti = new Set();
     const conta = new Map();
     let avanti = 0;
     for (const r of log.split('\n')) {
       if (r.startsWith('\u0001')) {
         avanti += 1;
         for (const m of r.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
-      } else if (r.trim()) file.add(r.trim());
+      } else if (r.trim()) (haFormaDiPercorso(r.trim()) ? file : storti).add(r.trim());
     }
     if (!avanti) continue;
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), feedback });
+    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), ...(storti.size ? { fileStorti: storti.size } : {}), feedback });
   }
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
