@@ -3878,7 +3878,7 @@
   // Prima il server dice cosa toglierebbe, poi la conferma rimanda quello che l'owner ha visto: se è cambiato, rifiuta.
   const TITOLO_DICHIARA = 'Ramo e note di questo lavoro diventano fidati così come sono, a tuo nome: il lavoro riparte al giro dopo. La fiducia del feedback non cambia.';
   function aggiungiDichiara(fb) {
-    if (!isAdmin || !mgWorkState || !MR.restaLocale(fb)) return;
+    if (!isAdmin || !mgWorkState || !fermoRestaLocale(fb)) return;
     const posto = document.createElement('div');
     posto.className = 'mg-dichiara';
     const btn = document.createElement('button');
