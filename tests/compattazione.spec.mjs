@@ -628,7 +628,9 @@ test('con la soglia scritta sotto la parte fissa la risposta non aspetta una com
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Va bene.' }]);
   await compattatoreFinto(app, '10:00 parlato di animali');
-  await conSoglia(app, 40000);
+  // Sotto la parte fissa misurata oggi, non sotto un numero: da #1564 strumenti e istruzioni pesano un quarto di prima.
+  const scritta = Math.max(5000, Math.floor((await base(app)) / 2));
+  await conSoglia(app, scritta);
   try {
     await chiedi(page, 'la mia gatta si chiama Ofelia');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(1);
