@@ -546,16 +546,16 @@ test('le fonti si leggono come testo, sulla pagina e per il modello', () => {
 
 // #515 — Presentato col sottotitolo («le motivazioni etiche…»), il documento
 // sui modelli sembrava non rispondere a «che fine fanno i miei dati?».
-test('lo strumento dice al modello cosa c\'è dentro ogni documento, e di leggerlo prima di dire che non c\'è', () => {
+// Da #1564 i titoli delle sezioni non stanno nello strumento (tetto degli strumenti): ci sono gli argomenti che i
+// documenti coprono, dati compresi, e la regola di leggerli prima di rispondere.
+test('lo strumento dice al modello di cosa parlano i documenti, e di leggerli prima di rispondere', () => {
   const { T } = loadModules();
   const fn = toolTrasparenza();
   for (const d of T.all()) {
-    for (const s of d.sections) {
-      assert.ok(fn.description.includes(s.title), `"${d.id}": lo strumento non nomina la sezione «${s.title}»`);
-    }
     if (d.subtitle) {
       assert.ok(!fn.description.includes(d.subtitle), `"${d.id}": presentato con la frase scritta per la pagina`);
     }
   }
-  assert.match(fn.description, /leggilo prima di rispondere/);
+  assert.match(fn.description, /modelli e aziende scelti, costi, soldi e dati/);
+  assert.match(fn.description, /Leggilo prima di rispondere/);
 });
