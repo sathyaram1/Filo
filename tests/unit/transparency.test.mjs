@@ -475,7 +475,7 @@ test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
   // lascerebbe l'istruzione a puntare nel vuoto, in silenzio.
   const { T } = loadModules();
   const src = readFileSync(join(ROOT, 'src', 'shared', 'onboarding.js'), 'utf8');
-  const citati = [...src.matchAll(/LEGGI_TRASPARENZA\s+doc\s+"([^"]+)"/g)].map((m) => m[1]);
+  const citati = [...src.matchAll(/filo_su_di_se\(documento\)\s+doc\s+"([^"]+)"/g)].map((m) => m[1]);
   assert.ok(citati.length, 'l\'accoglienza non cita più nessun documento: aggiorna questo test');
   for (const id of citati) {
     assert.ok(T.ids().includes(id), `l'accoglienza manda l'agente a leggere "${id}", che non esiste`);
