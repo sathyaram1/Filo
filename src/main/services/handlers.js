@@ -1852,6 +1852,9 @@ function analizzaPer(sender) {
   return tm && typeof tm._sbAnalizza === 'function' ? (u, ctx) => tm._sbAnalizza(u, ctx) : null;
 }
 
+// Il modello conosce le azioni come strumento(azione), non per tipo.
+const chiamataPerModello = (type) => (globalThis.SN_ACTION_TOOLS ? globalThis.SN_ACTION_TOOLS.chiamata(type) : type);
+
 // Cosa sente il modello quando l'indirizzo che ha scritto non compare da nessuna parte (#553).
 function rifiutoNonCompare(type) {
   const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
