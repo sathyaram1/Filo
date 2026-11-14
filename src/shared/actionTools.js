@@ -157,23 +157,23 @@
     },
     REGOLA_PROXY_DOMINIO: {
       via: ['scheda', 'regola_paese'],
-      description: 'un dominio si apre sempre da un paese (senza dominio: la scheda davanti).',
-      properties: { country: S(), dominio: S() }, required: ['country'],
+      description: 'un sito si apre sempre da un paese (senza sito: quello della scheda davanti).',
+      properties: { country: S(), sito: S() }, required: ['country'],
     },
     RIMUOVI_REGOLA_PROXY: {
       via: ['scheda', 'togli_regola_paese'],
-      description: 'toglie la regola del paese di un dominio.',
-      properties: { dominio: S() }, required: [],
+      description: 'toglie la regola del paese di un sito.',
+      properties: { sito: S() }, required: [],
     },
     TIENI_APERTA: {
       via: ['scheda', 'tieni_aperta'],
-      description: 'la pulizia non archivia mai questo sito.',
-      properties: { dominio: S() }, required: [],
+      description: 'la pulizia non archivia mai questo sito (senza sito: quello della scheda davanti).',
+      properties: { sito: S() }, required: [],
     },
     NON_TENERE_APERTA: {
       via: ['scheda', 'non_tenere_aperta'],
       description: 'toglie la regola di tieni_aperta.',
-      properties: { dominio: S() }, required: [],
+      properties: { sito: S() }, required: [],
     },
     RIPRENDI_AUDIO: {
       via: ['scheda', 'riprendi_audio'],
