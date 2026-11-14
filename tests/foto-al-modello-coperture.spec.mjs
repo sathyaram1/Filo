@@ -424,6 +424,8 @@ test('#2116.5: guardando lo schermo intero, il numero della carta nella finestra
   await guardaDopoOk(app, chat, 'Schermo intero');
   await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  const grezza = await app.evaluate(() => globalThis.__schermo.grezza);
+  expect(await pixelDelColore(app, grezza, ROSA), 'lo schermo del sistema finto deve mostrare il numero scoperto').toBeGreaterThan(200);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare lo schermo con la cassa').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto dello schermo').toBeLessThan(20);
 });
