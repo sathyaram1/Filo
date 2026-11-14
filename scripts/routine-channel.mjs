@@ -1654,13 +1654,7 @@ if (isMain) {
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
   // I nomi di campo che questo strumento conosce.
-  const CAMPI = new Set([
-    'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
-    'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
-    'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
-  ]);
+  const CAMPI = new Set(CAMPI_DELLA_RIGA);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
   // resta è uno dei nostri campi. La conchiglia di Git trasforma `/guasto` in
