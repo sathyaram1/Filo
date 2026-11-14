@@ -473,7 +473,9 @@ test('#2116.5: Wayland, una carta scritta mentre il selettore è aperto ferma la
       const tab = tm.tabs.find((t) => t.title === 'Cassa del negozio');
       await tab.view.webContents.executeJavaScript(`(() => { const i = document.createElement('input'); i.name = 'q2';
         i.style.cssText = 'position:absolute;left:20px;top:260px;width:420px;font:bold 34px monospace;color:${rosa};background:#fff;border:1px solid #999;caret-color:transparent;outline:0';
-        i.value = '5555 5555 5555 4444'; document.body.appendChild(i); })()`);
+        document.body.appendChild(i); i.focus(); })()`);
+      await tab.view.webContents.insertText('5555 5555 5555 4444');
+      await tab.view.webContents.executeJavaScript('document.activeElement.blur()');
       await new Promise((r) => setTimeout(r, 150));
     };
   }, tinta(ROSA));
