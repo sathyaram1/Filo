@@ -60,7 +60,7 @@
     },
     TOGLI_PERMESSO_SITO: {
       via: ['impostazioni', 'togli_permesso'],
-      description: 'toglie una risposta ricordata per un sito (microfono, posizione, notifiche, scaricamenti…); senza permesso tutte.',
+      description: 'toglie una risposta ricordata per un sito (permesso: microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file, scaricamenti); senza permesso tutte.',
       properties: { sito: S(), permesso: S() }, required: ['sito'],
     },
     INSTALLA_AGGIORNAMENTO: {
