@@ -8127,6 +8127,10 @@
     renderFsDrill();
     if (mgFsDrillList && scorrimento) mgFsDrillList.scrollTop = scorrimento;
     fsRiprendiFuoco(fuoco);
+    // Una finestra nuova può chiedere l'esito di righe che non si sono ancora lette intere.
+    if (!fsRipiego && fsPannelloAperto() && ((stat.auditIds && stat.auditIds.nonLetti) || []).some((id) => !fsChiesteIntere.has(id))) {
+      fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+    }
   }
 
   // Finestra, mittenti e riquadri: un solo ascoltatore per la scheda.
