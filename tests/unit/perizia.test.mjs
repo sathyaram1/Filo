@@ -118,7 +118,8 @@ test('i rami in corso danno al manutentore solo nomi scritti dal server e file c
     const testo = [...rami.map(rigaRamo), rigaFuori(fuori, 0)].join('\n');
     assert.doesNotMatch(testo, /ignora/);
     const noto = rami.find((r) => r.ramo === 'worker/IdDelFeedback901xyz-20261114T120000Z');
-    assert.deepEqual([noto.file, noto.fileNuovi], [['docs/nota.md'], 2]);
+    assert.deepEqual([noto.file, noto.fileNuovi.length], [['docs/nota.md'], 2]);
+    assert.deepEqual(incroci(rami, ['docs/']).map((c) => c.comuni), [['docs/nota.md'], ['docs/nota.md'], ['docs/nota.md']], 'una cartella della scheda non porta i nomi dei file nuovi');
     assert.match(rigaRamo(noto), /docs\/nota\.md, 2 file che su main non ci sono/);
     assert.equal(rami.filter((r) => /\(nome non mostrato\) @[0-9a-f]{7}$/.test(r.ramo)).length, 2, 'gli altri due rami di lavoro, contati col commit');
     assert.match(rigaFuori(fuori, 0), /1 rami che non sono di lavoro \(altro\/\(nome non mostrato\) @[0-9a-f]{7}\)/);
