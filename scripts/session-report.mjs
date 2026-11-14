@@ -195,6 +195,15 @@ export function slugProgetto(percorso) {
   return String(percorso || '').replace(/[^A-Za-z0-9]/g, '-');
 }
 
+// I comandi della shell che scaricano da un indirizzo, contati in `tools.byName` sotto questo nome (#2337).
+export const STRUMENTO_RETE = 'Bash_rete';
+const RE_RETE = /(?:^|[;&|(`]|\$\()\s*(?:sudo\s+|command\s+|env\s+(?:\S+=\S*\s+)*)?(?:curl|wget|gh|Invoke-WebRequest|Invoke-RestMethod|iwr|irm|lynx|w3m|aria2c|http|https|xh)(?:\.exe)?(?=\s|$)/im;
+
+/** Il comando chiama la rete con uno strumento da riga di comando? Solo in posizione di comando. PURA. */
+export function chiamaLaRete(comando) {
+  return RE_RETE.test(String(comando || ''));
+}
+
 /** Una chiave ammessa da Firestore: solo [A-Za-z0-9_-], il resto diventa `_`. PURA. */
 export function chiaveSicura(nome) {
   const s = String(nome || '').replace(/[^A-Za-z0-9_-]/g, '_');
