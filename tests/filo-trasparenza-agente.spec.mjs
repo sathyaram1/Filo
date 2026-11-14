@@ -221,10 +221,10 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'documento sulla privacy' })).toBeVisible({ timeout: 20_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'LEGGI_TRASPARENZA');
-  expect(strumento, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'filo_su_di_se');
+  expect(strumento, 'filo_su_di_se non arriva al modello').toBeTruthy();
   expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
-  expect(strumento.function.description).toContain('Cosa resta sul tuo computer');
+  expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy[^)]*\): [^\n]*dati/);
 
   const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
   const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
