@@ -6250,6 +6250,11 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (PAGE_ACTIONS.includes(type) && !res.output) {
     return `Azione ${nome} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
+  // Un'icona che non riconosco: l'elenco è la strada per riprovare, non un motivo per fermarsi.
+  if (type === 'SPOSTA_ICONA' && res.output && res.output.icone) {
+    return `Icona NON spostata: «${E_perModello(res.output.id)}» non è un'icona che conosco. Riprova adesso con l'id di quella che `
+      + `intende l'utente, da questo elenco (id e nome): ${res.output.icone}. Se nessuna gli somiglia, chiediglielo.`;
+  }
   return `Azione ${nome} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
