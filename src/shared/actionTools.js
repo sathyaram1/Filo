@@ -203,7 +203,7 @@
       description: () => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const contesti = D && D.CONTESTI ? Object.keys(D.CONTESTI).join(', ') : '';
-        return 'sposta un\'icona per id (uno sbagliato torna con l\'elenco): dove barra o altro della barra laterale, fila o altro_fila del tasto destro col contesto'
+        return 'sposta un\'icona detta col nome del menu o con l\'id (una che non conosco torna con l\'elenco degli id): dove barra o altro della barra laterale, fila o altro_fila del tasto destro col contesto'
           + (contesti ? ` (${contesti})` : '') + '.';
       },
       properties: { icona: S(), dove: S(), contesto: S(), prima_di: S() },
