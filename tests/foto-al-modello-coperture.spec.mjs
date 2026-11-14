@@ -481,6 +481,7 @@ test('#2116.5: Wayland, una carta scritta mentre il selettore è aperto ferma la
   }, tinta(ROSA));
   await guardaDopoOk(app, chat, SELETTORE);
   await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
+  console.log('DEBUG', await app.evaluate(() => globalThis.__debugSel));
   expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto con la carta scoperta non deve partire').toBe(0);
   expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(1);
   expect((await app.evaluate(() => globalThis.__chat[1])).slice(-800)).toContain('mentre sceglievi nel selettore');
