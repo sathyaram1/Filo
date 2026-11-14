@@ -238,7 +238,8 @@ test('segnalato dai giudici o dal filtro: «Segna fidato» dal tasto destro avve
 // Giro 4 della verifica locale: un lavoro locale preso in carico non riceve le frasi delle routine.
 test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione, non che rientra in coda da solo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const da = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+  // Oltre la tolleranza del battito (50 minuti da #2469): la routine senza battito è ferma, il lavoro locale no.
+  const da = new Date(Date.now() - 70 * 60 * 1000).toISOString();
   const preso = fb({ status: 'working', workingSince: da, localOnly: SEGNO });
   const routine = fb({ _id: 'r-1', seq: 701, clientId: 'utente-x', senderProof: undefined, fiducia: undefined, status: 'working', workingSince: da });
   await apri(page, [preso, routine]);

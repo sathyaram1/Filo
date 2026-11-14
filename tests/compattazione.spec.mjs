@@ -414,23 +414,24 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
 
 test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti vecchi, il testo dell\'utente resta', async ({ app }) => {
   const page = await home(app);
-  // Sette pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
-  // portano la richiesta oltre il listino.
-  await app.evaluate(async () => {
+  // Dodici pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
+  // portano la richiesta oltre il listino anche con la parte fissa leggera di #1564.
+  const PAGINE = 12;
+  await app.evaluate(async (_e, PAGINE) => {
     const s = await globalThis.SN_STORAGE.getSettings();
     await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), token: 400000 } });
     const t0 = Date.now() - 10 * 60 * 1000;
     const Chats = globalThis.SN_FILO_CHATS;
     await Chats.append('lett1', { role: 'user', text: 'leggi la tesi', ts: new Date(t0).toISOString() });
-    const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: 7 }, () => ({ type: 'LEGGI_PAGINA' })) });
+    const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: PAGINE }, () => ({ type: 'LEGGI_PAGINA' })) });
     const testo = 'Il miele matura nelle celle opercolate. '.repeat(900);
     globalThis.SN_CONTESTO_FILO.ricordaEsiti('lett1', c.messages.at(-1).ts, {
-      azioni: Array.from({ length: 7 }, (_, i) => {
+      azioni: Array.from({ length: PAGINE }, (_, i) => {
         const url = `https://api.example/tesi/${i}`;
         return { type: 'LEGGI_PAGINA', _executed: true, params: { url }, _output: { ok: true, pageRead: url, url, titolo: `Tesi ${i}`, testo, da: 0, fino: testo.length, totale: testo.length } };
       }),
     });
-  });
+  }, PAGINE);
   await modelloFinto(app, [{ text: 'Va bene.' }]);
   // Chi compatta non risponde (rete giù): il tratto resta com'è, e la richiesta deve comunque stare sotto il listino.
   await app.evaluate(() => {
@@ -447,7 +448,7 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
     const [richiesta] = await chiamateAlModello(app);
     const testo = JSON.stringify(richiesta);
     // Le pagine c'erano davvero: messe a parte, la richiesta passerebbe il listino.
-    expect(await tokenDi(app, richiesta) + Math.ceil((7 * 36000) / 3.5)).toBeGreaterThan(100000);
+    expect(await tokenDi(app, richiesta) + Math.ceil((PAGINE * 32 * 1024) / 3.5)).toBeGreaterThan(100000);
     expect(await tokenDi(app, richiesta), 'tolti gli esiti, la richiesta sta sotto il listino').toBeLessThan(100000);
     expect(testo).not.toContain('celle opercolate');
     expect(testo).toContain('esiti sono stati tolti per stare nel contesto');
@@ -600,6 +601,9 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Letto, ecco il punto.' }]);
   await compattatoreFinto(app, '10:00 letto un capitolo della tesi');
+  // Lo spazio stretto per cui la prova è nata (soglia di serie sopra una parte fissa di 45.000 token): dalla parte fissa
+  // di oggi, più leggera da #1564, quella di serie lascerebbe una compattazione sola in dodici messaggi.
+  await conSoglia(app, (await base(app)) + 25000);
   const perMessaggio = [];
   try {
     for (let i = 0; i < 12; i++) {
@@ -628,7 +632,9 @@ test('con la soglia scritta sotto la parte fissa la risposta non aspetta una com
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Va bene.' }]);
   await compattatoreFinto(app, '10:00 parlato di animali');
-  await conSoglia(app, 40000);
+  // Sotto la parte fissa misurata oggi, non sotto un numero: da #1564 strumenti e istruzioni pesano un quarto di prima.
+  const scritta = Math.max(5000, Math.floor((await base(app)) / 2));
+  await conSoglia(app, scritta);
   try {
     await chiedi(page, 'la mia gatta si chiama Ofelia');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(1);
@@ -639,13 +645,13 @@ test('con la soglia scritta sotto la parte fissa la risposta non aspetta una com
     await page.waitForTimeout(1500);
     expect(await app.evaluate(() => globalThis.__compattazioni.map((x) => x.motivo)), 'nessuna compattazione').toEqual([]);
     // La chat compatta dove dice la regola dello spazio: la parte fissa misurata più lo spazio minimo.
-    const { base, soglia } = await app.evaluate(async () => {
+    const { fissa, soglia } = await app.evaluate(async (_e, scritta) => {
       const C = globalThis.SN_COMPATTAZIONE;
-      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: 40000 }, null) });
-      return { base: C.base(false), soglia: l.soglia };
-    });
-    expect(base, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(40000);
-    expect(soglia).toBe(base + 30000);
+      const l = await C.limiti(false, { tetti: globalThis.SN_FILO_CONTESTO.tetti({ soglia: scritta }, null) });
+      return { fissa: C.base(false), soglia: l.soglia };
+    }, scritta);
+    expect(fissa, 'la parte fissa sta sopra la soglia scritta').toBeGreaterThan(scritta);
+    expect(soglia).toBe(fissa + 30000);
   } finally { await rimettiCompattatore(app); await ripristina(app); }
 });
 
