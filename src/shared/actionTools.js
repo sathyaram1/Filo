@@ -113,7 +113,7 @@
     },
     CERCA_SALVATE: {
       via: ['scheda', 'salvate'], risultato: true,
-      description: 'cerca fra le pagine messe da parte con «Salva per dopo»; vuoto le dà tutte.',
+      description: 'cerca in «Aperti per dopo»; vuoto: tutte.',
       properties: { cerca: S() }, required: [],
     },
     APRI_SALVATA: {
