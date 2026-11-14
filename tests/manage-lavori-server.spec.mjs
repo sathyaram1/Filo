@@ -170,7 +170,7 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z --server');
   const rigaSporca = page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server');
   await expect(rigaSporca).toHaveText('Fermo: resta locale');
-  await expect(rigaSporca).toHaveAttribute('title', /non torna pulito: lo porta avanti una sessione locale/);
+  await expect(rigaSporca).toHaveAttribute('title', /non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è»/);
   await expect(rigaSporca).not.toHaveAttribute('title', /riparte da solo|sanatoria/i);
   await expect(page.locator('.mg-item[data-id="srv-6"] b')).toHaveCount(0);
   await expect(page.locator('.mg-item[data-id="srv-7"]')).toBeVisible();
