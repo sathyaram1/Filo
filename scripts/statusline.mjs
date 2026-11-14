@@ -156,7 +156,7 @@ export async function invia({ home = os.homedir(), nowMs = Date.now(), fetchImpl
     if (res.status === 404) return esito({ ok: false, errore: 'ownerCrediti non ancora pubblicata' });
     const corpo = await res.json().catch(() => ({}));
     if (!res.ok || corpo.error) return esito({ ok: false, errore: String((corpo.error && corpo.error.message) || `HTTP ${res.status}`).slice(0, 300) });
-    return esito({ ok: true, errore: '' });
+    return esito({ ok: true, errore: '', inviata: firmaLettura(ultima), inviataAtMs: nowMs });
   } catch (e) {
     return esito({ ok: false, errore: `rete: ${String((e && e.message) || e).slice(0, 200)}` });
   }
