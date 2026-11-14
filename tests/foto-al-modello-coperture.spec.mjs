@@ -358,6 +358,8 @@ async function schermoFinto(app, { wayland = false } = {}) {
     filo.forEach((w, i) => w.setBounds({ x: d.x + Math.round((i * d.width) / filo.length), y: d.y, width: Math.floor(d.width / filo.length), height: d.height }));
     globalThis.__schermo = { catture: 0, veli: 0, durante: null };
     const componi = async () => {
+      // Quello che l'utente fa col selettore aperto, prima di scegliere.
+      if (globalThis.__schermo.durante) await globalThis.__schermo.durante();
       const buf = Buffer.alloc(d.width * d.height * 4);
       for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x30; buf[i + 1] = 0x30; buf[i + 2] = 0x30; buf[i + 3] = 255; }
       for (const w of BrowserWindow.getAllWindows().filter((x) => x._filoTabs && !x.isDestroyed())) {
