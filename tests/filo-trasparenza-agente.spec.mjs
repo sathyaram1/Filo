@@ -224,7 +224,8 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
   const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'filo_su_di_se');
   expect(strumento, 'filo_su_di_se non arriva al modello').toBeTruthy();
   expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
-  expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy[^)]*\): [^\n]*dati/);
+  // Da #1564 il documento ci sta col suo titolo, che dice di cosa parla, non con una frase sugli argomenti.
+  expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy «[^»]+»[^)]*\): [^\n]*leggilo prima di rispondere/);
 
   const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
   const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
