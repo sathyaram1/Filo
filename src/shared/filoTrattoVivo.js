@@ -436,6 +436,60 @@
     }
   }
 
+  // filo(espandi): messaggi, pagine e cose successe fra due istanti, una riga ciascuna, in ordine. Il testo di altri lo
+  // decide daFuoriDi, la stessa regola del blocco di ogni messaggio. Oltre il tetto di un esito (SPEC-CONTESTO § Gli
+  // esiti degli strumenti) si ferma e dice da dove riprendere. Regole: tests/unit/filoRiletto.test.mjs.
+  const RILETTO_MAX_CARATTERI = 70000;
+  function rileggi({ da, a = null, chat = [], eventi = [], classeDelMessaggio = null, max = RILETTO_MAX_CARATTERI } = {}) {
+    const t0 = Date.parse(String(da ?? ''));
+    if (!Number.isFinite(t0)) return { errore: '«da» non è un istante: scrivilo come 2026-11-12T20:24' };
+    const t1 = a == null || a === '' ? t0 + 60 * 60 * 1000 : Date.parse(String(a));
+    if (!Number.isFinite(t1)) return { errore: '«a» non è un istante: scrivilo come 2026-11-12T21:30' };
+    if (t1 <= t0) return { errore: '«a» viene prima di «da»' };
+    const dentro = (ts) => { const t = Date.parse(ts); return Number.isFinite(t) && t >= t0 && t < t1 ? t : null; };
+    const voci = [];
+    for (const c of Array.isArray(chat) ? chat : []) {
+      for (const m of Array.isArray(c && c.messages) ? c.messages : []) {
+        const t = dentro(m && m.ts);
+        const testo = String((m && m.text) || '').replace(/\s+/g, ' ').trim();
+        if (t == null || !testo) continue;
+        // Una risposta nata da testo di altri resta sospetta come quando la si rilegge con filo(cerca) (#1508).
+        const classe = typeof classeDelMessaggio === 'function' ? classeDelMessaggio(m, c.fonti) : 1;
+        voci.push({ t, riga: `${m.role === 'user' ? 'utente' : 'Filo'} nella chat «${c.title || 'senza titolo'}» (id ${c.id}): ${testo}`, fuori: !!(m.esterno || m.daPagina), classe });
+      }
+    }
+    const conTesto = (ev) => daFuoriDi(ev).some((g) => g.testi.length);
+    for (const ev of Array.isArray(eventi) ? eventi : []) {
+      const t = dentro(ev && ev.ts);
+      if (t == null) continue;
+      if (ev.tipo === 'navigazione') {
+        const riga = ev.casa ? 'una pagina della rete di casa'
+          : (ev.delicata ? `una pagina di ${ev.sito}` : `pagina di ${ev.sito || 'un file'}${ev.titolo ? `: «${ev.titolo}»` : ''}${ev.cercato ? ` (cercato «${ev.cercato}»)` : ''}`);
+        voci.push({ t, riga, fuori: conTesto(ev) });
+        continue;
+      }
+      const r = rigaDi(ev);
+      if (r) voci.push({ t, riga: r, fuori: conTesto(ev) });
+    }
+    voci.sort((x, y) => x.t - y.t);
+    const ora = (t) => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const righe = [];
+    let caratteri = 0;
+    let seguito = null;
+    for (const v of voci) {
+      const riga = `- ${ora(v.t)} ${v.riga}`;
+      if (caratteri + riga.length > max && righe.length) { seguito = new Date(v.t).toISOString(); break; }
+      righe.push(riga);
+      caratteri += riga.length + 1;
+    }
+    const tenute = voci.slice(0, righe.length);
+    return {
+      da: new Date(t0).toISOString(), a: new Date(t1).toISOString(), testo: righe.join('\n'), righe: righe.length, totale: voci.length,
+      ...(seguito ? { seguito } : {}), esterno: tenute.some((v) => v.fuori),
+      classeLetta: tenute.reduce((n, v) => Math.max(n, v.classe || 1), 1),
+    };
+  }
+
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
   function preambolo({ eventi = '', stato = '', turno = '' } = {}) {
     const parti = [eventi, stato ? `Cambiato da quando è stato scritto il CONTESTO (vale questo):\n${stato}` : '', turno]
