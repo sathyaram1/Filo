@@ -2684,8 +2684,7 @@ async function finalizeBucket(bucket, fromServer) {
   // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
   // fallisce, il feedback resta in coda invece di restare marchiato "in
   // lavorazione" da nessuno.
-  // La perizia (#2337) legge il feedback e consegna dati: nessun ramo da aprire.
-  if (bucket.id && bucket.role !== 'perizia') {
+  if (apreUnRamo(bucket)) {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
       if (pos.kind === 'permanent') {
