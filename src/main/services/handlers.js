@@ -5995,8 +5995,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
   if (res && (res.nonCompare || res.senzaModulo)) return res.error;
-  // Il modello conosce le azioni come strumento(azione), non per tipo.
-  const nome = globalThis.SN_ACTION_TOOLS ? globalThis.SN_ACTION_TOOLS.chiamata(type) : type;
+  const nome = chiamataPerModello(type);
   if (res && res.no) return `Azione ${nome} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
