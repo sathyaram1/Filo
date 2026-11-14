@@ -2231,6 +2231,12 @@ if (isMain) {
       console.error(testoIntentoNonCapito(intento));
       process.exit(1);
     }
+    if (intento === 'perizia') {
+      const p = datiPerizia(data);
+      if (p.errore) { console.error(`${p.errore}: non ho consegnato niente.`); process.exit(1); }
+      for (const k of Object.keys(data)) delete data[k];
+      Object.assign(data, p.dati);
+    }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
     // in costruzione, nel manifesto del progetto). Va timbrata da sola: è ciò
     // che regge il "questo è arrivato agli utenti" nella bacheca e
