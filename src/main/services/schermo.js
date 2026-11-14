@@ -449,7 +449,7 @@ function crea({ sistema = null } = {}) {
       const dopo = sulloSchermo();
       const cambiata = dopo.some((w) => {
         const i = prima.findIndex((p) => p.wc === w.wc);
-        return i < 0 || !stessoPosto(prima[i].dentro, w.dentro);
+        return i < 0 || (Foto.daCoprire(misurate[i]) && !stessoPosto(prima[i].dentro, w.dentro));
       });
       if (cambiata || prima.some((_, i) => Foto.daCoprire(pagine[i]) && !velataGia(misurate[i], pagine[i]))) {
         return { errore: FRASE_SELETTORE, ...nome };
