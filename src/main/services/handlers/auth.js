@@ -1488,7 +1488,7 @@ module.exports = function register(on, ctx) {
   try {
     require('../mergeApprovalSignal').start({
       isAdmin: () => auth.isAdmin(),
-      read: listMergeApprovals,
+      read: () => listMergeApprovals({ fresco: true }),
       broadcast: (m) => ctx.broadcastToFiloPages(m),
       type: MSG.MERGE_APPROVALS_CHANGED,
     });
