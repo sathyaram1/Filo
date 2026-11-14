@@ -98,7 +98,7 @@
       const server = /server/.test(m);
       const nome = String(ramo || '').trim() || '<ramo>';
       return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
-        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, lo porta avanti una sessione locale.`;
+        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, «Dichiara fidato com’è» nel dettaglio, dopo averlo letto.`;
     }
     if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
