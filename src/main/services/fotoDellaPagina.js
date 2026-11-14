@@ -312,7 +312,8 @@ async function fotoPerModello(wc) {
   if (p.no) return { ok: false, code: p.no, piena: img };
   if (!p.lista.length) return { ok: true, img, piena: img };
   const { width, height } = img.getSize();
-  const coperta = dipintaSu(img, p.lista, { x: width / p.vista.w, y: height / p.vista.h });
+  // Lo stesso conto dello schermo intero, con la foto intera come posto: i due non possono divergere.
+  const coperta = dipintaSu(img, copertureNellaFoto(p, { left: 0, top: 0, width, height }), { x: 1, y: 1 });
   return coperta ? { ok: true, img: coperta, piena: img } : { ok: false, code: 'misura', piena: img };
 }
 
