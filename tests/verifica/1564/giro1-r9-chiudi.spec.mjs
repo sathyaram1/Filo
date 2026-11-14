@@ -14,6 +14,8 @@ test('r9 «chiudi tutte le schede tranne questa» con scheda(chiudi): resta solo
     { text: 'Fatto.' },
   ]);
   await chiedi(page, 'chiudi tutte le schede tranne questa');
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 15_000 });
+  console.log('DEBUG', (await page.locator('.dash-activity').allInnerTexts()).join(' | '), JSON.stringify(await app.evaluate(() => globalThis.__chatFinta_calls)).slice(-1500));
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
   await ripristina(app);
 });
