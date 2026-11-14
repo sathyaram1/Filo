@@ -181,7 +181,7 @@ test('oltre il listino escono per primi gli esiti dei turni passati, il testo de
   const senza = FC.finestra(lista, { ora, giorni: 3, token: 100000, esiti, osserva, senzaEsiti: true });
   assert.match(JSON.stringify(con.messaggi), /Guanciale/);
   assert.doesNotMatch(JSON.stringify(senza.messaggi), /Guanciale/);
-  assert.match(senza.messaggi[1].content, /esiti sono stati tolti per stare nel contesto.*CERCA_CHAT/);
+  assert.match(senza.messaggi[1].content, /esiti sono stati tolti per stare nel contesto.*filo\(cerca\)/);
   assert.equal(senza.messaggi[0].content, con.messaggi[0].content, 'il messaggio dell\'utente non cambia');
 });
 
