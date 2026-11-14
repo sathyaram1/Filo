@@ -520,6 +520,10 @@
         const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
         for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
         daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'ESPANDI_FILO') {
+        // Il grezzo di quelle ore: conversazioni come in CERCA_CHAT, titoli di pagine e nomi scritti dai siti.
+        const t = testo(out.testo);
+        if (t.trim()) { nonFidato = true; conversazioni.push(t); pezzi.push(t); daFuori(t, 'dal filo riletto'); }
       } else if (type === 'LEGGI_PAGINA') {
         // Una pagina letta è testo di sconosciuti (#553): i suoi codici non escono, e il suo indirizzo il modello l'ha visto.
         if (!out.ok) continue;
