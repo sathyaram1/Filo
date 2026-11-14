@@ -391,7 +391,7 @@
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     ELIMINA_FILE: 'Niente cancellato',
-    CERCA_CHAT: 'Conversazione non ritrovata',
+    CERCA_CHAT: 'Conversazione non ritrovata', ESPANDI_FILO: 'Filo di quelle ore non riletto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
