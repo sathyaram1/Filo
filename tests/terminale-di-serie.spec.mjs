@@ -111,6 +111,20 @@ test('profilo nuovo: una lettura parte subito con la frase della prima volta, un
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(btn.locator('.dash-cmd-btn-cosa')).toContainText('▶');
 
+  // Lettura: nessun popup, l'esito è già lì.
+  await chiedi(page, 'quanto spazio ho sul disco?', 'Hai parecchio spazio libero.');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  const blocco = page.locator('.dash-activity').last();
+  await blocco.locator('.dash-activity-head').click();
+  const esito = blocco.locator('.dash-activity-cmd');
+  await expect(esito.locator('.dash-cmd-cosa')).toHaveText('Misuro lo spazio libero sul disco');
+  await expect(esito.locator('.dash-cmd-line')).toHaveText('$ echo spazio-libero-892');
+  await expect(esito.locator('.dash-cmd-output')).toContainText('spazio-libero-892');
+  await expect(frase, 'la frase della prima volta si dice una volta sola').toHaveCount(1);
+  // Girato un comando, la chat mostra dove lavora e come scriverne uno.
+  await expect(input).toHaveAttribute('placeholder', /comando per la shell/);
+  await expect(page.locator('#dashDir')).toBeVisible();
+
   // «Preferenze» porta dritto alla voce che lo spegne.
   await frase.locator('a', { hasText: 'Preferenze' }).click();
   let pref = null;
