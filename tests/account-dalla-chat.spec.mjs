@@ -24,7 +24,7 @@ async function preparaLogin(app, testServer) {
   return pagina;
 }
 
-const esegui = (app, action) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), action);
+const esegui = (app, action, opts) => app.evaluate((_e, [a, o]) => globalThis.SN_EXECUTE_FILO_ACTION(a, o), [action, opts]);
 const stato = (shell) => shell.evaluate(() => window.filoShell.auth.status());
 
 // Google nelle schede collegato o no, come lo direbbero i cookie di Google (che le pagine finte non lasciano).
