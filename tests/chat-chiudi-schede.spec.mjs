@@ -192,6 +192,7 @@ test('«chiudi la seconda scheda» chiude la seconda della barra, «tutte quelle
   await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   await chiedi(page, 'chiudi tutte le schede di sito-pubblico');
+  await okAlPopup(page);
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Delta']);
   await ripristina(app);
 });
