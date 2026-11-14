@@ -1,11 +1,11 @@
-// Verifica #2116.5, giro 1: una finestra di Filo che mostra un PDF, o un sito con un riquadro di un altro sito, non deve
-// far mancare a Filo tutto lo schermo, né (Wayland) la finestra di un'altra app scelta nel selettore del sistema.
-// Il contenitore non fotografa lo schermo: la foto la compone la prova dalle schede vere, ognuna al suo posto.
+// #2116.5: una finestra di Filo che mostra un PDF, o un sito con un riquadro di un altro sito, non fa mancare a Filo
+// tutto lo schermo, né (Wayland) la finestra di un'altra app scelta nel selettore del sistema.
+// Il contenitore non fotografa lo schermo: la foto la compone la prova.
 
-import { test, expect } from '../../fixtures/electron.mjs';
-import { copertura, vistaAvviso } from '../../helpers/avvisoSito.mjs';
-import { chiedi } from '../../helpers/chatFinta.mjs';
-import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
+import { test, expect } from './fixtures/electron.mjs';
+import { copertura, vistaAvviso } from './helpers/avvisoSito.mjs';
+import { chiedi } from './helpers/chatFinta.mjs';
+import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const VERDE = [0x12, 0xab, 0x34];
 const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
