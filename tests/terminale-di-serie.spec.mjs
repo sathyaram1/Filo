@@ -84,8 +84,9 @@ test('profilo nuovo: la frase della prima volta, una cancellazione chiede «conf
   // La cancellazione viene prima: cancellare per sempre è costo 4, che dopo aver letto l'uscita di un comando è un no
   // (#1840). Proposta, porta già la frase della prima volta.
   await fakeProvider(app, [
-    // Un comando fermo sulla conferma chiude il turno (#1130): la frase va scritta insieme.
-    { ...comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'), text: 'Ti chiedo conferma prima di cancellare.' },
+    // Un comando fermo sulla conferma col testo del giro richiama il modello (#1130), che scrive la frase.
+    { ...comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'), text: 'Lo cancello.' },
+    { text: 'Ti chiedo conferma prima di cancellare.' },
     comando('c1', 'echo spazio-libero-892', 'Misuro lo spazio libero sul disco'),
     { text: 'Hai parecchio spazio libero.' },
   ]);
