@@ -910,7 +910,25 @@ module.exports = function register(on, ctx) {
     };
   }
 
-  async function listMergeApprovals() {
+  // Le richieste di fusione lette da poco valgono per tutte le pagine: la Gestione le chiedeva a ogni cambio di
+  // scheda e di stato, ~400 volte al giorno (#2470). Dopo una decisione, e dal campanello, si rileggono.
+  const FUSIONI_FRESCHE_MS = 90 * 1000;
+  let fusioniInMano = null;   // { at, chi, r }
+  function fusioniCambiate() { fusioniInMano = null; }
+
+  async function listMergeApprovals({ fresco = false } = {}) {
+    const chi = emailOwner();
+    const eta = fusioniInMano && fusioniInMano.chi === chi ? Date.now() - fusioniInMano.at : Infinity;
+    if (!fresco && eta < FUSIONI_FRESCHE_MS) {
+      return { ...fusioniInMano.r, daCopia: true, scadeTraMs: FUSIONI_FRESCHE_MS - eta };
+    }
+    const at = Date.now();
+    const r = await leggiMergeApprovals();
+    fusioniInMano = { at, chi, r };
+    return r;
+  }
+
+  async function leggiMergeApprovals() {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list' });
     return {
       ok: true,
