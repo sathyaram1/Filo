@@ -180,7 +180,7 @@
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
-        CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con NAVIGA e non cancella',
+        CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con scheda(apri) e non cancella',
         CANCELLA_TUTTI_I_DATI_STATO: 'dice alla conferma di «Cancella tutti i dati di Filo» se c’è un’identità dei crediti da tenere: non è un valore da cambiare',
         GET_CLIPBOARD_HISTORY: 'la cronologia appunti è un dato dell’utente (anche password copiate), non un’impostazione: si legge nella pagina',
         REMOVE_CLIPBOARD_ENTRY: 'pulsante che fa un’azione (toglie una voce della cronologia appunti): resta nella pagina',
