@@ -41,7 +41,18 @@
     },
     IMPOSTA_PREFERENZA: {
       via: ['impostazioni', 'imposta'],
-      description: 'una chiave per chiamata. Frequenti: tema (sistema|chiaro|scuro), dimensione_testo, colore_tab (più vivaci|più neutre|nessuno|predefinito), blocco_pubblicita, gestione_cookie, modalita_terminale, guarda_schermo, stile_agente, autonomia (solo se l\'utente lo chiede). Chiavi e valori ammessi con leggi.',
+      // I valori ammessi delle chiavi frequenti escono dal loro setter, come le voci di leggi: una copia a mano aveva già
+      // perso «più preciso» del colore delle schede (#1564).
+      description: () => {
+        const P = modulo('SN_PREF', './preferences.js');
+        const valori = (k) => {
+          const s = P && typeof P.setterDellaChiave === 'function' ? P.setterDellaChiave(k) : null;
+          const v = (s && typeof s.aiuto === 'string' ? s.aiuto : '').split(' (')[0].trim();
+          return v.startsWith('"') ? ` (${v.replace(/"/g, '').replace(/\s*\|\s*/g, '|')})` : '';
+        };
+        const frequenti = CHIAVI_FREQUENTI.map((k) => `${k}${valori(k)}`).join(', ');
+        return `una chiave per chiamata. Frequenti: ${frequenti}, autonomia (solo se l'utente lo chiede). Chiavi e valori ammessi con leggi.`;
+      },
       properties: { chiave: S(), valore: { anyOf: [S(), { type: 'number' }, B()] } }, required: ['chiave', 'valore'],
     },
     IMPOSTA_ESTETICA: {
