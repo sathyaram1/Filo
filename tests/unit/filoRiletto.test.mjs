@@ -7,8 +7,13 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/constants.js');
-require('../../src/shared/esterno.js');
+require('../../src/shared/contenutoEsterno.js');
+require('../../src/shared/chatArchive.js');
+require('../../src/shared/filoEventi.js');
+require('../../src/shared/filoApp.js');
+require('../../src/shared/filoContesto.js');
 require('../../src/shared/filoTrattoVivo.js');
+require('../../src/shared/cambi.js');
 const TV = globalThis.SN_TRATTO_VIVO;
 
 const DA = '2026-11-12T20:00:00.000Z';
