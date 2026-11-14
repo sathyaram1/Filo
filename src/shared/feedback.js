@@ -1460,7 +1460,7 @@
       if (!fra.campo || !Array.isArray(fra.valori) || !fra.valori.length) throw new Error('conto filtrato senza campo o valori');
       structuredQuery.where = { fieldFilter: { field: { fieldPath: String(fra.campo) }, op: 'IN', value: { arrayValue: { values: fra.valori.map((v) => ({ stringValue: String(v) })) } } } };
     }
-    const body = { structuredAggregationQuery: { structuredQuery }, aggregations: [{ alias: 'n', count: {} }] };
+    const body = { structuredAggregationQuery: { structuredQuery, aggregations: [{ alias: 'n', count: {} }] } };
     const opts = { method: 'POST', headers, body: JSON.stringify(body) };
     let timer = null;
     if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
