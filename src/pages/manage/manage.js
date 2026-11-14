@@ -5676,7 +5676,7 @@
         }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
-        setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
+        setTimeout(() => { loadMergeApprovals(null, { fresco: true }); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
       } catch (e) {
         esito.dataset.kind = 'err';
         esito.textContent = e.message || 'Non riuscito.';
