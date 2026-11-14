@@ -158,12 +158,16 @@ test('i rami in corso dicono i loro file e i feedback citati, e si incrociano co
   git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261002T000000Z', 'HEAD']);
   git(dir, ['checkout', '-q', 'main']);
   const rami = ramiInCorso(dir);
-  assert.deepEqual(rami.map((r) => r.ramo).sort(), ['claude/uno', 'worker/AbC123-20261002T000000Z'],
+  // Il nome di un ramo che non è un tentativo scritto dal server non si mostra (#2337): resta il commit.
+  assert.deepEqual(rami.map((r) => r.ramo.replace(/@[0-9a-f]{7}$/, '@…')).sort(), ['claude/(nome non mostrato) @…', 'worker/AbC123-20261002T000000Z'],
     'fuori i rami già su main, quelli messi da parte e i tentativi vecchi dello stesso worker');
   rami.splice(rami.findIndex((r) => r.ramo.startsWith('worker/')), 1);
-  assert.deepEqual(rami[0].file.sort(), ['a.js', 'src/pagina/b.js']);
+  const claude = rami[0].ramo;
+  assert.deepEqual([rami[0].file, rami[0].fileNuovi], [['a.js'], ['src/pagina/b.js']], 'un file che su main non c\'è si tiene a parte');
   assert.deepEqual(rami[0].feedback, ['44']);
-  assert.deepEqual(incroci(rami, ['src/pagina/']), [{ ramo: 'claude/uno', repo: 'app', feedback: ['44'], comuni: ['src/pagina/b.js'] }]);
+  assert.deepEqual(incroci(rami, ['a.js']), [{ ramo: claude, repo: 'app', feedback: ['44'], comuni: ['a.js'] }]);
+  assert.deepEqual(incroci(rami, ['src/pagina/b.js']), [{ ramo: claude, repo: 'app', feedback: ['44'], comuni: ['src/pagina/b.js'] }], 'un file nuovo si incrocia per nome intero');
+  assert.deepEqual(incroci(rami, ['src/pagina/']), [], 'non con una cartella: il nome lo porterebbe chi lavora');
   assert.deepEqual(incroci(rami, ['c.js']), []);
   // #2340: un ramo del server confronta le voci nude e quelle col prefisso; uno dell'app non prende quelle del server.
   const delServer = [{ ramo: 'claude/s', repo: 'server', file: ['functions/src/x.js', 'a.js'], feedback: [] }];
