@@ -6841,7 +6841,7 @@
       (async () => {
         // La lista in pagina è già TUTTI i feedback, tenuta in pari dal giro: rileggerli interi costava migliaia di
         // letture a ogni apertura (#2470). Il dettaglio che manca (l'esito della sicurezza) lo chiede fsCompletaRighe.
-        if (dataLoaded && !testDataInjected) return { rows: allFeedbacks.slice(), complete: !caricoIncompleto, ripiego: false };
+        if (dataLoaded) return { rows: allFeedbacks.slice(), complete: !caricoIncompleto, ripiego: false };
         try {
           const r = await FB.listAllPaged({});
           return { rows: r.rows, complete: r.complete !== false, ripiego: false };
