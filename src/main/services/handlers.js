@@ -2475,7 +2475,6 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     difesa: ing.difesa, chiesta: chiesta && ing.chiesta !== false, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
-  console.log('[DEBUG1564]', JSON.stringify({ ingressi, d, ing }), new Error().stack.split('\n').slice(2, 5).join(' | '));
   let nuovaUguale = false;
   const diUnaNuova = d.risposta === 'no' && Array.isArray(contesto) ? LETTURE_DI_UNA_NUOVA.get(contesto) : null;
   if (diUnaNuova) {
