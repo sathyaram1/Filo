@@ -437,7 +437,7 @@
     computer: 'Il computer dell\'utente.',
     web: 'Il web.',
     memoria: 'Quello che Filo ricorda dell\'utente.',
-    filo: 'Il filo: quello che l\'utente ha fatto con Filo, conversazioni e pagine comprese.',
+    filo: 'Tutto quello che l\'utente ha fatto con Filo.',
     filo_su_di_se: 'Filo su di sé.',
   };
   const NOMI_STRUMENTI = Object.keys(STRUMENTI);
