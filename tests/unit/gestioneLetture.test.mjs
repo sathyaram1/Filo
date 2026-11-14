@@ -57,6 +57,22 @@ test('il registro dei worker si chiede senza il resto della configurazione', asy
   });
 });
 
+// Il triage forzava il giro intero della bacheca a ogni azione (~2.300 letture): la scheda toccata la scrive
+// syncOneCard, e il giro intero non forzato parte al più ogni mezz'ora.
+test('il triage dell\'owner non forza il giro intero della bacheca', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js'), 'utf8');
+  const da = src.indexOf('on(MSG.FEEDBACK_UPDATE');
+  const a = src.indexOf('\n  }));', da);
+  assert.ok(da > 0 && a > da, 'gestore del triage non trovato');
+  const gestore = src.slice(da, a);
+  assert.match(gestore, /await syncOneCard\(id, idToken\)/);
+  assert.doesNotMatch(gestore, /scheduleViewSync\([^)]*force:\s*true/);
+  const gap = /const SYNC_MIN_GAP_MS = ([^;]+);/.exec(src);
+  assert.ok(gap && eval(gap[1]) >= 30 * 60 * 1000, `SYNC_MIN_GAP_MS: ${gap && gap[1]}`); // eslint-disable-line no-eval
+  assert.doesNotMatch(src, /cardsCache = \{ at: 0/, 'una scrittura aggiorna la scheda in mano, non butta via tutte');
+});
+
 test('l\'indice delle schede legge i soli aperti quando ogni feedback dice se lo è; altrimenti tutti', async () => {
   const { righeDaIndicizzare } = await import('../../scripts/schede.mjs');
   const chieste = [];
