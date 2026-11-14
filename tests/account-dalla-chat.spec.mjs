@@ -127,7 +127,7 @@ test('«esci» esce dall\'account e il bottone torna «Accedi»; un secondo «es
   await expect(shell.locator('#nav-account')).not.toHaveClass(/signed-in/);
 
   const ancora = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' }, { confirmed: true });
-  expect(ancora.executed).toBe(true);
+  expect(ancora.executed, JSON.stringify(ancora)).toBe(true);
   expect(ancora.output.gia).toBe('fuori');
 
   const rientra = await esegui(app, { type: 'ACCOUNT', cosa: 'accedi' });
