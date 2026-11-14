@@ -727,6 +727,8 @@ const ROLE_FILE = {
   compito: 'compito.md',
   // Il manutentore acceso dal pacemaker (SPEC-MANUTENTORE § 4): niente feedback, il contesto piccolo dal server.
   manutentore: 'manutentore.md',
+  // La perizia di un feedback non fidato (#2337): classe, unioni e file, e nient'altro.
+  perizia: 'perizia.md',
 };
 // Un halt che non è un guasto ha il suo testo: un `--guasto` qualunque fermerebbe il lavoro per niente, fino allo sblocco del manutentore (#1796).
 const HALT_KIND_FILE = {
