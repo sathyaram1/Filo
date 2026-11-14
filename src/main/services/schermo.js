@@ -447,7 +447,6 @@ function crea({ sistema = null } = {}) {
       const no = senzaImmagine(img);
       if (no) return { ...no, ...nome };
       const dopo = sulloSchermo();
-      globalThis.__debugSel = JSON.stringify({ misurate, pagine, n: prima.length });
       const cambiata = dopo.some((w) => {
         const i = prima.findIndex((p) => p.wc === w.wc);
         return i < 0 || (Foto.daCoprire(misurate[i]) && !stessoPosto(prima[i].dentro, w.dentro));
