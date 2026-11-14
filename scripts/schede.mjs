@@ -259,6 +259,23 @@ export function importaSchede(cartella, schede, indice = []) {
 }
 
 /**
+ * Le righe che l'indice può volere, col token dell'owner. Se ogni feedback dice in chiaro se è aperto (`statusPublic`,
+ * contato contro il totale) si leggono i soli aperti: i chiusi sono quasi tutti, e leggerli costava migliaia di
+ * letture (#2470). Senza quella certezza, o con un conto non riuscito, tutti come prima. → { rows, complete }
+ */
+export async function righeDaIndicizzare({ FB, idToken, fields }) {
+  let soloAperti = false;
+  try {
+    const [tutti, conStato] = await Promise.all([
+      FB.countAll({ idToken }),
+      FB.countAll({ idToken, fra: { campo: 'statusPublic', valori: ['open', 'closed'] } }),
+    ]);
+    soloAperti = Number.isInteger(tutti) && tutti === conStato;
+  } catch (_) { soloAperti = false; }
+  return FB.listAllPaged({ idToken, fields, ...(soloAperti ? { uguale: { campo: 'statusPublic', valore: 'open' } } : {}) });
+}
+
+/**
  * Righe e schede dalla strada locale: token e chiave dell'owner. `dip` (le prove): `leggiRighe()` → { rows già decifrate,
  * complete }, `apri(v)` → la scheda in chiaro. → { ok, righe, schede, segnalati, complete }
  */
