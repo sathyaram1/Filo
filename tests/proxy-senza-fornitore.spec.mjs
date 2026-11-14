@@ -130,7 +130,7 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
     });
     globalThis.__calls = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools }) => {
-      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: (tools || []).map((t) => t.function.name) });
+      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: (tools || []).map((t) => ({ name: t.function.name, description: t.function.description })) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (n === 1) {
         return {
