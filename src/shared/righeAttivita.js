@@ -81,6 +81,11 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    ESPANDI_FILO: (a) => {
+      const o = a._output || {};
+      if (o.error) return null;
+      return { title: 'Riletto il filo di quelle ore', meta: o.righe ? `${o.righe} cose` : 'niente da rileggere' };
+    },
     CERCA_CHAT: (a) => {
       // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni, ognuna una volta
       // anche quando ne arrivano più pezzi (#868.2).
