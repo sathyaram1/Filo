@@ -1940,7 +1940,7 @@
     if (!isAdmin) return spegni();
     let r = already || null;
     try {
-      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET });
+      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET, ...(fresco ? { fresco: true } : {}) });
     } catch (err) {
       console.error('[manage] fusioni in attesa:', err);
       return spegni();
