@@ -163,7 +163,7 @@ async function schermoFinto(app) {
   });
 }
 
-test('r2 guardando lo schermo intero, la password resa visibile nella finestrella di accesso di Filo arriva coperta', async ({ app, openTab, testServer }) => {
+test('#2116.5: guardando lo schermo intero, la password resa visibile nella finestrella di accesso di Filo arriva coperta', async ({ app, openTab, testServer }) => {
   test.setTimeout(150_000);
   await servi(app, {
     'login.negozio-finto.it/login': `<!doctype html><html><head><title>Accedi</title></head><body style="margin:0">
