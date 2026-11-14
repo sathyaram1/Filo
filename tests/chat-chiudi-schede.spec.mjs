@@ -16,7 +16,14 @@ async function tornaAllaHome(shell) {
   return h.id;
 }
 
-const pagineWeb = async (shell) => (await schede(shell)).filter((t) => !String(t.url).startsWith('filo://')).map((t) => t.title).sort();
+// Più schede insieme sono costo 2: a Normale, finché manca il guardiano, chiedono un OK anche a compito pulito (#1840).
+async function okAlPopup(page) {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await scrollConfirmToEnd(page).catch(() => {});
+  await clickConfirm(page, 'ok');
+}
+
+const pagineWeb = async (shell) =>(await schede(shell)).filter((t) => !String(t.url).startsWith('filo://')).map((t) => t.title).sort();
 
 // Il testo che il modello riceve come esito della chiamata `id`.
 const esitoPerIlModello = async (app, id) => {
