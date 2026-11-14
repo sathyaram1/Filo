@@ -411,7 +411,8 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
     const lettura = chiamate.find((c) => String(c.url).endsWith('/ownerMergeApprovals'));
     assert.ok(lettura, 'lo stato della richiesta va riletto dal deposito');
     assert.equal(lettura.opts.headers.Authorization, 'Bearer id-finto');
-    assert.deepEqual(JSON.parse(lettura.opts.body), { data: { op: 'list' } });
+    // Le decise stanno nelle parti che il server dà solo a richiesta (#2468).
+    assert.deepEqual(JSON.parse(lettura.opts.body), { data: { op: 'list', parti: ['recent', 'preapproved'] } });
     const msg = messageForOwnerMerge(r, 'claude/x');
     assert.match(msg, /già stata SCARTATA/);
     assert.doesNotMatch(msg, /approvala da Filo/);
