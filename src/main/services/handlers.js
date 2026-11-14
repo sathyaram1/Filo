@@ -2960,6 +2960,13 @@ async function eseguiAzioneFilo(action, {
     rigaDaCorreggere = trovate.length === 1 ? trovate[0] : null;
   }
 
+  // «Metti Screenshot in cima alla barra»: l'icona detta col nome del menu diventa il suo id prima del registro, così
+  // popup, esito e diario dicono quella giusta.
+  if (type === 'SPOSTA_ICONA' && globalThis.SN_DISPOSIZIONE_ICONE) {
+    const id = globalThis.SN_DISPOSIZIONE_ICONE.risolvi(action.icona ?? action.id, action.contesto);
+    if (id) { action.icona = id; delete action.id; }
+  }
+
   // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
   // l'esito dicono quello che si salva o si toglie davvero.
   if (type === 'TIENI_APERTA' || type === 'NON_TENERE_APERTA') {
