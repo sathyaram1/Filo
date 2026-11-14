@@ -6040,7 +6040,7 @@
       // statistiche seguono anche questo giro (feedback #496).
       if (giro && live.inVista()) fsSegueLive([], []).catch(() => {});
     },
-    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
+    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(null, { dalGiro: true }); },
     avvisi: (testo) => segnaAvvisoGiro(testo),
     segno: () => { aggiornaSegnoFerma(); domandeDalVivo(); },
     quandoInVista: () => domandeDalVivo(),
