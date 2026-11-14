@@ -1764,7 +1764,7 @@ module.exports = function register(on, ctx) {
     if (!data.prima) {
       compitiInMano = {
         chi, storico: data.storico || 0, intera: Date.now(), adesso: out.adesso,
-        aperti: new Map(out.aperti.filter((c) => c && c.id).map((c) => [String(c.id), c])), chiusi: out.storico.slice(), altri: out.altri, ambiti: out.ambiti,
+        aperti: new Map(out.aperti.filter((c) => c && c.id).map((c) => [String(c.id), c])), chiusi: out.storico.slice(), nChiusi: out.storico.length, altri: out.altri, ambiti: out.ambiti,
       };
     }
     return out;
