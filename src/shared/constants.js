@@ -1337,7 +1337,14 @@
   // che nessuno sappia perché.
   const MAX_BLOCCO_PAGINA = 128 * 1024;
 
-  // Una lista sola per «Spiega», «Approfondisci» e la chat: il modello deve
+  // I siti di cui il modello della chat può scrivere a memoria home e ricerca (#553): uguali per tutti, nella parte fissa.
+  function sitiComuniPerModello() {
+    if (!global.SN_SITI_COMUNI && typeof require === 'function') { try { require('./sitiComuni.js'); } catch (_) {} }
+    const S = global.SN_SITI_COMUNI;
+    return S ? `Siti comuni (home, ricerca, voce): ${S.perModello()}.\n` : '';
+  }
+
+  // Una lista sola per «Spiega» e «Approfondisci»: il modello deve
   // riconoscere «rupie» come INR ovunque gli si chieda un cambio (#724.1).
   const NOMI_VALUTE = 'rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN, dollari = USD, sterline = GBP, franchi svizzeri = CHF, yen = JPY, yuan = CNY';
   const FATTORI_UNITA = '1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9';
