@@ -61,10 +61,8 @@ test('la pausa che chiude e l\'attimo per annullare sono dell\'utente: si chiedo
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '0').partial.dictation.cancelSec, 0);
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '3,5').partial.dictation.cancelSec, 3.5);
   assert.equal(P.buildPreferencePartial('pausa_microfono', 'boh'), null);
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  assert.match(desc, /pausa_microfono/);
-  assert.match(desc, /attesa_invio_vocale/);
+  assert.match(letturaPerIlModello('pausa microfono'), /\[chiave pausa_microfono; valori: /);
+  assert.match(letturaPerIlModello('attesa invio vocale'), /\[chiave attesa_invio_vocale; valori: /);
   assert.equal(globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.silenceSec', prima: 2, dopo: 4 }),
     'pausa che chiude il microfono delle chat: 2 s → 4 s');
 });
