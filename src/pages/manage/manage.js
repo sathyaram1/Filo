@@ -3003,6 +3003,16 @@
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
+  // Il segno lo ripulisce solo un giro che rivaluta il lavoro fra i pronti: fuori dai pronti per altro (lavori server
+  // spenti, una domanda bloccante, attesi non fusi, un'istanza al lavoro) vale quel motivo, non il fermo (#2036.1).
+  // Una regola sola per riga, dettaglio e «Dichiara fidato com'è» (#2258); un lavoro in coda non ha iter (progress null).
+  function fermoRestaLocale(fb, progress = fb && !MR.statusUnreadable(fb) ? MR.workProgress(fb) : null) {
+    if (!fb || (progress && progress.active)) return null;
+    const fermo = MR.restaLocale(fb, { lavoriServer: !!(mgLavoriServer && mgLavoriServer.checked) });
+    if (!fermo || MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) || (ATT && ATT.aspettaAncora(fb, trovaAtteso))) return null;
+    return fermo;
+  }
+
   function workStateHtml(progress, fb) {
     // Un lavoro server passato aspetta il cancello, GitHub o il PC (#1159); coi lavori server alle routine, un fidato
     // segue il loro iter.
