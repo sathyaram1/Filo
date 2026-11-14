@@ -137,7 +137,6 @@ test('«chiudi questa scheda» detto nella home la chiude: si torna alla pagina 
 test('quando chiede conferma, il popup elenca le schede e all\'OK chiude proprio quelle', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await home(app);
-  // A Conservativo più schede insieme (costo 2) chiedono anche a compito pulito (#530).
   await livelloAutonomia(app, 'conservativo');
   await openTab(testServer.html('<title>Ricetta della torta</title><p>ricetta'));
   await openTab(testServer.html('<title>Orari dei treni</title><p>treni', { pubblico: true }));
