@@ -231,7 +231,7 @@ test('la segnalazione automatica è fra le impostazioni di serie, accesa', () =>
 test('ogni chiave scrive quello che dichiara, la chat la trova coi suoi valori e ha lo stesso livello dell\'annullo', () => {
   // Le chiavi non stanno più tutte nello strumento (#1564): le porta impostazioni(leggi), voce per voce coi valori;
   // quella che nessuna voce mostra la nomina la descrizione di impostazioni(imposta).
-  const descr = Tools.TOOLS.IMPOSTA_PREFERENZA.description;
+  const descr = Tools.TOOLS.IMPOSTA_PREFERENZA.description({});
   const conVoce = new Map(V.voci().filter((v) => v.chiave).map((v) => [v.chiave, v]));
   for (const s of P.PREF_SETTERS) {
     assert.ok(s.aiuto, `${s.keys[0]}: manca \`aiuto\`, la riga che la chat legge`);
