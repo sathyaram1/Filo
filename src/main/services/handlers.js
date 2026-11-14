@@ -2470,7 +2470,6 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
   const statoPer = (c) => A.stato({ fonti: A.fontiPerCosto(fonti, c), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const st = statoPer(costo);
-  console.log('[DEBUG1564]', JSON.stringify({ costo, livello, st, fonti }));
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
     difesa: ing.difesa, chiesta: chiesta && ing.chiesta !== false, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
