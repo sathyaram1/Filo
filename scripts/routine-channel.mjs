@@ -1651,7 +1651,7 @@ export const CAMPI_DELLA_RIGA = Object.freeze([
   'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
   'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-  'feedback', 'piano', 'fusione', 'motivo', 'processo',
+  'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
   ...CAMPI_PERIZIA,
 ]);
 
@@ -1693,7 +1693,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
