@@ -463,7 +463,7 @@ test('l’autonomia è una voce da scoprire, e la si spunta dopo la scelta (#118
   assert.equal(voce.kind, 'scoprire');
   assert.match(voce.applica, /"autonomia": true/, 'il modello deve sapere come mostrare la scelta');
   assert.match(voce.applica, /il clic lo salva già/, 'che il clic non va rifatto');
-  assert.match(voce.applica, /IMPOSTA_PREFERENZA con chiave autonomia/, 'e che detto a parole lo cambia come in chat (#1312)');
+  assert.match(voce.applica, /impostazioni\(imposta\) con chiave autonomia/, 'e che detto a parole lo cambia come in chat (#1312)');
   assert.match(O.renderChecklistForPrompt(O.emptyState()), /\[ \] autonomia/);
 });
 
