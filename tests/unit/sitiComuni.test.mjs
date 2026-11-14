@@ -44,8 +44,10 @@ test('fuori dalla forma dell\'elenco non è dell\'elenco', () => {
   ]) assert.equal(S.riconosci(url), null, url);
 });
 
-test('l\'elenco per il modello nomina home e ricerca di ogni sito', () => {
-  const t = S.perModello();
+test('l\'elenco per il modello nomina home e ricerca di ogni sito, e arriva alla chat nella parte fissa', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const t = globalThis.SN_CONST.PROMPTS.filoChatStatic();
+  assert.ok(t.includes(`Siti comuni (home, ricerca, voce): ${S.perModello()}`), 'la chat non riceve l\'elenco dei siti comuni');
   for (const sito of S.SITI) assert.ok(t.includes(sito.home), sito.nome);
   assert.ok(t.includes('https://www.amazon.it/s?k=…'));
 });
