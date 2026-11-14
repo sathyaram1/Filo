@@ -62,10 +62,10 @@ test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un
   await expect.poll(() => readFileSync(vecchio, 'utf8'), { timeout: 12_000 }).toBe('testo nuovo');
 });
 
-test('proposto da Filo: sovrascrivere chiede anche a compito pulito, la copia su un file nuovo no', async ({ app, openTab }) => {
+test('proposto da Filo: sovrascrivere chiede col suo rischio, la copia su un file nuovo con un OK semplice', async ({ app, openTab }) => {
   const { dir, nuovo, vecchio } = dueFile();
   await openTab('filo://newtab/');
-  const esegui = (comando) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, {}), { type: 'ESEGUI_COMANDO', comando });
+  const esegui = (comando, opzioni = {}) => app.evaluate((_e, [a, o]) => globalThis.SN_EXECUTE_FILO_ACTION(a, o), [{ type: 'ESEGUI_COMANDO', comando }, opzioni]);
 
   const sopra = await esegui(copia(nuovo, vecchio));
   expect(sopra.executed, 'senza un sì non parte').toBe(false);
