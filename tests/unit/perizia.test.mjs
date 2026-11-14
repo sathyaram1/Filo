@@ -80,7 +80,7 @@ test('la rete della shell del rapporto conta ogni programma di rete del classifi
   await import('../../src/shared/cmdClassify.js');
   const src = globalThis.SN_CMD_CLASSIFY.PROGRAMMI_RETE.source.replace(/^\\b\(\?:/, '').replace(/\)\\b$/, '');
   const nomi = src.replace(/\|?git\\s\+\(\?:[^)]*\)/, '').split('|').filter(Boolean);
-  assert.ok(nomi.length > 20 && nomi.every((n) => /^[a-z-]+$/.test(n)), nomi.join(' '));
+  assert.ok(nomi.length > 20 && nomi.every((n) => /^[a-z0-9-]+$/.test(n)), nomi.join(' '));
   assert.deepEqual(nomi.filter((n) => !chiamaLaRete(`${n} esempio`)), [], 'un programma del classificatore che il rapporto non conta');
   for (const sotto of src.match(/git\\s\+\(\?:([^)]*)\)/)[1].split('|')) assert.equal(chiamaLaRete(`git ${sotto} https://esempio.com/x`), true, sotto);
 });
