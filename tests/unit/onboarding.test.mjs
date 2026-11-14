@@ -630,8 +630,8 @@ test('la voce dei contatori dice come applicare una risposta data a parole, con 
   const voce = O.ITEMS.find((i) => i.id === 'contatori');
   assert.match(voce.applica, /a parole/);
   assert.doesNotMatch(voce.applica, /non hai un.azione/i);
-  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
-  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  const m = /impostazioni\(imposta\), chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina impostazioni(imposta) e la sua chiave');
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });
