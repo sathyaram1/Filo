@@ -1641,6 +1641,17 @@ export function parolaInPiu(cmd, args) {
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
+// I nomi di campo che la riga di comando conosce: uno fuori elenco si ferma prima del server (#565). Quelli della perizia
+// li vuole datiPerizia (#2337).
+export const CAMPI_DELLA_RIGA = Object.freeze([
+  'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
+  'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
+  'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
+  'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
+  'feedback', 'piano', 'fusione', 'motivo', 'processo',
+  ...CAMPI_PERIZIA,
+]);
+
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   // I comandi nei testi stampati, i nostri e quelli del server, portano alla copia fissata (#763).
