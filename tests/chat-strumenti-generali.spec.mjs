@@ -136,28 +136,29 @@ test('«sveglia alle 7:30 per la palestra» con promemoria(sveglia), orario ed e
 
 // Il modello gli id delle icone non li vede: arriva col nome del menu, e un nome che non conosco torna con l'elenco per
 // riprovare subito (#1564).
-const statoIcone = (app) => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.disposizioneIcone || s.layoutIcone || null));
-const nellaBarra = async (app, id) => app.evaluate((_e, x) => {
-  const D = globalThis.SN_DISPOSIZIONE_ICONE;
-  return require('./src/main/services/layoutIcone').leggi ? null : D && x;
-}, id);
 test('home(icona) col nome del menu sposta l\'icona; un nome sconosciuto torna con gli id, e al secondo giro si sposta', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
-  const nome = await app.evaluate(() => globalThis.SN_DISPOSIZIONE_ICONE.nome('colorPicker'));
-  expect(nome).not.toBe('colorPicker');
-  const barra = () => app.evaluate(async () => (await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'SPOSTA_ICONA', icona: 'reload', dove: 'barra' }), null));
-  void barra; void statoIcone; void nellaBarra;
-  const posizione = () => app.evaluate(async () => {
-    const L = globalThis.SN_LAYOUT_ICONE;
-    return L && typeof L.attuale === 'function' ? L.attuale() : null;
-  });
-  void posizione;
+  await barraPage(app);
+  const nomi = await app.evaluate(() => ['colorPicker', 'transcribe'].map((id) => globalThis.SN_DISPOSIZIONE_ICONE.nome(id)));
+  expect((await statoBarra(app)).bar).not.toContain('colorPicker');
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'i1', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: `«${nome}»`, dove: 'barra' }) }] },
+    { toolCalls: [{ id: 'i1', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: `«${nomi[0]}»`, dove: 'barra' }) }] },
     { text: 'Messa nella barra.' },
   ]);
-  await chiedi(page, `metti ${nome} nella barra`);
-  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await chiedi(page, `metti ${nomi[0]} nella barra`);
+  await expect.poll(async () => (await statoBarra(app)).bar, { timeout: 10_000 }).toContain('colorPicker');
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'i2', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: 'registratore', dove: 'barra' }) }] },
+    { toolCalls: [{ id: 'i3', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: 'transcribe', dove: 'barra' }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'metti il registratore nella barra');
+  await expect.poll(async () => (await statoBarra(app)).bar, { timeout: 10_000 }).toContain('transcribe');
+  const c = await chiamateAlModello(app);
+  const esito = JSON.stringify(c[1]);
+  expect(esito).toMatch(/Riprova adesso con l'id/);
+  expect(esito).toContain(`transcribe (${nomi[1]})`);
   await ripristina(app);
 });
