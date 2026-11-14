@@ -52,7 +52,7 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
   expect((await schede(shell)).map((t) => t.id)).toEqual([idHome]);
-  const activity = page.locator('.dash-activity');
+  const activity = page.locator('.dash-activity').first();
   await expect(activity).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
   await expect(activity.locator('.dash-activity-head')).toContainText('Ha chiuso delle schede');
   await expect(activity.locator('.dash-activity-row', { hasText: 'Chiuse 3 schede' })).toHaveCount(1);
