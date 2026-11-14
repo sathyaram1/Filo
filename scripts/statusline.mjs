@@ -1,6 +1,6 @@
 // Barra di stato di Claude Code: l'unico posto dove arriva la percentuale vera del piano (SPEC-DOMANDE.md §8.1).
 // Salva la lettura per sessione in ~/.claude/filo-quota.json, stampa una riga corta, non lancia e non aspetta la rete.
-// L'invio a ownerCrediti (token admin; A o B lo dice il rinnovo) parte staccato ogni 5 minuti al più; se non arriva, la riga lo dice.
+// L'invio a ownerCrediti (token admin) parte staccato coi numeri cambiati o ogni mezz'ora (daInviare); se non arriva, la riga lo dice.
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -81,11 +81,24 @@ export function registra(file, { sessionId, lettura: vista, nowMs = Date.now() }
   return out;
 }
 
-/** Ora di inviare? Al massimo ogni cinque minuti, contando anche i tentativi. PURA a meno della lettura. */
-export function daInviare(fileInvio, nowMs = Date.now()) {
+// Coi numeri fermi l'invio parte lo stesso ogni tanto: il server sa così che la barra gira (#2470: ogni 5 minuti
+// anche senza niente di nuovo erano centinaia di chiamate al giorno).
+export const INVIO_COMUNQUE_MS = 30 * 60 * 1000;
+
+function firmaLettura(l) {
+  return l ? [l.pct7d, l.reset7dAtS, l.pct5h ?? '', l.reset5hAtS ?? ''].join('|') : '';
+}
+
+/**
+ * Ora di inviare? Al massimo ogni cinque minuti, contando anche i tentativi; e solo se `ultima` non è quella già
+ * arrivata, o l'ultimo invio non è arrivato, o è passata mezz'ora. PURA a meno della lettura del file.
+ */
+export function daInviare(fileInvio, nowMs = Date.now(), ultima = null) {
   const v = leggiJson(fileInvio) || {};
   const ultimo = Math.max(Number(v.tentatoAtMs) || 0, Number(v.atMs) || 0);
-  return nowMs - ultimo >= INVIO_OGNI_MS;
+  if (nowMs - ultimo < INVIO_OGNI_MS) return false;
+  if (v.ok !== true || !ultima || firmaLettura(ultima) !== v.inviata) return true;
+  return nowMs - (Number(v.inviataAtMs) || 0) >= INVIO_COMUNQUE_MS;
 }
 
 /** Il giro della barra: legge, registra, stampa, e se è ora lancia l'invio staccato. Non lancia mai. */
@@ -97,8 +110,8 @@ export function barra(testo, { home = os.homedir(), nowMs = Date.now(), lancia =
     const input = JSON.parse(String(testo || '{}'));
     lettura = letturaDa(input, nowMs);
     const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
-    registra(quotaFile(home), { sessionId, lettura, nowMs });
-    if (lettura && daInviare(invioFile(home), nowMs)) {
+    const scritto = registra(quotaFile(home), { sessionId, lettura, nowMs });
+    if (lettura && daInviare(invioFile(home), nowMs, scritto.ultima)) {
       const prima = leggiJson(invioFile(home)) || {};
       scriviAtomico(invioFile(home), Object.assign({}, prima, { tentatoAtMs: nowMs }));
       lancia(home);
@@ -143,7 +156,7 @@ export async function invia({ home = os.homedir(), nowMs = Date.now(), fetchImpl
     if (res.status === 404) return esito({ ok: false, errore: 'ownerCrediti non ancora pubblicata' });
     const corpo = await res.json().catch(() => ({}));
     if (!res.ok || corpo.error) return esito({ ok: false, errore: String((corpo.error && corpo.error.message) || `HTTP ${res.status}`).slice(0, 300) });
-    return esito({ ok: true, errore: '' });
+    return esito({ ok: true, errore: '', inviata: firmaLettura(ultima), inviataAtMs: nowMs });
   } catch (e) {
     return esito({ ok: false, errore: `rete: ${String((e && e.message) || e).slice(0, 200)}` });
   }

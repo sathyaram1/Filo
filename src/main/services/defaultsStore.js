@@ -862,7 +862,8 @@ async function setJudgeBudget(patch, idToken) {
 // `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
 // della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
 async function getWorkerLog(idToken, { severo = false } = {}) {
-  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  // Il giro della Gestione lo chiede ogni minuto: il resto del documento (bilanci, manopole) non serve (#2470).
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken, { campi: ['workerLog'] });
   if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
   const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];

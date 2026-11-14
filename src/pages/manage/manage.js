@@ -1858,7 +1858,7 @@
   function opzioniFusioni(extra) {
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
-      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onDone: () => { setTimeout(() => loadMergeApprovals(null, { fresco: true }), 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
       inVolo: (req) => approvazioniInVolo.get(req.id) || null,
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
@@ -1913,7 +1913,9 @@
     }));
   }
 
-  async function loadMergeApprovals(already) {
+  // `fresco`: dopo una decisione, che cambia gli elenchi; senza, il main risponde con la copia letta da poco (#2470).
+  let fusioniRiletturaTimer = null;
+  async function loadMergeApprovals(already, { fresco = false, dalGiro = false } = {}) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI) return 0;
     const spegni = () => {
@@ -1938,12 +1940,17 @@
     if (!isAdmin) return spegni();
     let r = already || null;
     try {
-      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET });
+      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET, ...(fresco ? { fresco: true } : {}) });
     } catch (err) {
       console.error('[manage] fusioni in attesa:', err);
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
+    // Un cambio di stato visto dal giro può voler dire una richiesta appena aperta dal server, che la copia del main
+    // non ha ancora: la si richiede quando la copia scade.
+    if (dalGiro && r.daCopia && Number(r.scadeTraMs) > 0 && !fusioniRiletturaTimer) {
+      fusioniRiletturaTimer = setTimeout(() => { fusioniRiletturaTimer = null; loadMergeApprovals(); }, Number(r.scadeTraMs) + 500);
+    }
     // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
     // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
@@ -5585,7 +5592,7 @@
       toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
       // La richiesta nuova sta negli elenchi, una pratica che ha cambiato stato nel documento: si rilegge tutto.
       // Riaperta, la frase serve finché la richiesta non è nel pannello: una scadenza futura non deve ritrovarla lì.
-      Promise.resolve(loadMergeApprovals()).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
+      Promise.resolve(loadMergeApprovals(null, { fresco: true })).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
       if (m === RIAPRI_ESITI.non_ferma) refreshFromRemote({ force: true }).catch(() => {});
     });
     return box;
@@ -5669,7 +5676,7 @@
         }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
-        setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
+        setTimeout(() => { loadMergeApprovals(null, { fresco: true }); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
       } catch (e) {
         esito.dataset.kind = 'err';
         esito.textContent = e.message || 'Non riuscito.';
@@ -6033,7 +6040,7 @@
       // statistiche seguono anche questo giro (feedback #496).
       if (giro && live.inVista()) fsSegueLive([], []).catch(() => {});
     },
-    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
+    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(null, { dalGiro: true }); },
     avvisi: (testo) => segnaAvvisoGiro(testo),
     segno: () => { aggiornaSegnoFerma(); domandeDalVivo(); },
     quandoInVista: () => domandeDalVivo(),
@@ -6839,6 +6846,9 @@
     // Le due letture non dipendono l'una dall'altra: partono insieme.
     const [lista, log] = await Promise.all([
       (async () => {
+        // La lista in pagina è già TUTTI i feedback, tenuta in pari dal giro: rileggerli interi costava migliaia di
+        // letture a ogni apertura (#2470). Il dettaglio che manca (l'esito della sicurezza) lo chiede fsCompletaRighe.
+        if (dataLoaded) return { rows: allFeedbacks.slice(), complete: !caricoIncompleto, ripiego: false };
         try {
           const r = await FB.listAllPaged({});
           return { rows: r.rows, complete: r.complete !== false, ripiego: false };
@@ -6921,13 +6931,14 @@
     if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
   }
 
-  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
-  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
-  // A scheda davanti la si legge intera, una volta per caricamento.
+  // Una riga d'elenco non porta i campi di dettaglio: il suo controllo di sicurezza risulterebbe «non letto»
+  // (#997). A scheda davanti si leggono intere le sole righe che i conti della finestra chiedono, una volta per
+  // caricamento: le statistiche partono dalla lista in pagina, e leggerle tutte intere era il conto di #2470.
   let fsChiesteIntere = new Set();
   async function fsCompletaRighe() {
+    const servono = new Set((fsStat && fsStat.auditIds && fsStat.auditIds.nonLetti) || []);
     const ids = (fsFeedbacks || [])
-      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .filter((f) => f && f._proiezione && f._id && servono.has(f._id) && !fsChiesteIntere.has(f._id))
       .map((f) => f._id);
     if (!ids.length) return false;
     for (const id of ids) fsChiesteIntere.add(id);
@@ -8123,6 +8134,10 @@
     renderFsDrill();
     if (mgFsDrillList && scorrimento) mgFsDrillList.scrollTop = scorrimento;
     fsRiprendiFuoco(fuoco);
+    // Una finestra nuova può chiedere l'esito di righe che non si sono ancora lette intere.
+    if (!fsRipiego && fsPannelloAperto() && ((stat.auditIds && stat.auditIds.nonLetti) || []).some((id) => !fsChiesteIntere.has(id))) {
+      fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+    }
   }
 
   // Finestra, mittenti e riquadri: un solo ascoltatore per la scheda.

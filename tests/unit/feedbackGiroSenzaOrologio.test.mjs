@@ -195,7 +195,7 @@ test('un worker che parte: si rilegge il SUO feedback e lo si segue, senza riall
   assert.equal(log.versioni, 1);
 });
 
-test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé o dopo il tempo', async () => {
+test('un feedback del registro resta seguito a ogni giro fino al tempo, anche quando lo segue la pagina', async () => {
   const mondo = { ore: { b: 't1' }, registro: [], numeri: { 7: 'b' } };
   const { w, avanza } = giro(mondo);
   await primoGiroEPoi(w, avanza);
@@ -203,7 +203,7 @@ test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé
   await w.tick();
   assert.deepEqual(w.seguitiDalRegistro(), ['b']);
   avanza(LIVE.REGISTRO_SEGUI_MS + 1);
-  await w.tick(); // questo è il riallineamento della mezz'ora
+  await w.tick();
   avanza(60_000);
   await w.tick();
   assert.deepEqual(w.seguitiDalRegistro(), [], 'scaduto');
@@ -215,7 +215,11 @@ test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé
   mondo.seguiti = ['b'];
   avanza(60_000);
   await w.tick();
-  assert.deepEqual(w.seguitiDalRegistro(), [], 'ora lo segue la pagina');
+  // La pagina lo guarda ogni cinque minuti; chi l'ha appena preso può riscriverlo senza firma a ogni minuto (#2470).
+  assert.deepEqual(w.seguitiDalRegistro(), ['b'], 'resta anche se lo segue la pagina');
+  avanza(LIVE.REGISTRO_SEGUI_MS);
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), [], 'scaduto');
 });
 
 test('un registro illeggibile non vale «registro svuotato»', async () => {

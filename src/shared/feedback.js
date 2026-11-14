@@ -1450,6 +1450,48 @@
     return Number.isInteger(n) && n >= 0 ? n : null;
   }
 
+  // Quanti feedback ci sono: il conto di Firestore costa una lettura ogni mille documenti (#2470). `null` = non lo so.
+  // `fra` ({ campo, valori }): solo quelli col campo uguale a uno dei valori (testi).
+  async function countAll({ timeoutMs = 0, idToken = '', fra = null } = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const structuredQuery = { from: [{ collectionId: COLLECTION }] };
+    if (fra) {
+      if (!fra.campo || !Array.isArray(fra.valori) || !fra.valori.length) throw new Error('conto filtrato senza campo o valori');
+      structuredQuery.where = { fieldFilter: { field: { fieldPath: String(fra.campo) }, op: 'IN', value: { arrayValue: { values: fra.valori.map((v) => ({ stringValue: String(v) })) } } } };
+    }
+    const body = { structuredAggregationQuery: { structuredQuery, aggregations: [{ alias: 'n', count: {} }] } };
+    const opts = { method: 'POST', headers, body: JSON.stringify(body) };
+    let timer = null;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try { res = await fetch(`${FIRESTORE_BASE}:runAggregationQuery?key=${API_KEY}`, opts); } finally { if (timer) clearTimeout(timer); }
+    if (!res.ok) throw new Error(`firestore conto dei feedback fallito (${res.status})`);
+    const arr = await res.json();
+    const campo = Array.isArray(arr) ? arr.map((r) => r && r.result && r.result.aggregateFields && r.result.aggregateFields.n).find(Boolean) : null;
+    const n = Number(campo && campo.integerValue);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+
+  // Il controllo leggero del giro della Gestione: quanti sono e l'ultimo firmato, con la sua ora di Firestore.
+  async function controlloLeggero({ timeoutMs = 0, idToken = '' } = {}) {
+    const [count, ultimi] = await Promise.all([
+      countAll({ timeoutMs, idToken }),
+      runQueryDirect({
+        from: [{ collectionId: COLLECTION }],
+        orderBy: [{ field: { fieldPath: 'updatedAt' }, direction: 'DESCENDING' }],
+        select: selectFields(['updatedAt']),
+        limit: 1,
+      }, { timeoutMs, idToken, what: 'ultimo cambiato' }),
+    ]);
+    const u = Array.isArray(ultimi) ? ultimi[0] : null;
+    return { count, ultimo: u && u._id ? { _id: String(u._id), _updateTime: u._updateTime || null } : null };
+  }
+
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     // batchGet vuole il NOME della risorsa: con l'indirizzo intero risponde 400 a ogni richiesta.
@@ -2204,6 +2246,7 @@
     versionsOf,
     idDelNumero, unicoDelNumero,
     submissionCount,
+    countAll, controlloLeggero,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
     listPublic,
