@@ -29,6 +29,7 @@
   }
 
   const RIPETI = { anyOf: [LISTA(), S()] };
+  const CHIAVI_FREQUENTI = ['tema', 'dimensione_testo', 'colore_tab', 'blocco_pubblicita', 'gestione_cookie', 'modalita_terminale', 'guarda_schermo', 'stile_agente'];
 
   // Ogni azione: lo strumento e il nome con cui il modello la chiama, una riga d'uso, i parametri (tipi soli) e i
   // campi obbligatori. `risultato`: l'esito torna al modello per intero, non come riga di conferma.
