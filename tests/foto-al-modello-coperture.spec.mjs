@@ -389,7 +389,6 @@ async function schermoFinto(app, { wayland = false } = {}) {
           }
         }
       }
-      if (globalThis.__schermo.durante) await globalThis.__schermo.durante();
       const foto = nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
       globalThis.__schermo.grezza = foto.toDataURL();
       return foto;
