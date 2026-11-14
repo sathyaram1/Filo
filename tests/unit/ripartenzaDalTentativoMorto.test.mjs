@@ -18,7 +18,8 @@ import { conNumeri, numeriDellIndice } from '../../scripts/manutentore.mjs';
 import { segnaProprie } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ID = 'fid-2152';
+// Di sole lettere e cifre come gli id veri: un nome di ramo fuori forma il manutentore non lo vede (#2337).
+const ID = 'fid2152';
 const BIGLIETTO = 'biglietto-di-prova';
 
 const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a],
