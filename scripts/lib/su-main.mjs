@@ -152,6 +152,16 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
   }
 }
 
+// La forma di un percorso del repo, la stessa che il server chiede ai file della perizia (#2337): un nome di file scelto
+// da un ramo non fidato arriva al manutentore fidato solo così, mai come una frase.
+const PERCORSO_RE = /^[A-Za-z0-9_@+-][A-Za-z0-9_.@+-]*(\/[A-Za-z0-9_@+-][A-Za-z0-9_.@+-]*)*$/;
+const PERCORSO_MAX = 300;
+
+/** Il nome ha la forma di un percorso del repo: relativo, senza spazi, `..` né segmenti vuoti. PURA. */
+export function haFormaDiPercorso(v) {
+  return typeof v === 'string' && v.length <= PERCORSO_MAX && PERCORSO_RE.test(v) && !v.split('/').some((s) => s === '.' || s === '..');
+}
+
 /**
  * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
  * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
