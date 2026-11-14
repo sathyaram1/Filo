@@ -34,8 +34,7 @@ test('ogni preferenza modificabile a parole è nell\'elenco che riceve il modell
 });
 
 test('le chiavi dichiarate al modello sono chiavi che esistono davvero', () => {
-  const dichiarate = [...ELENCO.matchAll(/(?:^|[•;])\s*([a-z][a-z0-9_]*(?:\s*\/\s*[a-z][a-z0-9_]*)*)\s*:/gm)]
-    .flatMap((m) => m[1].split('/').map((x) => x.trim()));
+  const dichiarate = [...LETTURA.matchAll(/\[chiave ([a-z][a-z0-9_ ]*?)[;,\]]/g)].map((m) => m[1].trim());
   assert.ok(dichiarate.length > 20, 'l\'elenco deve contenere le chiavi, una per voce');
   const inventate = dichiarate.filter((k) => !PREF_SETTERS.some((s) => s.keys.includes(k)));
   assert.deepEqual(inventate, [], `chiavi dichiarate ma non esistenti: ${inventate.join(', ')}`);
