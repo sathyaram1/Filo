@@ -1528,17 +1528,20 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
 
 export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano', 'perizia'];
 
+export const CAMPI_PERIZIA = Object.freeze(['classe', 'area', 'unioni', 'file']);
+
 /**
- * `deliver perizia --classe N [--unioni 812,813] [--file a,b]` nei tipi che il server vuole (#2337): un campo in più
- * si ferma qui, ma la regola che rifiuta il testo libero sta sul server (routine/perizia.js). PURA.
+ * `deliver perizia --classe N [--area A] [--unioni 812,813] [--file a,b]` nei tipi che il server vuole (#2337): un campo
+ * in più si ferma qui, ma la regola che rifiuta il testo libero sta sul server (routine/perizia.js). PURA.
  */
 export function datiPerizia(data) {
   const d = data && typeof data === 'object' ? data : {};
-  const estranei = Object.keys(d).filter((k) => !['classe', 'unioni', 'file'].includes(k));
-  if (estranei.length) return { errore: `la perizia porta solo --classe, --unioni e --file (non --${estranei[0]})` };
+  const estranei = Object.keys(d).filter((k) => !CAMPI_PERIZIA.includes(k));
+  if (estranei.length) return { errore: `la perizia porta solo --classe, --area, --unioni e --file (non --${estranei[0]})` };
   if (!/^\d{1,2}$/.test(String(d.classe ?? ''))) return { errore: '--classe è un intero da 1 a 10' };
+  if (d.area !== undefined && typeof d.area !== 'string') return { errore: '--area vuole una delle aree delle schede' };
   const lista = (v) => (typeof v === 'string' ? v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean) : []);
-  return { dati: { classe: Number(d.classe), unioni: lista(d.unioni), file: lista(d.file) } };
+  return { dati: { classe: Number(d.classe), ...(d.area !== undefined ? { area: d.area.trim() } : {}), unioni: lista(d.unioni), file: lista(d.file) } };
 }
 
 /**
