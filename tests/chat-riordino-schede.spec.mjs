@@ -105,9 +105,9 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
   await expect(riga).toContainText('crediti sono finiti');
   await expect(riga).not.toContainText('Schede riordinate');
   const esito = await esitoDopoLOk(app);
-  expect(esito).toContain('Riordino NON riuscito');
+  expect(esito).toContain('ha chiuso solo un doppione');
   expect(esito).toContain(MOTIVO);
-  expect(esito).not.toMatch(/^Schede riordinate/);
+  expect(esito).not.toContain('fatta: Schede riordinate');
   await page.screenshot({ path: 'tests/.shots/chat-riordino-giudizio-mancato.png' });
   await ripristina(app);
 });
