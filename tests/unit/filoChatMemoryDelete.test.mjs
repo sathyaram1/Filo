@@ -27,9 +27,7 @@ test('la chat ha memoria(cancella_tutto), e la parte fissa dice che la conferma 
 
 test('PROMPTS.filoChat: vieta di confabulare sulla memoria vuota', () => {
   const p = C.PROMPTS.filoChat({ ...basePayload });
-  // Il guard del feedback #165: niente "rimosse come richiesto" / "cancellate"
-  // quando la memoria è solo vuota, e ogni scheda parte da una conversazione
-  // nuova (non sa cosa è successo in un'altra scheda).
-  assert.match(p, /rimosse come richiesto|sono state cancellate/i);
+  // Niente «cancellate» quando la memoria è solo vuota, e quello che l'utente ha detto in un'altra scheda vale anche qui.
+  assert.match(p, /PROFILO e PREFERENZE sono vuoti[^\n]*non inventare un perché, per esempio che le memorie sono state cancellate/);
   assert.match(p, /scheda parte (da )?(una )?conversazione nuova|altra scheda/i);
 });
