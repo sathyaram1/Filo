@@ -10,7 +10,7 @@
           "la fila c'è anche lì: un'icona fa la sua azione, e una portata dal «+» alla fila resta"
         ],
         "perche": "rosso solo nella suite di GitHub, dalla fusione 6d4098f45d del 13/11 (che non tocca menu, fila né trascinamento) e su ogni corsa dopo: il trascinamento dal «+» alla fila, col menu nello strato sopra la scheda, non accende la fila come bersaglio. Nel contenitore delle routine, con lo stesso commit, lo stesso schermo virtuale e il file intero, passa a ogni corsa (#2472): la causa sta nella macchina di GitHub e da qui non si vede, perché screenshot e trace di quella corsa non si scaricano.",
-        "feedback": "#2472, da togliere col feedback aperto dalla sua nota"
+        "feedback": "da aprire: rosso solo in GitHub trovato da #2472 (la segnalazione è finita nelle note di #2472)"
       },
       {
         "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-attriti",
