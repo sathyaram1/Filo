@@ -1526,7 +1526,20 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   return r && r.num ? ok : 'OK: consegnato.';
 }
 
-export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano'];
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano', 'perizia'];
+
+/**
+ * `deliver perizia --classe N [--unioni 812,813] [--file a,b]` nei tipi che il server vuole (#2337): un campo in più
+ * si ferma qui, ma la regola che rifiuta il testo libero sta sul server (routine/perizia.js). PURA.
+ */
+export function datiPerizia(data) {
+  const d = data && typeof data === 'object' ? data : {};
+  const estranei = Object.keys(d).filter((k) => !['classe', 'unioni', 'file'].includes(k));
+  if (estranei.length) return { errore: `la perizia porta solo --classe, --unioni e --file (non --${estranei[0]})` };
+  if (!/^\d{1,2}$/.test(String(d.classe ?? ''))) return { errore: '--classe è un intero da 1 a 10' };
+  const lista = (v) => (typeof v === 'string' ? v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean) : []);
+  return { dati: { classe: Number(d.classe), unioni: lista(d.unioni), file: lista(d.file) } };
+}
 
 /**
  * Una fermata (`--status design`) senza la domanda scritta da chi si ferma non parte (#1790): il server non ne compone
