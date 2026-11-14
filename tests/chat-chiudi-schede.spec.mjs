@@ -228,6 +228,7 @@ test('«chiudi tutto tranne Gmail» con quattordici schede: la più vecchia ha i
 
   await modelloCheTieneGmail(app);
   await chiedi(page, 'chiudi tutto tranne Gmail');
+  await okAlPopup(page);
 
   await expect.poll(() => pagineWeb(shell), { timeout: 15_000 }).toEqual(['Posta in arrivo - Gmail']);
   await ripristina(app);
