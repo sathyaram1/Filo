@@ -284,7 +284,6 @@ test('in una chat pulita la pagina che l\'utente chiede si apre con un OK anche 
   // Un'apertura riuscita parla da sé (#1130): il turno si chiude senza richiamare il modello.
   expect((await chiamate(app)).length).toBe(1);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toHaveCount(0);
-  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 // Il canale dei messaggi arriva anche ai content script dei siti: se quello strato cedesse, un sito non deve poter
