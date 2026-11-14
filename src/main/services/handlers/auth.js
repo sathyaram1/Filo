@@ -944,7 +944,7 @@ module.exports = function register(on, ctx) {
     };
   }
 
-  on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
+  on(MSG.MERGE_APPROVALS_GET, ownerOnly((msg) => listMergeApprovals({ fresco: !!(msg && msg.fresco === true) })));
 
   // La collezione `feedback` non si legge senza credenziali e in una pagina filo:// l'ID token
   // non deve arrivare: si legge qui, col token e con gli stessi due cancelli (#583).
