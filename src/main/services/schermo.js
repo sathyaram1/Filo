@@ -4,6 +4,7 @@
 'use strict';
 
 const Foto = require('./fotoDellaPagina');
+const { interseca } = require('./campiNeiRiquadri');
 
 // Il lato lungo chiesto al sistema e quello che va al modello: un 4K resta leggibile, una PNG da decine di MB no.
 const LATO_CATTURA = 2560;
