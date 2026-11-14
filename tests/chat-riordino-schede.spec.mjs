@@ -37,6 +37,12 @@ async function schedeDaRiordinare(openTab, testServer, shell) {
   await tornaAllaHome(shell);
 }
 
+// Quello che il modello riceve quando il lavoro riprende dopo l'OK (#1685): l'esito sta nell'ultima chiamata.
+const esitoDopoLOk = async (app) => {
+  const ultima = (await chiamateAlModello(app)).at(-1) || [];
+  return ultima.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+};
+
 // Riordinare è costo 2: a Normale, finché manca il guardiano, chiede col bottone come a Conservativo (#1840).
 async function alBottone(page) {
   const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
