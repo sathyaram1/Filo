@@ -2528,7 +2528,7 @@ const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
  */
 // Chi ha bisogno di leggere il feedback per poter lavorare: senza, il compito
 // è vuoto anche se la busta è formalmente in ordine.
-const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
+const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work', 'perizia'];
 
 // Quello che il server ha messo DENTRO la busta (codice in `payload.codiceBusta`, #1514) o, da un server che
 // non la manda, dentro la cornice con la quadra: è quello che dice se il compito ha un contenuto. Senza l'una e
