@@ -110,8 +110,8 @@ export function barra(testo, { home = os.homedir(), nowMs = Date.now(), lancia =
     const input = JSON.parse(String(testo || '{}'));
     lettura = letturaDa(input, nowMs);
     const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
-    registra(quotaFile(home), { sessionId, lettura, nowMs });
-    if (lettura && daInviare(invioFile(home), nowMs)) {
+    const scritto = registra(quotaFile(home), { sessionId, lettura, nowMs });
+    if (lettura && daInviare(invioFile(home), nowMs, scritto.ultima)) {
       const prima = leggiJson(invioFile(home)) || {};
       scriviAtomico(invioFile(home), Object.assign({}, prima, { tentatoAtMs: nowMs }));
       lancia(home);
