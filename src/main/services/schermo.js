@@ -191,14 +191,24 @@ function sistemaVero() {
       }));
     },
     // Le finestre di Filo si fotografano dalla loro scheda in vista: niente permessi del sistema, su ogni piattaforma.
+    // `vista`: dove la scheda si disegna sul desktop, se la finestra si vede.
     finestreFilo: () => finestre().filter((w) => w._filoTabs).map((w) => {
       const tm = w._filoTabs;
       const tab = (tm.tabs || []).find((t) => t.id === tm.activeId);
+      let vista = null;
+      try {
+        if (tab && tab.view && w.isVisible() && !w.isMinimized()) {
+          const c = w.getContentBounds();
+          const b = tab.view.getBounds();
+          if (b.width > 0 && b.height > 0) vista = { left: c.x + b.x, top: c.y + b.y, width: b.width, height: b.height };
+        }
+      } catch (_) { vista = null; }
       return {
         id: `filo:${w.id}`, tipo: 'finestra', filo: true,
         nome: `Filo: ${String((tab && tab.title) || 'scheda vuota')}`,
         url: String((tab && tab.url) || ''),
         wc: tab && tab.view ? tab.view.webContents : null,
+        vista,
       };
     }),
     maniglieFilo: () => finestre().map((w) => {
