@@ -1,11 +1,11 @@
-// Verifica #2116.5, giro 1: la finestrella di accesso («Accedi con…») è una finestra di Filo; nella foto dello schermo
-// intero la password resa visibile lì dentro deve arrivare coperta come nelle schede. Il contenitore non fotografa lo
-// schermo: la foto la compone la prova dalle finestre vere, scoperte, ognuna nel punto in cui sta.
+// #2116.5: la finestrella di accesso («Accedi con…») è una finestra di Filo; nella foto dello schermo intero la password
+// resa visibile lì dentro arriva coperta come nelle schede. Il contenitore non fotografa lo schermo: la foto la compone
+// la prova dalle finestre vere, scoperte, ognuna nel punto in cui sta.
 
-import { test, expect } from '../../fixtures/electron.mjs';
-import { vistaAvviso, copertura } from '../../helpers/avvisoSito.mjs';
-import { chiedi } from '../../helpers/chatFinta.mjs';
-import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
+import { test, expect } from './fixtures/electron.mjs';
+import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
+import { chiedi } from './helpers/chatFinta.mjs';
+import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const ROSA = [0xc9, 0x25, 0x85];
 const VERDE = [0x12, 0xab, 0x34];
