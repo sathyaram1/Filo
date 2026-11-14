@@ -1906,7 +1906,7 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
       kept: false,
       rejected: true,
       senzaModulo: true,
-      error: `Azione ${type} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
+      error: `Azione ${chiamataPerModello(type)} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
         + 'ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. Oppure cerca la pagina con web(cerca).',
       output: { senzaModulo: true, url: home },
     };
