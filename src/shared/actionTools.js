@@ -384,7 +384,7 @@
     },
     ANNULLA_CAMBIO: {
       via: ['filo', 'annulla'],
-      description: 'rimette com\'era un cambio (impostazione, aspetto, sveglia, proxy, zoom, icone) per id «cambio <id>»; senza id l\'ultimo.',
+      description: 'rimette com\'era un cambio (impostazione, aspetto, sveglia, proxy, zoom, icone della barra laterale o del desktop) per id «cambio <id>»; senza id l\'ultimo.',
       properties: { id: S() }, required: [],
     },
 
