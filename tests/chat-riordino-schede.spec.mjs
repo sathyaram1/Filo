@@ -58,6 +58,7 @@ test('a Normale «riordinami le tab» archivia e la chat dice quante', async ({ 
     { text: 'Ho archiviato due schede.' },
   ]);
   await chiedi(page, 'riordinami le tab');
+  await alBottone(page);
 
   await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile']);
   const riga = page.locator('.dash-activity').last();
