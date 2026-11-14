@@ -41,7 +41,7 @@ test.afterAll(async () => {
 function riga(i) {
   return {
     _id: `f${i}`, _updateTime: 't1', updatedAt: '2026-09-01T10:00:00.000Z', name: `Feedback ${i}`, text: 'x',
-    seq: 100 + i, subSeq: 0, clientId: 'tester@example.com', status: 'todo',
+    seq: 100 + i, subSeq: 0, clientId: 'tester@example.com',
     createdAt: new Date(Date.now() - (i + 1) * 60_000).toISOString(),
   };
 }
