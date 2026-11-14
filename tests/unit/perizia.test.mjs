@@ -13,9 +13,9 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { checkEnvelope, buildPayload, serverCtx, readRoleInstructions, apreUnRamo } from '../../scripts/dispatch.mjs';
 import { normalizeRole } from '../../scripts/lib/routine-role.mjs';
 import { datiPerizia, INTENTI_CONSEGNA, CAMPI_PERIZIA, CAMPI_DELLA_RIGA } from '../../scripts/routine-channel.mjs';
-import { chiamaLaRete, STRUMENTO_RETE } from '../../scripts/session-report.mjs';
+import { chiamaLaRete, STRUMENTO_RETE, analizzaRighe } from '../../scripts/session-report.mjs';
 import { ramiInCorso } from '../../scripts/lib/su-main.mjs';
-import { rigaRamo } from '../../scripts/manutentore.mjs';
+import { rigaRamo, rigaFuori } from '../../scripts/manutentore.mjs';
 
 const BUSTA = { role: 'perizia', id: 'abc', num: '#901', branch: '', payload: { codiceBusta: 'c0de', feedback: { name: 'Download rotto', text: 'Il pulsante non risponde.' }, immagini: [] } };
 
