@@ -8,6 +8,8 @@
   const CAMPO = 'roleModels';
   // L'ordine è quello in cui la fase arriva a un cambio di codice.
   const RUOLI = Object.freeze([
+    // Prima del primo lavoro di un feedback non fidato, col manutentore acceso (#2337).
+    Object.freeze({ id: 'perizia', nome: 'Perizia dei non fidati' }),
     Object.freeze({ id: 'new-work', nome: 'Primo lavoro' }),
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
     // Guarda solo i file di un conflitto risolto (#2344): vuota vale la Verifica, salvo la partenza, che il server
