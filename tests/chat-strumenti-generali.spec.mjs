@@ -83,17 +83,23 @@ test('filo_su_di_se(feedback) a Conservativo apre la conferma, e uno strumento s
   const page = await home(app);
   await livelloAutonomia(app, 'conservativo');
   await modelloFinto(app, [
-    { text: '', toolCalls: [
-      { id: 'x1', name: 'scheda', arguments: JSON.stringify({ url: 'https://example.com' }) },
-      { id: 'f1', name: 'filo_su_di_se', arguments: JSON.stringify({ azione: 'feedback', testo: 'Il timer non suona.', titolo: 'Timer muto' }) },
-    ] },
+    { text: '', toolCalls: [{ id: 'f1', name: 'filo_su_di_se', arguments: JSON.stringify({ azione: 'feedback', testo: 'Il timer non suona.', titolo: 'Timer muto' }) }] },
     { text: 'Ho preparato la segnalazione.' },
   ]);
   await chiedi(page, 'segnala che il timer non suona');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(CONFIRM_HOST)).toContainText('Il timer non suona.');
   await page.screenshot({ path: 'tests/.shots/chat-strumenti-generali-conferma.png' });
   await clickConfirm(page, 'cancel');
-  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBeGreaterThan(1);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'x1', name: 'scheda', arguments: JSON.stringify({ url: 'https://example.com' }) }] },
+    { text: 'Riprovo.' },
+  ]);
+  await chiedi(page, 'apri example');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
   expect(await ultimaStoria(app)).toMatch(/manca l'azione in scheda: scegli fra apri/);
   await ripristina(app);
 });
