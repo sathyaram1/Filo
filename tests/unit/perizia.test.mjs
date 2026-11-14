@@ -76,6 +76,15 @@ test('il rapporto conta la rete chiamata dalla shell, che il server tiene fuori 
   }
 });
 
+test('la rete della shell del rapporto conta ogni programma di rete del classificatore dei comandi', async () => {
+  await import('../../src/shared/cmdClassify.js');
+  const src = globalThis.SN_CMD_CLASSIFY.PROGRAMMI_RETE.source.replace(/^\\b\(\?:/, '').replace(/\)\\b$/, '');
+  const nomi = src.replace(/\|?git\\s\+\(\?:[^)]*\)/, '').split('|').filter(Boolean);
+  assert.ok(nomi.length > 20 && nomi.every((n) => /^[a-z-]+$/.test(n)), nomi.join(' '));
+  assert.deepEqual(nomi.filter((n) => !chiamaLaRete(`${n} esempio`)), [], 'un programma del classificatore che il rapporto non conta');
+  for (const sotto of src.match(/git\\s\+\(\?:([^)]*)\)/)[1].split('|')) assert.equal(chiamaLaRete(`git ${sotto} https://esempio.com/x`), true, sotto);
+});
+
 test('il rapporto di fine sessione porta la rete della shell fra gli strumenti, dove il server la legge', async () => {
   const riga = (id, comando) => JSON.stringify({
     type: 'assistant', sessionId: 's', timestamp: '2026-11-14T10:00:00.000Z',
