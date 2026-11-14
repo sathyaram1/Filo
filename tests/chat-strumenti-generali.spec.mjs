@@ -149,6 +149,8 @@ test('home(icona) col nome del menu sposta l\'icona; un nome sconosciuto torna c
   ]);
   await chiedi(page, `metti ${nomi[0]} nella barra`);
   await expect.poll(async () => (await statoBarra(app)).bar, { timeout: 10_000 }).toContain('colorPicker');
+  await expect(page.locator('.dash-activity').last()).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
+  await ripristina(app);
 
   await modelloFinto(app, [
     { toolCalls: [{ id: 'i2', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: 'registratore', dove: 'barra' }) }] },
