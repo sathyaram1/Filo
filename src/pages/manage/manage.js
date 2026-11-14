@@ -3726,7 +3726,7 @@
     // Solo per i feedback nell'iter; stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
-      const mostra = !!progress || (leggibile && !!MR.restaLocale(fb));
+      const mostra = !!progress || (leggibile && !!fermoRestaLocale(fb, progress));
       mgWorkState.hidden = !mostra;
       mgWorkState.innerHTML = mostra ? workStateHtml(progress, fb) : '';
       if (mostra) aggiungiDichiara(fb);
