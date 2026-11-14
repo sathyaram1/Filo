@@ -226,15 +226,17 @@
       description: 'un timer di secondi, come carta nella home.',
       properties: { secondi: I(), etichetta: S() }, required: ['secondi'],
     },
+    // Dentro uno strumento un dato ha un nome solo (orario, etichetta, secondi): il modello copia quello dell'azione
+    // accanto, e un nome diverso per la stessa cosa veniva respinto come mancante (#1564).
     SVEGLIA: {
       via: ['promemoria', 'sveglia'],
-      description: 'una sveglia che suona: time "HH:MM" o data-ora ISO, calcolata dall\'ora del messaggio; ripeti ["lun","mer"] o "feriali", "weekend", "ogni giorno".',
-      properties: { time: S(), label: S(), ripeti: RIPETI }, required: ['time'],
+      description: 'una sveglia che suona: orario "HH:MM" o data-ora ISO, calcolata dall\'ora del messaggio; ripeti ["lun","mer"] o "feriali", "weekend", "ogni giorno".',
+      properties: { orario: S(), etichetta: S(), ripeti: RIPETI }, required: ['orario'],
     },
     MODIFICA_SVEGLIA: {
       via: ['promemoria', 'modifica'],
-      description: 'sposta una sveglia (orario "HH:MM") o cambia la durata di un timer (secondi).',
-      properties: { etichetta: S(), orario: S(), ripeti: RIPETI }, required: ['orario'],
+      description: 'sposta una sveglia (orario "HH:MM", ripeti) o cambia la durata di un timer (secondi).',
+      properties: { etichetta: S(), orario: S(), secondi: I(), ripeti: RIPETI }, required: [], unoDi: ['orario', 'secondi', 'ripeti'],
     },
     CANCELLA_SVEGLIA: {
       via: ['promemoria', 'cancella'],
