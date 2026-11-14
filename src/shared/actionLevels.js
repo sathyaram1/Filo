@@ -653,9 +653,13 @@
     ESPANDI_FILO: {
       costo: 0,
       campo: null,
-      fonte: (a, out) => (out && out.daFuori
-        ? { classe: 5, campo: 'web', chiave: 'filo:espanso', motivo: 'ho riletto il filo di quelle ore, con pagine e testi arrivati da fuori' }
-        : null),
+      fonte: (a, out) => {
+        if (out && out.daFuori) return { classe: 5, campo: 'web', chiave: 'filo:espanso', motivo: 'ho riletto il filo di quelle ore, con pagine e testi arrivati da fuori' };
+        const c = Number(out && out.classeLetta);
+        return Number.isInteger(c) && c > 1 && c <= 5
+          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte nate dai tuoi file' : 'ho riletto risposte nate da testo scritto da altri' }
+          : null;
+      },
       describe: () => 'Rileggere il filo di quelle ore',
     },
     // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
