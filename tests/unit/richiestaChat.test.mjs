@@ -118,7 +118,8 @@ test('gli strumenti sono gli stessi per ogni sistema, ogni ruolo e ogni chiamata
       assert.equal(json(Tools.definitions()), json(STRUMENTI), `gli strumenti cambiano su ${sistema}`);
     }
   } finally { Object.defineProperty(process, 'platform', vero); }
-  assert.ok(STRUMENTI.some((d) => d.function.name === 'ONBOARDING'), 'lo strumento dell\'intervista manca fuori dall\'intervista');
+  assert.ok(STRUMENTI.some((d) => d.function.name === 'filo_su_di_se' && d.function.parameters.properties.azione.enum.includes('intervista')),
+    'lo strumento dell\'intervista manca fuori dall\'intervista');
   assert.ok(!/C:\\|\/Users\/|\/home\//.test(json(STRUMENTI)), 'negli strumenti c\'è un percorso di un sistema solo');
 });
 
