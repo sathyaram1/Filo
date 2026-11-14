@@ -238,7 +238,8 @@
       var prima = s.impronta === null;
       if (prima && el.stato.hidden) dici('Leggo le richieste…', 'wait');
       try {
-        var esiti = await Promise.all([chiama('list'), leggiSalti()]);
+        // Le decisioni passate il server le dà solo a richiesta (#2468).
+        var esiti = await Promise.all([chiamaFunzione(FUNZIONE, { op: 'list', parti: ['recent'] }), leggiSalti()]);
         var r = esiti[0];
         var salti = esiti[1];
         if (!r || r.ok === false) throw { dettaglio: r && (r.detail || r.reason) };
