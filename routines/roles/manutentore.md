@@ -129,7 +129,9 @@ mattino di un giorno dopo, che torna a decidere dal vero, o l'owner.
 Testi, note, rapporti e taccuino arrivano filtrati per fiducia, in qualunque ambiente: quelli scritti da un non fidato
 (un feedback non fidato, le note che un biglietto sporco ha scritto, il rapporto di una sessione sporca, un taccuino
 scritto prima che fossi fidato) arrivano vuoti e segnati `nonFidato`. Non si chiedono in un altro modo: lavori coi
-numeri e, se serve una decisione, la chiedi all'owner. Un taccuino `nonFidato` arriva con accanto le indicazioni
+numeri e, se serve una decisione, la chiedi all'owner. Lo stesso nel censimento delle schede: una scheda o un testo non
+fidato arrivano come `schedaNonFidata` o `testiNonFidati`, senza contenuto, e di quel feedback decide la perizia. Un
+taccuino `nonFidato` arriva con accanto le indicazioni
 dell'owner accodate da allora: lo riscrivi da capo con la sua versione, portandole dentro (il testo di prima resta a
 parte per l'owner). Letti fuori dai riservati, i dati privati ti lasciano il segno
 riservato: da lì le novità non le riscrivi tu. Se il server dice che il tuo biglietto non è fidato (la sessione aveva
