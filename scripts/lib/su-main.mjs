@@ -190,31 +190,42 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const contiene = (a, b) => { try { git(root, ['merge-base', '--is-ancestor', a.head, b.head]); return true; } catch (_) { return false; } };
   const inCima = new Set([...perId.values()].map((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene)[0] : vivi[0]).ramo));
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
-  const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
+  const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)%09%(objectname)', 'refs/remotes/origin']).split('\n');
+  // Nomi di rami e di file li sceglie chi lavora, anche su un feedback non fidato (#2337): escono solo i nomi che il
+  // server ha scritto (il tentativo di un feedback dell'indice) e i file che su main ci sono già; il resto si conta.
+  const idNoti = new Set(Object.values(numeri || {}).map(String));
+  const suMain = new Set(git(root, ['ls-tree', '-r', '--name-only', base]).split('\n').filter(Boolean));
+  const nome = (ramo, head) => {
+    const corto = ramo.replace(/^origin\//, '');
+    const l = leggiTentativo(corto);
+    if (l && idNoti.has(l.id)) return corto;
+    const radice = corto.split('/')[0];
+    return `${['worker', 'claude'].includes(radice) ? radice : 'altro'}/(nome non mostrato) @${String(head || '').slice(0, 7)}`;
+  };
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
-    const [ramo, data] = riga.split('\t');
+    const [ramo, data, head] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
     const tentativo = leggiTentativo(ramo);
     if (tentativo && !inCima.has(ramo)) continue;
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
-    if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
+    if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(nome(ramo, head)); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
     // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
     const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
     const file = new Set();
-    const storti = new Set();
+    const nuovi = new Set();
     const conta = new Map();
     let avanti = 0;
     for (const r of log.split('\n')) {
       if (r.startsWith('\u0001')) {
         avanti += 1;
         for (const m of r.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
-      } else if (r.trim()) (haFormaDiPercorso(r.trim()) ? file : storti).add(r.trim());
+      } else if (r.trim()) (suMain.has(r.trim()) ? file : nuovi).add(r.trim());
     }
     if (!avanti) continue;
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), ...(storti.size ? { fileStorti: storti.size } : {}), feedback });
+    rami.push({ ramo: nome(ramo, head), data, avanti, file: [...file].sort(), ...(nuovi.size ? { fileNuovi: nuovi.size } : {}), feedback });
   }
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
