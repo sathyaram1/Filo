@@ -1711,15 +1711,48 @@ module.exports = function register(on, ctx) {
     if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
     return r;
   }
+  // La scheda Compiti si rilegge ogni minuto (#2468): dopo una lettura intera il main chiede al server solo i compiti
+  // cambiati e li fonde nella sua copia, così la pagina riceve sempre l'elenco intero. Ogni tanto si rilegge tutto:
+  // gli ambienti dei riservati cambiano il segno anche dei compiti non toccati.
+  const COMPITI_RILETTURA_MS = 10 * 60 * 1000;
+  let compitiInMano = null;   // { chi, storico, intera, adesso, aperti: Map, chiusi, altri, ambiti }
+  const perUrgenza = (a, b) => (Number(b.urgenza) - Number(a.urgenza)) || ((Number(a.creatoIl) || 0) - (Number(b.creatoIl) || 0))
+    || ((Number(a.numero) || 0) - (Number(b.numero) || 0));
+  function rispostaCompiti(m) {
+    return { ok: true, aperti: [...m.aperti.values()], storico: m.chiusi.slice(), altri: m.altri, adesso: m.adesso, ambiti: m.ambiti.slice() };
+  }
+  function fondiCompiti(m, r, n) {
+    for (const c of (Array.isArray(r.aperti) ? r.aperti : [])) if (c && c.id) m.aperti.set(String(c.id), c);
+    for (const c of (Array.isArray(r.storico) ? r.storico : [])) {
+      if (!c || !c.id) continue;
+      m.aperti.delete(String(c.id));
+      m.chiusi = [c].concat(m.chiusi.filter((x) => x.id !== c.id));
+    }
+    m.aperti = new Map([...m.aperti].sort(([, a], [, b]) => perUrgenza(a, b)));
+    m.chiusi.sort((a, b) => (Number(b.chiusoIl) || 0) - (Number(a.chiusoIl) || 0));
+    if (m.chiusi.length > n) { m.chiusi = m.chiusi.slice(0, n); m.altri = true; }
+    m.adesso = Number(r.adesso) || m.adesso;
+    if (Array.isArray(r.ambiti)) m.ambiti = r.ambiti;
+  }
   on(MSG.COMPITI_ELENCO, ownerOnly(async (msg) => {
     const data = { op: 'elenco' };
     if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
     if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
     // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
     if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
+    const chi = emailOwner();
+    const m = compitiInMano;
+    const aDelta = !data.prima && m && m.chi === chi && m.storico === (data.storico || 0) && m.adesso > 0
+      && Date.now() - m.intera < COMPITI_RILETTURA_MS;
+    if (aDelta) data.dopo = m.adesso;
     const r = await chiamaCompiti(data);
     if (!r.ok) return r;
-    return {
+    if (aDelta && r.delta === true) {
+      // La pagina chiesta di solito è più corta dello storico già visto: la copia tiene almeno quella.
+      fondiCompiti(m, r, Math.max(Number(data.storico) || 0, m.chiusi.length));
+      return rispostaCompiti(m);
+    }
+    const out = {
       ok: true,
       aperti: Array.isArray(r.aperti) ? r.aperti : [],
       storico: Array.isArray(r.storico) ? r.storico : [],
@@ -1728,6 +1761,14 @@ module.exports = function register(on, ctx) {
       adesso: Number(r.adesso) || 0,
       ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
     };
+    // Solo la prima pagina fa da copia: quelle dei più vecchi (`prima`) sono un'altra vista.
+    if (!data.prima) {
+      compitiInMano = {
+        chi, storico: data.storico || 0, intera: Date.now(), adesso: out.adesso,
+        aperti: new Map(out.aperti.filter((c) => c && c.id).map((c) => [String(c.id), c])), chiusi: out.storico.slice(), altri: out.altri, ambiti: out.ambiti,
+      };
+    }
+    return out;
   }));
   on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
     const v = globalThis.SN_COMPITI.validaNuovo(msg?.compito);
