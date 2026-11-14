@@ -421,6 +421,45 @@ function crea({ sistema = null } = {}) {
     return s.finestreFilo().filter((w) => w.wc && w.vista);
   }
 
+  // Nel selettore di Wayland non si sa dove finiscono le finestre di Filo, né se l'utente ne sceglie una: le coperture
+  // si posano DENTRO le finestre finché il selettore è aperto. Se intanto qualcosa esce dai veli, la foto non parte.
+  async function catturaColSelettore() {
+    const s = S();
+    const prima = sulloSchermo();
+    const wcs = prima.map((w) => w.wc);
+    const misurate = prima.length ? (await Foto.copertureIntorno(wcs, async () => true)).pagine : [];
+    const togli = [];
+    try {
+      for (let i = 0; i < prima.length; i++) {
+        if (!Foto.daCoprire(misurate[i])) continue;
+        for (const r of veliDellaFinestra(misurate[i], prima[i].dentro)) togli.push(s.posaVelo(prima[i].win, r));
+      }
+      // I veli devono essere disegnati prima che il sistema prenda il fotogramma.
+      if (togli.length) await new Promise((r) => setTimeout(r, 120));
+      let sc = null;
+      const { img, pagine } = await Foto.copertureIntorno(wcs, async () => {
+        const fonti = await s.fonti({ tipi: ['window', 'screen'], lato: latoCattura() });
+        sc = fonti.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()));
+        return sc ? sc.immagine : null;
+      });
+      if (!sc) return { errore: 'nel selettore del sistema non è stato scelto niente' };
+      const nome = { nome: sc.nome };
+      const no = senzaImmagine(img);
+      if (no) return { ...no, ...nome };
+      const dopo = sulloSchermo();
+      const cambiata = dopo.some((w) => {
+        const i = prima.findIndex((p) => p.wc === w.wc);
+        return i < 0 || !stessoPosto(prima[i].dentro, w.dentro);
+      });
+      if (cambiata || prima.some((_, i) => Foto.daCoprire(pagine[i]) && !velataGia(misurate[i], pagine[i]))) {
+        return { errore: FRASE_SELETTORE, ...nome };
+      }
+      return { ...immagineDa(img), ...nome };
+    } finally {
+      for (const t of togli) t();
+    }
+  }
+
   // Lo schermo, o quello che si sceglie nel selettore: dentro possono esserci finestre di Filo (#2116.5). Le finestre
   // delle altre app no, perché le finestre di Filo non stanno nel loro elenco.
   async function catturaConFilo(f) {
