@@ -5,9 +5,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { checkEnvelope, buildPayload, serverCtx, readRoleInstructions } from '../../scripts/dispatch.mjs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+import { checkEnvelope, buildPayload, serverCtx, readRoleInstructions, apreUnRamo } from '../../scripts/dispatch.mjs';
 import { normalizeRole } from '../../scripts/lib/routine-role.mjs';
-import { datiPerizia, INTENTI_CONSEGNA } from '../../scripts/routine-channel.mjs';
+import { datiPerizia, INTENTI_CONSEGNA, CAMPI_PERIZIA, CAMPI_DELLA_RIGA } from '../../scripts/routine-channel.mjs';
+import { chiamaLaRete, STRUMENTO_RETE } from '../../scripts/session-report.mjs';
+import { ramiInCorso } from '../../scripts/lib/su-main.mjs';
+import { rigaRamo } from '../../scripts/manutentore.mjs';
 
 const BUSTA = { role: 'perizia', id: 'abc', num: '#901', branch: '', payload: { codiceBusta: 'c0de', feedback: { name: 'Download rotto', text: 'Il pulsante non risponde.' }, immagini: [] } };
 
