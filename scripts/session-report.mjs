@@ -198,9 +198,10 @@ export function slugProgetto(percorso) {
 
 // I comandi della shell che scaricano da un indirizzo, contati in `tools.byName` sotto questo nome (#2337).
 export const STRUMENTO_RETE = 'Bash_rete';
-// I programmi di rete sono quelli dell'elenco unico del classificatore dei comandi; qui in più gh e un interprete che
-// apre un indirizzo. git parla col repo dal proxy: conta solo con un indirizzo scritto.
-const RE_PROGRAMMA_RETE = new RegExp(`^(?:${globalThis.SN_CMD_CLASSIFY.PROGRAMMI_RETE.source})`, 'i');
+// L'elenco del classificatore dei comandi (PROGRAMMI_RETE di src/shared/cmdClassify.js), qui senza importarlo: un
+// modulo dell'app raggiunto da uno script dell'owner vorrebbe il suo sì a ogni modifica. La sentinella in
+// tests/unit/perizia.test.mjs li tiene uguali. In più gh, e un interprete che apre un indirizzo; git solo con un indirizzo.
+const RE_PROGRAMMA_RETE = /^(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin|tracert|traceroute|whois|socat|smbclient|git)(?:\.exe)?\b/i;
 const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
 const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
 const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
