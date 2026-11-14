@@ -88,9 +88,10 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
   await chiedi(page, 'riordinami le tab');
   await alBottone(page);
 
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' })).toBeVisible({ timeout: 15_000 });
   // Il doppione si chiude per regola, le altre restano: nessuna valutata.
-  expect(await titoli(shell)).toEqual(['Doppia', 'Utile', 'Vecchia']);
+  await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile', 'Vecchia']);
+  await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('Riordino NON riuscito');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' }).last()).toBeVisible({ timeout: 15_000 });
   const riga = page.locator('.dash-activity').last();
   await riga.locator('.dash-activity-head').click();
   await expect(riga).toContainText('Riordino non riuscito');
