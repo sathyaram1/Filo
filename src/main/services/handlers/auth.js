@@ -1811,7 +1811,8 @@ module.exports = function register(on, ctx) {
     if (!feedbackId) return { ok: false, error: 'Manca la pratica di cui chiedere la fusione.' };
     let r;
     try {
-      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId });
+      fusioniCambiate();
+      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId }).finally(fusioniCambiate);
     } catch (e) {
       if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
       return { ok: false, error: e?.detail || e?.message || 'Il server non ha riaperto la richiesta.' };
