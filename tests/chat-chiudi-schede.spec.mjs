@@ -92,6 +92,7 @@ test('per numero e per sito, e a «tutte» il testo non inviato resta aperto e i
   await fermo();
 
   await chiedi(page, 'chiudi le schede di sito-pubblico');
+  await okAlPopup(page);
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Bozza']);
   await fermo();
 
