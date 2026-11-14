@@ -1,23 +1,21 @@
-// Verifica #2116.5, giro 1: la cassa con la pagina ingrandita, il campo della carta nel riquadro del servizio di
-// pagamento e la finestra che esce in parte dallo schermo: nella foto dello schermo intero il numero arriva coperto.
-// Il contenitore non fotografa lo schermo: la foto la compone la prova dalle schede vere, scoperte, ognuna al suo posto.
+// Verifica #2116.5, giro 1: una finestra di Filo che mostra un PDF, o un sito con un riquadro di un altro sito, non deve
+// far mancare a Filo tutto lo schermo, né (Wayland) la finestra di un'altra app scelta nel selettore del sistema.
+// Il contenitore non fotografa lo schermo: la foto la compone la prova dalle schede vere, ognuna al suo posto.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { copertura, vistaAvviso } from '../../helpers/avvisoSito.mjs';
 import { chiedi } from '../../helpers/chatFinta.mjs';
 import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
 
-const ROSA = [0xc9, 0x25, 0x85];
 const VERDE = [0x12, 0xab, 0x34];
-const tinta = ([r, g, b]) => `rgb(${r},${g},${b})`;
-const CAMPO = 'https://pagamenti-finti.it/campo';
+const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
 
 async function servi(app, pagine) {
   await app.evaluate(({ session, net }, pg) => {
     const risposta = (req) => {
       const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      const p = pg[u.hostname + u.pathname];
+      if (p) return new Response(p.corpo, { headers: { 'content-type': p.tipo } });
       return net.fetch(req, { bypassCustomProtocolHandlers: true });
     };
     try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
@@ -48,8 +46,8 @@ async function pixelDelColore(app, dataUrl, rgb, tol = 40) {
   }, { u: dataUrl, c: rgb, tol });
 }
 
-async function chatCheGuarda(app) {
-  await app.evaluate(async () => {
+async function chatCheGuarda(app, finestra) {
+  await app.evaluate(async (_e, nome) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -60,24 +58,24 @@ async function chatCheGuarda(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__occhio = [];
+    globalThis.__chat = [];
     P.completeWithFallback = async ({ attempts, messages }) => {
       const parti = (messages || []).flatMap((m) => (Array.isArray(m.content) ? m.content : []));
       const img = parti.find((p) => p && p.type === 'image_url');
       if (img) globalThis.__occhio.push(img.image_url.url);
-      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop', text: 'Una cassa.' };
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop', text: 'Uno schermo.' };
     };
     let n = 0;
-    globalThis.__chat = [];
     P.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       n += 1;
-      globalThis.__chat.push(JSON.stringify(messages).slice(-1500));
-      const calls = n === 1 ? [{ id: 'v1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: 'Schermo intero' }) }] : [];
+      globalThis.__chat.push(JSON.stringify(messages).slice(-600));
+      const calls = n === 1 ? [{ id: 'v1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: nome }) }] : [];
       for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
-      const text = n === 1 ? '' : 'Ho guardato lo schermo.';
+      const text = n === 1 ? '' : 'Ho guardato.';
       if (text) { try { onDelta && onDelta(text); } catch (_) {} }
       return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text, toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop' };
     };
-  });
+  }, finestra);
 }
 
 async function secondaFinestraConChat(app) {
@@ -113,48 +111,53 @@ async function secondaFinestraConChat(app) {
   return chat;
 }
 
-// La prima finestra esce di 150 punti a sinistra dello schermo; la seconda le sta accanto.
+// Windows: lo schermo come lo fotograferebbe il sistema, con le due finestre di Filo affiancate.
 async function schermoFinto(app) {
   await app.evaluate(({ nativeImage, screen, BrowserWindow }) => {
     const d = screen.getPrimaryDisplay().bounds;
     const filo = BrowserWindow.getAllWindows().filter((w) => w._filoTabs && !w.isDestroyed());
-    const meta = Math.floor(d.width / 2);
-    filo[0].setBounds({ x: d.x - 150, y: d.y, width: meta + 150, height: d.height });
-    filo[1].setBounds({ x: d.x + meta, y: d.y, width: d.width - meta, height: d.height });
-    globalThis.__schermo = {};
-    const disegna = (buf, img, x0, y0, w, h) => {
-      const src = img.resize({ width: w, height: h }).toBitmap();
-      for (let y = 0; y < h; y++) {
-        const ty = y0 + y - d.y;
-        if (ty < 0 || ty >= d.height) continue;
-        for (let x = 0; x < w; x++) {
-          const tx = x0 + x - d.x;
-          if (tx < 0 || tx >= d.width) continue;
-          src.copy(buf, (ty * d.width + tx) * 4, (y * w + x) * 4, (y * w + x) * 4 + 4);
-        }
-      }
-    };
-    const componi = async () => {
+    filo.forEach((w, i) => w.setBounds({ x: d.x + Math.round((i * d.width) / filo.length), y: d.y, width: Math.floor(d.width / filo.length), height: d.height }));
+    const componi = () => {
       const buf = Buffer.alloc(d.width * d.height * 4);
-      for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x30; buf[i + 1] = 0x30; buf[i + 2] = 0x30; buf[i + 3] = 255; }
-      for (const w of BrowserWindow.getAllWindows().filter((x) => x._filoTabs && !x.isDestroyed())) {
-        const tm = w._filoTabs;
-        const tab = tm.tabs.find((t) => t.id === tm.activeId);
-        const c = w.getContentBounds();
-        const b = tab.view.getBounds();
-        disegna(buf, await tab.view.webContents.capturePage(), c.x + b.x, c.y + b.y, b.width, b.height);
-      }
-      const foto = nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
-      globalThis.__schermo.grezza = foto.toDataURL();
-      return foto;
+      for (let i = 0; i < buf.length; i += 4) { buf[i] = VERDE_B; buf[i + 1] = VERDE_G; buf[i + 2] = VERDE_R; buf[i + 3] = 255; }
+      return nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
     };
+    const [VERDE_R, VERDE_G, VERDE_B] = [0x12, 0xab, 0x34];
     globalThis.SN_SCHERMO._perProve.usaSistema({
       piattaforma: () => 'win32',
       wayland: () => false,
       permessoMac: () => 'granted',
-      fonti: async ({ lato = 0 } = {}) => [{ id: 'screen:1:0', nome: 'Entire screen', tipo: 'schermo', displayId: String(screen.getPrimaryDisplay().id), immagine: lato > 0 ? await componi() : null }],
+      fonti: async ({ lato = 0 } = {}) => [{ id: 'screen:1:0', nome: 'Entire screen', tipo: 'schermo', displayId: String(screen.getPrimaryDisplay().id), immagine: lato > 0 ? componi() : null }],
     });
   });
+}
+
+// Wayland: nel selettore del sistema l'utente sceglie la finestra del terminale, un'altra app.
+async function selettoreFinto(app) {
+  await app.evaluate(({ nativeImage }) => {
+    const terminale = () => {
+      const w = 800, h = 600, buf = Buffer.alloc(w * h * 4);
+      for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x34; buf[i + 1] = 0xab; buf[i + 2] = 0x12; buf[i + 3] = 255; }
+      return nativeImage.createFromBitmap(buf, { width: w, height: h });
+    };
+    globalThis.SN_SCHERMO._perProve.usaSistema({
+      piattaforma: () => 'linux',
+      wayland: () => true,
+      fonti: async ({ lato = 0 } = {}) => (lato > 0 ? [{ id: 'window:77:0', nome: 'Terminale', tipo: 'finestra', displayId: '', immagine: terminale() }] : []),
+    });
+  });
+}
+
+async function guardaEdAspetta(app, chat, finestra) {
+  await chatCheGuarda(app, finestra);
+  await chiedi(chat, 'guarda e dimmi cosa vedi');
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
+  const occhio = await app.evaluate(() => globalThis.__occhio);
+  expect(occhio.length, `la foto deve arrivare al modello; esito: ${(await app.evaluate(() => globalThis.__chat))[1]}`).toBe(1);
+  expect(await pixelDelColore(app, occhio[0], VERDE), 'deve arrivare quello che si è scelto').toBeGreaterThan(20_000);
 }
 
 const PDF = `%PDF-1.4
@@ -168,33 +171,29 @@ endstream endobj
 trailer<</Root 1 0 R>>
 %%EOF`;
 
-test('guardando lo schermo intero con un PDF aperto in una finestra di Filo, la foto arriva', async ({ app, openTab }) => {
+test('r1 guardando lo schermo intero con un PDF aperto in una finestra di Filo, la foto arriva', async ({ app, openTab }) => {
   test.setTimeout(150_000);
-  await app.evaluate(({ session, net }, pdf) => {
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', (req) => (new URL(req.url).hostname === 'documenti-finti.it'
-      ? new Response(pdf, { headers: { 'content-type': 'application/pdf' } })
-      : net.fetch(req, { bypassCustomProtocolHandlers: true })));
-    globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, PDF);
+  await servi(app, { 'documenti-finti.it/bolletta.pdf': { corpo: PDF, tipo: 'application/pdf' } });
   await openTab('https://documenti-finti.it/bolletta.pdf').catch(() => null);
   await superaAvvisoSeCe(app);
   await new Promise((r) => setTimeout(r, 3_000));
   const url = await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const tm = w._filoTabs;
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
     return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL();
   });
   expect(url, 'la scheda del PDF deve essere in vista').toContain('documenti-finti.it');
-
   const chat = await secondaFinestraConChat(app);
   await schermoFinto(app);
-  await chatCheGuarda(app);
-  await chiedi(chat, 'guarda lo schermo e dimmi cosa vedi');
-  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
-  await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'ok');
-  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
-  console.log('ESITO', (await app.evaluate(() => globalThis.__chat))[1]);
-  expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto dello schermo deve arrivare al modello').toBe(1);
+  await guardaEdAspetta(app, chat, 'Schermo intero');
+});
+
+test('r1 su Wayland, con un sito che incorpora un video in una finestra di Filo, la finestra del terminale scelta nel selettore arriva', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  await servi(app, { 'video-finti.it/embed': { corpo: '<!doctype html><body style="margin:0;background:#000;color:#fff">video</body>', tipo: 'text/html; charset=utf-8' } });
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Ricetta</title></head><body style="margin:0">
+    <h1>Ricetta della torta</h1><iframe src="https://video-finti.it/embed" style="width:560px;height:315px;border:0"></iframe></body></html>`);
+  await superaAvvisoSeCe(app);
+  const chat = await secondaFinestraConChat(app);
+  await selettoreFinto(app);
+  await guardaEdAspetta(app, chat, SELETTORE);
 });
