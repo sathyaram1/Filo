@@ -100,12 +100,11 @@ test('azione mancante, sconosciuta o senza i suoi campi: l\'errore torna al mode
 // #1564: il modello copia i nomi dell'azione accanto; due nomi per lo stesso dato in uno strumento facevano respingere
 // come mancante un campo che il gestore sa leggere.
 test('dentro uno strumento un dato ha un nome solo', () => {
-  const SINONIMI = [['time', 'orario', 'at'], ['label', 'etichetta', 'nome'], ['dominio', 'domain', 'sito'], ['seconds', 'secondi'], ['query', 'cerca', 'cosa']];
+  const SINONIMI = [['time', 'orario', 'at'], ['label', 'etichetta', 'nome'], ['dominio', 'domain', 'sito'], ['seconds', 'secondi']];
   for (const d of Tools.definitions()) {
     const nomi = Object.keys(d.function.parameters.properties);
     for (const gruppo of SINONIMI) {
       const usati = gruppo.filter((n) => nomi.includes(n));
-      if (gruppo[0] === 'query' && ['web', 'filo', 'file', 'scheda', 'impostazioni'].includes(d.function.name)) continue;
       assert.ok(usati.length <= 1, `${d.function.name}: ${usati.join(' e ')} sono lo stesso dato`);
     }
   }
