@@ -97,7 +97,9 @@ test('riaperta, la Gestione chiede i cambiati e il conto; le statistiche contano
     Object.assign(globalThis.__docs.find((d) => d._id === 'f3'), { name: 'Riscritto mentre era chiusa', _updateTime: 't2', updatedAt: ora });
     globalThis.__docs.push({ ...globalThis.__docs[0], _id: 'nuovo', seq: 999, name: 'Arrivato adesso', _updateTime: 't1', updatedAt: ora });
   });
-  const seconda = await apriGestione(openTab, 41);
+  const seconda = await apriGestione(openTab, 41).catch(async (e) => {
+    throw new Error(`${e.message}\nconta: ${JSON.stringify(await conta(app))}`);
+  });
   await expect(seconda.locator('.mg-item-title', { hasText: 'Riscritto mentre era chiusa' })).toHaveCount(1);
   await expect(seconda.locator('.mg-item-title', { hasText: 'Arrivato adesso' })).toHaveCount(1);
   const dopo = await conta(app);
