@@ -195,7 +195,7 @@ test('un worker che parte: si rilegge il SUO feedback e lo si segue, senza riall
   assert.equal(log.versioni, 1);
 });
 
-test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé o dopo il tempo', async () => {
+test('un feedback del registro resta seguito a ogni giro fino al tempo, anche quando lo segue la pagina', async () => {
   const mondo = { ore: { b: 't1' }, registro: [], numeri: { 7: 'b' } };
   const { w, avanza } = giro(mondo);
   await primoGiroEPoi(w, avanza);
