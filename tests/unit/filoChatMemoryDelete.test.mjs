@@ -1,14 +1,5 @@
-// Unit test per #165: l'assistente della home (PROMPTS.filoChat) deve poter
-// CANCELLARE la memoria solo tramite la vera azione CANCELLA_MEMORIA — quella
-// che il sistema gate al livello 3 (l'utente digita "conferma"). Prima del fix
-// l'azione esisteva nel backend ma NON era esposta all'LLM: chiedere "cancella
-// le memorie" faceva confabulare il modello ("fatto, cancellate") senza avviso
-// né cancellazione reale, e in una scheda nuova diceva "rimosse come richiesto".
-//
-// Due invarianti puri, testabili senza Electron né rete:
-//   1) il prompt espone CANCELLA_MEMORIA (intent + azione disponibile);
-//   2) il prompt vieta di inventare che la memoria è stata cancellata quando è
-//      semplicemente vuota (e ricorda che ogni scheda parte da zero).
+// #165: la chat cancella la memoria solo con lo strumento vero, che il sistema ferma su «conferma»; senza, il modello
+// diceva «fatto, cancellate» senza cancellare, e a memoria vuota «rimosse come richiesto».
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
