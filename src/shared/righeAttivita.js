@@ -235,7 +235,7 @@
     TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || a.sito || 'questo sito'}` }),
     NON_TENERE_APERTA: (a) => {
       const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
-      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || 'questo sito'}` };
+      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || a.sito || 'questo sito'}` };
     },
     STILE_PAGINA: (a) => {
       const d = String(a.descrizione || a.description || '').trim();
