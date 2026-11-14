@@ -116,10 +116,13 @@ function immagineDa(img) {
 }
 
 // ─── Le finestre di Filo dentro la foto dello schermo (#2116.5) ──────────────────────────────────────────────────────
-// Passano dalle stesse coperture della finestra guardata da sola; una che non si può coprire ferma la foto.
+// Passano dalle stesse coperture della finestra guardata da sola; una che non si misura si copre per intero, così le
+// altre app restano visibili. Contano anche le finestrelle di accesso, che sono di Filo ma non hanno schede.
 
 // Corta: con il nome della finestra sta nel motivo della riga d'esito, che si taglia a 200 caratteri.
-const FRASE_SELETTORE = 'una finestra di Filo mostra dati da coprire e nel selettore non so dove sta: guardala da sola o riducila a icona';
+const FRASE_SELETTORE = 'mentre sceglievi nel selettore una finestra di Filo ha cambiato quello che mostra e poteva restare scoperta: riprova';
+// Grigio dei veli: lo stesso delle coperture dipinte sulla foto.
+const TINTA_VELO = `#${Foto.GRIGIO.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 
 /** Il rettangolo del desktop (coordinate dello schermo) che la foto di `displayId` ritrae: quel monitor, o l'insieme dei
  *  monitor quando il sistema ne fa una foto sola (X11), scelto dalle proporzioni della foto. Null se non si sa. PURA. */
