@@ -364,6 +364,24 @@ test('foto dello schermo: una finestra di Filo che non si può misurare si copre
   assert.deepEqual(Schermo.copertureDelloSchermo({ prima: [], dopo: [], misure: [], area: null, larghezza: 1000, altezza: 500 }), { lista: [] });
 });
 
+test('selettore di Wayland: i veli stanno dove la pagina si disegna nella finestra, e una pagina che non si misura si vela intera', () => {
+  const dentro = { x: 0, y: 80, width: 800, height: 400 };
+  const misura = { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista: { w: 400, h: 200 } };
+  assert.deepEqual(Schermo.veliDellaFinestra(misura, dentro).map((r) => [r.left, r.top, r.width, r.height]), [[18, 118, 204, 24]]);
+  assert.deepEqual(Schermo.veliDellaFinestra({ no: 'riquadri' }, dentro), [{ left: 0, top: 80, width: 800, height: 400 }]);
+});
+
+test('selettore di Wayland: la foto parte solo se quello da coprire dopo la scelta stava già sotto un velo', () => {
+  const vista = { w: 400, h: 200 };
+  const prima = { lista: [{ left: 8, top: 18, width: 104, height: 14 }], vista };
+  assert.equal(Schermo.velataGia(prima, { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista }), true);
+  assert.equal(Schermo.velataGia(prima, { lista: [{ left: 10, top: 120, width: 100, height: 10 }], vista }), false, 'il campo scritto col selettore aperto');
+  assert.equal(Schermo.velataGia({ lista: [], vista }, { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista }), false);
+  assert.equal(Schermo.velataGia(prima, { lista: prima.lista, vista: { w: 500, h: 200 } }), false, 'la pagina ha cambiato grandezza');
+  assert.equal(Schermo.velataGia(prima, { no: 'misura' }), false);
+  assert.equal(Schermo.velataGia({ no: 'riquadri' }, { no: 'misura' }), true, 'velata intera');
+});
+
 test('foto dello schermo: quando il sistema fotografa tutti i monitor insieme le proporzioni scelgono l\'insieme', () => {
   const r = [{ id: '1', left: 0, top: 0, width: 1920, height: 1080 }, { id: '2', left: 1920, top: 0, width: 1280, height: 1024 }];
   assert.deepEqual(Schermo.areaDelloSchermo(r, '1', 3200 / 1080), { left: 0, top: 0, width: 3200, height: 1080 });
