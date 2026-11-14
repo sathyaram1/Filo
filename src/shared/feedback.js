@@ -1451,10 +1451,16 @@
   }
 
   // Quanti feedback ci sono: il conto di Firestore costa una lettura ogni mille documenti (#2470). `null` = non lo so.
-  async function countAll({ timeoutMs = 0, idToken = '' } = {}) {
+  // `fra` ({ campo, valori }): solo quelli col campo uguale a uno dei valori (testi).
+  async function countAll({ timeoutMs = 0, idToken = '', fra = null } = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
-    const body = { structuredAggregationQuery: { structuredQuery: { from: [{ collectionId: COLLECTION }] }, aggregations: [{ alias: 'n', count: {} }] } };
+    const structuredQuery = { from: [{ collectionId: COLLECTION }] };
+    if (fra) {
+      if (!fra.campo || !Array.isArray(fra.valori) || !fra.valori.length) throw new Error('conto filtrato senza campo o valori');
+      structuredQuery.where = { fieldFilter: { field: { fieldPath: String(fra.campo) }, op: 'IN', value: { arrayValue: { values: fra.valori.map((v) => ({ stringValue: String(v) })) } } } };
+    }
+    const body = { structuredAggregationQuery: { structuredQuery }, aggregations: [{ alias: 'n', count: {} }] };
     const opts = { method: 'POST', headers, body: JSON.stringify(body) };
     let timer = null;
     if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
