@@ -96,7 +96,7 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
 
   // Il doppione si chiude per regola, le altre restano: nessuna valutata.
   await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile', 'Vecchia']);
-  await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('Riordino NON riuscito');
+  await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('NON riuscita: PULISCI_TAB');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' }).last()).toBeVisible({ timeout: 15_000 });
   const riga = page.locator('.dash-activity').last();
   await riga.locator('.dash-activity-head').click();
