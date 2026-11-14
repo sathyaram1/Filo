@@ -5297,7 +5297,7 @@ function chatSearchesForPrompt(actions) {
     // #1295 — le nascoste si nominano e basta: l'utente le ha tolte dalla vista, e si rimettono solo se lo chiede.
     if (nascoste.length) {
       const righe = nascoste.map((c) => `- [${c.id}] "${E.neutralizza(c.title || 'senza titolo', { unaRiga: true })}"${c.date ? ` · ${new Date(c.date).toLocaleDateString('it-IT')}` : ''}`);
-      blocks.push(`[${out.nascosteTutte ? `Tutte le ${nascoste.length} conversazioni che l'utente ha nascosto` : `Conversazioni che l'utente ha nascosto e che combaciano con "${cercato}"`}: non le leggi. Se è una di queste che cerca, diglielo e chiedigli se vuole rimetterla (RIMETTI_CHAT con l'id).]\n`
+      blocks.push(`[${out.nascosteTutte ? `Tutte le ${nascoste.length} conversazioni che l'utente ha nascosto` : `Conversazioni che l'utente ha nascosto e che combaciano con "${cercato}"`}: non le leggi. Se è una di queste che cerca, diglielo e chiedigli se vuole rimetterla (filo(rimetti_chat) con l'id).]\n`
         + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
     }
     // #868 — le pagine visitate: titoli, indirizzi e riassunti li scrivono i siti, quindi in busta.
