@@ -217,7 +217,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     }
     if (!avanti) continue;
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-    rami.push({ ramo: nome(ramo, head), data, avanti, file: [...file].sort(), ...(nuovi.size ? { fileNuovi: nuovi.size } : {}), feedback });
+    rami.push({ ramo: nome(ramo, head), data, avanti, file: [...file].sort(), ...(nuovi.size ? { fileNuovi: [...nuovi].sort() } : {}), feedback });
   }
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
