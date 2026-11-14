@@ -28,7 +28,7 @@ test('una mancanza si segnala nello stesso turno, col testo già scritto, e la c
 
 test('«come scegli i modelli?» si legge con il documento di trasparenza, non a memoria', () => {
   assert.match(riga('Tutto quello che l\'utente può fare in Filo'), /perché ha scelto un modello, un'azienda o un prezzo, leggilo con lo strumento: non a memoria/);
-  assert.match(strumento('filo_su_di_se'), /- documento\(doc\?\): [^\n]*leggilo prima di rispondere su questo/);
+  assert.match(strumento('filo_su_di_se'), /- documento\(doc\?\): [^\n]*Leggilo prima di rispondere su questo/);
 });
 
 test('chiavi delle impostazioni e id delle capacità non finiscono nel testo per l\'utente', () => {
