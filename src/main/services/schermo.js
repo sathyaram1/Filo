@@ -222,7 +222,8 @@ function sistemaVero() {
       let conFilo = '';
       try { if (w) conFilo = String(screen.getDisplayMatching(w.getBounds()).id); } catch (_) {}
       const lato = Math.max(...tutti.map((d) => Math.max(d.size.width, d.size.height) * (d.scaleFactor || 1)), 0);
-      return { primario: String(primario.id), conFilo, lato: Math.round(lato) };
+      const rettangoli = tutti.map((d) => ({ id: String(d.id), left: d.bounds.x, top: d.bounds.y, width: d.bounds.width, height: d.bounds.height }));
+      return { primario: String(primario.id), conFilo, lato: Math.round(lato), rettangoli };
     },
     delicata: async (url) => {
       if (!/^https?:/i.test(String(url || ''))) return '';
