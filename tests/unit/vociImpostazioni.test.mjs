@@ -227,11 +227,16 @@ test('la segnalazione automatica è fra le impostazioni di serie, accesa', () =>
   assert.equal(C.DEFAULT_SETTINGS.security.autoFeedback, true);
 });
 
-test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e lo stesso livello dell\'annullo', () => {
-  const descr = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+test('ogni chiave scrive quello che dichiara, la chat la trova coi suoi valori e ha lo stesso livello dell\'annullo', () => {
+  // Le chiavi non stanno più tutte nello strumento (#1564): le porta impostazioni(leggi), voce per voce coi valori;
+  // quella che nessuna voce mostra la nomina la descrizione di impostazioni(imposta).
+  const descr = Tools.TOOLS.IMPOSTA_PREFERENZA.description;
+  const conVoce = new Map(V.voci().filter((v) => v.chiave).map((v) => [v.chiave, v]));
   for (const s of P.PREF_SETTERS) {
     assert.ok(s.aiuto, `${s.keys[0]}: manca \`aiuto\`, la riga che la chat legge`);
-    assert.ok(descr.includes(`• ${s.keys[0]}: `), `${s.keys[0]}: non compare nella descrizione di IMPOSTA_PREFERENZA`);
+    const v = conVoce.get(s.keys[0]);
+    assert.ok(v || descr.includes(s.keys[0]), `${s.keys[0]}: né impostazioni(leggi) né la descrizione di impostazioni(imposta) la nominano`);
+    if (v) assert.ok(v.ammessi && !/undefined/.test(v.ammessi), `${s.keys[0]}: la lettura non dice i valori ammessi`);
     const scritti = percorsiScrittiDa(s);
     for (const p of s.scrive || []) {
       // Un percorso jolly (`models.*`, una chiave per funzione) vale scritto se ne è scritta una foglia.
