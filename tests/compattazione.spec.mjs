@@ -414,9 +414,10 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
 
 test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti vecchi, il testo dell\'utente resta', async ({ app }) => {
   const page = await home(app);
-  // Sette pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
-  // portano la richiesta oltre il listino.
-  await app.evaluate(async () => {
+  // Dodici pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
+  // portano la richiesta oltre il listino anche con la parte fissa leggera di #1564.
+  const PAGINE = 12;
+  await app.evaluate(async (_e, PAGINE) => {
     const s = await globalThis.SN_STORAGE.getSettings();
     await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), token: 400000 } });
     const t0 = Date.now() - 10 * 60 * 1000;
