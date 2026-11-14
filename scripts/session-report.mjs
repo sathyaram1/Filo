@@ -208,11 +208,13 @@ const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|env(?:\s+\S+=\S*)*|xarg
 
 /** Il comando chiama la rete? Ogni pezzo in posizione di comando, anche col percorso intero del programma. PURA. */
 export function chiamaLaRete(comando) {
-  for (const pezzo of String(comando || '').split(/[;&|\n`()]|\$\(/)) {
+  const tutto = String(comando || '');
+  for (const pezzo of tutto.split(/[;&|\n`()]|\$\(/)) {
     const s = pezzo.trim().replace(RE_PREFISSI, '').replace(/^["']?(?:[^\s"']*[\\/])?/, '');
     const m = RE_PROGRAMMA_RETE.exec(s);
     if (m && (!/^git\b/i.test(m[0]) || RE_INDIRIZZO.test(s))) return true;
-    if (RE_SOLO_QUI.test(s) || (RE_INTERPRETE.test(s) && RE_INDIRIZZO.test(s))) return true;
+    // Il codice di un interprete sta fra virgolette e parentesi, che spezzano il comando: l'indirizzo si cerca in tutto.
+    if (RE_SOLO_QUI.test(s) || (RE_INTERPRETE.test(s) && RE_INDIRIZZO.test(tutto))) return true;
   }
   return false;
 }
