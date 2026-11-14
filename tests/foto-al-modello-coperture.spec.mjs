@@ -378,7 +378,9 @@ async function schermoFinto(app, { wayland = false } = {}) {
           }
         }
       }
-      return nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
+      const foto = nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
+      globalThis.__schermo.grezza = foto.toDataURL();
+      return foto;
     };
     globalThis.SN_SCHERMO._perProve.usaSistema({
       piattaforma: () => 'win32',
