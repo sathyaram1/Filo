@@ -288,8 +288,8 @@ test('a «quanto costa Filo?» la chat riceve la nota su come si sostiene', asyn
   expect(nota).toContain('Fino ad allora è tutto offerto');
   // Lo strumento offerto al modello ammette la sezione: senza, il modello non
   // potrebbe nemmeno chiederla.
-  const def = (calls[0].tools || []).map((t) => t.function || t).find((f) => f && f.name === 'LEGGI_TRASPARENZA');
-  expect(def, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  const def = (calls[0].tools || []).map((t) => t.function || t).find((f) => f && f.name === 'filo_su_di_se');
+  expect(def, 'filo_su_di_se non arriva al modello').toBeTruthy();
   expect(def.parameters.properties.doc.enum).toContain('business');
   const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
   expect(tool, 'l\'esito di LEGGI_TRASPARENZA non torna al modello').toBeTruthy();
