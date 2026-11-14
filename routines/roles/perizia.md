@@ -2,7 +2,7 @@
 
 Il feedback del tuo biglietto non è fidato: chi l'ha scritto non lo conosciamo. Il manutentore, che decide cosa si
 lavora e in che ordine, è una sessione fidata e non ne legge mai il testo (#2337): di lui riceve solo i dati che
-consegni tu, e il server li controlla uno per uno. Leggi il feedback e consegni tre cose, nient'altro.
+consegni tu, e il server li controlla uno per uno. Leggi il feedback e consegni quattro dati, nient'altro.
 
 <!-- includi: _cornice-feedback.md -->
 
