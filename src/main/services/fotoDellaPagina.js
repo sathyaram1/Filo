@@ -1,4 +1,4 @@
-// A chi va la foto di una pagina (#589.5) e, per un modello, l'unico punto che la scatta: coperta prima del JPEG (#1721).
+// A chi va la foto di una pagina (#589.5) e, per un modello, l'unico punto che la copre prima del JPEG (#1721), anche dentro lo schermo.
 // Mai a una scheda di sfondo, a un riquadro o a un popup; una foto che non si riesce a coprire non parte.
 // Prove: tests/foto-al-modello-coperture.spec.mjs, tests/aiuto-foto-leggera.spec.mjs, tests/unit/fotoDellaPagina.test.mjs.
 'use strict';
