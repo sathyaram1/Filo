@@ -45,8 +45,10 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    sempre col margine. Un giro a vuoto costa una lettura. Una riga riletta coi soli
    campi della lista li sostituisce tutti: un campo della lista che manca è
    stato tolto sul server, non si tiene quello vecchio.
-4. **La riconciliazione rara** (mezz'ora): le versioni di tutto, confrontate in
-   pagina. Una lettura interrotta non fa uscire nessuno.
+4. **La riconciliazione rara** (sei ore): le versioni di tutto, confrontate in
+   pagina. Una lettura interrotta non fa uscire nessuno. Nel mezzo, ogni
+   mezz'ora, il controllo leggero: il conto contro le righe in mano e l'ultimo
+   cambiato contro la sua versione; un conto diverso fa riallineare.
 5. **Un giro solo, e solo con qualcuno che guarda.** Vive nel main senza un
    orologio suo: lo chiede la pagina in vista, e la porta ricontrolla la vista.
    L'esito va anche alle altre pagine iscritte.
