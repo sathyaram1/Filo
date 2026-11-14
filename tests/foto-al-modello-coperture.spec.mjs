@@ -410,19 +410,50 @@ async function guardaDopoOk(app, chat, nome) {
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
   await scrollConfirmToEnd(chat);
   await clickConfirm(chat, 'ok');
-  return chat;
 }
+
+const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
 
 test('#2116.5: guardando lo schermo intero, il numero della carta nella finestra di Filo accanto arriva coperto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await cassaCompilata(app, openTab, testServer);
-  await secondaFinestraConChat(app).then(() => null);
+  const chat = await secondaFinestraConChat(app);
   await schermoFinto(app);
-  await guardaDopoOk(app, 'Schermo intero');
+  await guardaDopoOk(app, chat, 'Schermo intero');
   await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare lo schermo con la cassa').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto dello schermo').toBeLessThan(20);
+});
+
+// Su Wayland il selettore può dare proprio la finestra di Filo, e non dice dove sta: con una cassa compilata in vista
+// il selettore non si apre, e il modello sa perché e cosa proporre.
+test('#2116.5: Wayland, con una cassa compilata in una finestra di Filo il selettore non si apre e il modello sa cosa proporre', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
+  const secondo = await app.evaluate(() => globalThis.__chat[1]);
+  expect(secondo).toContain('mostra cose da coprire');
+  expect(secondo).toContain('Filo da sola');
+  expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(0);
+  expect(await app.evaluate(() => globalThis.__occhio.length)).toBe(0);
+});
+
+test('#2116.5: Wayland, con le finestre di Filo senza niente da coprire quello scelto nel selettore arriva al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Ricette</title></head><body style="margin:0;background:${tinta(VERDE)}">
+    <p style="font:20px sans-serif">Pasta al forno</p></body></html>`);
+  await superaAvvisoSeCe(app);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare quello scelto nel selettore').toBeGreaterThan(20_000);
+  expect(await app.evaluate(() => globalThis.__schermo.catture)).toBe(1);
 });
 async function scattaScreenshot(app, page) {
   let utente = null;
