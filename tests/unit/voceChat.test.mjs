@@ -11,9 +11,11 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 for (const f of ['constants.js', 'i18n.js', 'tasti.js', 'chatErrors.js', 'preferences.js', 'actionTools.js',
-  'cambi.js', 'ascolto.js', 'voceChat.js']) {
+  'cambi.js', 'ascolto.js', 'voceChat.js', 'vociImpostazioni.js']) {
   require(join(ROOT, 'src', 'shared', f));
 }
+// Quello che il modello legge con impostazioni(leggi) cercando quella voce: chiave e valori ammessi.
+const letturaPerIlModello = (cerca) => globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, { cerca }).righe.join('\n');
 const T = globalThis.SN_TASTI;
 const V = globalThis.SN_VOCE_CHAT;
 const A = globalThis.SN_ASCOLTO;
