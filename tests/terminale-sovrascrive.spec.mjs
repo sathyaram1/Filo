@@ -1,5 +1,6 @@
 // #892.2 — un comando che sovrascrive o svuota un file che c'è già chiede prima di partire, scritto a mano nella home
-// come proposto da Filo: il contenuto di prima non torna. Sul file nuovo la copia parte come prima, senza domande.
+// come proposto da Filo: il contenuto di prima non torna, e la domanda lo dice. Sul file nuovo la copia è costo 2: a
+// Normale, finché manca il guardiano, chiede un OK semplice, senza il rischio di sovrascrivere (#1840).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm } from './helpers/confirm.mjs';
@@ -48,6 +49,9 @@ test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un
   const terzo = path.join(dir, 'copia.txt');
   await input.fill(`/${copia(nuovo, terzo)}`);
   await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).fuori || '', 'sul file nuovo non c\'è niente da sovrascrivere').not.toMatch(/sovrascrive/);
+  await clickConfirm(page, 'ok');
   await expect.poll(() => existsSync(terzo), { timeout: 12_000 }).toBe(true);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
@@ -58,10 +62,10 @@ test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un
   await expect.poll(() => readFileSync(vecchio, 'utf8'), { timeout: 12_000 }).toBe('testo nuovo');
 });
 
-test('proposto da Filo: sovrascrivere chiede anche a compito pulito, la copia su un file nuovo no', async ({ app, openTab }) => {
+test('proposto da Filo: sovrascrivere chiede col suo rischio, la copia su un file nuovo con un OK semplice', async ({ app, openTab }) => {
   const { dir, nuovo, vecchio } = dueFile();
   await openTab('filo://newtab/');
-  const esegui = (comando) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, {}), { type: 'ESEGUI_COMANDO', comando });
+  const esegui = (comando, opzioni = {}) => app.evaluate((_e, [a, o]) => globalThis.SN_EXECUTE_FILO_ACTION(a, o), [{ type: 'ESEGUI_COMANDO', comando }, opzioni]);
 
   const sopra = await esegui(copia(nuovo, vecchio));
   expect(sopra.executed, 'senza un sì non parte').toBe(false);
@@ -71,6 +75,11 @@ test('proposto da Filo: sovrascrivere chiede anche a compito pulito, la copia su
 
   const terzo = path.join(dir, 'copia.txt');
   const nuova = await esegui(copia(nuovo, terzo));
-  expect(nuova.executed, 'una copia su un file nuovo resta una modifica che si rimedia').toBe(true);
+  expect(nuova.executed).toBe(false);
+  expect(nuova.needsConfirm, 'una copia su un file nuovo resta una modifica che si rimedia: un OK').toBe(2);
+  expect(JSON.stringify(nuova.parti || nuova.describe || '')).not.toMatch(/sovrascrive/);
+  expect(existsSync(terzo)).toBe(false);
+  const fatta = await esegui(copia(nuovo, terzo), { confirmed: true });
+  expect(fatta.executed).toBe(true);
   expect(existsSync(terzo)).toBe(true);
 });

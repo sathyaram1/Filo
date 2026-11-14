@@ -16,7 +16,14 @@ async function tornaAllaHome(shell) {
   return h.id;
 }
 
-const pagineWeb = async (shell) => (await schede(shell)).filter((t) => !String(t.url).startsWith('filo://')).map((t) => t.title).sort();
+// Più schede insieme sono costo 2: a Normale, finché manca il guardiano, chiedono un OK anche a compito pulito (#1840).
+async function okAlPopup(page) {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await scrollConfirmToEnd(page).catch(() => {});
+  await clickConfirm(page, 'ok');
+}
+
+const pagineWeb = async (shell) =>(await schede(shell)).filter((t) => !String(t.url).startsWith('filo://')).map((t) => t.title).sort();
 
 // Il testo che il modello riceve come esito della chiamata `id`.
 const esitoPerIlModello = async (app, id) => {
@@ -41,15 +48,17 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
     { text: 'Questa frase arriva solo da un secondo giro.' },
   ]);
   await chiedi(page, 'chiudi tutte le schede tranne questa');
+  await okAlPopup(page);
 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
   expect((await schede(shell)).map((t) => t.id)).toEqual([idHome]);
-  const activity = page.locator('.dash-activity');
+  const activity = page.locator('.dash-activity').first();
   await expect(activity).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
   await expect(activity.locator('.dash-activity-head')).toContainText('Ha chiuso delle schede');
   await expect(activity.locator('.dash-activity-row', { hasText: 'Chiuse 3 schede' })).toHaveCount(1);
-  // Un comando riuscito senza schede lasciate aperte parla da sé: una chiamata sola.
-  expect((await chiamateAlModello(app)).length).toBe(1);
+  // Dato l'OK il lavoro riprende col suo esito (#1685): la seconda chiamata sa cosa si è chiuso.
+  await expect.poll(async () => (await chiamateAlModello(app)).length).toBe(2);
+  expect(JSON.stringify((await chiamateAlModello(app))[1])).toContain('Chiuse 3 schede');
   // Il modello vede quale scheda è la sua, e i numeri da usare.
   const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
   expect(prompt).toContain('[QUESTA CHAT]');
@@ -71,10 +80,11 @@ test('per numero e per sito, e a «tutte» il testo non inviato resta aperto e i
   await tornaAllaHome(shell);
 
   // L'elenco del modello segue la barra (#413.2): 1 la home, 2 Alfa, 3 Beta, 4 Gamma, 5 Bozza. Un comando riuscito
-  // chiude il turno con una chiamata: il giro di testo serve solo all'ultimo, che lascia aperta la bozza.
+  // chiude il turno con una chiamata; dopo l'OK delle due del sito il lavoro riprende, e quel giro di testo è suo.
   await modelloFinto(app, [
     { text: '', toolCalls: [{ id: 'n1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [2] }) }] },
     { text: '', toolCalls: [{ id: 's1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ sito: 'sito-pubblico.test' }) }] },
+    { text: 'Chiuse le due del sito.' },
     { text: '', toolCalls: [{ id: 't1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ tutte: true }) }] },
     { text: 'Ho lasciato aperta la bozza.' },
   ]);
@@ -84,6 +94,7 @@ test('per numero e per sito, e a «tutte» il testo non inviato resta aperto e i
   await fermo();
 
   await chiedi(page, 'chiudi le schede di sito-pubblico');
+  await okAlPopup(page);
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Bozza']);
   await fermo();
 
@@ -128,7 +139,6 @@ test('«chiudi questa scheda» detto nella home la chiude: si torna alla pagina 
 test('quando chiede conferma, il popup elenca le schede e all\'OK chiude proprio quelle', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await home(app);
-  // A Conservativo più schede insieme (costo 2) chiedono anche a compito pulito (#530).
   await livelloAutonomia(app, 'conservativo');
   await openTab(testServer.html('<title>Ricetta della torta</title><p>ricetta'));
   await openTab(testServer.html('<title>Orari dei treni</title><p>treni', { pubblico: true }));
@@ -183,6 +193,7 @@ test('«chiudi la seconda scheda» chiude la seconda della barra, «tutte quelle
   await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   await chiedi(page, 'chiudi tutte le schede di sito-pubblico');
+  await okAlPopup(page);
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Delta']);
   await ripristina(app);
 });
@@ -218,6 +229,7 @@ test('«chiudi tutto tranne Gmail» con quattordici schede: la più vecchia ha i
 
   await modelloCheTieneGmail(app);
   await chiedi(page, 'chiudi tutto tranne Gmail');
+  await okAlPopup(page);
 
   await expect.poll(() => pagineWeb(shell), { timeout: 15_000 }).toEqual(['Posta in arrivo - Gmail']);
   await ripristina(app);

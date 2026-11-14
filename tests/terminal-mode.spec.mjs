@@ -139,6 +139,8 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
   // "un processo per comando" qui uscirebbe "persist=" (variabile persa); con la
   // shell persistente esce "persist=vivo-5566".
   await submitInput(page, readCmd);
+  // Una variabile espansa è costo 2: a Normale chiede un OK finché manca il guardiano (#1840).
+  await clickConfirm(page, 'ok');
   await expect(page.locator('.dash-term-out').last())
     .toContainText('persist=vivo-5566', { timeout: 12_000 });
 });

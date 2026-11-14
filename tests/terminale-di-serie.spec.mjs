@@ -70,7 +70,7 @@ async function chiedi(page, testo, risposta) {
 
 const impostazioni = (page) => page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
 
-test('profilo nuovo: una lettura parte subito con la frase della prima volta, una cancellazione chiede «conferma»', async ({ app, shell }) => {
+test('profilo nuovo: la frase della prima volta, una cancellazione chiede «conferma» e una lettura parte subito', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -81,35 +81,24 @@ test('profilo nuovo: una lettura parte subito con la frase della prima volta, un
   await expect(page.locator('#dashDir')).toBeHidden();
 
   await configureModel(app);
+  // La cancellazione viene prima: cancellare per sempre è costo 4, che dopo aver letto l'uscita di un comando è un no
+  // (#1840). Proposta, porta già la frase della prima volta.
   await fakeProvider(app, [
+    // Un comando fermo sulla conferma col testo del giro richiama il modello (#1130), che scrive la frase.
+    { ...comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'), text: 'Lo cancello.' },
+    { text: 'Ti chiedo conferma prima di cancellare.' },
     comando('c1', 'echo spazio-libero-892', 'Misuro lo spazio libero sul disco'),
     { text: 'Hai parecchio spazio libero.' },
-    // Un comando fermo sulla conferma chiude il turno (#1130): la frase va scritta insieme.
-    { ...comando('c2', 'rm -rf cartella-892-che-non-esiste', 'Cancello la cartella cartella-892-che-non-esiste'), text: 'Ti chiedo conferma prima di cancellare.' },
   ]);
-
-  // Lettura: nessun popup, l'esito è già lì; la frase spiega cosa è successo e dove si spegne.
-  await chiedi(page, 'quanto spazio ho sul disco?', 'Hai parecchio spazio libero.');
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
-  const frase = page.locator('.dash-cmd-primavolta');
-  await expect(frase).toHaveCount(1);
-  await expect(frase).toContainText(`${FRASE}: quello che legge parte subito, quello che cambia qualcosa te lo chiedo prima. Si spegne in Preferenze.`);
-  const blocco = page.locator('.dash-activity').last();
-  await blocco.locator('.dash-activity-head').click();
-  const esito = blocco.locator('.dash-activity-cmd');
-  await expect(esito.locator('.dash-cmd-cosa')).toHaveText('Misuro lo spazio libero sul disco');
-  await expect(esito.locator('.dash-cmd-line')).toHaveText('$ echo spazio-libero-892');
-  await expect(esito.locator('.dash-cmd-output')).toContainText('spazio-libero-892');
-  // Girato un comando, la chat mostra dove lavora e come scriverne uno.
-  await expect(input).toHaveAttribute('placeholder', /comando per la shell/);
-  await expect(page.locator('#dashDir')).toBeVisible();
 
   // Cancellazione: il bottone dice prima a parole cosa fa, il comando vero sta sotto.
   await chiedi(page, 'cancella la cartella', 'Ti chiedo conferma prima di cancellare.');
   const btn = page.locator('.dash-cmd-btn').last();
   await expect(btn.locator('.dash-cmd-btn-cosa')).toHaveText('▶ Cancello la cartella cartella-892-che-non-esiste');
   await expect(btn.locator('.dash-cmd-btn-codice')).toHaveText('rm -rf cartella-892-che-non-esiste');
-  await expect(page.locator('.dash-cmd-primavolta'), 'la frase della prima volta si dice una volta sola').toHaveCount(1);
+  const frase = page.locator('.dash-cmd-primavolta');
+  await expect(frase).toHaveCount(1);
+  await expect(frase).toContainText(`${FRASE}: quello che legge parte subito, quello che cambia qualcosa te lo chiedo prima. Si spegne in Preferenze.`);
 
   await btn.click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
@@ -122,6 +111,20 @@ test('profilo nuovo: una lettura parte subito con la frase della prima volta, un
   await clickConfirm(page, 'cancel');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(btn.locator('.dash-cmd-btn-cosa')).toContainText('▶');
+
+  // Lettura: nessun popup, l'esito è già lì.
+  await chiedi(page, 'quanto spazio ho sul disco?', 'Hai parecchio spazio libero.');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  const blocco = page.locator('.dash-activity').last();
+  await blocco.locator('.dash-activity-head').click();
+  const esito = blocco.locator('.dash-activity-cmd');
+  await expect(esito.locator('.dash-cmd-cosa')).toHaveText('Misuro lo spazio libero sul disco');
+  await expect(esito.locator('.dash-cmd-line')).toHaveText('$ echo spazio-libero-892');
+  await expect(esito.locator('.dash-cmd-output')).toContainText('spazio-libero-892');
+  await expect(frase, 'la frase della prima volta si dice una volta sola').toHaveCount(1);
+  // Girato un comando, la chat mostra dove lavora e come scriverne uno.
+  await expect(input).toHaveAttribute('placeholder', /comando per la shell/);
+  await expect(page.locator('#dashDir')).toBeVisible();
 
   // «Preferenze» porta dritto alla voce che lo spegne.
   await frase.locator('a', { hasText: 'Preferenze' }).click();

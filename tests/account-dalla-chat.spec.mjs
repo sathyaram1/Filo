@@ -24,7 +24,7 @@ async function preparaLogin(app, testServer) {
   return pagina;
 }
 
-const esegui = (app, action) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), action);
+const esegui = (app, action, opts) => app.evaluate((_e, [a, o]) => globalThis.SN_EXECUTE_FILO_ACTION(a, o), [action, opts]);
 const stato = (shell) => shell.evaluate(() => window.filoShell.auth.status());
 
 // Google nelle schede collegato o no, come lo direbbero i cookie di Google (che le pagine finte non lasciano).
@@ -114,14 +114,20 @@ test('«esci» esce dall\'account e il bottone torna «Accedi»; un secondo «es
   expect((await stato(shell)).signedIn).toBe(true);
   await livelloAutonomia(app, 'default');
 
-  const esci = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' });
+  // Uscire è costo 2: a Normale, finché manca il guardiano, chiede un OK prima (#1840).
+  const chiesta = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' });
+  expect(chiesta.executed).toBe(false);
+  expect(chiesta.needsConfirm).toBe(2);
+  expect((await stato(shell)).signedIn).toBe(true);
+  const esci = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' }, { confirmed: true });
   expect(esci.executed).toBe(true);
   expect(esci.output.voce).toBe('esci');
   // Detto «uscito», lo è già: un «accedi» chiesto subito dopo non trova la sessione vecchia.
   expect((await stato(shell)).signedIn).toBe(false);
   await expect(shell.locator('#nav-account')).not.toHaveClass(/signed-in/);
 
-  const ancora = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' });
+  expect((await esegui(app, { type: 'ACCOUNT', cosa: 'esci' })).needsConfirm).toBe(2);
+  const ancora = await esegui(app, { type: 'ACCOUNT', cosa: 'esci' }, { confirmed: true });
   expect(ancora.executed).toBe(true);
   expect(ancora.output.gia).toBe('fuori');
 
