@@ -423,7 +423,7 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
     const t0 = Date.now() - 10 * 60 * 1000;
     const Chats = globalThis.SN_FILO_CHATS;
     await Chats.append('lett1', { role: 'user', text: 'leggi la tesi', ts: new Date(t0).toISOString() });
-    const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: 7 }, () => ({ type: 'LEGGI_PAGINA' })) });
+    const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: PAGINE }, () => ({ type: 'LEGGI_PAGINA' })) });
     const testo = 'Il miele matura nelle celle opercolate. '.repeat(900);
     globalThis.SN_CONTESTO_FILO.ricordaEsiti('lett1', c.messages.at(-1).ts, {
       azioni: Array.from({ length: 7 }, (_, i) => {
