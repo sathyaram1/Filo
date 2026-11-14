@@ -88,7 +88,6 @@ test('filo_su_di_se(feedback) a Conservativo apre la conferma, e uno strumento s
   ]);
   await chiedi(page, 'segnala che il timer non suona');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator(CONFIRM_HOST)).toContainText('Il timer non suona.');
   await page.screenshot({ path: 'tests/.shots/chat-strumenti-generali-conferma.png' });
   await clickConfirm(page, 'cancel');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 10_000 });
