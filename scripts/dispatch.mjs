@@ -1186,6 +1186,8 @@ export function buildPayload(bucket, ctx = {}) {
       if (bucket.ripartenzaPersa) out.ripartenzaPersa = { ...bucket.ripartenzaPersa, nota: testoRipartenzaPersa(bucket.ripartenzaPersa) };
       return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
+    case 'perizia':
+      return { case: 'perizia', id: bucket.id, num: bucket.num, ...conBusta(ctx), feedback: ctx.feedback || null, ...conImmagini(ctx) };
     case 'risposta': {
       const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
       return { ...resto, case: 'risposta', num: bucket.num || '' };
