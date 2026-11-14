@@ -93,7 +93,7 @@
   // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
   function sbloccoFermo(motivo, ramo) {
     const m = String(motivo || '').toLowerCase();
-    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito: lo porta avanti una sessione locale.';
+    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
     if (/ramo|registro/.test(m)) {
       const server = /server/.test(m);
       const nome = String(ramo || '').trim() || '<ramo>';
