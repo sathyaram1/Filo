@@ -322,3 +322,14 @@ test('#2258: senza essere l’owner il tasto non c’è', async ({ openTab }) =>
   await expect(page.locator('#mgWorkState .mg-attesa-server')).toHaveText('Fermo: resta locale');
   await expect(page.locator('#mgDichiaraBtn')).toHaveCount(0);
 });
+
+test('#2258: coi lavori server spenti il segno rimasto non è un fermo, e il tasto non c’è: la stessa regola della riga', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriFermo(page);
+  await expect(page.locator('#mgDichiaraBtn')).toBeVisible();
+  await page.evaluate(() => { window.__auto.lavoriServer = false; return window.__mgTest.loadAutoMode(); });
+  await page.evaluate(() => window.__mgTest.openDetail('srv-8'));
+  await expect(page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('#mgWorkState .mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('#mgDichiaraBtn')).toHaveCount(0);
+});
