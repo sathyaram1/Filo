@@ -184,10 +184,11 @@ test('#2116.5: guardando lo schermo intero con un PDF aperto in una finestra di 
   expect(url, 'la scheda del PDF deve essere in vista').toContain('documenti-finti.it');
   const chat = await secondaFinestraConChat(app);
   await schermoFinto(app);
-  await guardaEdAspetta(app, chat, 'Schermo intero');
+  const immagine = await guardaEdAspetta(app, chat, 'Schermo intero');
+  expect(await pixelDelColore(app, immagine, [128, 128, 128], 4), 'la finestra del PDF, che non si misura, va coperta intera').toBeGreaterThan(100_000);
 });
 
-test('r1 su Wayland, con un sito che incorpora un video in una finestra di Filo, la finestra del terminale scelta nel selettore arriva', async ({ app, openTab, testServer }) => {
+test('#2116.5: su Wayland, con un sito che incorpora un video in una finestra di Filo, la finestra del terminale scelta nel selettore arriva', async ({ app, openTab, testServer }) => {
   test.setTimeout(150_000);
   await servi(app, { 'video-finti.it/embed': { corpo: '<!doctype html><body style="margin:0;background:#000;color:#fff">video</body>', tipo: 'text/html; charset=utf-8' } });
   await testServer.openReady(openTab, `<!doctype html><html><head><title>Ricetta</title></head><body style="margin:0">
