@@ -330,5 +330,5 @@ function fotoDellaBarra(win, altezza) {
 module.exports = {
   paginaDaFotografare, barraDaFotografare, fattoreDiScala, fotoLeggera, QUALITA_LEGGERA,
   fotoPerModello, fotoPiena, fotoDellaBarra, perche, frameDiAltreOrigini, rifiutoDellaMisura, coperture, dipingi, colore, codiceMisura,
-  GRIGIO, PERCHE,
+  copertureIntorno, copertureNellaFoto, daCoprire, dipintaSu, GRIGIO, PERCHE,
 };
