@@ -358,16 +358,54 @@ function crea({ sistema = null } = {}) {
       if (!r.ok && r.code !== 'vuota') return { errore: `la foto non è partita: ${Foto.perche(r.code)}` };
       return immagineDa(r.ok ? r.img : null);
     }
-    if (f.tipo === SELETTORE) {
-      const scelte = await s.fonti({ tipi: ['window', 'screen'], lato: latoCattura() });
-      const sc = scelte.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()));
-      if (!sc) return { errore: 'nel selettore del sistema non è stato scelto niente' };
-      return { ...immagineDa(sc.immagine), nome: sc.nome };
-    }
-    const fonti = await s.fonti({ tipi: [f.tipo === 'schermo' ? 'screen' : 'window'], lato: latoCattura() });
+    if (f.tipo === SELETTORE || f.tipo === 'schermo') return catturaConFilo(f);
+    const fonti = await s.fonti({ tipi: ['window'], lato: latoCattura() });
     const trovata = fonti.find((x) => x.id === f.id);
     if (!trovata) return { errore: 'non è più aperta' };
     return immagineDa(trovata.immagine);
+  }
+
+  // Lo schermo, o quello che si sceglie nel selettore: dentro possono esserci finestre di Filo (#2116.5). Le finestre
+  // delle altre app no, perché le finestre di Filo non stanno nel loro elenco.
+  async function catturaConFilo(f) {
+    const s = S();
+    const selettore = f.tipo === SELETTORE;
+    const inVista = () => s.finestreFilo().filter((w) => w.wc && w.vista);
+    const prima = inVista();
+    const wcs = prima.map((w) => w.wc);
+    // Nel selettore non si sa dove finiscono le finestre di Filo: se una ha qualcosa da coprire non lo si apre nemmeno.
+    if (selettore && prima.length && (await Foto.copertureIntorno(wcs, async () => true)).pagine.some(Foto.daCoprire)) {
+      return { errore: FRASE_SELETTORE };
+    }
+    let sc = null;
+    const { img, pagine } = await Foto.copertureIntorno(wcs, async () => {
+      const fonti = await s.fonti({ tipi: selettore ? ['window', 'screen'] : ['screen'], lato: latoCattura() });
+      sc = selettore
+        ? fonti.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()))
+        : fonti.find((x) => x.id === f.id);
+      return sc ? sc.immagine : null;
+    });
+    if (!sc) return { errore: selettore ? 'nel selettore del sistema non è stato scelto niente' : 'non è più aperta' };
+    const nome = selettore ? { nome: sc.nome } : {};
+    const no = senzaImmagine(img);
+    if (no) return { ...no, ...nome };
+    const dopo = inVista();
+    if (selettore) {
+      const nuova = dopo.some((w) => !prima.some((p) => p.wc === w.wc));
+      if (nuova || pagine.some(Foto.daCoprire)) return { errore: FRASE_SELETTORE, ...nome };
+      return { ...immagineDa(img), ...nome };
+    }
+    const { width, height } = img.getSize();
+    let info = {};
+    try { info = s.schermi() || {}; } catch (_) {}
+    const c = copertureDelloSchermo({
+      prima, dopo, misure: pagine, area: areaDelloSchermo(info.rettangoli, sc.displayId, width / height), larghezza: width, altezza: height,
+    });
+    if (c.no) return { errore: `la foto dello schermo non è partita: in una finestra di Filo ${Foto.perche(c.no)}` };
+    if (!c.lista.length) return immagineDa(img);
+    const coperta = Foto.dipintaSu(img, c.lista, { x: 1, y: 1 });
+    if (!coperta) return { errore: `la foto dello schermo non è partita: in una finestra di Filo ${Foto.perche('misura')}` };
+    return immagineDa(coperta);
   }
 
   // Dopo il gate: l'OK (o la finestra già guardata in questa richiesta) c'è. Torna solo testo.
