@@ -380,17 +380,15 @@
       return Array.isArray(rows) ? rows : [];
     }
 
-    // Seguiti: quelli delle pagine (in mano alle routine) più quelli indicati
-    // dal registro, finché la pagina non li segue da sé o non scadono. Sopra il
-    // tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
-    // Quelli del registro (appena presi da un worker, pochi) a ogni giro; quelli delle pagine ogni `seguitiMs`.
+    // Seguiti: quelli delle pagine (in mano alle routine) ogni `seguitiMs`, più quelli indicati dal registro
+    // (appena presi da un worker, pochi) a ogni giro finché non scadono: è lì che il server riscrive senza firmare.
+    // Sopra il tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
     async function daiSeguiti() {
       if (typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
       const dallePagine = typeof seguiti === 'function' ? (seguiti() || []).map(String).filter(Boolean) : [];
-      const seguitiDallePagine = new Set(dallePagine);
       const ora = now();
       for (const [id, da] of daRegistro) {
-        if (seguitiDallePagine.has(id) || ora - da > registroSeguiMs) daRegistro.delete(id);
+        if (ora - da > registroSeguiMs) daRegistro.delete(id);
       }
       const tocca = ora - lastSeguitiAt >= seguitiMs;
       const tutti = Array.from(new Set([...(tocca ? dallePagine : []), ...daRegistro.keys()]));
