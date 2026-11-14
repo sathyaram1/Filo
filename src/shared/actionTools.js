@@ -19,14 +19,16 @@
 
   // I documenti di trasparenza che esistono davvero, dal registro generato dai markdown (#515): un elenco scritto a
   // mano prometteva documenti che non c'erano.
-  function idTrasparenza() {
+  // Ognuno col suo titolo, che dice di cosa parla: una frase a mano sugli argomenti lasciava fuori la Sicurezza.
+  function docTrasparenza() {
     try {
       const T = global.SN_TRANSPARENCY;
-      const docs = T && typeof T.all === 'function' ? T.all().map((d) => String(d.id || '')).filter(Boolean) : [];
-      const note = T && typeof T.conNota === 'function' ? T.conNota().map((n) => String(n.id || '')).filter(Boolean) : [];
-      return docs.concat(note);
+      const docs = T && typeof T.all === 'function' ? T.all().map((d) => ({ id: String(d.id || ''), titolo: String(d.title || '') })) : [];
+      const note = T && typeof T.conNota === 'function' ? T.conNota().map((n) => ({ id: String(n.id || ''), titolo: String(n.label || '') })) : [];
+      return docs.concat(note).filter((d) => d.id);
     } catch (_) { return []; }
   }
+  const idTrasparenza = () => docTrasparenza().map((d) => d.id);
 
   const RIPETI = { anyOf: [LISTA(), S()] };
   const CHIAVI_FREQUENTI = ['tema', 'dimensione_testo', 'colore_tab', 'blocco_pubblicita', 'gestione_cookie', 'modalita_terminale', 'guarda_schermo', 'stile_agente'];
