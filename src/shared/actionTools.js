@@ -195,7 +195,7 @@
     // ── home ──
     CARTA_HOME: {
       via: ['home', 'carta'],
-      description: 'le carte della home: operazione togli, rimetti, sposta (verso su|giu|cima|fondo, o prima_di), ripristina. A destra editor, suggerimenti, rapide; a sinistra timer, avvisi, scaricamenti…, detti a parole.',
+      description: 'operazione togli, rimetti, sposta (verso su|giu|cima|fondo, o prima_di), ripristina. A destra editor, suggerimenti, rapide; a sinistra timer, avvisi, scaricamenti…, detti a parole.',
       properties: { operazione: S(), carta: S(), verso: S(), prima_di: S() }, required: ['operazione'],
     },
     SPOSTA_ICONA: {
