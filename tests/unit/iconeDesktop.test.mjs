@@ -336,7 +336,7 @@ test('uno spostamento che si rompe a metà: il desktop riletto, il cambio regist
   const r = await conDesktop(finto, () => D.ordinaIcone({}));
   assert.equal(r.ok, false);
   assert.equal(registrati.length, 1);
-  assert.match(D.esitoPerModello(r), new RegExp(`cambiato lo stesso.*ANNULLA_CAMBIO, id ${r.cambio}`));
+  assert.match(D.esitoPerModello(r), new RegExp(`cambiato lo stesso.*filo\\(annulla\\), id ${r.cambio}`));
 });
 
 // ── Mac: la Scrivania del Finder ─────────────────────────────────────────────
