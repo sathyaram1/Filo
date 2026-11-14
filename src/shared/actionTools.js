@@ -51,7 +51,7 @@
     },
     PULSANTE_PREFERENZE: {
       via: ['impostazioni', 'pulsante'],
-      description: 'i pulsanti di Preferenze: prova suoni (tono) e voci (voce), rifai l\'intervista, aspetto o tutto di serie.',
+      description: 'i pulsanti di Preferenze: prova suoni (tono) e voci (voce), rifai l\'intervista, aspetto o tutto di serie. Un\'intervista di prima si toglie a mano da filo://preferences/preferences.html#restartOnboarding.',
       properties: {
         pulsante: S({ enum: ['prova_suono', 'prova_suoneria', 'prova_voce', 'prova_voce_sistema', 'rifai_intervista', 'ripristina_aspetto', 'ripristina_tutto'] }),
         tono: S(), voce: S(),
