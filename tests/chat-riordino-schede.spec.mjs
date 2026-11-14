@@ -78,6 +78,7 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
     { text: 'Non sono riuscito a valutare le schede: i crediti sono finiti.' },
   ]);
   await chiedi(page, 'riordinami le tab');
+  await alBottone(page);
 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' })).toBeVisible({ timeout: 15_000 });
   // Il doppione si chiude per regola, le altre restano: nessuna valutata.
