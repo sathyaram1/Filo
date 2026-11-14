@@ -243,8 +243,12 @@ export function incroci(rami, file) {
   const delServer = voci.map((v) => v.replace(PREFISSO_SERVER, ''));
   const tocca = (elenco) => (f) => elenco.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
   return (Array.isArray(rami) ? rami : [])
-    .map((r) => ({ ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
-      comuni: (r.file || []).filter(tocca(r.repo === 'server' ? delServer : nude)) }))
+    // Un file nuovo del ramo ha il nome di chi lavora (#2337): conta solo uguale a uno della scheda, che lo ripete lei.
+    .map((r) => {
+      const elenco = r.repo === 'server' ? delServer : nude;
+      return { ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
+        comuni: [...(r.file || []).filter(tocca(elenco)), ...(r.fileNuovi || []).filter((f) => elenco.includes(f))] };
+    })
     .filter((r) => r.comuni.length);
 }
 
