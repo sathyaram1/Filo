@@ -448,7 +448,7 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
     const [richiesta] = await chiamateAlModello(app);
     const testo = JSON.stringify(richiesta);
     // Le pagine c'erano davvero: messe a parte, la richiesta passerebbe il listino.
-    expect(await tokenDi(app, richiesta) + Math.ceil((7 * 36000) / 3.5)).toBeGreaterThan(100000);
+    expect(await tokenDi(app, richiesta) + Math.ceil((PAGINE * 32 * 1024) / 3.5)).toBeGreaterThan(100000);
     expect(await tokenDi(app, richiesta), 'tolti gli esiti, la richiesta sta sotto il listino').toBeLessThan(100000);
     expect(testo).not.toContain('celle opercolate');
     expect(testo).toContain('esiti sono stati tolti per stare nel contesto');
