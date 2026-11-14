@@ -1858,7 +1858,7 @@
   function opzioniFusioni(extra) {
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
-      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onDone: () => { setTimeout(() => loadMergeApprovals(null, { fresco: true }), 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
       inVolo: (req) => approvazioniInVolo.get(req.id) || null,
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
