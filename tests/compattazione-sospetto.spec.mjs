@@ -1,7 +1,7 @@
 // Il sospetto delle pagine lette non passa nel riassunto della compattazione (D-181, #1916): regole e prova in
 // SPEC-CONTESTO § Il sospetto non passa nel riassunto.
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 
 // La porta della fase 4 (#1563). compatta(app, { memorie }) → { ricevuto, riassunto }: il tratto, con la pagina fuori
