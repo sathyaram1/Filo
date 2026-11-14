@@ -836,7 +836,11 @@ test('#1685 eliminazione dall\'archivio: un no resta un no, e una non riuscita l
     expect((await chiamateAlModello(app)).length, 'un no non fa ripartire il lavoro').toBe(2);
     await app.evaluate(() => { globalThis.SN_ARCHIVED_TABS.removeMany = async () => { throw new Error('disco pieno'); }; });
     await elimina.click();
-    await clickConfirm(page, 'ok', { timeout: 5_000 });
+    // Cancellare per sempre è costo 4 (#1312): il riquadro vuole la parola «conferma».
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await fillConfirmInput(page, 'conferma');
+    await scrollConfirmToEnd(page);
+    await clickConfirm(page, 'danger');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'NON ELIMINATE' }), 'il guasto torna al modello').toBeVisible({ timeout: 10_000 });
     expect(ultimoMessaggio((await chiamateAlModello(app))[2])).toMatch(/NON riuscita: [^\n]*\(perché: l’archivio è rimasto com’era/);
     await expect.poll(esiti, { timeout: 8_000 }).toEqual(['fallito:l’archivio è rimasto com’era']);
