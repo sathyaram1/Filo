@@ -5217,6 +5217,7 @@ async function espandiFilo(daRaw, aRaw) {
   return {
     da: new Date(t0).toISOString(), a: new Date(t1).toISOString(), testo: righe.join('\n'), righe: righe.length, totale: voci.length,
     ...(seguito ? { seguito } : {}), daFuori: tenute.some((v) => v.fuori),
+    classeLetta: tenute.reduce((n, v) => Math.max(n, v.classe || 1), 1),
   };
 }
 
