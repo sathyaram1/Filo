@@ -1715,7 +1715,7 @@ module.exports = function register(on, ctx) {
   // cambiati e li fonde nella sua copia, così la pagina riceve sempre l'elenco intero. Ogni tanto si rilegge tutto:
   // gli ambienti dei riservati cambiano il segno anche dei compiti non toccati.
   const COMPITI_RILETTURA_MS = 10 * 60 * 1000;
-  let compitiInMano = null;   // { chi, storico, intera, adesso, aperti: Map, chiusi, altri, ambiti }
+  let compitiInMano = null;   // { chi, storico, intera, adesso, aperti: Map, chiusi, nChiusi, altri, ambiti }
   const perUrgenza = (a, b) => (Number(b.urgenza) - Number(a.urgenza)) || ((Number(a.creatoIl) || 0) - (Number(b.creatoIl) || 0))
     || ((Number(a.numero) || 0) - (Number(b.numero) || 0));
   function rispostaCompiti(m) {
