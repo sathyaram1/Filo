@@ -49,6 +49,9 @@ test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un
   const terzo = path.join(dir, 'copia.txt');
   await input.fill(`/${copia(nuovo, terzo)}`);
   await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).fuori || '', 'sul file nuovo non c\'è niente da sovrascrivere').not.toMatch(/sovrascrive/);
+  await clickConfirm(page, 'ok');
   await expect.poll(() => existsSync(terzo), { timeout: 12_000 }).toBe(true);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
