@@ -155,28 +155,35 @@ async function schermoFinto(app) {
   });
 }
 
-test('guardando lo schermo intero, la carta nel riquadro di pagamento di una cassa ingrandita arriva coperta', async ({ app, openTab, testServer }) => {
+const PDF = `%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj
+4 0 obj<</Length 44>>stream
+BT /F1 24 Tf 40 100 Td (Bolletta) Tj ET
+endstream endobj
+5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj
+trailer<</Root 1 0 R>>
+%%EOF`;
+
+test('guardando lo schermo intero con un PDF aperto in una finestra di Filo, la foto arriva', async ({ app, openTab }) => {
   test.setTimeout(150_000);
-  await servi(app, {
-    'pagamenti-finti.it/campo': `<!doctype html><html><head><title>Campo</title></head><body style="margin:0;background:#fff">
-      <input id="n" name="cardnumber" autocomplete="cc-number" inputmode="numeric" style="width:440px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
-      </body></html>`,
-  });
-  const cassa = await testServer.openReady(openTab, `<!doctype html><html><head><title>Cassa</title></head><body style="margin:0;background:${tinta(VERDE)}">
-    <div style="height:260px"></div>
-    <div style="padding:20px 180px">Numero della carta</div>
-    <iframe src="${CAMPO}" style="margin-left:180px;width:480px;height:70px;border:0;background:#fff"></iframe>
-    <div style="height:1400px"></div></body></html>`);
+  await app.evaluate(({ session, net }, pdf) => {
+    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
+    session.defaultSession.protocol.handle('https', (req) => (new URL(req.url).hostname === 'documenti-finti.it'
+      ? new Response(pdf, { headers: { 'content-type': 'application/pdf' } })
+      : net.fetch(req, { bypassCustomProtocolHandlers: true })));
+    globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
+  }, PDF);
+  await openTab('https://documenti-finti.it/bolletta.pdf').catch(() => null);
   await superaAvvisoSeCe(app);
-  const campo = cassa.frameLocator('iframe').locator('#n');
-  await campo.fill('4111 1111 1111 1111');
-  await campo.blur();
-  await app.evaluate(({ BrowserWindow }) => {
+  await new Promise((r) => setTimeout(r, 3_000));
+  const url = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const tm = w._filoTabs;
-    tm.tabs.find((t) => t.id === tm.activeId).view.webContents.setZoomFactor(1.5);
+    return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL();
   });
-  await cassa.evaluate(() => window.scrollTo(0, 120));
+  expect(url, 'la scheda del PDF deve essere in vista').toContain('documenti-finti.it');
 
   const chat = await secondaFinestraConChat(app);
   await schermoFinto(app);
