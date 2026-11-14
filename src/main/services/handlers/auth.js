@@ -358,6 +358,8 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
+      // La copia dei feedback non resta sul disco di chi è uscito.
+      listaInMano.dimentica();
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
       giudiciFermi?.colpo('accesso');
       return { ok: true };
