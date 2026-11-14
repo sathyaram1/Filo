@@ -3921,7 +3921,7 @@
     if (selectedId !== id || !posto.isConnected) return;
     if (!r || r.ok === false) { setManageMsg(`Non riesco a guardarlo: ${(r && r.error) || 'il server non ha risposto'}`, 'err'); return; }
     if (r.niente) {
-      const fermo = MR.restaLocale(allFeedbacks.find((f) => f._id === id));
+      const fermo = fermoRestaLocale(allFeedbacks.find((f) => f._id === id));
       setManageMsg(`Ramo e note sono già puliti: lo tiene fermo altro${fermo ? ` (${fermo.motivi.join(', ')})` : ''}.`, 'ok');
       return;
     }
