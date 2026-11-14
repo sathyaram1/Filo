@@ -38,6 +38,19 @@ test('deliver perizia: classe intera, unioni e file in lista; un altro campo si 
   for (const classe of [undefined, 'quattro', '4.5', '123']) assert.ok(datiPerizia({ classe }).errore, String(classe));
 });
 
+test('il censimento delle schede lascia fuori il non fidato che il server dà al fidato senza contenuto', async () => {
+  const { letturaCloud } = await import('../../scripts/schede.mjs');
+  const riga = (n) => ({ _id: `f${n}`, seq: n, subSeq: 0, status: 'todo', priority: 1, updatedAt: '2026-11-14T10:00:00.000Z', waitsFor: [], unisce: [], schedaAt: '2026-11-13T10:00:00.000Z' });
+  const chiama = async () => ({ status: 200, body: { ok: true, resto: [], voci: [
+    { num: '900', id: 'f900', riga: riga(900), schedaNonFidata: true },
+    { num: '901', id: 'f901', riga: riga(901), nonFidato: true, schedaNonFidata: true },
+  ] } });
+  const r = await letturaCloud('tk', { chiama });
+  assert.deepEqual(r.righe.map((x) => x._id), ['f900'], 'il non fidato non entra nell’indice da scrivere');
+  assert.equal(r.nonFidati, 1);
+  assert.equal(r.illeggibili, 0, 'una scheda non fidata data senza contenuto non è da riscrivere');
+});
+
 test('il manutentore è fidato e non ha web: niente istruzioni di ricerca sul web nel suo ruolo', () => {
   const t = readFileSync(new URL('../../routines/roles/manutentore.md', import.meta.url), 'utf8');
   assert.doesNotMatch(t, /\*\*ricerca\*\*/);
