@@ -80,10 +80,11 @@ test('per numero e per sito, e a «tutte» il testo non inviato resta aperto e i
   await tornaAllaHome(shell);
 
   // L'elenco del modello segue la barra (#413.2): 1 la home, 2 Alfa, 3 Beta, 4 Gamma, 5 Bozza. Un comando riuscito
-  // chiude il turno con una chiamata: il giro di testo serve solo all'ultimo, che lascia aperta la bozza.
+  // chiude il turno con una chiamata; dopo l'OK delle due del sito il lavoro riprende, e quel giro di testo è suo.
   await modelloFinto(app, [
     { text: '', toolCalls: [{ id: 'n1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [2] }) }] },
     { text: '', toolCalls: [{ id: 's1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ sito: 'sito-pubblico.test' }) }] },
+    { text: 'Chiuse le due del sito.' },
     { text: '', toolCalls: [{ id: 't1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ tutte: true }) }] },
     { text: 'Ho lasciato aperta la bozza.' },
   ]);
