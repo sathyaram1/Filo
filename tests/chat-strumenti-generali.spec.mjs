@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { barraPage, statoBarra } from './helpers/barra.mjs';
 
 // Gli strumenti che ogni chiamata della chat ha portato al fornitore, per nome.
 async function contaStrumenti(app) {
