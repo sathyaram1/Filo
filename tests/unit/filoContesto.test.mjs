@@ -171,7 +171,7 @@ test('un messaggio enorme resta testa e coda, e dice dove si rilegge intero', ()
   const filo = scambio('c', 1, 'a'.repeat(300000), 'ok');
   const f = FC.finestra(filo, { ora: ORA, giorni: 3, token: 20000 });
   assert.equal(f.messaggi.length, 2);
-  assert.match(f.messaggi[0].content, /non sono qui: si rileggono interi con CERCA_CHAT/);
+  assert.match(f.messaggi[0].content, /non sono qui: si rileggono interi con filo\(cerca\)/);
   assert.ok(f.token <= 20000);
 });
 
