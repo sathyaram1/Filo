@@ -94,13 +94,20 @@ function tuttaNera(img) {
   return true;
 }
 
-function immagineDa(img) {
+function senzaImmagine(img) {
   if (!img || (typeof img.isEmpty === 'function' && img.isEmpty())) {
     return { errore: 'il sistema non mi ha dato l\'immagine: forse la finestra è ridotta a icona' };
   }
   const { width, height } = img.getSize();
   if (!width || !height) return { errore: 'il sistema non mi ha dato l\'immagine: forse la finestra è ridotta a icona' };
   if (tuttaNera(img)) return { errore: 'il sistema mi ha dato un\'immagine tutta nera', nera: true };
+  return null;
+}
+
+function immagineDa(img) {
+  const no = senzaImmagine(img);
+  if (no) return no;
+  const { width, height } = img.getSize();
   const vista = Math.max(width, height) > LATO_MODELLO
     ? img.resize(width >= height ? { width: LATO_MODELLO, quality: 'best' } : { height: LATO_MODELLO, quality: 'best' })
     : img;
