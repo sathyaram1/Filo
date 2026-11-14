@@ -88,7 +88,7 @@ async function apriGestione(openTab, n) {
 test('riaperta, la Gestione chiede i cambiati e il conto; le statistiche contano dalla lista in pagina', async ({ app, openTab }) => {
   const docs = Array.from({ length: 40 }, (_, i) => riga(i));
   await fingiFirestore(app, docs);
-  await apriGestione(openTab, 40);
+  const prima = await apriGestione(openTab, 40);
   expect((await conta(app)).tutti).toBe(1);
 
   // Mentre era chiusa una segnalazione è cambiata e ne è arrivata una.
