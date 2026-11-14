@@ -62,7 +62,7 @@ test('PROMPTS.filoChat: con capacita include la sezione, l\'azione e l\'onestà'
   const p = C.PROMPTS.filoChat({ profilo: 'a', preferenze: 'b', stato: 'c', capacita: idx });
   assert.match(p, /═══ COSA SA FARE FILO/);
   assert.ok(p.includes('[save-for-later]'), 'l\'indice non è dentro al prompt');
-  assert.match(p, /CAPACITA_DETTAGLIO/);
+  assert.match(p, /filo_su_di_se\(capacita\)/);
   // Istruzione di onestà: se nulla corrisponde, dire che Filo non sa farlo.
   assert.match(p, /non sa fare/i);
 });
