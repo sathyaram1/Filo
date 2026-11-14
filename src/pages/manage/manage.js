@@ -1946,8 +1946,9 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
-    // Una copia del main può non avere ancora la richiesta appena aperta dal server: la si richiede quando scade.
-    if (r.daCopia && Number(r.scadeTraMs) > 0 && !fusioniRiletturaTimer) {
+    // Un cambio di stato visto dal giro può voler dire una richiesta appena aperta dal server, che la copia del main
+    // non ha ancora: la si richiede quando la copia scade.
+    if (dalGiro && r.daCopia && Number(r.scadeTraMs) > 0 && !fusioniRiletturaTimer) {
       fusioniRiletturaTimer = setTimeout(() => { fusioniRiletturaTimer = null; loadMergeApprovals(); }, Number(r.scadeTraMs) + 500);
     }
     // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
