@@ -158,6 +158,7 @@ async function guardaEdAspetta(app, chat, finestra) {
   const occhio = await app.evaluate(() => globalThis.__occhio);
   expect(occhio.length, `la foto deve arrivare al modello; esito: ${(await app.evaluate(() => globalThis.__chat))[1]}`).toBe(1);
   expect(await pixelDelColore(app, occhio[0], VERDE), 'deve arrivare quello che si è scelto').toBeGreaterThan(20_000);
+  return occhio[0];
 }
 
 const PDF = `%PDF-1.4
