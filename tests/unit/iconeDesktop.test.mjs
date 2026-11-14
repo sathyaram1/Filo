@@ -197,7 +197,7 @@ test('«ordina le icone del desktop in ordine alfabetico da sinistra in alto a d
   assert.equal(r.cambio, registrati[0].id);
   const testo = D.esitoPerModello(r);
   assert.match(testo, /in ordine alfabetico, a righe: 8 icone su 3 righe e 3 colonne/);
-  assert.match(testo, new RegExp(`ANNULLA_CAMBIO con id ${r.cambio}`));
+  assert.match(testo, new RegExp(`filo\\(annulla\\) con id ${r.cambio}`));
   assert.doesNotMatch(testo, /Zoom|appunti|Bilancio/, 'i nomi dei file non vanno al modello');
 
   // A colonne: dall'alto in basso, poi la colonna a destra.
