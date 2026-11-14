@@ -56,8 +56,9 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
   await expect(activity).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
   await expect(activity.locator('.dash-activity-head')).toContainText('Ha chiuso delle schede');
   await expect(activity.locator('.dash-activity-row', { hasText: 'Chiuse 3 schede' })).toHaveCount(1);
-  // Un comando riuscito senza schede lasciate aperte parla da sé: una chiamata sola.
-  expect((await chiamateAlModello(app)).length).toBe(1);
+  // Dato l'OK il lavoro riprende col suo esito (#1685): la seconda chiamata sa cosa si è chiuso.
+  await expect.poll(async () => (await chiamateAlModello(app)).length).toBe(2);
+  expect(JSON.stringify((await chiamateAlModello(app))[1])).toContain('Chiuse 3 schede');
   // Il modello vede quale scheda è la sua, e i numeri da usare.
   const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
   expect(prompt).toContain('[QUESTA CHAT]');
