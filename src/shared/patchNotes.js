@@ -13,6 +13,9 @@
       features: [
         { testo: 'Se chiedi a Filo cosa è successo in un certo momento, anche giorni fa, rilegge com\'era andata davvero, coi messaggi e le pagine di quelle ore, invece di fermarsi al riassunto.', segnalazione: 1564 },
       ],
+      fixes: [
+        { testo: 'Quando Filo guarda lo schermo intero, le finestre di Filo che ci si vedono, comprese le finestrelle di accesso, arrivano al modello con password e carte coperte, come quando guarda una di quelle finestre da sola. Su Linux con Wayland le coperture restano sulle finestre di Filo finché scegli nel selettore del sistema.', segnalazione: 2116 },
+      ],
     },
     {
       version: '0.2.280', date: '2026-11-13',

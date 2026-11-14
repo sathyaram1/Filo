@@ -330,6 +330,66 @@ test('l\'archivio della chat tiene il nome della finestra guardata, mai l\'immag
   assert.match(f.messaggi[0].content, /Errore di Word.*non è conservato/);
 });
 
+// #2116.5 — la finestra di Filo dentro la foto dello schermo: le sue coperture finiscono dove la scheda si vede.
+test('foto dello schermo: il campo della carta di una finestra di Filo si copre nel punto in cui la scheda sta sul monitor', () => {
+  const area = Schermo.areaDelloSchermo([{ id: '1', left: 0, top: 0, width: 1000, height: 500 }, { id: '2', left: 1000, top: 0, width: 1000, height: 500 }], '2', 2);
+  assert.deepEqual(area, { id: '2', left: 1000, top: 0, width: 1000, height: 500 });
+  // La pagina, zoomata al 200%: 400 pixel CSS su 800 punti dello schermo. La foto è a metà risoluzione.
+  const wc = {};
+  const vista = { left: 1100, top: 50, width: 800, height: 400 };
+  const misure = [{ lista: [{ left: 10, top: 20, width: 100, height: 10, colore: [255, 255, 255], puntini: [60, 60, 60] }], vista: { w: 400, h: 200 } }];
+  const c = Schermo.copertureDelloSchermo({ prima: [{ wc, vista }], dopo: [{ wc, vista }], misure, area, larghezza: 500, altezza: 250 });
+  assert.equal(c.no, undefined);
+  assert.equal(c.lista.length, 2, 'prima e dopo lo scatto');
+  const r = c.lista[0];
+  // (1100 - 1000 + 10*2) / 2 = 60, allargata di 2.
+  assert.deepEqual([r.left, r.top, r.width, r.height], [58, 43, 104, 14]);
+  assert.deepEqual(r.puntini, [60, 60, 60]);
+});
+
+test('foto dello schermo: una finestra di Filo che non si può misurare si copre intera e il resto dello schermo arriva (#2116.5 giro 1)', () => {
+  const area = { left: 0, top: 0, width: 1000, height: 500 };
+  const wc = {};
+  const prima = [{ wc, vista: { left: 100, top: 100, width: 300, height: 200 } }];
+  const intera = (c) => c.lista.map((r) => [r.left, r.top, r.width, r.height]);
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima, dopo: prima, misure: [{ no: 'segreti' }], area, larghezza: 1000, altezza: 500 })), [[100, 100, 300, 200], [100, 100, 300, 200]]);
+  const altrove = [{ wc, vista: { left: 1200, top: 100, width: 300, height: 200 } }];
+  assert.deepEqual(Schermo.copertureDelloSchermo({ prima: altrove, dopo: altrove, misure: [{ no: 'segreti' }], area, larghezza: 1000, altezza: 500 }), { lista: [] });
+  // Spostata sul monitor fotografato durante lo scatto: conta anche la posizione di dopo.
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima: altrove, dopo: prima, misure: [{ no: 'riquadri' }], area, larghezza: 1000, altezza: 500 })), [[100, 100, 300, 200]]);
+  // Una scheda passata in vista durante lo scatto non ha la misura di prima: si copre intera, a metà risoluzione.
+  assert.deepEqual(intera(Schermo.copertureDelloSchermo({ prima, dopo: [{ wc: {}, vista: prima[0].vista }], misure: [{ lista: [], vista: { w: 300, h: 200 } }], area, larghezza: 500, altezza: 250 })), [[50, 50, 150, 100]]);
+  // Senza sapere dove sta il monitor, con Filo in vista non si copre a caso.
+  assert.deepEqual(Schermo.copertureDelloSchermo({ prima, dopo: prima, misure: [{ lista: [], vista: { w: 300, h: 200 } }], area: null, larghezza: 1000, altezza: 500 }), { no: 'misura' });
+  assert.deepEqual(Schermo.copertureDelloSchermo({ prima: [], dopo: [], misure: [], area: null, larghezza: 1000, altezza: 500 }), { lista: [] });
+});
+
+test('selettore di Wayland: i veli stanno dove la pagina si disegna nella finestra, e una pagina che non si misura si vela intera', () => {
+  const dentro = { x: 0, y: 80, width: 800, height: 400 };
+  const misura = { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista: { w: 400, h: 200 } };
+  assert.deepEqual(Schermo.veliDellaFinestra(misura, dentro).map((r) => [r.left, r.top, r.width, r.height]), [[18, 118, 204, 24]]);
+  assert.deepEqual(Schermo.veliDellaFinestra({ no: 'riquadri' }, dentro), [{ left: 0, top: 80, width: 800, height: 400 }]);
+});
+
+test('selettore di Wayland: la foto parte solo se quello da coprire dopo la scelta stava già sotto un velo', () => {
+  const vista = { w: 400, h: 200 };
+  const prima = { lista: [{ left: 8, top: 18, width: 104, height: 14 }], vista };
+  assert.equal(Schermo.velataGia(prima, { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista }), true);
+  assert.equal(Schermo.velataGia(prima, { lista: [{ left: 10, top: 120, width: 100, height: 10 }], vista }), false, 'il campo scritto col selettore aperto');
+  assert.equal(Schermo.velataGia({ lista: [], vista }, { lista: [{ left: 10, top: 20, width: 100, height: 10 }], vista }), false);
+  assert.equal(Schermo.velataGia(prima, { lista: prima.lista, vista: { w: 500, h: 200 } }), false, 'la pagina ha cambiato grandezza');
+  assert.equal(Schermo.velataGia(prima, { no: 'misura' }), false);
+  assert.equal(Schermo.velataGia({ no: 'riquadri' }, { no: 'misura' }), true, 'velata intera');
+});
+
+test('foto dello schermo: quando il sistema fotografa tutti i monitor insieme le proporzioni scelgono l\'insieme', () => {
+  const r = [{ id: '1', left: 0, top: 0, width: 1920, height: 1080 }, { id: '2', left: 1920, top: 0, width: 1280, height: 1024 }];
+  assert.deepEqual(Schermo.areaDelloSchermo(r, '1', 3200 / 1080), { left: 0, top: 0, width: 3200, height: 1080 });
+  assert.equal(Schermo.areaDelloSchermo(r, '2', 1280 / 1024).id, '2');
+  assert.deepEqual(Schermo.areaDelloSchermo(r, '', 3200 / 1080), { left: 0, top: 0, width: 3200, height: 1080 });
+  assert.equal(Schermo.areaDelloSchermo([], '1', 1), null);
+});
+
 test('ogni azione di sola lettura del registro ha uno strumento, e VEDI_SCHERMO è fra le letture', () => {
   assert.ok(AL.LETTURE.includes('VEDI_SCHERMO'));
   assert.ok(globalThis.SN_ACTION_TOOLS.NAMES.includes('VEDI_SCHERMO'));
