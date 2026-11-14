@@ -114,6 +114,51 @@ function immagineDa(img) {
   return { dataUrl: `data:image/jpeg;base64,${vista.toJPEG(QUALITA).toString('base64')}` };
 }
 
+// ─── Le finestre di Filo dentro la foto dello schermo (#2116.5) ──────────────────────────────────────────────────────
+// Passano dalle stesse coperture della finestra guardata da sola; una che non si può coprire ferma la foto.
+
+const FRASE_SELETTORE = 'una finestra di Filo aperta mostra cose da coprire (una password, una carta o un riquadro di un '
+  + 'altro sito), e in quello che si sceglie nel selettore del sistema non so dove sta. Si può guardare quella finestra di '
+  + 'Filo da sola, che arriva coperta, oppure ridurla a icona e riprovare';
+
+/** Il rettangolo del desktop (coordinate dello schermo) che la foto di `displayId` ritrae: quel monitor, o l'insieme dei
+ *  monitor quando il sistema ne fa una foto sola (X11), scelto dalle proporzioni della foto. Null se non si sa. PURA. */
+function areaDelloSchermo(rettangoli, displayId, rapporto) {
+  const r = (rettangoli || []).filter((x) => x && x.width > 0 && x.height > 0);
+  if (!r.length) return null;
+  const left = Math.min(...r.map((x) => x.left)), top = Math.min(...r.map((x) => x.top));
+  const insieme = {
+    left, top,
+    width: Math.max(...r.map((x) => x.left + x.width)) - left,
+    height: Math.max(...r.map((x) => x.top + x.height)) - top,
+  };
+  const quello = r.find((x) => String(x.id) === String(displayId));
+  if (!quello || !(rapporto > 0)) return quello || insieme;
+  const scarto = (a) => Math.abs(Math.log((a.width / a.height) / rapporto));
+  return scarto(insieme) < scarto(quello) ? insieme : quello;
+}
+
+/** Le coperture delle finestre di Filo in una foto dello schermo `larghezza`×`altezza` che ritrae `area`: `prima` e `dopo`
+ *  sono le finestre in vista ai due lati dello scatto (`{ wc, vista }`), `misure[i]` le coperture di `prima[i]`.
+ *  `{ lista }` in pixel della foto, o `{ no }` quando una finestra sulla foto non si può coprire. PURA. */
+function copertureDelloSchermo({ prima, dopo, misure, area, larghezza, altezza }) {
+  if (!prima.length && !dopo.length) return { lista: [] };
+  if (!area) return { no: 'misura' };
+  const kx = larghezza / area.width, ky = altezza / area.height;
+  const sulla = (v) => !!(v && interseca(v, area));
+  const nellaFoto = (v) => ({ left: (v.left - area.left) * kx, top: (v.top - area.top) * ky, width: v.width * kx, height: v.height * ky });
+  // Una scheda arrivata durante lo scatto non ha la misura di prima: la foto può averla presa scoperta.
+  if (dopo.some((w) => sulla(w.vista) && !prima.some((p) => p.wc === w.wc))) return { no: 'misura' };
+  const lista = [];
+  for (let i = 0; i < prima.length; i++) {
+    const posti = [prima[i].vista, ...dopo.filter((w) => w.wc === prima[i].wc).map((w) => w.vista)].filter(sulla);
+    if (!posti.length) continue;
+    if (misure[i].no) return { no: misure[i].no };
+    for (const v of posti) lista.push(...Foto.copertureNellaFoto(misure[i], nellaFoto(v), 2));
+  }
+  return { lista };
+}
+
 function sistemaVero() {
   const electron = require('electron');
   const { BrowserWindow } = electron;
