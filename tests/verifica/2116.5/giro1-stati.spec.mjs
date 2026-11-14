@@ -67,8 +67,10 @@ async function chatCheGuarda(app) {
       return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop', text: 'Una cassa.' };
     };
     let n = 0;
-    P.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
+    globalThis.__chat = [];
+    P.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       n += 1;
+      globalThis.__chat.push(JSON.stringify(messages).slice(-1500));
       const calls = n === 1 ? [{ id: 'v1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: 'Schermo intero' }) }] : [];
       for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       const text = n === 1 ? '' : 'Ho guardato lo schermo.';
