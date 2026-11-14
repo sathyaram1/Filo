@@ -232,6 +232,35 @@ function sistemaVero() {
         vista,
       };
     }),
+    // Tutto quello di Filo che lo schermo può mostrare: la scheda in vista di ogni finestra e le finestrelle di accesso.
+    // `dentro`: dove la pagina sta nella sua finestra; `vista`: dove sta sul desktop.
+    sulloSchermo: () => finestre().filter((w) => w.isVisible() && !w.isMinimized()).map((w) => {
+      try {
+        const c = w.getContentBounds();
+        let wc = null;
+        let dentro = null;
+        if (w._filoTabs) {
+          const tm = w._filoTabs;
+          const tab = (tm.tabs || []).find((t) => t.id === tm.activeId);
+          if (tab && tab.view) { wc = tab.view.webContents; dentro = tab.view.getBounds(); }
+        } else if (w.webContents && w.webContents._filoFinestrella) {
+          wc = w.webContents;
+          dentro = { x: 0, y: 0, width: c.width, height: c.height };
+        }
+        if (!wc || !dentro || !(dentro.width > 0) || !(dentro.height > 0)) return null;
+        return { win: w, wc, dentro, vista: { left: c.x + dentro.x, top: c.y + dentro.y, width: dentro.width, height: dentro.height } };
+      } catch (_) { return null; }
+    }).filter(Boolean),
+    // Un velo è una vista piena posata sopra la pagina: qualunque foto del sistema la trova già coperta.
+    posaVelo: (win, r) => {
+      const { View } = electron;
+      const v = new View();
+      v.setBackgroundColor(TINTA_VELO);
+      v.setBounds({ x: Math.floor(r.left), y: Math.floor(r.top), width: Math.ceil(r.width) + 1, height: Math.ceil(r.height) + 1 });
+      v._filoVelo = true;
+      win.contentView.addChildView(v);
+      return () => { try { if (!win.isDestroyed()) win.contentView.removeChildView(v); } catch (_) {} };
+    },
     maniglieFilo: () => finestre().map((w) => {
       try { return maniglia(w.getMediaSourceId()); } catch (_) { return ''; }
     }).filter(Boolean),
