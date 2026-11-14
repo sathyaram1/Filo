@@ -53,7 +53,8 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    orologio suo: lo chiede la pagina in vista, e la porta ricontrolla la vista.
    L'esito va anche alle altre pagine iscritte.
 6. **I segni senza orologio coprono chi non firma**: l'ora di Firestore dei
-   feedback in mano alle routine (una lettura ciascuno), il contatore degli
+   feedback in mano alle routine (una lettura ciascuno, ogni cinque minuti; a
+   ogni giro quelli appena presi secondo il registro), il contatore degli
    invii CONTATO contro le righe arrivate, e il registro dei worker, che dice
    QUALE feedback è stato preso: quello si rilegge e si segue, il resto no.
 7. **Un tetto non taglia in silenzio.** I seguiti si leggono a pezzi con un
