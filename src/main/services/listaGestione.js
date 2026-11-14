@@ -197,7 +197,7 @@ function creaSchede({
       salva();
     },
     // Una scrittura di cui non si sa l'esito: la prossima domanda rilegge tutto.
-    dimentica() { if (stato) stato.pienoAt = 0; },
+    dimentica() { if (stato) { stato.pienoAt = 0; stato.guardateAt = 0; } },
   };
 }
 
