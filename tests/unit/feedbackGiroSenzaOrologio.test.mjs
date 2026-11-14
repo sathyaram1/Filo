@@ -215,7 +215,11 @@ test('un feedback del registro resta seguito a ogni giro fino al tempo, anche qu
   mondo.seguiti = ['b'];
   avanza(60_000);
   await w.tick();
-  assert.deepEqual(w.seguitiDalRegistro(), [], 'ora lo segue la pagina');
+  // La pagina lo guarda ogni cinque minuti; chi l'ha appena preso può riscriverlo senza firma a ogni minuto (#2470).
+  assert.deepEqual(w.seguitiDalRegistro(), ['b'], 'resta anche se lo segue la pagina');
+  avanza(LIVE.REGISTRO_SEGUI_MS);
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), [], 'scaduto');
 });
 
 test('un registro illeggibile non vale «registro svuotato»', async () => {
