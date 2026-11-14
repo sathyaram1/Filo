@@ -22,10 +22,10 @@ consegni tu, e il server li controlla uno per uno. Leggi il feedback e consegni 
   nel repo con Grep e Glob: un percorso che su main non c'è il server lo scarta.
 
 ```bash
-node scripts/routine-channel.mjs deliver perizia --classe 4 --unioni "812 830" --file "src/main/tabs.js src/renderer/shell.js"
+node scripts/routine-channel.mjs deliver perizia --classe 4 --area browser-schede --unioni "812 830" --file "src/main/tabs.js src/renderer/shell.js"
 ```
 
-Senza unioni o senza file, si omette il campo. Il server rifiuta ogni altro campo: è proprio lì che passerebbe testo, e
+Senza area, unioni o file, si omette il campo. Il server rifiuta ogni altro campo: è proprio lì che passerebbe testo, e
 nessun testo tuo arriva al manutentore. Una consegna rifiutata dice perché: correggi e riconsegna.
 
 ## Cosa non fai
