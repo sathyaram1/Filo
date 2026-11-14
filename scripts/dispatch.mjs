@@ -2617,6 +2617,10 @@ export function serverCtx(bucket, fromServer, diff = '') {
       rapportoPrecedente: payload && payload.rapportoPrecedente && typeof payload.rapportoPrecedente === 'object' ? payload.rapportoPrecedente : null,
     };
   }
+  // La perizia (#2337): il feedback e le sue immagini, nient'altro.
+  if (role === 'perizia') {
+    return { ...conBusta(payload), feedback: (payload && payload.feedback) || null, immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [] };
+  }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
