@@ -1014,14 +1014,17 @@ module.exports = function register(on, ctx) {
     // freno sulle pagine è scattato, chi guarda deve poterlo dire.
     if (op === 'listAll') {
       const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      if (msg.lista !== true) {
+        const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
+        return { ok: true, rows, complete, readTime };
+      }
+      // `lista`: è il caricamento della Gestione (#676). Tutti i feedback, ricomposti dalla copia in mano più i
+      // cambiati quando il conto torna (#2470): le schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
       const startedAt = Date.now();
-      const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
-      // `lista`: è il caricamento della Gestione (#676), che ora legge tutto: le
-      // schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
-      if (msg.lista !== true) return { ok: true, rows, complete, readTime };
+      const { rows, complete, readTime, pienoAt } = await listaInMano.carica({ chi: emailOwner(), campi: fields });
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
-      if (w && complete) w.allineato(startedAt, rows, readTime);
+      if (w && complete) w.allineato(startedAt, rows, readTime, pienoAt);
       return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
