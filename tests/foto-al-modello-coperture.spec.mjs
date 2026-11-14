@@ -403,9 +403,8 @@ async function cassaCompilata(app, openTab, testServer) {
   await page.locator('#c').blur();
 }
 
-// Il giro della chat fino all'OK sul popup: torna la chat.
-async function guardaDopoOk(app, nome) {
-  const chat = await secondaFinestraConChat(app);
+// Il giro della chat fino all'OK sul popup.
+async function guardaDopoOk(app, chat, nome) {
   await chatCheGuarda(app, nome);
   await chiedi(chat, 'guarda lo schermo e dimmi cosa vedi');
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
