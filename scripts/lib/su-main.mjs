@@ -183,7 +183,9 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)%09%(objectname)', 'refs/remotes/origin']).split('\n');
   // Nomi di rami e di file li sceglie chi lavora, anche su un feedback non fidato (#2337): escono solo i nomi che il
   // server ha scritto (il tentativo di un feedback dell'indice) e i file che su main ci sono già; il resto si conta.
-  const idNoti = new Set(Object.values(numeri || {}).map(String));
+  // Senza l'indice (chi chiama non passa `numeri`) vale la forma stretta del tentativo: un id corto di sole lettere e cifre.
+  const idNoti = numeri ? new Set(Object.values(numeri).map(String)) : null;
+  const idValido = (id) => (idNoti ? idNoti.has(id) : /^[A-Za-z0-9]{1,24}$/.test(id));
   const suMain = new Set(git(root, ['ls-tree', '-r', '--name-only', base]).split('\n').filter(Boolean));
   const nome = (ramo, head) => {
     const corto = ramo.replace(/^origin\//, '');
