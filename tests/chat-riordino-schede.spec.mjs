@@ -98,12 +98,9 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
   await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile', 'Vecchia']);
   await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('NON riuscita: PULISCI_TAB');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' }).last()).toBeVisible({ timeout: 15_000 });
-  const riga = page.locator('.dash-activity').last();
-  await riga.locator('.dash-activity-head').click();
-  await expect(riga).toContainText('Riordino non riuscito');
-  await expect(riga).toContainText('ha chiuso solo un doppione');
-  await expect(riga).toContainText('crediti sono finiti');
-  await expect(riga).not.toContainText('Schede riordinate');
+  // Dopo l'OK il perché sta sotto il bottone, come a Conservativo.
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn').first()).toHaveText(/Chiusi solo un doppione · riprova/, { timeout: 15_000 });
+  await expect(page.locator('.dash-riordino-motivo')).toContainText('crediti sono finiti');
   const esito = await esitoDopoLOk(app);
   expect(esito).toContain('ha chiuso solo un doppione');
   expect(esito).toContain(MOTIVO);
