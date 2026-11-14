@@ -929,7 +929,8 @@ module.exports = function register(on, ctx) {
   }
 
   async function leggiMergeApprovals() {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list' });
+    // La Gestione mostra anche decisioni passate e fusioni senza chiedere: il server le dà solo a richiesta (#2468).
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list', parti: ['recent', 'preapproved'] });
     return {
       ok: true,
       pending: (r && r.pending) || [],
