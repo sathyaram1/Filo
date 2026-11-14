@@ -115,7 +115,7 @@ test('«in ordine alfabetico, da sinistra in alto a destra in basso»: le icone 
   const esito = JSON.stringify(giri[1]);
   expect(esito).toContain('in ordine alfabetico, a righe: 8 icone su 3 righe e 3 colonne');
   expect(esito).toContain('Disponi automaticamente');
-  expect(esito).toMatch(/ANNULLA_CAMBIO con id c[0-9a-f]{10}/);
+  expect(esito).toMatch(/filo\(annulla\) con id c[0-9a-f]{10}/);
   expect(esito).not.toContain('Bilancio 2024');
 
   await page.locator('.dash-activity-head').first().click();
