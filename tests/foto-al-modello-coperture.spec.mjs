@@ -348,7 +348,83 @@ test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password res
   expect(await pixelDelColore(app, immagine, ROSA), 'la password si legge nella foto').toBeLessThan(20);
 });
 
-// Lo Screenshot dal menu della scheda «Conto»: torna la foto che l'utente scarica.
+// #2116.5 — lo schermo intero, o quello che si sceglie nel selettore di Wayland: il contenitore non ha un sistema che
+// fotografi lo schermo, quindi la foto la compone la prova dalle schede vere, scoperte, nel punto in cui ogni finestra
+// di Filo sta. Le due finestre stanno affiancate, come nella segnalazione.
+async function schermoFinto(app, { wayland = false } = {}) {
+  await app.evaluate(({ nativeImage, screen, BrowserWindow }, { wl }) => {
+    const d = screen.getPrimaryDisplay().bounds;
+    const filo = BrowserWindow.getAllWindows().filter((w) => w._filoTabs && !w.isDestroyed());
+    filo.forEach((w, i) => w.setBounds({ x: d.x + Math.round((i * d.width) / filo.length), y: d.y, width: Math.floor(d.width / filo.length), height: d.height }));
+    globalThis.__schermo = { catture: 0 };
+    const componi = async () => {
+      const buf = Buffer.alloc(d.width * d.height * 4);
+      for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x30; buf[i + 1] = 0x30; buf[i + 2] = 0x30; buf[i + 3] = 255; }
+      for (const w of BrowserWindow.getAllWindows().filter((x) => x._filoTabs && !x.isDestroyed())) {
+        const tm = w._filoTabs;
+        const tab = tm.tabs.find((t) => t.id === tm.activeId);
+        const c = w.getContentBounds();
+        const b = tab.view.getBounds();
+        const img = (await tab.view.webContents.capturePage()).resize({ width: b.width, height: b.height });
+        const src = img.toBitmap();
+        const { width: sw, height: sh } = img.getSize();
+        for (let y = 0; y < sh; y++) {
+          const ty = c.y + b.y + y - d.y;
+          if (ty < 0 || ty >= d.height) continue;
+          for (let x = 0; x < sw; x++) {
+            const tx = c.x + b.x + x - d.x;
+            if (tx < 0 || tx >= d.width) continue;
+            src.copy(buf, (ty * d.width + tx) * 4, (y * sw + x) * 4, (y * sw + x) * 4 + 4);
+          }
+        }
+      }
+      return nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
+    };
+    globalThis.SN_SCHERMO._perProve.usaSistema({
+      piattaforma: () => 'win32',
+      wayland: () => wl,
+      permessoMac: () => 'granted',
+      fonti: async ({ lato = 0 } = {}) => {
+        if (lato > 0) globalThis.__schermo.catture += 1;
+        if (wl) return lato > 0 ? [{ id: 'screen:77:0', nome: 'Schermo scelto nel selettore', tipo: 'schermo', displayId: '', immagine: await componi() }] : [];
+        return [{ id: 'screen:1:0', nome: 'Entire screen', tipo: 'schermo', displayId: String(screen.getPrimaryDisplay().id), immagine: lato > 0 ? await componi() : null }];
+      },
+    });
+  }, { wl: wayland });
+}
+
+async function cassaCompilata(app, openTab, testServer) {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Cassa del negozio</title></head><body style="margin:0">
+    <div style="height:120px;background:${tinta(VERDE)}"></div>
+    <form style="padding:20px"><input id="c" name="q" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0"></form>
+    </body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await page.locator('#c').blur();
+}
+
+// Il giro della chat fino all'OK sul popup: torna la chat.
+async function guardaDopoOk(app, nome) {
+  const chat = await secondaFinestraConChat(app);
+  await chatCheGuarda(app, nome);
+  await chiedi(chat, 'guarda lo schermo e dimmi cosa vedi');
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
+  return chat;
+}
+
+test('#2116.5: guardando lo schermo intero, il numero della carta nella finestra di Filo accanto arriva coperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  await secondaFinestraConChat(app).then(() => null);
+  await schermoFinto(app);
+  await guardaDopoOk(app, 'Schermo intero');
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare lo schermo con la cassa').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto dello schermo').toBeLessThan(20);
+});
 async function scattaScreenshot(app, page) {
   let utente = null;
   await expect.poll(async () => {
