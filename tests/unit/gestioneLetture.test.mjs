@@ -68,8 +68,7 @@ test('il triage dell\'owner non forza il giro intero della bacheca', async () =>
   const gestore = src.slice(da, a);
   assert.match(gestore, /await syncOneCard\(id, idToken\)/);
   assert.doesNotMatch(gestore, /scheduleViewSync\([^)]*force:\s*true/);
-  const gap = /const SYNC_MIN_GAP_MS = ([^;]+);/.exec(src);
-  assert.ok(gap && eval(gap[1]) >= 30 * 60 * 1000, `SYNC_MIN_GAP_MS: ${gap && gap[1]}`); // eslint-disable-line no-eval
+  assert.match(src, /const SYNC_MIN_GAP_MS = 30 \* 60 \* 1000;/);
   assert.doesNotMatch(src, /cardsCache = \{ at: 0/, 'una scrittura aggiorna la scheda in mano, non butta via tutte');
 });
 
