@@ -23,14 +23,15 @@ const C = globalThis.SN_CONST;
 
 const basePayload = { profilo: '', preferenze: '', stato: '' };
 
-test('PROMPTS.filoChat: espone l\'azione CANCELLA_MEMORIA all\'LLM', () => {
-  const p = C.PROMPTS.filoChat({ ...basePayload });
-  // L'azione compare sia come intent ("dimentica tutto di me") sia nell'elenco
-  // delle azioni disponibili: senza questo il modello non può emetterla.
-  assert.match(p, /CANCELLA_MEMORIA/);
-  assert.match(p, /dimentica tutto di me|azzera quello che sai/i);
-  // E spiega che cancellare per sempre vuole «conferma», che apre il SISTEMA (#1312), e che non si dichiara prima dell'esito.
-  assert.match(p, /CANCELLAZIONE MEMORIA[^\n]*«conferma»[^\n]*SISTEMA[^\n]*finché l'esito non lo dice/);
+test('la chat ha memoria(cancella_tutto), e la parte fissa dice che la conferma è del sistema e il fatto dell\'esito', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
+  const memoria = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'memoria').function.description;
+  // Senza lo strumento il modello non può cancellare: confabula «fatto» (#165).
+  assert.match(memoria, /- cancella_tutto\(\): cancella tutta la memoria di Filo/);
+  const p = C.PROMPTS.filoChatStatic();
+  // Cancellare per sempre vuole «conferma», che apre il sistema (#1312), e non si dichiara prima dell'esito.
+  assert.match(p, /fanno scrivere «conferma» all'utente\. Tu chiami l'azione e basta: non chiedere il permesso a parole/);
+  assert.match(p, /Non dire fatto niente che l'esito non conferma/);
 });
 
 test('PROMPTS.filoChat: vieta di confabulare sulla memoria vuota', () => {
