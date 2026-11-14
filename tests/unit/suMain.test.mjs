@@ -195,7 +195,7 @@ test('un tentativo vecchio di un feedback il cui ultimo tentativo è su main non
   git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
   const fuori = {};
   assert.deepEqual(ramiInCorso(dir, { fuori }), [], 'il tentativo del 20 è morto: quello del 22 è già su main');
-  assert.deepEqual(fuori.altri, ['prova/esperimento'], 'un ramo che non è di lavoro resta fuori, ma si dice');
+  assert.deepEqual(fuori.altri.map((r) => r.replace(/@[0-9a-f]{7}$/, '@…')), ['altro/(nome non mostrato) @…'], 'un ramo che non è di lavoro resta fuori, ma si conta');
   git(dir, ['checkout', '-qb', 'vivo']);
   commit(dir, '#900', { 'c.js': 'c\n' });
   git(dir, ['update-ref', 'refs/remotes/origin/claude/vivo', 'HEAD']);
