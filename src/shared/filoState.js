@@ -488,7 +488,7 @@
     if (state.cambi && !perChat) {
       const righe = [
         'CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom, icone della barra laterale; dal più vecchio al più nuovo)',
-        'Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con ANNULLA_CAMBIO e l\'id.',
+        'Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con filo(annulla) e l\'id.',
       ];
       if (!state.cambi.righe.length) righe.push('(nessuno)');
       else righe.push(salvati(state.cambi.righe));
