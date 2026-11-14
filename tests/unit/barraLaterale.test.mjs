@@ -192,9 +192,11 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.match(P.buildPreferencePartial('barra_uscita', '20').rifiuto, /20 ms/);
   // Un numero piccolo senza unità sono secondi: «metti l'attesa a 1» è un secondo, non un millisecondo.
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '1').partial, { barraLaterale: { attesaMs: 1000 } });
-  // L'elenco che legge il modello le nomina tutte.
-  const righe = P.righeDescrizione({ sistema: 'win32', shellPref: '' }).join('\n');
-  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita', 'barra_schede', 'barra_bloccata']) assert.ok(righe.includes(`• ${k}: `), k);
+  // impostazioni(leggi) le nomina tutte, ognuna con la sua chiave.
+  require('../../src/shared/cambi.js');
+  require('../../src/shared/vociImpostazioni.js');
+  const righe = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, {}).righe.join('\n');
+  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita', 'barra_schede', 'barra_bloccata']) assert.ok(righe.includes(`[chiave ${k}`), k);
 });
 
 test('il manifesto non manda più l\'utente dove le voci della barra non ci sono più', () => {
