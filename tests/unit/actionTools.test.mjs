@@ -97,6 +97,15 @@ test('azione mancante, sconosciuta o senza i suoi campi: l\'errore torna al mode
   assert.equal(Tools.chiamata('CERCA_CHAT'), 'filo(cerca)');
 });
 
+// #1564: i valori delle chiavi frequenti escono dal setter; il colore delle schede non ha voce in impostazioni(leggi),
+// quindi questa riga è l'unico posto da cui il modello impara «più preciso».
+test('impostazioni(imposta) porta i valori delle chiavi frequenti presi dalle impostazioni', () => {
+  require('../../src/shared/preferences.js');
+  const d = Tools.TOOLS.IMPOSTA_PREFERENZA.description({});
+  assert.match(d, /colore_tab \(più vivaci\|più neutre\|nessuno\|più preciso\|predefinito\)/);
+  assert.match(d, /tema \(sistema\|chiaro\|scuro\)/);
+});
+
 // #1564: il modello copia i nomi dell'azione accanto; due nomi per lo stesso dato in uno strumento facevano respingere
 // come mancante un campo che il gestore sa leggere.
 test('dentro uno strumento un dato ha un nome solo', () => {
