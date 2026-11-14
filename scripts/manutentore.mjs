@@ -710,7 +710,7 @@ export function righeSpesa(spesa) {
 export const PICCOLO_TETTO_TOKEN = 30000;
 // Una stima, non un conteggio: ~4 caratteri per token sul testo italiano di Filo.
 export const stimaToken = (testo) => Math.ceil(String(testo || '').length / 4);
-const nelPiccolo = (s) => s && (s.priorita === 3 || s.priorita === 2 || !!s.fermo || !!s.restaLocale);
+const nelPiccolo = (s) => s && (s.priorita === 3 || s.priorita === 2 || !!s.fermo);
 
 /**
  * Il contesto piccolo: ruolo, stato coi segnali, taccuino, le schede a priorità 3 e 2 (e le ferme), i rami dei loro
