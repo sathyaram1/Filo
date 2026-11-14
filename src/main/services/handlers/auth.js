@@ -1748,8 +1748,7 @@ module.exports = function register(on, ctx) {
     const r = await chiamaCompiti(data);
     if (!r.ok) return r;
     if (aDelta && r.delta === true) {
-      // La pagina chiesta di solito è più corta dello storico già visto: la copia tiene almeno quella.
-      fondiCompiti(m, r, Math.max(Number(data.storico) || 0, m.chiusi.length));
+      fondiCompiti(m, r, Number(data.storico) || m.nChiusi);
       return rispostaCompiti(m);
     }
     const out = {
