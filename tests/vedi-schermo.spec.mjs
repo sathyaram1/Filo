@@ -219,7 +219,7 @@ test('spenta: la stessa richiesta non cattura niente e propone di accenderla con
   expect(await app.evaluate(() => globalThis.__vs_occhio.length)).toBe(0);
   const chat = await app.evaluate(() => globalThis.__vs_chat);
   expect(chat[1]).toContain('è spenta');
-  expect(chat[1]).toContain('IMPOSTA_PREFERENZA');
+  expect(chat[1]).toContain('impostazioni(imposta)');
 
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');

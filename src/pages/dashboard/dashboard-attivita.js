@@ -582,6 +582,7 @@
     FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
+    ESPANDI_FILO: (n) => (n > 1 ? `riletto il filo ${n} volte` : 'riletto il filo'),
     RICORDO_FILO: () => 'ripescato un ricordo dal filo',
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     LEGGI_PAGINA: (n) => (n > 1 ? `letto ${n} pagine` : 'letto una pagina'),

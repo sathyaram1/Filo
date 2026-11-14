@@ -14,12 +14,14 @@ const NEWTAB = 'filo://newtab/';
 const execAction = (app, action) =>
   app.evaluate((_electron, { action }) => globalThis.SN_EXECUTE_FILO_ACTION(action), { action });
 
+// filo_su_di_se(documento) come parte verso il fornitore: la sua riga e il parametro `doc` dello strumento.
 const toolTrasparenza = (app) => app.evaluate(() => {
   const T = globalThis.SN_ACTION_TOOLS;
   const def = T.definitions({ sistema: process.platform })
-    .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
+    .find((d) => d.function.name === 'filo_su_di_se');
+  const riga = def ? def.function.description.split('\n').find((r) => r.startsWith('- documento(')) : null;
   return {
-    def: def ? def.function : null,
+    def: riga ? { description: riga, parameters: { properties: { doc: { description: '', ...def.function.parameters.properties.doc } } } } : null,
     esistenti: globalThis.SN_TRANSPARENCY.ids(),
     previsti: globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id),
     conNota: globalThis.SN_TRANSPARENCY.conNota().map((n) => n.id),
@@ -29,7 +31,7 @@ const toolTrasparenza = (app) => app.evaluate(() => {
 test('il prompt dichiara al modello solo i documenti che esistono davvero', async ({ app, openTab }) => {
   await openTab(NEWTAB);
   const { def, esistenti, previsti, conNota } = await toolTrasparenza(app);
-  expect(def, 'LEGGI_TRASPARENZA non arriva più al modello').toBeTruthy();
+  expect(def, 'filo_su_di_se(documento) non arriva più al modello').toBeTruthy();
   expect(esistenti.length).toBeGreaterThan(0);
   // Le sezioni non scritte con la loro nota si leggono come un documento (#888).
   expect(def.parameters.properties.doc.enum).toEqual(esistenti.concat(conNota));
@@ -202,10 +204,10 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
       const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
-        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: 't1', name: 'filo_su_di_se' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"privacy"}' }],
+          toolCalls: [{ id: 't1', name: 'filo_su_di_se', arguments: '{"azione":"documento","doc":"privacy"}' }],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
@@ -219,10 +221,10 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'documento sulla privacy' })).toBeVisible({ timeout: 20_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'LEGGI_TRASPARENZA');
-  expect(strumento, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'filo_su_di_se');
+  expect(strumento, 'filo_su_di_se non arriva al modello').toBeTruthy();
   expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
-  expect(strumento.function.description).toContain('Cosa resta sul tuo computer');
+  expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy[^)]*\): [^\n]*dati/);
 
   const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
   const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
@@ -265,10 +267,10 @@ test('a «quanto costa Filo?» la chat riceve la nota su come si sostiene', asyn
       const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
-        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: 't1', name: 'filo_su_di_se' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"business"}' }],
+          toolCalls: [{ id: 't1', name: 'filo_su_di_se', arguments: '{"azione":"documento","doc":"business"}' }],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
@@ -286,8 +288,8 @@ test('a «quanto costa Filo?» la chat riceve la nota su come si sostiene', asyn
   expect(nota).toContain('Fino ad allora è tutto offerto');
   // Lo strumento offerto al modello ammette la sezione: senza, il modello non
   // potrebbe nemmeno chiederla.
-  const def = (calls[0].tools || []).map((t) => t.function || t).find((f) => f && f.name === 'LEGGI_TRASPARENZA');
-  expect(def, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  const def = (calls[0].tools || []).map((t) => t.function || t).find((f) => f && f.name === 'filo_su_di_se');
+  expect(def, 'filo_su_di_se non arriva al modello').toBeTruthy();
   expect(def.parameters.properties.doc.enum).toContain('business');
   const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
   expect(tool, 'l\'esito di LEGGI_TRASPARENZA non torna al modello').toBeTruthy();

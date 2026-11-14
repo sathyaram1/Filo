@@ -133,9 +133,10 @@ test('la scheda che rinasce in una vista nuova (Privacy fra siti) tiene il conto
 
 test('la chat e lo strumento che il modello legge nominano gli stessi permessi, e la chat li capisce tutti', () => {
   const strumenti = readFileSync(new URL('../../src/shared/actionTools.js', import.meta.url), 'utf8');
-  const riga = strumenti.slice(strumenti.indexOf('TOGLI_PERMESSO_SITO'), strumenti.indexOf('LEGGI_TRASPARENZA'));
+  const da = strumenti.indexOf('TOGLI_PERMESSO_SITO: {');
+  const riga = strumenti.slice(da, strumenti.indexOf('INSTALLA_AGGIORNAMENTO: {', da));
   for (const nome of P.PERMESSI_DA_CHAT) {
-    assert.match(riga, new RegExp(`"${nome}"`), `lo strumento offre «${nome}» al modello`);
+    assert.match(riga, new RegExp(`[ (]${nome}[,)]`), `lo strumento offre «${nome}» al modello`);
     assert.equal(P.togliPerChat('nessuno.example', nome).errore, undefined, `la chat capisce «${nome}»`);
   }
 });

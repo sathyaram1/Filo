@@ -36,7 +36,6 @@ const NON_DI_RETE = [
 
 // Esempi e identificatori: indirizzi scritti nel codice che nessuno contatta.
 const ESEMPI = [
-  { file: 'src/shared/actionTools.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/handlers.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },

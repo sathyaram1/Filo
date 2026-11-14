@@ -520,6 +520,13 @@
         const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
         for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
         daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'ESPANDI_FILO') {
+        // Il grezzo di quelle ore: pagine e risposte nate da testo di altri sono di fuori, come la prima volta; le sole
+        // parole dell'utente e di Filo no (la stessa regola di fonte in actionLevels.js).
+        const t = testo(out.testo);
+        conversazioni.push(t);
+        pezzi.push(t);
+        if (t.trim() && (out.esterno || Number(out.classeLetta) > 1)) { nonFidato = true; daFuori(t, 'dal filo riletto'); }
       } else if (type === 'LEGGI_PAGINA') {
         // Una pagina letta è testo di sconosciuti (#553): i suoi codici non escono, e il suo indirizzo il modello l'ha visto.
         if (!out.ok) continue;

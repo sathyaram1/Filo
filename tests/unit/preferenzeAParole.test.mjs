@@ -1,6 +1,6 @@
-// Sentinella: ogni impostazione modificabile a parole è anche DICHIARATA al modello.
-// L'elenco dentro lo strumento IMPOSTA_PREFERENZA è l'unico da cui gli è permesso pescare,
-// e chi aggiunge un setter senza aggiungerla lì crea una manopola che solo le mani girano.
+// Sentinella: ogni impostazione modificabile a parole è anche DICHIARATA al modello, che le chiavi le legge con
+// impostazioni(leggi) (voce per voce) e nella descrizione di impostazioni(imposta): chi aggiunge un setter che nessuna
+// delle due nomina crea una manopola che solo le mani girano.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,12 +17,12 @@ require(join(ROOT, 'src/shared/tabColor.js'));
 require(join(ROOT, 'src/shared/constants.js'));
 require(join(ROOT, 'src/shared/preferences.js'));
 require(join(ROOT, 'src/shared/actionTools.js'));
+require(join(ROOT, 'src/shared/cambi.js'));
+require(join(ROOT, 'src/shared/vociImpostazioni.js'));
 
 const { PREF_SETTERS, buildPreferencePartial } = globalThis.SN_PREF;
-const strumento = globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA;
-const ELENCO = typeof strumento.description === 'function'
-  ? strumento.description({ sistema: {} })
-  : strumento.description;
+const LETTURA = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, {}).righe.join('\n');
+const ELENCO = `${globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA.description({})}\n${LETTURA}`;
 
 // La chiave va cercata come parola intera: "voce" dentro "velocita_voce" non è
 // una dichiarazione di "voce".
@@ -34,8 +34,7 @@ test('ogni preferenza modificabile a parole è nell\'elenco che riceve il modell
 });
 
 test('le chiavi dichiarate al modello sono chiavi che esistono davvero', () => {
-  const dichiarate = [...ELENCO.matchAll(/(?:^|[•;])\s*([a-z][a-z0-9_]*(?:\s*\/\s*[a-z][a-z0-9_]*)*)\s*:/gm)]
-    .flatMap((m) => m[1].split('/').map((x) => x.trim()));
+  const dichiarate = [...LETTURA.matchAll(/\[chiave ([a-z][a-z0-9_ ]*?)[;,\]]/g)].map((m) => m[1].trim());
   assert.ok(dichiarate.length > 20, 'l\'elenco deve contenere le chiavi, una per voce');
   const inventate = dichiarate.filter((k) => !PREF_SETTERS.some((s) => s.keys.includes(k)));
   assert.deepEqual(inventate, [], `chiavi dichiarate ma non esistenti: ${inventate.join(', ')}`);

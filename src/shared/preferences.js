@@ -2215,7 +2215,7 @@
       keys: ['bluetooth_preferiti', 'dispositivi bluetooth preferiti', 'preferiti bluetooth'],
       scrive: ['bluetoothPreferiti'],
       aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth in qualunque forma, '
-        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
+        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa computer(bluetooth) con dispositivo e preferito)',
       costo: 1,
       risk: 'Cambia quali dispositivi Bluetooth stanno in cima all\'elenco della home.',
       build(v) {
@@ -2229,7 +2229,7 @@
         const s = String(v == null ? '' : v).trim();
         const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
         if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
-          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con BLUETOOTH' };
+          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con computer(bluetooth)' };
         }
         const o = opElenco(v, null, indirizzo);
         if (!o || o.rifiuto) return o;
@@ -2506,14 +2506,6 @@
     },
   ];
 
-  // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
-  // così una voce nuova arriva alla chat da sola (#949).
-  function righeDescrizione(ctx = {}) {
-    return PREF_SETTERS.map((s) => {
-      const aiuto = typeof s.aiuto === 'function' ? s.aiuto(ctx) : s.aiuto;
-      return `• ${s.keys[0]}: ${aiuto}${s.costo >= 2 ? ' [conferma]' : ''}`;
-    });
-  }
 
   // Il nome con cui la pagina mostra la voce di un setter: è quello che legge l'utente, la chiave è per il modello.
   function nomeVoce(setter) {
@@ -2647,14 +2639,14 @@
     if (!r || !r.setter) {
       return {
         rifiuto: `«${detta}» non è un'impostazione che Filo conosce`,
-        perModello: 'Usa una chiave dell\'elenco di IMPOSTA_PREFERENZA; per cercarla c\'è LEGGI_IMPOSTAZIONI.',
+        perModello: 'Cerca la chiave giusta con impostazioni(leggi): ogni voce porta la sua chiave e i valori ammessi.',
       };
     }
     const aiuto = typeof r.setter.aiuto === 'function' ? r.setter.aiuto({}) : r.setter.aiuto;
     const valore = typeof rawVal === 'string' ? rawVal.trim().slice(0, 60) : String(rawVal);
     return {
       rifiuto: `«${valore}» non è un valore che «${nomeVoce(r.setter)}» accetta`,
-      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'vedi l\'elenco di IMPOSTA_PREFERENZA'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
+      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'li dice impostazioni(leggi) con la chiave'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
     };
   }
   function pianoChiave(s) {
@@ -2714,7 +2706,7 @@
 
   global.SN_PREF = {
     buildPreferencePartial, allentaParziale, doveSeAllenta, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    applicaElenco, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
     SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

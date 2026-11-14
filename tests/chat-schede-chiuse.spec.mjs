@@ -164,7 +164,7 @@ test('una scheda chiusa trovata con la ricerca nel filo si riapre com\'era, col 
   ]);
   await chiedi(chat, 'riaprimi quella pagina sulle orche');
   await expect.poll(async () => (await schede(shell)).filter((t) => t.url === orche.url).length, { timeout: 15_000 }).toBe(1);
-  expect(await esitoPerIlModello(app, 'f1')).toContain('RIAPRI_SCHEDA');
+  expect(await esitoPerIlModello(app, 'f1')).toContain('scheda(riapri)');
   await expect(chat.locator('.dash-activity').last()).toContainText('Riaperta', { timeout: 10_000 });
   await ripristina(app);
 });

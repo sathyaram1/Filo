@@ -175,7 +175,7 @@
     const coda = s.slice(-Math.floor(max * 0.4));
     const tolti = s.length - testa.length - coda.length;
     const id = /^[\w.:-]{1,80}$/.test(String(chat || '')) ? String(chat) : '';
-    const come = id ? `CERCA_CHAT con id "${id}", a pezzi con \`da\`` : 'CERCA_CHAT';
+    const come = id ? `filo(cerca) con id "${id}", a pezzi con \`da\`` : 'filo(cerca)';
     return `${testa}\n…(${tolti} caratteri di questo messaggio non sono qui: si rileggono interi con ${come})…\n${coda}`;
   }
 
@@ -217,7 +217,7 @@
     const dove = r.ts || r.chat ? ` ${intestazione(r.ts, r.chat)}` : '';
     const di = r.role === 'user' ? 'a un suo messaggio' : 'al tuo messaggio';
     if (r.esterno) {
-      const come = r.chat ? `: si rilegge con CERCA_CHAT e l'id "${r.chat}"` : '';
+      const come = r.chat ? `: si rilegge con filo(cerca) e l'id "${r.chat}"` : '';
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
@@ -313,7 +313,8 @@
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
-    const tipi = Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : [];
+    const T = global.SN_ACTION_TOOLS;
+    const tipi = (Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : []).map((t) => (T ? T.chiamata(t) : t));
     // I ricordi ripescati da soli stanno nel messaggio dell'utente del loro turno, non qui.
     const azioni = esito && Array.isArray(esito.azioni) ? esito.azioni.filter((a) => !(a && a._auto)) : [];
     const oss = azioni.length && typeof osserva === 'function' ? osserva(azioni) : '';
@@ -323,8 +324,8 @@
     const voci = ES ? ES.daRaccontare(m.esiti, !!oss) : [];
     const storia = ES && !m.confermaDopo && voci.length ? ES.perModello(voci) : '';
     if (oss) parti.push(oss);
-    else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
-    else if (tipi.length && esitiTolti) parti.push(`(azioni di questo turno: ${tipi.join(', ')}; i loro esiti sono stati tolti per stare nel contesto: se ti servono, rifai l'azione o rileggi la conversazione con CERCA_CHAT e l'id "${m.chat}")`);
+    else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con filo(cerca) e l'id ${m.chat})`);
+    else if (tipi.length && esitiTolti) parti.push(`(azioni di questo turno: ${tipi.join(', ')}; i loro esiti sono stati tolti per stare nel contesto: se ti servono, rifai l'azione o rileggi la conversazione con filo(cerca) e l'id "${m.chat}")`);
     else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
     if (storia) parti.push(storia);
     // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
@@ -819,7 +820,7 @@
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
-    return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con CERCA_CHAT e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
+    return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con filo(cerca) e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
   }
 
   // I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
@@ -848,7 +849,7 @@
     });
     return '═══ RICORDI DAL FILO (ripescati da Filo perché sembrano legati al messaggio qui sotto) ═══\n'
       + 'Sono tratti di conversazioni più vecchie dei giorni che hai davanti. Usali se servono, ignorali se non c\'entrano; '
-      + 'una conversazione per intero si rilegge con CERCA_CHAT e il suo id.\n\n'
+      + 'una conversazione per intero si rilegge con filo(cerca) e il suo id.\n\n'
       + blocchi.join('\n\n');
   }
 

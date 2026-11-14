@@ -221,7 +221,7 @@ test('la chat porta al tasto che c\'è: stesso indirizzo nel prompt, nel manifes
   const html = fs.readFileSync(join(ROOT, 'src', 'pages', 'security', 'security.html'), 'utf8');
   const js = fs.readFileSync(join(ROOT, 'src', 'pages', 'security', 'security.js'), 'utf8');
   const url = 'filo://security/security.html#cancella-tutto';
-  assert.ok(prompt.includes(`NAVIGA con {url: "${url}"`));
+  assert.ok(prompt.includes(`il tasto con cui l'utente cancella tutti i dati di Filo, che Filo non cancella mai da solo, è ${url}`));
   assert.ok(caps.includes(url));
   assert.ok(js.includes("'#cancella-tutto': { tasto: 'sec-wipe-btn', riga: 'sec-wipe-row' }"));
   assert.ok(html.includes('id="sec-wipe-btn"') && html.includes('id="sec-wipe-row"'));

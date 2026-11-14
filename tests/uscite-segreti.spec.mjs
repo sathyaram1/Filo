@@ -685,7 +685,7 @@ test('riaperta dalla Cronologia, la chat racconta come fermata l’azione fermat
   // Il turno di allora torna col suo giro, l'esito dello strumento compreso, o senza il giro in memoria come risposta
   // sola con la nota delle fermate (#1562).
   const domanda = (await app.evaluate(() => globalThis.__visti)).filter((m) => JSON.stringify(m).includes('l’hai aperta la pagina?')).pop();
-  expect(JSON.stringify(domanda)).toMatch(/NON fatte, fermate da Filo|NAVIGA NON eseguita, e non si può eseguire: non ho aperto l'indirizzo/);
+  expect(JSON.stringify(domanda)).toMatch(/NON fatte, fermate da Filo|scheda\(apri\) NON eseguita, e non si può eseguire: non ho aperto l'indirizzo/);
 });
 
 // ── Quello che si apre o si scrive con un clic su una proposta di un modello (#810, giro 7) ──────────────

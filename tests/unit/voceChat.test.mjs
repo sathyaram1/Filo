@@ -11,9 +11,11 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 for (const f of ['constants.js', 'i18n.js', 'tasti.js', 'chatErrors.js', 'preferences.js', 'actionTools.js',
-  'cambi.js', 'ascolto.js', 'voceChat.js']) {
+  'cambi.js', 'ascolto.js', 'voceChat.js', 'vociImpostazioni.js']) {
   require(join(ROOT, 'src', 'shared', f));
 }
+// Quello che il modello legge con impostazioni(leggi) cercando quella voce: chiave e valori ammessi.
+const letturaPerIlModello = (cerca) => globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, { cerca }).righe.join('\n');
 const T = globalThis.SN_TASTI;
 const V = globalThis.SN_VOCE_CHAT;
 const A = globalThis.SN_ASCOLTO;
@@ -43,9 +45,8 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
   assert.equal(auto(false), false);
   assert.equal(auto('boh'), undefined);
   assert.equal(P.buildPreferencePartial('invio_vocale', true).costo, 1, 'reversibile e innocua: niente conferma');
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  assert.match(desc, /invio_vocale/, 'il modello non sa che la chiave esiste');
+  const desc = letturaPerIlModello('invio vocale');
+  assert.match(desc, /\[chiave invio_vocale; valori: /, 'il modello non sa che la chiave esiste');
   assert.equal(globalThis.SN_CONST.DEFAULT_SETTINGS.dictation.autoSend, true, 'di serie la richiesta parte da sola');
   const frase = globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.autoSend', prima: true, dopo: false });
   assert.equal(frase, 'invio di quello che detti nelle chat: da solo → a mano, dopo averlo corretto');
@@ -62,10 +63,8 @@ test('la pausa che chiude e l\'attimo per annullare sono dell\'utente: si chiedo
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '0').partial.dictation.cancelSec, 0);
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '3,5').partial.dictation.cancelSec, 3.5);
   assert.equal(P.buildPreferencePartial('pausa_microfono', 'boh'), null);
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
-  assert.match(desc, /pausa_microfono/);
-  assert.match(desc, /attesa_invio_vocale/);
+  assert.match(letturaPerIlModello('pausa microfono'), /\[chiave pausa_microfono; valori: /);
+  assert.match(letturaPerIlModello('attesa invio vocale'), /\[chiave attesa_invio_vocale; valori: /);
   assert.equal(globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.silenceSec', prima: 2, dopo: 4 }),
     'pausa che chiude il microfono delle chat: 2 s → 4 s');
 });

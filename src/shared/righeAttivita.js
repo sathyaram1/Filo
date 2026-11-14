@@ -81,6 +81,10 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    ESPANDI_FILO: (a) => {
+      const o = a._output || {};
+      return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
+    },
     CERCA_CHAT: (a) => {
       // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni, ognuna una volta
       // anche quando ne arrivano più pezzi (#868.2).
@@ -228,10 +232,10 @@
     RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
     REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
     RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
-    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || 'questo sito'}` }),
+    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || a.sito || 'questo sito'}` }),
     NON_TENERE_APERTA: (a) => {
       const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
-      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || 'questo sito'}` };
+      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || a.sito || 'questo sito'}` };
     },
     STILE_PAGINA: (a) => {
       const d = String(a.descrizione || a.description || '').trim();
@@ -386,7 +390,7 @@
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     ELIMINA_FILE: 'Niente cancellato',
-    CERCA_CHAT: 'Conversazione non ritrovata',
+    CERCA_CHAT: 'Conversazione non ritrovata', ESPANDI_FILO: 'Filo di quelle ore non riletto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',

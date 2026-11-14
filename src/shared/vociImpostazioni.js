@@ -113,7 +113,7 @@
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_STIMA_SOGLIA: 'legge listino e modelli per stimare costo e attesa accanto alla soglia di compattazione: non salva niente',
         FILO_RESTART_ONBOARDING: 'PULSANTE_PREFERENZE',
-        FILO_ONBOARDING_TOGLI: 'toglie per sempre un’intervista conservata: per una sola la chat non ha un’azione (tutte insieme vanno con CANCELLA_MEMORIA, che vuole «conferma»), e gli apre la pagina lì',
+        FILO_ONBOARDING_TOGLI: 'toglie per sempre un’intervista conservata: per una sola la chat non ha un’azione (tutte insieme vanno con memoria(cancella_tutto), che vuole «conferma»), e gli apre la pagina lì',
         RESET_SETTINGS: 'PULSANTE_PREFERENZE',
         TTS_SYNTH: 'PULSANTE_PREFERENZE',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
@@ -180,7 +180,7 @@
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
-        CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con NAVIGA e non cancella',
+        CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con scheda(apri) e non cancella',
         CANCELLA_TUTTI_I_DATI_STATO: 'dice alla conferma di «Cancella tutti i dati di Filo» se c’è un’identità dei crediti da tenere: non è un valore da cambiare',
         GET_CLIPBOARD_HISTORY: 'la cronologia appunti è un dato dell’utente (anche password copiate), non un’impostazione: si legge nella pagina',
         REMOVE_CLIPBOARD_ENTRY: 'pulsante che fa un’azione (toglie una voce della cronologia appunti): resta nella pagina',
@@ -234,13 +234,13 @@
   const ALTROVE = {
     permessiSiti: {
       nome: 'permessi dei siti (risposte ricordate)',
-      come: 'TOGLI_PERMESSO_SITO per toglierne una',
+      come: 'impostazioni(togli_permesso) per toglierne una',
       parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete file cartelle consentito negato',
     },
     // #947.3 — le cartelle fuori elenco in cui l'utente ha cercato: l'indice ne tiene i documenti già letti.
     cartelleCercate: {
       nome: 'cartelle dei documenti dove hai cercato una volta (Filo tiene i documenti già letti)',
-      come: 'IMPOSTA_PREFERENZA chiave cartelle_documenti, valore "togli <cartella>" per fargliele dimenticare',
+      come: 'impostazioni(imposta) chiave cartelle_documenti, valore "togli <cartella>" per fargliele dimenticare',
       parole: 'cartelle cartella documenti ricerca cercato cercata indice archivio letti dimentica',
     },
   };
@@ -285,13 +285,17 @@
   }
 
   // ── Le voci per la chat ────────────────────────────────────────────────────
-  // Come la chat la cambia: la chiave di IMPOSTA_PREFERENZA, o il token di IMPOSTA_ESTETICA.
+  // Le shell di ogni sistema: quelle valide qui le dice la parte dell'utente, perché le voci sono uguali per tutti.
+  const SHELL_AMMESSE = '"powershell" | "cmd" | "bash" | "sh" (quelle valide su questo computer le dice IL COMPUTER DELL\'UTENTE)';
+  // Come la chat la cambia: la chiave di impostazioni(imposta) coi valori ammessi, o il token di impostazioni(aspetto).
   function chiaveDi(percorso) {
-    if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false };
-    if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
+    if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false, ammessi: '' };
+    if (percorso.startsWith('themeTokens.')) return { come: `impostazioni(aspetto) token ${percorso.slice(12)}`, chiave: '', conferma: false, ammessi: '' };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
+    if (!s) return { come: '', chiave: '', conferma: false, ammessi: '' };
+    const aiuto = typeof s.aiuto === 'function' ? s.aiuto({ shellPref: SHELL_AMMESSE }) : s.aiuto;
+    return { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2, ammessi: String(aiuto || '') };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);
@@ -450,7 +454,10 @@
         titolo = v.titolo;
         righe.push(v.pagina ? `${titolo} (pagina)` : `${titolo} (si cambiano dalla chat o dalle loro pagine)`);
       }
-      const chiave = v.come ? ` [${v.come}${v.conferma ? ', chiede conferma' : ''}]` : '';
+      // I valori ammessi stanno qui e non nello strumento (SPEC-CONTESTO § Gli strumenti): li porta una lettura mirata,
+      // non l'elenco intero, che resterebbe lungo quanto la descrizione di prima.
+      const ammessi = v.ammessi && !nessuna && scelte.length < tutte.length ? `; valori: ${v.ammessi}` : '';
+      const chiave = v.come ? ` [${v.come}${ammessi}${v.conferma ? ', chiede conferma' : ''}]` : '';
       righe.push(`- ${v.nome}: ${valoreLeggibile(v.percorso, settings, { tema, sistema, cerca: nessuna ? '' : cerca })}${chiave}`);
     }
     return { righe, trovate: nessuna ? 0 : scelte.length, totale: tutte.length };

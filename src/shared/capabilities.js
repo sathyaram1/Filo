@@ -387,7 +387,7 @@
     },
     {
       id: 'chat-archive-recall', title: 'Filo ricorda gli ultimi giorni e ritrova il resto', category: 'assistant',
-      desc: 'In ogni scheda Filo ha davanti le conversazioni degli ultimi giorni, di tutte le schede, con l’ora. Se ieri in un’altra scheda gli hai detto che oggi hai l’esame, lo sa anche qui senza cercare. Quando una domanda tocca qualcosa di più vecchio, ripesca da solo il pezzo di conversazione che c’entra e lo dice nel blocco di attività. Per il resto cerca in tutto il filo: «riprendi la discussione di lunedì su X», «quella pagina sulle orche che ho chiuso ieri» (la ritrova e la riapre), un cambio di impostazioni da rimettere com’era. Quanti giorni (3 di serie) e quanti token (100.000) ricorda si cambiano; vince il minore dei due. Quando quello che ha davanti passerebbe la soglia di compattazione (70.000 token di serie), o dopo un’ora di pausa con una conversazione lunga, Filo riassume la parte più vecchia in righe con l’ora, un diario che tiene davanti al posto dei messaggi; le ultime due ore (o gli ultimi quattro messaggi tuoi, se sono meno) restano intere. Una volta al giorno il diario di ieri diventa una riga sola. Le memorie che il riassunto trova le scrive da sé; se quella parte della conversazione aveva letto una pagina o un testo di fuori, le propone soltanto, nel quaderno delle memorie, e aspettano il tuo sì.',
+      desc: 'In ogni scheda Filo ha davanti le conversazioni degli ultimi giorni, di tutte le schede, con l’ora. Se ieri in un’altra scheda gli hai detto che oggi hai l’esame, lo sa anche qui senza cercare. Quando una domanda tocca qualcosa di più vecchio, ripesca da solo il pezzo di conversazione che c’entra e lo dice nel blocco di attività. Per il resto cerca in tutto il filo: «riprendi la discussione di lunedì su X», «quella pagina sulle orche che ho chiuso ieri» (la ritrova e la riapre), un cambio di impostazioni da rimettere com’era. Quanti giorni (3 di serie) e quanti token (100.000) ricorda si cambiano; vince il minore dei due. Quando quello che ha davanti passerebbe la soglia di compattazione (70.000 token di serie), o dopo un’ora di pausa con una conversazione lunga, Filo riassume la parte più vecchia in righe con l’ora, un diario che tiene davanti al posto dei messaggi; le ultime due ore (o gli ultimi quattro messaggi tuoi, se sono meno) restano intere. Una volta al giorno il diario di ieri diventa una riga sola. Sotto una riga del diario Filo rilegge, quando serve, com’erano andate quelle ore: i messaggi, le pagine aperte e le cose fatte. Le memorie che il riassunto trova le scrive da sé; se quella parte della conversazione aveva letto una pagina o un testo di fuori, le propone soltanto, nel quaderno delle memorie, e aspettano il tuo sì.',
       invoke: 'Chiediglielo a parole, nominando l’argomento o quando ne avevate parlato. I due tetti e la soglia di compattazione, con accanto quanto costa al mese: pagina Preferenze (filo://preferences/preferences.html), Impostazioni avanzate, «Quanto ricorda la chat», oppure chiedilo a Filo («ricorda una settimana di conversazioni», «compatta la chat oltre 50.000 token»). Il modello che compatta (di serie quello della chat) si sceglie in Opzioni, fra i modelli.',
       doesNot: 'Le conversazioni restano sul tuo computer. Per ritrovare da sole quelle più vecchie dei giorni che ha davanti, ognuna passa una volta dal modello che indicizza le schede chiuse (con la stessa politica sui modelli). Le pagine visitate non le mette da sé nel contesto: le ritrova solo se gliele chiedi. Una conversazione o una pagina che cancelli non gli arriva più dal messaggio dopo, in nessuna scheda, nemmeno dove l’aveva ripescata o trovata. Il testo di una pagina o di un documento letto, o l’esito di un comando dato in chat, resta davanti insieme al suo messaggio, in ogni scheda, finché quel messaggio è fra i giorni che ha davanti e Filo resta aperto. Le foto che gli mandi in chat fanno lo stesso (al più sedici insieme): dopo sa che c’erano e cosa ne aveva letto, ma non le rivede finché non le rimandi. Il riassunto non cancella niente: la conversazione resta intera nel filo e si rilegge come prima. Chi riassume non vede il testo delle pagine lette, solo indirizzo, titolo e lunghezza; una conversazione che cancelli porta via anche le sue righe del diario. Se dopo la compattazione una richiesta passa ancora i 100.000 token, prima escono gli esiti vecchi delle letture (si rifanno quando servono), poi la richiesta parte lo stesso e la Cronologia AI lo segna: il testo che hai scritto non si taglia.',
     },
@@ -931,13 +931,66 @@
       }
       let b = `• ${c.title} [${c.id}]\n  Cosa fa: ${c.desc}\n  Come si attiva: ${c.invoke}`;
       if (c.doesNot) b += `\n  Limiti: ${c.doesNot}`;
+      const s = STRUMENTO[c.id];
+      if (s) b += s === SOLO_A_MANO ? '\n  Dalla chat: nessuno strumento la comanda, si spiega all\'utente.' : `\n  Dalla chat: ${s}.`;
       blocks.push(b);
     }
     return blocks.join('\n\n');
   }
 
+  // Lo strumento della chat che arriva a ogni capacità (SPEC-CONTESTO § Gli strumenti: quello che l'utente fa in Filo lo
+  // fa anche Filo). SOLO_A_MANO: un gesto dell'interfaccia che nessuno strumento comanda, e che la chat sa spiegare.
+  // Sentinella: tests/unit/capacitaStrumenti.test.mjs (ogni voce ne ha uno, e lo strumento esiste).
+  const SOLO_A_MANO = 'filo_su_di_se(capacita)';
+  const STRUMENTO = Object.freeze({
+    'new-tab': 'scheda(apri)', 'close-tab': 'scheda(chiudi)', 'reopen-closed-tab': 'scheda(riapri)',
+    'navigate-back-forward': SOLO_A_MANO, 'switch-tab-by-number': 'scheda(mostra)', 'switch-tab-next-prev': 'scheda(mostra)',
+    reload: SOLO_A_MANO, home: 'scheda(finestra)', 'address-bar': 'scheda(apri)', incognito: SOLO_A_MANO,
+    fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
+    'pannello-strumenti': 'home(pannello)', 'page-zoom': 'scheda(zoom)', 'network-error-page': SOLO_A_MANO,
+    'auto-archive': 'scheda(riordina)', 'restore-tabs': SOLO_A_MANO, 'reorder-tabs': SOLO_A_MANO, 'drag-tab': SOLO_A_MANO,
+    'tab-preview': 'impostazioni(imposta)', 'open-in-background': 'scheda(apri)', 'explain-selection': SOLO_A_MANO,
+    'translate-selection': SOLO_A_MANO, 'edit-selection': SOLO_A_MANO, 'read-aloud': SOLO_A_MANO, dictate: SOLO_A_MANO,
+    'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
+    'email-nei-siti': 'impostazioni(imposta)', 'testo-dei-campi': 'impostazioni(imposta)', 'spellcheck-manage': 'scheda(apri)',
+    editor: 'file(leggi_editor)', 'translate-page': SOLO_A_MANO, 'explain-image': SOLO_A_MANO,
+    'copy-download-image': SOLO_A_MANO, 'search-image': SOLO_A_MANO, 'video-audio-controls': 'scheda(pausa_audio)',
+    'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
+    ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
+    'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': SOLO_A_MANO,
+    'open-for-later': 'scheda(salvate)', archive: 'scheda(chiuse)', 'chat-archive': 'filo(cerca)',
+    'visited-pages': 'filo(cancella_pagine)', 'filo-accaduti': 'filo(espandi)', 'chat-archive-recall': 'filo(cerca)',
+    'response-length': 'impostazioni(imposta)', 'app-chats-in-filo': 'filo(cerca)', 'chat-conti-cambi': 'web(cerca)',
+    history: 'scheda(apri)', 'downloads-list': 'scheda(apri)', 'help-sidebar': 'scheda(finestra)',
+    'chat-schede-trascinate': SOLO_A_MANO, 'chat-immagini-trascinate': SOLO_A_MANO, 'voice-chat': SOLO_A_MANO,
+    'web-search-assistant': 'web(cerca)', feedback: 'filo_su_di_se(feedback)', 'transparency-docs': 'filo_su_di_se(documento)',
+    'filo-assistant': SOLO_A_MANO, 'read-user-documents': 'file(leggi)', 'find-user-documents': 'file(cerca)',
+    'file-names': 'file(rinomina)', 'delete-files': 'file(elimina)', 'terminal-mode': 'computer(comando)',
+    'read-web-pages': 'web(leggi)', 'look-at-screen': 'computer(guarda)', 'generate-dashboard': 'impostazioni(imposta)',
+    'agent-actions': 'scheda(apri)', 'autonomy-levels': 'impostazioni(imposta)', 'filo-memory': 'memoria(correggi)',
+    'filo-notes': 'file(appunto)', 'filo-timers': 'promemoria(timer)', 'filo-alarms': 'promemoria(sveglia)',
+    'filo-calendar-event': 'promemoria(evento)', 'filo-notifications': 'home(carta)', 'system-status': 'computer(volume)',
+    'system-control': 'computer(volume)', 'desktop-icons': 'computer(ordina_desktop)', 'home-page': 'scheda(finestra)',
+    'home-filo': 'filo(cerca)', 'home-cards': 'home(carta)', 'patch-notes': 'scheda(apri)', 'segnalazioni-mie': 'scheda(apri)',
+    'auto-update': 'impostazioni(aggiorna)', 'options-models': 'impostazioni(imposta)', 'model-cost-estimate': SOLO_A_MANO,
+    'open-weights-only': 'impostazioni(imposta)', 'own-key-all-providers': 'impostazioni(imposta)',
+    'host-order': 'impostazioni(imposta)', 'model-usage-census': SOLO_A_MANO, preferences: 'impostazioni(pulsante)',
+    'settings-by-chat': 'impostazioni(imposta)', 'undo-changes': 'filo(annulla)', security: 'impostazioni(imposta)',
+    'google-account': 'impostazioni(account)', 'accesso-ai-siti': SOLO_A_MANO, 'dangerous-sites': 'impostazioni(imposta)',
+    'cookie-banners': 'impostazioni(imposta)', 'stay-signed-in': 'impostazioni(imposta)', 'cookie-embed': 'impostazioni(imposta)',
+    'cookie-embed-broken': 'impostazioni(imposta)', 'ad-block': 'impostazioni(imposta)', 'video-ad-skip': 'impostazioni(imposta)',
+    'youtube-ad-block': 'impostazioni(imposta)', 'site-permissions': 'impostazioni(togli_permesso)',
+    'site-own-menu': 'impostazioni(imposta)', 'filo-off-on-site': 'impostazioni(imposta)', 'data-export-import': SOLO_A_MANO,
+    'data-wipe-all': 'scheda(apri)', 'pagine-delicate': 'impostazioni(imposta)', 'auto-feedback': 'impostazioni(imposta)',
+    'contatori-anonimi': 'impostazioni(imposta)', 'filo-shortcuts': 'impostazioni(imposta)', theme: 'impostazioni(imposta)',
+    'aspetto-su-misura': 'impostazioni(aspetto)', onboarding: 'impostazioni(pulsante)', credits: 'impostazioni(crediti)',
+    'credits-warning': 'impostazioni(imposta)', invites: 'scheda(apri)',
+    // Dietro un cancello: valgono quando il cancello si apre.
+    'deck-builder': 'scheda(apri)', 'red-team': 'scheda(apri)', board: 'scheda(apri)',
+  });
+
   global.SN_CAPABILITIES = {
     CATEGORIES, CAPABILITIES, index, get, byCategory, all,
-    renderIndexForPrompt, renderDetailForPrompt,
+    renderIndexForPrompt, renderDetailForPrompt, STRUMENTO, SOLO_A_MANO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -648,6 +648,20 @@
         return q ? ['Cercare nel filo ', cit(q)] : 'Cercare nel filo';
       },
     },
+    // SPEC-CONTESTO § Tre livelli: sotto una riga del diario c'è il grezzo. Sola lettura → costo 0; pagine e testi
+    // arrivati da fuori tornano sospetti come la prima volta (§ Il sospetto non passa nel riassunto).
+    ESPANDI_FILO: {
+      costo: 0,
+      campo: null,
+      fonte: (a, out) => {
+        if (out && out.esterno) return { classe: 5, campo: 'web', chiave: 'filo:espanso', motivo: 'ho riletto il filo di quelle ore, con pagine e testi arrivati da fuori' };
+        const c = Number(out && out.classeLetta);
+        return Number.isInteger(c) && c > 1 && c <= 5
+          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte nate dai tuoi file' : 'ho riletto risposte nate da testo scritto da altri' }
+          : null;
+      },
+      describe: () => 'Rileggere il filo di quelle ore',
+    },
     // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
     // scelto di tenere (classe 3, come i siti segnati da lui). Sola lettura, niente esce → costo 0.
     CERCA_SALVATE: {
@@ -1628,7 +1642,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE',
+    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 

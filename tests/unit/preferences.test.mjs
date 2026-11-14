@@ -392,10 +392,10 @@ test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
     const etichetta = globalThis.SN_SOUNDS.TONE_LABELS[id];
     assert.equal(build('suono_notifiche', etichetta).partial.notifications.sound, id, `tono ${etichetta} non riconosciuto`);
   }
-  // E il modello li legge nell'elenco delle chiavi, insieme alla durata.
-  require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  // E il modello li legge con impostazioni(leggi), coi valori ammessi, insieme alla durata.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'cambi.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'vociImpostazioni.js'));
+  const desc = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, { cerca: 'notifiche' }).righe.join('\n');
   assert.match(desc, /durata_notifiche/);
   assert.match(desc, /suono_notifiche/);
   for (const etichetta of Object.values(globalThis.SN_SOUNDS.TONE_LABELS)) {

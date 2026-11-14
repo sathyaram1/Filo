@@ -62,7 +62,7 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
   // Il modello vede quale scheda è la sua, e i numeri da usare.
   const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
   expect(prompt).toContain('[QUESTA CHAT]');
-  expect(prompt).toContain('CHIUDI_SCHEDE');
+  expect(prompt).toContain('scheda(chiudi)');
   await page.screenshot({ path: 'tests/.shots/chat-chiudi-schede-tutte.png' });
   await ripristina(app);
 });

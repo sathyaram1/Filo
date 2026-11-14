@@ -197,7 +197,7 @@ test('«ordina le icone del desktop in ordine alfabetico da sinistra in alto a d
   assert.equal(r.cambio, registrati[0].id);
   const testo = D.esitoPerModello(r);
   assert.match(testo, /in ordine alfabetico, a righe: 8 icone su 3 righe e 3 colonne/);
-  assert.match(testo, new RegExp(`ANNULLA_CAMBIO con id ${r.cambio}`));
+  assert.match(testo, new RegExp(`filo\\(annulla\\) con id ${r.cambio}`));
   assert.doesNotMatch(testo, /Zoom|appunti|Bilancio/, 'i nomi dei file non vanno al modello');
 
   // A colonne: dall'alto in basso, poi la colonna a destra.
@@ -311,7 +311,7 @@ test('le icone spostate ma rimesse altrove da un altro programma: non è «fatto
   assert.match(testo, /^Non fatto: Windows ha spostato le icone, ma rileggendo il desktop non sono nell'ordine chiesto/);
   assert.match(testo, /Fences/);
   assert.doesNotMatch(testo, /Disponi automaticamente/, 'Filo lo spegne già da sé: non lo si consiglia');
-  assert.match(testo, new RegExp(`ANNULLA_CAMBIO, id ${r.cambio}`));
+  assert.match(testo, new RegExp(`filo\\(annulla\\), id ${r.cambio}`));
 
   // Due icone nella stessa casella non si leggono in nessun ordine.
   const g = { x0: 3, y0: 2, passoX: 75, passoY: 100 };
@@ -336,7 +336,7 @@ test('uno spostamento che si rompe a metà: il desktop riletto, il cambio regist
   const r = await conDesktop(finto, () => D.ordinaIcone({}));
   assert.equal(r.ok, false);
   assert.equal(registrati.length, 1);
-  assert.match(D.esitoPerModello(r), new RegExp(`cambiato lo stesso.*ANNULLA_CAMBIO, id ${r.cambio}`));
+  assert.match(D.esitoPerModello(r), new RegExp(`cambiato lo stesso.*filo\\(annulla\\), id ${r.cambio}`));
 });
 
 // ── Mac: la Scrivania del Finder ─────────────────────────────────────────────

@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.281', date: '2026-11-14',
+      features: [
+        { testo: 'Se chiedi a Filo cosa è successo in un certo momento, anche giorni fa, rilegge com\'era andata davvero, coi messaggi e le pagine di quelle ore, invece di fermarsi al riassunto.', segnalazione: 1564 },
+      ],
+    },
+    {
       version: '0.2.280', date: '2026-11-13',
       features: [
         'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',

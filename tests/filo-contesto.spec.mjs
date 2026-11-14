@@ -1025,7 +1025,7 @@ test('con la finestra del modello nota dal listino, rileggere una conversazione 
   // La rilettura ha l'inizio e la fine, e dice da dove leggere il mezzo.
   expect(ultima).toContain('trasloco, punto 0:');
   expect(ultima).toContain('Punto 59 segnato.');
-  expect(ultima).toMatch(/parte centrale omessa: caratteri \d+-\d+ di \d+; si legge richiamando CERCA_CHAT con questo id e da = \d+/);
+  expect(ultima).toMatch(/parte centrale omessa: caratteri \d+-\d+ di \d+; si legge richiamando filo\(cerca\) con questo id e da = \d+/);
 });
 
 test('senza la finestra nota, il rifiuto accorcia la rilettura nello stesso turno: la risposta arriva al primo messaggio, e anche al secondo', async ({ app }) => {
