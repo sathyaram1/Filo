@@ -417,9 +417,14 @@
 
   // Il testo di altri nella riga di un evento, con la sua fonte (#2305): lo stesso pezzo che la riga mostra. Un avviso
   // di Filo no: le sue parole le scrive Filo (le notifiche salvate, che può scrivere un modello, le dice lo STATO).
+  // Vale anche per le righe del filo riletto (filo(espandi)): lì una pagina è una riga sua, col titolo e la ricerca.
   function daFuoriDi(ev) {
     const g = (testi, fonte) => [{ testi: testi.filter(Boolean), fonte }];
+    if (!ev) return [];
     switch (ev.tipo) {
+      case 'navigazione':
+        if (ev.casa || ev.delicata) return [];
+        return stringa(ev.titolo) || stringa(ev.cercato) ? g([stringa(ev.titolo) ? campo(ev.titolo, 120) : '', stringa(ev.cercato) ? campo(ev.cercato, 120) : ''], 'dalle pagine visitate') : [];
       case 'download': return stringa(ev.file || ev.scaricamento) ? g([campo(ev.file || ev.scaricamento)], 'dai nomi dei file scaricati') : [];
       case 'file': return g([campo(ev.titolo || ev.file), stringa(ev.prima) ? campo(ev.prima) : ''], 'dai file dell\'editor');
       case 'timer.scattato': return g([campo(ev.nome || '')], 'dai nomi di timer e sveglie');
