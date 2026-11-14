@@ -197,11 +197,23 @@ export function slugProgetto(percorso) {
 
 // I comandi della shell che scaricano da un indirizzo, contati in `tools.byName` sotto questo nome (#2337).
 export const STRUMENTO_RETE = 'Bash_rete';
-const RE_RETE = /(?:^|[;&|(`]|\$\()\s*(?:sudo\s+|command\s+|env\s+(?:\S+=\S*\s+)*)?(?:curl|wget|gh|Invoke-WebRequest|Invoke-RestMethod|iwr|irm|lynx|w3m|aria2c|http|https|xh)(?:\.exe)?(?=\s|$)/im;
+// I programmi di rete sono quelli dell'elenco unico del classificatore dei comandi; qui in più gh e un interprete che
+// apre un indirizzo. git parla col repo dal proxy: conta solo con un indirizzo scritto.
+const RE_PROGRAMMA_RETE = new RegExp(`^(?:${globalThis.SN_CMD_CLASSIFY.PROGRAMMI_RETE.source})`, 'i');
+const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
+const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
+const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
+const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|env(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*)\s+)+/i;
 
-/** Il comando chiama la rete con uno strumento da riga di comando? Solo in posizione di comando. PURA. */
+/** Il comando chiama la rete? Ogni pezzo in posizione di comando, anche col percorso intero del programma. PURA. */
 export function chiamaLaRete(comando) {
-  return RE_RETE.test(String(comando || ''));
+  for (const pezzo of String(comando || '').split(/[;&|\n`()]|\$\(/)) {
+    const s = pezzo.trim().replace(RE_PREFISSI, '').replace(/^["']?(?:[^\s"']*[\\/])?/, '');
+    const m = RE_PROGRAMMA_RETE.exec(s);
+    if (m && (!/^git\b/i.test(m[0]) || RE_INDIRIZZO.test(s))) return true;
+    if (RE_SOLO_QUI.test(s) || (RE_INTERPRETE.test(s) && RE_INDIRIZZO.test(s))) return true;
+  }
+  return false;
 }
 
 /** Una chiave ammessa da Firestore: solo [A-Za-z0-9_-], il resto diventa `_`. PURA. */
