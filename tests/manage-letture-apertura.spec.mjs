@@ -106,8 +106,8 @@ test('riaperta, la Gestione chiede i cambiati e il conto; le statistiche contano
   expect(dopo.schedeTutte, 'le schede pubbliche non si rileggono tutte').toBeLessThanOrEqual(1);
 
   await apriScheda(seconda, 'fbstats');
-  await expect(seconda.locator('[data-fs-id="ricevuti"] .mg-tile-n')).not.toHaveText('', { timeout: 15000 });
-  await seconda.locator('[data-fs-range="tutto"], [data-fs-range="365g"], [data-fs-range="30g"]').first().click();
+  await seconda.locator('[data-fs-range="30g"]').click();
+  await expect(seconda.locator('[data-fs-id="ricevuti"] .mg-tile-n')).toHaveText('41', { timeout: 15000 });
   expect((await conta(app)).tutti, 'le statistiche non rileggono tutto').toBe(1);
 });
 
