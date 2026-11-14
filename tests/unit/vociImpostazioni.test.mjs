@@ -425,7 +425,7 @@ test('una chiave o un valore che non si applicano hanno il loro perché, per l\'
   assert.match(v.perModello, /"off" \| "default" \| "privacy"/);
   const k = P.spiegaNonValida('boh', 1);
   assert.match(k.rifiuto, /«boh» non è un'impostazione/);
-  assert.match(k.perModello, /LEGGI_IMPOSTAZIONI/);
+  assert.match(k.perModello, /impostazioni\(leggi\)/);
 });
 
 test('un\'ora di inattività si scrive al singolare', () => {
