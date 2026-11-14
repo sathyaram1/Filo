@@ -131,3 +131,11 @@ test('la risposta del server arriva alle card nella forma dell\'app', () => {
   assert.deepEqual(dati(W.rispostaPerCard({ ok: true, result: 'merged', sha: 'x' })), { ok: true, result: 'merged', sha: 'x' });
   assert.equal(W.rispostaPerCard(null).ok, false);
 });
+
+test('pagina e Gestione chiedono le parti dell\'elenco che mostrano: il server dà solo attese e fallite senza richiesta (#2468)', () => {
+  assert.match(SORGENTE, /chiamaFunzione\(FUNZIONE, \{ op: 'list', parti: \['recent'\] \}\)/, 'la pagina mostra le decisioni passate');
+  assert.doesNotMatch(SORGENTE, /chiama\('list'\)/);
+  const app = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js'), 'utf8');
+  assert.match(app, /callSecurityFunction\('ownerMergeApprovals', \{ op: 'list', parti: \['recent', 'preapproved'\] \}\)/,
+    'la Gestione mostra decisioni passate e fusioni senza chiedere');
+});
