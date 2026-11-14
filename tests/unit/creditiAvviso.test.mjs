@@ -239,9 +239,9 @@ test('RIMEDIO_CREDITI: la chat applica e rimette i rimedi coi pulsanti, costo 1 
   require('../../src/shared/i18n.js');
   require('../../src/shared/actionLevels.js');
   require('../../src/shared/actionTools.js');
-  const def = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'RIMEDIO_CREDITI');
-  assert.ok(def, 'strumento RIMEDIO_CREDITI assente');
-  const p = def.function.parameters.properties;
+  const def = globalThis.SN_ACTION_TOOLS.TOOLS.RIMEDIO_CREDITI;
+  assert.deepEqual(def.via, ['impostazioni', 'crediti']);
+  const p = def.properties;
   assert.deepEqual(p.operazione.enum, ['applica', 'annulla', 'elenca']);
   assert.deepEqual(p.rimedio.enum, ['modello', 'automatiche']);
   const L = globalThis.SN_ACTION_LEVELS;
