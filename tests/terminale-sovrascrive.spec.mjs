@@ -75,6 +75,11 @@ test('proposto da Filo: sovrascrivere chiede col suo rischio, la copia su un fil
 
   const terzo = path.join(dir, 'copia.txt');
   const nuova = await esegui(copia(nuovo, terzo));
-  expect(nuova.executed, 'una copia su un file nuovo resta una modifica che si rimedia').toBe(true);
+  expect(nuova.executed).toBe(false);
+  expect(nuova.needsConfirm, 'una copia su un file nuovo resta una modifica che si rimedia: un OK').toBe(2);
+  expect(JSON.stringify(nuova.parti || nuova.describe || '')).not.toMatch(/sovrascrive/);
+  expect(existsSync(terzo)).toBe(false);
+  const fatta = await esegui(copia(nuovo, terzo), { confirmed: true });
+  expect(fatta.executed).toBe(true);
   expect(existsSync(terzo)).toBe(true);
 });
