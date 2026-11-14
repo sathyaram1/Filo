@@ -426,12 +426,12 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
     const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: PAGINE }, () => ({ type: 'LEGGI_PAGINA' })) });
     const testo = 'Il miele matura nelle celle opercolate. '.repeat(900);
     globalThis.SN_CONTESTO_FILO.ricordaEsiti('lett1', c.messages.at(-1).ts, {
-      azioni: Array.from({ length: 7 }, (_, i) => {
+      azioni: Array.from({ length: PAGINE }, (_, i) => {
         const url = `https://api.example/tesi/${i}`;
         return { type: 'LEGGI_PAGINA', _executed: true, params: { url }, _output: { ok: true, pageRead: url, url, titolo: `Tesi ${i}`, testo, da: 0, fino: testo.length, totale: testo.length } };
       }),
     });
-  });
+  }, PAGINE);
   await modelloFinto(app, [{ text: 'Va bene.' }]);
   // Chi compatta non risponde (rete giù): il tratto resta com'è, e la richiesta deve comunque stare sotto il listino.
   await app.evaluate(() => {
