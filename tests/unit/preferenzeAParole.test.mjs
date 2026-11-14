@@ -22,7 +22,7 @@ require(join(ROOT, 'src/shared/vociImpostazioni.js'));
 
 const { PREF_SETTERS, buildPreferencePartial } = globalThis.SN_PREF;
 const LETTURA = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, {}).righe.join('\n');
-const ELENCO = `${globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA.description}\n${LETTURA}`;
+const ELENCO = `${globalThis.SN_ACTION_TOOLS.TOOLS.IMPOSTA_PREFERENZA.description({})}\n${LETTURA}`;
 
 // La chiave va cercata come parola intera: "voce" dentro "velocita_voce" non è
 // una dichiarazione di "voce".
