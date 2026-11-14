@@ -5592,7 +5592,7 @@
       toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
       // La richiesta nuova sta negli elenchi, una pratica che ha cambiato stato nel documento: si rilegge tutto.
       // Riaperta, la frase serve finché la richiesta non è nel pannello: una scadenza futura non deve ritrovarla lì.
-      Promise.resolve(loadMergeApprovals()).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
+      Promise.resolve(loadMergeApprovals(null, { fresco: true })).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
       if (m === RIAPRI_ESITI.non_ferma) refreshFromRemote({ force: true }).catch(() => {});
     });
     return box;
