@@ -1273,9 +1273,11 @@ e controllo cieco. La funzione gira in due momenti:
 
 - a ogni modifica del feedback, con un trigger: copre anche le modifiche che
   l'owner fa da Gestione senza passare dal server;
-- ogni 10 minuti nel pacemaker, come rete. Un feedback che ha bisogno di un
-  compito e non ce l'ha lo riceve. Un compito aperto il cui feedback è andato
-  avanti si chiude come «superato».
+- ogni 20 minuti nel pacemaker, come rete, con la cadenza del recupero degli
+  arenati (#2467: legge tutti i compiti aperti, uno per feedback in coda); se
+  resta a metà riparte al giro dopo. Un feedback che ha bisogno di un compito e
+  non ce l'ha lo riceve. Un compito aperto il cui feedback è andato avanti si
+  chiude come «superato».
 
 Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
