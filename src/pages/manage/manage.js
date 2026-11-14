@@ -1913,7 +1913,9 @@
     }));
   }
 
-  async function loadMergeApprovals(already) {
+  // `fresco`: dopo una decisione, che cambia gli elenchi; senza, il main risponde con la copia letta da poco (#2470).
+  let fusioniRiletturaTimer = null;
+  async function loadMergeApprovals(already, { fresco = false } = {}) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI) return 0;
     const spegni = () => {
