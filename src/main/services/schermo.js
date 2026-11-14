@@ -446,5 +446,6 @@ function crea({ sistema = null } = {}) {
 
 module.exports = {
   crea, acceso, scegli, normalizza, nomiUnici, nomiSchermi, sessioneWayland, maniglia, tuttaNera,
-  LATO_CATTURA, LATO_MODELLO, SELETTORE, PANNELLO_MAC, FRASE_MAC,
+  areaDelloSchermo, copertureDelloSchermo,
+  LATO_CATTURA, LATO_MODELLO, SELETTORE, PANNELLO_MAC, FRASE_MAC, FRASE_SELETTORE,
 };
