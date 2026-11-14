@@ -70,7 +70,7 @@ async function chiedi(page, testo, risposta) {
 
 const impostazioni = (page) => page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
 
-test('profilo nuovo: una lettura parte subito con la frase della prima volta, una cancellazione chiede «conferma»', async ({ app, shell }) => {
+test('profilo nuovo: la frase della prima volta, una cancellazione chiede «conferma» e una lettura parte subito', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
