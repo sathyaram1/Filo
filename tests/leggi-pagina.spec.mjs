@@ -257,9 +257,15 @@ test('dopo una ricerca, un indirizzo che il modello scrive coi dati della memori
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(1);
 });
 
-test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo indirizzo ha parole della memoria', async ({ app, openTab }) => {
+// Le parole della memoria nell'indirizzo lo portano a costo 2, che a Normale chiede un OK finché manca il guardiano
+// (#1840): un OK solo, e la pagina si apre senza una «conferma» da scrivere.
+test('in una chat pulita la pagina che l\'utente chiede si apre con un OK anche se il suo indirizzo ha parole della memoria', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab(NEWTAB);
+  await page.evaluate(() => {
+    window.__chiesto = [];
+    window.SN_CONFIRM_UI = { confirm: async (o) => { window.__chiesto.push(String((o && o.text) || '')); return true; }, confirmTyped: async () => false };
+  });
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Mario Rossi, vive a Bologna nel quartiere Navile.', PREFERENZE: '' }));
   const url = 'https://www.comune.bologna.it/quartieri/navile';
   await stubModello(app, [
@@ -267,7 +273,13 @@ test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo 
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
   await chiedi(page, 'aprimi la pagina del quartiere Navile sul sito del comune di Bologna');
+  const bottone = page.locator('.dash-bubble-actions .dash-action-btn-primary');
+  await expect(bottone).toHaveCount(1, { timeout: 20_000 });
+  await bottone.click();
   await expect.poll(() => schedaVerso(app, 'comune.bologna.it'), { timeout: 20_000 }).toBe(true);
+  const chiesto = await page.evaluate(() => window.__chiesto);
+  expect(chiesto).toHaveLength(1);
+  expect(chiesto[0]).toContain('comune.bologna.it');
   await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
   // Un'apertura riuscita parla da sé (#1130): il turno si chiude senza richiamare il modello.
   expect((await chiamate(app)).length).toBe(1);
