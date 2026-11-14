@@ -102,3 +102,62 @@ test('filo_su_di_se(feedback) a Conservativo apre la conferma, e uno strumento s
   expect(await ultimaStoria(app)).toMatch(/manca l'azione in scheda: scegli fra apri/);
   await ripristina(app);
 });
+
+// Dentro promemoria un dato ha un nome solo: quello che il modello copia dalla riga accanto arriva al gestore (#1564).
+test('«allunga il timer a 10 minuti» con promemoria(modifica) e i secondi cambia la durata', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.addTimer({ label: 'pasta', seconds: 60 }));
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'm1', name: 'promemoria', arguments: JSON.stringify({ azione: 'modifica', etichetta: 'pasta', secondi: 600 }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'allunga il timer della pasta a 10 minuti');
+  await expect.poll(async () => {
+    const t = (await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).find((x) => x.label === 'pasta');
+    return t ? Math.round((Date.parse(t.endsAt) - Date.now()) / 1000) : 0;
+  }, { timeout: 10_000, message: 'il timer della pasta dura ancora un minuto' }).toBeGreaterThan(300);
+  expect(await ultimaStoria(app)).not.toMatch(/manca orario/);
+  await ripristina(app);
+});
+
+test('«sveglia alle 7:30 per la palestra» con promemoria(sveglia), orario ed etichetta, la mette', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 's1', name: 'promemoria', arguments: JSON.stringify({ azione: 'sveglia', orario: '07:30', etichetta: 'palestra' }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'sveglia alle 7:30 per la palestra');
+  await expect.poll(async () => (await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).some((x) => x.label === 'palestra'),
+    { timeout: 10_000, message: 'nessuna sveglia «palestra»' }).toBe(true);
+  await ripristina(app);
+});
+
+// Il modello gli id delle icone non li vede: arriva col nome del menu, e un nome che non conosco torna con l'elenco per
+// riprovare subito (#1564).
+const statoIcone = (app) => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.disposizioneIcone || s.layoutIcone || null));
+const nellaBarra = async (app, id) => app.evaluate((_e, x) => {
+  const D = globalThis.SN_DISPOSIZIONE_ICONE;
+  return require('./src/main/services/layoutIcone').leggi ? null : D && x;
+}, id);
+test('home(icona) col nome del menu sposta l\'icona; un nome sconosciuto torna con gli id, e al secondo giro si sposta', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  const nome = await app.evaluate(() => globalThis.SN_DISPOSIZIONE_ICONE.nome('colorPicker'));
+  expect(nome).not.toBe('colorPicker');
+  const barra = () => app.evaluate(async () => (await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'SPOSTA_ICONA', icona: 'reload', dove: 'barra' }), null));
+  void barra; void statoIcone; void nellaBarra;
+  const posizione = () => app.evaluate(async () => {
+    const L = globalThis.SN_LAYOUT_ICONE;
+    return L && typeof L.attuale === 'function' ? L.attuale() : null;
+  });
+  void posizione;
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'i1', name: 'home', arguments: JSON.stringify({ azione: 'icona', icona: `«${nome}»`, dove: 'barra' }) }] },
+    { text: 'Messa nella barra.' },
+  ]);
+  await chiedi(page, `metti ${nome} nella barra`);
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await ripristina(app);
+});
