@@ -1800,7 +1800,8 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
+    fusioniCambiate();
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') }).finally(fusioniCambiate);
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
     return { ok: true, result: 'discarded' };
   }));
