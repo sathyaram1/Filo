@@ -564,23 +564,25 @@ test('una pagina d’errore di rete e una scheda caduta sono errori visti, col n
 test('una conferma di Filo detta di no si conta coi suoi ingressi, e l’azione non parte', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Riordinare le schede è costo 2: a Normale chiede col suo bottone. Il costo 4 (cancellare per sempre) i contatori non
+  // lo distinguono ancora, perché le regole del server ne tengono la forma.
   await chatCheFa(app, [
-    { toolCalls: [{ id: 'c1', name: 'CANCELLA_PAGINE', arguments: JSON.stringify({ periodo: 'tutto' }) }] },
+    { toolCalls: [{ id: 'c1', name: 'PULISCI_TAB', arguments: '{}' }] },
     { text: 'Te lo chiedo prima.' },
   ]);
   const home = await homeDi(app);
-  await home.locator('#input').fill('cancella tutta la cronologia');
+  await home.locator('#input').fill('riordinami le schede');
   await home.locator('#sendBtn').click();
   const bottone = home.locator('.dash-action-btn').last();
   await expect(bottone).toBeVisible({ timeout: 15_000 });
   await bottone.click();
   await expect(home.locator('.sn-confirm-host')).toBeVisible({ timeout: 8_000 });
   await home.evaluate(() => window.SN_CONFIRM_UI._test.click('cancel'));
-  await expect.poll(async () => (await oggi(app))?.conferme?.CANCELLA_PAGINE || null, { timeout: 8_000 }).not.toBeNull();
-  const conferme = Object.keys((await oggi(app)).conferme.CANCELLA_PAGINE);
+  await expect.poll(async () => (await oggi(app))?.conferme?.PULISCI_TAB || null, { timeout: 8_000 }).not.toBeNull();
+  const conferme = Object.keys((await oggi(app)).conferme.PULISCI_TAB);
   expect(conferme).toHaveLength(1);
   const [livello, stato, costo, perimetro, origine, risposta, esito] = conferme[0].split('|');
-  expect({ livello, costo, perimetro, origine, esito }).toEqual({ livello: 'default', costo: '3', perimetro: 'dentro', origine: 'chat', esito: 'rifiutata' });
+  expect({ livello, costo, perimetro, origine, esito }).toEqual({ livello: 'default', costo: '2', perimetro: 'dentro', origine: 'chat', esito: 'rifiutata' });
   expect(['chiede', 'conferma']).toContain(risposta);
   expect(['pulito', 'contaminato']).toContain(stato);
 });
