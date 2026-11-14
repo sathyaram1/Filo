@@ -5176,6 +5176,7 @@ async function espandiFilo(daRaw, aRaw) {
   if (!Number.isFinite(t1)) return { errore: '«a» non è un istante: scrivilo come 2026-11-12T21:30' };
   if (t1 <= t0) return { errore: '«a» viene prima di «da»' };
   const dentro = (ts) => { const t = Date.parse(ts); return Number.isFinite(t) && t >= t0 && t < t1 ? t : null; };
+  const FC = globalThis.SN_FILO_CONTESTO;
   const voci = [];
   for (const c of await FiloChats.list()) {
     const titolo = c.title || ChatArchive.fallbackTitle(c.messages);
@@ -5183,7 +5184,9 @@ async function espandiFilo(daRaw, aRaw) {
       const t = dentro(m && m.ts);
       const testo = String((m && m.text) || '').replace(/\s+/g, ' ').trim();
       if (t == null || !testo) continue;
-      voci.push({ t, riga: `${m.role === 'user' ? 'utente' : 'Filo'} nella chat «${titolo}» (id ${c.id}): ${testo}`, fuori: !!(m.esterno || m.daPagina) });
+      // Una risposta nata da testo di altri resta sospetta come quando la si rilegge con filo(cerca) (#1508).
+      const classe = FC ? FC.classeDelMessaggio(m, c.fonti) : 1;
+      voci.push({ t, riga: `${m.role === 'user' ? 'utente' : 'Filo'} nella chat «${titolo}» (id ${c.id}): ${testo}`, fuori: !!(m.esterno || m.daPagina), classe });
     }
   }
   const TV = globalThis.SN_TRATTO_VIVO;
