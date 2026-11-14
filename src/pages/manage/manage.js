@@ -6924,13 +6924,14 @@
     if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
   }
 
-  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
-  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
-  // A scheda davanti la si legge intera, una volta per caricamento.
+  // Una riga d'elenco non porta i campi di dettaglio: il suo controllo di sicurezza risulterebbe «non letto»
+  // (#997). A scheda davanti si leggono intere le sole righe che i conti della finestra chiedono, una volta per
+  // caricamento: le statistiche partono dalla lista in pagina, e leggerle tutte intere era il conto di #2470.
   let fsChiesteIntere = new Set();
   async function fsCompletaRighe() {
+    const servono = new Set((fsStat && fsStat.auditIds && fsStat.auditIds.nonLetti) || []);
     const ids = (fsFeedbacks || [])
-      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .filter((f) => f && f._proiezione && f._id && servono.has(f._id) && !fsChiesteIntere.has(f._id))
       .map((f) => f._id);
     if (!ids.length) return false;
     for (const id of ids) fsChiesteIntere.add(id);
