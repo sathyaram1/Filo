@@ -356,7 +356,7 @@ async function schermoFinto(app, { wayland = false } = {}) {
     const d = screen.getPrimaryDisplay().bounds;
     const filo = BrowserWindow.getAllWindows().filter((w) => w._filoTabs && !w.isDestroyed());
     filo.forEach((w, i) => w.setBounds({ x: d.x + Math.round((i * d.width) / filo.length), y: d.y, width: Math.floor(d.width / filo.length), height: d.height }));
-    globalThis.__schermo = { catture: 0 };
+    globalThis.__schermo = { catture: 0, veli: 0, durante: null };
     const componi = async () => {
       const buf = Buffer.alloc(d.width * d.height * 4);
       for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x30; buf[i + 1] = 0x30; buf[i + 2] = 0x30; buf[i + 3] = 255; }
