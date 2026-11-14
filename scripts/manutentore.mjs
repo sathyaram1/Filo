@@ -136,7 +136,8 @@ export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
   const dove = r.repo === 'server' ? ' sul server' : '';
-  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ') || '(nessun file)'}`;
+  const storti = r.fileStorti ? `${r.file.length ? ', ' : ''}${r.fileStorti} file con un nome che non è un percorso del repo (non si mostra)` : '';
+  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ')}${storti}${r.file.length || storti ? '' : '(nessun file)'}`;
 }
 
 /**
