@@ -48,6 +48,7 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
     { text: 'Questa frase arriva solo da un secondo giro.' },
   ]);
   await chiedi(page, 'chiudi tutte le schede tranne questa');
+  await okAlPopup(page);
 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
   expect((await schede(shell)).map((t) => t.id)).toEqual([idHome]);
