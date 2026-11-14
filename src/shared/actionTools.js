@@ -215,7 +215,7 @@
         const P = global.SN_PANNELLI_APP;
         const cat = P ? P.catalogo('editor') : null;
         const ids = cat ? cat.elementi.map((e) => e.id).join(', ') : '';
-        return 'il pannello degli strumenti delle app di Filo (bordo destro dell\'Editor): operazione apri, chiudi, blocca, sblocca, aggiungi o togli un elemento' + (ids ? ` (${ids})` : '') + '.';
+        return 'il pannello sul bordo destro dell\'Editor: operazione apri, chiudi, blocca, sblocca, aggiungi o togli un elemento' + (ids ? ` (${ids})` : '') + '.';
       },
       properties: { operazione: S(), elemento: S() }, required: ['operazione'],
     },
