@@ -248,7 +248,7 @@ test('ogni chiave scrive quello che dichiara, la chat la trova coi suoi valori e
       if (voce && !voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
     }
   }
-  assert.ok(descr.includes('LEGGI_IMPOSTAZIONI'), 'la descrizione dice come leggere il valore di adesso');
+  assert.match(descr, /valori ammessi con leggi/, 'la descrizione dice dove si leggono chiavi e valori');
 });
 
 test('lettura: «com\'è impostato il blocco della pubblicità?» ha la risposta vera, e cambia col valore', () => {
