@@ -111,7 +111,7 @@
       id: 'modelli',
       kind: 'dire',
       label: 'L’impegno sui modelli',
-      detail: 'Filo non paga i grandi laboratori chiusi tranne Anthropic, usa modelli a pesi aperti su fornitori indipendenti, e c’è un interruttore per restare solo su quelli. UNA riga, senza predica: «se ti interessa come scelgo i modelli e chi pago, chiedimelo». Se te lo chiede, leggi il documento con LEGGI_TRASPARENZA doc "models" prima di rispondere.',
+      detail: 'Filo non paga i grandi laboratori chiusi tranne Anthropic, usa modelli a pesi aperti su fornitori indipendenti, e c’è un interruttore per restare solo su quelli. UNA riga, senza predica: «se ti interessa come scelgo i modelli e chi pago, chiedimelo». Se te lo chiede, leggi il documento con filo_su_di_se(documento) doc "models" prima di rispondere.',
     },
     {
       id: 'crediti',
