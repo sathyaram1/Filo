@@ -391,7 +391,10 @@
     // ── filo_su_di_se ──
     LEGGI_TRASPARENZA: {
       via: ['filo_su_di_se', 'documento'], risultato: true,
-      description: 'un documento di trasparenza (modelli e aziende scelti, costi, soldi e dati): leggilo prima di rispondere su questo.',
+      description: () => {
+        const ids = idTrasparenza();
+        return `un documento di trasparenza${ids.length ? ` (${ids.join(', ')})` : ''}: modelli e aziende scelti, costi, soldi e dati. Leggilo prima di rispondere su questo.`;
+      },
       properties: () => {
         const ids = idTrasparenza();
         return { doc: S(ids.length ? { enum: ids } : null) };
