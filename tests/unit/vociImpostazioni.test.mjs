@@ -251,7 +251,7 @@ test('lettura: «com\'è impostato il blocco della pubblicità?» ha la risposta
   let r = V.righePerModello(S, { cerca: 'blocco della pubblicità' });
   assert.ok(r.trovate >= 1);
   const riga = () => r.righe.find((x) => x.startsWith('- blocco di pubblicità e tracker:'));
-  assert.match(riga(), /: attivo \[chiave blocco_pubblicita, chiede conferma\]/);
+  assert.match(riga(), /: attivo \[chiave blocco_pubblicita; valori: true \| false[^\]]*, chiede conferma\]/);
   S.security.adblock.enabled = false;
   r = V.righePerModello(S, { cerca: 'blocchi la pubblicità?' });
   assert.match(riga(), /: spento \[/);
