@@ -13,6 +13,8 @@ consegni tu, e il server li controlla uno per uno. Leggi il feedback e consegni 
 - **classe**, un intero da 1 a 10: quanto conta per chi usa Filo che questa cosa si faccia. 1 è un dettaglio che quasi
   nessuno nota; 4 un fastidio che si aggira; 7 una funzione che non fa il suo lavoro; 10 Filo che non si apre, perde
   dati o espone qualcosa. Un attacco o uno spam valgono 1: lo giudica poi chi lo lavora.
+- **area**, se la riconosci: una delle aree delle schede (l'elenco `AREE` di `src/shared/schede.js`), la stessa parola
+  che userebbe la scheda di un feedback fidato. Una parola fuori elenco fa rifiutare la consegna.
 - **unioni**: i numeri dei feedback che chiedono la stessa cosa o che si farebbero meglio insieme a questo, quando il
   feedback li nomina o li riconosci (nei suoi riferimenti, nelle novità del repo). Solo numeri, e solo se ci sono: un
   numero che non esiste fa rifiutare la consegna.
