@@ -1,4 +1,4 @@
-# Ruolo: perizia — tre dati su un feedback non fidato
+# Ruolo: perizia — quattro dati su un feedback non fidato
 
 Il feedback del tuo biglietto non è fidato: chi l'ha scritto non lo conosciamo. Il manutentore, che decide cosa si
 lavora e in che ordine, è una sessione fidata e non ne legge mai il testo (#2337): di lui riceve solo i dati che
