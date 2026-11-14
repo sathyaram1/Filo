@@ -118,9 +118,8 @@ function immagineDa(img) {
 // ─── Le finestre di Filo dentro la foto dello schermo (#2116.5) ──────────────────────────────────────────────────────
 // Passano dalle stesse coperture della finestra guardata da sola; una che non si può coprire ferma la foto.
 
-const FRASE_SELETTORE = 'una finestra di Filo aperta mostra cose da coprire (una password, una carta o un riquadro di un '
-  + 'altro sito), e in quello che si sceglie nel selettore del sistema non so dove sta. Si può guardare quella finestra di '
-  + 'Filo da sola, che arriva coperta, oppure ridurla a icona e riprovare';
+// Corta: con il nome della finestra sta nel motivo della riga d'esito, che si taglia a 200 caratteri.
+const FRASE_SELETTORE = 'una finestra di Filo mostra dati da coprire e nel selettore non so dove sta: guardala da sola o riducila a icona';
 
 /** Il rettangolo del desktop (coordinate dello schermo) che la foto di `displayId` ritrae: quel monitor, o l'insieme dei
  *  monitor quando il sistema ne fa una foto sola (X11), scelto dalle proporzioni della foto. Null se non si sa. PURA. */
