@@ -1,6 +1,6 @@
-// Sentinella: ogni impostazione modificabile a parole è anche DICHIARATA al modello.
-// L'elenco dentro lo strumento IMPOSTA_PREFERENZA è l'unico da cui gli è permesso pescare,
-// e chi aggiunge un setter senza aggiungerla lì crea una manopola che solo le mani girano.
+// Sentinella: ogni impostazione modificabile a parole è anche DICHIARATA al modello, che le chiavi le legge con
+// impostazioni(leggi) (voce per voce) e nella descrizione di impostazioni(imposta): chi aggiunge un setter che nessuna
+// delle due nomina crea una manopola che solo le mani girano.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
