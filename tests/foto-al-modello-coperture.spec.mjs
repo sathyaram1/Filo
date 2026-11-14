@@ -443,20 +443,45 @@ test('#2116.5: guardando lo schermo intero, il numero della carta nella finestra
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto dello schermo').toBeLessThan(20);
 });
 
-// Su Wayland il selettore può dare proprio la finestra di Filo, e non dice dove sta: con una cassa compilata in vista
-// il selettore non si apre, e il modello sa perché e cosa proporre.
-test('#2116.5: Wayland, con una cassa compilata in una finestra di Filo il selettore non si apre e il modello sa cosa proporre', async ({ app, openTab, testServer }) => {
+// Su Wayland il selettore può dare proprio la finestra di Filo, e non dice dove sta: finché è aperto le coperture
+// stanno dentro le finestre di Filo, e qualunque cosa si scelga le trova già coperte.
+test('#2116.5: Wayland, con una cassa compilata in una finestra di Filo quello scelto nel selettore arriva col numero coperto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await cassaCompilata(app, openTab, testServer);
   const chat = await secondaFinestraConChat(app);
   await schermoFinto(app, { wayland: true });
   await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await app.evaluate(() => globalThis.__schermo.veli), 'col selettore aperto la cassa deve avere il suo velo').toBeGreaterThan(0);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare quello scelto nel selettore').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
+  const rimasti = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .reduce((n, w) => n + w.contentView.children.filter((v) => v._filoVelo).length, 0));
+  expect(rimasti, 'chiuso il selettore i veli se ne vanno').toBe(0);
+});
+
+// Col selettore aperto l'utente torna alla cassa e scrive un'altra carta fuori dai veli: quella foto non parte.
+test('#2116.5: Wayland, una carta scritta mentre il selettore è aperto ferma la foto e il modello sa perché', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await app.evaluate(({ BrowserWindow }, rosa) => {
+    globalThis.__schermo.durante = async () => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.title === 'Cassa del negozio'))._filoTabs;
+      const tab = tm.tabs.find((t) => t.title === 'Cassa del negozio');
+      await tab.view.webContents.executeJavaScript(`(() => { const i = document.createElement('input'); i.name = 'q2';
+        i.style.cssText = 'position:absolute;left:20px;top:260px;width:420px;font:bold 34px monospace;color:${rosa};background:#fff;border:1px solid #999;caret-color:transparent;outline:0';
+        i.value = '5555 5555 5555 4444'; document.body.appendChild(i); })()`);
+      await new Promise((r) => setTimeout(r, 150));
+    };
+  }, tinta(ROSA));
+  await guardaDopoOk(app, chat, SELETTORE);
   await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
-  const secondo = await app.evaluate(() => globalThis.__chat[1]);
-  expect(secondo).toContain('mostra dati da coprire');
-  expect(secondo).toContain('guardala da sola o riducila a icona');
-  expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(0);
-  expect(await app.evaluate(() => globalThis.__occhio.length)).toBe(0);
+  expect(await app.evaluate(() => globalThis.__chat[1])).toContain('mentre sceglievi nel selettore');
+  expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(1);
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto con la carta scoperta non deve partire').toBe(0);
 });
 
 test('#2116.5: Wayland, con le finestre di Filo senza niente da coprire quello scelto nel selettore arriva al modello', async ({ app, openTab, testServer }) => {
