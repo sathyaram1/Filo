@@ -441,7 +441,9 @@ test('la domanda dell\'utente passata com\'è come ricerca: il pezzo eliso e la 
   assert.ok(!tutto.righe.join('\n').includes('con la ricerca'), '«com» di «com\'è» non è un sito da cercare');
   const tema = V.righePerModello({ theme: 'dark' }, { cerca: 'che tema ho?' });
   assert.ok(tema.trovate > 0 && tema.trovate < tema.totale);
-  assert.ok(tema.righe.includes('- tema: scuro [chiave tema]'));
+  // Una lettura mirata porta anche i valori ammessi: la chiave sola non basta più a cambiarla (#1564, gli strumenti
+  // non li elencano).
+  assert.ok(tema.righe.includes('- tema: scuro [chiave tema; valori: "sistema" | "chiaro" | "scuro"]'));
   const anteprima = V.righePerModello({}, { cerca: 'com\'è la dimensione dell\'anteprima?' }).righe.join('\n');
   assert.match(anteprima, /dimensione dell'anteprima delle schede: media/);
   assert.doesNotMatch(anteprima, /stile dell'agente|IP locale/);
