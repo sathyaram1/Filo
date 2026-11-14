@@ -97,6 +97,29 @@ test('azione mancante, sconosciuta o senza i suoi campi: l\'errore torna al mode
   assert.equal(Tools.chiamata('CERCA_CHAT'), 'filo(cerca)');
 });
 
+// #1564: il modello copia i nomi dell'azione accanto; due nomi per lo stesso dato in uno strumento facevano respingere
+// come mancante un campo che il gestore sa leggere.
+test('dentro uno strumento un dato ha un nome solo', () => {
+  const SINONIMI = [['time', 'orario', 'at'], ['label', 'etichetta', 'nome'], ['dominio', 'domain', 'sito'], ['seconds', 'secondi'], ['query', 'cerca', 'cosa']];
+  for (const d of Tools.definitions()) {
+    const nomi = Object.keys(d.function.parameters.properties);
+    for (const gruppo of SINONIMI) {
+      const usati = gruppo.filter((n) => nomi.includes(n));
+      if (gruppo[0] === 'query' && ['web', 'filo', 'file', 'scheda', 'impostazioni'].includes(d.function.name)) continue;
+      assert.ok(usati.length <= 1, `${d.function.name}: ${usati.join(' e ')} sono lo stesso dato`);
+    }
+  }
+  const [allunga, sposta, ricorre, sveglia, vuota] = Tools.toolCallsToActions([
+    { id: 'a', name: 'promemoria', arguments: '{"azione":"modifica","etichetta":"pasta","secondi":600}' },
+    { id: 'b', name: 'promemoria', arguments: '{"azione":"modifica","etichetta":"palestra","orario":"08:00"}' },
+    { id: 'c', name: 'promemoria', arguments: '{"azione":"modifica","etichetta":"palestra","ripeti":"feriali"}' },
+    { id: 'd', name: 'promemoria', arguments: '{"azione":"sveglia","orario":"07:30","etichetta":"palestra"}' },
+    { id: 'e', name: 'promemoria', arguments: '{"azione":"modifica","etichetta":"pasta"}' },
+  ]);
+  for (const a of [allunga, sposta, ricorre, sveglia]) assert.equal(a._argsError, undefined, JSON.stringify(a));
+  assert.match(vuota._argsError, /per promemoria\(modifica\) serve almeno uno fra orario, secondi, ripeti/);
+});
+
 test('filo(espandi) è una lettura: costo 0, e quello che riporta da fuori torna sospetto come la prima volta', () => {
   assert.equal(Levels.costoFor({ type: 'ESPANDI_FILO', da: '2026-11-12T20:00' }), 0);
   assert.ok(Levels.diSolaLettura('ESPANDI_FILO'));
