@@ -194,5 +194,7 @@ test('guardando lo schermo intero con un PDF aperto in una finestra di Filo, la 
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
   await scrollConfirmToEnd(chat);
   await clickConfirm(chat, 'ok');
-  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
+  console.log('ESITO', (await app.evaluate(() => globalThis.__chat))[1]);
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto dello schermo deve arrivare al modello').toBe(1);
 });
