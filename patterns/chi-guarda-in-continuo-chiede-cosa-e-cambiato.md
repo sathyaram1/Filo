@@ -33,7 +33,9 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    `touchUpdatedAt` in `src/shared/feedback.js`). I cammini che non passano da
    lì si contano a mano, una volta, per iscritto (anche negli script).
 2. **All'apertura si legge tutto**, a pagine e coi soli campi della lista; se
-   il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover).
+   il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover). Il main
+   tiene la lista, anche su disco: alla riapertura bastano i cambiati e il
+   conto, e un conto che non torna fa rileggere tutto (#2470).
 3. **La domanda incrementale.** Filtro `> ultimo visto` meno un margine per gli
    orologi scentrati, ordine (campo, nome), cursore oltre il tetto di pagina.
    «Ultimo visto» è l'ora del SERVER, e il margine si toglie anche a quella.
