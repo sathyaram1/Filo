@@ -159,7 +159,7 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
  * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge. `numeri` ({ N: id }) come
  * in fusioniSuMain.
  */
-export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = {} } = {}) {
+export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = null } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
