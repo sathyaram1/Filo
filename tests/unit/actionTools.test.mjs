@@ -97,6 +97,14 @@ test('azione mancante, sconosciuta o senza i suoi campi: l\'errore torna al mode
   assert.equal(Tools.chiamata('CERCA_CHAT'), 'filo(cerca)');
 });
 
+test('filo(espandi) è una lettura: costo 0, e quello che riporta da fuori torna sospetto come la prima volta', () => {
+  assert.equal(Levels.costoFor({ type: 'ESPANDI_FILO', da: '2026-11-12T20:00' }), 0);
+  assert.ok(Levels.diSolaLettura('ESPANDI_FILO'));
+  assert.equal(Levels.fonteDi({ type: 'ESPANDI_FILO', _output: { righe: 2, daFuori: false, classeLetta: 1 } }), null);
+  assert.equal(Levels.fonteDi({ type: 'ESPANDI_FILO', _output: { righe: 2, daFuori: true, classeLetta: 1 } }).classe, 5);
+  assert.equal(Levels.fonteDi({ type: 'ESPANDI_FILO', _output: { righe: 2, daFuori: false, classeLetta: 3 } }).classe, 3);
+});
+
 test('intervista: le voci da spuntare sono quelle dell’intervista, e c’è la scelta dell’autonomia (#1188)', () => {
   const props = Tools.definitions().find((d) => d.function.name === 'filo_su_di_se').function.parameters.properties;
   assert.deepEqual(props.spunta.items.enum, globalThis.SN_ONBOARDING.ITEM_IDS, 'una voce nuova dell’intervista arriva da sola allo strumento');
