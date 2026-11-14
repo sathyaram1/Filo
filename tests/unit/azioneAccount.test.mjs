@@ -38,9 +38,10 @@ test('il racconto dice la voce premuta davvero, e chi era già dove chiedeva non
   assert.equal(AL.describe({ type: 'ACCOUNT', cosa: 'esci' }), 'Uscire dall\'account di Filo');
 });
 
-test('lo strumento offre solo le tre voci, e la descrizione dice di farle invece di spiegarle', () => {
+test('lo strumento offre solo le tre voci, e la parte fissa dice di farle invece di spiegarle', () => {
   const def = T.TOOLS.ACCOUNT;
   assert.deepEqual(def.properties.cosa.enum, ['accedi', 'collega_google', 'esci']);
   assert.deepEqual(def.required, ['cosa']);
-  assert.match(def.description, /invece di spiegargli dove cliccare/);
+  assert.deepEqual(def.via, ['impostazioni', 'account']);
+  assert.match(globalThis.SN_CONST.PROMPTS.filoChatStatic(), /Tutto quello che l'utente può fare in Filo lo puoi fare anche tu/);
 });
