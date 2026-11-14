@@ -14,12 +14,14 @@ const NEWTAB = 'filo://newtab/';
 const execAction = (app, action) =>
   app.evaluate((_electron, { action }) => globalThis.SN_EXECUTE_FILO_ACTION(action), { action });
 
+// filo_su_di_se(documento) come parte verso il fornitore: la sua riga e il parametro `doc` dello strumento.
 const toolTrasparenza = (app) => app.evaluate(() => {
   const T = globalThis.SN_ACTION_TOOLS;
   const def = T.definitions({ sistema: process.platform })
-    .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
+    .find((d) => d.function.name === 'filo_su_di_se');
+  const riga = def ? def.function.description.split('\n').find((r) => r.startsWith('- documento(')) : null;
   return {
-    def: def ? def.function : null,
+    def: riga ? { description: riga, parameters: { properties: { doc: { description: '', ...def.function.parameters.properties.doc } } } } : null,
     esistenti: globalThis.SN_TRANSPARENCY.ids(),
     previsti: globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id),
     conNota: globalThis.SN_TRANSPARENCY.conNota().map((n) => n.id),
