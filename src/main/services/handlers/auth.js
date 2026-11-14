@@ -960,6 +960,15 @@ module.exports = function register(on, ctx) {
     return schedeInMano.tutte({ fresh });
   }
 
+  // La lista della Gestione fra un'apertura e l'altra: la copia di quell'account, i cambiati e il conto (#2470).
+  const emailOwner = () => { try { return String(auth.getTokenClaims()?.email || ''); } catch (_) { return ''; } };
+  const listaInMano = ListaGestione.creaLista({
+    leggiTutti: async ({ fields }) => FEEDBACK().listAllPaged({ idToken: await liveToken(), fields }),
+    leggiCambiati: async ({ since, fields }) => FEEDBACK().listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields }),
+    conta: async () => FEEDBACK().countAll({ timeoutMs: 20000, idToken: await liveToken() }),
+    ...discoDi('gestione-lista.json'),
+  });
+
   // Per pochi feedback si chiedono le loro sole schede: il giro della Gestione
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
   const SCHEDE_MIRATE_MAX = 100;
