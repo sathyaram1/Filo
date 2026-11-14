@@ -456,7 +456,7 @@
       }
       // I valori ammessi stanno qui e non nello strumento (SPEC-CONTESTO § Gli strumenti): li porta una lettura mirata,
       // non l'elenco intero, che resterebbe lungo quanto la descrizione di prima.
-      const ammessi = v.ammessi && !nessuna && cerca ? `; valori: ${v.ammessi}` : '';
+      const ammessi = v.ammessi && !nessuna && scelte.length < tutte.length ? `; valori: ${v.ammessi}` : '';
       const chiave = v.come ? ` [${v.come}${ammessi}${v.conferma ? ', chiede conferma' : ''}]` : '';
       righe.push(`- ${v.nome}: ${valoreLeggibile(v.percorso, settings, { tema, sistema, cerca: nessuna ? '' : cerca })}${chiave}`);
     }
