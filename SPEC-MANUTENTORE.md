@@ -24,11 +24,13 @@ singoli lavori. Tre facce dello stesso compito:
 comprese, non sporca i lavori server, e quello che apre resta fidato. Di un
 feedback non fidato il server gli dà solo numero, stato, priorità, mittente e la perizia (classe 1-10, area delle schede, unioni, file del repo)
 che un ruolo non fidato, `perizia`, consegna come dati validati. Dei rami dei
-worker legge solo i file in forma di percorso. Niente web: il ruolo lo vieta, e
-il server al rilascio guarda gli strumenti nel rapporto della sessione (uno
-fuori dall'elenco chiuso di quelli che non leggono fuori, la rete chiamata
-dalla shell, o un rapporto assente o senza l'elenco dopo aver scritto, ritira
-la fiducia a tutto quello che la sessione ha scritto). La tenuta la prova
+worker legge solo i file che su main ci sono già e i nomi di ramo scritti dal
+server; il resto si conta. Niente web: il ruolo lo vieta, e il server guarda
+gli strumenti nel rapporto della sessione (uno fuori dall'elenco chiuso di
+quelli che non leggono fuori, la rete chiamata dalla shell, o un rapporto
+assente o senza l'elenco dopo aver scritto, ritira la fiducia a tutto quello
+che la sessione ha scritto), anche quando la sessione chiude senza un rilascio
+vivo o non chiude affatto. La tenuta la prova
 `functions/test/manutentore-tenuta-2337.test.js` di filo-security, che chiama
 ogni sua operazione con dati non fidati. Non scrive codice, non fonde, non
 approva L5. Scrive ordini che il server applica e apre feedback che le routine
