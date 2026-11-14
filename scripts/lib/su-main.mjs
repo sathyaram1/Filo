@@ -190,7 +190,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const nome = (ramo, head) => {
     const corto = ramo.replace(/^origin\//, '');
     const l = leggiTentativo(corto);
-    if (l && idNoti.has(l.id)) return corto;
+    if (l && idValido(l.id)) return corto;
     const radice = corto.split('/')[0];
     return `${['worker', 'claude'].includes(radice) ? radice : 'altro'}/(nome non mostrato) @${String(head || '').slice(0, 7)}`;
   };
