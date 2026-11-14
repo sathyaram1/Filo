@@ -207,19 +207,20 @@ test('il manifesto non manda più l\'utente dove le voci della barra non ci sono
   assert.doesNotMatch(errore, /Ricarica"? dal menu/i, '«Ricarica» non sta più nel menu del tasto destro');
 });
 
-test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice cosa ha fatto', () => {
+test('home(icona): lo strumento dice dove e in quali contesti, e dice cosa ha fatto', () => {
   require('../../src/shared/i18n.js');
   require('../../src/shared/disposizioneIcone.js');
   require('../../src/shared/actionLevels.js');
   require('../../src/shared/actionTools.js');
   const D = globalThis.SN_DISPOSIZIONE_ICONE;
-  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'SPOSTA_ICONA');
-  assert.ok(def, 'strumento SPOSTA_ICONA assente');
+  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'home');
+  assert.ok(def, 'strumento home assente');
   const p = def.function.parameters.properties;
-  assert.deepEqual(p.icona.enum, [...Object.keys(D.ICONE), ...Object.keys(D.AZIONI)]);
-  assert.deepEqual(p.dove.enum, Object.keys(D.DOVE));
-  assert.deepEqual(p.contesto.enum, Object.keys(D.CONTESTI));
-  assert.match(p.icona.description, /screenshot \([^)]+\)/);
+  for (const k of ['icona', 'dove', 'contesto', 'prima_di']) assert.ok(p[k], `manca ${k}`);
+  // Gli id delle icone non stanno nello strumento (tetto degli strumenti): un id sbagliato torna con l'elenco.
+  const riga = def.function.description.split('\n').find((r) => r.startsWith('- icona('));
+  for (const d of Object.keys(D.DOVE)) assert.ok(riga.includes(d), `dove ${d} non è detto`);
+  for (const c of Object.keys(D.CONTESTI)) assert.ok(riga.includes(c), `contesto ${c} non è detto`);
   assert.equal(D.nome('closeTab') !== 'closeTab', true, 'il nome del menu, non l\'id');
   const L = globalThis.SN_ACTION_LEVELS;
   assert.equal(L.costoFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
