@@ -217,6 +217,9 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
     { text: 'Spento.' },
   ]);
   await chiedi(page, 'spegni il bluetooth');
+  // Spegnere una radio è costo 2: a Normale chiede un OK finché manca il guardiano (#1840).
+  await expect.poll(() => confirmText(page), { timeout: 20_000 }).toContain('Bluetooth');
+  await clickConfirm(page, 'ok');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso), { timeout: 20_000 }).toContain(false);
   const spento = await rigaDi('Bluetooth spento');
   await spento.click({ button: 'right' });
