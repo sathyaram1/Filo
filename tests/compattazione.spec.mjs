@@ -600,6 +600,9 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Letto, ecco il punto.' }]);
   await compattatoreFinto(app, '10:00 letto un capitolo della tesi');
+  // Lo spazio stretto per cui la prova è nata (soglia di serie sopra una parte fissa di 45.000 token): dalla parte fissa
+  // di oggi, più leggera da #1564, quella di serie lascerebbe una compattazione sola in dodici messaggi.
+  await conSoglia(app, (await base(app)) + 25000);
   const perMessaggio = [];
   try {
     for (let i = 0; i < 12; i++) {
