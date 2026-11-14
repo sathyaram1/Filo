@@ -408,8 +408,8 @@
     LEGGI_TRASPARENZA: {
       via: ['filo_su_di_se', 'documento'], risultato: true,
       description: () => {
-        const ids = idTrasparenza();
-        return `un documento di trasparenza${ids.length ? ` (${ids.join(', ')})` : ''}: modelli e aziende scelti, costi, soldi e dati. Leggilo prima di rispondere su questo.`;
+        const docs = docTrasparenza().map((d) => (d.titolo ? `${d.id} «${d.titolo}»` : d.id));
+        return `un documento di trasparenza${docs.length ? ` (${docs.join(', ')})` : ''}: le scelte di Filo scritte. Se la domanda può toccarne uno, leggilo prima di rispondere.`;
       },
       properties: () => {
         const ids = idTrasparenza();
