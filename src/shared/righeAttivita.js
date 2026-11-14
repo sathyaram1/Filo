@@ -83,8 +83,7 @@
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
     ESPANDI_FILO: (a) => {
       const o = a._output || {};
-      if (o.error) return null;
-      return { title: 'Riletto il filo di quelle ore', meta: o.righe ? `${o.righe} cose` : 'niente da rileggere' };
+      return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
     },
     CERCA_CHAT: (a) => {
       // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni, ognuna una volta
