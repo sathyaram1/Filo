@@ -35,6 +35,15 @@
         { "fieldPath": "pseudonym", "order": "ASCENDING" },
         { "fieldPath": "at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "//": "Elenco di default delle fusioni in Gestione (#2468, filo-security): le sole richieste mai usate e non ancora scadute (where used == false and expiresAtMs > adesso). Le scadute mai decise non escono mai da used == false, e senza la scadenza nella query si rileggerebbero tutte a ogni chiamata. Senza questo indice la query viene rifiutata e il server ripiega sull'elenco intero.",
+      "collectionGroup": "routine-merge-approvals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "used", "order": "ASCENDING" },
+        { "fieldPath": "expiresAtMs", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
