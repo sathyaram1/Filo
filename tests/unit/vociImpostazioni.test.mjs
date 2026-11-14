@@ -154,7 +154,8 @@ test('una voce naturale scritta a mano, come nella pagina, si imposta anche a pa
 });
 
 test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la scrive davvero', () => {
-  const estetica = Tools.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'IMPOSTA_ESTETICA').function.description;
+  // I token si leggono con impostazioni(leggi), ognuno col suo nome per impostazioni(aspetto) (#1564).
+  const comeDelToken = new Map(V.voci().filter((v) => v.percorso.startsWith('themeTokens.')).map((v) => [v.percorso.slice(12), v.come]));
   let contate = 0;
   for (const def of Object.values(V.PAGINE)) {
     for (const percorso of [...Object.values(def.campi), ...Object.values(def.gruppi)].flatMap(V.espandi)) {
