@@ -18,14 +18,6 @@ async function tornaAllaHome(shell) {
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), h.id);
 }
 
-const esitoPerIlModello = async (app, id) => {
-  for (const msgs of await chiamateAlModello(app)) {
-    const m = msgs.find((x) => x.role === 'tool' && x.tool_call_id === id);
-    if (m) return String(m.content);
-  }
-  return '';
-};
-
 // Due schede sulla stessa pagina (un doppione che Filo chiude da sé) e due pagine diverse.
 async function schedeDaRiordinare(openTab, testServer, shell) {
   const doppia = testServer.html('<title>Doppia</title><p>doppia');
