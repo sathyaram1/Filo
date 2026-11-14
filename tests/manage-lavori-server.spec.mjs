@@ -248,7 +248,9 @@ async function apriFermo(page, opzioni) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await stubAutomazioni(page);
+  // Coi lavori server spenti il segno rimasto non è un fermo (#2036.1): qui sono accesi.
+  await stubAutomazioni(page, { lavoriServer: true });
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
   await stubDichiara(page, opzioni);
   const fermo = fb({ _id: 'srv-8', seq: 1160, status: 'todo', branch: 'worker/srv-8-20261029T090000Z',
     restaLocale: { motivi: ['ramo non pulito', 'contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-07T10:00:00Z') } });
