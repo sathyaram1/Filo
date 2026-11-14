@@ -204,10 +204,10 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
       const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
-        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: 't1', name: 'filo_su_di_se' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"privacy"}' }],
+          toolCalls: [{ id: 't1', name: 'filo_su_di_se', arguments: '{"azione":"documento","doc":"privacy"}' }],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
