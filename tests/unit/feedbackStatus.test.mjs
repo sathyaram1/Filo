@@ -243,3 +243,13 @@ test('#476 — retrocompat: feedback storici senza enum grossolano', () => {
   assert.equal(FS.isResolvedForUser({}), false);
   assert.equal(FS.isResolvedForUser(null), false);
 });
+
+// #2469: il server specchia il battito al più ogni mezz'ora, e fra due specchi passano fino a 40 minuti.
+test('un lavoro col battito specchiato 40 minuti fa resta attivo; dopo un battito perso in più no', () => {
+  const now = Date.parse('2026-11-14T10:00:00Z');
+  const fa = (min) => new Date(now - min * 60 * 1000).toISOString();
+  assert.equal(FS.isBeating({ status: 'working', beatAt: fa(40) }, now), true);
+  assert.equal(FS.isBeating({ status: 'working', beatAt: fa(49) }, now), true);
+  assert.equal(FS.isBeating({ status: 'working', beatAt: fa(51) }, now), false);
+  assert.equal(FS.isBeating({ status: 'working', beatAt: fa(60), workingSince: fa(5) }, now), true, 'vale l’ultimo segno di vita');
+});
