@@ -163,7 +163,7 @@ test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la sc
       if (percorso.startsWith('themeTokens.')) {
         const nome = percorso.slice(12);
         assert.ok(T.get(nome), `${percorso}: token sconosciuto`);
-        assert.ok(estetica.includes(`• ${nome} (`), `il token ${nome} della pagina non è nella descrizione di IMPOSTA_ESTETICA`);
+        assert.equal(comeDelToken.get(nome), `impostazioni(aspetto) token ${nome}`, `il token ${nome} della pagina non si legge per la chat`);
         continue;
       }
       const s = P.setterDi(percorso);
