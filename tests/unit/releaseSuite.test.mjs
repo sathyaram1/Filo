@@ -210,16 +210,16 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
   // #1504: la parola della costruzione sta in un lavoro suo, nell'ambiente fisso. I lavori che fanno girare il codice
   // provato (npm ci, prove) non nominano segreti: senza ambiente un segreto arriva col valore omonimo del repo.
-  describe('un rosso nuovo su main apre un feedback, da un lavoro a parte', () => {
-    const allarme = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Suite Playwright rossa/.test(p.corpo));
+  describe('importanti.yml: un rosso delle prove importanti o degli unit su main apre un feedback, da un lavoro a parte', () => {
+    const allarme = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Prove importanti rosse su main/.test(p.corpo));
     const allarmeUnit = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
     const seAvviso = (avvisoJob.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
-    const corsa = ({ ref = 'refs/heads/main', suite: s = 'success', verdetto = 'success', unit = 'success', cancellata = false } = {}) => ({
+    const corsa = ({ ref = 'refs/heads/main', importanti = 'success', aggiornamenti = 'success', unit = 'success', cancellata = false } = {}) => ({
       github: { ref },
       cancellata,
       needs: {
-        suite: { result: s, outputs: {} },
-        verdetto: { result: verdetto, outputs: {} },
+        importanti: { result: importanti, outputs: {} },
+        aggiornamenti: { result: aggiornamenti, outputs: {} },
         [LAVORO_UNIT_WINDOWS]: { result: unit, outputs: {} },
       },
     });
@@ -227,46 +227,45 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     const condizione = (p) => (p.corpo.match(/^ {8}if:\s*(.+)$/m) || [])[1] || '';
 
     // #1788: col commit provato il server riconosce un rosso che una fusione arrivata dopo ha già corretto.
-    test('ogni allarme dice al server il commit su cui la suite ha girato', () => {
+    test('ogni allarme dice al server il commit su cui le prove hanno girato', () => {
       for (const p of [allarme, allarmeUnit]) {
         assert.match(p.corpo, /^ {10}COMMIT_PROVATO: \$\{\{ github\.sha \}\}$/m, p.nome);
         assert.match(p.corpo, /node scripts\/build-alarm\.mjs .* --commit "\$COMMIT_PROVATO"/, p.nome);
       }
     });
 
-    test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
-      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
+    test('gira su main a ogni rosso; salta una corsa verde, un ramo, una corsa annullata', () => {
+      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*importanti,\s*aggiornamenti,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
       const apre = {
-        'rossi nuovi della suite': { verdetto: 'failure' },
-        'npm ci rosso in una parte, prima della suite': { suite: 'failure', verdetto: 'failure' },
-        'una parte rossa con il verdetto verde': { suite: 'failure' },
+        'prove importanti rosse o sopra il tetto': { importanti: 'failure' },
+        'catena degli aggiornamenti rossa': { aggiornamenti: 'failure' },
         'unit rossi su Windows': { unit: 'failure' },
         'unit su Windows fermati dal tetto del lavoro': { unit: 'cancelled' },
-        'suite e unit rossi insieme': { verdetto: 'failure', unit: 'failure' },
+        'prove importanti e unit rossi insieme': { importanti: 'failure', unit: 'failure' },
       };
       for (const [caso, esiti] of Object.entries(apre)) {
         assert.equal(valutaCondizione(seAvviso, corsa(esiti)), true, `${caso}: su main il feedback non partirebbe`);
       }
       assert.equal(valutaCondizione(seAvviso, corsa()), false, 'una corsa verde salta l\'avviso');
-      assert.equal(valutaCondizione(seAvviso, corsa({ ref: 'refs/heads/prova', verdetto: 'failure', unit: 'failure' })), false,
+      assert.equal(valutaCondizione(seAvviso, corsa({ ref: 'refs/heads/prova', importanti: 'failure', unit: 'failure' })), false,
         'su un ramo l\'avviso si salta prima dell\'ambiente, che lo respingerebbe');
-      assert.equal(valutaCondizione(seAvviso, corsa({ verdetto: 'failure', cancellata: true })), false);
+      assert.equal(valutaCondizione(seAvviso, corsa({ importanti: 'failure', cancellata: true })), false);
     });
 
     test('un passo per lavoro rosso, e il secondo parte anche se il primo non ha consegnato', () => {
       assert.ok(allarme && allarmeUnit, 'un rosso deve diventare un feedback, non un silenzio');
-      const scaricaSuite = passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/);
+      const scaricaImp = passoCon(/download-artifact[\s\S]*name:\s*importanti-registro/);
       const scaricaUnit = passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/);
-      for (const p of [allarme, scaricaSuite]) {
-        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), true, `«${p.nome}» salta a suite rossa`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ suite: 'failure', verdetto: 'failure' })), true, `«${p.nome}» salta con una parte rossa`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), false, `«${p.nome}» apre la suite per un rosso degli unit`);
+      assert.equal(valutaCondizione(condizione(allarme), corsa({ aggiornamenti: 'failure' })), true, 'la catena rossa apre il suo feedback');
+      for (const p of [allarme, scaricaImp]) {
+        assert.equal(valutaCondizione(condizione(p), corsa({ importanti: 'failure' })), true, `«${p.nome}» salta a prove importanti rosse`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), false, `«${p.nome}» apre le prove importanti per un rosso degli unit`);
       }
       for (const p of [allarmeUnit, scaricaUnit]) {
         assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), true, `«${p.nome}» salta a unit rossi`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), false, `«${p.nome}» apre gli unit per un rosso della suite`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ importanti: 'failure' })), false, `«${p.nome}» apre gli unit per un rosso delle prove importanti`);
       }
-      for (const p of [allarme, allarmeUnit, scaricaSuite, scaricaUnit]) {
+      for (const p of [allarme, allarmeUnit, scaricaImp, scaricaUnit]) {
         assert.match(condizione(p), /^always\(\) && !cancelled\(\)/, `«${p.nome}» senza always(): dopo un passo rosso verrebbe saltato`);
       }
     });
@@ -276,12 +275,27 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       assert.match(allarmeUnit.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
       assert.match(senzaCommenti(job('release')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il cancello unit usa FILO_BUILD_PASSPHRASE');
       assert.match(avvisoJob, /^ {4}environment:\s*rilascio\s*$/m, 'la parola si legge solo nell\'ambiente `rilascio`, scritto fisso');
-      for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob]]) {
+      for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob], ['importanti', importantiJob], ['aggiornamenti', catenaJob]]) {
         assert.doesNotMatch(testo, /secrets\.|environment:/, `\`${nome}\` fa girare il codice provato: niente segreti né ambiente`);
       }
       assert.doesNotMatch(avvisoJob, /npm-ci-ritenta|^\s*(?:run:\s*)?(?:npm|npx|yarn|pnpm)\s/m,
         'in `avviso` niente installazione: lo stesso lavoro che legge la parola non esegue dipendenze');
-      assert.match(allarme.corpo, /PARTI_ESITO:\s*\$\{\{\s*needs\.suite\.result\s*\}\}/, 'l\'allarme deve sapere se una parte è rossa fuori dalla suite');
+    });
+
+    test('le prove importanti girano come nel contenitore, col loro tetto; la catena degli aggiornamenti a parte', () => {
+      assert.match(importantiJob, /ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a node scripts\/test-importanti\.mjs --chiavi chiavi-importanti\.txt/);
+      assert.doesNotMatch(importantiJob, /--tetto/, 'il tetto è quello dello script: alzarlo qui farebbe verde una corsa lunga');
+      assert.match(catenaJob, /node scripts\/test-importanti\.mjs --catena --chiavi chiavi-catena\.txt/);
+      for (const j of [importantiJob, catenaJob]) {
+        assert.match(j, /set -o pipefail/, 'col tee senza pipefail un rosso finirebbe verde');
+        assert.match(j, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+        assert.doesNotMatch(j, /^ {4}(?:if|continue-on-error):/m, 'saltato o tollerato, la corsa sarebbe verde senza averlo passato');
+        const rossa = passi(j).find((p) => /la corsa resta rossa/.test(p.nome));
+        assert.ok(rossa && /exit 1/.test(rossa.corpo), 'un rosso lascia la corsa rossa');
+      }
+      const on = intestazione(IMP_YML);
+      assert.match(on, /^on:\s*\n\s+push:\s*\n\s+branches:\s*\[main\]/m);
+      assert.doesNotMatch(on, /paths(-ignore)?:/, 'ogni fusione va provata');
     });
 
     test('gli strumenti dell\'avviso usano solo moduli di Node: senza npm ci un import da node_modules lo farebbe tacere', () => {
