@@ -584,28 +584,50 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
 });
 
-// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261).
-test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti e la spesa lo consente, non a secco (#2261)', () => {
+// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261). Dal
+// #2269 non c'è più la rosa: l'ordine è l'unica condizione, e a ogni accensione ha almeno 2×N lavori pronti.
+test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe è un criterio, niente rosa (#2269)', () => {
   const piatto = (t) => t.replace(/\s+/g, ' ');
+  const ruolo = piatto(RUOLO);
   const ritmo = piatto(RUOLO.slice(RUOLO.indexOf('## Il ritmo'), RUOLO.indexOf('## La sessione accesa dal pacemaker')));
-  const regola = ritmo.slice(ritmo.indexOf('**La rosa si riempie anche di giorno.**'));
-  assert.ok(ritmo.includes('**La rosa si riempie anche di giorno.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
-  assert.match(regola, /A ogni battito e sveglia/);
-  assert.match(regola, /nell'ordine non resta un lavoro che possa partire adesso \(vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner\)/);
-  // Il conto è unico come al mattino: con «prima B, poi A» la condizione su ogni account lascerebbe la rosa vuota.
-  assert.match(regola, /spesa delle ultime 24 ore, sommata sugli account .*sotto il ritmo sostenibile fino ai rinnovi/);
-  assert.doesNotMatch(regola, /(ultime 24 ore|ultimo giorno) di ogni account/);
-  assert.match(regola, /riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole/);
+  const regola = ritmo.slice(ritmo.indexOf('**L\'ordine non resta mai corto.**'));
+  assert.ok(ritmo.includes('**L\'ordine non resta mai corto.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
+  assert.match(regola, /A ogni battito e sveglia l'ordine contiene almeno \*\*2×N\*\* lavori che possono partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano/);
+  assert.match(regola, /La spesa si regola con N, non svuotando l'ordine/);
   for (const r of ['decisione incrementale', 'scala delle classi', 'classe ereditata da chi blocca', 'incroci coi rami vivi', 'riscrivi l\'ordine', 'taccuino', 'recap del giorno dopo']) {
     assert.ok(regola.includes(r), r);
   }
   assert.match(regola, /In una giornata a secco no\./);
+  // L'ordine è l'unica condizione per cominciare, e nessuna 2 da scegliere ogni mattina.
+  assert.match(ruolo, /\*\*L'ordine è l'unica condizione per cominciare\.\*\* Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2; fuori dall'ordine parte solo una 3/);
+  assert.doesNotMatch(ruolo.replace(/\*\*Una volta sola\*\* \(#2269[^]*?contano come importanti\./, ''), /\brosa\b(?! delle 2| non c'è)/i,
+    'la rosa resta nominata solo per dire che non c\'è più e per toglierla dal taccuino');
+  assert.doesNotMatch(ruolo, /la 2 è solo tua|Scrivi la rosa|priorità 3 e 2/);
+  // La classe è il primo criterio, non un filtro.
+  const ordine = piatto(RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')));
+  assert.match(ordine, /\*\*La classe è il primo criterio, non un filtro\.\*\*.*tocca i file probabili di un ramo vivo \(`incroci <N>`\) aspetta.*entra uno di classe più bassa in un'area libera/);
+  assert.match(ordine, /Un compito può stare davanti a un feedback/);
+  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
+  assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
+  // Il primo mattino toglie dal taccuino le regole sulla rosa.
+  assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);
+  // I rilievi messi da parte nascono a 1.
+  assert.match(ruolo, /Un interno messo da parte nasce a 1, a ogni livello: se serve, lo metti tu nell'ordine/);
   const spec = piatto(readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'));
   const quattro = spec.slice(spec.indexOf('## 4. Ritmo'), spec.indexOf('## 5.'));
-  assert.match(quattro, /\*\*La rosa si riempie anche di giorno\.\*\* A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire adesso/);
-  assert.match(quattro, /dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
-  assert.doesNotMatch(quattro, /ultimo giorno di ogni account/);
-  assert.match(quattro, /Non in una giornata a secco\./);
+  assert.match(quattro, /\*\*L'ordine non resta mai corto\.\*\* A ogni battito e sveglia l'ordine contiene almeno 2×N lavori che possono partire subito/);
+  assert.match(quattro, /La classe è il primo criterio, non un filtro/);
+  assert.match(spec, /\*\*L'ordine è l'unica condizione per cominciare\*\* \(#2269\)/);
+  assert.doesNotMatch(spec, /la rosa \(priorità 2\)|promuove la rosa|aspettano una prossima rosa/);
+});
+
+// Il segno «lavoro server» non aspetta l'owner (#2269 punto 6): neanche lo strumento lo deve far chiedere a lui.
+test('un segno «lavoro server» non confermato non si chiede all\'owner: un fidato entra nell\'ordine lo stesso (#2269)', () => {
+  const riga = M.rigaSegnoServer(true, { ok: true, numero: '900' });
+  assert.match(riga, /^SEGNO NON MESSO/);
+  assert.match(riga, /non chiedere il segno all'owner/);
+  assert.match(riga, /mettilo nell'ordine lo stesso: il primo giro consegna «design --reason locale» e il server lo segna da sé/);
+  assert.doesNotMatch(riga, /chiedi all'owner/);
 });
 
 // Il segno lo mette il server alla consegna design + locale: aspettarlo dall'owner tiene fuori un fidato per giorni (#2261).
