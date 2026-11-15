@@ -551,6 +551,7 @@ async function main() {
   const fermo = (messaggio, chiavi, nuovi = []) => {
     console.error(messaggio);
     for (const c of parti) console.error(`  ✗ ${rigaRosso(c)}`);
+    console.log(righeRegistro({ nuovi: [...parti, ...nuovi] }, { completo: false }).join('\n'));
     if (opt.out && parti.length) writeFileSync(resolve(opt.out), `${parti.map(rigaRosso).join('\n')}\n`, 'utf8');
     scriviChiavi(opt, parti.length && !chiavi.includes(CHIAVE_NON_PARTITA) ? [...chiavi, CHIAVE_NON_PARTITA] : chiavi);
     scriviErrori(opt, nuovi);
