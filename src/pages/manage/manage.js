@@ -5157,9 +5157,64 @@
     return b;
   }
 
+  // La classe di rischio della consegna (#2505): in fondo alla fila, si apre nel pannello di destra come una forma.
+  function renderClasse(fb) {
+    if (!mgClasse) return;
+    const v = MR.vistaConsegna(fb && fb.consegna);
+    mgClasse.hidden = !v;
+    if (!v) return;
+    mgClasse.textContent = v.classe;
+    mgClasse.className = `mg-classe mg-classe--${v.classe}${livelloAperto === 'consegna' ? ' mg-classe--scelta' : ''}`;
+    mgClasse.title = v.titolo;
+    mgClasse.setAttribute('aria-label', v.titolo);
+    mgClasse.onclick = () => openSidebarConsegna(fb);
+  }
+
+  function openSidebarConsegna(fb) {
+    const v = MR.vistaConsegna(fb && fb.consegna);
+    if (!v) return;
+    segnaForma('consegna');
+    giudiceAperto = null;
+    const body = document.createElement('div');
+    const testo = (tag, cls, t) => { const el = document.createElement(tag); if (cls) el.className = cls; el.textContent = t; return el; };
+    const righe = document.createElement('div');
+    righe.className = 'mg-liv-righe';
+    for (const r of v.righe) {
+      const el = document.createElement('div');
+      el.className = 'mg-liv-riga';
+      el.append(testo('strong', '', `${r.etichetta}:`), testo('span', '', (r.etichetta === 'Quando' && formatDateTime(r.valore)) || r.valore));
+      righe.appendChild(el);
+    }
+    body.appendChild(righe);
+    const lista = (voci) => {
+      const ul = document.createElement('ul');
+      ul.className = 'mg-consegna-lista';
+      for (const [t, segnalato] of voci) ul.appendChild(testo('li', segnalato ? 'mg-consegna-segnalato' : '', t));
+      return ul;
+    };
+    if (!v.leggibile) body.appendChild(testo('div', 'mg-liv-testo', 'La tabella, gli elementi e il motivo sono cifrati con la tua chiave, che qui non c\'è.'));
+    if (v.motivo) body.append(testo('div', 'mg-consegna-sez', 'Motivo'), testo('div', 'mg-liv-testo', v.motivo));
+    if (v.prova.riepilogo) {
+      body.append(testo('div', 'mg-consegna-sez', `Test nuovi: ${v.prova.riepilogo}`));
+      if (v.prova.casi.length) body.appendChild(lista(v.prova.casi.map((c) => [c.testo, c.segnalato])));
+    }
+    if (v.prova.nonProvato) body.appendChild(testo('div', 'mg-liv-testo', v.prova.nonProvato));
+    if (v.criteri.length) {
+      body.append(testo('div', 'mg-consegna-sez', 'Criteri'));
+      body.appendChild(lista(v.criteri.map((c) => [`${c.n}. ${c.nome}, ${c.esito}: ${c.testo}`, false])));
+    }
+    if (v.elementi.length) {
+      body.append(testo('div', 'mg-consegna-sez', 'Elementi nuovi'));
+      body.appendChild(lista(v.elementi.map((e) => [`${e.nome}: ${e.perche} ${e.azioni.map((a) => `${a.azione}: ${a.testo}`).join('; ')}`, false])));
+    } else if (v.nessunElemento) body.append(testo('div', 'mg-consegna-sez', 'Elementi nuovi'), testo('div', 'mg-liv-testo', v.nessunElemento));
+    openSidebar('Consegna', '');
+    mgSideBody.replaceChildren(body);
+  }
+
   function renderLivelliRow(fb) {
     if (!mgLivelliRow || !mgForme) return;
     mgForme.replaceChildren();
+    renderClasse(fb);
 
     // Stato illeggibile: le forme nascerebbero da un `unlabeled` inventato e direbbero «in
     // attesa del giudizio» su una chiusa. Al loro posto si dice solo: aperta o chiusa.
