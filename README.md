@@ -156,18 +156,27 @@ Un messaggio IPC nuovo:
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
 npm test               # suite Playwright completa (~730 spec, ~4.650 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
-npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
+npm run test:importanti # i cammini principali su un avvio solo, rossi sopra i 4 minuti
+npm run finish:check   # in locale: unit test + prove importanti + spec delle aree toccate dal ramo
 ```
+
+Le prove importanti (`tests/importanti.spec.mjs`) decidono la pubblicazione
+(decisione owner 2026-11-14): `.github/workflows/importanti.yml` le corre a ogni
+fusione su main, con la catena intera degli aggiornamenti e gli unit test su
+Windows che rifà anche il cancello di pubblicazione, e un rosso lì diventa un
+feedback. Ogni sei ore `release.yml` pubblica il commit più nuovo di main con
+quella corsa verde.
 
 La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub a ogni fusione su main, in
 `.github/workflows/suite.yml` (Linux senza schermo, divisa in quattro parti che
 girano insieme su macchine diverse; sugli esiti uniti `scripts/suite-verdict.mjs`
-toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), insieme
-agli unit test su Windows che rifà anche il cancello di pubblicazione, e un
-rosso nuovo diventa un feedback. Ogni sei ore `release.yml` pubblica il commit
-più nuovo di main con la suite verde. Per provare la suite su un ramo:
-`gh workflow run suite.yml --ref <ramo>`.
+toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`). Un suo
+rosso non apre feedback: lo registra, e una volta a settimana un compito solo
+la riporta verde (`node scripts/rossi-della-suite.mjs` dà l'elenco, con la
+fusione che ha rotto ogni prova). A suite verde la versione costruita da quel
+commit si segna «stabile» (`scripts/segna-stabile.mjs`). Per provare la suite
+su un ramo: `gh workflow run suite.yml --ref <ramo>`.
 Sulla macchina di chi sviluppa Filo
 durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
 più lo spec mirato della feature toccata (`npx playwright test
