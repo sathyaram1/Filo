@@ -148,6 +148,11 @@ Gestione → Automazioni.
    API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
    della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le
    accensioni e se è fermo: un account fermo non accende fino al rinnovo o al giorno dopo.
+8. **Compiti nell'ordine.** Una revisione, un censimento, una verifica sistematica è un compito senza feedback:
+   `compito "<titolo>" -` lo apre e risponde col suo id (`C-12`), che metti nell'ordine accanto ai numeri
+   (`accendi 812,C-12,815`): il server lo accende nella sua posizione. Un feedback può aspettare un compito
+   (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
+   correggere un hover.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
 e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta. Le sessioni libere
