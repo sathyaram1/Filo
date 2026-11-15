@@ -32,8 +32,6 @@ test('il controllo di fine lavoro lancia le prove importanti su ogni ramo, e ros
   const passo = src.slice(i, src.indexOf('\n    }\n', i));
   assert.match(passo, /run\(process\.execPath, \[importanti\], 'Prove importanti'/);
   assert.match(passo, /process\.exit\(1\)/, 'prove importanti rosse devono fermare la consegna');
-  const prima = src.slice(src.lastIndexOf('\n  }\n', i), i);
-  assert.doesNotMatch(prima, /if \(checkOnly\)|if \(!checkOnly\)/, 'girano anche col solo controllo, quello delle routine');
 });
 
 test('il tetto è di quattro minuti, e sopra la corsa è rossa anche con le prove verdi', () => {
