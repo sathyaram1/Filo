@@ -67,14 +67,17 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
   test('una suite partita arriva in fondo; le fusioni arrivate intanto si raccolgono nell\'ultima', () => {
     const on = intestazione(SUITE_YML);
-    assert.match(on, /concurrency:\s*\n\s+group:\s*suite-\$\{\{\s*github\.ref\s*\}\}\s*\n\s+cancel-in-progress:\s*false/,
-      'annullare una suite a metà butta un\'ora e non dice niente di nessun commit');
+    assert.match(on, /concurrency:\s*\n\s+group:\s*suite-\$\{\{\s*github\.ref\s*\}\}-\$\{\{\s*inputs\.commit \|\| 'fusioni'\s*\}\}\s*\n\s+cancel-in-progress:\s*false/,
+      'annullare una suite a metà butta un\'ora; e la corsa chiesta per una versione non si fa scavalcare da una fusione');
   });
 
-  test('prova il commit della spinta; l\'avviso lo prende con la storia, per elencare i commit dopo l\'ultimo verde', () => {
-    for (const lavoro of [suite, verdettoJob, avvisoJob]) {
-      assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+  test('prova il commit della spinta, o quello chiesto per una versione; l\'avviso lo prende con la storia', () => {
+    for (const lavoro of [suite, verdettoJob]) {
+      assert.match(lavoro, /ref:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/);
     }
+    assert.match(verdettoJob, /SUITE_COMMIT:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/, 'il registro dice il commit provato');
+    assert.match(intestazione(SUITE_YML), /workflow_dispatch:\s*\n\s+inputs:\s*\n\s+commit:/);
+    assert.match(avvisoJob, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
     assert.match(avvisoJob, /fetch-depth:\s*0/);
   });
 
