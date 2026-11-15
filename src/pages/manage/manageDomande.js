@@ -651,13 +651,12 @@
     return s;
   }
 
-  // Chi l'ha superata: la domanda che l'ha assorbita (§3.6) o quella nata al suo posto; le assorbite prima che il server
-  // scrivesse `superataDa` lo portano solo nel motivo.
+  // Chi l'ha superata: la domanda che l'ha assorbita (§3.6) o quella nata al suo posto.
   function superataDa(d) {
+    const dentro = D.assorbitaIn(d);
+    if (dentro) return { id: dentro, assorbita: true };
     const e = d.esito && typeof d.esito === 'object' ? d.esito : {};
-    const m = /^assorbita in (D-\d+)$/.exec(String(e.superata || ''));
-    const id = D.numeroDi(e.superataDa) !== null ? String(e.superataDa) : (m ? m[1] : '');
-    return id ? { id, assorbita: !!m } : null;
+    return D.numeroDi(e.superataDa) !== null ? { id: String(e.superataDa), assorbita: false } : null;
   }
 
   // Le domande che questa ha assorbito restano visibili dentro di lei (§3.6).
