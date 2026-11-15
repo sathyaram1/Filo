@@ -524,14 +524,29 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
     const a = apriAlbero(git, base, 'fusione', contenuto ? punta : mainSha);
     if (a.dir) alberi.push(a.dir);
     if (a.errore) return { errore: a.errore, mainSha };
+    let novita = null;
     if (!contenuto) {
       const ga = gitIn(a.dir);
       const fusa = ga([...IDENTITA, '-c', `core.hooksPath=${nessunHook}`, 'merge', '--no-ff', '--no-edit', '--quiet', punta]);
+      let n = null;
       if (!fusa.ok) {
         const u = ga(['diff', '--name-only', '--diff-filter=U']);
         const file = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : [];
-        if (file.length) return { ...decidiEsito({ conflitto: file }), mainSha };
-        return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+        if (!file.length) return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+        // Un conflitto sul solo registro delle novità si risolve tenendo le righe dei due lati, come farà il server.
+        if (file.length !== 1 || file[0] !== FILE_NOVITA) return { ...decidiEsito({ conflitto: file }), mainSha };
+        n = uniscaNovitaNellAlbero({ git: ga, dir: a.dir, mainSha, punta, conflitto: true, nessunHook });
+        if (!n.ok) {
+          scrivi(`▸ Novità: il conflitto sul registro non si risolve a macchina (${n.motivo}).`);
+          return { ...decidiEsito({ conflitto: file }), mainSha };
+        }
+      } else {
+        n = uniscaNovitaNellAlbero({ git: ga, dir: a.dir, mainSha, punta, nessunHook });
+        if (n && !n.ok) scrivi(`▸ Novità: le righe del ramo sotto versioni uscite non si spostano a macchina (${n.motivo}).`);
+      }
+      if (n && n.ok) {
+        novita = n.novita;
+        scrivi(testoNovita(novita));
       }
     }
     let scelti = null;
