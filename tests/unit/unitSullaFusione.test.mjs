@@ -764,6 +764,8 @@ test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo l
 // ─── Le novità sulla fusione (#2543): spostate o unite prima della prova, come farà la fusione vera ───────────
 
 const NOVITA = 'src/shared/patchNotes.js';
+// Il registro eseguito vive in un altro contesto: i suoi elenchi non sono Array di qui per deepEqual.
+const dati = (src) => JSON.parse(JSON.stringify(registroDa(src)));
 const registroFinto = (blocchi) => `(function (global) {\n  'use strict';\n\n  const NOTES = [\n${blocchi.map(([version, features]) => [
   '    {', `      version: '${version}', date: '2026-11-01',`, '      features: [', ...features.map((r) => `        '${r}',`), '      ],', '      fixes: [],', '    },',
 ].join('\n')).join('\n')}\n  ];\n\n  global.SN_PATCH_NOTES = { NOTES };\n})(typeof globalThis !== 'undefined' ? globalThis : this);\n`;
