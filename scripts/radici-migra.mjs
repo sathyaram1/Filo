@@ -55,23 +55,6 @@ export function rigaConto(t) {
   return `${come}: radici a ${t.migrati} documenti (${per || 'nessuno'}), ${t.legacy} con legacy, ${t.giaFatti} le avevano già${errori}. Lotti: ${t.lotti}.`;
 }
 
-async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const refresh = findAdminRefreshToken();
-  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
-  const idToken = await mintIdToken(refresh);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data }),
-  });
-  let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
-  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
-  return body.result || {};
-}
-
 async function main() {
   const args = leggiArgomenti(process.argv.slice(2));
   if (args.errore) { console.error(args.errore); return 2; }
