@@ -51,8 +51,10 @@ La prova del test nuovo la fa uno strumento senza modello: corre i casi nuovi o
 cambiati del ramo senza le modifiche del lavoro (rosso atteso) e con (verde
 atteso), e il canale attacca l'esito alla consegna; quello scritto a mano nel
 file non vale. Lancialo tu, in sottofondo, insieme a `npm run finish:check`:
-`node scripts/prova-test-nuovi.mjs` (in un lavoro server con
-`--server "/root/filo-security"`). La consegna riprende quell'esito se la punta
-è la stessa, altrimenti lo rifà. Un caso verde anche senza il lavoro esce
+`node scripts/prova-test-nuovi.mjs` (in un lavoro server trova da sé il clone
+del server; altrove `--server <clone>`). La consegna riprende quell'esito se
+dopo è cambiata solo la riga delle novità o un `.md`; se è cambiato del codice
+lo rifà lei, in primo piano, e con degli spec nuovi dura minuti: in quel caso
+lancia la consegna in sottofondo. Un caso verde anche senza il lavoro esce
 segnalato: o la prova non prova il lavoro e la correggi, o nella riga del
 criterio 1 dici perché.
