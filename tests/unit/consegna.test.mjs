@@ -48,7 +48,7 @@ test('«l\'ho guardato» non è una prova; un criterio che non si applica vuole 
 });
 
 test('un lavoro sull\'interfaccia senza l\'elenco degli elementi nuovi è rifiutato; con l\'elenco o un «nessuno» motivato passa', () => {
-  const ui = C.lavoroDiInterfaccia(['src/pages/manage/manage.js', 'tests/manage.spec.mjs', 'scripts/routine-channel.mjs']);
+  const ui = C.lavoroDiInterfaccia(['src/pages/manage/manage.js', 'tests/manage.spec.mjs', 'scripts/conta-prove.mjs']);
   assert.deepEqual(ui, ['src/pages/manage/manage.js']);
   assert.match(C.validaConsegna(buona(), { interfaccia: ui })[0], /lavoro sull'interfaccia \(tocca src\/pages\/manage\/manage\.js\): manca l'elenco/);
   assert.deepEqual(C.validaConsegna(buona({ elementi: [elemento()] }), { interfaccia: ui }), []);
