@@ -293,3 +293,10 @@ test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
   assert.match(m, /^testo di 400 domande non fidate \(D-1, .*D-10, …\)$/);
   assert.ok(`elenco delle domande: ${m}`.length <= 300);
 });
+
+test('#2542: l’assorbimento si legge dal terminale nei due sensi', () => {
+  const q = { quando: () => 'ora' };
+  assert.match(formattaDomanda({ id: 'D-40', stato: 'aperta', titolo: 't', assorbite: ['D-41', 'D-42'] }, {}, q), /^assorbe: D-41, D-42$/m);
+  assert.match(formattaDomanda({ id: 'D-41', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'assorbita in D-40', superataDa: 'D-40' } }, {}, q), /^assorbita in D-40$/m);
+  assert.match(formattaDomanda({ id: 'D-43', stato: 'superata', titolo: 't', esito: { ok: true, superataDa: 'D-44' } }, {}, q), /^superata da D-44$/m);
+});
