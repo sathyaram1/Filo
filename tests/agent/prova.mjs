@@ -162,9 +162,9 @@ async function run() {
   const servito = servitoDa(ultimo && ultimo.modelUsage);
   const costo = Number(ultimo && ultimo.total_cost_usd) || 0;
   const secondi = (Date.now() - t0) / 1000;
-  const dati = { compito: o.compito, modo: o.modo, ...esito, passi, servito, costo, secondi: Math.round(secondi), finale };
+  const dati = { compito: o.compito, modo: o.modo, ...esito, passi, servito, costo, secondi: Math.round(secondi), finale, avviso };
   writeFileSync(join(out, 'esito.json'), `${JSON.stringify(dati, null, 2)}\n`);
-  writeFileSync(join(out, 'esito.md'), resoconto({ opzioni: o, esito, passi, servito, costo, secondi, finale }));
+  writeFileSync(join(out, 'esito.md'), resoconto({ opzioni: o, esito, passi, servito, costo, secondi, finale, avviso }));
   const dove = relative(process.cwd(), out) || out;
   console.log(`\n${esito.riga}\nModello: ${servito.modelli.join(', ') || o.modello}, servito da ${servito.fornitore || 'non riportato'}. ${Math.round(secondi)} s.`);
   console.log(`Passi e schermate: ${join(dove, 'esito.md')} (il giudizio del modello è un indizio: guarda le schermate).`);
