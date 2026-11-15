@@ -24,13 +24,15 @@ La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno: i feedback più importanti fra tutti | tu, ogni mattina | sempre nel tuo contesto; fra questi decidi ordine, pacchetti, quanti insieme |
-| **1** | da fare, ma non oggi | tu e l'owner | aspettano una prossima rosa |
-| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non si lavorano |
+| **2** | importante: da mettere presto nell'ordine | tu e l'owner | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
+| **1** | da fare | tu, l'owner, i giudici | parte quando la metti nell'ordine |
+| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non lo metti nell'ordine |
 
-La soglia fra i livelli si muove con la maturità di Filo e con i token disponibili (più account, o un modello piccolo
-al livello di Opus: molti 0 diventano 1, molti 1 diventano 2). La decidi tu, e quando cambi criterio lo scrivi nel
-taccuino. I giudici assegnano 3 o lasciano 1: la 2 è solo tua.
+**L'ordine è l'unica condizione per cominciare.** Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2;
+fuori dall'ordine parte solo una 3. Con l'ordine vuoto, o senza lavori che possano partire, il server dà la coda per
+urgenza, e lì le priorità 0 e 1 restano chiuse fino all'ultimo giorno prima del rinnovo. Niente rosa: la priorità dice
+quanto una cosa conta, l'ordine dice cosa comincia. La soglia fra i livelli si muove con la maturità di Filo e con i
+token disponibili; la decidi tu, e quando cambi criterio lo scrivi nel taccuino. I giudici assegnano 3 o lasciano 1.
 
 ## Cosa puoi, e cosa no
 
