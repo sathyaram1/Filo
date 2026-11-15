@@ -91,6 +91,16 @@ async function main() {
     console.error(opt.errore);
     process.exit(2);
   }
+  const { appendFileSync, writeFileSync, readFileSync } = await import('node:fs');
+  if (!opt.catena) {
+    const elenco = controllaElenco(readFileSync(resolve(ROOT, SPEC), 'utf8'));
+    if (!elenco.ok) {
+      console.error(elenco.testo);
+      if (opt.chiavi) writeFileSync(resolve(opt.chiavi), 'importanti:elenco\n', 'utf8');
+      if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${elenco.testo}\n`);
+      process.exit(1);
+    }
+  }
   const inizio = Date.now();
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   const specs = opt.catena ? CATENA_AGGIORNAMENTI : [SPEC];
