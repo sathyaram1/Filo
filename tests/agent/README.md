@@ -137,6 +137,8 @@ Modelli vision usati:
 
 - **Dopo una feature**: `test:shoot` con uno scenario mirato → guardo gli
   screenshot a colpo d'occhio. Veloce, ripetibile, gratis.
+- **Prima di consegnare una funzione che si prova usandola**: `test:prova` col
+  compito dell'utente.
 - **Caccia a problemi non previsti**: `test:explore` / `test:daily` lasciando
   esplorare il modello su un'area.
 
