@@ -2396,12 +2396,22 @@ function positionOnBranch(bucket) {
   // Le basi feature/N del Modello B restano abolite (SPEC-RIDISEGNO-MAX.md §1).
   const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, num: bucket.num, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
   if (!precedenti.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin i tentativi precedenti di ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${precedenti.errore}` };
+  // Il ramo legato al feedback prima della fermata (#2516): base se nessun tentativo lo supera, e se manca si dice.
+  const legato = isNew && !dalBiglietto
+    ? ramoLegatoDaRiprendere({ root: ROOT, legato: bucket.ramoLegato, mainBranch: MAIN_BRANCH, escludi: branch })
+    : { ok: true, stato: 'nessuno', ramo: '' };
+  if (!legato.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin il ramo ${bucket.ramoLegato} a cui era legato ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${legato.errore}` };
+  const sorgente = precedenti.scelto || (legato.stato === 'presente' ? { ramo: legato.ramo, propri: legato.propri } : null);
+  if (legato.stato === 'perso') {
+    bucket.ripartenzaPersa = { ramo: legato.ramo, ...(sorgente ? { invece: sorgente.ramo } : {}) };
+    process.stderr.write(`[dispatch] ${bucket.id}: il ramo ${legato.ramo} a cui era legato non c'è più su origin; ${sorgente ? `si riparte da ${sorgente.ramo}` : `si riparte da ${MAIN_BRANCH}`}, e il piano o la ripresa che lo danno per fatto non valgono\n`);
+  }
   const res = prepareBranch({
     root: ROOT,
     branch,
     create: isNew && !dalBiglietto,
     createIfMissing: dalBiglietto,
-    base: precedenti.scelto ? precedenti.scelto.ramo : '',
+    base: sorgente ? sorgente.ramo : '',
     mainBranch: MAIN_BRANCH,
     checkpoint,
   });
