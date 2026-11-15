@@ -105,6 +105,7 @@
   }
 
   function etichetta(w) {
+    if (w && COMPITO_RE.test(String(w.num || ''))) return `il compito ${w.num}`;
     return w && w.num ? `#${w.num}` : 'un feedback senza numero';
   }
 
