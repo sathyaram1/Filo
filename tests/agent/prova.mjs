@@ -162,7 +162,7 @@ async function run() {
     errore = errore || `lo strumento si è fermato: ${String(e.message).split('\n')[0].slice(0, 300)}`;
   } finally {
     modello.chiudi();
-    await d.closeFilo(app);
+    if (app) await d.closeFilo(app);
     await schermo.spegni();
   }
 
