@@ -60,7 +60,7 @@ async function main() {
   if (args.errore) { console.error(args.errore); return 2; }
   console.log(args.dalVero ? 'Migrazione delle radici, dal vero: scrivo solo dove mancano.' : 'Migrazione delle radici a secco: conto e basta (--dal-vero per scrivere).');
   const t = await migraTutto({
-    chiama: (data) => chiamaServer(data),
+    chiama: (data) => chiamaLotto(data),
     dalVero: args.dalVero,
     ogniLotto: (tot, r) => console.log(`  lotto ${tot.lotti} (${r.collezione || '?'}): ${tot.migrati} documenti finora`),
   });
