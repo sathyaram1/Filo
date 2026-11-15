@@ -20,14 +20,47 @@ export function fileDellEsito(root) {
 
 const punta = (dir) => { try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim(); } catch (_) { return ''; } };
 
+function esitoGrezzo(root) {
+  try { return JSON.parse(readFileSync(fileDellEsito(root), 'utf8')); } catch (_) { return null; }
+}
+
+/** Il clone del server dell'ultima prova salvata, anche se non vale più: la prova rifatta lo riprende. '' se no. */
+export function cloneDellUltimaProva(root) {
+  const e = esitoGrezzo(root);
+  return (e && e.server && typeof e.server.clone === 'string' && e.server.clone) || '';
+}
+
+/** Il clone del server se questo è un lavoro server (lì c'è un ramo con lo stesso nome, con commit suoi); '' se no. */
+export function serverDelLavoro(root, { clone = '' } = {}) {
+  const funzioni = clone ? '' : cartellaDelServer(root);
+  const c = clone || (funzioni ? dirname(funzioni) : '');
+  if (!c) return '';
+  const s = parteDelServer(c, ramoCorrente(root));
+  return s.head ? c : '';
+}
+
+// Dopo la prova, la riga delle novità e i testi in .md non cambiano l'esito dei test: la prova si riprende.
+const SOLO_TESTI = (p) => p === 'src/shared/patchNotes.js' || (/\.md$/i.test(p) && !/^tests\//.test(p));
+
+function soloTestiDopo(root, da, a) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', da, a], { cwd: root, stdio: 'ignore' });
+    const toccati = execFileSync('git', ['diff', '--name-only', '-z', da, a], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    return toccati.every(SOLO_TESTI);
+  } catch (_) { return false; }
+}
+
 /**
- * L'esito salvato, se vale ancora: stessa punta dell'app e, se c'era il server, stessa punta del suo ramo. null se no.
+ * L'esito salvato, se vale ancora: la punta dell'app di allora, o una che da lì cambia solo testi; se c'era il server
+ * la stessa punta del suo ramo; e in un lavoro server deve avere la parte del server. null se no.
  */
 export function esitoSalvato(root) {
-  let e;
-  try { e = JSON.parse(readFileSync(fileDellEsito(root), 'utf8')); } catch (_) { return null; }
-  if (!e || e.versione !== VERSIONE || !e.app || e.app.punta !== punta(root)) return null;
+  const e = esitoGrezzo(root);
+  const ora = punta(root);
+  if (!e || e.versione !== VERSIONE || !e.app || !e.app.punta) return null;
+  if (e.app.punta !== ora && !soloTestiDopo(root, e.app.punta, ora)) return null;
   if (e.server && e.server.clone && e.server.punta && punteDelServer(e.server.clone, ramoCorrente(root)) !== e.server.punta) return null;
+  if (!e.server && serverDelLavoro(root)) return null;
   return e;
 }
 
