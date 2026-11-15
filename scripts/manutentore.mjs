@@ -25,13 +25,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo stesso tetto del server (functions/src/routine/accensioni.js, ORDINE_MAX): oltre si rifiuta col numero.
 export const ORDINE_MAX = 2000;
 
-/** «812, #815,815.2» → { ok, numeri } senza doppioni nell'ordine dato, o { ok:false, motivo }. PURA. */
-export function leggiOrdine(testo) {
+/**
+ * «812, #815,C-12,815.2» → { ok, numeri } senza doppioni nell'ordine dato, o { ok:false, motivo }: numeri di feedback e,
+ * con `compiti`, id di compiti (#2269; l'ordine sì, un pacchetto no). PURA.
+ */
+export function leggiOrdine(testo, { compiti = true } = {}) {
   const pezzi = String(testo || '').split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
-  if (!pezzi.length) return { ok: false, motivo: 'accendi vuole i numeri in ordine (accendi 812,815) o --niente per svuotare l\'ordine' };
-  const storti = pezzi.filter((x) => !/^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/.test(x));
-  if (storti.length) return { ok: false, motivo: `non sono numeri di feedback: ${storti.slice(0, 5).join(', ')}` };
-  const numeri = [...new Set(pezzi.map((x) => x.replace(/^#/, '')))];
+  if (!pezzi.length) return { ok: false, motivo: 'accendi vuole i numeri in ordine (accendi 812,C-12,815) o --niente per svuotare l\'ordine' };
+  const voce = (x) => (compiti ? voceDi(x) : numeroDi(x));
+  const storti = pezzi.filter((x) => !voce(x));
+  if (storti.length) return { ok: false, motivo: `non sono numeri di feedback${compiti ? ' né id di compiti (C-12)' : ''}: ${storti.slice(0, 5).join(', ')}` };
+  const numeri = [...new Set(pezzi.map(voce))];
   if (numeri.length > ORDINE_MAX) return { ok: false, motivo: `${numeri.length} numeri, il massimo è ${ORDINE_MAX}` };
   return { ok: true, numeri };
 }
