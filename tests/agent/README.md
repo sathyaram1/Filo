@@ -99,8 +99,12 @@ npm run test:prova -- --modo chat --compito "Aprire in una nuova scheda la pagin
 ```
 
 - `--modo utente` (di serie) usa Filo a mano; `--modo chat` scrive la
-  richiesta nella chat della home e guarda se Filo la porta a termine: la chat
-  risponde con la chiave OpenRouter di qui sopra e i modelli di prova.
+  richiesta nella chat della home e guarda se Filo la porta a termine. In tutti
+  e due Filo parte acceso, con la chiave OpenRouter di qui sopra e i modelli di
+  prova, senza il benvenuto; senza chiave il modo utente parte spento e
+  `esito.md` lo dice in cima, il modo chat non parte.
+- Nel contenitore delle routine i siti esterni non si caricano (il tunnel del
+  proxy li rifiuta): lì la funzione si prova su una pagina locale (`--start`).
 - Tetto: 20 passi e 4 minuti (`--passi`, `--minuti`), poi si ferma e dice dove
   è arrivato. Si lancia in sottofondo; nel contenitore accende da sé lo schermo
   virtuale.
