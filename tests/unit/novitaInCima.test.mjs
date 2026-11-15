@@ -267,7 +267,7 @@ test('prima del rebase lo strumento riconosce la riga che finirà sotto la versi
   assert.deepEqual(aggiunteSottoUscite(prima, registroDa(sulRamo), '0.2.256'), [], 'sul ramo da solo la sentinella è verde');
   const cli = execFileSync(process.execPath, [join(REPO, 'scripts', 'novita-in-cima.mjs'), '--commit'],
     { encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: s.work, FILO_ROUTINE: '' } });
-  assert.match(cli, /una riga del ramo sta sotto la 0\.2\.257, uscita su main dopo la partenza del ramo\. Dopo il rebase su main le sposta questo strumento/);
+  assert.match(cli, /una riga del ramo sta sotto la 0\.2\.257, uscita su main dopo la partenza del ramo\. Le sposta da sé la fusione con main/);
   assert.match(cli, /in 0\.2\.257: Una novità del ramo/);
   assert.doesNotMatch(cli, /nessuna riga del ramo/);
   assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), sulRamo, 'il ramo com\'è resta com\'è');
