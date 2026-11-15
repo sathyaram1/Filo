@@ -951,7 +951,7 @@
   // feedback senza `name` ed è il campo su cui cercano tutte e due le pagine.
   // Toglierlo svuoterebbe la ricerca invece di alleggerirla.
   // `noteFidate` va con `notes`: le impronte delle note fidate (#1919) contano solo accanto al testo che le ha.
-  const CAMPI_DETTAGLIO = ['notes', 'noteFidate', 'livelli', 'reviewComment', 'images', 'files'];
+  const CAMPI_DETTAGLIO = ['notes', 'noteFidate', 'livelli', 'reviewComment', 'images', 'files', 'consegna'];
 
   // I campi che un elenco mostra, ordina o filtra: tutti quelli che le regole
   // Firestore ammettono meno quelli di dettaglio, più `pipeline` (lo scrive il
