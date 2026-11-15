@@ -1749,8 +1749,8 @@ if (isMain) {
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
         // `--piano` vuole un FILE, non un testo: dirgli «un testo» lo mandava a passarlo sulla riga di comando.
-        console.error(key === 'segnala' ? SEGNALA_TOLTA : key === 'piano'
-          ? `--${key} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`
+        console.error(key === 'segnala' ? SEGNALA_TOLTA : key === 'piano' || key === 'consegna'
+          ? `--${key} vuole il percorso di un file subito dopo di sé (un ${key === 'piano' ? '.md' : '.json'} scritto prima): non ho consegnato niente.`
           : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
