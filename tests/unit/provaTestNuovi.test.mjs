@@ -4,10 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { esitiDaPlaywright, esitiDaTap, provaTestNuovi, testNuoviDelRamo, testoDellaProva } from '../../scripts/lib/prova-test-nuovi.mjs';
+import { corriFile, esitiDaPlaywright, esitiDaTap, esitoDelCaso, provaTestNuovi, testNuoviDelRamo, testoDellaProva } from '../../scripts/lib/prova-test-nuovi.mjs';
+import { cloneDellUltimaProva, esitoSalvato, provaDelRamo } from '../../scripts/prova-test-nuovi.mjs';
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 function ramoDiProva() {
   const root = cartellaTemporanea('filo-prova-nuovi-test-');
