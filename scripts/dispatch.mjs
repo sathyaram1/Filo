@@ -1916,7 +1916,7 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   if (prova && !prova.ok) return { rejected: true, formatRejected: true, message: prova.errore };
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
-    prova: prova && prova.prova,
+    prova: prova && prova.prova, consegna,
   }));
   if (prova && sent.outcome === 'ok') process.stderr.write(`${pa.testoProvaConsegnata(prova.prova, sent.prova)}\n`);
   if (sent.outcome === 'refused') {
