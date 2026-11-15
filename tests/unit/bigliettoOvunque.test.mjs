@@ -100,7 +100,7 @@ test('deliver: --ticket al posto del biglietto davanti consegna con quel bigliet
   const casa = depositoSulRamo();
   try {
     const r = await esegui('routine-channel.mjs', [
-      'deliver', 'status', '--status', 'revision_capability', '--notes', 'Report.', '--ticket', BIGLIETTO,
+      'deliver', 'status', '--status', 'revision_capability', '--notes', 'Report.', '--ticket', BIGLIETTO, ...argomentiConsegna(casa),
     ], ambiente(port, casa));
     assert.equal(r.code, 0, `la consegna doveva partire (stderr: ${r.se})`);
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
