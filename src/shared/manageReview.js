@@ -2319,10 +2319,12 @@
     const parti = pt ? [['', pt.app], ['server: ', pt.server]].filter(([, p]) => p && Array.isArray(p.casi)) : [];
     const casi = parti.flatMap(([pre, p]) => p.casi.map((x) => ({
       testo: `${pre}${x.file} › ${x.caso}: senza il lavoro ${x.senza}, con ${x.con}`,
-      segnalato: x.senza === 'verde' || x.con !== 'verde',
+      segnalato: segnalato(x),
     })));
     const nonProvato = pt && pt.server && pt.server.nonProvato ? `server non provato: ${pt.server.nonProvato}` : '';
-    const verdiSenza = casi.filter((x) => /senza il lavoro verde/.test(x.testo)).length;
+    // Il conto lo registra il server in chiaro; dal dettaglio solo se manca.
+    const verdiSenza = Number.isFinite(c.verdiSenza) ? c.verdiSenza
+      : parti.reduce((n, [, p]) => n + p.casi.filter((x) => x && x.senza === 'verde').length, 0);
     const riepilogo = !pt ? '' : !casi.length ? 'nessun caso di prova nuovo o cambiato'
       : `${casi.length} ${casi.length === 1 ? 'caso' : 'casi'}, ${verdiSenza} ${verdiSenza === 1 ? 'verde' : 'verdi'} anche senza il lavoro`;
     return {
