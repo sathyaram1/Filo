@@ -138,7 +138,8 @@
       if (!CLASSI.includes(testo(cl.valore))) m.push(`classe di rischio: «${testo(cl.valore).slice(0, 30)}» non vale, sono ${CLASSI.map((x) => `«${x}»`).join(', ')}`);
       if (testo(cl.motivo).length < MIN_PROVA) m.push('classe di rischio: manca la riga di motivo («motivo»)');
     }
-    if (c.provaTest !== undefined && (!c.provaTest || typeof c.provaTest !== 'object' || !Array.isArray(c.provaTest.casi))) {
+    const pt = c.provaTest;
+    if (pt !== undefined && (!pt || typeof pt !== 'object' || !pt.app || !Array.isArray(pt.app.casi))) {
       m.push('«provaTest» la scrive lo strumento dei test nuovi: non è nella sua forma');
     }
     return m;
