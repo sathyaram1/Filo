@@ -280,11 +280,12 @@ npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G
 npm run manutentore -- rapporti --giorni 7 --cache  # per ruolo: cache scritta, rewarm, attese oltre 5 min, saldo dell'ora
 npm run manutentore -- rapporti --giorni 7 --rifiuti  # per ruolo: Edit e Write rifiutati (non letto, modificato), con la causa
 npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
-npm run manutentore -- ordine                      # com'è adesso, e quali numeri sono ancora aperti
-npm run manutentore -- accendi 812,815,820 | accendi --niente
+npm run manutentore -- ordine                      # com'è adesso, quali numeri sono aperti, i pronti contro i 2×N
+npm run manutentore -- accendi 812,C-12,815 | accendi --niente   # numeri di feedback e id di compiti
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
-npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
+npm run manutentore -- attesa <B> <A|C-12> [--togli]   # B aspetta A, o il compito C-12
+npm run manutentore -- compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   # un compito senza feedback, istruzioni da stdin: risponde col suo id
 npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
