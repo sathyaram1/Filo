@@ -1899,7 +1899,7 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
-    report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
+    report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento, consegna,
   }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
