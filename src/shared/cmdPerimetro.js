@@ -205,7 +205,7 @@
     while (coda.length) {
       const w = coda.shift();
       const e = apriGraffa(w);
-      if (e) coda.unshift(...e); else out.push(w.replace(//g, '{').replace(//g, '}'));
+      if (e) coda.unshift(...e); else out.push(w.replace(//g, '{').replace(//g, '}'));
       if (out.length + coda.length > GRAFFE_MAX) return null;
     }
     return out;
