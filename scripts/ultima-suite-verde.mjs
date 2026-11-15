@@ -39,7 +39,7 @@ export function passaIlCancello(lavori) {
   return (Array.isArray(lavori) ? lavori : []).some((j) => j?.name === LAVORO_UNIT_WINDOWS && j.conclusion === 'success');
 }
 
-/** Le corse riuscite di suite.yml su main, per commit (la più nuova per prima). PURA. */
+/** Le corse riuscite del workflow del verde su main, per commit (la più nuova per prima). PURA. */
 export function corseVerdi(runs) {
   const perSha = new Map();
   for (const r of Array.isArray(runs) ? runs : []) {
