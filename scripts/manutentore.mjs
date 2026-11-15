@@ -751,7 +751,7 @@ export const stimaToken = (testo) => Math.ceil(String(testo || '').length / 4);
 export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
   const posto = new Map(((stato && stato.ordine) || []).map((n, i) => [String(n), i + 1]));
   const rango = (s) => (s.priorita === 3 ? 0 : posto.has(String(s.num)) ? 1 : 2);
-  const scelte = (schede || []).filter((s) => s && rango(s) < 2 || (s && s.fermo)).sort((a, b) => rango(a) - rango(b)
+  const scelte = (schede || []).filter((s) => !!s && (rango(s) < 2 || !!s.fermo)).sort((a, b) => rango(a) - rango(b)
     || (posto.get(String(a.num)) || 0) - (posto.get(String(b.num)) || 0)
     || Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
   const numeri = new Set(scelte.map((s) => String(s.num)));
