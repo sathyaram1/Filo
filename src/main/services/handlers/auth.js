@@ -197,6 +197,20 @@ async function decryptLivelliFields(out, C, priv) {
   if (toccato) out.livelli = copia;
 }
 
+// La consegna con la prova accanto (#2505): classe e conti in chiaro, tabella, elementi e motivo nella busta dell'owner.
+async function decryptConsegnaField(out, C, priv) {
+  const c = out.consegna;
+  if (!c || typeof c !== 'object' || !C.isEncrypted(c.testo)) return;
+  const { testo, ...resto } = c;
+  let dettaglio = null;
+  if (priv) {
+    try { dettaglio = JSON.parse(await C.decrypt(testo, priv)); } catch (e) {
+      console.warn('[auth] decifratura di consegna.testo fallita:', e?.message || e);
+    }
+  }
+  out.consegna = { ...resto, dettaglio };
+}
+
 // `privKey` opzionale: il batch della dashboard la legge una volta per tutti i documenti,
 // invece di rileggerla dal disco 500 volte per una lista.
 async function decryptFeedbackObject(fields, privKey) {
