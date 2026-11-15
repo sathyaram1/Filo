@@ -62,17 +62,17 @@ async function main() {
   }
   const inizio = Date.now();
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const figlio = spawn(npx, ['playwright', 'test', SPEC, ...opt.resto], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const specs = opt.catena ? CATENA_AGGIORNAMENTI : [SPEC];
+  const figlio = spawn(npx, ['playwright', 'test', ...specs, ...opt.resto], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
   const codice = await new Promise((ok) => {
     figlio.on('exit', (c) => ok(c ?? 1));
     figlio.on('error', (e) => { console.error(String(e.message || e)); ok(1); });
   });
-  const v = verdettoImportanti({ codice, durataMs: Date.now() - inizio, tettoS: opt.tettoS });
+  const v = verdettoImportanti({ codice, durataMs: Date.now() - inizio, tettoS: opt.tettoS, catena: opt.catena });
   console.log(v.testo);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    const { appendFileSync } = await import('node:fs');
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${v.testo}\n`);
-  }
+  const { appendFileSync, writeFileSync } = await import('node:fs');
+  if (opt.chiavi) writeFileSync(resolve(opt.chiavi), v.chiavi.length ? `${v.chiavi.join('\n')}\n` : '', 'utf8');
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${v.testo}\n`);
   if (v.sopra && process.env.GITHUB_ACTIONS) console.log(`::error::${v.testo.split('\n')[1]}`);
   process.exit(v.codice);
 }
