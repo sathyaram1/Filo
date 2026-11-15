@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { confrontaCasi, PROVE_APP, PROVE_SERVER } from './conta-prove.mjs';
 import { preparaLancioElectron } from './schermo-virtuale.mjs';
+import '../../src/shared/consegna.js';
 
 export const VERSIONE = 1;
 // Uno spec lento sta sotto i dieci minuti; oltre, il file conta come «errore», non come rosso.
