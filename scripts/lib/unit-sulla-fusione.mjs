@@ -111,27 +111,26 @@ export function shaBlob(testo) {
  * → null (niente da fare) | { ok: true, novita } | { ok: false, motivo }
  */
 export function uniscaNovitaNellAlbero({ git, dir, mainSha, punta, conflitto = false, nessunHook = '', oggi = new Date().toISOString().slice(0, 10) }) {
-  const show = (ref) => git(['show', `${ref}:${FILE_NOVITA}`]);
-  const m = show(mainSha);
-  if (!m.ok) return conflitto ? { ok: false, motivo: `non leggo il registro di main (${primaRiga(m.out)})` } : null;
+  // Interi, a capo finale compreso: sono i byte che legge il server.
+  const blob = (ref, file = FILE_NOVITA) => {
+    try { return String(execFileSync('git', ['cat-file', 'blob', `${ref}:${file}`], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })); } catch (_) { return null; }
+  };
+  const main = blob(mainSha);
+  if (main === null) return conflitto ? { ok: false, motivo: 'non leggo il registro di main' } : null;
   let manifesto;
-  try { manifesto = JSON.parse(git(['show', `${mainSha}:package.json`]).out); } catch (_) { return { ok: false, motivo: 'non leggo il package.json di main' }; }
+  try { manifesto = JSON.parse(blob(mainSha, 'package.json')); } catch (_) { return { ok: false, motivo: 'non leggo il package.json di main' }; }
   const percorso = join(dir, ...FILE_NOVITA.split('/'));
   if (!conflitto) {
     let sotto;
-    try { sotto = aggiunteSottoUscite(registroDa(m.out), registroDa(readFileSync(percorso, 'utf8')), String(manifesto.version || '')); } catch (_) { return null; }
+    try { sotto = aggiunteSottoUscite(registroDa(main), registroDa(readFileSync(percorso, 'utf8')), String(manifesto.version || '')); } catch (_) { return null; }
     if (!sotto.length) return null;
   }
   const b = git(['merge-base', mainSha, punta]);
   if (!b.ok) return { ok: false, motivo: `non trovo la base comune (${primaRiga(b.out)})` };
-  const base = show(b.out.trim());
-  const ramo = show(punta);
-  if (!base.ok || !ramo.ok) return { ok: false, motivo: 'non leggo il registro della base o del ramo' };
-  // `git show` toglie l'a capo finale: i testi si leggono interi, come li legge il server.
-  const intero = (ref) => git(['cat-file', 'blob', `${ref}:${FILE_NOVITA}`]);
-  const testi = [intero(b.out.trim()), intero(mainSha), intero(punta)];
-  if (testi.some((t) => !t.ok)) return { ok: false, motivo: 'non leggo il registro della base, di main o del ramo' };
-  const r = uniscaNovita({ base: testi[0].grezzo, main: testi[1].grezzo, ramo: testi[2].grezzo, manifesto, oggi });
+  const base = blob(b.out.trim());
+  const ramo = blob(punta);
+  if (base === null || ramo === null) return { ok: false, motivo: 'non leggo il registro della base o del ramo' };
+  const r = uniscaNovita({ base, main, ramo, manifesto, oggi });
   if (!r.ok) return { ok: false, motivo: r.motivo };
   writeFileSync(percorso, r.src, 'utf8');
   const nessuno = nessunHook ? ['-c', `core.hooksPath=${nessunHook}`] : [];
