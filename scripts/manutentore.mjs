@@ -1287,10 +1287,10 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'attesa': {
       const togli = argv.includes('--togli');
       const atteso = voceDi(argv[2]);
-      const nome = (v) => (COMPITO_RE.test(String(v)) ? `il compito ${v}` : `#${v}`);
+      const nome = (v) => globalThis.SN_FB_ATTESE.etichetta({ num: v });
       const r = await chiama(cred, togli ? 'attesa.togli' : 'attesa', { numero: numeroDi(arg), aspetta: atteso });
       return esito(r, (x) => (togli ? `#${x.numero} non aspetta più ${nome(x.tolta)}.` : x.gia ? `#${numeroDi(arg)} aspettava già ${nome(atteso)}.`
-        : `#${x.numero} aspetta ${nome(x.aspetta)}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : COMPITO_RE.test(String(x.aspetta)) ? ': parte quando il compito chiude' : ''}.`));
+        : `#${x.numero} aspetta ${nome(x.aspetta)}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : eCompito(x.aspetta) ? ': parte quando il compito chiude' : ''}.`));
     }
     case 'compito': {
       const istruzioni = (await leggiStdin()).trim();
