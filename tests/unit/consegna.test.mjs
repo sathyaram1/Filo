@@ -91,6 +91,21 @@ test('il minimo: un ramo che tocca il formato dei dati salvati esce irreparabile
   assert.equal(C.minimoDaiPercorsi({ app: ['tests/unit/storageDurevole.test.mjs'] }).classe, '');
 });
 
+test('il pannello in Gestione: azioni degli elementi e segnalazioni dalla regola condivisa, il conto dal server', async () => {
+  await import('../../src/shared/manageReview.js');
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const casi = [{ file: 'a', caso: 'x', senza: 'rosso', con: 'verde' }, { file: 'a', caso: 'y', senza: 'rosso', con: 'non trovato' }];
+  const v = MR.vistaConsegna({
+    classe: 'nascosto', decisaDa: 'chi lavora', verdiSenza: 0,
+    dettaglio: { criteri: tabella(), elementi: [elemento()], provaTest: { app: { casi } } },
+  });
+  assert.deepEqual(v.elementi[0].azioni.length, C.AZIONI.length);
+  assert.deepEqual(v.prova.casi.map((c) => c.segnalato), casi.map((c) => !!C.casoSegnalato(c)));
+  assert.match(v.prova.riepilogo, /2 casi, 0 verdi anche senza il lavoro/);
+  const dalServer = MR.vistaConsegna({ classe: 'nascosto', verdiSenza: 3, dettaglio: { provaTest: { app: { casi } } } });
+  assert.match(dalServer.prova.riepilogo, /3 verdi anche senza il lavoro/, 'il conto registrato dal server vince');
+});
+
 test('un caso verde anche senza il lavoro, o non verde col lavoro, si segnala con la stessa regola ovunque', () => {
   assert.equal(C.casoSegnalato({ senza: 'rosso', con: 'verde' }), '');
   assert.equal(C.casoSegnalato({ senza: 'verde', con: 'verde' }), 'verde anche senza il lavoro');
