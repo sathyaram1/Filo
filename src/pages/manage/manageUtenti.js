@@ -522,12 +522,19 @@
     pianificaPulizia();
   }
 
+  // I criteri si dicono coi numeri che il server ha applicato: l'owner conferma una cancellazione che non si disfa.
+  function finestraRientro(c) {
+    const ore = Number(c && c.criteri && c.criteri.rientroOre);
+    if (!(ore > 0)) return 'la finestra di rientro del server';
+    return ore === 1 ? 'la prima ora' : `le prime ${formatInt(ore)} ore`;
+  }
+
   // Il tasto chiede un secondo sì nello stesso posto: la cancellazione non si disfa.
   function bottoneCancella(c) {
     const n = Number(c.cancellabili);
     const soglia = c.criteri && c.criteri.natiPrimaDi ? ` e nati prima del ${formatDate(c.criteri.natiPrimaDi)}` : '';
     return bottone(`Cancella ${formatInt(n)} account`, 'sn-btn-danger',
-      `Anonimi, senza portafoglio, mai tornati dopo la prima ora${soglia}. Non si torna indietro.`, () => {
+      `Anonimi, senza portafoglio, mai tornati dopo ${finestraRientro(c)}${soglia}. Non si torna indietro.`, () => {
         const riga = $('ownerAnonimiPulizia');
         const no = bottone('No', 'sn-btn-secondary', '', () => renderAnonimi(null));
         const si = bottone('Cancella', 'sn-btn-danger', '', (b) => {
