@@ -2701,7 +2701,10 @@ async function finalizeBucket(bucket, fromServer) {
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
-    const presa = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    const presa = await deliverToChannel('status', {
+      status: 'working', branch: bucket.branch || '',
+      ...(bucket.ripartenzaPersa ? { notes: testoRipartenzaPersa(bucket.ripartenzaPersa), ripartenzaPersa: bucket.ripartenzaPersa.ramo } : {}),
+    });
     // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
     if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
       const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
