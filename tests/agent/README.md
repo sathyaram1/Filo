@@ -85,6 +85,32 @@ npm run test:daily            # esplora dashboard, editor, shell/tab, history, o
 ```
 Aggrega tutto in `tests/agent/reports/daily-<ts>/INDEX.md`.
 
+## 3. `prova.mjs` — un utente prova la funzione prima della consegna
+
+Haiku (Anthropic, comprato da Anthropic: istanza figlia di Claude Code, nella
+quota della sessione, nessuna chiave) riceve un compito in una frase e lo porta
+a termine guardando la schermata coi badge e muovendo clic, tasto destro,
+doppio clic, scrittura, tasti, scorrimento e attese. Situazioni normali: i casi
+limite restano a chi lavora.
+
+```bash
+npm run test:prova -- --compito "Nel modulo premi Salva: deve comparire Salvato" --start http://127.0.0.1:8765/modulo
+npm run test:prova -- --modo chat --compito "Aprire in una nuova scheda la pagina example.com"
+```
+
+- `--modo utente` (di serie) usa Filo a mano; `--modo chat` scrive la
+  richiesta nella chat della home e guarda se Filo la porta a termine: la chat
+  risponde con la chiave OpenRouter di qui sopra e i modelli di prova.
+- Tetto: 20 passi e 4 minuti (`--passi`, `--minuti`), poi si ferma e dice dove
+  è arrivato. Si lancia in sottofondo; nel contenitore accende da sé lo schermo
+  virtuale.
+- Esce in `tests/agent/.out/prova-<ts>/` (o `--out`): `esito.md` con i passi e
+  una schermata per passo, `esito.json`, `finale.png`. Uscita 0 riuscito, 1 non
+  riuscito o fermo al tetto, 3 interrotto (modello o strumento), 2 argomenti.
+- Ogni risposta porta chi l'ha servita: se non è Anthropic stessa la prova si
+  interrompe (stessa regola dell'app, `servedPolicyViolation`).
+- Il giudizio di Haiku è un indizio: chi lavora guarda le schermate e decide.
+
 ## Chiave API (OpenRouter)
 
 La chiave si legge da:
