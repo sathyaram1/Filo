@@ -18,7 +18,6 @@ import { trovaClaude, envFiglio } from '../../scripts/orchestratore-locale.mjs';
 import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 
-const require = createRequire(import.meta.url);
 // Il margine per chiudere Filo e scrivere la cartella dentro il tetto dei minuti.
 const MARGINE_MS = 15_000;
 const INVALIDE_DI_FILA = 3;
