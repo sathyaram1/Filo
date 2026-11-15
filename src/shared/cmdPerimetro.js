@@ -256,7 +256,7 @@
   // Tutti i segni interni, presi dalle loro definizioni: scritti da chi manda il comando fingerebbero un gruppo già misurato.
   const segniInterni = () => SEGNO_GRUPPO + SEGNI_INERTI;
   // I segni delle graffe inerti mentre si aprono le altre: `graffe` li rimette come erano.
-  const SEGNI_INERTI = '';
+  const SEGNI_INERTI = '';
 
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
