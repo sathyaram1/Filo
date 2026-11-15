@@ -108,7 +108,7 @@ test('--consegna fuori dalla messa in revisione si rifiuta; dalla ripresa (--rec
     const fuori = await esegui('routine-channel.mjs', ['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--consegna', fileConsegna()], port, casa);
     assert.equal(fuori.code, 1);
     assert.match(fuori.se, /--consegna vale solo con deliver status --status revision_capability/);
-    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-2505', 'Applicata la strada B dopo la risposta dell\'owner, provata sul ramo.', '--motivo', 'ripresa',
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-2505', 'Applicata la strada B dopo la risposta dell\'owner: il doppio ora raddoppia davvero, la prova nuova lo dice.', '--motivo', 'ripresa',
       '--consegna', fileConsegna(), '--ticket', 'biglietto-di-prova'], port, casa);
     const d = consegne(ricevuti).at(-1)?.body.data;
     assert.ok(d, `la ripresa deve arrivare al server (uscita ${r.code}): ${r.se}`);
