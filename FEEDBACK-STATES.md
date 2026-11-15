@@ -274,7 +274,8 @@ all'owner, il freno.
   solo in quella coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del rinnovo. L'ordine
   porta anche i compiti senza feedback (`C-12`), e un feedback può aspettare un compito (`waitsFor` col suo id:
   l'attesa si scioglie quando il compito chiude). I giudici assegnano 3 o lasciano 1. Una 3 il manutentore la
-  può creare, non abbassare né archiviare: la toglie solo l'owner, e il limite vale per ogni automazione, riordino del lunedì compreso, giudice di priorità e risposte
+  può creare, non abbassare né archiviare: la toglie solo l'owner, e il limite vale per ogni automazione,
+  riordino del lunedì compreso, giudice di priorità e risposte
   automatiche delle domande (#2000, #2291; regola unica in `src/shared/prioritaTre.js`, che il server incorpora e
   ricontrolla sul documento al momento della scrittura, e che rifiuta anche chi scrive senza sapere la priorità di
   adesso). Archiviarla dentro un lavoro che resta a 3 (doppione di una 3 che avanza, unione col figlio a 3) non la
