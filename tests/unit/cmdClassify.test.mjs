@@ -1453,7 +1453,7 @@ test('#2392 — dopo una sostituzione fra gli argomenti `$_` è un valore ignoto
 
 // Una copia del rifiuto col segno scritto a mano resta indietro quando i segni cambiano: il rifiuto si costruisce dalle definizioni.
 test('#2392 — i segni interni non si confrontano scritti a mano', () => {
-  const src = readFileSync(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'), 'utf8');
+  const src = sorgenteDelClassificatore();
   assert.doesNotMatch(src, /includes\(\s*['"`](?:[-]|\\u[Ee][0-9A-Fa-f]{3})/);
 });
 
