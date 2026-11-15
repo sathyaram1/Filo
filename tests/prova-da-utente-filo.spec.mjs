@@ -43,8 +43,9 @@ test('la conferma di Filo ha i segni sui suoi pulsanti, e il clic sul segno di O
     return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => m.label).sort();
   }, { timeout: 10_000 }).toEqual(['Annulla', 'OK']);
   const { map } = await markInteractables(app, shell);
-  console.log('DBG', JSON.stringify(map.filter((m) => /^(OK|Annulla)$/i.test(m.label))), map.find((m) => /^OK$/i.test(m.label)).pagina.url());
-  await (await import('./agent/driver.mjs')).captureComposite(app, 'tests/.shots/dbg-conferma.png');
+  console.log('DBG raf', await page.evaluate(() => Promise.race([new Promise((r) => requestAnimationFrame(() => r('raf'))), new Promise((r) => setTimeout(() => r('niente raf'), 2000))])), await page.evaluate(() => [document.visibilityState, document.hasFocus()]));
+  const okM = map.find((m) => /^OK$/i.test(m.label));
+  console.log('DBG el', await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e && (e.className || e.tagName); }, [okM.x, okM.y]));
   await clickMark(app, shell, map, map.find((m) => /^OK$/i.test(m.label)).i);
   await expect.poll(() => page.evaluate(() => window.__esitoConferma)).toBe(true);
 });
