@@ -140,7 +140,7 @@ export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, c
 export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, oreDalVerde, pubblicazioni, esecuzione, erroreApi } = {}) {
   const giorni = Math.floor((oreDallUltima || 0) / 24);
   const righe = [
-    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit. Un commit con la suite Playwright verde da pubblicare c'è da ${Math.round(oreDalVerde || 0)} ore, quindi la pubblicazione si ferma DOPO aver scelto il commit: nel lavoro per Windows (controlli unit, chiavi di default, numero di versione, costruzione, file nella bozza) o nel passaggio da bozza a pubblicata.`,
+    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit. Un commit con le prove importanti verdi da pubblicare c'è da ${Math.round(oreDalVerde || 0)} ore, quindi la pubblicazione si ferma DOPO aver scelto il commit: nel lavoro per Windows (controlli unit, chiavi di default, numero di versione, costruzione, file nella bozza) o nel passaggio da bozza a pubblicata.`,
     '',
     `Il commit verde più nuovo: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}.`,
   ];
