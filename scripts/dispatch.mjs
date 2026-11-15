@@ -2324,6 +2324,7 @@ export async function run() {
     id: w.id || undefined,
     num: w.num || '',
     branch: w.branch || '',
+    ramoLegato: w.role === 'new-work' && w.payload && typeof w.payload.ramoLegato === 'string' ? w.payload.ramoLegato : '',
   };
   if (bucket.id) {
     // Lo stato locale resta il ripiego quando il server non risponde: si
