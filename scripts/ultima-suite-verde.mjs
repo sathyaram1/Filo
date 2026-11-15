@@ -244,10 +244,10 @@ async function main() {
     '## Quale commit si pubblica',
     '',
     sha
-      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con la suite verde${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}.`
+      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con le prove importanti verdi${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}.`
       : verde
-        ? `- Niente da pubblicare: il commit più nuovo con la suite verde è \`${verde}\`, non più nuovo di ${tag}.`
-        : '- Niente da pubblicare: nessun commit di main ha la suite verde fra le ultime corse riuscite.',
+        ? `- Niente da pubblicare: il commit più nuovo con le prove importanti verdi è \`${verde}\`, non più nuovo di ${tag}.`
+        : '- Niente da pubblicare: nessun commit di main ha le prove importanti verdi fra le ultime corse riuscite.',
     `- main adesso: \`${testa}\`.`,
     `- Commit di main dopo il verde, non ancora verdi o non ancora provati: ${nonProvati === null ? 'tutti (nessun verde)' : nonProvati}.`,
     tag
