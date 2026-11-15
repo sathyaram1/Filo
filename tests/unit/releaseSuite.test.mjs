@@ -672,10 +672,24 @@ describe('release.yml: si pubblica il commit più nuovo di main con le prove imp
     assert.match(scegli, /id:\s*scelta/);
   });
 
-  test('la scelta guarda solo corse riuscite di suite.yml su main', () => {
-    assert.match(SCEGLI_JS, /actions\/workflows\/suite\.yml\/runs\?branch=main&/);
+  test('la scelta guarda solo corse riuscite di importanti.yml su main, non la suite completa (#2501)', () => {
+    assert.equal(WORKFLOW_VERDE, 'importanti.yml');
+    assert.match(SCEGLI_JS, /actions\/workflows\/\$\{WORKFLOW_VERDE\}\/runs\?branch=main&/);
+    assert.doesNotMatch(senzaCommenti(SCEGLI_JS.split('\n').filter((r) => !/^\s*(\/\/|\*)/.test(r)).join('\n')), /workflows\/suite\.yml/);
     assert.match(SCEGLI_JS, /status=success/);
     assert.match(SCEGLI_JS, /--first-parent/);
+    assert.match(readFileSync(resolve(ROOT, 'scripts', 'manutentore.mjs'), 'utf8'), /workflows\/\$\{WORKFLOW_VERDE\}\/runs/,
+      'il redattore delle novità legge lo stesso verde che la pubblicazione costruisce');
+  });
+
+  test('dopo la pubblicazione la versione si segna stabile se la suite completa del suo commit è già verde', () => {
+    const r = release();
+    const passo = passi(r).find((p) => /segna-stabile/.test(p.corpo));
+    assert.ok(passo, 'una versione con la suite già verde uscirebbe senza segno');
+    assert.ok(r.indexOf('segna-stabile') > r.indexOf('--draft=false'), 'si segna una versione già pubblicata');
+    assert.match(passo.corpo, /--commit "\$\{\{ steps\.applica\.outputs\.sha \}\}" --se-suite-verde/);
+    assert.match(passo.corpo, /continue-on-error:\s*true/, 'un segno mancato non fa rossa una versione già uscita');
+    assert.match(passo.corpo, /git show "\$\{GITHUB_SHA\}:scripts\/segna-stabile\.mjs"/, 'lo strumento di questa corsa: il commit provato può essere più vecchio');
   });
 
   test('pubblicazione ferma da più di 48 ore: un feedback con la sua chiave, e la corsa rossa', () => {
