@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { argomentiConsegna } from '../helpers/consegnaDiProva.mjs';
 
 const { dirtyTreeLines, dirtyTreeText } = await import('../../scripts/dispatch.mjs');
 const { gitStatusPorcelain, statoDirectory: statoDirectorySync } = await import('../../scripts/lib/dirty-tree.mjs');
