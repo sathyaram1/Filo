@@ -110,9 +110,12 @@ async function run() {
   let errore = '';
   let ultimo = null;
   let finale = '';
-  // Node nel main di Filo non segue il proxy da solo: senza, nel contenitore la chat non arriva al fornitore.
-  const { app, shell } = await d.launchFilo({ userDataPrefix: 'filo-prova-', extraEnv: { NODE_USE_ENV_PROXY: '1' } });
+  let app = null;
   try {
+    // Node nel main di Filo non segue il proxy da solo: senza, nel contenitore la chat non arriva al fornitore.
+    const aperta = await d.launchFilo({ userDataPrefix: 'filo-prova-', extraEnv: { NODE_USE_ENV_PROXY: '1' } });
+    app = aperta.app;
+    const { shell } = aperta;
     if (o.modo === 'chat') await preparaChat(app, shell, chiave);
     if (o.start) await d.navigate(app, shell, o.start);
     let fuoco = null;
