@@ -108,7 +108,7 @@ require(path.join(SHARED, 'feedbackPublicView.js')); // dopo manageReview: lo us
 require(path.join(SHARED, 'testoDeiCampi.js')); // #2378 — le durate del testo dei campi: PRIMA di preferences, che le offre alla chat
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
-require(path.join(SHARED, 'cmdClassify.js'));
+require(path.join(SHARED, 'cmdClassify.js')); // #2493 — carica da sé le sue parti (cmdBase, cmdGit…), nel loro ordine
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: il main li cerca anche nei riquadri
