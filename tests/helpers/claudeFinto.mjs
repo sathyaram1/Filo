@@ -27,11 +27,11 @@ createInterface({ input: process.stdin }).on('line', (riga) => {
     delete passo.etichetta;
     delete passo.superficie;
   }
-  // `seStrato`: l'esito dipende da quello che il modello vede, cioè se fra i badge c'è una superficie sopra la scheda.
-  if (passo.seStrato) {
-    passo.esito = badge.some((x) => x.page === 'strato' && new RegExp(passo.seStrato, 'i').test(x.label)) ? 'riuscito' : 'non_riuscito';
-    passo.perche = `badge: ${badge.map((x) => `${x.page}:${x.label}`).join(' | ').slice(0, 400)}`;
-    delete passo.seStrato;
+  // `seBadge`: l'esito dipende da quello che il modello vede, un badge «superficie:etichetta» che risponde alla regex.
+  if (passo.seBadge) {
+    passo.esito = badge.some((x) => new RegExp(passo.seBadge, 'i').test(`${x.page}:${x.label}`)) ? 'riuscito' : 'non_riuscito';
+    passo.perche = `badge: ${badge.map((x) => `${x.page}:${x.label}`).join(' | ').slice(0, 500)}`;
+    delete passo.seBadge;
   }
   const result = JSON.stringify({ vedo: `passo finto ${i}`, ...passo });
   scrivi({ type: 'assistant', message: { content: [{ type: 'text', text: result }] } });
