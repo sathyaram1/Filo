@@ -407,6 +407,6 @@
     FILE, CAMPO, CHIAVI,
     confrontaVersioni, prossimaVersione,
     chiaviDoppie, testoChiaviDoppie, mappaSorgente, tagliaElemento, applica, rientro, modificheInCima,
-    rigaDiDati, sottoUscite, uniscaNovita,
+    rigaDiDati, aggiunteSottoUscite, sottoUscite, uniscaNovita,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
