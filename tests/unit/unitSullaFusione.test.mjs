@@ -813,7 +813,7 @@ test('prova vera: main pubblica la versione su cui il ramo scriveva, e la fusion
     const s = registroDelServer(r, punta, p.novita.data);
     assert.equal(s.ok, true, s.motivo);
     assert.equal(shaBlob(s.src), p.novita.sha, 'il server ricalcola lo stesso registro che la prova ha provato');
-    assert.deepEqual(registroDa(s.src).map((n) => [n.version, n.features]), [['0.2.12', ['di main', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
+    assert.deepEqual(dati(s.src).map((n) => [n.version, n.features]), [['0.2.12', ['di main', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
     assert.deepEqual(campoPerIlServer(p).novita, p.novita);
     pulita(r);
   } finally {
