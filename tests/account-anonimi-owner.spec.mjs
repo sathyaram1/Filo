@@ -161,6 +161,15 @@ test('la pulizia parte solo dopo il secondo sì, col numero letto sul tasto, e s
   await expect(riga(page).getByRole('button', { name: 'Cancella 230.000 account' })).toBeVisible();
 });
 
+test('un rifiuto motivato del server si legge con le sue parole, e niente è partito', async ({ app, openTab }) => {
+  stato.rifiuta = 'il conto da cui leggere il numero non c’è, o è da rifare';
+  const page = await apriOwner(app, openTab);
+  await riga(page).getByRole('button', { name: 'Cancella 230.000 account' }).click({ timeout: 15_000 });
+  await riga(page).getByRole('button', { name: 'Cancella', exact: true }).click();
+  await expect(riga(page)).toContainText('Pulizia non partita: il conto da cui leggere il numero non c’è, o è da rifare.', { timeout: 15_000 });
+  await expect(riga(page).getByRole('button', { name: 'Riprova' })).toBeVisible();
+});
+
 test('il server che non risponde lo dice e si rilegge; senza conto ancora fatto lo dice', async ({ app, openTab }) => {
   stato.guasto = true;
   const page = await apriOwner(app, openTab);
