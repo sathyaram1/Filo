@@ -49,7 +49,8 @@ const caso = (titolo, ...k) => `test('${titolo}', () => {\n${k.map((x) => `  ver
 const banco = (...k) => `export const banco = {\n${k.map((x) => `  ${x}: 'stato-${x}.txt',\n`).join('')}};\n`;
 const prova = (...casi) => `import { banco } from './helpers/banco.mjs';\n${casi.join('')}`;
 
-function giro(files, { ramo = 'worker/746' } = {}) {
+// `main` e `lavoro`: i file su main e quelli che il ramo ha cambiato prima della critica (senza, il ramo non ha main).
+function giro(files, { ramo = 'worker/746', main = null, lavoro = {} } = {}) {
   const dir = cartellaTemporanea('prove-casi-');
   const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
@@ -60,7 +61,13 @@ function giro(files, { ramo = 'worker/746' } = {}) {
   scrivi('bin/npx', `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/npx.mjs" "$@"\n`);
   scrivi('bin/npx.cmd', `@"${process.execPath}" "%~dp0npx.mjs" %*\r\n`);
   chmodSync(resolve(dir, 'bin', 'npx'), 0o755);
-  g('add', '-A'); g('commit', '-qm', 'avvio della verifica');
+  for (const [f, t] of Object.entries(main || {})) scrivi(f, t);
+  g('add', '-A'); g('commit', '-qm', main ? 'main' : 'avvio della verifica');
+  if (main) {
+    g('branch', 'main');
+    for (const [f, t] of Object.entries(lavoro)) scrivi(f, t);
+    g('add', '-A'); g('commit', '-q', '--allow-empty', '-m', 'lavoro del ramo');
+  }
   const avvio = g('rev-parse', 'HEAD');
   for (const [f, t] of Object.entries(files)) scrivi(f, t);
   g('add', '-A'); g('commit', '-qm', 'critica');
@@ -243,6 +250,43 @@ test('un aiuto comune fuori dal giro indebolito da chi corregge: la prova si ril
     t.scrivi('stato-a.txt', 'corretto\n');
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
+  } finally {
+    togliCartella(t.dir);
+  }
+});
+
+test('#2546 uno strumento sotto tests/ che il ramo stava già correggendo è il lavoro: la prova del giro gira su quello nuovo', () => {
+  const STRUMENTO = 'tests/agent/strumento.mjs';
+  const COMUNE = 'tests/helpers/banco-comune.mjs';
+  const R1 = `${CARTELLA}/giro1-r1-a.spec.mjs`;
+  const t = giro({
+    [R1]: `import { banco } from '../../agent/strumento.mjs';\n${caso('caso a', 'a')}`,
+    [`${CARTELLA}/giro1-r2-b.spec.mjs`]: `import { banco } from '../../helpers/banco-comune.mjs';\n${caso('caso b', 'b')}`,
+  }, {
+    main: { [STRUMENTO]: banco('a'), [COMUNE]: banco('b'), 'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n' },
+    lavoro: { [STRUMENTO]: banco('a', 'z') },
+  });
+  const log = [];
+  const controlla = () => controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: (m) => log.push(m) });
+  try {
+    t.scrivi(STRUMENTO, "export const banco = {\n  a: 'stato-nuovo.txt',\n};\n");
+    t.scrivi('stato-nuovo.txt', 'corretto\n');
+    t.commit('correzione dello strumento');
+    assert.deepEqual(controlla(), { ferma: false, testo: '' }, 'lo strumento corretto è il lavoro: non si rimette com\'era');
+    assert.deepEqual(t.visti, []);
+    t.g('rm', '-q', R1);
+    t.commit('tolta la prova del rilievo, chiusa da una prova durevole');
+    assert.deepEqual(controlla(), { ferma: false, testo: '' }, 'com\'era, sullo strumento nuovo, la prova tolta è verde');
+    assert.deepEqual(nomi(t.visti), ['giro1-r1-a.spec.mjs']);
+    assert.match(log.join('\n'), /sono il suo lavoro: tests\/agent\/strumento\.mjs/);
+    assert.doesNotMatch(log.join('\n'), /copia del ramo a parte/);
+    // Un aiuto che il ramo non aveva toccato prima della critica resta un aiuto, anche con main.
+    t.scrivi(COMUNE, banco());
+    t.commit('correzione che indebolisce l\'aiuto comune invece del codice');
+    const e = controlla();
+    assert.equal(e.ferma, true, 'con l\'aiuto com\'era la prova di b è ancora rossa');
+    assert.match(e.testo, /giro1-r2-b\.spec\.mjs \(usa tests\/helpers\/banco-comune\.mjs\)/);
+    assert.doesNotMatch(e.testo, /strumento\.mjs/);
   } finally {
     togliCartella(t.dir);
   }
