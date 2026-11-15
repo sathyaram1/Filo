@@ -114,7 +114,7 @@ test('roundNote parla per gruppi: il feedback dei rimasti coi suoi rilievi, ness
   const list = [f(2, 'i', 'Non salva. Passi: …'), f(1, 'i', 'Etichetta tagliata.'), f(1, 'i', 'Bordo storto.'), f(null, 'e', 'Altrove.')];
   const r = decide(list, { count2: 5, count1: 2 });
   const nota = R.roundNote({ summary: 'provato', findings: list, decision: r });
-  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1 \(la più alta fra loro\): \[2i\] Non salva\.; \[1i\] Etichetta tagliata\.; \[1i\] Bordo storto\./);
+  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1: \[2i\] Non salva\.; \[1i\] Etichetta tagliata\.; \[1i\] Bordo storto\./);
   assert.match(nota, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti/);
   assert.match(nota, /Un rilievo è esterno/);
   assert.doesNotMatch(nota, /escono come feedback a parte/);
