@@ -38,3 +38,8 @@
    su `main`, anche se l'hai scritta adesso, e tiene le immagini dei due lati
    in `tests/.shots/confronto/`. Gli oggetti si contano sulle immagini, non a
    memoria.
+11. **Prove importanti.** `npm run test:importanti` è verde e sotto il suo
+   tetto. L'elenco dei cammini (`tests/importanti.spec.mjs`) lo cambiano solo
+   l'owner e il manutentore: un ramo che ci aggiunge un cammino senza che il
+   feedback lo chieda è un rilievo, e uno nuovo entra togliendone o
+   accorciandone un altro.
