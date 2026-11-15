@@ -169,11 +169,12 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
  */
 export function ramoLegatoDaRiprendere({ root, legato, mainBranch = 'main', escludi = '' }) {
   const ramo = String(legato || '').trim();
-  if (!ramo || ramo === escludi || !NOME_DI_RAMO.test(ramo) || isProtectedBranch(ramo, mainBranch)) return { ok: true, stato: 'nessuno', ramo: '' };
+  const g = gitIn(root);
+  if (!ramo || ramo === escludi || ramo.startsWith('-') || isProtectedBranch(ramo, mainBranch)
+    || !g(['check-ref-format', `refs/heads/${ramo}`]).ok) return { ok: true, stato: 'nessuno', ramo: '' };
   const su = ramoSuOrigin(root, ramo);
   if (su.errore) return { ok: false, errore: su.errore };
   if (!su.presente) return { ok: true, stato: 'perso', ramo };
-  const g = gitIn(root);
   const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`, `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]);
   if (!f.ok) return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
   const head = g(['rev-parse', `refs/remotes/origin/${ramo}`]);
