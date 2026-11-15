@@ -700,6 +700,23 @@ describe('release.yml: si pubblica il commit più nuovo di main con le prove imp
     assert.match(passo.corpo, /git show "\$\{GITHUB_SHA\}:scripts\/segna-stabile\.mjs"/, 'lo strumento di questa corsa: il commit provato può essere più vecchio');
   });
 
+  // La suite gira su circa metà delle fusioni: senza una corsa sul commit di ogni versione, il segno arriva per caso.
+  test('una versione uscita senza la suite verde sul suo commit chiede la sua corsa della suite', () => {
+    const j = senzaCommenti(job('suite-della-versione'));
+    assert.match(j, /^ {4}needs:\s*release\s*$/m);
+    const se = (j.match(/^ {4}if:\s*\$\{\{\s*(.+?)\s*\}\}\s*$/m) || [])[1] || '';
+    const corsa = (result, uscita, sha = 'a'.repeat(40)) => ({ needs: { release: { result, outputs: { should_release: uscita, sha } } } });
+    assert.equal(valutaCondizione(se, corsa('success', 'true')), true);
+    assert.equal(valutaCondizione(se, corsa('success', 'false')), false, 'niente di nuovo pubblicato: niente da provare');
+    assert.equal(valutaCondizione(se, corsa('failure', 'true')), false);
+    assert.match(j, /^ {6}actions:\s*write\s*$/m);
+    assert.doesNotMatch(j, /secrets\.|environment:|actions\/checkout/, 'avvia un workflow e basta: niente segreti, niente codice');
+    assert.match(j, /workflows\/suite\.yml\/runs\?head_sha=\$\{COMMIT\}&status=success/);
+    assert.match(j, /gh workflow run suite\.yml --repo "\$\{GITHUB_REPOSITORY\}" --ref main -f commit="\$\{COMMIT\}"/);
+    assert.match(j, /COMMIT:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/);
+    assert.doesNotMatch(senzaCommenti(job('release')), /actions:\s*write/, 'dove si costruisce il token non avvia workflow');
+  });
+
   test('pubblicazione ferma da più di 48 ore: un feedback con la sua chiave, e la corsa rossa', () => {
     assert.equal(CHIAVE_FERMO, 'rilascio:fermo');
     assert.equal(SOGLIA_ORE, 48);
