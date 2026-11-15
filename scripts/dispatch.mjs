@@ -2427,9 +2427,10 @@ function positionOnBranch(bucket) {
     if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
     if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
   }
-  const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
+  const ripartito = !!sorgente && res.base === `origin/${sorgente.ramo}`;
   if (ripartito) {
-    const { scelto, altri } = precedenti;
+    const scelto = sorgente;
+    const altri = precedenti.altri || [];
     process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
     const a = allineaAMain({ root: ROOT, mainBranch: MAIN_BRANCH });
     if (!a.ok) return { ok: false, kind: 'transient', message: `${branch}: non riesco a portare dentro il ${MAIN_BRANCH} di adesso, e senza si lavorerebbe sul codice di quando ${scelto.ramo} era partito: ${a.errore}` };
