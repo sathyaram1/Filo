@@ -54,19 +54,6 @@ function apriModello(claude, modello, prompt) {
   };
 }
 
-// «Chiedendo a Filo»: la chat della home deve poter rispondere davvero, con la chiave OpenRouter di chi prova e i
-// modelli di prova (tests/fixtures/testModels.js), senza il colloquio di benvenuto.
-async function preparaChat(app, shell, chiave) {
-  require('../../src/shared/constants.js');
-  require('../fixtures/testModels.js');
-  const { registry, models } = globalThis.SN_TEST_MODELS;
-  await app.evaluate(async (_e, { chiave, registry, models }) => {
-    await chrome.storage.local.set({ filo_onboarding: { done: true } });
-    await SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: chiave }, models, modelRegistry: registry });
-  }, { chiave, registry, models });
-  await d.navigate(app, shell, 'filo://newtab/');
-}
-
 async function esegui(app, shell, mossa, map, fuoco) {
   const m = mossa.segno != null ? map.find((x) => x.i === mossa.segno) : null;
   if (m) mossa.etichetta = m.label || m.tag;
