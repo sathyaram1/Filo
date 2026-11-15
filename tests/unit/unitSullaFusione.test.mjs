@@ -837,8 +837,9 @@ test('prova vera: il conflitto sul solo registro si risolve tenendo le righe dei
     assert.match(testoNovita(p.novita), /conflitto sul registro risolto tenendo le righe dei due lati/);
     pulita(r);
     // Con un altro file in conflitto il registro non basta: resta un conflitto, coi due file.
-    const due = r.ramo('claude/due', () => { r.scrivi(NOVITA, registroFinto([['0.2.11', ['a', 'altra del ramo']], ['0.2.10', ['vecchia']]])); r.scrivi('valore.txt', 'tre\n'); });
-    r.suMain(() => r.scrivi('valore.txt', 'quattro\n'));
+    const lati = (riga) => registroFinto([['0.2.11', ['a', 'di main', 'uguale', riga]], ['0.2.10', ['vecchia']]]);
+    const due = r.ramo('claude/due', () => { r.scrivi(NOVITA, lati('altra del ramo')); r.scrivi('valore.txt', 'tre\n'); });
+    r.suMain(() => { r.scrivi(NOVITA, lati('altra di main')); r.scrivi('valore.txt', 'quattro\n'); });
     const p2 = provaIn(r, due);
     assert.equal(p2.esito, 'conflitto');
     assert.deepEqual(p2.file.sort(), [NOVITA, 'valore.txt']);
