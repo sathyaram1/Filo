@@ -997,6 +997,7 @@ fra l'addetto comunicazioni e l'owner.
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) | `high` |
 | lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare | `high` |
 | domenica | audit di sicurezza | `audit` | 45 | Opus | `high` |
+| lunedì | suite completa: riporta verde (§ 4.2, #2501) | `audit` | 45 | Opus | `high` |
 
 Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
 (§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
