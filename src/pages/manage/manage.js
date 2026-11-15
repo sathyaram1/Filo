@@ -5762,6 +5762,7 @@
   // le strade di una fusione ferma senza richiesta e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
+    if (key === 'consegna') { openSidebarConsegna(fb); return; }
     const liv = MR.livelloPer(fb, key, opzioniLivelli(fb));
     if (!liv) return;
     segnaForma(key);
