@@ -491,7 +491,7 @@
           (b) => { b.disabled = true; loadAnonimi({ op: 'ferma' }).catch(() => {}); }),
       );
     } else {
-      if (p && p.stato === 'finita') riga.appendChild(testo(`Cancellati ${formatInt(p.cancellati)} ${formatDateTime(p.finitaIl)}.`));
+      if (p && p.stato === 'finita') riga.appendChild(testo(`Cancellati ${formatInt(p.cancellati)} il ${formatDateTime(p.finitaIl)}.`));
       if (p && p.stato === 'fermata') riga.appendChild(testo(`Pulizia fermata dopo ${formatInt(p.cancellati)}.`));
       if (c && c.superato) riga.appendChild(testo('Il server li riconta a breve.'));
       else if (c && Number(c.cancellabili) > 0) riga.appendChild(bottoneCancella(c));
