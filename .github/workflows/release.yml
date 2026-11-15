@@ -477,8 +477,8 @@ jobs:
         # conta da li').
         run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest --target "${{ steps.applica.outputs.sha }}"
 
-      # La suite completa di questo commit già verde: la versione esce segnata «stabile» (#2501). Se lo diventa dopo,
-      # la segna suite.yml. Un segno che non riesce non tocca una versione già uscita.
+      # La suite completa di questo commit già verde: la versione esce segnata «stabile» (#2501). Altrimenti la segna
+      # suite.yml, con la corsa che chiede `suite-della-versione`. Un segno che non riesce non tocca una versione già uscita.
       - name: Segna stabile, se la suite completa di questo commit e' verde
         if: steps.check.outputs.should_release == 'true'
         continue-on-error: true
