@@ -83,6 +83,9 @@ export function nomeDelGuasto(chiave) {
   if (k === 'suite:non-partita') return 'suite non partita';
   if (k === 'suite:tetto') return 'suite oltre il tetto di tempo';
   if (k === 'suite:rossi-noti') return 'elenco dei rossi noti illeggibile';
+  if (k === 'importanti:rosse') return 'prove importanti rosse';
+  if (k === 'importanti:durata') return 'prove importanti oltre il tetto di tempo';
+  if (k === 'importanti:catena-aggiornamenti') return 'catena degli aggiornamenti';
   const m = k.match(/^suite:(?:tests\/)?(.+?)(?:\.spec\.m?js)?$/) || k.match(/^unit:(?:tests\/unit\/)?(.+?)(?:\.test\.m?js)?$/);
   return m ? m[1] : '';
 }
