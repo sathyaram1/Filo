@@ -154,7 +154,7 @@ jobs:
           PROVATO="${{ needs.scegli.outputs.sha }}"
           QUI=$(git rev-parse HEAD)
           if [ -z "$PROVATO" ] || [ "$QUI" != "$PROVATO" ]; then
-            echo "::error::nessun commit con la suite verde scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
+            echo "::error::nessun commit con le prove importanti verdi scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
             exit 1
           fi
           git fetch --tags --force
