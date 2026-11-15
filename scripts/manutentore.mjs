@@ -152,7 +152,6 @@ export function rigaOrdine(numeri, indice, pronti = undefined) {
   if (!numeri.length) return 'Nessun ordine: il pacemaker accende per urgenza, come ripiego, con le priorità basse chiuse fino al rinnovo.';
   const perNum = new Map((indice || []).map((f) => [String(f.num), f]));
   const conIndice = (indice || []).length > 0;
-  const eCompito = (n) => COMPITO_RE.test(String(n));
   const voce = (n) => (eCompito(n) ? `compito ${n}` : !conIndice ? `#${n}` : perNum.has(n) ? `#${n} (${perNum.get(n).stato || 'aperto'})` : `#${n} (non fra gli aperti)`);
   const feedback = numeri.filter((n) => !eCompito(n));
   const vivi = conIndice ? feedback.filter((n) => perNum.has(n)).length : feedback.length;
