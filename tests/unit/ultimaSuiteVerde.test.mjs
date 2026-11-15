@@ -1,4 +1,4 @@
-// Quale commit si pubblica (scripts/ultima-suite-verde.mjs): il più nuovo di main con la suite verde, e un
+// Quale commit si pubblica (scripts/ultima-suite-verde.mjs): il più nuovo di main con importanti.yml verde, e un
 // feedback quando la pubblicazione è ferma da troppo. Un verde sbagliato pubblica un rosso; uno mancato ferma tutto.
 
 import { test, describe } from 'node:test';
