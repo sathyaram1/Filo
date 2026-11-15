@@ -4005,8 +4005,9 @@
   // l'attesa, qualunque esito). Su un errore restano «stato non letto», e chi li aspetta resta fra quelli che aspettano.
   function caricaCompitiAttesi(ids) {
     if (compitiAttesiInLettura) return;
-    const nuovi = [...ids].some((id) => !attesiFuori.has(id));
+    const nuovi = [...ids].some((id) => !attesiChiesti.has(id));
     if (!nuovi && Date.now() - compitiAttesiLettiMs < COMPITI_ATTESI_OGNI_MS) return;
+    for (const id of ids) attesiChiesti.add(id);
     compitiAttesiInLettura = true;
     (async () => {
       const r = await sendToMain({ type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.COMPITI_ELENCO) || 'compiti_elenco' });
