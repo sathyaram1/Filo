@@ -214,16 +214,18 @@ async function captureCompositeLinux(app, outPath, dove) {
   return captureCompositeElectron(app, outPath);
 }
 
-// Composizione fatta da Electron, senza schermo: ogni superficie (la shell, le
-// viste nell'ordine in cui stanno, poi le finestre figlie come menu e fumetti)
-// fotografata con capturePage e sovrapposta col suo alfa. Non vede quello che
-// disegna il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
-export async function captureCompositeElectron(app, outPath) {
-  const esito = await app.evaluate(async ({ BrowserWindow, nativeImage }) => {
+// Le superfici che si vedono ora, dal basso in alto: la shell, le viste nell'ordine in cui stanno, poi le finestre
+// figlie (menu, fumetti). Una sola copia per la schermata e per i segni numerati: se divergono, il modello riceve segni
+// di cose che nella schermata non ci sono. `tipo`: 'shell', 'view' (la scheda attiva) o 'strato'; `rect` è dove sta
+// la superficie nella finestra, `clip` la parte che se ne vede. Prova: tests/prova-da-utente.spec.mjs.
+async function elencoSuperfici(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
     const all = BrowserWindow.getAllWindows();
     const win = all.find((w) => w._filoTabs) || all[0];
-    if (!win) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
+    if (!win) return null;
     const cb = win.getContentBounds();
+    const tm = win._filoTabs;
+    const attiva = tm?.tabs?.find((t) => t.id === tm.activeId)?.view?.webContents || null;
     const conTetto = (p, ms, riserva) => Promise.race([p, new Promise((r) => setTimeout(() => r(riserva), ms))]);
 
     const strati = [];
@@ -233,10 +235,10 @@ export async function captureCompositeElectron(app, outPath) {
       const r = Math.min(a.x + a.w, b.x + b.w), g = Math.min(a.y + a.h, b.y + b.h);
       return { x, y, w: Math.max(0, r - x), h: Math.max(0, g - y) };
     };
-    const aggiungi = (wc, rect, clip) => {
+    const aggiungi = (wc, rect, clip, tipo) => {
       if (!wc || wc.isDestroyed() || visti.has(wc.id)) return;
       visti.add(wc.id);
-      strati.push({ wc, rect, clip });
+      strati.push({ wc, rect, clip, tipo: tipo || (wc === attiva ? 'view' : 'strato') });
     };
     // Una vista figlia si vede solo dentro la madre: il ritaglio scende con la discesa.
     const discendi = (view, ox, oy, clip) => {
@@ -250,7 +252,7 @@ export async function captureCompositeElectron(app, outPath) {
       }
     };
     const tutta = { x: 0, y: 0, w: cb.width, h: cb.height };
-    aggiungi(win.webContents, tutta, tutta);
+    aggiungi(win.webContents, tutta, tutta, 'shell');
     discendi(win.contentView, 0, 0, tutta);
     for (const f of win.getChildWindows()) {
       if (f.isDestroyed() || !f.isVisible()) continue;
@@ -266,19 +268,37 @@ export async function captureCompositeElectron(app, outPath) {
     // Se è «hidden» anche la shell, il sistema crede coperta la finestra intera e la pagina non dice niente.
     const visibilita = (wc) => conTetto(wc.executeJavaScript('document.visibilityState').catch(() => 'visible'), 1000, 'visible');
     const pagineAttendibili = (await visibilita(win.webContents)) !== 'hidden';
+    const superfici = [];
+    for (const s of strati) {
+      if (s.tipo !== 'shell' && pagineAttendibili && (await visibilita(s.wc)) === 'hidden') continue;
+      superfici.push({ id: s.wc.id, bersaglio: s.wc.getOrCreateDevToolsTargetId(), rect: s.rect, clip: s.clip, tipo: s.tipo });
+    }
+    return { larghezza: cb.width, altezza: cb.height, superfici };
+  });
+}
+
+// Composizione fatta da Electron, senza schermo: ogni superficie di elencoSuperfici fotografata con capturePage e
+// sovrapposta col suo alfa. Non vede quello che disegna il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
+export async function captureCompositeElectron(app, outPath) {
+  const elenco = await elencoSuperfici(app);
+  if (!elenco) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
+  const esito = await app.evaluate(async ({ webContents, nativeImage }, { larghezza, altezza, superfici }) => {
+    const conTetto = (p, ms, riserva) => Promise.race([p, new Promise((r) => setTimeout(() => r(riserva), ms))]);
     const saltate = [];
     const immagini = [];
-    for (const s of strati) {
-      if (s.wc !== win.webContents && pagineAttendibili && (await visibilita(s.wc)) === 'hidden') continue;
-      const img = await conTetto(s.wc.capturePage().catch(() => null), 5000, null);
-      if (!img || img.isEmpty()) { saltate.push(s.wc.getURL()); continue; }
+    for (const s of superfici) {
+      const wc = webContents.fromId(s.id);
+      if (!wc || wc.isDestroyed()) continue;
+      const img = await conTetto(wc.capturePage().catch(() => null), 5000, null);
+      if (!img || img.isEmpty()) { saltate.push(wc.getURL()); continue; }
       const k = Math.max(...(img.getScaleFactors?.() || [1]));
       immagini.push({ ...s, size: img.getSize(k), bmp: img.toBitmap({ scaleFactor: k }) });
     }
-    if (!immagini.length || immagini[0].wc !== win.webContents) {
+    if (!immagini.length || immagini[0].tipo !== 'shell') {
       throw new Error('captureCompositeElectron: la shell non si lascia fotografare');
     }
 
+    const cb = { width: larghezza, height: altezza };
     const K = immagini[0].size.width / cb.width;
     const W = Math.round(cb.width * K), H = Math.round(cb.height * K);
     const tela = Buffer.alloc(W * H * 4);
