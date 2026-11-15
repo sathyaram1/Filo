@@ -764,7 +764,10 @@ test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo l
 
 // ─── Le novità sulla fusione (#2543): spostate o unite prima della prova, come farà la fusione vera ───────────
 
-const NOVITA = 'src/shared/patchNotes.js';
+createRequire(import.meta.url)(join(ROOT, 'src', 'shared', 'novitaFusione.js'));
+const NOVITA = globalThis.SN_NOVITA_FUSIONE.FILE;
+
+test('la prova e la regola condivisa nominano lo stesso registro', () => assert.equal(FILE_NOVITA, NOVITA));
 // Il registro eseguito vive in un altro contesto: i suoi elenchi non sono Array di qui per deepEqual.
 const dati = (src) => JSON.parse(JSON.stringify(registroDa(src)));
 const registroFinto = (blocchi) => `(function (global) {\n  'use strict';\n\n  const NOTES = [\n${blocchi.map(([version, features]) => [
