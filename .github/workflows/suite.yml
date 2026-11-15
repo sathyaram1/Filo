@@ -43,7 +43,7 @@ jobs:
       - name: Checkout del commit da provare (con la storia)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.commit || github.sha }}
           fetch-depth: 0
 
       - name: Setup Node
