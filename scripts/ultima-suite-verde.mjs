@@ -1,7 +1,6 @@
-// ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con la corsa di importanti.yml
-// verde (prove importanti, catena degli aggiornamenti, unit su Windows: #2501), non più la suite completa.
-// Non pubblica e non scrive su git; pubblicazione ferma da troppo, per qualunque motivo: un feedback. Garanzie:
-// tests/unit/ultimaSuiteVerde.test.mjs e tests/unit/releaseSuite.test.mjs.
+// ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con importanti.yml verde (#2501).
+// Non pubblica e non scrive su git; pubblicazione ferma da troppo, per qualunque motivo: un feedback.
+// Garanzie: tests/unit/ultimaSuiteVerde.test.mjs e tests/unit/releaseSuite.test.mjs.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
