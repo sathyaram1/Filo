@@ -208,9 +208,9 @@ async function main() {
   // Un verde trovato basta; senza, un errore nel leggere i lavori può essere il motivo, e si dice.
   if (!verde && erroreLavori && !erroreApi) erroreApi = erroreLavori;
 
-  // Il suite.yml di un avviso vuole solo lo sha: da lì conta i commit entrati dopo.
+  // L'avviso di importanti.yml vuole solo lo sha: da lì conta i commit entrati dopo.
   if (process.argv.includes('--stampa')) {
-    if (erroreApi) console.error(`[suite verde] corse non lette: ${erroreApi}`);
+    if (erroreApi) console.error(`[verde] corse non lette: ${erroreApi}`);
     if (verde) console.log(verde);
     return;
   }
