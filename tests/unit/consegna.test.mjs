@@ -86,6 +86,16 @@ test('il minimo: un ramo che tocca il formato dei dati salvati esce irreparabile
   const server = C.minimoDaiPercorsi({ server: ['functions/src/routine/mergeGate.js'] });
   assert.deepEqual(server.zone, [{ chiave: 'fusione', nome: 'chi può fondere o è fidato', percorsi: ['server: functions/src/routine/mergeGate.js'] }]);
   assert.deepEqual(C.classeFinale('irreparabile', ''), { classe: 'irreparabile', decisaDa: 'chi lavora' });
+  // Il file che scrive su disco i dati salvati (e cifra i segreti a riposo) è il cuore della zona dei dati.
+  assert.deepEqual(C.minimoDaiPercorsi({ app: ['src/main/shim/storage.js'] }).zone.map((z) => z.chiave), ['dati']);
+  assert.equal(C.minimoDaiPercorsi({ app: ['tests/unit/storageDurevole.test.mjs'] }).classe, '');
+});
+
+test('un caso verde anche senza il lavoro, o non verde col lavoro, si segnala con la stessa regola ovunque', () => {
+  assert.equal(C.casoSegnalato({ senza: 'rosso', con: 'verde' }), '');
+  assert.equal(C.casoSegnalato({ senza: 'verde', con: 'verde' }), 'verde anche senza il lavoro');
+  assert.equal(C.casoSegnalato({ senza: 'rosso', con: 'non trovato' }), 'non verde col lavoro');
+  assert.equal(C.casoSegnalato({ senza: 'errore', con: 'errore' }), 'non verde col lavoro');
 });
 
 test('ogni zona riconosce almeno un file che esiste nel repo', async () => {
