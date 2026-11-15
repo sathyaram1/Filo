@@ -53,10 +53,11 @@ function leggiRiassuntoVecchio(log) {
 }
 
 /**
- * Dalle corse in ordine (la più vecchia per prima, ognuna `{ sha, url, quando, registro }`): ogni prova rossa
- * nell'ultima corsa letta, con la prima corsa rossa della sua serie (la fusione che l'ha rotta) e l'ultima corsa verde
- * prima di lei; a parte le instabili, rosse e verdi sullo stesso commit o verdi dopo un tentativo, che non contano
- * come rosse. Una corsa incompleta non fa verde una prova che non ha girato. PURA.
+ * Dalle corse in ordine (la più vecchia per prima, ognuna `{ sha, url, quando, registro }`): ogni prova rossa adesso,
+ * con la prima corsa rossa della sua serie (la fusione che l'ha rotta) e l'ultima corsa verde prima di lei; a parte le
+ * instabili, rosse e verdi sullo stesso commit o verdi dopo un tentativo, che non contano come rosse. Rossa adesso è
+ * rossa dall'ultima corsa completa in poi: una corsa incompleta non fa verde una prova che non ha girato, e quella
+ * rimasta fuori dall'ultima corsa porta `daRicontrollare`. PURA.
  */
 export function rossiDaCorse(corse) {
   const lette = (Array.isArray(corse) ? corse : []).filter((c) => c && c.registro);
