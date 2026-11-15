@@ -600,7 +600,7 @@ test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe
   assert.match(regola, /In una giornata a secco no\./);
   // L'ordine è l'unica condizione per cominciare, e nessuna 2 da scegliere ogni mattina.
   assert.match(ruolo, /\*\*L'ordine è l'unica condizione per cominciare\.\*\* Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2; fuori dall'ordine parte solo una 3/);
-  assert.doesNotMatch(ruolo.replace(/\*\*Una volta sola\*\* \(#2269[^]*?contano come importanti\./, ''), /\brosa\b(?! delle 2| non c'è)/i,
+  assert.doesNotMatch(ruolo.replace(/\*\*Una volta sola\*\* \(#2269[^]*?contano come importanti\./, ''), /\b(la|una|nella|della|alla) rosa\b/i,
     'la rosa resta nominata solo per dire che non c\'è più e per toglierla dal taccuino');
   assert.doesNotMatch(ruolo, /la 2 è solo tua|Scrivi la rosa|priorità 3 e 2/);
   // La classe è il primo criterio, non un filtro.
