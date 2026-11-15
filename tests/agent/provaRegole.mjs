@@ -71,7 +71,7 @@ const FORMA = `Rispondi SEMPRE e SOLO con un oggetto JSON, una mossa per volta:
 export function sistema(modo) {
   const comune = `Sei una persona normale che usa Filo, un browser desktop. Ricevi a ogni passo la SCHERMATA della finestra,
 con BADGE NUMERATI rossi sugli elementi che si possono cliccare, e l'elenco di quei badge. In alto c'è la barra delle
-schede e degli indirizzi, sotto la pagina della scheda attiva.
+schede, sotto la pagina della scheda attiva. Filo non somiglia del tutto agli altri browser: guarda la schermata.
 Hai un compito da portare a termine in modo normale, come farebbe chiunque: niente casi limite, niente tentativi strani.
 Una mossa per volta; dopo ogni mossa ricevi la schermata nuova. Se qualcosa sta caricando, aspetta.
 Quando il compito è riuscito e lo VEDI sullo schermo, chiudi con fine ed esito riuscito. Se dopo tentativi ragionevoli
