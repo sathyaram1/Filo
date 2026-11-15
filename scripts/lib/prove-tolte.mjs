@@ -568,7 +568,9 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
     const nomi = cambiati(PROVE_GIRO, 'DM');
     const prove = toccateDalRamo(proveTolte(nomi), shaPrima, root, principale);
     const nellaCartella = proveDelleCartelle(shaPrima, toccateDalRamo(supportoDelGiro([...nomi, ...cambiati(PROVE_GIRO, 'A')]), shaPrima, root, principale), root);
-    const aiuti = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
+    const toccati = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
+    const opera = operaDelRamo(shaPrima, root, principale);
+    const aiuti = toccati.filter((f) => !opera.has(f));
     // La configurazione di Playwright la usano tutte: un filtro aggiunto lì spegne un caso rosso come un aiuto svuotato.
     const config = toccateDalRamo(cambiati('playwright.config.*', 'ADM').filter((f) => CONFIG_PLAYWRIGHT.test(f)), shaPrima, root, principale);
     const cartelle = aiuti.length || config.length ? cartelleDelRamo(nomi, root, principale) : [];
