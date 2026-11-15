@@ -651,6 +651,24 @@
     return s;
   }
 
+  // Chi l'ha superata: la domanda che l'ha assorbita (§3.6) o quella nata al suo posto; le assorbite prima che il server
+  // scrivesse `superataDa` lo portano solo nel motivo.
+  function superataDa(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : {};
+    const m = /^assorbita in (D-\d+)$/.exec(String(e.superata || ''));
+    const id = D.numeroDi(e.superataDa) !== null ? String(e.superataDa) : (m ? m[1] : '');
+    return id ? { id, assorbita: !!m } : null;
+  }
+
+  // Le domande che questa ha assorbito restano visibili dentro di lei (§3.6).
+  function assorbite(d) {
+    const ids = (Array.isArray(d.assorbite) ? d.assorbite : []).filter((id) => D.numeroDi(id) !== null);
+    if (!ids.length) return null;
+    const l = el('div', 'mg-dq-legami mg-dq-assorbite');
+    for (const id of ids) l.appendChild(legame('domanda', id));
+    return sezione('mg-dq-assorbite-sez', ids.length === 1 ? 'Assorbe la domanda' : `Assorbe ${ids.length} domande`, l);
+  }
+
   function esito(d) {
     const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
     let testo = '';
