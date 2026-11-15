@@ -319,6 +319,11 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   if (Array.isArray(x.collegamenti) && x.collegamenti.length) {
     righe.push(`collegamenti: ${x.collegamenti.map((c) => `${visibile(c.tipo)} ${visibile(c.id)}`).join(', ')}`);
   }
+  // L'assorbimento della revisione (§3.6) lega le domande nei due sensi.
+  if (Array.isArray(x.assorbite) && x.assorbite.length) righe.push(`assorbe: ${x.assorbite.map(visibile).join(', ')}`);
+  if (x.stato === 'superata' && x.esito && x.esito.superataDa) {
+    righe.push(`${/^assorbita in /.test(String(x.esito.superata || '')) ? 'assorbita in' : 'superata da'} ${visibile(x.esito.superataDa)}`);
+  }
   if (x.contesto) righe.push('', 'Contesto', rientro(x.contesto));
   if (x.problema) righe.push('', 'Problema', rientro(x.problema));
   const opzioni = Array.isArray(x.opzioni) ? x.opzioni : [];
