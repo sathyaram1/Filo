@@ -21,7 +21,7 @@
   // «L'ho guardato» non vale (#2505), in nessuna forma: una prova fatta SOLO di parole che dicono «ho controllato» senza
   // dire cosa è vaga. Basta una parola fuori da qui (un file, un caso, una strada) perché un altro abbia cosa controllare.
   const PAROLE_VAGHE = new Set(('l lo la li le ho ha abbiamo è e ed a al ai con di da in nel nella nell su sul sulla io ci '
-    + 'mano occhio vista bene tutto tutti tutte ok okay si sì no fatto fatta fatti visto vista guardato guardata guardati '
+    + 'mano occhio bene tutto tutti tutte ok okay si sì no fatto fatta fatti visto vista guardato guardata guardati '
     + 'verificato verificata verificati controllato controllata controllati provato provata provati testato testata testati '
     + 'funziona funzionano funzionante correttamente regolarmente va vanno nessun nessuno problema problemi errore errori '
     + 'manualmente già anche sempre tutto ok come atteso previsto passa passano verde verdi').split(' '));
