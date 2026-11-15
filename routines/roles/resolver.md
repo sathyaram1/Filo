@@ -164,11 +164,13 @@ il rilievo che riproduce.
 
 ## Consegna
 
-I tre testi (report, frase, changelog) li scrivi tu.
+I tre testi (report, frase, changelog) li scrivi tu, e la consegna con la prova
+accanto (qui sopra) la passi con `--consegna`; non serve solo a una domanda che
+ferma il lavoro.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" [--domanda <file.json>]
+  --notes "[il tuo report]" --frase "[la frase]" --consegna <file.json> [--domanda <file.json>]
 ```
 
 Infine rilascia il biglietto:
