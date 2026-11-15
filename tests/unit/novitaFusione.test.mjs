@@ -102,8 +102,13 @@ test('sul registro vero: una riga del ramo sotto il secondo blocco va in cima, e
   const prima = dati(vero);
   const seconda = prima[1].version;
   const riga = "{ testo: 'Una riga del ramo finita sotto una versione uscita.', segnalazione: 2543 }";
-  const ramo = vero.replace(`version: '${seconda}'`, `version: '${seconda}'`).replace(/(version: '[^']+', date: '[^']+',\n\s*features: \[\n)/g, (m, g, off) => (vero.indexOf(`version: '${seconda}'`) < off && vero.indexOf(`version: '${seconda}'`) > off - 200 ? `${g}        ${riga},\n` : m));
-  assert.notEqual(ramo, vero, 'la riga di prova non è entrata nel secondo blocco');
+  const i = vero.indexOf(`version: '${seconda}'`);
+  const elenco = /(features|fixes): \[\n/g;
+  elenco.lastIndex = i;
+  const t = elenco.exec(vero);
+  assert.ok(t && t.index < vero.indexOf('version:', i + 10), `il blocco ${seconda} non ha un elenco scritto su più righe`);
+  const dove = t.index + t[0].length;
+  const ramo = `${vero.slice(0, dove)}        ${riga},\n${vero.slice(dove)}`;
   const manifesto = { ...pkg, version: seconda };
   delete manifesto.prossimaVersione;
   const r = uniscaNovita({ base: vero, main: vero, ramo, manifesto, oggi: OGGI });
