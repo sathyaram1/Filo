@@ -113,7 +113,7 @@ test('CLI routine-channel deliver: revisione, correzione, critica e verdetto di 
     const REPORT = 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo. Lasciato stare il menu sotto i 300 pixel, fuori dal giro.';
     const lancia = (...args) => spawnSync(process.execPath, [CANALE, 'deliver', 'biglietto-finto', ...args], { env, encoding: 'utf8', cwd: sandbox });
     const consegne = [
-      ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ok', '--branch', 'claude/lavoro'],
+      ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ok', '--branch', 'claude/lavoro', ...argomentiConsegna(sandbox)],
       ['fixed', '--report', REPORT],
       ['verdict', '--critique', REPORT, '--sha', 'abc'],
       // Il verdetto del controllo di sicurezza era l'unico rimasto fuori: vale
