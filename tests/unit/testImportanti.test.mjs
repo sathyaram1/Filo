@@ -19,9 +19,18 @@ test('il tetto è di quattro minuti, e sopra la corsa è rossa anche con le prov
 });
 
 test('--tetto si sceglie per provare il controllo; il resto va a Playwright', () => {
-  assert.deepEqual(leggiArgomenti(['--tetto', '5', '--reporter=list']), { tettoS: 5, resto: ['--reporter=list'] });
+  assert.deepEqual(leggiArgomenti(['--tetto', '5', '--reporter=list']), { tettoS: 5, catena: false, chiavi: '', resto: ['--reporter=list'] });
   assert.ok(leggiArgomenti(['--tetto', 'x']).errore);
   assert.equal(verdettoImportanti({ codice: 0, durataMs: 6000, tettoS: 5 }).codice, 1);
+});
+
+test('le chiavi dell\'allarme dicono cosa è rosso: le prove, la durata, la catena', () => {
+  assert.deepEqual(verdettoImportanti({ codice: 0, durataMs: 1000 }).chiavi, []);
+  assert.deepEqual(verdettoImportanti({ codice: 1, durataMs: 300_000 }).chiavi, ['importanti:rosse', 'importanti:durata']);
+  const catena = verdettoImportanti({ codice: 1, durataMs: 900_000, catena: true });
+  assert.deepEqual(catena.chiavi, ['importanti:catena-aggiornamenti']);
+  assert.equal(catena.sopra, false, 'la catena non ha tetto');
+  assert.ok(CATENA_AGGIORNAMENTI.every((f) => existsSync(resolve(ROOT, f))), 'ogni spec della catena esiste');
 });
 
 test('npm run test:importanti lancia lo script, e lo spec avvia Filo una volta più il riavvio', () => {
