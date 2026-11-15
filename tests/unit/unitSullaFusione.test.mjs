@@ -15,9 +15,10 @@ import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
-  unitToccati, COMANDI_DI_ACTIONS, shaBlob, testoNovita,
+  unitToccati, COMANDI_DI_ACTIONS, shaBlob, testoNovita, FILE_NOVITA,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { registroDa } from '../../scripts/lib/novita-in-cima.mjs';
+import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
