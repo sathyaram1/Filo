@@ -58,6 +58,7 @@ test.beforeAll(async () => {
         const data = (JSON.parse(raw || '{}').data) || {};
         stato.chiamate.push(data);
         if (stato.guasto) return json(res, 500, { error: { message: 'INTERNAL' } });
+        if (data.op === 'cancella' && stato.rifiuta) return json(res, 400, { error: { message: stato.rifiuta, status: 'INVALID_ARGUMENT' } });
         if (data.op === 'cancella') {
           stato.pulizia = { stato: 'in_corso', chiestaIl: '2026-11-15T11:00:00.000Z', attesi: data.attesi, cancellati: 30_000, falliti: 0 };
         }
