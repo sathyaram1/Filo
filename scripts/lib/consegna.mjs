@@ -39,8 +39,8 @@ export function leggiConsegna(file, root, { prova = null, percorsi = null, log =
   if (motivi.length) return { errore: `la consegna non è completa:\n- ${motivi.join('\n- ')}` };
   let esito = prova || esitoSalvato(root);
   if (!esito) {
-    log('Prova dei test nuovi: quella salvata non vale per questa punta (dopo la prova è cambiato del codice), la rifaccio '
-      + 'qui, senza il lavoro e con: con degli spec nuovi dura minuti. La prossima volta lanciala dopo l\'ultimo commit di codice: '
+    log('Prova dei test nuovi: per questa punta non ce n\'è una salvata (o dopo è cambiato del codice), la faccio qui, senza '
+      + 'il lavoro e con: con degli spec nuovi dura minuti. La prossima volta lanciala dopo l\'ultimo commit di codice: '
       + 'la riga delle novità e i .md dopo non la invalidano.');
     // Il clone del server della prova di prima, o quello del lavoro server: la parte del server non si perde.
     esito = provaDelRamo(root, { log, server: cloneDellUltimaProva(root) });
