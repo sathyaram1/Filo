@@ -1,6 +1,6 @@
 // Le prove importanti (#2501): i cammini principali in fila su un avvio solo, più il riavvio che il cammino
 // dell'impostazione chiede. Decidono la pubblicazione; si lanciano con `npm run test:importanti`, che ne misura il tetto.
-// L'elenco lo cambiano solo l'owner e il manutentore: uno nuovo entra togliendone o accorciandone un altro.
+// L'elenco lo cambiano solo l'owner e il manutentore (i titoli: CAMMINI in scripts/test-importanti.mjs, che li confronta).
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
