@@ -1835,7 +1835,7 @@ export function fixedReplyText(id, reply, conDomanda = false) {
   if (reply && reply.giro === 'pieno') return `stato ${id}: consegnato; il server chiede la verifica del riallineamento, torna in coda per la verifica`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
-async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null, cartellaProva = '') {
+async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null, cartellaProva = '', consegna = null) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
