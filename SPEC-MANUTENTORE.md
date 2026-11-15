@@ -118,15 +118,19 @@ la memoria nel taccuino (§ 5). Si accende:
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
 
-**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se
-nell'ordine non resta un lavoro che possa partire adesso (vuoto, o solo lavori
-fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa
-dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino
-ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del
-mattino e riscrive l'ordine; lo annota nel taccuino, e il recap del giorno
-dopo lo racconta. Non in una giornata a secco. Il 06/11 la rosa del mattino si
-è svuotata a metà giornata, nessun battito l'ha riempita e le quote sono
-rimaste ferme per quattordici ore circa.
+**L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene
+almeno 2×N lavori che possono partire subito; quelli in attesa, fermi, che
+restano locali o in mano all'owner non contano. Il conto lo fa il server (lo
+stato e il comando `ordine` dicono i pronti contro i 2×N). Se mancano, il
+manutentore allunga l'ordine con i criteri del mattino; lo annota nel
+taccuino, e il recap del giorno dopo lo racconta. La spesa si regola con N,
+non svuotando l'ordine. Non in una giornata a secco. La classe è il primo
+criterio, non un filtro: un lavoro che tocca i file di un ramo vivo aspetta, e
+intanto entra uno di classe più bassa in un'area libera; un compito può stare
+davanti a un feedback; un lavoro già iniziato non si mette in attesa di uno
+non iniziato. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
+nessun battito l'ha riempita e le quote sono rimaste ferme per quattordici ore
+circa; nelle 48 ore fino al 07/11 nessun primo lavoro era partito in 32.
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
