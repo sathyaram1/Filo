@@ -15,9 +15,9 @@ const CENSIMENTO = () => ({
   portafogli: 5,
   criteri: { etaMinimaGiorni: 14, rientroOre: 1, natiPrimaDi: '2026-11-01T10:00:00.000Z' },
   origine: {
-    giorni: 30, totale: 200_000, fuori: 2_000, ultime24h: 15_700,
+    giorni: 30, totale: 200_000, fuori: 2_000, ultime24h: 15_700, copertura: 0.541, natiPerOra: { dentro: 509.2, fuori: 6.1 },
     perWorkflow: { 'suite.yml': 197_000, 'verifica-linux.yml': 600, 'release.yml': 400 },
-    perGiorno: [{ giorno: '2026-11-14', nati: 15_700, inCorsa: 15_650 }, { giorno: '2026-11-13', nati: 14_000, inCorsa: 13_990 }],
+    perGiorno: [{ giorno: '2026-11-14', nati: 15_700, inCorsa: 15_650, copertura: 0.6 }, { giorno: '2026-11-13', nati: 14_000, inCorsa: 13_990, copertura: 0.5 }],
   },
   corse: { 'suite.yml': { lette: 700, completo: true }, 'verifica-linux.yml': { lette: 580, completo: true }, 'release.yml': { lette: 30, completo: true } },
 });
