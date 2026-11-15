@@ -153,7 +153,9 @@ una priorità 3» le tue su una 3, che parte lo stesso (tornano a fermare se la 
 fusione» blocca per sempre: spostala sull'originale (`attesa <B> <vecchio> --togli`, poi `attesa <B> <originale>`). Una scheda «non riletta» non basta per
 togliere lavoro; una «SCHEDA VECCHIA» o «NON BUONA» va rifatta prima di decidere su di lei
 (`npm run feedback:schede -- scrivi --solo N`). Un feedback fermo su una domanda per l'owner ha la sua riga: aspetta
-lui, accenderlo non serve.
+lui, accenderlo non serve. «RESTA LOCALE (motivi)» è un lavoro server che nessuna routine prende perché il biglietto
+nascerebbe sporco: nel recap scrivi quei motivi, non un'ipotesi; ramo e note sporchi li toglie l'owner da Gestione
+(«Dichiara fidato com'è»).
 
 ## Guasti
 

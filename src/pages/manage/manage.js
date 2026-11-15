@@ -1589,6 +1589,7 @@
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
+  const FIDUCIA_DICHIARA = (window.SN_MSG?.MSG?.FIDUCIA_DICHIARA) || 'fiducia_dichiara';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
@@ -2900,7 +2901,8 @@
         ${priorityDotsHtml(fb)}
         ${fiduciaSegnoHtml(fb)}
       `;
-      item.innerHTML = progress
+      // Un lavoro server in coda fermo «resta locale» (#2258) non ha iter, ma il suo fermo si dice lo stesso.
+      item.innerHTML = progress || (leggibile && fermoRestaLocale(fb, progress))
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
@@ -3001,6 +3003,16 @@
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
+  // Il segno lo ripulisce solo un giro che rivaluta il lavoro fra i pronti: fuori dai pronti per altro (lavori server
+  // spenti, una domanda bloccante, attesi non fusi, un'istanza al lavoro) vale quel motivo, non il fermo (#2036.1).
+  // Una regola sola per riga, dettaglio e «Dichiara fidato com'è» (#2258); un lavoro in coda non ha iter (progress null).
+  function fermoRestaLocale(fb, progress = fb && statoLeggibile(fb) ? MR.workProgress(fb) : null) {
+    if (!fb || (progress && progress.active)) return null;
+    const fermo = MR.restaLocale(fb, { lavoriServer: !!(mgLavoriServer && mgLavoriServer.checked) });
+    if (!fermo || MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) || (ATT && ATT.aspettaAncora(fb, trovaAtteso))) return null;
+    return fermo;
+  }
+
   function workStateHtml(progress, fb) {
     // Un lavoro server passato aspetta il cancello, GitHub o il PC (#1159); coi lavori server alle routine, un fidato
     // segue il loro iter.
@@ -3008,10 +3020,8 @@
     if (attesa) {
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
     }
-    // Il segno lo ripulisce solo un giro che rivaluta il lavoro fra i pronti: fuori dai pronti per altro (lavori server
-    // spenti, una domanda bloccante, attesi non fusi, un'istanza al lavoro) vale quel motivo, non il fermo (#2036.1).
-    const fermo = fb && !progress.active ? MR.restaLocale(fb, { lavoriServer: !!(mgLavoriServer && mgLavoriServer.checked) }) : null;
-    if (fermo && !MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) && !(ATT && ATT.aspettaAncora(fb, trovaAtteso))) {
+    const fermo = fermoRestaLocale(fb, progress);
+    if (fermo) {
       const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
       const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
@@ -3716,8 +3726,10 @@
     // Solo per i feedback nell'iter; stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
-      mgWorkState.hidden = !progress;
-      mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
+      const mostra = !!progress || (leggibile && !!fermoRestaLocale(fb, progress));
+      mgWorkState.hidden = !mostra;
+      mgWorkState.innerHTML = mostra ? workStateHtml(progress, fb) : '';
+      if (mostra) aggiungiDichiara(fb);
     }
 
     renderThread(fb);
@@ -3859,6 +3871,91 @@
     mgFiduciaBtn.addEventListener('click', () => {
       if (selectedId) impostaFiducia(selectedId, mgFiduciaBtn.getAttribute('aria-pressed') !== 'true');
     });
+  }
+
+  // ── «Dichiara fidato com'è» (#2258) ───────────────────────────────────────
+  // Un lavoro server fermo perché il suo biglietto nascerebbe sporco: l'owner, letti ramo e note, li dichiara fidati.
+  // Prima il server dice cosa toglierebbe, poi la conferma rimanda quello che l'owner ha visto: se è cambiato, rifiuta.
+  const TITOLO_DICHIARA = 'Ramo e note di questo lavoro diventano fidati così come sono, a tuo nome: il lavoro riparte al giro dopo. La fiducia del feedback non cambia.';
+  function aggiungiDichiara(fb) {
+    if (!isAdmin || !mgWorkState || !fermoRestaLocale(fb)) return;
+    const posto = document.createElement('div');
+    posto.className = 'mg-dichiara';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-star-btn mg-fiducia-btn';
+    btn.id = 'mgDichiaraBtn';
+    btn.textContent = '🤝 Dichiara fidato com’è';
+    btn.title = TITOLO_DICHIARA;
+    btn.addEventListener('click', () => guardaDichiara(fb._id, posto, btn));
+    posto.appendChild(btn);
+    mgWorkState.appendChild(posto);
+  }
+  // Si dichiara fidato dopo averlo letto: ogni ramo apre le sue modifiche rispetto a main.
+  const CONFRONTO_DICHIARA = { app: 'https://github.com/sathyaram1/Filo/compare/', server: 'https://github.com/sathyaram1/filo-security/compare/' };
+  function modificheDelRamo(repo, ramo) {
+    const r = String(ramo || '');
+    if (!CONFRONTO_DICHIARA[repo] || !/^[A-Za-z0-9._/-]{1,200}$/.test(r) || r.includes('..')) return '';
+    return `${CONFRONTO_DICHIARA[repo]}main...${r.split('/').map(encodeURIComponent).join('/')}`;
+  }
+  function righeDichiara(r, ramo) {
+    const dove = { app: 'Ramo dell’app', server: 'Ramo del server' };
+    const righe = (r.rami || []).map((x) => {
+      const nome = esc(dove[x.repo] || x.repo);
+      const url = modificheDelRamo(x.repo, ramo);
+      const testa = url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Le modifiche rispetto a main">${nome}</a>` : nome;
+      return `${testa}, all’ultimo commit ${esc(String(x.punta || '').slice(0, 7))}: ${esc(x.motivo || 'non pulito')}`;
+    });
+    const n = Number(r.stato) || 0;
+    // Quando e da chi: l'owner trova fra le note quelle da leggere senza rileggerle tutte.
+    const chi = (ruolo) => (ruolo === 'unito' ? 'da un feedback unito' : ruolo ? roleLabel(ruolo) : '');
+    const scritti = (r.scritti || []).map((s) => [chi(s.ruolo), formatDateTime(s.at)].filter(Boolean).join(' ')).filter(Boolean);
+    if (n) righe.push(esc(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`) + (scritti.length ? `: ${esc(scritti.join('; '))}` : ''));
+    return righe;
+  }
+  async function guardaDichiara(id, posto, btn) {
+    btn.disabled = true;
+    setManageMsg('Guardo cosa tiene sporco il lavoro…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, prova: true }).catch((e) => ({ ok: false, error: e.message }));
+    btn.disabled = false;
+    if (selectedId !== id || !posto.isConnected) return;
+    if (!r || r.ok === false) { setManageMsg(`Non riesco a guardarlo: ${(r && r.error) || 'il server non ha risposto'}`, 'err'); return; }
+    if (r.niente) {
+      const fermo = fermoRestaLocale(allFeedbacks.find((f) => f._id === id));
+      setManageMsg(`Ramo e note sono già puliti: lo tiene fermo altro${fermo ? ` (${fermo.motivi.join(', ')})` : ''}.`, 'ok');
+      return;
+    }
+    setManageMsg('', '');
+    posto.innerHTML = `<div class="mg-dichiara-cosa">Diventano fidati così come sono:<ul>${righeDichiara(r, (allFeedbacks.find((f) => f._id === id) || {}).branch).map((x) => `<li>${x}</li>`).join('')}</ul></div>
+      <div class="mg-dichiara-tasti"><button type="button" class="mg-star-btn mg-fiducia-btn" id="mgDichiaraSi">Li ho letti: dichiara fidati</button>
+      <button type="button" class="mg-star-btn" id="mgDichiaraNo">Annulla</button></div>`;
+    const si = posto.querySelector('#mgDichiaraSi');
+    posto.querySelector('#mgDichiaraNo').addEventListener('click', () => {
+      const fb = allFeedbacks.find((f) => f._id === id);
+      posto.remove();
+      if (fb) aggiungiDichiara(fb);
+    });
+    si.addEventListener('click', () => confermaDichiara(id, r.visto, si));
+    si.focus();
+  }
+  async function confermaDichiara(id, visto, si) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
+    const chi = num ? ` di #${num}` : '';
+    si.disabled = true;
+    setManageMsg('Lo dichiaro fidato…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, visto }).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || r.ok === false) {
+      si.disabled = false;
+      setManageMsg(`Non dichiarato fidato: ${(r && r.error) || 'il server non ha risposto'}`, 'err');
+      return;
+    }
+    // Il server ha tolto il segno: la rilettura porterà lo stesso, intanto la pagina lo dice subito.
+    if (fb) fb.restaLocale = null;
+    if (selectedId === id) openDetail(id, { ridisegno: true });
+    renderList();
+    updateTabCounts();
+    setManageMsg(`Ramo e note del lavoro${chi} sono fidati: riparte al prossimo giro, se non lo ferma altro.`, 'ok');
   }
 
   // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────

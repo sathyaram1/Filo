@@ -588,6 +588,14 @@ export function testoMittente(m) {
   return `da ${classe}${ruolo ? `/${ruolo}` : ''}`;
 }
 
+// Un lavoro server che resta locale porta motivi e ora (#2258): il recap li scrive invece di ipotizzarli.
+function testoFermo(f) {
+  if (f.tipo !== 'resta_locale') return `FERMO (${unaRiga(f.tipo)}${f.gruppo ? `: ${unaRiga(f.gruppo)}` : ''})`;
+  const motivi = Array.isArray(f.motivi) && f.motivi.length ? f.motivi.map(unaRiga).join('; ') : unaRiga(f.gruppo);
+  const ora = Number(f.atMs) > 0 ? `; visto ${new Date(Number(f.atMs)).toISOString().slice(0, 16).replace('T', ' ')}` : '';
+  return `RESTA LOCALE (${motivi}${ora})`;
+}
+
 /** La scheda del server in una riga, con la parte della scheda locale (area, riassunto, file) se c'è. PURA. */
 export function rigaSchedaServer(s, locale = null) {
   const numeri = (l) => (Array.isArray(l) ? l : []).map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ');
@@ -596,7 +604,9 @@ export function rigaSchedaServer(s, locale = null) {
     `#${unaRiga(s.num)}`,
     Number.isInteger(s.priorita) ? `p${s.priorita}${s.prioritaOwner ? ' (owner)' : ''}` : 'p?',
     unaRiga(s.stato) || '?',
-    s.fermo ? `FERMO (${unaRiga(s.fermo.tipo)}${s.fermo.gruppo ? `: ${unaRiga(s.fermo.gruppo)}` : ''})` : '',
+    s.fermo ? testoFermo(s.fermo) : '',
+    s.attesa ? `aspetta il server (${unaRiga(s.attesa)})` : '',
+    Array.isArray(s.domandeBloccanti) && s.domandeBloccanti.length ? `fermo sulle domande ${s.domandeBloccanti.map(unaRiga).join(', ')}` : '',
     s.inLavorazione ? 'in lavorazione' : '',
     s.lavoroServer ? 'lavoro server' : '',
     s.fiducia && s.fiducia !== 'fidato' ? unaRiga(s.fiducia).replace(/_/g, ' ') : '',
