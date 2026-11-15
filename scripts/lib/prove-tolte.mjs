@@ -945,6 +945,7 @@ export function controllaProveTolte({
   const pulite = conPulizia ? toccateDallaPulizia(shaCritica, shaPrima, root) : null;
   const accorciate = pulite ? pulite.prove.filter((f) => !prove.includes(f) && !esenti.has(f)) : [];
   if (!prove.length && !accorciate.length) return { ferma: false, testo: '' };
+  if (dal.lavoro?.length) log(`Restano come sono adesso, perché il ramo li aveva già cambiati prima della critica e sono il suo lavoro: ${dal.lavoro.join(', ')}.`);
   const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, {
     log, fuori: dal.fuori || [], versioni, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}),
   });
