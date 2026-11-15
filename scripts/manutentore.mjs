@@ -953,7 +953,8 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   const prima = linkDi(originali);
   const nuovi = [...linkDi(tutte.join('\n'))].filter((l) => !prima.has(l));
   if (nuovi.length) errori.push(`link che le righe dei worker non avevano: ${nuovi.slice(0, 10).join(', ')}`);
-  const ammessi = new Map((schede || []).filter((s) => s.priorita === 2 || s.priorita === 3).map((s) => [String(s.num), s]));
+  const promettibili = lavoriPromettibili(schede, ordine);
+  const ammessi = new Map([...promettibili.tre, ...promettibili.ordine].map((s) => [String(s.num), s]));
   const promesse = Array.isArray(c.promesse) ? c.promesse : [];
   for (const p of promesse) {
     const n = numeroDi(p && p.numero);
