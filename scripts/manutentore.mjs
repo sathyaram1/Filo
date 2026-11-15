@@ -172,7 +172,7 @@ export function rigaPronti(p) {
   if (p === null) return 'Pronti nell\'ordine: il server non ha letto la coda, contali dalle schede.';
   if (!p || !Array.isArray(p.pronti)) return 'Pronti nell\'ordine: il server non li conta ancora.';
   const n = p.pronti.length;
-  const elenco = n ? `: ${p.pronti.map((v) => (COMPITO_RE.test(String(v)) ? v : `#${v}`)).join(', ')}` : '';
+  const elenco = n ? `: ${p.pronti.map((v) => (eCompito(v) ? v : `#${v}`)).join(', ')}` : '';
   return n >= p.servono
     ? `Pronti nell'ordine: ${n}, ne servono almeno ${p.servono} (2×N)${elenco}.`
     : `ORDINE CORTO: pronti ${n}, ne servono almeno ${p.servono} (2×N)${elenco}. Allungalo coi criteri del mattino.`;
