@@ -363,65 +363,41 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         return { stato: r.stato, registro: r.registro, riepilogo: r.riepilogo, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
       };
 
-      test('suite senza allegato (npm ci rosso in una parte): feedback con la chiave «non partita»', () => {
-        const r = gira(allarme, { env: { PARTI_ESITO: 'failure' } });
+      test('prove importanti senza allegato: feedback con la chiave delle prove rosse', () => {
+        const r = gira(allarme);
         assert.equal(r.stato, 0, r.registro);
-        assert.equal(r.titolo, 'Suite Playwright rossa su main: commit non pubblicabile');
-        assert.deepEqual(r.chiavi, ['--chiave', 'suite:non-partita', '--commit', SHA_PROVATO]);
-        assert.match(r.testo, /Una parte della suite NON e partita/);
+        assert.equal(r.titolo, 'Prove importanti rosse su main: commit non pubblicabile');
+        assert.deepEqual(r.chiavi, ['--chiave', 'importanti:rosse', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /actions\/runs\/1/);
       });
 
-      test('suite con i rossi nuovi: feedback coi rossi e le chiavi del verdetto', () => {
+      test('le chiavi scritte dallo script delle prove e dalla catena, tutte, e la coda dei registri nel testo', () => {
         const r = gira(allarme, {
-          env: { PARTI_ESITO: 'success' },
           file: {
-            'esiti-suite/chiavi-allarme.txt': 'suite:tests/a.spec.mjs\n',
-            'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › il caso rosso\n',
-            'esiti-suite/verdetto.log': 'Rossi nuovi: 1\n',
-            'esiti-suite/suite-risultati.json': '{}',
+            'esiti-importanti/chiavi-importanti.txt': 'importanti:rosse\nimportanti:durata\n',
+            'esiti-importanti/importanti.log': 'DURATA SOPRA IL TETTO: 300 s contro 240 s.\n',
+            'esiti-catena/chiavi-catena.txt': 'importanti:catena-aggiornamenti\n',
           },
         });
         assert.equal(r.stato, 0, r.registro);
-        assert.deepEqual(r.chiavi, ['--chiavi-da', 'esiti-suite/chiavi-allarme.txt', '--commit', SHA_PROVATO]);
-        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso/);
-        assert.match(r.testo, /Verdetto:\nRossi nuovi: 1/);
-        assert.doesNotMatch(r.testo, /NON e partita|non ha lasciato il JSON/);
+        assert.deepEqual(r.chiavi, ['--chiave', 'importanti:rosse', '--chiave', 'importanti:durata', '--chiave', 'importanti:catena-aggiornamenti', '--commit', SHA_PROVATO]);
+        assert.match(r.testo, /Coda delle prove importanti:\nDURATA SOPRA IL TETTO/);
       });
 
       // #2313: dalla cloud gli artifact non si scaricano; i registri dei lavori si, con l'API.
       const REGISTRI = (avvisoJob.match(/^ {6}REGISTRI_DALLA_CLOUD:\s*"(.*)"\s*$/m) || [])[1] || '';
       const registriDellaCorsa = REGISTRI.replace(/\$\{\{ github\.repository \}\}/g, 'o/r').replace(/\$\{\{ github\.run_id \}\}/g, '1');
 
-      test('suite con i rossi nuovi: l\'errore di ogni rosso sta nel testo, e la strada per i registri che dalla cloud passa', () => {
+      test('i due feedback dicono la strada per i registri che dalla cloud passa', () => {
         assert.ok(REGISTRI, '`avviso` deve dire, una volta per i suoi due feedback, come leggere i registri dalla cloud');
-        const errori = '✗ tests/a.spec.mjs › il caso rosso\n    in tests/a.spec.mjs:12\n    Error: expect(locator).toBeVisible() failed\n';
-        const r = gira(allarme, {
-          env: { PARTI_ESITO: 'success', REGISTRI_DALLA_CLOUD: registriDellaCorsa },
-          file: {
-            'esiti-suite/chiavi-allarme.txt': 'suite:tests/a.spec.mjs\n',
-            'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › il caso rosso\n',
-            'esiti-suite/rossi-errori.txt': errori,
-            'esiti-suite/verdetto.log': 'Rossi nuovi: 1\n',
-            'esiti-suite/suite-risultati.json': '{}',
-          },
-        });
-        assert.equal(r.stato, 0, r.registro);
-        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso\n/);
-        assert.match(r.testo, /\n\n\nErrori dei rossi nuovi:\n✗ tests\/a\.spec\.mjs › il caso rosso\n {4}in tests\/a\.spec\.mjs:12\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed\n\n\nVerdetto:/);
-        assert.ok(r.testo.indexOf('Nessuna suite verde su main') < r.testo.indexOf('Errori dei rossi nuovi'),
-          'i commit sospetti prima degli errori: oltre il tetto del server il taglio mangia la coda');
-        assert.ok(r.testo.includes('gh api repos/o/r/actions/runs/1/jobs'), r.testo);
+        const r = gira(allarme, { env: { REGISTRI_DALLA_CLOUD: registriDellaCorsa } });
         assert.ok(r.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), r.testo);
-        assert.doesNotMatch(r.testo, /stanno negli artifact di questa esecuzione/, 'gli artifact dalla cloud non si scaricano: non sono la strada');
-        const senza = gira(allarme, { env: { PARTI_ESITO: 'success' }, file: { 'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › x\n' } });
-        assert.doesNotMatch(senza.testo, /Errori dei rossi nuovi/, 'senza errori nessuna intestazione vuota');
         const unit = gira(allarmeUnit, { env: { REGISTRI_DALLA_CLOUD: registriDellaCorsa }, file: { 'esiti-unit/unit.log': 'not ok 1 - a\n' } });
         assert.ok(unit.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), 'anche il feedback degli unit dice la strada');
       });
 
       test('un allarme non consegnato fa rosso `avviso`', () => {
-        const r = gira(allarme, { env: { PARTI_ESITO: 'failure', INVIO_ESITO: '1' } });
+        const r = gira(allarme, { env: { INVIO_ESITO: '1' } });
         assert.notEqual(r.stato, 0);
         assert.match(r.registro, /non consegnato/);
       });
