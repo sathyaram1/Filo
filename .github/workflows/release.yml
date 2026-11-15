@@ -229,7 +229,7 @@ jobs:
             PUNTA=$(git rev-parse --short FETCH_HEAD)
             if GIA_VERDI=$(node .punta-main/scripts/rossi-sulla-punta.mjs unit.log); then
               git worktree remove --force .punta-main || true
-              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
+              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con le prove importanti verdi."
               { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
