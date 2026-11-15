@@ -263,7 +263,7 @@ illegale.
 
 ### 3b. Il manutentore (SPEC-MANUTENTORE.md, #1958, #1959)
 
-Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** con la sua chiave (classe
+Rivede il § 3a dove dice altro. Il manutentore è un ruolo **fidato** (decisione dell'owner, #2215.1) con la sua chiave (classe
 `manutentore`, endpoint `routineManutentore`) o col biglietto che il pacemaker lega alla sessione accesa per lui
 (ruolo `manutentore`, contesto piccolo nel payload): legge schede, testi e rapporti (testi e rapporti solo
 nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
