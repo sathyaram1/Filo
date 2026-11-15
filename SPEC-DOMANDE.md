@@ -1127,8 +1127,8 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     lo rifiuta, come rifiuta le ricerche alla posta dopo la casella. Chi lo
     legge per mestiere parte lì: oggi l'addetto comunicazioni, la gestione del
     lavoro, l'audit, la revisione delle domande, «Gestisci la risposta», il
-    riordino della coda, la potatura dei rami, gli esperimenti e il loro
-    giudice (§ 4.6);
+    riordino della coda, la potatura dei rami, la suite completa che torna
+    verde, gli esperimenti e il loro giudice (§ 4.6);
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
     registro delle decisioni (§ 3.6), che è testo di altre domande;
