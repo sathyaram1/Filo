@@ -277,8 +277,8 @@ async function elencoSuperfici(app) {
   });
 }
 
-// Composizione fatta da Electron, senza schermo: ogni superficie di elencoSuperfici fotografata con capturePage e
-// sovrapposta col suo alfa. Non vede quello che disegna il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
+// Ogni superficie di elencoSuperfici fotografata e sovrapposta col suo alfa, senza schermo. Non vede quello che disegna
+// il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
 export async function captureCompositeElectron(app, outPath) {
   const elenco = await elencoSuperfici(app);
   if (!elenco) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
