@@ -18,9 +18,10 @@ singoli lavori. Tre facce dello stesso compito:
   strumenti falliscono, quanto aspettano i modelli, dove si spende senza
   fondere), propone e fa esperimenti dal vivo, misura cosa hanno portato.
 
-Il suo contesto è testo scritto da chiunque, quindi è **non fidato**: non
-scrive codice, non fonde, non approva L5. Scrive ordini che il server applica
-e apre feedback che le routine lavorano.
+Il suo contesto è testo scritto da chiunque: non scrive codice, non fonde,
+non approva L5. Scrive ordini che il server applica e apre feedback che le
+routine lavorano. Per decisione dell'owner (#2215.1) è un ruolo **fidato**:
+quello che scrive, note comprese, non sporca i lavori server.
 
 Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
 consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
