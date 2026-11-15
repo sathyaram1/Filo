@@ -545,7 +545,7 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
   });
 
   test('su main l\'avviso apre il feedback con le chiavi del cancello', () => {
-    const allarme = passi(senzaCommenti(job('avviso', SUITE_YML))).find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
+    const allarme = passi(senzaCommenti(job('avviso', IMP_YML))).find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
     assert.ok(allarme, 'un rosso che non diventa un feedback ferma la pubblicazione in silenzio');
     assert.match(allarme.corpo, /--chiavi-unit esiti-unit\/unit\.log/, 'le chiavi del cancello: lo stesso rosso visto qui e là apre un feedback solo');
     assert.match(allarme.corpo, /--chiave unit-windows:non-partiti/);
