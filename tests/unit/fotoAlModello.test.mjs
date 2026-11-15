@@ -66,7 +66,7 @@ test('la foto intera e quella della barra si chiedono solo dal gestore delle ric
 // Chi chiede alla pagina la foto senza la copia coperta la riceve intera: lo fa solo chi non la manda a un modello né
 // fuori dal computer. Lo screenshot del feedback va all'owner e chiede `coperta` (#2116).
 const RICHIESTE_INTERE = {
-  'src/preload/internal-preload.js': 'chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello',
+  'src/preload/chrome-shim.js': 'chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello',
 };
 test('una richiesta di foto della pagina senza la copia coperta sta solo dove la foto non va a un modello', () => {
   const fuori = [];
