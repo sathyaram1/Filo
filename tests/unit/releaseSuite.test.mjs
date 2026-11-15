@@ -785,13 +785,13 @@ describe('release.yml: si pubblica il commit più nuovo di main con le prove imp
 describe('ogni allarme dice al server cosa è rotto', () => {
   test('ogni passo che chiama build-alarm.mjs nei workflow passa le sue chiavi', () => {
     let chiamate = 0;
-    for (const [nome, testo] of [['release.yml', YML], ['suite.yml', SUITE_YML]]) {
+    for (const [nome, testo] of [['release.yml', YML], ['suite.yml', SUITE_YML], ['importanti.yml', IMP_YML]]) {
       for (const p of passi(senzaCommenti(testo)).filter((x) => /node scripts\/build-alarm\.mjs/.test(x.corpo))) {
         chiamate += 1;
         assert.match(p.corpo, /--chiav/, `${nome}: il passo «${p.nome}» apre un allarme senza chiavi`);
       }
     }
-    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, la suite rossa e gli unit rossi su Windows');
+    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, le prove importanti rosse e gli unit rossi su Windows');
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
