@@ -2236,7 +2236,7 @@
     })) : [];
     const elementi = d && Array.isArray(d.elementi) ? d.elementi.map((e) => ({
       nome: String((e && e.elemento) || ''), perche: String((e && e.perche) || ''),
-      azioni: ['clic', 'destro', 'trascina', 'hover'].map((a) => ({ azione: a === 'destro' ? 'tasto destro' : a, testo: String((e && e[a]) || '') })),
+      azioni: (K.AZIONI || []).map((a) => ({ azione: a === 'destro' ? 'tasto destro' : a, testo: String((e && e[a]) || '') })),
     })) : [];
     const pt = d && d.provaTest && typeof d.provaTest === 'object' ? d.provaTest : null;
     const parti = pt ? [['', pt.app], ['server: ', pt.server]].filter(([, p]) => p && Array.isArray(p.casi)) : [];
