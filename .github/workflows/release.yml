@@ -358,7 +358,7 @@ jobs:
           node scripts/release-apply-version.mjs "$ATTESA"
           QUI=$(git rev-parse HEAD)
           if [ "$QUI" != "$PROVATO" ]; then
-            echo "::error::qui c'e' $QUI, la suite ha provato ${PROVATO:-(niente)}: non costruisco codice mai provato."
+            echo "::error::qui c'e' $QUI, le prove importanti hanno provato ${PROVATO:-(niente)}: non costruisco codice mai provato."
             exit 1
           fi
           echo "sha=$QUI" >> "$GITHUB_OUTPUT"
