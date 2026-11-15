@@ -1250,7 +1250,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     }
     case 'pacchetto': {
       const server = vuoleServer(argv);
-      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri, ...(server ? { lavoroServer: true } : {}) });
+      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).numeri, ...(server ? { lavoroServer: true } : {}) });
       const fatto = esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
       if (!fatto) segnoServer(server, r);
       return fatto;
