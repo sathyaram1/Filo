@@ -316,10 +316,12 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     });
 
     test('legge gli allegati dei lavori provati, gli stessi che loro caricano', () => {
-      const caricaVerdetto = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
+      const caricaImp = passi(importantiJob).find((p) => /upload-artifact/.test(p.corpo));
+      const caricaCatena = passi(catenaJob).find((p) => /upload-artifact/.test(p.corpo));
       const caricaUnit = passi(unitJob).find((p) => /upload-artifact/.test(p.corpo));
       for (const [scarica, carica, cartella] of [
-        [passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/), caricaVerdetto, 'esiti-suite'],
+        [passoCon(/download-artifact[\s\S]*name:\s*importanti-registro/), caricaImp, 'esiti-importanti'],
+        [passoCon(/download-artifact[\s\S]*name:\s*catena-registro/), caricaCatena, 'esiti-catena'],
         [passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/), caricaUnit, 'esiti-unit'],
       ]) {
         assert.ok(scarica && carica);
