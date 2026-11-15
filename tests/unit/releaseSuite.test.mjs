@@ -1,6 +1,6 @@
-// La suite completa gira in GitHub a ogni fusione su main (suite.yml); la pubblicazione (release.yml)
-// prende il commit più nuovo di main con la suite verde. Qui si legge che i due workflow lo fanno davvero:
-// i testi del repo lo promettono, e un pezzo mancante pubblicherebbe senza suite, in silenzio.
+// La suite completa gira in GitHub a ogni fusione su main (suite.yml) e registra i suoi rossi; le prove importanti
+// (importanti.yml) decidono la pubblicazione (release.yml), che prende il loro ultimo verde (#2501). Qui si legge che i
+// workflow lo fanno davvero: i testi del repo lo promettono, e un pezzo mancante pubblicherebbe senza prove, in silenzio.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
