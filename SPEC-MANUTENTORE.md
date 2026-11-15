@@ -280,7 +280,8 @@ Il minimo di feedback; chi li prende usa sotto-agenti per area.
 
 **Server (filo-security), primo:**
 - chiave di classe «manutentore» sul canale delle routine, coi poteri del § 3
-  e niente altro; una sessione con quella chiave è non fidata;
+  e niente altro; una sessione con quella chiave scrive note che non sporcano
+  (#2215.1, § 1);
 - operazione che dà a quella chiave schede, testi e note di un feedback a
   scelta, e i rapporti dei biglietti (oggi servono il token admin e la chiave
   di decifratura, solo sul PC dell'owner);
