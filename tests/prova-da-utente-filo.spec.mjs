@@ -42,15 +42,10 @@ test('la conferma di Filo ha i segni sui suoi pulsanti, e il clic sul segno di O
     await clearMarks(app, shell);
     return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => m.label).sort();
   }, { timeout: 10_000 }).toEqual(['Annulla', 'OK']);
+  // Nel primo mezzo secondo la conferma non prende i sì (#592): il modello vero ci mette di più a rispondere.
+  await page.waitForTimeout(600);
   const { map } = await markInteractables(app, shell);
-  console.log('DBG raf', await page.evaluate(() => Promise.race([new Promise((r) => requestAnimationFrame(() => r('raf'))), new Promise((r) => setTimeout(() => r('niente raf'), 2000))])), await page.evaluate(() => [document.visibilityState, document.hasFocus()]));
-  const okM = map.find((m) => /^OK$/i.test(m.label));
-  console.log('DBG el', await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e && (e.className || e.tagName); }, [okM.x, okM.y]));
   await clickMark(app, shell, map, map.find((m) => /^OK$/i.test(m.label)).i);
-  console.log('DBG dopo', await page.evaluate(() => [window.__esitoConferma, !!document.querySelector('.sn-confirm-host')]));
-  await page.mouse.click(okM.x, okM.y);
-  await new Promise((r) => setTimeout(r, 700));
-  console.log('DBG dopo2', await page.evaluate(() => [window.__esitoConferma, !!document.querySelector('.sn-confirm-host')]));
   await expect.poll(() => page.evaluate(() => window.__esitoConferma)).toBe(true);
 });
 
