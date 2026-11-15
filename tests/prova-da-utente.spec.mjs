@@ -109,6 +109,14 @@ for (const modo of ['utente', 'chat']) {
   });
 }
 
+test('senza chiave il modo utente parte da Filo acceso lo stesso, e l\'esito avvisa che i modelli non rispondono', async () => {
+  test.skip(existsSync(join(ROOT, 'tests', 'agent', '.env')), 'la chiave sta nel file di chi prova: qui non si toglie');
+  const r = await prova([{ azione: 'fine', seBadge: ':(Scrivi|Preferenze)$' }], ['--compito', 'guarda'], { home: true, senzaChiave: true });
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
+  expect(readFileSync(join(r.cartella, 'esito.md'), 'utf8')).toMatch(/Attenzione.*Nessuna chiave OpenRouter/);
+  togliCartella(r.cartella);
+});
+
 test('una risposta servita da chi la politica non ammette interrompe la prova', async () => {
   const r = await prova([{ azione: 'fine', esito: 'riuscito' }], ['--compito', 'x'], { fornitore: 'Amazon Bedrock' });
   expect([r.codice, r.esito.esito], r.uscita).toEqual([3, 'interrotto']);
