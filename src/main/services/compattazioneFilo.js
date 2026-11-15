@@ -274,6 +274,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     s.ore.splice(s.ore.length - letto.ore.length, letto.ore.length);
     s.a = prima.a;
     s.da = prima.da;
+    s.fontiDa = prima.fontiDa;
     console.warn('[Filo] livelli del filo non salvati, il tratto resta com\'è:', e?.message || e);
     return { fatto: false, motivo: 'disco' };
   }
