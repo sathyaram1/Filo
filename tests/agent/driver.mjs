@@ -421,6 +421,24 @@ async function superficiVisibili(app, shell, view) {
     .filter((s) => s.pagina);
 }
 
+// Sui siti i pezzi di Filo (la conferma, i riquadri) stanno in radici chiuse che vede solo il mondo dei suoi content
+// script (lo stesso di tests/helpers/riquadri.mjs).
+const MONDO_CONTENT_SCRIPT = 999;
+async function segniNelMondoDiFilo(app, id) {
+  const code = `(${COLLECT_FN.toString()})(true)`;
+  try {
+    return await app.evaluate(async ({ webContents }, { id, mondo, code }) => {
+      const wc = webContents.fromId(id);
+      if (!wc || wc.isDestroyed()) return [];
+      const r = await Promise.race([
+        wc.executeJavaScriptInIsolatedWorld(mondo, [{ code }]).catch(() => []),
+        new Promise((ok) => setTimeout(() => ok([]), 2000)),
+      ]);
+      return Array.isArray(r) ? r : [];
+    }, { id, mondo: MONDO_CONTENT_SCRIPT, code });
+  } catch (_) { return []; }
+}
+
 const pagineSegnate = new Set();
 
 // Disegna i badge numerati su ogni superficie visibile e ritorna la mappa.
