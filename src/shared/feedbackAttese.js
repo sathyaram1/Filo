@@ -64,7 +64,7 @@
       if (!ID_RE.test(id) || visti.has(id)) continue;
       visti.add(id);
       // Un compito aspettato (#2269) ha per numero il suo id: `C-12`.
-      out.push({ id, num: COMPITO_RE.test(id) ? id : w && typeof w === 'object' ? normalizzaNumero(w.num) : '' });
+      out.push({ id, num: eCompito(id) ? id : w && typeof w === 'object' ? normalizzaNumero(w.num) : '' });
     }
     return out;
   }
