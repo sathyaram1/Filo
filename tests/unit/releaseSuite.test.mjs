@@ -606,7 +606,7 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
       assert.deepEqual(usciteDelLavoro(punta), {
         punta: { passo: 'rifai', chiave: 'punta' }, gia_verdi: { passo: 'rifai', chiave: 'gia_verdi' }, tutti: { passo: 'rifai', chiave: 'tutti' },
       });
-      const allarmeUnit = passi(senzaCommenti(job('avviso', SUITE_YML))).find((p) => /Unit test rossi su Windows/.test(p.corpo) && /build-alarm/.test(p.corpo));
+      const allarmeUnit = passi(senzaCommenti(job('avviso', IMP_YML))).find((p) => /Unit test rossi su Windows/.test(p.corpo) && /build-alarm/.test(p.corpo));
       for (const [env, uscita] of [['PUNTA', 'punta'], ['GIA_VERDI', 'gia_verdi'], ['TUTTI_GIA_VERDI', 'tutti']]) {
         assert.match(allarmeUnit.corpo, new RegExp(`^ {10}${env}: \\$\\{\\{ needs\\.unit-windows-punta\\.outputs\\.${uscita} \\}\\}$`, 'm'));
       }
