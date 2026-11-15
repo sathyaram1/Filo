@@ -1033,6 +1033,31 @@ export function spedisciAppPrimaDelServer(root, biglietto, { exec = execFileSync
 }
 
 /**
+ * Una fermata (`status design`) lascia il ramo a chi riparte: prima che il server la registri il ramo va su origin, alla
+ * punta della cartella, o il piano dà per fatto quello che nessuno ritroverà (#2516). Solo nella cartella del biglietto.
+ * → { ok, skipped, branch, punta, reason, righe }: un `ok` falso ferma la consegna.
+ */
+export function spedisciPrimaDellaFermata(root, biglietto, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (!marcatore || !marcatore.ticket || String(marcatore.ticket) !== String(biglietto || '') || bigliettoFinito(marcatore)) {
+    return { ok: true, skipped: true, branch: '', reason: 'non è la cartella di un biglietto vivo', righe: [] };
+  }
+  const p = spedisciAppPrimaDelServer(root, biglietto, { exec, env });
+  if (!p.ok || p.skipped) return p;
+  let remoto = '';
+  try {
+    remoto = String(exec('git', ['ls-remote', 'origin', `refs/heads/${p.branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '');
+  } catch (e) {
+    return { ...p, ok: false, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(String((e && (e.stderr || e.message)) || ''))}` };
+  }
+  const su = (remoto.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === `refs/heads/${p.branch}`) || [])[0] || '';
+  if (!p.punta || su.toLowerCase() !== p.punta.toLowerCase()) {
+    return { ...p, ok: false, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${String(p.punta || '?').slice(0, 9)}` };
+  }
+  return p;
+}
+
+/**
  * Un'operazione di git ferma a metà in `root` — «un rebase», «una fusione»,
  * «un cherry-pick», «un revert», o «la risoluzione di un conflitto» (file
  * non ancora fusi nell'indice) — oppure '' se non ce n'è nessuna. Stessa
@@ -2315,6 +2340,15 @@ if (isMain) {
     }
     const fermata = fermataSenzaDomanda(intento, data);
     if (fermata) { console.error(fermata); process.exit(1); }
+    if (intento === 'status' && data.status === 'design') {
+      const sped = spedisciPrimaDellaFermata(ROOT, biglietto);
+      for (const riga of sped.righe || []) console.error(riga);
+      if (!sped.ok) {
+        console.error(`Il ramo${sped.branch ? ` '${sped.branch}'` : ''} NON è su origin: ${sped.reason}`);
+        console.error('Non ho consegnato la fermata: chi riparte cercherebbe il lavoro su un ramo che non lo ha. Se la causa sta nel ramo (detta qui sopra) sistemala e rilancia lo stesso comando; altrimenti è un guasto da dichiarare nel rilascio. Non spingere a mano.');
+        process.exit(1);
+      }
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su

@@ -75,7 +75,7 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, ramoLegatoDaRiprendere, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
@@ -1177,6 +1177,7 @@ export function buildPayload(bucket, ctx = {}) {
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
       if (bucket.ripartenza) out.ripartenza = bucket.ripartenza;
+      if (bucket.ripartenzaPersa) out.ripartenzaPersa = { ...bucket.ripartenzaPersa, nota: testoRipartenzaPersa(bucket.ripartenzaPersa) };
       return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
     case 'risposta': {
@@ -1878,6 +1879,13 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
     process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
+  } else if (ferma || domanda) {
+    // Una consegna che si ferma lascia il ramo a chi riprende: prima su origin (#2516).
+    const canale = ch || await import('./routine-channel.mjs');
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const sped = canale.spedisciPrimaDellaFermata(ROOT, readTicket(ROOT));
+    for (const riga of sped.righe || []) process.stderr.write(`${riga}\n`);
+    if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
@@ -2324,6 +2332,7 @@ export async function run() {
     id: w.id || undefined,
     num: w.num || '',
     branch: w.branch || '',
+    ramoLegato: w.role === 'new-work' && w.payload && typeof w.payload.ramoLegato === 'string' ? w.payload.ramoLegato : '',
   };
   if (bucket.id) {
     // Lo stato locale resta il ripiego quando il server non risponde: si
@@ -2362,6 +2371,12 @@ export function tornaAllaLineaPrincipale() {
   return { ok: true, head: headSha(ROOT) };
 }
 
+/** La frase di una ripartenza persa (#2516), per chi lavora e per la conversazione del feedback. PURA. */
+export function testoRipartenzaPersa({ ramo = '', invece = '' } = {}) {
+  return `Il ramo ${ramo} a cui il lavoro era legato prima della fermata non c'è più su origin: si riparte da ${invece || MAIN_BRANCH}. `
+    + 'Quello che il piano o la ripresa danno per fatto su quel ramo va controllato nel codice e, se manca, rifatto.';
+}
+
 /**
  * A + D: posiziona la directory sul branch del bucket e registra nello stato
  * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
@@ -2395,12 +2410,22 @@ function positionOnBranch(bucket) {
   // Le basi feature/N del Modello B restano abolite (SPEC-RIDISEGNO-MAX.md §1).
   const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, num: bucket.num, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
   if (!precedenti.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin i tentativi precedenti di ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${precedenti.errore}` };
+  // Il ramo legato al feedback prima della fermata (#2516): base se nessun tentativo lo supera, e se manca si dice.
+  const legato = isNew && !dalBiglietto
+    ? ramoLegatoDaRiprendere({ root: ROOT, legato: bucket.ramoLegato, mainBranch: MAIN_BRANCH, escludi: branch })
+    : { ok: true, stato: 'nessuno', ramo: '' };
+  if (!legato.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin il ramo ${bucket.ramoLegato} a cui era legato ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${legato.errore}` };
+  const sorgente = precedenti.scelto || (legato.stato === 'presente' ? { ramo: legato.ramo, propri: legato.propri } : null);
+  if (legato.stato === 'perso') {
+    bucket.ripartenzaPersa = { ramo: legato.ramo, ...(sorgente ? { invece: sorgente.ramo } : {}) };
+    process.stderr.write(`[dispatch] ${bucket.id}: il ramo ${legato.ramo} a cui era legato non c'è più su origin; ${sorgente ? `si riparte da ${sorgente.ramo}` : `si riparte da ${MAIN_BRANCH}`}, e il piano o la ripresa che lo danno per fatto non valgono\n`);
+  }
   const res = prepareBranch({
     root: ROOT,
     branch,
     create: isNew && !dalBiglietto,
     createIfMissing: dalBiglietto,
-    base: precedenti.scelto ? precedenti.scelto.ramo : '',
+    base: sorgente ? sorgente.ramo : '',
     mainBranch: MAIN_BRANCH,
     checkpoint,
   });
@@ -2416,9 +2441,10 @@ function positionOnBranch(bucket) {
     if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
     if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
   }
-  const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
+  const ripartito = !!sorgente && res.base === `origin/${sorgente.ramo}`;
   if (ripartito) {
-    const { scelto, altri } = precedenti;
+    const scelto = sorgente;
+    const altri = precedenti.altri || [];
     process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
     const a = allineaAMain({ root: ROOT, mainBranch: MAIN_BRANCH });
     if (!a.ok) return { ok: false, kind: 'transient', message: `${branch}: non riesco a portare dentro il ${MAIN_BRANCH} di adesso, e senza si lavorerebbe sul codice di quando ${scelto.ramo} era partito: ${a.errore}` };
@@ -2682,7 +2708,10 @@ async function finalizeBucket(bucket, fromServer) {
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
-    const presa = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    const presa = await deliverToChannel('status', {
+      status: 'working', branch: bucket.branch || '',
+      ...(bucket.ripartenzaPersa ? { notes: testoRipartenzaPersa(bucket.ripartenzaPersa), ripartenzaPersa: bucket.ripartenzaPersa.ramo } : {}),
+    });
     // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
     if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
       const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
