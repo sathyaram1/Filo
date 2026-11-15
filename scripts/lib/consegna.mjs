@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import '../../src/shared/consegna.js';
-import { esitoSalvato, provaDelRamo, testoDelRamo } from '../prova-test-nuovi.mjs';
+import { cloneDellUltimaProva, esitoSalvato, provaDelRamo, testoDelRamo } from '../prova-test-nuovi.mjs';
 import { estremiDelLavoro } from './lettura-diff.mjs';
 
 const C = globalThis.SN_CONSEGNA;
