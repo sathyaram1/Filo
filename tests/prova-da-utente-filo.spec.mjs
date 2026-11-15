@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { preparaFilo } from './agent/provaPreparazione.mjs';
-import { markInteractables, clearMarks } from './agent/driver.mjs';
+import { markInteractables, clearMarks, clickMark } from './agent/driver.mjs';
 import { home, chiedi } from './helpers/chatFinta.mjs';
 
 test.describe('profilo nuovo', () => {
