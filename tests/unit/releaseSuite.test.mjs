@@ -110,7 +110,10 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'success')), true);
     assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'failure')), false, 'una suite rossa non segna niente');
     assert.equal(valutaCondizione(se, corsa('refs/heads/prova', 'success', 'success')), false);
-    assert.match(stabile, /node scripts\/segna-stabile\.mjs --commit "\$\{GITHUB_SHA\}"/);
+    assert.match(stabile, /PROVATO:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/);
+    assert.match(stabile, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/, 'col token che scrive gira lo strumento di main, non quello del commit chiesto');
+    assert.match(stabile, /git merge-base --is-ancestor "\$PROVATO" HEAD[\s\S]*exit 1[\s\S]*node scripts\/segna-stabile\.mjs --commit "\$PROVATO"/,
+      'un commit fuori da main non si segna');
     assert.match(stabile, /fetch-depth:\s*0/, 'il tag della versione si trova solo con la storia');
   });
 
