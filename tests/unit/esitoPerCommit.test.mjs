@@ -198,7 +198,7 @@ test('canale deliver: correzione e revisione partono con lo sha timbrato, e uno 
     const f = await lancia(['deliver', 'biglietto-finto', 'fixed', '--report', 'corretto il difetto', '--frase', 'ora va']);
     assert.equal(f.status, 0, f.stderr);
     assert.equal(ultimo().sha, atteso);
-    const v = await lancia(['deliver', 'biglietto-finto', 'status', '--status', 'revision_capability', '--notes', 'fatto', '--frase', 'ora va']);
+    const v = await lancia(['deliver', 'biglietto-finto', 'status', '--status', 'revision_capability', '--notes', 'fatto', '--frase', 'ora va', ...argomentiConsegna(dir)]);
     assert.equal(v.status, 0, v.stderr);
     assert.equal(ultimo().sha, atteso);
     const quanti = ricevuti.length;
