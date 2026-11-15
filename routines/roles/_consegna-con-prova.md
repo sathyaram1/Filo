@@ -54,7 +54,7 @@ file non vale. Lancialo tu, in sottofondo, insieme a `npm run finish:check`:
 `node scripts/prova-test-nuovi.mjs` (in un lavoro server trova da sé il clone
 del server; altrove `--server <clone>`). La consegna riprende quell'esito se
 dopo è cambiata solo la riga delle novità o un `.md`; se è cambiato del codice
-lo rifà lei, in primo piano, e con degli spec nuovi dura minuti: in quel caso
-lancia la consegna in sottofondo. Un caso verde anche senza il lavoro esce
+lo rifà lei, in primo piano, e con degli spec nuovi dura minuti: se dopo la
+prova hai cambiato del codice, rilanciala in sottofondo prima di consegnare. Un caso verde anche senza il lavoro esce
 segnalato: o la prova non prova il lavoro e la correggi, o nella riga del
 criterio 1 dici perché.
