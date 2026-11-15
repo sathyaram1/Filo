@@ -62,8 +62,9 @@ crescente del pacemaker sulle accensioni nate morte e il tetto sulle richieste
 al minuto.
 
 **Transizione.** Le centinaia di priorità 2 in coda oggi scendono a 1 in un
-colpo; la prima mattina il manutentore promuove la rosa. Nessuna segnalazione
-si perde: cambia solo quante 2 si vedono in Gestione.
+colpo. Nessuna segnalazione si perde: cambia solo quante 2 si vedono in
+Gestione. Il primo mattino dopo #2269 il manutentore toglie dal taccuino le
+regole sulla rosa.
 
 ## 3. Cosa può fare, e cosa no
 
