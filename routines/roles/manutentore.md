@@ -96,8 +96,11 @@ dei pronti contro i 2×N (`stato.pronti`). È il contesto piccolo: basta per una
   uguale (quelle già salvate non si rifanno), e una sessione che chiude prima lascia nel taccuino il censimento «in
   corso», che il mattino dopo riprende anche senza FERMO. Solo a censimento finito scrivi il giorno nel taccuino e apri
   un feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
-  (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
+  per la lettura intera, poi ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  (qui sotto) ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno. **Una volta
+  sola** (#2269, la rosa non c'è più): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le
+  sue regole (la scelta quotidiana delle 2, l'obiettivo di 2, la rosa che si riempie di giorno) e scrivi al loro posto
+  la regola dei 2×N; le 2 che restano non le riporti a 1 per forza, contano come importanti.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
 
