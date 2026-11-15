@@ -14,7 +14,8 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
 
-const FILE_NOVITA = 'src/shared/patchNotes.js';
+// Lo stesso di SN_NOVITA_FUSIONE.FILE: lo controlla tests/unit/unitSullaFusione.test.mjs.
+export const FILE_NOVITA = 'src/shared/patchNotes.js';
 // Solo quando serve: chi importa la prova per altro (dispatch, il canale) non deve dipendere da src/shared.
 const novitaFusione = () => {
   if (!globalThis.SN_NOVITA_FUSIONE) createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
