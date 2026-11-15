@@ -89,7 +89,7 @@
   }
 
   const testo = (v) => (typeof v === 'string' ? v.trim() : '');
-  const vaga = (t) => PROVE_VAGHE.has(t.toLowerCase().replace(/[’']/g, ' ').replace(/[.!,;:]+/g, '').replace(/\s+/g, ' ').trim());
+  const vaga = (t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).every((p) => PAROLE_VAGHE.has(p));
 
   /**
    * I motivi per cui una consegna non è buona (vuoto = buona), ognuno con la riga che li ha. `interfaccia`: i percorsi
