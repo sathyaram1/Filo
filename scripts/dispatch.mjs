@@ -2364,6 +2364,12 @@ export function tornaAllaLineaPrincipale() {
   return { ok: true, head: headSha(ROOT) };
 }
 
+/** La frase di una ripartenza persa (#2516), per chi lavora e per la conversazione del feedback. PURA. */
+export function testoRipartenzaPersa({ ramo = '', invece = '' } = {}) {
+  return `Il ramo ${ramo} a cui il lavoro era legato prima della fermata non c'è più su origin: si riparte da ${invece || MAIN_BRANCH}. `
+    + 'Quello che il piano o la ripresa danno per fatto su quel ramo va controllato nel codice e, se manca, rifatto.';
+}
+
 /**
  * A + D: posiziona la directory sul branch del bucket e registra nello stato
  * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
