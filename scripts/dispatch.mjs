@@ -924,11 +924,13 @@ export function rigaCartellaDiPartenza(cwd, root) {
 }
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
-export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs'), seServe = false } = {}) {
   const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
   if (!existsSync(f)) return '';
   const avanti = (p) => String(p).split('\\').join('/');
-  const testo = readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+  const prima = resolve(ROLES_DIR, LAVORO_SERVER_SE_SERVE_FILE);
+  const pezzi = [seServe && existsSync(prima) ? readFileSync(prima, 'utf8').trim() : '', readFileSync(f, 'utf8')].filter(Boolean);
+  const testo = pezzi.join('\n\n').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
   return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
