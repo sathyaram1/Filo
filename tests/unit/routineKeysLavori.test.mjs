@@ -35,7 +35,7 @@ test('routine-keys: rete e lavori si scrivono sul server, si vedono nell’elenc
     const l = await corri(['lavori', 'server', 'server']);
     assert.equal(l.code, 0, l.err);
     assert.deepEqual(chiamate(l), [{ op: 'lavori', slug: 'server', lavori: 'server' }]);
-    assert.match(l.out, /solo lavori server/);
+    assert.match(l.out, /i lavori server fidati e il primo lavoro di ogni feedback fidato/, '#2500');
     const n = await corri(['lavori', 'server', 'normali']);
     assert.deepEqual(chiamate(n), [{ op: 'lavori', slug: 'server', lavori: 'normali' }]);
     const r = await corri(['rete', 'server', 'limitata']);
