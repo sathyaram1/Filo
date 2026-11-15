@@ -16,6 +16,9 @@ import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
+import '../src/shared/prioritaTre.js';
+
+const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -749,12 +752,19 @@ async function tutteLeSchede(cred) {
 
 // ── Priorità, taccuino, indicazioni ─────────────────────────────────────────
 
-/** Una priorità che si può scrivere: 0..3, e una 3 non si abbassa (la toglie solo l'owner). PURA. */
+/** Una priorità che il manutentore può scrivere: la regola sta in src/shared/prioritaTre.js. PURA. */
 export function controlloPriorita(attuale, nuova) {
-  const v = /^[0-3]$/.test(String(nuova ?? '').trim()) ? Number(nuova) : null;
-  if (v === null) return { ok: false, motivo: 'la priorità è 0, 1, 2 o 3' };
-  if (Number(attuale) === 3 && v < 3) return { ok: false, motivo: 'una priorità 3 non si abbassa: la toglie solo l\'owner' };
-  return { ok: true, valore: v };
+  const c = PRIORITA_TRE.scrittura(attuale, nuova);
+  return c.ok ? c : { ok: false, motivo: c.motivo };
+}
+
+/** Le priorità di adesso dei feedback `nums` fra le schede del server, nello stesso ordine; null se non si legge o non c'è. */
+async function prioritaAttuali(cred, ...nums) {
+  const sc = await tutteLeSchede(cred);
+  return nums.map((num) => {
+    const s = sc.ok === false ? null : sc.schede.find((x) => String(x.num) === String(num));
+    return s ? s.priorita : null;
+  });
 }
 
 /** Il giorno in Italia (YYYY-MM-DD), quello che il server scrive accanto a un'indicazione. PURA. */
@@ -1209,9 +1219,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'parallelo': { const r = await chiama(cred, 'ordine', { parallelismo: Number(arg) }); return esito(r, (x) => `Parallelismo ${x.parallelismo}: ne valgono ${x.parallelismoEffettivo}, sotto il freno dell'owner.`); }
     case 'priorita': {
       const num = numeroDi(arg);
-      const sc = await tutteLeSchede(cred);
-      const attuale = sc.ok === false ? null : (sc.schede.find((s) => String(s.num) === num) || {}).priorita;
-      const c = controlloPriorita(attuale, argv[2]);
+      const c = controlloPriorita((await prioritaAttuali(cred, num))[0], argv[2]);
       if (!c.ok) { console.error(`RIFIUTATO: #${num}: ${c.motivo}. Non ho scritto niente.`); return 1; }
       const r = await chiama(cred, 'priorita', { numero: num, priorita: c.valore });
       return esito(r, (x) => `#${x.numero}: priorità da ${x.da ?? '?'} a ${x.a}.`);
@@ -1234,7 +1242,16 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const r = await chiama(cred, cmd, { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
       return esito(r, rigaNotaOSblocco);
     }
-    case 'archivia': { const r = await chiama(cred, 'archivia', { numero: numeroDi(arg), doppioneDi: numeroDi(argv[2]) }); return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`); }
+    case 'archivia': {
+      const num = numeroDi(arg);
+      const originale = numeroDi(argv[2]);
+      // Doppione di una 3: la 3 resta aperta nell'originale, e il server ricontrolla che quello vada avanti.
+      const [attuale, continuaA] = await prioritaAttuali(cred, num, originale);
+      const c = PRIORITA_TRE.archiviazione(attuale, { continuaA });
+      if (!c.ok) { console.error(`RIFIUTATO: #${num}: ${c.motivo}. Non ho scritto niente.`); return 1; }
+      const r = await chiama(cred, 'archivia', { numero: num, doppioneDi: originale });
+      return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`);
+    }
     case 'taccuino': {
       if (arg === 'scrivi') {
         const testo = await leggiStdin();
@@ -1341,7 +1358,7 @@ export function controlliLocali(cmd, argv) {
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
-    case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
+    case 'priorita': return num(a, cmd) || (PRIORITA_TRE.leggi(b) === null ? 'la priorità è 0, 1, 2 o 3' : '');
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');

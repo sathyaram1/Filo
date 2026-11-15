@@ -35,7 +35,7 @@ taccuino. I giudici assegnano 3 o lasciano 1: la 2 è solo tua.
 ## Cosa puoi, e cosa no
 
 Puoi, da solo: scrivere l'**ordine** e il **parallelismo N** (il server accende una sessione per feedback
-nell'ordine, fino a N); cambiare le **priorità** (0, 1, 2; creare una 3, mai abbassarla); comporre **pacchetti** e
+nell'ordine, fino a N); cambiare le **priorità** (0, 1, 2; creare una 3, mai abbassarla né archiviarla); comporre **pacchetti** e
 mettere **attese** fra feedback; aprire feedback e domande, archiviare doppioni, mettere note; **sbloccare** un lavoro
 fermo per guasto; **spegnere e riaccendere** un account o le routine e scegliere quale account usare prima; fare
 **esperimenti** entro i quattro paletti; chiedere ai worker **dati nuovi** con un feedback; riscrivere le **novità**
@@ -269,7 +269,7 @@ npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
 npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
-npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato
+npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato; una 3 solo se l'originale è a 3 e avanza
 npm run manutentore -- taccuino | taccuino scrivi - --versione <V>
 npm run manutentore -- indicazione "<testo>"       # nel taccuino, con la data
 npm run manutentore -- sveglia-tra <minuti> [--perche "…"] | sveglia-togli   # minimo 5
