@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { absolutizeOutput, pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { estremiDelLavoro, parteDelServer, ramoCorrente } from './lib/lettura-diff.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
 import { PROVE_SERVER, provaTestNuovi, testoDellaProva, VERSIONE } from './lib/prova-test-nuovi.mjs';
 
 const USO = 'node scripts/prova-test-nuovi.mjs [--base <sha>] [--server <clone>] [--json]';
