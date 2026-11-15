@@ -131,8 +131,11 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
 
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
   assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
-  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
+  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback né id di compiti \(C-12\): menu/);
   assert.equal(M.leggiOrdine('').ok, false);
+  // #2269: un compito sta nell'ordine col suo id; in un pacchetto no.
+  assert.deepEqual(M.leggiOrdine('C-12, 812, c-12').numeri, ['C-12', '812']);
+  assert.match(M.leggiOrdine('812,C-12', { compiti: false }).motivo, /non sono numeri di feedback: C-12/);
   const tanti = Array.from({ length: M.ORDINE_MAX + 1 }, (_, i) => String(i + 1)).join(',');
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
 });
