@@ -30,7 +30,7 @@
   const r = (s) => new RegExp(s);
   const ZONE = Object.freeze([
     { chiave: 'dati', nome: 'formato dei dati salvati e migrazioni',
-      app: [r('^src/shared/storage\\.js$'), r('^src/main/services/scritturaAtomica\\.js$'), r('(^|/)[^/]*Migrazione\\.js$'),
+      app: [r('^src/(shared|main/shim)/storage\\.js$'), r('^src/main/services/scritturaAtomica\\.js$'), r('(^|/)[^/]*Migrazione\\.js$'),
         r('^scripts/[^/]*-migra\\.mjs$'), r('^src/main/cancellaTutto\\.js$'), r('^(firestore|storage)\\.rules$')],
       server: [r('(^|/)[^/]*Migrazione\\.js$'), r('(^|/)(firestore|storage)\\.rules$')] },
     { chiave: 'conferme', nome: 'conferme prima di un\'azione o di un comando',
