@@ -10,6 +10,7 @@ import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { fileConsegna } from '../helpers/consegnaDiProva.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
 import { newWorkBranch } from '../../scripts/lib/branch-integrity.mjs';
 
