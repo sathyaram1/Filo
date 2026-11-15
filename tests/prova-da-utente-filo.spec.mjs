@@ -37,11 +37,9 @@ test('la conferma di Filo ha i segni sui suoi pulsanti, e il clic sul segno di O
     window.__esitoConferma = 'aperta';
     window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Aprire la pagina?' }).then((ok) => { window.__esitoConferma = ok; });
   });
-  let ok = null;
   await expect.poll(async () => {
     const { map } = await markInteractables(app, shell);
-    ok = map.find((m) => /^OK$/i.test(m.label)) || null;
-    if (!ok) await clearMarks(app, shell);
+    await clearMarks(app, shell);
     return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => m.label).sort();
   }, { timeout: 10_000 }).toEqual(['Annulla', 'OK']);
   const { map } = await markInteractables(app, shell);
