@@ -186,7 +186,7 @@ jobs:
           exit 1
 
   # Suite verde su main: la versione costruita da questo commit, se c'è, si segna «stabile». Se esce dopo, la segna la
-  # pubblicazione stessa (release.yml), che chiede se la suite di quel commit è verde.
+  # pubblicazione stessa (release.yml) se la suite di quel commit è già verde, altrimenti chiede qui una corsa su di lui.
   stabile:
     needs: [suite, verdetto]
     if: always() && !cancelled() && github.ref == 'refs/heads/main' && needs.suite.result == 'success' && needs.verdetto.result == 'success'
