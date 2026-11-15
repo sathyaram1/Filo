@@ -111,7 +111,6 @@ async function main() {
   });
   const v = verdettoImportanti({ codice, durataMs: Date.now() - inizio, tettoS: opt.tettoS, catena: opt.catena });
   console.log(v.testo);
-  const { appendFileSync, writeFileSync } = await import('node:fs');
   if (opt.chiavi) writeFileSync(resolve(opt.chiavi), v.chiavi.length ? `${v.chiavi.join('\n')}\n` : '', 'utf8');
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${v.testo}\n`);
   if (v.sopra && process.env.GITHUB_ACTIONS) console.log(`::error::${v.testo.split('\n')[1]}`);
