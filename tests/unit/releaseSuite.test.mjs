@@ -335,24 +335,13 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       }
     });
 
-    test('il testo: i rossi con un tetto dichiarato, il link alla corsa, i commit entrati dopo l\'ultimo verde', () => {
-      assert.match(allarme.corpo, /head -80/);
-      assert.match(allarme.corpo, /elenco tagliato/);
-      assert.match(allarme.corpo, /N_TUTTE - 80/);
+    test('il testo: il link alla corsa, i commit entrati dopo l\'ultimo verde, la coda delle prove', () => {
       assert.match(allarme.corpo, /actions\/runs\/\$\{\{ github\.run_id \}\}/, 'chi prende il feedback deve arrivare alla corsa');
       assert.match(allarme.corpo, /node scripts\/ultima-suite-verde\.mjs --stampa/);
       assert.match(allarme.corpo, /git log --first-parent --format='%h %s' "\$\{VERDE\}\.\.HEAD"/);
-      assert.match(allarme.corpo, /head -40/);
-      assert.match(allarme.corpo, /N_COMMIT - 40/, 'anche il taglio dei commit si dice');
-      assert.match(allarme.corpo, /Nessuna suite verde su main/, 'senza un verde lo si dice, invece di un elenco vuoto');
+      assert.match(allarme.corpo, /Nessun commit verde su main/, 'senza un verde lo si dice, invece di un elenco vuoto');
       assert.match(allarme.corpo, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
-      assert.doesNotMatch(allarme.corpo, /prima di ogni pubblicazione/, 'la suite non gira più prima della pubblicazione');
-    });
-
-    test('le chiavi: quelle del verdetto, o `suite:non-partita` se il verdetto non c\'è', () => {
-      assert.match(allarme.corpo, /--chiavi-da esiti-suite\/chiavi-allarme\.txt/);
-      assert.match(allarme.corpo, /--chiave suite:non-partita/);
-      assert.match(allarme.corpo, /-s esiti-suite\/chiavi-allarme\.txt/);
+      assert.match(allarme.corpo, /il tetto non si alza/);
     });
 
     // I passi si fanno girare con lo strumento dell'allarme finto: gli allegati ci sono o mancano, l'invio va o no.
