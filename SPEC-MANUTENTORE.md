@@ -130,7 +130,7 @@ intanto entra uno di classe più bassa in un'area libera; un compito può stare
 davanti a un feedback; un lavoro già iniziato non si mette in attesa di uno
 non iniziato. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
 nessun battito l'ha riempita e le quote sono rimaste ferme per quattordici ore
-circa; nelle 48 ore fino al 07/11 nessun primo lavoro era partito in 32.
+circa.
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
