@@ -4001,10 +4001,30 @@
     })().catch(() => { /* restano «stato non letto»: chi li aspetta resta fra quelli che aspettano, come per la coda */ });
   }
 
+  // Aperto se l'elenco dei compiti aperti lo porta, chiuso altrimenti: la regola della coda (un compito chiuso scioglie
+  // l'attesa, qualunque esito). Su un errore restano «stato non letto», e chi li aspetta resta fra quelli che aspettano.
+  function caricaCompitiAttesi(ids) {
+    if (compitiAttesiInLettura) return;
+    const nuovi = [...ids].some((id) => !attesiFuori.has(id));
+    if (!nuovi && Date.now() - compitiAttesiLettiMs < COMPITI_ATTESI_OGNI_MS) return;
+    compitiAttesiInLettura = true;
+    (async () => {
+      const r = await sendToMain({ type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.COMPITI_ELENCO) || 'compiti_elenco' });
+      compitiAttesiLettiMs = Date.now();
+      if (!r || !r.ok || !Array.isArray(r.aperti)) return;
+      const aperti = new Set(r.aperti.map((c) => String((c && c.id) || '')));
+      for (const id of ids) attesiFuori.set(id, { _id: id, compito: true, status: aperti.has(id) ? 'todo' : 'done' });
+      renderList();
+      const aperto = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (aperto) reflectAttese(aperto);
+    })().catch(() => {}).finally(() => { compitiAttesiInLettura = false; });
+  }
+
   function numeroDi(doc) {
     return doc ? FB.formatNum(doc.seq, doc.subSeq) : '';
   }
   function statoAttesaTesto(w) {
+    if (ATT.eCompito(w.id)) return w.stato === ATT.STATO.APERTO ? 'aperto' : w.stato === ATT.STATO.FUSO ? 'chiuso' : ATT.ETICHETTA[w.stato] || w.stato;
     if (w.stato !== ATT.STATO.APERTO) return ATT.ETICHETTA[w.stato] || w.stato;
     const doc = trovaAtteso(w.id);
     const info = doc && window.SN_FB_STATUS && window.SN_FB_STATUS.STATUSES[MR.normalizeStatus(doc).status];
