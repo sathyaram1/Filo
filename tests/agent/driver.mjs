@@ -417,7 +417,7 @@ async function superficiVisibili(app, shell, view) {
   // Una scheda appena nata può non avere ancora il suo bersaglio fra le pagine: la sua Page la dà activeView.
   const riserva = { shell, view };
   return elenco.superfici
-    .map((s) => ({ tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) || riserva[s.tipo] }))
+    .map((s) => ({ id: s.id, tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) || riserva[s.tipo] }))
     .filter((s) => s.pagina);
 }
 
