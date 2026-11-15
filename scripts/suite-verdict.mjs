@@ -531,6 +531,8 @@ function scriviErrori(opt, nuovi) {
   if (opt.errori) writeFileSync(resolve(opt.errori), testo ? `${testo}\n` : '', 'utf8');
 }
 
+const COMMIT_PROVATO = process.env.SUITE_COMMIT || process.env.GITHUB_SHA || '';
+
 async function main() {
   const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--errori <file>] [--parti <N> --esiti <cartella>]';
   let opt;
