@@ -499,7 +499,11 @@
       );
     } else {
       if (p && p.stato === 'finita') riga.appendChild(testo(`Cancellati ${formatInt(p.cancellati)} il ${formatDateTime(p.finitaIl)}.`));
-      if (p && p.stato === 'fermata') riga.appendChild(testo(`Pulizia fermata dopo ${formatInt(p.cancellati)}.`));
+      if (p && p.stato === 'fermata') {
+        riga.appendChild(testo(p.motivo === 'portafogli'
+          ? `Pulizia fermata dal server dopo ${formatInt(p.cancellati)}: ha letto ${formatInt(p.portafogliLetti)} portafogli invece di ${formatInt(p.portafogli)}, e non sapeva più chi salvare.`
+          : `Pulizia fermata dopo ${formatInt(p.cancellati)}.`));
+      }
       if (c && c.superato) riga.appendChild(testo('Il server li riconta a breve.'));
       else if (c && Number(c.cancellabili) > 0) riga.appendChild(bottoneCancella(c));
     }
