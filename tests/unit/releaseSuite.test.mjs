@@ -16,7 +16,7 @@ const SUITE_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'suite.yml'
 const IMP_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'importanti.yml'), 'utf8');
 const SCEGLI_JS = readFileSync(resolve(ROOT, 'scripts', 'ultima-suite-verde.mjs'), 'utf8');
 const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
-const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS } = await import('../../scripts/ultima-suite-verde.mjs');
+const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS, WORKFLOW_VERDE } = await import('../../scripts/ultima-suite-verde.mjs');
 const { nomeEsitoParte, rossiDellePartiMancanti } = await import('../../scripts/suite-verdict.mjs');
 const { chiaviDelRegistroUnit } = await import('../../scripts/build-alarm.mjs');
 
