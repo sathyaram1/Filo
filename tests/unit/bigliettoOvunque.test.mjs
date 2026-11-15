@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { argomentiConsegna } from '../helpers/consegnaDiProva.mjs';
 import { bigliettoAMano, parolaInPiu } from '../../scripts/routine-channel.mjs';
 import { leggiBigliettoAMano } from '../../scripts/lib/routine-ticket.mjs';
 
