@@ -99,6 +99,22 @@ test('sotto le versioni uscite: le righe che la fusione aggiunge a un blocco gi�
   assert.throws(() => sottoUscite({ main, fuso, uscita: 'x' }), /a\.b\.c/);
 });
 
+test('la prova sulla fusione e la sentinella danno la stessa risposta: una riga uscita riformulata non è una riga nuova', () => {
+  const main = registro(blocco('0.2.12', { features: ["'di main'"] }), blocco('0.2.11', { features: ["'a'"], fixes: ["{ testo: 'corretta', segnalazione: 9 }"] }));
+  const casi = {
+    riformulata: registro(blocco('0.2.12', { features: ["'di main'"] }), blocco('0.2.11', { features: ["'a, detto meglio'"], fixes: ["{ testo: 'corretta', segnalazione: 9 }"] })),
+    aggiunta: registro(blocco('0.2.12', { features: ["'di main'"] }), blocco('0.2.11', { features: ["'a'", "'del ramo'"], fixes: ["{ testo: 'corretta', segnalazione: 9 }"] })),
+    spostata: registro(blocco('0.2.12', { features: ["'di main'", "'a'"] }), blocco('0.2.11', { fixes: ["{ testo: 'corretta', segnalazione: 9 }"] })),
+  };
+  for (const [nome, fuso] of Object.entries(casi)) {
+    const sentinella = aggiunteSottoUscite(dati(main), dati(fuso), '0.2.11').map((r) => [r.version, r.chiave]);
+    const prova = sottoUscite({ main, fuso, uscita: '0.2.11' }).map((r) => [r.version, r.chiave]);
+    assert.deepEqual(prova, sentinella, nome);
+  }
+  assert.deepEqual(sottoUscite({ main, fuso: casi.riformulata, uscita: '0.2.11' }), []);
+  assert.equal(sottoUscite({ main, fuso: casi.aggiunta, uscita: '0.2.11' }).length, 1);
+});
+
 test('una riga che si sposta è solo un dato: stringa su una riga, o { testo, segnalazione }', () => {
   for (const ok of ["'x'", '"x \\" y"', "'l\\'altra'", "{ testo: 'x', segnalazione: 12 }", "{ testo: \"x\" }"]) assert.equal(rigaDiDati(ok), true, ok);
   for (const no of ['`x${a}`', "'a' + b", "{ testo: 'x', segnalazione: f() }", "{ testo: 'x', altro: 1 }", "x()", "'a'\n'b'"]) assert.equal(rigaDiDati(no), false, no);
