@@ -4,8 +4,9 @@
 //
 // PERCHÉ ESISTE
 //   La suite completa gira SOLO in GitHub Actions, a ogni fusione su main
-//   (.github/workflows/suite.yml), e si pubblica solo un commit con la suite
-//   verde. Lì un rosso non vale per forza «non pubblicare»: nel contenitore
+//   (.github/workflows/suite.yml): non decide la pubblicazione (#2501), ma i
+//   suoi rossi li raccoglie il lavoro settimanale, e a suite verde la versione
+//   si segna «stabile». Un rosso non vale per forza «guasto»: nel contenitore
 //   senza schermo ci sono casi che sono rossi da sempre e per motivi
 //   d'ambiente (una cattura dello schermo, un sito esterno), scritti in
 //   tests/rossi-noti.json → contenitore.specs. Senza questo confronto la
