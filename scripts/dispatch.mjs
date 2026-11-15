@@ -498,10 +498,11 @@ export function leggiOpzioniRegistrazione(list) {
  * Il payload della consegna «corretto», con la domanda se c'è. `sha`: la punta della cartella, che il registro del
  * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
  */
-export function fixedPayload({ report, frase, branch, ferma, sha, domanda, motivo, riallineamento, prova } = {}) {
+export function fixedPayload({ report, frase, branch, ferma, sha, domanda, motivo, riallineamento, prova, consegna } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (domanda && typeof domanda === 'object') p.domanda = domanda;
   if (prova && typeof prova === 'object') p.prova = prova;
+  if (consegna && typeof consegna === 'object') p.consegna = consegna;
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   if (motivo && typeof motivo === 'object' && motivo.tipo) p.motivo = motivo;
