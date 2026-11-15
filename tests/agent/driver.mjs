@@ -413,8 +413,11 @@ const pagineSegnate = new Set();
 export async function markInteractables(app, shell) {
   const view = await activeView(app, shell);
   const superfici = await superficiVisibili(app);
-  if (!superfici.some((s) => s.tipo === 'shell')) superfici.unshift({ tipo: 'shell', x: 0, y: 0, pagina: shell });
-  if (view && !superfici.some((s) => s.pagina === view)) superfici.push({ tipo: 'view', x: 0, y: SHELL_HEIGHT, pagina: view });
+  // Solo se l'elenco non si è potuto fare: una scheda che l'elenco ha scartato non si vede neanche nella schermata.
+  if (!superfici.length) {
+    superfici.push({ tipo: 'shell', x: 0, y: 0, pagina: shell });
+    if (view) superfici.push({ tipo: 'view', x: 0, y: SHELL_HEIGHT, pagina: view });
+  }
   const map = [];
   let i = 0;
   for (const s of superfici) {
@@ -422,7 +425,11 @@ export async function markInteractables(app, shell) {
     try { segni = await s.pagina.evaluate(COLLECT_FN); } catch (_) { continue; }
     const qui = [];
     for (const m of segni) {
-      const voce = { i: ++i, page: s.tipo, ...m, cx: Math.round(m.x + s.x), cy: Math.round(m.y + s.y) };
+      const cx = m.x + s.x;
+      const cy = m.y + s.y;
+      // Un elemento nella parte della superficie tagliata via dalla madre o dalla finestra non sta nella schermata.
+      if (s.clip && (cx < s.clip.x || cy < s.clip.y || cx > s.clip.x + s.clip.w || cy > s.clip.y + s.clip.h)) continue;
+      const voce = { i: ++i, page: s.tipo, ...m, cx: Math.round(cx), cy: Math.round(cy) };
       Object.defineProperty(voce, 'pagina', { value: s.pagina, enumerable: false });
       map.push(voce);
       qui.push({ i: voce.i, x: m.x, y: m.y, w: m.w, h: m.h });
