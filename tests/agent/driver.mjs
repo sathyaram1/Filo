@@ -369,20 +369,85 @@ function DRAW_FN(marks) {
 
 function CLEAR_FN() { const l = document.getElementById('__filo_marks__'); if (l) l.remove(); }
 
-// Disegna i badge numerati su shell+view e ritorna la mappa.
-// Ritorna [{ i, page:'shell'|'view', x, y, tag, label, cx, cy }] dove (cx,cy) sono
+// Le superfici che si vedono ora, dal basso in alto, con lo stesso giro di captureCompositeElectron: senza gli strati
+// sopra la scheda (il menu del tasto destro sulle pagine web, i riquadri) un modello vedeva voci che non poteva cliccare.
+// `tipo`: 'shell', 'view' (la scheda attiva) o 'strato'; (x, y) è dove sta la superficie nella finestra.
+async function superficiVisibili(app) {
+  const elenco = await app.evaluate(async ({ BrowserWindow }) => {
+    const all = BrowserWindow.getAllWindows();
+    const win = all.find((w) => w._filoTabs) || all[0];
+    if (!win) return [];
+    const cb = win.getContentBounds();
+    const tm = win._filoTabs;
+    const attiva = tm?.tabs?.find((t) => t.id === tm.activeId)?.view?.webContents || null;
+    const strati = [];
+    const visti = new Set();
+    const aggiungi = (wc, x, y, tipo) => {
+      if (!wc || wc.isDestroyed() || visti.has(wc.id)) return;
+      visti.add(wc.id);
+      strati.push({ wc, x, y, tipo });
+    };
+    const discendi = (view, ox, oy) => {
+      for (const c of view.children || []) {
+        const b = c.getBounds();
+        if (!b.width || !b.height) continue;
+        if (c.webContents) aggiungi(c.webContents, ox + b.x, oy + b.y, c.webContents === attiva ? 'view' : 'strato');
+        discendi(c, ox + b.x, oy + b.y);
+      }
+    };
+    aggiungi(win.webContents, 0, 0, 'shell');
+    discendi(win.contentView, 0, 0);
+    for (const f of win.getChildWindows()) {
+      if (f.isDestroyed() || !f.isVisible()) continue;
+      const fb = f.getContentBounds();
+      aggiungi(f.webContents, fb.x - cb.x, fb.y - cb.y, 'strato');
+      discendi(f.contentView, fb.x - cb.x, fb.y - cb.y);
+    }
+    const visibilita = (wc) => Promise.race([
+      wc.executeJavaScript('document.visibilityState').catch(() => 'visible'),
+      new Promise((r) => setTimeout(() => r('visible'), 1000)),
+    ]);
+    const attendibili = (await visibilita(win.webContents)) !== 'hidden';
+    const out = [];
+    for (const s of strati) {
+      if (s.tipo === 'strato' && attendibili && (await visibilita(s.wc)) === 'hidden') continue;
+      out.push({ bersaglio: s.wc.getOrCreateDevToolsTargetId(), x: s.x, y: s.y, tipo: s.tipo });
+    }
+    return out;
+  });
+  const perBersaglio = new Map();
+  for (const page of app.windows()) {
+    const b = await bersaglioDi(page);
+    if (b) perBersaglio.set(b, page);
+  }
+  return elenco.map((s) => ({ ...s, pagina: perBersaglio.get(s.bersaglio) })).filter((s) => s.pagina);
+}
+
+const pagineSegnate = new Set();
+
+// Disegna i badge numerati su ogni superficie visibile e ritorna la mappa.
+// Ritorna [{ i, page:'shell'|'view'|'strato', x, y, tag, label, cx, cy }] dove (cx,cy) sono
 // coordinate COMPOSITE (per riferimento del modello) e (x,y) di pagina (per il click).
+// La Page di ogni segno sta in `m.pagina`, non enumerabile: la mappa resta stampabile.
 export async function markInteractables(app, shell) {
   const view = await activeView(app, shell);
-  const shellMarks = await shell.evaluate(COLLECT_FN);
-  const viewMarks = view ? await view.evaluate(COLLECT_FN) : [];
+  const superfici = await superficiVisibili(app);
+  if (!superfici.some((s) => s.tipo === 'shell')) superfici.unshift({ tipo: 'shell', x: 0, y: 0, pagina: shell });
+  if (view && !superfici.some((s) => s.pagina === view)) superfici.push({ tipo: 'view', x: 0, y: SHELL_HEIGHT, pagina: view });
   const map = [];
   let i = 0;
-  for (const m of shellMarks) map.push({ i: ++i, page: 'shell', ...m, cx: Math.round(m.x), cy: Math.round(m.y) });
-  for (const m of viewMarks) map.push({ i: ++i, page: 'view', ...m, cx: Math.round(m.x), cy: Math.round(m.y) + SHELL_HEIGHT });
-  // disegna
-  await shell.evaluate(DRAW_FN, map.filter((m) => m.page === 'shell').map((m) => ({ i: m.i, x: m.x, y: m.y, w: m.w, h: m.h })));
-  if (view) await view.evaluate(DRAW_FN, map.filter((m) => m.page === 'view').map((m) => ({ i: m.i, x: m.x, y: m.y, w: m.w, h: m.h })));
+  for (const s of superfici) {
+    let segni = [];
+    try { segni = await s.pagina.evaluate(COLLECT_FN); } catch (_) { continue; }
+    const qui = [];
+    for (const m of segni) {
+      const voce = { i: ++i, page: s.tipo, ...m, cx: Math.round(m.x + s.x), cy: Math.round(m.y + s.y) };
+      Object.defineProperty(voce, 'pagina', { value: s.pagina, enumerable: false });
+      map.push(voce);
+      qui.push({ i: voce.i, x: m.x, y: m.y, w: m.w, h: m.h });
+    }
+    try { await s.pagina.evaluate(DRAW_FN, qui); pagineSegnate.add(s.pagina); } catch (_) {}
+  }
   return { map, view };
 }
 
@@ -390,16 +455,24 @@ export async function clearMarks(app, shell) {
   try { await shell.evaluate(CLEAR_FN); } catch (_) {}
   const view = await activeView(app, shell);
   if (view) { try { await view.evaluate(CLEAR_FN); } catch (_) {} }
+  for (const p of pagineSegnate) {
+    pagineSegnate.delete(p);
+    if (p === shell || p === view || p.isClosed()) continue;
+    try { await p.evaluate(CLEAR_FN); } catch (_) {}
+  }
 }
 
 // Click su un mark dalla mappa (coordinate di pagina → robusto, niente pixel-hunting).
-export async function clickMark(app, shell, map, index) {
+// `opzioni` come in page.mouse.click ({ button: 'right' }, { clickCount: 2 }); ritorna la Page cliccata, quella che
+// riceve i tasti dopo.
+export async function clickMark(app, shell, map, index, opzioni = {}) {
   const m = map.find((x) => x.i === index);
   if (!m) throw new Error('mark ' + index + ' inesistente');
   await clearMarks(app, shell);
-  const page = m.page === 'shell' ? shell : await activeView(app, shell);
-  await page.mouse.click(m.x, m.y);
+  const page = m.pagina && !m.pagina.isClosed() ? m.pagina : (m.page === 'shell' ? shell : await activeView(app, shell));
+  await page.mouse.click(m.x, m.y, opzioni);
   await sleep(400);
+  return page;
 }
 
 // Click libero in coordinate composite.
