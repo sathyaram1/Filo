@@ -67,7 +67,8 @@ async function main() {
     const lavori = forse(() => JSON.parse(sh('gh', ['api', `repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`, '--jq', '[.jobs[] | {id, name}]'])));
     const verdetto = Array.isArray(lavori) ? lavori.find((j) => j.name === 'verdetto') : null;
     if (verdetto) registro = leggiRegistro(forse(() => sh('gh', ['api', `repos/${repo}/actions/jobs/${verdetto.id}/logs`])));
-    corse.push({ sha: r.head_sha, url: r.html_url, quando: r.created_at, registro });
+    // Una corsa chiesta per una versione prova un commit più vecchio della punta su cui parte: vale quello del registro.
+    corse.push({ sha: registro?.commit || r.head_sha, url: r.html_url, quando: r.created_at, registro });
   }
   forse(() => sh('git', ['fetch', '--quiet', 'origin', 'main']));
   const primoGenitore = forse(() => sh('git', ['rev-list', '--first-parent', '--max-count=3000', 'origin/main'])).split('\n').filter(Boolean);
