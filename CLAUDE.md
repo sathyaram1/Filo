@@ -180,12 +180,20 @@ osservato. Minimi per tipo di modifica:
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`);
+- **le prove importanti** (`npm run test:importanti`: i cammini principali su
+  un avvio solo, rosse sopra i 4 minuti) le lancia ogni lavoro prima di
+  consegnare, dentro `npm run finish:check`, e decidono la pubblicazione: ogni
+  sei ore esce il commit più nuovo di main con prove importanti, catena degli
+  aggiornamenti e unit verdi (`importanti.yml`). L'elenco lo cambiano solo
+  l'owner e il manutentore: chi lavora non ci aggiunge prove;
 - **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
-  a ogni fusione su main (`suite.yml`), e un rosso nuovo diventa un feedback;
-  ogni sei ore si pubblica il commit più nuovo con la suite verde. Al suo
-  posto chi verifica lancia `npm run finish:check` (unit più gli spec delle
-  aree toccate). Le regressioni restano di chi le introduce: se ne temi una
-  precisa, lancia quello spec.
+  a ogni fusione su main (`suite.yml`) e registra quale fusione ha reso rossa
+  quale prova, senza aprire feedback; una volta a settimana un compito solo la
+  riporta verde (`node scripts/rossi-della-suite.mjs` dà l'elenco) e la
+  versione di un commit con la suite verde si segna «stabile». Al suo posto chi
+  verifica lancia `npm run finish:check` (unit, prove importanti e gli spec
+  delle aree toccate). Le regressioni restano di chi le introduce: se ne temi
+  una precisa, lancia quello spec.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
