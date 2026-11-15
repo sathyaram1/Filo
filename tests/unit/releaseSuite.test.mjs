@@ -77,10 +77,37 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.match(avvisoJob, /fetch-depth:\s*0/);
   });
 
-  test('permessi di sola lettura: legge le corse, non scrive niente', () => {
+  test('permessi di sola lettura: scrive solo `stabile`, su main e nell\'ambiente fisso', () => {
     const on = intestazione(SUITE_YML);
     assert.match(on, /permissions:\s*\n\s+contents:\s*read\s*\n\s+actions:\s*read/);
-    assert.doesNotMatch(SUITE_YML, /:\s*write\b/, 'la suite non ha niente da scrivere');
+    const stabile = senzaCommenti(job('stabile', SUITE_YML));
+    assert.doesNotMatch(SUITE_YML.replace(job('stabile', SUITE_YML), ''), /:\s*write\b/, 'la suite non ha niente da scrivere');
+    assert.match(stabile, /^ {6}contents:\s*write\s*$/m);
+    assert.match(stabile, /^ {4}environment:\s*rilascio\s*$/m);
+    assert.match(intestazione(IMP_YML), /permissions:\s*\n\s+contents:\s*read\s*\n\s+actions:\s*read/);
+    assert.doesNotMatch(IMP_YML, /:\s*write\b/, 'le prove importanti non hanno niente da scrivere');
+  });
+
+  // #2501: un rosso della suite non apre più feedback; lo raccoglie il lavoro settimanale dalle righe del registro.
+  test('un rosso della suite non apre feedback: il verdetto lo registra a macchina, nel registro del lavoro', () => {
+    assert.doesNotMatch(senzaCommenti(SUITE_YML), /build-alarm|FILO_BUILD_PASSPHRASE/);
+    assert.doesNotMatch(SUITE_YML, /^\s{2}avviso:\s*$/m);
+    assert.doesNotMatch(SUITE_YML, /^\s{2}unit-windows:\s*$/m, 'gli unit su Windows stanno con le prove importanti');
+    const v = elencoVerdetto.find((p) => p.id === 'verdetto');
+    assert.match(v.corpo, /\| tee verdetto\.log/, 'le righe del registro stanno nel registro del lavoro, che dalla cloud si legge');
+    assert.match(readFileSync(resolve(ROOT, 'scripts', 'rossi-della-suite.mjs'), 'utf8'), /j\.name === 'verdetto'/,
+      'il lavoro settimanale legge il registro del lavoro che si chiama così');
+  });
+
+  test('suite verde su main: la versione di quel commit si segna stabile', () => {
+    const stabile = senzaCommenti(job('stabile', SUITE_YML));
+    const se = (stabile.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+    const corsa = (ref, s, v) => ({ github: { ref }, needs: { suite: { result: s }, verdetto: { result: v } } });
+    assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'success')), true);
+    assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'failure')), false, 'una suite rossa non segna niente');
+    assert.equal(valutaCondizione(se, corsa('refs/heads/prova', 'success', 'success')), false);
+    assert.match(stabile, /node scripts\/segna-stabile\.mjs --commit "\$\{GITHUB_SHA\}"/);
+    assert.match(stabile, /fetch-depth:\s*0/, 'il tag della versione si trova solo con la storia');
   });
 
   // #1485: in fila su una macchina la suite ha passato il tetto del passo (200 minuti) e cresceva ancora.
