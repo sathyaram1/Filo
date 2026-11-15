@@ -389,58 +389,19 @@ function DRAW_FN(marks) {
 
 function CLEAR_FN() { const l = document.getElementById('__filo_marks__'); if (l) l.remove(); }
 
-// Le superfici che si vedono ora, dal basso in alto, con lo stesso giro di captureCompositeElectron: senza gli strati
-// sopra la scheda (il menu del tasto destro sulle pagine web, i riquadri) un modello vedeva voci che non poteva cliccare.
-// `tipo`: 'shell', 'view' (la scheda attiva) o 'strato'; (x, y) è dove sta la superficie nella finestra.
+// Le superfici di elencoSuperfici con la loro Page: senza gli strati sopra la scheda (il menu del tasto destro sulle
+// pagine web, i riquadri) un modello vedeva voci che non poteva cliccare.
 async function superficiVisibili(app) {
-  const elenco = await app.evaluate(async ({ BrowserWindow }) => {
-    const all = BrowserWindow.getAllWindows();
-    const win = all.find((w) => w._filoTabs) || all[0];
-    if (!win) return [];
-    const cb = win.getContentBounds();
-    const tm = win._filoTabs;
-    const attiva = tm?.tabs?.find((t) => t.id === tm.activeId)?.view?.webContents || null;
-    const strati = [];
-    const visti = new Set();
-    const aggiungi = (wc, x, y, tipo) => {
-      if (!wc || wc.isDestroyed() || visti.has(wc.id)) return;
-      visti.add(wc.id);
-      strati.push({ wc, x, y, tipo });
-    };
-    const discendi = (view, ox, oy) => {
-      for (const c of view.children || []) {
-        const b = c.getBounds();
-        if (!b.width || !b.height) continue;
-        if (c.webContents) aggiungi(c.webContents, ox + b.x, oy + b.y, c.webContents === attiva ? 'view' : 'strato');
-        discendi(c, ox + b.x, oy + b.y);
-      }
-    };
-    aggiungi(win.webContents, 0, 0, 'shell');
-    discendi(win.contentView, 0, 0);
-    for (const f of win.getChildWindows()) {
-      if (f.isDestroyed() || !f.isVisible()) continue;
-      const fb = f.getContentBounds();
-      aggiungi(f.webContents, fb.x - cb.x, fb.y - cb.y, 'strato');
-      discendi(f.contentView, fb.x - cb.x, fb.y - cb.y);
-    }
-    const visibilita = (wc) => Promise.race([
-      wc.executeJavaScript('document.visibilityState').catch(() => 'visible'),
-      new Promise((r) => setTimeout(() => r('visible'), 1000)),
-    ]);
-    const attendibili = (await visibilita(win.webContents)) !== 'hidden';
-    const out = [];
-    for (const s of strati) {
-      if (s.tipo === 'strato' && attendibili && (await visibilita(s.wc)) === 'hidden') continue;
-      out.push({ bersaglio: s.wc.getOrCreateDevToolsTargetId(), x: s.x, y: s.y, tipo: s.tipo });
-    }
-    return out;
-  });
+  const elenco = await elencoSuperfici(app);
+  if (!elenco) return [];
   const perBersaglio = new Map();
   for (const page of app.windows()) {
     const b = await bersaglioDi(page);
     if (b) perBersaglio.set(b, page);
   }
-  return elenco.map((s) => ({ ...s, pagina: perBersaglio.get(s.bersaglio) })).filter((s) => s.pagina);
+  return elenco.superfici
+    .map((s) => ({ tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) }))
+    .filter((s) => s.pagina);
 }
 
 const pagineSegnate = new Set();
