@@ -70,12 +70,12 @@ regole sulla rosa.
 
 Può, da solo e senza passare dall'owner:
 
-- scrivere l'**ordine** dei feedback e il **parallelismo N**; il server accende
-  una sessione per feedback nell'ordine, fino a N, come in #1680;
+- scrivere l'**ordine** dei feedback e dei compiti e il **parallelismo N**; il
+  server accende una sessione per voce dell'ordine, fino a N, come in #1680;
 - cambiare le **priorità** (0, 1, 2; creare 3; mai abbassare una 3);
 - comporre **pacchetti** (SPEC-RIDISEGNO-LAVORO § 3.1) e mettere **attese**
-  fra feedback;
-- aprire feedback e domande; archiviare doppioni e mettere note; **sbloccare
+  fra feedback, o di un feedback su un compito;
+- aprire feedback, compiti e domande; archiviare doppioni e mettere note; **sbloccare
   un lavoro fermo per guasto** (§ 7);
 - **spegnere e riaccendere** un account o le routine, e scegliere quale account
   usare prima (di norma B, poi A: non c'è più la riserva del 10% su A, perché
