@@ -136,6 +136,8 @@ jobs:
       - name: Verdetto (rossi nuovi fuori dai rossi noti del contenitore)
         id: verdetto
         continue-on-error: true
+        env:
+          SUITE_COMMIT: ${{ inputs.commit || github.sha }}
         shell: bash
         run: |
           set -o pipefail
