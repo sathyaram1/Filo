@@ -760,3 +760,108 @@ test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo l
   assert.ok(da >= 0 && corpo.includes('spawnSync('), 'la prova lancia ancora il lanciatore degli unit');
   assert.doesNotMatch(corpo, /\btimeout\s*:/, 'con la macchina carica la corsa intera supera qualunque tempo fisso');
 });
+
+// ─── Le novità sulla fusione (#2543): spostate o unite prima della prova, come farà la fusione vera ───────────
+
+const NOVITA = 'src/shared/patchNotes.js';
+const registroFinto = (blocchi) => `(function (global) {\n  'use strict';\n\n  const NOTES = [\n${blocchi.map(([version, features]) => [
+  '    {', `      version: '${version}', date: '2026-11-01',`, '      features: [', ...features.map((r) => `        '${r}',`), '      ],', '      fixes: [],', '    },',
+].join('\n')).join('\n')}\n  ];\n\n  global.SN_PATCH_NOTES = { NOTES };\n})(typeof globalThis !== 'undefined' ? globalThis : this);\n`;
+// La sentinella del registro vero, ridotta: rossa se la fusione lascia una riga del ramo sotto una versione uscita.
+const SENTINELLA_NOVITA = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { execFileSync } from 'node:child_process';\nimport { readFileSync } from 'node:fs';\n"
+  + `import { aggiunteSottoUscite, registroDa } from ${JSON.stringify(pathToFileURL(join(ROOT, 'scripts', 'lib', 'novita-in-cima.mjs')).href)};\n`
+  + "test('nessuna riga nuova sotto una versione già uscita', () => {\n"
+  + "  const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8' }).trim();\n"
+  + `  const prima = registroDa(execFileSync('git', ['show', base + ':${NOVITA}'], { encoding: 'utf8' }));\n`
+  + `  const dopo = registroDa(readFileSync('${NOVITA}', 'utf8'));\n`
+  + "  assert.deepEqual(aggiunteSottoUscite(prima, dopo, JSON.parse(readFileSync('package.json', 'utf8')).version), []);\n"
+  + '});\n';
+
+function repoConNovita() {
+  const r = repoFinto();
+  r.ok(['checkout', '-q', 'main']);
+  r.scrivi('package.json', '{ "name": "prova", "version": "0.2.10" }\n');
+  r.scrivi(NOVITA, registroFinto([['0.2.11', ['a']], ['0.2.10', ['vecchia']]]));
+  r.scrivi('tests/unit/novita.test.mjs', SENTINELLA_NOVITA);
+  r.ok(['add', '-A']);
+  r.ok(['commit', '-qm', 'registro']);
+  r.ok(['push', '-q', 'origin', 'main']);
+  return r;
+}
+
+/** Il registro che il server ricalcola dai tre lati: deve avere lo sha che la prova gli dichiara. */
+function registroDelServer(r, punta, data) {
+  const blob = (ref, f = NOVITA) => execFileSync('git', ['cat-file', 'blob', `${ref}:${f}`], { cwd: r.lavoro, encoding: 'utf8' });
+  const main = r.ok(['rev-parse', 'origin/main']);
+  const base = r.ok(['merge-base', main, punta]);
+  return globalThis.SN_NOVITA_FUSIONE.uniscaNovita({ base: blob(base), main: blob(main), ramo: blob(punta), manifesto: JSON.parse(blob(main, 'package.json')), oggi: data });
+}
+
+test('prova vera: main pubblica la versione su cui il ramo scriveva, e la fusione è verde con la riga nel blocco in cima', () => {
+  const r = repoConNovita();
+  try {
+    const punta = r.ramo('claude/novita', () => r.scrivi(NOVITA, registroFinto([['0.2.11', ['a', 'del ramo']], ['0.2.10', ['vecchia']]])));
+    r.suMain(() => {
+      r.scrivi('package.json', '{ "name": "prova", "version": "0.2.11" }\n');
+      r.scrivi(NOVITA, registroFinto([['0.2.12', ['di main']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]));
+    });
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: (s) => righe.push(s) });
+    assert.equal(p.esito, 'verde', `${JSON.stringify(p)}\n${righe.join('\n')}`);
+    assert.deepEqual({ ...p.novita, sha: '' }, { sha: '', righe: 1, data: p.novita.data, conflitto: false });
+    assert.match(righe.join('\n'), /una riga del ramo sotto versioni già uscite su main portata nel blocco in cima/);
+    const s = registroDelServer(r, punta, p.novita.data);
+    assert.equal(s.ok, true, s.motivo);
+    assert.equal(shaBlob(s.src), p.novita.sha, 'il server ricalcola lo stesso registro che la prova ha provato');
+    assert.deepEqual(registroDa(s.src).map((n) => [n.version, n.features]), [['0.2.12', ['di main', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
+    assert.deepEqual(campoPerIlServer(p).novita, p.novita);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+test('prova vera: il conflitto sul solo registro si risolve tenendo le righe dei due lati, e la fusione è verde', () => {
+  const r = repoConNovita();
+  try {
+    const punta = r.ramo('claude/conflitto', () => r.scrivi(NOVITA, registroFinto([['0.2.11', ['a', 'del ramo', 'uguale']], ['0.2.10', ['vecchia']]])));
+    r.suMain(() => r.scrivi(NOVITA, registroFinto([['0.2.11', ['a', 'di main', 'uguale']], ['0.2.10', ['vecchia']]])));
+    const p = provaIn(r, punta);
+    assert.equal(p.esito, 'verde', JSON.stringify(p));
+    assert.equal(p.novita.conflitto, true);
+    const s = registroDelServer(r, punta, p.novita.data);
+    assert.equal(shaBlob(s.src), p.novita.sha);
+    assert.deepEqual(registroDa(s.src)[0].features, ['a', 'di main', 'uguale', 'del ramo'], 'nessuna riga persa, nessun doppione');
+    assert.match(testoNovita(p.novita), /conflitto sul registro risolto tenendo le righe dei due lati/);
+    pulita(r);
+    // Con un altro file in conflitto il registro non basta: resta un conflitto, coi due file.
+    const due = r.ramo('claude/due', () => { r.scrivi(NOVITA, registroFinto([['0.2.11', ['a', 'altra del ramo']], ['0.2.10', ['vecchia']]])); r.scrivi('valore.txt', 'tre\n'); });
+    r.suMain(() => r.scrivi('valore.txt', 'quattro\n'));
+    const p2 = provaIn(r, due);
+    assert.equal(p2.esito, 'conflitto');
+    assert.deepEqual(p2.file.sort(), [NOVITA, 'valore.txt']);
+    assert.equal(campoPerIlServer(p2).novita, undefined);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+test('prova vera: un ramo che ha riscritto una riga uscita non si sposta a macchina, e la fusione resta rossa', () => {
+  const r = repoConNovita();
+  try {
+    const punta = r.ramo('claude/riscritta', () => r.scrivi(NOVITA, registroFinto([['0.2.11', ['A riscritta', 'del ramo']], ['0.2.10', ['vecchia']]])));
+    r.suMain(() => {
+      r.scrivi('package.json', '{ "name": "prova", "version": "0.2.11" }\n');
+      r.scrivi(NOVITA, registroFinto([['0.2.12', ['di main']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]));
+    });
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: (s) => righe.push(s) });
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.equal(p.novita, undefined);
+    assert.match(righe.join('\n'), /non si spostano a macchina \(nel blocco 0\.2\.11 il ramo ha tolto o riscritto/);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
