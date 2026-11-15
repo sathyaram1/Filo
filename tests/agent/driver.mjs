@@ -243,6 +243,8 @@ async function elencoSuperfici(app) {
     // Una vista figlia si vede solo dentro la madre: il ritaglio scende con la discesa.
     const discendi = (view, ox, oy, clip) => {
       for (const c of view.children || []) {
+        // Nascosta con setVisible(false), come la home lasciata per una pagina: senza schermo vero la pagina si dice «visible».
+        if (typeof c.getVisible === 'function' && !c.getVisible()) continue;
         const b = c.getBounds();
         const rect = { x: ox + b.x, y: oy + b.y, w: b.width, h: b.height };
         const dentro = interseca(rect, clip);
