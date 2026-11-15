@@ -36,6 +36,7 @@ export const INCORPORATI_DAL_SERVER = Object.freeze([
   'src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
   'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js',
   'src/shared/feedbackAttese.js', 'src/shared/schede.js', 'src/shared/prioritaTre.js', 'src/shared/novitaFusione.js',
+  'src/shared/consegna.js',
 ]);
 export const FILE_REGOLE = Object.freeze(['firestore.rules', 'storage.rules', 'firestore.indexes.json']);
 
