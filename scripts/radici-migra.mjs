@@ -4,7 +4,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { leggiArgomenti as argomentiFiducia, OWNER_FIDUCIA_URL } from './fiducia-migra.mjs';
+import { leggiArgomenti as argomentiFiducia, chiamaLotto } from './fiducia-migra.mjs';
 
 // 300 per lotto (il server) su sette collezioni: 20.000 lotti sono sei milioni di documenti. Oltre ci si ferma e lo si dice.
 export const TETTO_LOTTI = 20000;
