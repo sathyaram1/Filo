@@ -18,7 +18,7 @@ const elemento = (extra = {}) => ({ elemento: 'Riquadro Consegna', perche: 'Senz
 
 test('i nove criteri del modulo sono quelli di _criteri-verifica.md, nello stesso ordine', () => {
   const md = readFileSync(resolve(ROOT, 'routines/roles/_criteri-verifica.md'), 'utf8');
-  const nomi = [...md.matchAll(/^\d+\.\s+\*\*(.+?)\.\*\*/gm)].map((m) => m[1]);
+  const nomi = [...md.matchAll(/^\d+\.\s+\*\*(.+?)\.?\*\*/gm)].map((m) => m[1]);
   assert.deepEqual(nomi, C.CRITERI.map((k) => k.nome));
 });
 
