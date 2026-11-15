@@ -2340,6 +2340,15 @@ if (isMain) {
     }
     const fermata = fermataSenzaDomanda(intento, data);
     if (fermata) { console.error(fermata); process.exit(1); }
+    if (intento === 'status' && data.status === 'design') {
+      const sped = spedisciPrimaDellaFermata(ROOT, biglietto);
+      for (const riga of sped.righe || []) console.error(riga);
+      if (!sped.ok) {
+        console.error(`Il ramo${sped.branch ? ` '${sped.branch}'` : ''} NON è su origin: ${sped.reason}`);
+        console.error('Non ho consegnato la fermata: chi riparte cercherebbe il lavoro su un ramo che non lo ha. Se la causa sta nel ramo (detta qui sopra) sistemala e rilancia lo stesso comando; altrimenti è un guasto da dichiarare nel rilascio. Non spingere a mano.');
+        process.exit(1);
+      }
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
