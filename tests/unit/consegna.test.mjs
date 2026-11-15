@@ -47,6 +47,17 @@ test('«l\'ho guardato» non è una prova; un criterio che non si applica vuole 
   assert.match(C.validaConsegna(esito)[0], /criterio 1 .*l'esito è «ok»/);
 });
 
+test('«l\'ho guardato» detto con altre parole non è una prova; un test, una schermata o un elenco di strade sì', () => {
+  const con = (prova) => buona({ criteri: C.CRITERI.map((k) => ({ criterio: k.n, esito: 'fatto', prova })) });
+  for (const p of ['Ho guardato', 'guardato bene', 'verificato a mano', 'tutto funziona', 'ok ok ok ok ok', 'l\'ho guardato bene', 'Tutto verde, controllato.']) {
+    assert.match(C.validaConsegna(con(p))[0], /criterio 1 .*non è una prova/, p);
+  }
+  for (const p of ['tests/unit/conto.test.mjs, caso «il doppio di tre è sei»', 'tests/.shots/manage-consegna-dark.png',
+    'strade provate: menu, scorciatoia, tasto destro, chat', 'input insoliti: vuoto, soli spazi, 10.000 caratteri, emoji']) {
+    assert.deepEqual(C.validaConsegna(con(p)), [], p);
+  }
+});
+
 test('un lavoro sull\'interfaccia senza l\'elenco degli elementi nuovi è rifiutato; con l\'elenco o un «nessuno» motivato passa', () => {
   const ui = C.lavoroDiInterfaccia(['src/pages/manage/manage.js', 'tests/manage.spec.mjs', 'scripts/conta-prove.mjs']);
   assert.deepEqual(ui, ['src/pages/manage/manage.js']);
