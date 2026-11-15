@@ -8,13 +8,20 @@ name: Suite Playwright completa
 on:
   push:
     branches: [main]
-  # Per provare un ramo: gh workflow run suite.yml --ref <ramo>
+  # Per provare un ramo: gh workflow run suite.yml --ref <ramo>. Con `commit`, da main, prova quel commit di main:
+  # la pubblicazione la chiede per la versione appena uscita, che la suite può aver saltato.
   workflow_dispatch:
+    inputs:
+      commit:
+        description: "Lo sha intero di un commit di main da provare (vuoto: la punta del ramo)"
+        required: false
+        default: ""
 
 # Una suite gia' partita finisce (una corsa annullata non dice niente di nessun
 # commit); le fusioni arrivate intanto si raccolgono nell'ultima in attesa.
+# Quella chiesta per una versione ha un gruppo suo: una fusione dopo non la scavalca.
 concurrency:
-  group: suite-${{ github.ref }}
+  group: suite-${{ github.ref }}-${{ inputs.commit || 'fusioni' }}
   cancel-in-progress: false
 
 permissions:
