@@ -108,6 +108,8 @@ require(path.join(SHARED, 'feedbackPublicView.js')); // dopo manageReview: lo us
 require(path.join(SHARED, 'testoDeiCampi.js')); // #2378 — le durate del testo dei campi: PRIMA di preferences, che le offre alla chat
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
+// #2493 — le parti del classificatore dei comandi, prima dell'entrata che le compone (l'ordine lo tiene cmdClassify.js)
+for (const parte of ['cmdBase', 'cmdGit', 'cmdPerimetro', 'cmdSovrascritture', 'cmdGruppi']) require(path.join(SHARED, `${parte}.js`));
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
