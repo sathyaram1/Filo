@@ -42,10 +42,10 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
   come sempre e scrivi il motivo del rifiuto nel report;
 - se la fusione ne copre solo una parte, lavori il resto e lo dici nel report.
 
-`payload.commitProvato`, se c'è, dice che il feedback è un allarme della
-suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
-averlo già corretto la fusione di un altro feedback, arrivata mentre la suite
-girava: non cita questo feedback e può essere più vecchia della sua nascita.
+`payload.commitProvato`, se c'è, dice che il feedback è un allarme delle
+prove importanti o degli unit e porta il commit su cui hanno dato il rosso. Qui
+il rosso può averlo già corretto la fusione di un altro feedback, arrivata
+mentre la corsa girava: non cita questo feedback e può essere più vecchia della sua nascita.
 Le candidate sono le fusioni arrivate su `main` dopo quel commit:
 
 ```bash
