@@ -108,7 +108,7 @@ jobs:
       - name: Checkout del commit provato
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.commit || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
