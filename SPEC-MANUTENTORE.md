@@ -106,7 +106,7 @@ nel recap. La toglie la decisione del mattino del giorno dopo, o l'owner.
 
 **Fra una decisione e l'altra non resta sveglio: si fa svegliare.** Ogni
 accensione è una sessione nuova con un contesto piccolo (ruolo, taccuino,
-schede a priorità 3 e 2, rami vivi, segnali dall'ultima volta: ~25k token) e
+schede delle 3 e dei lavori nell'ordine, rami vivi, segnali dall'ultima volta: ~25k token) e
 la memoria nel taccuino (§ 5). Si accende:
 
 - a un **battito** ogni 55 minuti al massimo, per guardare biglietti, guasti,
