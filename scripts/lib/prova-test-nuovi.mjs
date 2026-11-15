@@ -108,7 +108,10 @@ export function corriFile(dir, voce, { lancia = spawnSync, prepara = preparaLanc
   if (r.error && r.error.code === 'ETIMEDOUT') return { esiti: new Map(), partito: false, errore: 'oltre il tetto di tempo' };
   let json = null;
   try { json = JSON.parse(readFileSync(rapporto, 'utf8')); } catch (_) { /* senza rapporto lo spec non è partito */ }
-  return { esiti: esitiDaPlaywright(json), partito: !!json };
+  // Playwright scrive il rapporto anche quando lo spec non si carica: senza, è il lancio che non è partito, e un
+  // «rosso senza il lavoro» sembrerebbe l'esito atteso.
+  if (!json) return { esiti: new Map(), partito: false, errore: `playwright non ha scritto il rapporto${r.error ? ` (${r.error.code || r.error.message})` : ''}: ${String(r.stderr || r.stdout || '').trim().split('\n').slice(-1)[0].slice(0, 160)}` };
+  return { esiti: esitiDaPlaywright(json), partito: true };
 }
 
 /**
