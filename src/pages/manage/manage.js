@@ -115,6 +115,7 @@
   const mgDetailHead  = document.getElementById('mgDetailHead');
   const mgLivelliRow  = document.getElementById('mgLivelliRow');
   const mgForme       = document.getElementById('mgForme');
+  const mgClasse      = document.getElementById('mgClasse');
   const mgWorkState   = document.getElementById('mgWorkState');
   const mgAssorbite   = document.getElementById('mgAssorbite');
   const mgThread      = document.getElementById('mgThread');
