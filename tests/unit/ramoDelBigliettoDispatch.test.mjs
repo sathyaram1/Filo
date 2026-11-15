@@ -174,7 +174,7 @@ test('server che porta il ramo del biglietto: chi riparte sta sul ramo legato, d
 
     const fine = commit(casa, 'lavoro.js', 'fatto\n');
     const consegna = await eseguiIn(casa, port, 'routine-channel.mjs',
-      ['deliver', BIGLIETTO, 'status', '--status', 'revision_capability', '--notes', 'Fatto.', '--frase', 'Adesso va.']);
+      ['deliver', BIGLIETTO, 'status', '--status', 'revision_capability', '--notes', 'Fatto.', '--frase', 'Adesso va.', '--consegna', fileConsegna()]);
     assert.equal(consegna.code, 0, `la consegna parte e il server la accetta: ${consegna.se}`);
     const ultima = mondo.consegne[mondo.consegne.length - 1];
     assert.deepEqual(ultima, { intent: 'status', status: 'revision_capability', branch: legato, rifiutata: false });
