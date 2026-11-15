@@ -66,11 +66,15 @@ export function esitoSalvato(root) {
 
 const punteDelServer = (clone, ramo) => { const s = parteDelServer(clone, ramo); return s.head || ''; };
 
-/** La prova intera (app, e server se c'è il clone), salvata accanto al clone. { app, server? } | { errore } */
+/**
+ * La prova intera (app, e server se c'è il clone), salvata accanto al clone. Senza `server` il clone si cerca da sé:
+ * un lavoro server non resta mai senza la sua parte perché nessuno l'ha chiesta. { app, server? } | { errore }
+ */
 export function provaDelRamo(root, { base = '', server = '', log = (s) => console.error(s) } = {}) {
   const e = estremiDelLavoro(root, { base });
   if (e.errore) return { errore: e.errore };
   if (e.avviso) log(`Attenzione: ${e.avviso}.`);
+  if (!server) server = serverDelLavoro(root);
   const out = { versione: VERSIONE, app: provaTestNuovi({ root, base: e.base, head: e.head, log }) };
   if (server) {
     const clone = resolve(server);
