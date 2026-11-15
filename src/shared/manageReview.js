@@ -2359,6 +2359,7 @@
     schedaDomanda, contaDomande, contaDaRispondere, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
     filtraFiducia, contaNonFidate, segnoFiducia, segnoFiduciaNota,
+    vistaConsegna,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
