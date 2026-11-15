@@ -30,6 +30,25 @@ test.describe('profilo nuovo', () => {
   });
 });
 
+// La conferma di Filo sta in una radice chiusa: si vedeva nella schermata, ma senza segni il modello non poteva rispondere.
+test('la conferma di Filo ha i segni sui suoi pulsanti, e il clic sul segno di OK conferma', async ({ app, shell }) => {
+  const page = await home(app);
+  await page.evaluate(() => {
+    window.__esitoConferma = 'aperta';
+    window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Aprire la pagina?' }).then((ok) => { window.__esitoConferma = ok; });
+  });
+  let ok = null;
+  await expect.poll(async () => {
+    const { map } = await markInteractables(app, shell);
+    ok = map.find((m) => /^OK$/i.test(m.label)) || null;
+    if (!ok) await clearMarks(app, shell);
+    return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => m.label).sort();
+  }, { timeout: 10_000 }).toEqual(['Annulla', 'OK']);
+  const { map } = await markInteractables(app, shell);
+  await clickMark(app, shell, map, map.find((m) => /^OK$/i.test(m.label)).i);
+  await expect.poll(() => page.evaluate(() => window.__esitoConferma)).toBe(true);
+});
+
 // La home lasciata per una pagina resta una vista nascosta grande quanto la scheda: dava i suoi segni sopra la pagina.
 test('una vista tagliata fuori dalla finestra o nascosta non dà segni, una dentro sì', async ({ app, shell }) => {
   await app.evaluate(async ({ BrowserWindow, WebContentsView }) => {
