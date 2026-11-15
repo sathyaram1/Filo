@@ -218,6 +218,11 @@
   // #903: gli aspettati che l'elenco non ha caricato, letti a parte una volta (id → riga, o { missing: true }).
   const attesiFuori = new Map();
   const attesiChiesti = new Set();
+  // I compiti aspettati (#2269) non sono feedback: il loro stato viene dall'elenco dei compiti, riletto al più ogni minuto
+  // perché chi li aspetta esca da «Aspettano» quando chiudono.
+  const COMPITI_ATTESI_OGNI_MS = 60 * 1000;
+  let compitiAttesiLettiMs = 0;
+  let compitiAttesiInLettura = false;
   let atteseApertePer = '';     // la pratica su cui l'owner ha aperto la casella delle attese
 
   // Etichette/testi vuoto per le tab-lista (DB1).
