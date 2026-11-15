@@ -1005,7 +1005,7 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
 // lavoro vuol dire «se questo fallisce, la corsa resta verde». Un lavoro così
 // che non apra un feedback è un rosso che nessuno vedrà mai.
 test('ogni lavoro che può fallire lasciando la corsa verde apre un feedback', () => {
-  for (const testo of [YML, SUITE_YML]) {
+  for (const testo of [YML, SUITE_YML, IMP_YML]) {
     const jobs = testo.slice(testo.search(/^jobs:\s*$/m));
     const nomi = [...jobs.matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
     // `continue-on-error` del LAVORO sta a quattro spazi; quello di un passo a otto.
