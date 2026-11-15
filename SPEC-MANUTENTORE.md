@@ -46,7 +46,8 @@ scriveva tre volte (classe nel taccuino, priorità 2, ordine), e un primo
 lavoro a 1 nell'ordine non partiva. I compiti senza feedback stanno nell'ordine
 col loro id (`C-12`) accanto ai numeri, e un feedback può aspettare un compito:
 l'attesa si scioglie quando il compito chiude. Le sessioni libere (compiti,
-sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi
+sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi i
+lavori già iniziati (finiscono da soli, dentro o fuori dall'ordine), poi
 l'ordine, poi il resto per urgenza.
 
 La soglia fra i livelli si muove con la maturità di Filo e con i token
