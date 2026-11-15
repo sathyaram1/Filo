@@ -649,7 +649,7 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
   });
 });
 
-describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
+describe('release.yml: si pubblica il commit più nuovo di main con le prove importanti verdi', () => {
   const release = () => senzaCommenti(job('release'));
   const scegli = senzaCommenti(job('scegli'));
 
