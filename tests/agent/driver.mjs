@@ -416,7 +416,7 @@ const pagineSegnate = new Set();
 // La Page di ogni segno sta in `m.pagina`, non enumerabile: la mappa resta stampabile.
 export async function markInteractables(app, shell) {
   const view = await activeView(app, shell);
-  const superfici = await superficiVisibili(app);
+  const superfici = await superficiVisibili(app, shell, view);
   // Solo se l'elenco non si è potuto fare: una scheda che l'elenco ha scartato non si vede neanche nella schermata.
   if (!superfici.length) {
     superfici.push({ tipo: 'shell', x: 0, y: 0, pagina: shell });
