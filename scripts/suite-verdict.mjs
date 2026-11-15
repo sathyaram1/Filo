@@ -587,6 +587,7 @@ async function main() {
   // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
   v.nuovi.unshift(...parti);
   console.log(testoRiassunto(v));
+  console.log(righeRegistro(v, { completo: !parti.length }).join('\n'));
   if (opt.out) {
     const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
