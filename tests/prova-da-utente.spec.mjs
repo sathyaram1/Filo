@@ -34,10 +34,11 @@ test.beforeAll(async () => {
 test.afterAll(() => server && server.close());
 
 /** Lancia la prova col copione dato → { codice, uscita, esito, cartella }. */
-async function prova(copione, argomenti = [], { fornitore, home = false } = {}) {
+async function prova(copione, argomenti = [], { fornitore, home = false, senzaChiave = false } = {}) {
   const cartella = cartellaTemporanea('filo-prova-spec-');
   // Una chiave finta: Filo si accende coi modelli di prova, e nessuna chiamata vera parte da qui.
   const env = { ...process.env, OPENROUTER_API_KEY: 'k-test', FILO_CLAUDE_BIN: FINTO, FILO_CLAUDE_FINTO: JSON.stringify(copione) };
+  if (senzaChiave) { delete env.OPENROUTER_API_KEY; delete env.FILO_DEFAULT_OPENROUTER_KEY; }
   if (fornitore) env.FILO_CLAUDE_FINTO_FORNITORE = fornitore;
   const inizio = home ? [] : ['--start', `${base}/modulo`];
   const figlio = spawn(process.execPath, [join(ROOT, 'tests', 'agent', 'prova.mjs'), ...inizio, '--out', cartella, ...argomenti], { cwd: ROOT, env });
