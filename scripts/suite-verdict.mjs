@@ -10,8 +10,8 @@
 //   senza schermo ci sono casi che sono rossi da sempre e per motivi
 //   d'ambiente (una cattura dello schermo, un sito esterno), scritti in
 //   tests/rossi-noti.json → contenitore.specs. Senza questo confronto la
-//   suite sarebbe rossa a ogni giro e nessuna versione uscirebbe più; col
-//   confronto fatto «a occhio» da un agente, il giudizio cambiava a ogni giro.
+//   suite sarebbe rossa a ogni giro e nessuna versione si segnerebbe stabile;
+//   col confronto fatto «a occhio» da un agente, il giudizio cambiava a ogni giro.
 //
 // COSA CONTA COME ROSSO
 //   Un caso il cui esito finale è «unexpected» (fallito in tutti i tentativi,
