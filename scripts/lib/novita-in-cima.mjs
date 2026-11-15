@@ -43,23 +43,8 @@ export function registroDa(src) {
 
 const righe = (n) => CHIAVI.flatMap((chiave) => (n[chiave] || []).map((r, indice) => ({ chiave, indice, riga: testo(r) })));
 
-/**
- * Le righe che `dopo` aggiunge rispetto a `prima` sotto le versioni fino a `uscita` compresa, ognuna con blocco,
- * elenco e posto. Si contano le righe per blocco: riscrivere una riga già uscita, o spostarla nel blocco della
- * prossima versione, resta lecito. PURA.
- */
-export function aggiunteSottoUscite(prima, dopo, uscita) {
-  const vecchie = new Map(prima.map((n) => [n.version, righe(n).map((r) => r.riga)]));
-  const out = [];
-  for (const n of dopo) {
-    if (cmpVersion(n.version, uscita) > 0) continue;
-    const prec = vecchie.get(n.version) || [];
-    const ora = righe(n);
-    if (ora.length <= prec.length) continue;
-    for (const r of ora) if (!prec.includes(r.riga)) out.push({ version: n.version, ...r });
-  }
-  return out;
-}
+/** Le righe che `dopo` aggiunge a `prima` sotto le versioni fino a `uscita`: la regola del modulo condiviso, che usa anche la prova sulla fusione. PURA. */
+export const aggiunteSottoUscite = (prima, dopo, uscita) => aggiunteDelModulo(prima, dopo, uscita, testo);
 
 /**
  * Le righe che il ramo ha scritto sotto versioni uscite su main DOPO la sua partenza (#2130): sul ramo la sentinella è
