@@ -162,8 +162,6 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
   return { ok: true, scelto, altri, superati: [...superati] };
 }
 
-const NOME_DI_RAMO = /^(?!.*\.\.)(?!.*\/\.)(?!.*\.lock$)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
-
 /**
  * Il ramo a cui il server aveva legato il feedback (`payload.ramoLegato`), per un lavoro nuovo che riparte da una
  * fermata (#2516): il piano e la ripresa danno per fatto quello che sta lì sopra, quindi la sua assenza va detta.
