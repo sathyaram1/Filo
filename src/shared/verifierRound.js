@@ -680,7 +680,8 @@
    *   - `decisione`: un interno col `?`, da solo (anche un 2 col `?` che
    *     intanto si corregge: porta `inCorrezione`);
    *   - `rimasti`: TUTTI gli altri interni messi da parte dal bilancio in un
-   *     feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
+   *     feedback solo. Un interno nasce a 1 a ogni livello (prioritaDiNascita); una
+   *     priorità già scritta sul rilievo vince, e il gruppo prende la più alta.
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
    * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
    * più `sede`, `level`, `priority` e `decision` canonici (lo stato della scala
