@@ -1184,6 +1184,22 @@
     .mg-dot--design { background: #2e9e5b; border-color: #2e9e5b; }
     .mg-dot--aligned { background: #5b6ee0; border-color: #5b6ee0; }
     .mg-dot--empty { border-style: dashed; opacity: 0.6; }
+    /* La classe di rischio della consegna (#2505): una parola in fondo alla fila, coi colori della stessa scala. */
+    .mg-classe {
+      all: unset; margin-left: auto; cursor: pointer;
+      font-size: 11px; line-height: 1; padding: 3px 8px; border-radius: 999px;
+      border: 1px solid currentColor; color: var(--sn-muted);
+      transition: background calc(0.1s * var(--sn-motion, 1)), transform calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-classe[hidden] { display: none; }
+    .mg-classe:hover, .mg-classe:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); transform: scale(1.04); }
+    .mg-classe--nascosto { color: #e08e0b; }
+    .mg-classe--irreparabile { color: #c0392b; font-weight: 600; }
+    .mg-classe--scelta { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-consegna-sez { margin-top: 12px; font-weight: 600; }
+    .mg-consegna-lista { margin: 4px 0 0; padding-left: 18px; }
+    .mg-consegna-lista li { margin: 3px 0; }
+    .mg-consegna-segnalato { color: #c0392b; font-weight: 600; }
     /* La frase accanto ai pallini dice PERCHÉ il feedback è in questo stato; il colore arriva inline da judgesNote. */
     .mg-judge-note { margin-left: 6px; font-weight: 600; }
 
