@@ -85,11 +85,21 @@ export function rossiDaCorse(corse) {
   const ultima = lette[lette.length - 1];
   const rossi = [];
   if (ultima) {
-    for (const k of ultima.registro.rossi) {
-      if (instabili.has(k) && lette.some((c) => c.sha === ultima.sha && c !== ultima && c.registro.completo && !c.registro.rossi.has(k))) continue;
-      let prima = ultima;
+    let base = lette.length - 1;
+    while (base > 0 && !lette[base].registro.completo) base -= 1;
+    // Per ogni prova, l'ultima corsa da `base` in poi in cui è rossa; le righe di corsa valgono solo per l'ultima.
+    const dove = new Map();
+    for (let i = base; i < lette.length; i += 1) {
+      for (const k of lette[i].registro.rossi) {
+        if (i === lette.length - 1 || !RIGA_DI_CORSA.test(k)) dove.set(k, i);
+      }
+    }
+    for (const [k, j] of dove) {
+      const ora = lette[j];
+      if (instabili.has(k) && lette.some((c) => c.sha === ora.sha && c !== ora && c.registro.completo && !c.registro.rossi.has(k))) continue;
+      let prima = ora;
       let verde = null;
-      for (let i = lette.length - 2; i >= 0; i -= 1) {
+      for (let i = j - 1; i >= 0; i -= 1) {
         const c = lette[i];
         if (c.registro.rossi.has(k)) prima = c;
         else if (c.registro.completo) { verde = c; break; }
@@ -99,6 +109,7 @@ export function rossiDaCorse(corse) {
         rottaDa: { sha: prima.sha, url: prima.url || '', quando: prima.quando || '' },
         ultimaVerde: verde ? { sha: verde.sha, url: verde.url || '', quando: verde.quando || '' } : null,
         instabile: instabili.has(k),
+        ...(j < lette.length - 1 ? { daRicontrollare: true } : {}),
       });
     }
   }
