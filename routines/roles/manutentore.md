@@ -282,7 +282,7 @@ taccuino. Le chiamate di Filo stesso hanno la stessa domanda, e lì il TTL lo sc
 
 ## Le novità
 
-Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un **redattore**: un tuo sotto-agente, col contesto
+Prima di ogni rilascio (ogni sei ore, se le prove importanti sono verdi) passa un **redattore**: un tuo sotto-agente, col contesto
 apposito di `npm run manutentore -- novita` e non col tuo. Riceve le righe dei worker dall'ultimo rilascio, il
 manifesto delle capacità, i titoli dei lavori nell'ordine e delle priorità 3 in corso. Riordina per argomento, dà
 spazio a ciò che conta, condensa. Ogni riga riscritta dice da quali righe dei worker nasce (`da`, coi numeri del
