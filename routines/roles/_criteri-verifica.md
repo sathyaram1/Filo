@@ -25,3 +25,8 @@
 9. **Una causa, tutte le porte.** Davanti a un difetto si cerca lo stato
    sbagliato che lo produce e **tutte le strade che portano a quello stato**:
    la cura è una regola sola sulla causa, non una pezza sulla porta vista.
+10. **Prove importanti.** `npm run test:importanti` è verde e sotto il suo
+   tetto. L'elenco dei cammini (`tests/importanti.spec.mjs`) lo cambiano solo
+   l'owner e il manutentore: un ramo che ci aggiunge un cammino senza che il
+   feedback lo chieda è un rilievo, e uno nuovo entra togliendone o
+   accorciandone un altro.
