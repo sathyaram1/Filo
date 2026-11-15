@@ -440,6 +440,7 @@ export async function markInteractables(app, shell) {
   for (const s of superfici) {
     let segni = [];
     try { segni = await s.pagina.evaluate(COLLECT_FN); } catch (_) { continue; }
+    if (s.id != null && !/^filo:/.test(s.pagina.url())) segni = segni.concat(await segniNelMondoDiFilo(app, s.id));
     const qui = [];
     for (const m of segni) {
       const cx = m.x + s.x;
