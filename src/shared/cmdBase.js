@@ -240,6 +240,20 @@
     return parts;
   }
 
+  // Sequenza pura (`&&`/`||`/`;`) senza pipe, background, redirezioni o sostituzioni → i
+  // singoli comandi: si prende il massimo, concatenare due letture non le rende un'azione.
+  function splitSafeSequence(cmd) {
+    // Metacaratteri che non sono sequenziamento: redirezioni, sostituzioni, backtick, newline.
+    if (/[`<>]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
+    const parts = cmd.split(/\s*(?:&&|\|\||;)\s*/).filter(Boolean);
+    // Un `&` o `|` solitario rimasto dopo aver tolto `&&`/`||`/`;` è background o pipe:
+    // non è una sequenza sicura.
+    for (const p of parts) {
+      if (/[&|]/.test(p)) return null;
+    }
+    return parts;
+  }
+
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
   // Le lunghe valgono anche accorciate, come le leggono getopt e git (`--forc`, `--de`): una lista sola per tutti.
