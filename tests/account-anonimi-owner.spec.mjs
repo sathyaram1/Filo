@@ -145,7 +145,6 @@ test('la pulizia parte solo dopo il secondo sì, col numero letto sul tasto, e s
   expect(stato.chiamate.some((c) => c.op === 'cancella')).toBe(false);
 
   await riga(page).getByRole('button', { name: 'Cancella 230.000 account' }).click();
-  await page.locator('.sn-wallet-numero-valore').first().scrollIntoViewIfNeeded();
   await riga(page).getByRole('button', { name: 'Cancella', exact: true }).click();
   await expect(riga(page)).toContainText('Cancellati 30.000 su circa 230.000…', { timeout: 15_000 });
   expect(stato.chiamate.filter((c) => c.op === 'cancella')).toEqual([{ op: 'cancella', attesi: 230_000 }]);
