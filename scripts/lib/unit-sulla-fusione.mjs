@@ -163,6 +163,14 @@ export function unitToccati({ cambiati = [], tutti = [], leggi = () => '' } = {}
   return tutti.filter((t) => cambiatiSet.has(t) || (cerca && cerca.test(String(leggi(t) || '')))).sort();
 }
 
+/** La riga che dice cosa la prova ha fatto del registro delle novità. PURA. */
+export function testoNovita(n) {
+  const quante = n.righe === 1 ? 'una riga del ramo' : `${n.righe} righe del ramo`;
+  return n.conflitto
+    ? `▸ Novità: il conflitto sul registro risolto tenendo le righe dei due lati (${quante} nel blocco in cima). La fusione vera farà lo stesso.`
+    : `▸ Novità: ${quante} sotto versioni già uscite su main ${n.righe === 1 ? 'portata' : 'portate'} nel blocco in cima. La fusione vera farà lo stesso.`;
+}
+
 /** Cosa si stampa dopo la prova. PURA. */
 export function testoProva(prova) {
   const p = prova || {};
