@@ -13,10 +13,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
-import { aggiunteSottoUscite, registroDa } from './novita-in-cima.mjs';
 
-createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
-const { FILE: FILE_NOVITA, uniscaNovita } = globalThis.SN_NOVITA_FUSIONE;
+const FILE_NOVITA = 'src/shared/patchNotes.js';
+// Solo quando serve: chi importa la prova per altro (dispatch, il canale) non deve dipendere da src/shared.
+const novitaFusione = () => {
+  if (!globalThis.SN_NOVITA_FUSIONE) createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
+  return globalThis.SN_NOVITA_FUSIONE;
+};
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
