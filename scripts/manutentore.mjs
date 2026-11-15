@@ -738,27 +738,31 @@ export function righeSpesa(spesa) {
   return righe;
 }
 
-// Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, la rosa è larga.
+// Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, l'ordine è lungo.
 export const PICCOLO_TETTO_TOKEN = 30000;
 // Una stima, non un conteggio: ~4 caratteri per token sul testo italiano di Filo.
 export const stimaToken = (testo) => Math.ceil(String(testo || '').length / 4);
-const nelPiccolo = (s) => s && (s.priorita === 3 || s.priorita === 2 || !!s.fermo);
 
 /**
- * Il contesto piccolo: ruolo, stato coi segnali, taccuino, le schede a priorità 3 e 2 (e le ferme), i rami dei loro
- * lavori. → { ok, testo, token } | { ok:false, motivo, token }. PURA.
+ * Il contesto piccolo: ruolo, stato coi segnali, taccuino, le schede delle 3, dei lavori nell'ordine nella sua
+ * sequenza (#2269, al posto della rosa) e le ferme, i rami dei loro lavori. → { ok, testo, token } | { ok:false, motivo,
+ * token }. PURA.
  */
 export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
-  const scelte = (schede || []).filter(nelPiccolo).sort((a, b) => (b.priorita ?? -1) - (a.priorita ?? -1)
+  const posto = new Map(((stato && stato.ordine) || []).map((n, i) => [String(n), i + 1]));
+  const rango = (s) => (s.priorita === 3 ? 0 : posto.has(String(s.num)) ? 1 : 2);
+  const scelte = (schede || []).filter((s) => s && rango(s) < 2 || (s && s.fermo)).sort((a, b) => rango(a) - rango(b)
+    || (posto.get(String(a.num)) || 0) - (posto.get(String(b.num)) || 0)
     || Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
   const numeri = new Set(scelte.map((s) => String(s.num)));
   const suoi = (rami || []).filter((r) => (r.feedback || []).some((n) => numeri.has(String(n))));
+  const dove = (s) => (posto.has(String(s.num)) ? `[${posto.get(String(s.num))}° nell'ordine] ` : '');
   const parti = [
     ['il ruolo', [String(ruolo || '').trim(), '']],
     ['lo stato coi segnali', ['## Stato', '', ...righeStato(stato), '']],
     ['il taccuino', ['## Taccuino', '', ...testoTaccuino(taccuino), '']],
-    [`le ${scelte.length} schede a priorità 3 e 2`, [`## Schede a priorità 3 e 2, e le ferme (${scelte.length} di ${(schede || []).length})`, '',
-      ...scelte.map((s) => rigaSchedaServer(s))]],
+    [`le ${scelte.length} schede delle 3 e dell'ordine`, [`## Schede a priorità 3, dei lavori nell'ordine e le ferme (${scelte.length} di ${(schede || []).length})`, '',
+      ...scelte.map((s) => `${dove(s)}${rigaSchedaServer(s)}`)]],
     ['i rami', ['', `## Rami di questi lavori (${suoi.length} di ${(rami || []).length} in corso)`, '', ...suoi.map(rigaRamo)]],
   ];
   const testo = parti.flatMap(([, righe]) => righe).join('\n');
