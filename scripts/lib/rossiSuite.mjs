@@ -25,11 +25,12 @@ export function leggiRegistro(log) {
     const valore = resto.slice(tab + 1).trim();
     if (!valore) continue;
     if (tipo === 'esito') esito = valore;
+    else if (tipo === 'commit' && /^[0-9a-f]{40}$/.test(valore)) commit = valore;
     else if (tipo === 'rosso') rossi.add(valore);
     else if (tipo === 'instabile') instabili.add(valore);
   }
   if (!esito) return leggiRiassuntoVecchio(log);
-  return { completo: esito === 'completo', rossi, instabili };
+  return { completo: esito === 'completo', rossi, instabili, ...(commit ? { commit } : {}) };
 }
 
 // Le corse di prima del registro hanno solo il riassunto a schermo («Rossi NUOVI: n», poi «  ✗ <prova>»): senza
