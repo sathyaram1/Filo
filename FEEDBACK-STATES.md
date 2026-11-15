@@ -135,11 +135,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   si legge con 0 → 1 e vicino → esterno). Ciò che il lavoro non corregge diventa
   SUBITO un feedback, aperto dal server in ogni esito: ogni esterno un feedback
   nuovo senza livello, classificato dopo come ogni altro; per ogni interno col `?` un
-  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, a
-  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore
+  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riscriva, a
+  priorità 1 a ogni livello: a cominciare lo decide l'ordine del manutentore (#2269)
   (quello col `?` aspetta la risposta alla sua domanda: sopra, Pipeline); UNO solo per
-  tutti gli altri interni messi da parte dal bilancio, a priorità = il livello
-  scritto più alto fra loro, con la stessa regola sul 2); —critica con rilievi
+  tutti gli altri interni messi da parte dal bilancio, anche lui a priorità 1); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
