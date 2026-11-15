@@ -501,8 +501,10 @@
       const certo = guastoCerto(guasto.error);
       const prima = guasto.op === 'cancella' ? (certo ? 'Pulizia non partita' : 'Non so se la pulizia è partita')
         : guasto.op === 'ferma' ? (certo ? 'Pulizia non fermata' : 'Non so se la pulizia si è fermata') : '';
+      // Un rifiuto motivato del server (conto da rifare, numero mancante) si dice con le sue parole.
+      const motivo = (/callable \w+ 400: (.+)$/.exec(String(guasto.error)) || [])[1] || fraseGuasto(guasto.error);
       riga.append(
-        testo(prima ? `${prima}: ${fraseGuasto(guasto.error)}.` : `${conMaiuscola(fraseGuasto(guasto.error))}.`),
+        testo(prima ? `${prima}: ${motivo}.` : `${conMaiuscola(motivo)}.`),
         bottoneRiprova(() => loadAnonimi(), 'Rileggi gli account anonimi dal server'),
       );
     }
