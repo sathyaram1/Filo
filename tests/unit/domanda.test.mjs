@@ -299,4 +299,16 @@ test('#2542: l’assorbimento si legge dal terminale nei due sensi', () => {
   assert.match(formattaDomanda({ id: 'D-40', stato: 'aperta', titolo: 't', assorbite: ['D-41', 'D-42'] }, {}, q), /^assorbe: D-41, D-42$/m);
   assert.match(formattaDomanda({ id: 'D-41', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'assorbita in D-40', superataDa: 'D-40' } }, {}, q), /^assorbita in D-40$/m);
   assert.match(formattaDomanda({ id: 'D-43', stato: 'superata', titolo: 't', esito: { ok: true, superataDa: 'D-44' } }, {}, q), /^superata da D-44$/m);
+  // Le assorbite di prima del legame hanno solo il motivo: il terminale le legge come la pagina.
+  assert.match(formattaDomanda({ id: 'D-45', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'assorbita in D-40' } }, {}, q), /^assorbita in D-40$/m);
+  assert.match(formattaDomanda({ id: 'D-46', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'altro', superataDa: 'D-40', assorbita: true } }, {}, q), /^assorbita in D-40$/m);
+});
+
+test('#2542: chi ha assorbito una domanda lo dice una regola sola, col segno del server o il motivo di prima', () => {
+  const D = globalThis.SN_DOMANDE;
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-7', assorbita: true } }), 'D-7');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superata: 'assorbita in D-8' } }), 'D-8');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-9' } }), '', 'superata da una nata al suo posto');
+  assert.equal(D.assorbitaIn({ stato: 'aperta', esito: { superataDa: 'D-7', assorbita: true } }), '');
+  assert.equal(D.assorbitaIn(null), '');
 });
