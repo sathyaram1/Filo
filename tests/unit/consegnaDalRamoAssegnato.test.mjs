@@ -25,7 +25,7 @@ const REPORT = 'Corretto il salvataggio col titolo vuoto: ora salva anche senza 
 
 // Le quattro consegne che valgono per un commit; le altre non guardano il ramo.
 const CONSEGNE = {
-  revisione: ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ora va'],
+  revisione: ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ora va', '--consegna', fileConsegna()],
   correzione: ['fixed', '--report', REPORT],
   critica: ['verdict', '--critique', REPORT],
   sicurezza: ['secaudit', '--verdict', 'pass'],
