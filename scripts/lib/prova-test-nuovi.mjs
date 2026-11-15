@@ -162,7 +162,8 @@ export function testoDellaProva(p, etichetta = '') {
   if (!p || !Array.isArray(p.casi)) return `${testa}prova dei test nuovi non fatta`;
   if (!p.casi.length) return `${testa}nessun caso di prova nuovo o cambiato nel ramo`;
   const righe = p.casi.map((c) => {
-    const segno = c.senza === 'verde' ? '  VERDE ANCHE SENZA IL LAVORO' : (c.con !== 'verde' ? '  NON VERDE COL LAVORO' : '');
+    const s = globalThis.SN_CONSEGNA.casoSegnalato(c);
+    const segno = s ? `  ${s.toUpperCase()}` : '';
     return `- ${c.file} › ${c.caso}: senza ${c.senza}, con ${c.con}${segno}`;
   });
   const conto = `${p.casi.length} casi, ${p.verdiSenza} verdi anche senza il lavoro, ${p.nonVerdiCon} non verdi col lavoro`;
