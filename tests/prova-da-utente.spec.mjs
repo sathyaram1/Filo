@@ -91,11 +91,20 @@ test('una risposta servita da chi la politica non ammette interrompe la prova', 
   togliCartella(r.cartella);
 });
 
-test('il menu del tasto destro su una pagina web ha i suoi badge: il modello può sceglierne le voci', async () => {
+test('il tasto destro su un collegamento apre il menu di Filo, e le sue voci hanno i badge', async () => {
   const r = await prova([
     { azione: 'destro', etichetta: 'collegamento' },
-    { azione: 'fine', seStrato: '.' },
+    { azione: 'fine', seBadge: '^\\w+:Copia URL$' },
   ], ['--compito', 'apri il menu del collegamento']);
-  expect([r.esito.esito, r.esito.riga], r.uscita).toEqual(['riuscito', expect.stringContaining('strato:')]);
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
+  togliCartella(r.cartella);
+});
+
+test('quello che sta sopra la scheda (la barra laterale) ha i badge anche lui, e si clicca', async () => {
+  const r = await prova([
+    { azione: 'clic', etichetta: '^Barra laterale$', superficie: 'shell' },
+    { azione: 'fine', seBadge: '^strato:' },
+  ], ['--compito', 'apri la barra laterale']);
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
   togliCartella(r.cartella);
 });
