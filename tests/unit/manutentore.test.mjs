@@ -433,6 +433,35 @@ test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => 
   assert.equal(s.corpi.length, n);
 });
 
+test('#2269: l\'ordine e le attese portano gli id dei compiti, e compito ne apre uno con le istruzioni da stdin', async (t) => {
+  const s = serverFinto(t, {
+    ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 2, pronti: { pronti: ['812'], servono: 4 } }],
+    attesa: [200, { ok: true, numero: '815', aspetta: 'C-12' }],
+    compito: [200, { ok: true, compito: 'C-13', fiducia: 'non_fidato' }],
+  });
+  assert.equal(await M.main(['accendi', '812,c-12,815'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /compito C-12.*\nORDINE CORTO: pronti 1, ne servono almeno 4/);
+  assert.equal(await M.main(['attesa', '815', 'C-12'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /#815 aspetta il compito C-12: parte quando il compito chiude\./);
+  const { Readable } = await import('node:stream');
+  const stdin = Object.getOwnPropertyDescriptor(process, 'stdin');
+  Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(Readable.from([Buffer.from('Rivedi tutti gli hover.\n')]), { isTTY: false }) });
+  t.after(() => Object.defineProperty(process, 'stdin', stdin));
+  assert.equal(await M.main(['compito', 'Revisione', 'degli', 'hover', '-', '--urgenza', '30'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
+    ['ordine', { ordine: ['812', 'C-12', '815'] }], ['attesa', { numero: '815', aspetta: 'C-12' }],
+    ['compito', { titolo: 'Revisione degli hover', istruzioni: 'Rivedi tutti gli hover.', urgenza: 30 }],
+  ]);
+  assert.match(s.out.join('\n'), /Aperto il compito C-13 \(non_fidato\): mettilo nell'ordine/);
+  // Gli storti non partono.
+  const n = s.corpi.length;
+  assert.equal(await M.main(['compito', 'x', '-', '--urgenza', 'alta'], CHIAVE), 1);
+  assert.equal(await M.main(['compito', '-'], CHIAVE), 1);
+  assert.equal(await M.main(['attesa', '815', 'C-0'], CHIAVE), 1);
+  assert.equal(await M.main(['pacchetto', '900', '812,C-12'], CHIAVE), 1, 'un compito non sta in un pacchetto');
+  assert.equal(s.corpi.length, n);
+});
+
 test('senza chiave né biglietto del manutentore non si chiama il server, e si dice come averla', async (t) => {
   const s = serverFinto(t, {});
   assert.equal(await M.main(['stato'], { env: {}, root: cartellaTemporanea('manutentore-senza') }), 1);
