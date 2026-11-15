@@ -214,10 +214,8 @@ async function captureCompositeLinux(app, outPath, dove) {
   return captureCompositeElectron(app, outPath);
 }
 
-// Le superfici che si vedono ora, dal basso in alto: la shell, le viste nell'ordine in cui stanno, poi le finestre
-// figlie (menu, fumetti). Una sola copia per la schermata e per i segni numerati: se divergono, il modello riceve segni
-// di cose che nella schermata non ci sono. `tipo`: 'shell', 'view' (la scheda attiva) o 'strato'; `rect` è dove sta
-// la superficie nella finestra, `clip` la parte che se ne vede. Prova: tests/prova-da-utente.spec.mjs.
+// Le superfici che si vedono ora, dal basso in alto: una copia sola per schermata e segni numerati, che divergendo
+// davano al modello segni di cose fuori dalla schermata. Prova: tests/prova-da-utente-filo.spec.mjs.
 async function elencoSuperfici(app) {
   return app.evaluate(async ({ BrowserWindow }) => {
     const all = BrowserWindow.getAllWindows();
