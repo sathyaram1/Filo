@@ -831,7 +831,7 @@ test('prova vera: il conflitto sul solo registro si risolve tenendo le righe dei
     assert.equal(p.novita.conflitto, true);
     const s = registroDelServer(r, punta, p.novita.data);
     assert.equal(shaBlob(s.src), p.novita.sha);
-    assert.deepEqual(registroDa(s.src)[0].features, ['a', 'di main', 'uguale', 'del ramo'], 'nessuna riga persa, nessun doppione');
+    assert.deepEqual(dati(s.src)[0].features, ['a', 'di main', 'uguale', 'del ramo'], 'nessuna riga persa, nessun doppione');
     assert.match(testoNovita(p.novita), /conflitto sul registro risolto tenendo le righe dei due lati/);
     pulita(r);
     // Con un altro file in conflitto il registro non basta: resta un conflitto, coi due file.
