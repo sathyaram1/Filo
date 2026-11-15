@@ -369,6 +369,23 @@ export function rigaRosso(c) {
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
 }
 
+/** Il segno delle righe del registro: le legge scripts/rossi-della-suite.mjs dal registro del lavoro, dalla cloud. */
+export const SEGNO_REGISTRO = '[registro-suite]';
+
+/**
+ * Le righe a macchina di una corsa (#2501): l'esito (`completo` solo se ogni caso ha girato, così un caso che manca
+ * vale verde), i rossi nuovi e le prove instabili, rosse a un tentativo e verdi a un altro sullo stesso commit. PURA.
+ */
+export function righeRegistro(v, { completo = true } = {}) {
+  const nuovi = Array.isArray(v?.nuovi) ? v.nuovi : [];
+  const intera = completo && !nuovi.some((c) => c.tetto || c.parteMancante);
+  return [
+    `${SEGNO_REGISTRO} esito\t${intera ? 'completo' : 'incompleto'}`,
+    ...nuovi.filter((c) => !c.strascicoDi).map((c) => `${SEGNO_REGISTRO} rosso\t${rigaRosso(c)}`),
+    ...(Array.isArray(v?.instabili) ? v.instabili : []).map((c) => `${SEGNO_REGISTRO} instabile\t${rigaRosso(c)}`),
+  ];
+}
+
 /** I tetti del testo degli errori, che finisce nel feedback: il server ne tiene 10.000 caratteri in tutto. */
 export const RIGHE_PER_ERRORE = 15;
 export const CARATTERI_PER_ERRORE = 1500;
