@@ -53,7 +53,7 @@ function apriModello(claude, modello, prompt) {
 }
 
 // «Chiedendo a Filo»: la chat della home deve poter rispondere davvero, con la chiave OpenRouter di chi prova e i
-// modelli di prova (tests/fixture/testModels.js), senza il colloquio di benvenuto.
+// modelli di prova (tests/fixtures/testModels.js), senza il colloquio di benvenuto.
 async function preparaChat(app, shell, chiave) {
   require('../../src/shared/constants.js');
   require('../fixtures/testModels.js');
