@@ -67,6 +67,8 @@ esce 0), non c'è niente da mandare in verifica.
 
 <!-- includi: _criteri-struttura.md -->
 
+<!-- includi: _consegna-con-prova.md -->
+
 <!-- includi: _segnala.md -->
 
 <!-- includi: _solo-in-locale.md -->
@@ -75,8 +77,13 @@ esce 0), non c'è niente da mandare in verifica.
 
 <!-- includi: _motivo-correttore.md -->
 
+Se chi si era fermato era chi risolveva (`ripresa.ruolo` «resolver»), il
+lavoro va in verifica per la prima volta: la consegna con la prova accanto è
+obbligatoria (`--consegna`), e il server la rifiuta senza. Dopo chi verificava
+non serve.
+
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>] [--prova <cartella della prova>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--consegna <file.json>] [--domanda <file.json>] [--prova <cartella della prova>]
 ```
 
 Il lavoro torna in verifica sul commit nuovo. Infine rilascia il biglietto:
