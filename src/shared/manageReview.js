@@ -2207,6 +2207,50 @@
     };
   }
 
+  /**
+   * La consegna con la prova accanto (#2505) come la legge il pannello: la classe sulla scheda, poi righe, tabella dei
+   * criteri, elementi nuovi e prova dei test nuovi. null senza consegna. `dettaglio` null = la busta non si apre. PURA.
+   */
+  function vistaConsegna(consegna) {
+    const c = consegna && typeof consegna === 'object' ? consegna : null;
+    if (!c || !c.classe) return null;
+    const minimo = c.decisaDa === 'minimo';
+    const zone = Array.isArray(c.zone) ? c.zone.map(String) : [];
+    const titolo = `Classe di rischio: ${c.classe}, ${minimo ? `alzata dal minimo (${zone.join(', ')})` : 'dichiarata da chi ha lavorato'}`;
+    const righe = [
+      { etichetta: 'Classe', valore: String(c.classe) },
+      { etichetta: 'Dichiarata', valore: String(c.dichiarata || '—') },
+      { etichetta: 'Minimo dai file', valore: c.minimo ? `${c.minimo}: ${zone.join(', ')}` : (c.percorsiCompleti === false ? 'nessuna zona fra i file letti (elenco incompleto)' : 'nessuna zona') },
+      { etichetta: 'Decisa da', valore: minimo ? 'il minimo dai file toccati' : 'chi ha lavorato' },
+      ...(c.at ? [{ etichetta: 'Quando', valore: String(c.at) }] : []),
+    ];
+    const d = c.dettaglio && typeof c.dettaglio === 'object' ? c.dettaglio : null;
+    const nomi = (global.SN_CONSEGNA && global.SN_CONSEGNA.CRITERI) || [];
+    const nomeDi = (n) => (nomi.find((k) => k.n === Number(n)) || {}).nome || `criterio ${n}`;
+    const criteri = d && Array.isArray(d.criteri) ? d.criteri.slice().sort((a, b) => Number(a.criterio) - Number(b.criterio)).map((r) => ({
+      n: Number(r.criterio), nome: nomeDi(r.criterio), esito: String(r.esito || ''),
+      testo: String((r.esito === 'non si applica' ? r.motivo : r.prova) || ''),
+    })) : [];
+    const elementi = d && Array.isArray(d.elementi) ? d.elementi.map((e) => ({
+      nome: String((e && e.elemento) || ''), perche: String((e && e.perche) || ''),
+      azioni: ['clic', 'destro', 'trascina', 'hover'].map((a) => ({ azione: a === 'destro' ? 'tasto destro' : a, testo: String((e && e[a]) || '') })),
+    })) : [];
+    const pt = d && d.provaTest && typeof d.provaTest === 'object' ? d.provaTest : null;
+    const parti = pt ? [['', pt.app], ['server: ', pt.server]].filter(([, p]) => p && Array.isArray(p.casi)) : [];
+    const casi = parti.flatMap(([pre, p]) => p.casi.map((x) => ({
+      testo: `${pre}${x.file} › ${x.caso}: senza il lavoro ${x.senza}, con ${x.con}`,
+      segnalato: x.senza === 'verde' || x.con !== 'verde',
+    })));
+    const nonProvato = pt && pt.server && pt.server.nonProvato ? `server non provato: ${pt.server.nonProvato}` : '';
+    const verdiSenza = casi.filter((x) => /senza il lavoro verde/.test(x.testo)).length;
+    const riepilogo = !pt ? '' : !casi.length ? 'nessun caso di prova nuovo o cambiato'
+      : `${casi.length} ${casi.length === 1 ? 'caso' : 'casi'}, ${verdiSenza} ${verdiSenza === 1 ? 'verde' : 'verdi'} anche senza il lavoro`;
+    return {
+      classe: String(c.classe), titolo, righe, leggibile: !!d, motivo: d ? String(d.motivo || '') : '',
+      criteri, elementi, nessunElemento: d ? String(d.nessunElemento || '') : '', prova: { riepilogo, casi, nonProvato },
+    };
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     tastoFrase,
