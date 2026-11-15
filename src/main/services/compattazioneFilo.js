@@ -244,6 +244,9 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   // cerca da `da` (una pagina prima di `da` farebbe uscire la riga come cancellata).
   s.da = s.da || new Date(Math.min(Date.parse(pezzo[0].ts), Date.parse(letto.ore[0].da))).toISOString();
   s.a = lista[fine] ? lista[fine].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
+  // Da dove `sezione` cerca le fonti delle righe: una cosa successa prima di `da`, letta in testa al primo messaggio,
+  // non ritrovata farebbe uscire la riga come cancellata. `da` resta l'inizio dei messaggi compattati.
+  if (Number.isFinite(fontiDa) && !(Date.parse(s.fontiDa) <= fontiDa)) s.fontiDa = new Date(fontiDa).toISOString();
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
