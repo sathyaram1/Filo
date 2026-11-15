@@ -120,9 +120,12 @@ test('i numeri degli account anonimi e da dove nascono', async ({ app, openTab }
   await expect(riquadro(page, 'mai tornati, senza portafoglio').locator('.sn-wallet-numero-valore')).toHaveText('245.000');
   const prove = riquadro(page, 'nati dentro le prove in 30 giorni');
   await expect(prove.locator('.sn-wallet-numero-valore')).toHaveText('99%');
-  await expect(prove.locator('.sn-wallet-numero-nota')).toHaveText('198.000 su 200.000');
+  // La quota dentro da sola è anche caso: accanto c'è quanto tempo le corse coprono, e i nati all'ora dentro e fuori.
+  await expect(prove.locator('.sn-wallet-numero-nota')).toHaveText('198.000 su 200.000, corse sul 54% del tempo');
+  await expect(prove).toHaveAttribute('title', /^Le corse coprono il 54% del tempo[^\n]*\nNati all'ora: 509 durante le corse, 6 fuori\.\n/);
   await expect(prove).toHaveAttribute('title', /Suite delle prove: 197\.000\nVerifica Linux: 600\nRilasci: 400\nFuori dalle prove: 2\.000/);
   await expect(riquadro(page, 'nati nel giorno prima del conto').locator('.sn-wallet-numero-valore')).toHaveText('15.700');
+  await expect(riquadro(page, 'nati nel giorno prima del conto')).toHaveAttribute('title', /15\.700, 15\.650 nelle prove \(corse sul 60% del giorno\)/);
   const tasto = riga(page).getByRole('button', { name: 'Cancella 230.000 account' });
   await expect(tasto).toBeVisible();
   await expect(tasto).toHaveAttribute('title', /senza portafoglio, mai tornati dopo la prima ora e nati prima del 1 nov\. Non si torna indietro\./);
