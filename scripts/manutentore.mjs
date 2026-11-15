@@ -1245,15 +1245,15 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return r2.status ?? 0;
     }
     case 'ordine': {
-      const [st, sc] = await Promise.all([chiama(cred, 'stato'), tutteLeSchede(cred)]);
+      const [st, sc] = await Promise.all([chiama(cred, 'stato', { pronti: true }), tutteLeSchede(cred)]);
       if (st.ok === false) return esito(st);
-      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede))}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
+      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede), st.pronti)}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
     }
     case 'accendi': {
       let numeri = [];
       if (arg !== '--niente') numeri = leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).numeri;
       const r = await chiama(cred, 'ordine', { ordine: numeri });
-      return esito(r, (x) => `${rigaOrdine(x.ordine || numeri, [])}\nVale un parallelismo di ${x.parallelismoEffettivo}.`);
+      return esito(r, (x) => `${rigaOrdine(x.ordine || numeri, [], x.pronti)}\nVale un parallelismo di ${x.parallelismoEffettivo}.`);
     }
     case 'parallelo': { const r = await chiama(cred, 'ordine', { parallelismo: Number(arg) }); return esito(r, (x) => `Parallelismo ${x.parallelismo}: ne valgono ${x.parallelismoEffettivo}, sotto il freno dell'owner.`); }
     case 'priorita': {
