@@ -14,6 +14,37 @@ export const TETTO_S = 240;
 export const CATENA_AGGIORNAMENTI = Object.freeze([
   'tests/aggiornamenti-da-soli.spec.mjs', 'tests/aggiornamento.spec.mjs', 'tests/update-recap.spec.mjs',
 ]);
+/**
+ * L'elenco dei cammini, coi titoli dello spec. Lo cambiano solo l'owner e il manutentore: sta qui perché il server
+ * ferma anche un lavoro fidato che tocca questo file, mentre le asserzioni dello spec restano di chi lavora.
+ */
+export const CAMMINI = Object.freeze([
+  'Filo si avvia e mostra la home',
+  'il controllo degli aggiornamenti trova una versione nuova',
+  'la chat di Filo risponde',
+  'una pagina web si apre in una scheda',
+  'il tasto destro apre il suo menu',
+  'i dati salvati da una versione precedente si leggono dopo l\'aggiornamento',
+  'un\'impostazione cambiata resta dopo il riavvio',
+]);
+
+/** Lo spec contro l'elenco: gli stessi cammini, e nessuno saltato, isolato o dato rosso in partenza. PURA. */
+export function controllaElenco(sorgente, cammini = CAMMINI) {
+  const s = String(sorgente || '');
+  const titoli = [...s.matchAll(/^\s*test\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/gm)].map((m) => m[2].replace(/\\(.)/g, '$1'));
+  const problemi = [];
+  const mancano = cammini.filter((t) => !titoli.includes(t));
+  const inPiu = titoli.filter((t) => !cammini.includes(t));
+  if (mancano.length) problemi.push(`mancano: ${mancano.map((t) => `«${t}»`).join(', ')}`);
+  if (inPiu.length) problemi.push(`in più: ${inPiu.map((t) => `«${t}»`).join(', ')}`);
+  if (/\btest(\.describe)?\.(skip|fixme|only|fail)\s*\(/.test(s)) problemi.push('un cammino saltato, isolato o segnato rosso atteso');
+  return {
+    ok: !problemi.length,
+    testo: problemi.length
+      ? `ELENCO DEI CAMMINI CAMBIATO (${problemi.join('; ')}). L'elenco lo cambiano solo l'owner e il manutentore, in ${SPEC} e in CAMMINI di scripts/test-importanti.mjs insieme.`
+      : '',
+  };
+}
 
 /**
  * Le opzioni: `--tetto <secondi>` (per provare il controllo), `--catena` (la catena degli aggiornamenti, senza tetto),
