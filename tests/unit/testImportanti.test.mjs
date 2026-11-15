@@ -2,10 +2,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { leggiArgomenti, verdettoImportanti, TETTO_S, SPEC } from '../../scripts/test-importanti.mjs';
+import { leggiArgomenti, verdettoImportanti, TETTO_S, SPEC, CATENA_AGGIORNAMENTI } from '../../scripts/test-importanti.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
