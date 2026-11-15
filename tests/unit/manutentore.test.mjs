@@ -264,20 +264,22 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
-test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segnali e il taccuino, sotto il tetto', () => {
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
-    rami: [{ ramo: 'worker/x', feedback: ['5'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
+test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, non le 2 (#2269)', () => {
+  const stato = { ...STATO, ordine: ['40', '7', 'C-5', '31'], pronti: { pronti: ['40', 'C-5'], servono: 6 } };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
+    rami: [{ ramo: 'worker/x', feedback: ['40'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
   assert.equal(p.ok, true);
   assert.ok(p.token < M.PICCOLO_TETTO_TOKEN, `${p.token} token`);
-  assert.match(p.testo, /Schede a priorità 3 e 2, e le ferme \(30 di 800\)/);
-  assert.match(p.testo, /^#1 · p3 · todo/m);
-  assert.match(p.testo, /^#29 · p1 · todo · FERMO \(guasto: guasto: npm\)/m);
-  assert.doesNotMatch(p.testo, /^#(3[1-9]|[4-9]\d|\d{3}) · /m, 'niente schede a 0 e a 1');
+  assert.match(p.testo, /Schede a priorità 3, dei lavori nell'ordine e le ferme \(8 di 800\)/);
+  const righe = p.testo.split('\n').filter((r) => /^(\[\d+° nell'ordine\] )?#\d+ · /.test(r)).map((r) => r.replace(/ · .*/, ''));
+  assert.deepEqual(righe, ['#1', '#2', '#3', '[1° nell\'ordine] #40', '[2° nell\'ordine] #7', '[4° nell\'ordine] #31', '#29', '#30'],
+    'le 3, poi l\'ordine nella sua sequenza, poi le ferme; niente 2 fuori ordine');
+  assert.match(p.testo, /ORDINE CORTO: pronti 2, ne servono almeno 6 \(2×N\): #40, C-5\./);
   assert.match(p.testo, /criterio: grafica prima/);
   assert.match(p.testo, /Versione 4/);
   assert.match(p.testo, /s1 guasto/);
   assert.match(p.testo, /^worker\/x/m);
-  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
+  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori dell\'ordine e delle 3');
 });
 
 test('la scheda del server dice perché un lavoro non parte: resta locale coi motivi e l’ora, attesa del server, domande (#2258)', () => {
@@ -295,10 +297,12 @@ test('la scheda del server dice perché un lavoro non parte: resta locale coi mo
 });
 
 test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
-  const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
+  const tutte = ottocento().map((s) => ({ ...s, titolo: s.titolo.repeat(3) }));
+  const lungo800 = { ...STATO, ordine: tutte.map((s) => s.num) };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: lungo800, taccuino: { testo: '', versione: 0 }, schede: tutte });
   assert.equal(p.ok, false);
-  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede delle 3 e dell'ordine \\(\\d+ token\\)\\. Togli dall'ordine`));
+  const tutte2 = tutte;
   // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
   const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
   assert.equal(lungo.ok, false);
