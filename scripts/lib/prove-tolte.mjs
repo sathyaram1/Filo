@@ -582,8 +582,19 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
     for (const [p, l] of [...Object.entries(dipFuori.via), ...Object.entries(conConfig.via)]) tutte[p] = [...new Set([...(tutte[p] || []), ...l])];
     const via = Object.fromEntries(Object.entries(tutte).filter(([p]) => !prove.includes(p)));
     const fuori = [...aiuti.filter((a) => Object.values(dipFuori.via).some((l) => l.includes(a))), ...config];
-    return { prove: [...prove, ...Object.keys(via)], via, fuori };
+    return { prove: [...prove, ...Object.keys(via)], via, fuori, lavoro: toccati.filter((f) => opera.has(f)) };
   } catch (_) { return null; }
+}
+
+// I file fuori dal giro sotto tests/ che il ramo aveva già cambiato alla critica sono il suo lavoro, non aiuti (#2546):
+// rimessi com'erano, la prova girerebbe sullo strumento da correggere. La verifica lì non scrive (codice-fermo.mjs).
+// Senza main non si sa cosa è del ramo: nessuno, e il rilancio resta il più severo.
+function operaDelRamo(shaPrima, root, principale) {
+  if (!principale) return new Set();
+  try {
+    const base = gitOut(['merge-base', shaPrima, principale], root).trim();
+    return new Set(aiutiFuoriDalGiro(gitOut(['diff', '--name-only', '-z', '--no-renames', base, shaPrima, '--', 'tests/'], root).split('\0').filter(Boolean)));
+  } catch (_) { return new Set(); }
 }
 
 // Le cartelle del giro di questo ramo: quelle cambiate dopo la critica e quelle che il ramo ha toccato rispetto a main.
