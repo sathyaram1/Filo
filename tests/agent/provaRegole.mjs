@@ -114,8 +114,11 @@ export function leggiMossa(testo, segni) {
   const vedo = String(j.vedo || '').trim().slice(0, 400);
   const mossa = { azione, vedo };
   const validi = new Set(segni);
-  const segno = j.segno === undefined || j.segno === null || j.segno === '' ? null : Number(j.segno);
-  if (segno !== null && !validi.has(segno)) return { ok: false, errore: `il badge #${j.segno} non c'è sullo schermo` };
+  // Le mosse senza badge arrivano spesso con "segno": 0; i badge partono da 1, quindi 0 vale «nessuno».
+  const usaSegno = ['clic', 'destro', 'doppio', 'scrivi'].includes(azione);
+  const grezzo = usaSegno ? j.segno : null;
+  const segno = grezzo === undefined || grezzo === null || grezzo === '' || Number(grezzo) === 0 ? null : Number(grezzo);
+  if (segno !== null && !validi.has(segno)) return { ok: false, errore: `il badge #${grezzo} non c'è sullo schermo` };
   if (['clic', 'destro', 'doppio'].includes(azione)) {
     if (segno === null) return { ok: false, errore: `${azione} vuole il numero di un badge in "segno"` };
     mossa.segno = segno;
