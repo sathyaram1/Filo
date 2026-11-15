@@ -374,12 +374,14 @@ export const SEGNO_REGISTRO = '[registro-suite]';
 
 /**
  * Le righe a macchina di una corsa (#2501): l'esito (`completo` solo se ogni caso ha girato, così un caso che manca
- * vale verde), i rossi nuovi e le prove instabili, rosse a un tentativo e verdi a un altro sullo stesso commit. PURA.
+ * vale verde), i rossi nuovi e le prove instabili, rosse a un tentativo e verdi a un altro sullo stesso commit. Il
+ * commit provato si scrive: in una corsa chiesta per una versione non è quello della corsa (la punta di main). PURA.
  */
-export function righeRegistro(v, { completo = true } = {}) {
+export function righeRegistro(v, { completo = true, commit = '' } = {}) {
   const nuovi = Array.isArray(v?.nuovi) ? v.nuovi : [];
   const intera = completo && !nuovi.some((c) => c.tetto || c.parteMancante);
   return [
+    ...(/^[0-9a-f]{40}$/.test(commit) ? [`${SEGNO_REGISTRO} commit\t${commit}`] : []),
     `${SEGNO_REGISTRO} esito\t${intera ? 'completo' : 'incompleto'}`,
     ...nuovi.filter((c) => !c.strascicoDi).map((c) => `${SEGNO_REGISTRO} rosso\t${rigaRosso(c)}`),
     ...(Array.isArray(v?.instabili) ? v.instabili : []).map((c) => `${SEGNO_REGISTRO} instabile\t${rigaRosso(c)}`),
