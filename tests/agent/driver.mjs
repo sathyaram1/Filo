@@ -362,16 +362,17 @@ function COLLECT_FN(soloFilo = false) {
   const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
   const UI = globalThis.SN_FILO_UI;
   const radici = [];
-  const giu = (radice) => {
-    radici.push(radice);
+  const giu = (radice, diFilo) => {
+    radici.push({ radice, diFilo });
     for (const el of radice.querySelectorAll('*')) {
       let r = el.shadowRoot;
-      if (!r && UI && UI.ombraDi) { try { r = UI.ombraDi(el); } catch (_) {} }
-      if (r) giu(r);
+      let nostra = diFilo;
+      if (!r && UI && UI.ombraDi) { try { r = UI.ombraDi(el); nostra = true; } catch (_) {} }
+      if (r) giu(r, nostra);
     }
   };
-  giu(document);
-  const els = (soloFilo ? radici.slice(1) : radici).flatMap((r) => Array.from(r.querySelectorAll(sel)));
+  giu(document, false);
+  const els = radici.filter((x) => !soloFilo || x.diFilo).flatMap((x) => Array.from(x.radice.querySelectorAll(sel)));
   const out = [];
   for (const el of els) {
     const r = el.getBoundingClientRect();
