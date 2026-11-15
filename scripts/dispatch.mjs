@@ -435,6 +435,8 @@ export const OPZIONI_REGISTRAZIONE = {
   '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
   // La cartella della prova da utente, allegata al report (#2539).
   '--prova': { tipo: 'cartella', comandi: ['--record-fixed'] },
+  // La consegna con la prova accanto (#2505) di chi riprende un primo lavoro fermo su una domanda.
+  '--consegna': { tipo: 'file', forma: ' <file.json>', comandi: ['--record-fixed'] },
   // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
   '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
