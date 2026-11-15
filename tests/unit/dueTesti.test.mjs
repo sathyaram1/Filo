@@ -86,7 +86,7 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
       '--status', 'revision_capability',
       '--notes', 'Report per l’owner: ho scartato la strada A perché costava una chiamata a pagamento in più.',
       '--frase', 'Ora puoi rimuovere un modello dalle impostazioni.',
-      '--branch', 'worker/900',
+      '--branch', 'worker/900', ...argomentiConsegna(casa),
     ], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa, FILO_NO_BEAT: '1' });
     assert.equal(r.code, 0, `la consegna doveva essere accettata (stderr: ${r.se})`);
 
