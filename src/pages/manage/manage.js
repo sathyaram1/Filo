@@ -5647,12 +5647,14 @@
     giudiceAperto = null;
     if (mgForme) mgForme.querySelectorAll('.mg-forma--scelta')
       .forEach((el) => el.classList.remove('mg-forma--scelta'));
+    if (mgClasse) mgClasse.classList.remove('mg-classe--scelta');
   }
 
   // Segna quale forma guarda il pannello: con cinque forme in fila non si saprebbe più quale si
   // era premuta.
   function segnaForma(key) {
     livelloAperto = key || null;
+    if (mgClasse) mgClasse.classList.toggle('mg-classe--scelta', livelloAperto === 'consegna');
     if (!mgForme) return;
     mgForme.querySelectorAll('.mg-forma').forEach((el) => {
       el.classList.toggle('mg-forma--scelta', el.dataset.livello === livelloAperto);
