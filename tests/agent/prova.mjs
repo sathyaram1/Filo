@@ -108,7 +108,7 @@ async function run() {
     const aperta = await d.launchFilo({ userDataPrefix: 'filo-prova-', extraEnv: { NODE_USE_ENV_PROXY: '1' } });
     app = aperta.app;
     const { shell } = aperta;
-    if (o.modo === 'chat') await preparaChat(app, shell, chiave);
+    if (chiave) await preparaFilo(app, shell, chiave);
     if (o.start) await d.navigate(app, shell, o.start);
     let fuoco = null;
     let nota = '';
