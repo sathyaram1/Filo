@@ -31,9 +31,9 @@
   // La SEDE: `i` se il difetto riguarda l'obiettivo del feedback o l'ha introdotto il ramo, e solo lui prende un
   // livello; `e` tutto il resto, che esce in un feedback nuovo senza livello, classificato dopo come ogni altro.
   const SEDI = ['i', 'e'];
-  // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
-  // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
-  const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
+  // Un interno messo da parte nasce a 1 a ogni livello (#2269): a cominciare lo decide l'ordine del manutentore, non il
+  // livello. Il livello resta quello scritto; un'emergenza esterna la classifica a 3 il giudice, come ogni feedback nuovo.
+  const prioritaDiNascita = () => 1;
   // La scala delle priorità dei feedback (0-3) non è quella dei livelli dei rilievi.
   const PRIORITA = [0, 1, 2, 3];
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se il difetto riguarda l\'obiettivo del feedback o l\'ha introdotto il ramo (per esempio [2i], [1i?]); tutto il resto è esterno e si scrive [e], senza livello';
