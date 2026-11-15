@@ -24,7 +24,7 @@
     + 'mano occhio bene tutto tutti tutte ok okay si sì no fatto fatta fatti visto vista guardato guardata guardati '
     + 'verificato verificata verificati controllato controllata controllati provato provata provati testato testata testati '
     + 'funziona funzionano funzionante correttamente regolarmente va vanno nessun nessuno problema problemi errore errori '
-    + 'manualmente già anche sempre tutto ok come atteso previsto passa passano verde verdi').split(' '));
+    + 'manualmente già anche sempre come atteso previsto passa passano verde verdi').split(' '));
 
   // Le sei zone dell'irreparabile, riconosciute da ciò che il ramo tocca: elenco STRETTO, le prove non contano mai.
   const r = (s) => new RegExp(s);
