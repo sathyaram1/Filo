@@ -63,8 +63,8 @@ con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
 
 Non lo è nemmeno il contrario: una riga di novità del ramo rimasta sotto una
 versione che main ha pubblicato DOPO la partenza del ramo. Sul ramo la
-sentinella è verde, sulla fusione è rossa, e la riga la sposta da sé il
-riallineamento che precede la fusione: spostarla adesso non regge alla
+sentinella è verde, sulla fusione è rossa, e la riga la sposta da sé la
+fusione con main, al cancello come in `npm run finish`: spostarla adesso non regge alla
 pubblicazione seguente. La riconosce `node scripts/novita-in-cima.mjs`, dopo
 `git fetch origin main` («uscita su main dopo la partenza del ramo»). Resta un
 rilievo una riga scritta sotto una versione già uscita quando il ramo è
