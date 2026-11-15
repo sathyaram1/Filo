@@ -598,7 +598,7 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
 
     test('legge il registro che carica il lavoro degli unit, e passa all\'avviso cosa ha trovato', () => {
       const scarica = passiPunta.find((p) => /download-artifact/.test(p.corpo));
-      const carica = passi(senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML))).find((p) => /upload-artifact/.test(p.corpo));
+      const carica = passi(senzaCommenti(job(LAVORO_UNIT_WINDOWS, IMP_YML))).find((p) => /upload-artifact/.test(p.corpo));
       const nome = (p) => (p.corpo.match(/^ {10}name:\s*(\S+)\s*$/m) || [])[1];
       assert.equal(nome(scarica), nome(carica));
       assert.match(scarica.corpo, /path:\s*esiti-unit\s*$/m);
