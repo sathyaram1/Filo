@@ -26,7 +26,9 @@ export function chiaveDelFermo(tipo, tag) {
 const EVENTI = new Set(['push', 'workflow_dispatch']);
 const PROFONDITA = 3000;
 
-/** Il lavoro di suite.yml che rifà il cancello di pubblicazione: gli unit test su Windows. */
+/** Il workflow il cui verde fa pubblicabile un commit. */
+export const WORKFLOW_VERDE = 'importanti.yml';
+/** Il suo lavoro che rifà il cancello di pubblicazione: gli unit test su Windows. */
 export const LAVORO_UNIT_WINDOWS = 'unit-windows';
 
 /**
