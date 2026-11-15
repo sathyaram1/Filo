@@ -61,7 +61,13 @@ function giro(files, { ramo = 'worker/746', main = null, lavoro = {} } = {}) {
   scrivi('bin/npx', `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/npx.mjs" "$@"\n`);
   scrivi('bin/npx.cmd', `@"${process.execPath}" "%~dp0npx.mjs" %*\r\n`);
   chmodSync(resolve(dir, 'bin', 'npx'), 0o755);
-  g('add', '-A'); g('commit', '-qm', 'avvio della verifica');
+  for (const [f, t] of Object.entries(main || {})) scrivi(f, t);
+  g('add', '-A'); g('commit', '-qm', main ? 'main' : 'avvio della verifica');
+  if (main) {
+    g('branch', 'main');
+    for (const [f, t] of Object.entries(lavoro)) scrivi(f, t);
+    g('add', '-A'); g('commit', '-qm', 'lavoro del ramo');
+  }
   const avvio = g('rev-parse', 'HEAD');
   for (const [f, t] of Object.entries(files)) scrivi(f, t);
   g('add', '-A'); g('commit', '-qm', 'critica');
