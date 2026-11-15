@@ -1245,8 +1245,23 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     }
     case 'attesa': {
       const togli = argv.includes('--togli');
-      const r = await chiama(cred, togli ? 'attesa.togli' : 'attesa', { numero: numeroDi(arg), aspetta: numeroDi(argv[2]) });
-      return esito(r, (x) => (togli ? `#${x.numero} non aspetta più #${x.tolta}.` : x.gia ? `#${numeroDi(arg)} aspettava già #${numeroDi(argv[2])}.` : `#${x.numero} aspetta #${x.aspetta}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : ''}.`));
+      const atteso = voceDi(argv[2]);
+      const nome = (v) => (COMPITO_RE.test(String(v)) ? `il compito ${v}` : `#${v}`);
+      const r = await chiama(cred, togli ? 'attesa.togli' : 'attesa', { numero: numeroDi(arg), aspetta: atteso });
+      return esito(r, (x) => (togli ? `#${x.numero} non aspetta più ${nome(x.tolta)}.` : x.gia ? `#${numeroDi(arg)} aspettava già ${nome(atteso)}.`
+        : `#${x.numero} aspetta ${nome(x.aspetta)}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : COMPITO_RE.test(String(x.aspetta)) ? ': parte quando il compito chiude' : ''}.`));
+    }
+    case 'compito': {
+      const istruzioni = (await leggiStdin()).trim();
+      if (!istruzioni) { console.error('RIFIUTATO: il compito vuole le istruzioni da stdin (compito "<titolo>" - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
+      const u = opzione(argv, '--urgenza');
+      const alle = opzione(argv, '--alle');
+      const ambito = opzione(argv, '--ambito');
+      const r = await chiama(cred, 'compito', {
+        titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), istruzioni,
+        ...(u !== undefined ? { urgenza: Number(u) } : {}), ...(alle ? { alle } : {}), ...(ambito ? { ambito } : {}),
+      });
+      return esito(r, (x) => `Aperto il compito ${x.compito}${x.fiducia ? ` (${x.fiducia})` : ''}${x.alle ? `, non prima delle ${x.alle}` : ''}: mettilo nell'ordine (accendi …,${x.compito},…) per dargli il suo posto, o lascia che lo prenda la coda per urgenza.`);
     }
     case 'pacchetto': {
       const server = vuoleServer(argv);
