@@ -435,7 +435,10 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
   const sha = String(r.sha || '').slice(0, 9);
   switch (r.outcome) {
     case 'merged': return `${r.app ? `Il cancello ha portato prima la parte dell’app in attesa su main di Filo (${String(r.app).slice(0, 9)}), poi ` : 'Il cancello ha portato '}${ramo} su main di filo-security${sha ? ` (${sha})` : ''}. La pubblicazione la fa GitHub (deploy.yml).`;
-    case 'aspetta_suite': return `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
+    // Le spinte sui rami di lavoro non accendono la suite (#2533): su una punta senza corse la si avvia a mano.
+    case 'aspetta_suite': return r.suite === 'assente'
+      ? `Su ${sha || 'quel commit'} la suite di filo-security non è mai partita: avviala da Actions di filo-security («Suite del server», Run workflow sul ramo ${ramo}), poi rilancia lo stesso comando.`
+      : `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
     case 'suite_rossa': return `La suite di filo-security è rossa su ${sha || 'quel commit'}${r.url ? ` (${r.url})` : ''}: correggi il ramo, spingi e rilancia.`;
     case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
     case 'rifiutata': return `Anche il cancello è stato rifiutato da GitHub (${String(r.detail || '').slice(0, 160)}): controlla il bypass della regola di main di filo-security.`;
