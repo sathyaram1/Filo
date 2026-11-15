@@ -1879,6 +1879,13 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
     process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
+  } else if (ferma || domanda) {
+    // Una consegna che si ferma lascia il ramo a chi riprende: prima su origin (#2516).
+    const canale = ch || await import('./routine-channel.mjs');
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const sped = canale.spedisciPrimaDellaFermata(ROOT, readTicket(ROOT));
+    for (const riga of sped.righe || []) process.stderr.write(`${riga}\n`);
+    if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
