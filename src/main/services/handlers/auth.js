@@ -221,6 +221,7 @@ async function decryptFeedbackObject(fields, privKey) {
   }
   await decryptPipelineField(out, C, priv);
   await decryptLivelliFields(out, C, priv);
+  await decryptConsegnaField(out, C, priv);
 
   // `priority` è un intero, non testo: logica dedicata. Se è già un numero resta invariato.
   if (C.isEncrypted(out.priority)) {
