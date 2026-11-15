@@ -11,6 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { ramoLegatoDaRiprendere } from '../../scripts/lib/branch-integrity.mjs';
+import { writeTicket } from '../../scripts/lib/routine-ticket.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ID = 'fid-2516';
