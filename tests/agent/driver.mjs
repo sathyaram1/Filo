@@ -325,7 +325,7 @@ export async function captureCompositeElectron(app, outPath) {
     }
     const png = nativeImage.createFromBitmap(tela, { width: W, height: H, scaleFactor: 1 }).toPNG();
     return { png: png.toString('base64'), saltate };
-  });
+  }, elenco);
   // In un clone pulito la cartella delle foto non c'è ancora.
   mkdirSync(dirname(resolve(outPath)), { recursive: true });
   writeFileSync(outPath, Buffer.from(esito.png, 'base64'));
