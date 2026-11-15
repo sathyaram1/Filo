@@ -175,8 +175,8 @@ async function main() {
     }
     await chiama({ op: 'lavori', slug: nome, lavori: potere });
     console.log(potere === 'server'
-      ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
-      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`);
+      ? `"${nome}" è la chiave della routine server: riceve i lavori server fidati e il primo lavoro di ogni feedback fidato, e solo a rete limitata.`
+      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata; il primo lavoro di un feedback fidato solo se le routine server sono spente.`);
     return;
   }
 
