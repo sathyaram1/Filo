@@ -580,12 +580,12 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
     const se = (punta.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
     const corsa = ({ ref = 'refs/heads/main', unit: u = 'failure', cancellata = false } = {}) => ({
       github: { ref }, cancellata,
-      needs: { suite: { result: 'success' }, verdetto: { result: 'success' }, [LAVORO_UNIT_WINDOWS]: { result: u } },
+      needs: { [LAVORO_UNIT_WINDOWS]: { result: u } },
     });
 
-    test('gira su Windows dopo la suite, solo su main e a unit rossi, col codice della punta e senza segreti', () => {
+    test('gira su Windows dopo gli unit, solo su main e a unit rossi, col codice della punta e senza segreti', () => {
       assert.match(punta, /runs-on:\s*windows-latest/, 'i rossi sono di Windows: su Linux passerebbero senza essere corretti');
-      assert.match(punta, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, 'a fine suite, quando l\'avviso apre il feedback');
+      assert.match(punta, /^ {4}needs:\s*\[\s*unit-windows\s*\]\s*$/m, 'dopo gli unit, prima che l\'avviso apra il feedback');
       assert.equal(valutaCondizione(se, corsa()), true);
       assert.equal(valutaCondizione(se, corsa({ unit: 'success' })), false);
       assert.equal(valutaCondizione(se, corsa({ ref: 'refs/heads/prova' })), false);
