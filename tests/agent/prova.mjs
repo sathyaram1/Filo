@@ -88,7 +88,10 @@ async function run() {
   let avviso = '';
   try { chiave = getApiKey(); } catch (e) {
     if (o.modo === 'chat') { console.error(`Il modo chat fa rispondere la chat di Filo con un modello vero. ${e.message}`); return 2; }
-    avviso = `Filo è spento, senza modelli: le funzioni che passano da un modello non rispondono. ${e.message}`;
+    // Senza chiave Filo si accende lo stesso, con una chiave che il fornitore rifiuta: le schermate restano quelle
+    // di un utente normale, e l'avviso dice che i modelli non rispondono.
+    chiave = 'chiave-assente';
+    avviso = `Nessuna chiave OpenRouter: Filo è acceso ma le funzioni che passano da un modello rispondono con un errore. ${e.message}`;
     console.log(avviso);
   }
 
