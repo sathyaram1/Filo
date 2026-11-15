@@ -93,7 +93,7 @@ export function oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, adesso 
 
 /**
  * Pubblicazione ferma: l'ultima versione ha più di `soglia` ore e su main c'è codice nuovo dopo di lei.
- * 'senza-verde' se nessun commit più nuovo ha la suite verde; 'dopo-il-verde' se un verde da pubblicare
+ * 'senza-verde' se nessun commit più nuovo è verde; 'dopo-il-verde' se un verde da pubblicare
  * c'è da più di `sogliaVerde` ore e non è uscito (cancello unit, numero, costruzione…); altrimenti ''. PURA.
  */
 export function rilascioFermo({
