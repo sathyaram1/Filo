@@ -1177,6 +1177,7 @@ export function buildPayload(bucket, ctx = {}) {
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
       if (bucket.ripartenza) out.ripartenza = bucket.ripartenza;
+      if (bucket.ripartenzaPersa) out.ripartenzaPersa = { ...bucket.ripartenzaPersa, nota: testoRipartenzaPersa(bucket.ripartenzaPersa) };
       return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
     case 'risposta': {
