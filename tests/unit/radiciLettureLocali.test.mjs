@@ -89,7 +89,8 @@ const D_F = { id: 'D-1', numero: 1, titolo: 'Fidata', priorita: 'importante', st
 
 test('elenco, stampa e registro delle domande nominano al server le sole non fidate che stampano', async () => {
   const { esegui } = await import('../../scripts/domanda.mjs');
-  const base = { biglietto: async () => '', bigliettoLocale: async () => '', scrivi: () => {}, errore: () => {} };
+  // La credenziale si dà alla prova: quella della macchina c'è solo da chi ha il token dell'owner.
+  const base = { biglietto: async () => '', bigliettoLocale: async () => '', credenziale: async () => ({ tipo: 'admin' }), scrivi: () => {}, errore: () => {} };
   const casi = [
     [['elenco'], { domande: [D_F, D_NF] }],
     [['mostra', 'D-2'], { domanda: D_NF }],
