@@ -487,16 +487,15 @@ export async function clickComposite(app, shell, cx, cy) {
   await sleep(400);
 }
 
-export async function typeText(app, shell, text) {
-  const view = await activeView(app, shell);
-  const page = view || shell;
+// `dove`: la Page che ha il fuoco (quella dell'ultimo clic, per esempio la barra indirizzi nella shell); senza, la scheda.
+export async function typeText(app, shell, text, dove = null) {
+  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
   await page.keyboard.type(text, { delay: 10 });
   await sleep(200);
 }
 
-export async function pressKey(app, shell, key) {
-  const view = await activeView(app, shell);
-  const page = view || shell;
+export async function pressKey(app, shell, key, dove = null) {
+  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
   await page.keyboard.press(key);
   await sleep(200);
 }
