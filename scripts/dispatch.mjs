@@ -3023,7 +3023,14 @@ if (isMainModule) {
       const siFerma = !!(domanda && domanda.blocca !== false);
       const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role, { siFerma });
       if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
-      const s = await recordFixed(id, report, frase, ferma, domanda, motivo.motivo, typeof opz['--prova'] === 'string' ? opz['--prova'] : '');
+      let consegna = null;
+      if (opz['--consegna']) {
+        const { leggiConsegna } = await import('./lib/consegna.mjs');
+        const l = leggiConsegna(opz['--consegna'], ROOT);
+        if (l.errore) { console.error(`${l.errore}\nNon ho consegnato niente.`); process.exit(1); }
+        consegna = l.consegna;
+      }
+      const s = await recordFixed(id, report, frase, ferma, domanda, motivo.motivo, typeof opz['--prova'] === 'string' ? opz['--prova'] : '', consegna);
       if (s.rejected) esciRespinto(s);
       console.log(fixedReplyText(id, s.reply, ferma || !!domanda));
       process.exit(0);
