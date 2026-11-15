@@ -1146,8 +1146,8 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
 }
 
 /**
- * Il commit che la prossima pubblicazione costruisce al più presto: il più nuovo di main (primo genitore) con la suite
- * verde, come lo sceglie ultima-suite-verde.mjs. La pubblicazione prende lui o uno dopo, quindi le sue righe ci sono
+ * Il commit che la prossima pubblicazione costruisce al più presto: il più nuovo di main (primo genitore) con le prove
+ * importanti verdi, come lo sceglie ultima-suite-verde.mjs. La pubblicazione prende lui o uno dopo, quindi le sue righe ci sono
  * tutte. → { sha } | { motivo }. Mai un throw.
  */
 export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = fetch, git = null, gh = null } = {}) {
