@@ -1378,7 +1378,14 @@ export function controlliLocali(cmd, argv) {
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
     case 'priorita': return num(a, cmd) || (PRIORITA_TRE.leggi(b) === null ? 'la priorità è 0, 1, 2 o 3' : '');
-    case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
+    case 'attesa': return num(a, cmd) || (voceDi(b) ? '' : `attesa: chi aspetta: «${String(b ?? '').slice(0, 20)}» non è un numero di feedback né l'id di un compito (C-12)`);
+    case 'compito': {
+      const u = opzione(argv, '--urgenza');
+      if (u !== undefined && !/^\d{1,2}$/.test(String(u))) return `--urgenza: «${String(u).slice(0, 20)}» non è un intero da 0 a 99`;
+      const alle = opzione(argv, '--alle');
+      if (alle !== undefined && !Number.isFinite(Date.parse(String(alle)))) return `--alle: «${String(alle).slice(0, 30)}» non è una data ISO`;
+      return ignote(cmd) || (senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'compito vuole il titolo, poi - e le istruzioni da stdin');
+    }
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).motivo || '');
     case 'taccuino': return a === 'scrivi' && !/^\d+$/.test(String(opzione(argv, '--versione') ?? '')) ? 'taccuino scrivi vuole --versione <V>, il numero che hai letto col taccuino: senza, un\'indicazione dell\'owner scritta in mezzo sparirebbe' : '';
