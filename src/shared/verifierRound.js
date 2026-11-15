@@ -591,7 +591,7 @@
    * e con `priority: null` (il feedback nuovo lo classifica chi classifica gli
    * altri, #2339), in ogni esito. Un esterno col `?` non ferma niente: la
    * domanda viaggia nel suo feedback. I rilievi messi da parte (`derived`)
-   * portano la `priority` del livello SCRITTO; come diventano feedback lo dice
+   * nascono a priorità 1, a ogni livello (#2269); come diventano feedback lo dice
    * derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1}, counts:{count3,count2,count1} }
