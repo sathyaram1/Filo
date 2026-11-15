@@ -1098,9 +1098,9 @@ export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = 
       if (!lavori.has(r.id)) lavori.set(r.id, passaIlCancello((await api(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)).jobs));
       if (lavori.get(r.id)) return { sha };
     }
-    return { motivo: 'nessun commit di main con la suite verde fra le ultime cento corse' };
+    return { motivo: 'nessun commit di main con le prove importanti verdi fra le ultime cento corse' };
   } catch (e) {
-    return { motivo: `le corse della suite non si leggono (${unaRiga(e.message).slice(0, 160)})` };
+    return { motivo: `le corse delle prove importanti non si leggono (${unaRiga(e.message).slice(0, 160)})` };
   }
 }
 
