@@ -10,10 +10,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const SPEC = 'tests/importanti.spec.mjs';
 /** Il tetto nel contenitore delle routine, in secondi. */
 export const TETTO_S = 240;
+/** La catena intera degli aggiornamenti: non sta nel tetto, gira a parte prima della pubblicazione (importanti.yml). */
+export const CATENA_AGGIORNAMENTI = Object.freeze([
+  'tests/aggiornamenti-da-soli.spec.mjs', 'tests/aggiornamento.spec.mjs', 'tests/update-recap.spec.mjs',
+]);
 
-/** Le opzioni: `--tetto <secondi>` (per provare il controllo), il resto passa a Playwright. PURA. */
+/**
+ * Le opzioni: `--tetto <secondi>` (per provare il controllo), `--catena` (la catena degli aggiornamenti, senza tetto),
+ * `--chiavi <file>` (le chiavi dell'allarme di un rosso); il resto passa a Playwright. PURA.
+ */
 export function leggiArgomenti(argv) {
-  const out = { tettoS: TETTO_S, resto: [] };
+  const out = { tettoS: TETTO_S, catena: false, chiavi: '', resto: [] };
   const a = Array.isArray(argv) ? argv.map(String) : [];
   for (let i = 0; i < a.length; i += 1) {
     if (a[i] === '--tetto') {
@@ -21,20 +28,30 @@ export function leggiArgomenti(argv) {
       if (!(Number.isFinite(n) && n > 0)) return { errore: '--tetto vuole i secondi, un numero sopra zero' };
       out.tettoS = n;
       i += 1;
+    } else if (a[i] === '--catena') out.catena = true;
+    else if (a[i] === '--chiavi') {
+      const f = a[i + 1];
+      if (!f || f.startsWith('--')) return { errore: '--chiavi vuole un percorso' };
+      out.chiavi = f;
+      i += 1;
     } else out.resto.push(a[i]);
   }
   return out;
 }
 
-/** L'esito: rosso se Playwright è rosso o se la corsa ha passato il tetto. PURA. */
-export function verdettoImportanti({ codice, durataMs, tettoS = TETTO_S }) {
+/** L'esito: rosso se Playwright è rosso o se la corsa ha passato il tetto (la catena non ne ha). PURA. */
+export function verdettoImportanti({ codice, durataMs, tettoS = TETTO_S, catena = false }) {
   const secondi = Math.round(durataMs / 100) / 10;
-  const sopra = durataMs > tettoS * 1000;
-  const righe = [`Prove importanti: ${codice === 0 ? 'verdi' : 'ROSSE'} in ${secondi} s (tetto ${tettoS} s).`];
+  const sopra = !catena && durataMs > tettoS * 1000;
+  const nome = catena ? 'Catena degli aggiornamenti' : 'Prove importanti';
+  const righe = [`${nome}: ${codice === 0 ? 'verdi' : 'ROSSE'} in ${secondi} s${catena ? '' : ` (tetto ${tettoS} s)`}.`];
   if (sopra) {
     righe.push(`DURATA SOPRA IL TETTO: ${secondi} s contro ${tettoS} s. Accorcia un cammino o togline uno: il tetto non si alza.`);
   }
-  return { codice: codice === 0 && !sopra ? 0 : 1, sopra, testo: righe.join('\n') };
+  const chiavi = catena
+    ? (codice === 0 ? [] : ['importanti:catena-aggiornamenti'])
+    : [...(codice === 0 ? [] : ['importanti:rosse']), ...(sopra ? ['importanti:durata'] : [])];
+  return { codice: codice === 0 && !sopra ? 0 : 1, sopra, chiavi, testo: righe.join('\n') };
 }
 
 async function main() {
