@@ -20,6 +20,8 @@ createInterface({ input: process.stdin }).on('line', (riga) => {
   if (visti.length) badge = visti;
   const passo = { ...copione[Math.min(i, copione.length - 1)] };
   i++;
+  // `muto`: un modello che non risponde più, per vedere scattare il tetto dei minuti.
+  if (passo.muto) return;
   if (passo.etichetta) {
     const re = new RegExp(passo.etichetta, 'i');
     const b = badge.find((x) => re.test(x.label) && (!passo.superficie || x.page === passo.superficie));
