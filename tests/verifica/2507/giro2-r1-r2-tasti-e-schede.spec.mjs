@@ -12,7 +12,6 @@ import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const FINTO = join(ROOT, 'tests', 'helpers', 'claudeFinto.mjs');
 
-test.describe.configure({ mode: 'serial' });
 test.setTimeout(150_000);
 
 let server;
