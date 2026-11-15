@@ -459,7 +459,10 @@ export async function markInteractables(app, shell) {
   for (const s of superfici) {
     let segni = [];
     try { segni = await s.pagina.evaluate(COLLECT_FN); } catch (_) { continue; }
-    if (s.id != null && !/^filo:/.test(s.pagina.url())) segni = segni.concat(await segniNelMondoDiFilo(app, s.id));
+    if (s.id != null && !/^filo:/.test(s.pagina.url())) {
+      const gia = new Set(segni.map((m) => `${Math.round(m.x)},${Math.round(m.y)}`));
+      for (const m of await segniNelMondoDiFilo(app, s.id)) if (!gia.has(`${Math.round(m.x)},${Math.round(m.y)}`)) segni.push(m);
+    }
     const qui = [];
     for (const m of segni) {
       const cx = m.x + s.x;
