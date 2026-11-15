@@ -49,7 +49,8 @@ const caso = (titolo, ...k) => `test('${titolo}', () => {\n${k.map((x) => `  ver
 const banco = (...k) => `export const banco = {\n${k.map((x) => `  ${x}: 'stato-${x}.txt',\n`).join('')}};\n`;
 const prova = (...casi) => `import { banco } from './helpers/banco.mjs';\n${casi.join('')}`;
 
-function giro(files, { ramo = 'worker/746' } = {}) {
+// `main` e `lavoro`: i file su main e quelli che il ramo ha cambiato prima della critica (senza, il ramo non ha main).
+function giro(files, { ramo = 'worker/746', main = null, lavoro = {} } = {}) {
   const dir = cartellaTemporanea('prove-casi-');
   const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
