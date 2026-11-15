@@ -486,6 +486,32 @@ jobs:
         shell: bash
         run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
 
+  # La versione appena uscita ha la sua corsa della suite (#2501): la suite gira su circa metà delle fusioni (le altre si
+  # raccolgono nella corsa dopo), e senza questa il segno «stabile» arriverebbe per caso. In un lavoro a sé: il permesso
+  # di avviare un workflow non sta dove si costruisce.
+  suite-della-versione:
+    needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.sha != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Chiedi la suite completa sul commit pubblicato, se non e' gia' verde
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ needs.release.outputs.sha }}
+        shell: bash
+        run: |
+          VERDI=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/suite.yml/runs?head_sha=${COMMIT}&status=success&per_page=1" --jq '.total_count')
+          if [ "${VERDI:-0}" != "0" ]; then
+            echo "La suite di ${COMMIT:0:10} e' gia' verde: la versione e' uscita segnata."
+            exit 0
+          fi
+          gh workflow run suite.yml --repo "${GITHUB_REPOSITORY}" --ref main -f commit="${COMMIT}"
+          echo "Chiesta la suite completa su ${COMMIT:0:10}: se e' verde, la versione si segna stabile."
+
   # ─── SECONDA META': LA VERSIONE PER MAC ──────────────────────────────────
   # Un pacchetto per Mac lo puo' costruire SOLO un Mac (serve `lipo` per fondere
   # Intel e Apple Silicon in un file solo, e gli strumenti di firma di Apple):
