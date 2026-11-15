@@ -155,9 +155,10 @@ Gestione → Automazioni.
    correggere un hover.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta. Le sessioni libere
-(compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi l'ordine, poi il
-resto per urgenza.
+e risposte dell'owner li accende il server da sé, davanti all'ordine. Un numero chiuso o non aperto il server lo salta.
+Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi
+i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella
+sessione che il pacemaker accende per lei.
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
