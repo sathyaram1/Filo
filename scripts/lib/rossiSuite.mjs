@@ -46,7 +46,7 @@ function leggiRiassuntoVecchio(log) {
     if (dentro && !r.startsWith('  ✗ ')) dentro = false;
     if (!dentro) continue;
     const prova = r.slice(4).trim();
-    if (/^parte \d+ di \d+ della suite senza esito|^la suite ha passato il suo tetto di tempo/.test(prova)) completo = false;
+    if (RIGA_DI_CORSA.test(prova)) completo = false;
     if (!/\(strascico di /.test(prova)) rossi.add(prova);
   }
   return { completo, rossi, instabili: new Set() };
