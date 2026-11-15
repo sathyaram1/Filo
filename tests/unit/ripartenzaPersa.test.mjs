@@ -142,6 +142,84 @@ test('il ramo legato c\'è, anche con un nome che non è un tentativo: si ripart
   } finally { srv.close(); togliCartella(base); }
 });
 
+test('un tentativo precedente vince sul ramo legato, e col ramo legato perso l\'avviso dice di ripartire da lui', async () => {
+  const tentativo = `worker/${ID}-20261101T000000Z`;
+  for (const legatoSuOrigin of [true, false]) {
+    const base = cartellaTemporanea('filo-ripartenza-precedenza-');
+    const legato = legatoSuOrigin ? 'claude/sessione-2516' : LEGATO;
+    const { srv, mondo, port } = await fintoServer({ ramoLegato: legato });
+    try {
+      const { casa } = scena(base);
+      if (legatoSuOrigin) ramoSpinto(casa, legato, 1);
+      const punta = ramoSpinto(casa, tentativo, 2);
+      const r = await giro(casa, port);
+      assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+      assert.equal(git(casa, 'rev-parse', 'HEAD'), punta, `si riparte dal tentativo (legato su origin: ${legatoSuOrigin})`);
+      assert.equal(r.json.payload.ripartenza && r.json.payload.ripartenza.ramo, tentativo);
+      const persa = r.json.payload.ripartenzaPersa;
+      if (legatoSuOrigin) {
+        assert.equal(persa, undefined);
+      } else {
+        assert.deepEqual({ ramo: persa && persa.ramo, invece: persa && persa.invece }, { ramo: LEGATO, invece: tentativo });
+        assert.match(persa.nota, new RegExp(`si riparte da ${tentativo}`));
+        assert.equal(mondo.consegne.find((c) => c.status === 'working').notes, persa.nota);
+      }
+    } finally { srv.close(); togliCartella(base); }
+  }
+});
+
+/** Il canale vero contro un server finto che registra le consegne. */
+async function fermata(casa, biglietto) {
+  const consegne = [];
+  const srv = createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; });
+    req.on('end', () => {
+      if (req.url.endsWith('/routineDeliver')) consegne.push(JSON.parse(corpo || '{}'));
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const esito = await new Promise((risolvi) => {
+    const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'deliver', biglietto, 'status',
+      '--status', 'design', '--reason', 'locale', '--notes', 'Per regola: serve il server. A1-A4 fatte sul ramo.'], {
+      cwd: casa,
+      env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, FILO_REPO_ROOT: casa, FILO_TOOLS_ROOT: casa, FILO_ROUTINE_TICKET: '' },
+    });
+    let se = '';
+    p.stderr.on('data', (c) => { se += c; });
+    p.on('close', (code) => risolvi({ code, se }));
+  });
+  srv.close();
+  return { ...esito, consegne };
+}
+
+test('la fermata per il server porta prima il ramo su origin, o non parte', async () => {
+  const biglietto = 'f'.repeat(43);
+  const base = cartellaTemporanea('filo-fermata-spinta-');
+  try {
+    const { casa, origin } = scena(base);
+    git(casa, 'checkout', '-q', '-b', LEGATO);
+    commit(casa, 'parte-a1.js', 'A1\n');
+    writeFileSync(resolve(casa, 'parte-a2.js'), 'A2 nata da shell\n', 'utf8');
+    writeTicket(casa, biglietto);
+
+    git(casa, 'remote', 'set-url', 'origin', resolve(base, 'non-c-e.git'));
+    const giu = await fermata(casa, biglietto);
+    assert.equal(giu.code, 1, giu.se);
+    assert.match(giu.se, /NON è su origin/);
+    assert.equal(giu.consegne.length, 0, 'senza il ramo su origin la fermata non arriva al server');
+
+    git(casa, 'remote', 'set-url', 'origin', origin);
+    const su = await fermata(casa, biglietto);
+    assert.equal(su.code, 0, su.se);
+    assert.equal(su.consegne.length, 1, 'la fermata è arrivata');
+    assert.equal(git(origin, 'rev-parse', `refs/heads/${LEGATO}`), git(casa, 'rev-parse', 'HEAD'), 'su origin c\'è la punta della cartella');
+    assert.equal(git(origin, 'show', `refs/heads/${LEGATO}:parte-a2.js`), 'A2 nata da shell', 'anche il file nato da shell');
+  } finally { togliCartella(base); }
+});
+
 test('ramoLegatoDaRiprendere: niente per main, nomi non validi o il ramo stesso; vuoto un ramo senza commit propri', () => {
   const base = cartellaTemporanea('filo-ramo-legato-');
   try {
