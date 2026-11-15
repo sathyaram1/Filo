@@ -149,8 +149,14 @@
     return m;
   }
 
+  /** Un caso della prova dei test nuovi da segnalare: verde anche senza il lavoro, o non verde col lavoro. PURA. */
+  function casoSegnalato(c) {
+    if (!c || c.senza === 'verde') return c ? 'verde anche senza il lavoro' : '';
+    return c.con !== 'verde' ? 'non verde col lavoro' : '';
+  }
+
   global.SN_CONSEGNA = Object.freeze({
     VERSIONE, CRITERI, ESITI, CLASSI, AZIONI, ZONE, MAX_BYTE,
-    validaConsegna, lavoroDiInterfaccia, minimoDaiPercorsi, classeFinale,
+    validaConsegna, lavoroDiInterfaccia, minimoDaiPercorsi, classeFinale, casoSegnalato,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);
