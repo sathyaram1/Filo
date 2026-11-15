@@ -81,7 +81,9 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test.beforeEach(() => { stato.censimento = CENSIMENTO(); stato.pulizia = null; stato.chiamate = []; stato.guasto = false; });
+test.beforeEach(() => {
+  stato.censimento = CENSIMENTO(); stato.pulizia = null; stato.chiamate = []; stato.guasto = false; stato.rifiuta = '';
+});
 
 async function apriOwner(app, openTab) {
   const owner = await app.evaluate(async ({}, o) => {
