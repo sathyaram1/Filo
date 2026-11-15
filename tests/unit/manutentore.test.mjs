@@ -307,7 +307,7 @@ test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () =
   const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
   assert.equal(lungo.ok, false);
   assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
-  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
+  assert.doesNotMatch(lungo.motivo, /Togli dall'ordine/);
 });
 
 test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
