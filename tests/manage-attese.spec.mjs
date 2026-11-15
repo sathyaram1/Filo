@@ -32,17 +32,23 @@ const LISTA = [
   fb({ _id: 'f13', seq: 13, name: 'Il secondo', status: 'archived', statusPublic: 'closed', resolvedInVersion: '0.2.230' }),
 ];
 
-async function apri(page, lista = LISTA) {
+async function apri(page, lista = LISTA, { compitiAperti } = {}) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate((ids) => {
+  await page.evaluate(({ ids, aperti }) => {
     window.__updates = [];
     window.__sulServer = {};
+    window.__compitiAperti = aperti;
+    window.__elenchiCompiti = 0;
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
+      if (t === 'compiti_elenco' && Array.isArray(window.__compitiAperti)) {
+        window.__elenchiCompiti += 1;
+        return { ok: true, aperti: window.__compitiAperti.map((id) => ({ id })), storico: [], altri: false, adesso: Date.now() };
+      }
       if (t === 'feedback_update') {
         window.__updates.push(msg);
         if (msg.waitsAggiungi === undefined && msg.waitsTogli === undefined) return { ok: true };
