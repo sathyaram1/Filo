@@ -65,6 +65,30 @@ describe('dalle corse all\'elenco', () => {
     assert.equal(r.rossi[0].ultimaVerde.sha, 'a');
   });
 
+  test('l\'ultima corsa incompleta non toglie dall\'elenco le prove rosse della parte che non ha finito', () => {
+    const fuori = 'parte 3 di 4 della suite senza esito';
+    const r = rossiDaCorse([
+      corsa('a', reg(true, [])), corsa('b', reg(true, [P(1), P(2)])), corsa('c', reg(false, ['parte 2 di 4 della suite senza esito'])),
+      corsa('d', reg(false, [fuori, P(1)])),
+    ]);
+    assert.deepEqual(r.rossi.map((x) => x.prova).sort(), [P(1), P(2), fuori].sort(), 'la riga di una corsa vecchia non resta');
+    const due = r.rossi.find((x) => x.prova === P(2));
+    assert.equal(due.daRicontrollare, true);
+    assert.equal(due.rottaDa.sha, 'b');
+    assert.equal(due.ultimaVerde.sha, 'a');
+    assert.equal(r.rossi.find((x) => x.prova === P(1)).daRicontrollare, undefined);
+    assert.match(testoElenco(r), /caso 2 \(da ricontrollare/);
+    const dopoUnaCompleta = rossiDaCorse([corsa('a', reg(true, [P(2)])), corsa('b', reg(true, [])), corsa('c', reg(false, []))]);
+    assert.deepEqual(dopoUnaCompleta.rossi, [], 'verde nell\'ultima corsa completa: tornata verde');
+  });
+
+  test('il registro dice il commit provato, che vale più di quello della corsa', () => {
+    const sha = 'f'.repeat(40);
+    const log = righeRegistro({ nuovi: [], instabili: [] }, { commit: sha }).map((r) => `2026-11-15T00:00:00.0000000Z ${r}`).join('\n');
+    assert.equal(leggiRegistro(log).commit, sha);
+    assert.equal(leggiRegistro(righeRegistro({ nuovi: [] }, { commit: 'non-uno-sha' }).join('\n')).commit, undefined);
+  });
+
   test('una prova tornata verde non è nell\'elenco', () => {
     const r = rossiDaCorse([corsa('a', reg(true, [P(1)])), corsa('b', reg(true, []))]);
     assert.deepEqual(r.rossi, []);
