@@ -133,7 +133,7 @@ export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, c
     'Dalla cloud registro e allegati di una corsa non si scaricano: i suoi rossi stanno nelle annotazioni del lavoro, che si leggono con l\'API (gh api repos/<repo>/actions/runs/<corsa>/jobs, poi gh api repos/<repo>/check-runs/<id del lavoro>/annotations).',
   );
   if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
-  return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con la suite verde`, testo: righe.join('\n') };
+  return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con le prove importanti verdi`, testo: righe.join('\n') };
 }
 
 /** Titolo e testo del feedback quando un verde c'è ma la pubblicazione non lo fa uscire. PURA. */
