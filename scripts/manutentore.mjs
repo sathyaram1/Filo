@@ -1369,8 +1369,10 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       }
       // Le righe del commit che la pubblicazione costruirà: con quelle di un main più avanti la riscrittura verrebbe scartata.
       const sha = consegna && typeof consegna.commit === 'string' && /^[0-9a-f]{7,40}$/.test(consegna.commit) ? consegna.commit : '';
-      const [bl, sc] = [await bloccoDaRiscrivere(root, sha), await tutteLeSchede(cred)];
+      const [bl, sc, st] = [await bloccoDaRiscrivere(root, sha), await tutteLeSchede(cred), await chiama(cred, 'stato')];
       if (sc.ok === false) return esito(sc);
+      if (st.ok === false) return esito(st);
+      const ordine = st.ordine || [];
       if (bl.errore) { console.error(`RIFIUTATO: ${bl.errore}.`); return 1; }
       const blocco = bl.blocco;
       if (!blocco) { console.error('RIFIUTATO: non trovo il blocco in cima alle novità.'); return 1; }
