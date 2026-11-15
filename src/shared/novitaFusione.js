@@ -286,6 +286,25 @@
     return { nuove, tolte: resto };
   }
 
+  /**
+   * Le righe che il registro `fuso` ha in più di quello di `main` sotto versioni fino a `uscita` compresa: quelle che
+   * la sentinella del registro darebbe rosse sulla fusione. Lancia se un registro non si legge.
+   */
+  function sottoUscite({ main, fuso, uscita }) {
+    if (!A_B_C.test(String(uscita || ''))) throw new Error(`versione uscita «${uscita}» non nella forma a.b.c`);
+    const M = vociDi(String(main));
+    const out = [];
+    for (const fb of vociDi(String(fuso)).blocchi) {
+      if (confrontaVersioni(fb.version, uscita) > 0) continue;
+      const mb = M.blocchi.find((x) => x.version === fb.version);
+      for (const c of CHIAVI) {
+        const ora = fb.voci[c] || [];
+        for (const i of differenza(ora, (mb && mb.voci[c]) || []).nuove) out.push({ version: fb.version, chiave: c, riga: ora[i] });
+      }
+    }
+    return out;
+  }
+
   const scheletro = (s) => String(s).replace(/[\s,]/g, '');
 
   /**
