@@ -12,10 +12,16 @@ non può sapere quali siano i più importanti fra tutti.
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo: sicurezza attaccabile oggi (non un irrobustimento), dati dell'utente, Filo inutilizzabile, una funzione che l'owner vuole subito | owner, giudici, manutentore (crearne sì, toglierne mai) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno | solo il manutentore, ogni mattina, leggendo tutte le schede | nel suo contesto; ordine, pacchetti e quanti insieme li decide lui |
-| **1** | da fare, non oggi | giudici (il valore che lasciano), manutentore, owner | aspetta una prossima rosa |
-| **0** | rimandato a lungo: difetti minori che oggi non valgono lo sforzo | manutentore, owner | non si lavora |
+| **2** | importante | manutentore, owner | come la 1; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
+| **1** | da fare | giudici (il valore che lasciano), manutentore, owner | parte quando il manutentore la mette nell'ordine |
+| **0** | rimandato a lungo: difetti minori che oggi non valgono lo sforzo | manutentore, owner | non entra nell'ordine |
 
+- **A cominciare lo decide l'ordine, non la priorità** (#2269, al posto della rosa
+  delle 2 del 31/10, che faceva scrivere la stessa scelta tre volte). Dentro
+  l'ordine un primo lavoro parte a qualunque priorità da 0 a 2, fuori solo una 3;
+  un ordine vuoto o senza lavori pronti vale come nessun ordine, e solo in quella
+  coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del
+  rinnovo. Un rilievo interno messo da parte nasce a 1, a ogni livello.
 - **I giudici assegnano 3 o lasciano 1.** Il giudice di priorità gira sul server
   (`functions/src/priority/judge.js` di filo-security; l'app ne sceglie solo il
   modello, slot `judge-priority`): critico, o sicurezza con un rischio reale
