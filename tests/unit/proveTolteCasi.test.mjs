@@ -66,7 +66,7 @@ function giro(files, { ramo = 'worker/746', main = null, lavoro = {} } = {}) {
   if (main) {
     g('branch', 'main');
     for (const [f, t] of Object.entries(lavoro)) scrivi(f, t);
-    g('add', '-A'); g('commit', '-qm', 'lavoro del ramo');
+    g('add', '-A'); g('commit', '-q', '--allow-empty', '-m', 'lavoro del ramo');
   }
   const avvio = g('rev-parse', 'HEAD');
   for (const [f, t] of Object.entries(files)) scrivi(f, t);
