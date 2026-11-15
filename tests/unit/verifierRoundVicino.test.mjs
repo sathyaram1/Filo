@@ -81,6 +81,15 @@ test('derivedGroups: esterni e domande da soli, tutti gli altri in un feedback s
   assert.deepEqual(g[3].findings.map((x) => x.priority), [1, 1], 'un 2 nasce a 1');
 });
 
+test('#2269: un interno messo da parte nasce a 1 anche di livello 3; a cominciare lo decide l\'ordine', () => {
+  // Un [3i?] che si corregge esce anche in un derivato con la sua domanda: prima nasceva a 3 e partiva fuori ordine.
+  const r = decide([f(3, 'i', 'quale strada?', true)], { count3: 0 });
+  assert.equal(r.stop, false);
+  assert.deepEqual(r.derived.map((x) => [x.level, x.priority, x.inCorrezione]), [[3, 1, true]]);
+  const g = R.derivedGroups([{ level: 3, sede: 'i', text: 'grave' }, { level: 3, sede: 'i', text: 'domanda', decision: true }]);
+  assert.deepEqual(g.map((x) => [x.tipo, x.priority]), [['decisione', 1], ['rimasti', 1]]);
+});
+
 test('derivedGroups accetta un elenco piatto e tiene i campi in più (numero, id); lo stato vecchio si legge con la regola scritta', () => {
   const g = R.derivedGroups([
     { level: 2, sede: 'i', text: 'a', num: '#7.1', id: 'x' },
