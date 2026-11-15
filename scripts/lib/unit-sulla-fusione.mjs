@@ -94,7 +94,51 @@ export function campoPerIlServer(prova) {
     if (rossi.length > TETTO_ROSSI) out.altriRossi = rossi.length - TETTO_ROSSI;
   }
   if (p.esito === 'conflitto' && Array.isArray(p.file)) out.file = p.file.slice(0, TETTO_ROSSI).map((f) => String(f).slice(0, 300));
+  if (p.novita && (p.esito === 'verde' || p.esito === 'rosso_anche_su_main')) out.novita = { ...p.novita };
   return out;
+}
+
+/** Lo sha git del blob con questo testo: il server lo ricalcola sul registro che scrive su main e lo confronta. PURA. */
+export function shaBlob(testo) {
+  const b = Buffer.from(String(testo), 'utf8');
+  return createHash('sha1').update(`blob ${b.length}\u0000`).update(b).digest('hex');
+}
+
+/**
+ * Nell'albero `dir` appena fuso (o fermo sul conflitto del solo registro, `conflitto`): le righe di novità del ramo
+ * unite a quelle di main con la regola che applica anche il server (#2543), e committate. Senza conflitto solo se il
+ * registro fuso ha righe del ramo sotto versioni che main ha già pubblicato: altrimenti la fusione resta quella di git.
+ * → null (niente da fare) | { ok: true, novita } | { ok: false, motivo }
+ */
+export function uniscaNovitaNellAlbero({ git, dir, mainSha, punta, conflitto = false, nessunHook = '', oggi = new Date().toISOString().slice(0, 10) }) {
+  const show = (ref) => git(['show', `${ref}:${FILE_NOVITA}`]);
+  const m = show(mainSha);
+  if (!m.ok) return conflitto ? { ok: false, motivo: `non leggo il registro di main (${primaRiga(m.out)})` } : null;
+  let manifesto;
+  try { manifesto = JSON.parse(git(['show', `${mainSha}:package.json`]).out); } catch (_) { return { ok: false, motivo: 'non leggo il package.json di main' }; }
+  const percorso = join(dir, ...FILE_NOVITA.split('/'));
+  if (!conflitto) {
+    let sotto;
+    try { sotto = aggiunteSottoUscite(registroDa(m.out), registroDa(readFileSync(percorso, 'utf8')), String(manifesto.version || '')); } catch (_) { return null; }
+    if (!sotto.length) return null;
+  }
+  const b = git(['merge-base', mainSha, punta]);
+  if (!b.ok) return { ok: false, motivo: `non trovo la base comune (${primaRiga(b.out)})` };
+  const base = show(b.out.trim());
+  const ramo = show(punta);
+  if (!base.ok || !ramo.ok) return { ok: false, motivo: 'non leggo il registro della base o del ramo' };
+  // `git show` toglie l'a capo finale: i testi si leggono interi, come li legge il server.
+  const intero = (ref) => git(['cat-file', 'blob', `${ref}:${FILE_NOVITA}`]);
+  const testi = [intero(b.out.trim()), intero(mainSha), intero(punta)];
+  if (testi.some((t) => !t.ok)) return { ok: false, motivo: 'non leggo il registro della base, di main o del ramo' };
+  const r = uniscaNovita({ base: testi[0].grezzo, main: testi[1].grezzo, ramo: testi[2].grezzo, manifesto, oggi });
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  writeFileSync(percorso, r.src, 'utf8');
+  const nessuno = nessunHook ? ['-c', `core.hooksPath=${nessunHook}`] : [];
+  const add = git(['add', '--', FILE_NOVITA]);
+  const c = add.ok ? git([...IDENTITA, ...nessuno, 'commit', '--quiet', '--no-verify', ...(conflitto ? ['--no-edit'] : ['--amend', '--no-edit'])]) : add;
+  if (!c.ok) return { ok: false, motivo: `non riesco a committare il registro unito (${primaRiga(c.out)})` };
+  return { ok: true, novita: { sha: shaBlob(r.src), righe: r.aggiunte.length, data: oggi, conflitto: !!conflitto } };
 }
 
 /** Quanto era profondo il clone, per il registro del server (#958). PURA. */
