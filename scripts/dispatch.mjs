@@ -2995,7 +2995,7 @@ if (isMainModule) {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--domanda <file.json>] [--prova <cartella>]'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --domanda <file.json>, --prova <cartella> e --ferma')); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --domanda <file.json>, --prova <cartella>, --consegna <file.json> e --ferma')); process.exit(1); }
       const senza = fermaSenzaDomanda(ferma, opz['--domanda']);
       if (senza) { console.error(senza); process.exit(1); }
       // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
