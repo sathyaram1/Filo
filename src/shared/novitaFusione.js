@@ -286,23 +286,35 @@
     return { nuove, tolte: resto };
   }
 
+  const testoRiga = (r) => (r && typeof r === 'object' ? String(r.testo) : String(r));
+
   /**
-   * Le righe che il registro `fuso` ha in più di quello di `main` sotto versioni fino a `uscita` compresa: quelle che
-   * la sentinella del registro darebbe rosse sulla fusione. Lancia se un registro non si legge.
+   * Le righe che `dopo` aggiunge a `prima` (blocchi { version, features, fixes }) sotto le versioni fino a `uscita`
+   * compresa, con blocco, elenco e posto. Si contano per blocco: riscrivere una riga già uscita, o spostarla nel blocco
+   * della prossima versione, resta lecito. È la regola della sentinella del registro e della prova sulla fusione. PURA.
+   */
+  function aggiunteSottoUscite(prima, dopo, uscita, testo = testoRiga) {
+    const righe = (n) => CHIAVI.flatMap((chiave) => ((n && n[chiave]) || []).map((r, indice) => ({ chiave, indice, riga: testo(r) })));
+    const vecchie = new Map(prima.map((n) => [n.version, righe(n).map((r) => r.riga)]));
+    const out = [];
+    for (const n of dopo) {
+      if (confrontaVersioni(n.version, uscita) > 0) continue;
+      const prec = vecchie.get(n.version) || [];
+      const ora = righe(n);
+      if (ora.length <= prec.length) continue;
+      for (const r of ora) if (!prec.includes(r.riga)) out.push(Object.assign({ version: n.version }, r));
+    }
+    return out;
+  }
+
+  /**
+   * Le righe che il registro `fuso` aggiunge a quello di `main` sotto versioni fino a `uscita` compresa: quelle che la
+   * sentinella del registro darebbe rosse sulla fusione, con la sua stessa regola. Lancia se un registro non si legge.
    */
   function sottoUscite({ main, fuso, uscita }) {
     if (!A_B_C.test(String(uscita || ''))) throw new Error(`versione uscita «${uscita}» non nella forma a.b.c`);
-    const M = vociDi(String(main));
-    const out = [];
-    for (const fb of vociDi(String(fuso)).blocchi) {
-      if (confrontaVersioni(fb.version, uscita) > 0) continue;
-      const mb = M.blocchi.find((x) => x.version === fb.version);
-      for (const c of CHIAVI) {
-        const ora = fb.voci[c] || [];
-        for (const i of differenza(ora, (mb && mb.voci[c]) || []).nuove) out.push({ version: fb.version, chiave: c, riga: ora[i] });
-      }
-    }
-    return out;
+    const dati = (src) => vociDi(String(src)).blocchi.map((b) => ({ version: b.version, features: b.voci.features || [], fixes: b.voci.fixes || [] }));
+    return aggiunteSottoUscite(dati(main), dati(fuso), uscita, String).map(({ version, chiave, riga }) => ({ version, chiave, riga }));
   }
 
   const scheletro = (s) => String(s).replace(/[\s,]/g, '');
