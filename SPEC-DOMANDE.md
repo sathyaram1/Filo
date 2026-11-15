@@ -657,7 +657,10 @@ Come funziona oggi (#1152):
   quelle dell'addetto comunicazioni (§ 4.1). Il compito:
   - raggruppa le domande aperte;
   - assorbe in una domanda sola quelle che sono casi dello stesso problema e
-    propone il ripensamento del sistema (le assorbite diventano `superata`).
+    propone il ripensamento del sistema (le assorbite diventano `superata`,
+    legate nei due sensi a quella che le assorbe). L'owner riapre
+    un'assorbita come una risposta automatica: torna da rispondere, esce
+    dall'elenco di quella che la assorbiva e la revisione non ce la riassorbe.
     Una domanda che ferma un lavoro non si assorbe, perché solo la sua
     risposta lo riprende: si raggruppa con le altre del suo caso;
   - rivede le priorità;
