@@ -80,7 +80,7 @@ describe('A — nomi di branch unici per tentativo', () => {
     assert.ok(t2 > t1, 'i nomi devono ordinarsi come il tempo, per l’archeologia');
   });
 
-  test('un lavoro nuovo nasce dalla linea principale o dal suo tentativo precedente (niente basi feature/N)', () => {
+  test('un lavoro nuovo nasce dalla linea principale, dal suo tentativo precedente o dal ramo legato (niente basi feature/N)', () => {
     // I sotto-feedback e il Modello B sono aboliti (SPEC-RIDISEGNO-MAX.md §1):
     // se preferredBase o le basi feature/* riappaiono, questo diventa rosso.
     const src = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
