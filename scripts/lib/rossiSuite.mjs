@@ -21,8 +21,27 @@ export function leggiRegistro(log) {
     else if (tipo === 'rosso') rossi.add(valore);
     else if (tipo === 'instabile') instabili.add(valore);
   }
-  if (!esito) return null;
+  if (!esito) return leggiRiassuntoVecchio(log);
   return { completo: esito === 'completo', rossi, instabili };
+}
+
+// Le corse di prima del registro hanno solo il riassunto a schermo («Rossi NUOVI: n», poi «  ✗ <prova>»): senza
+// questo la prima settimana partirebbe vuota. Le instabili lì non hanno il nome.
+function leggiRiassuntoVecchio(log) {
+  const righe = String(log || '').split(/\r?\n/).map((r) => r.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z /, ''));
+  if (!righe.some((r) => r.startsWith('Casi: '))) return null;
+  const rossi = new Set();
+  let completo = true;
+  let dentro = false;
+  for (const r of righe) {
+    if (r.startsWith('Rossi NUOVI:')) { dentro = true; continue; }
+    if (dentro && !r.startsWith('  ✗ ')) dentro = false;
+    if (!dentro) continue;
+    const prova = r.slice(4).trim();
+    if (/^parte \d+ di \d+ della suite senza esito|^la suite ha passato il suo tetto di tempo/.test(prova)) completo = false;
+    if (!/\(strascico di /.test(prova)) rossi.add(prova);
+  }
+  return { completo, rossi, instabili: new Set() };
 }
 
 /**
