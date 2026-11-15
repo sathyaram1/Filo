@@ -306,9 +306,9 @@ export function rigaSegnoServer(chiesto, r) {
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
 const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim().replace(/^#/, '') : '');
 // Un compito senza feedback nell'ordine e nelle attese (#2269): il suo id, come lo dà il comando `compito`.
-const COMPITO_RE = /^C-[1-9]\d{0,8}$/i;
-/** Un numero di feedback senza «#», o l'id di un compito (`C-12`); '' se non è né l'uno né l'altro. PURA. */
-export const voceDi = (v) => (COMPITO_RE.test(String(v || '').trim()) ? String(v).trim().toUpperCase() : numeroDi(v));
+const eCompito = (v) => globalThis.SN_FB_ATTESE.eCompito(v);
+/** Un numero di feedback senza «#», o l'id di un compito (`C-12`, anche scritto `c-12`); '' se non è né l'uno né l'altro. PURA. */
+export const voceDi = (v) => (eCompito(String(v || '').trim().toUpperCase()) ? String(v).trim().toUpperCase() : numeroDi(v));
 
 // ── I rapporti e il costo dei lavori (#2083) ────────────────────────────────
 
