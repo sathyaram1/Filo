@@ -75,7 +75,7 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, ramoLegatoDaRiprendere, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
