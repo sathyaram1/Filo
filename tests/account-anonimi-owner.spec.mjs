@@ -169,7 +169,6 @@ test('il server che non risponde lo dice e si rilegge; senza conto ancora fatto 
   await riga(page).getByRole('button', { name: 'Riprova' }).click();
   await expect(riga(page)).toHaveText('Il server non li ha ancora contati.', { timeout: 15_000 });
   stato.censimento = CENSIMENTO();
-  await page.locator('#ownerAnonimiTitle').click({ button: 'right' });
   await ricaricaSu(page, 'utenti');
   await expect(page.locator('#ownerAnonimi .sn-wallet-numero')).toHaveCount(4, { timeout: 15_000 });
 });
