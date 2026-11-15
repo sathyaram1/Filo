@@ -20,7 +20,7 @@ export const USO = [
   'Uso: npm run test:prova -- --compito "<cosa deve riuscire a fare un utente, in una frase>"',
   '       [--modo utente|chat] [--start <indirizzo>] [--out <cartella>] [--passi N] [--minuti N] [--modello <alias>]',
   '  utente: Haiku usa Filo con clic e tasti. chat: lo chiede a parole nella chat di Filo e guarda se Filo lo fa.',
-  '  Si lancia in sottofondo: si ferma da solo dopo 20 passi o 4 minuti e scrive esito.md nella cartella.',
+  `  Si lancia in sottofondo: si ferma da solo dopo ${TETTO_PASSI} passi o ${TETTO_MINUTI} minuti e scrive esito.md nella cartella.`,
 ].join('\n');
 
 /** Gli argomenti → { ok, opzioni } o { ok: false, errore }. PURA. */
