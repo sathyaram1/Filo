@@ -17,13 +17,13 @@ const { cmpVersion, testo } = globalThis.SN_PATCH_NOTES;
 // Lettura del sorgente e prossima versione stanno nel modulo che il server incorpora: una regola sola (#2543).
 const {
   FILE, CAMPO: CAMPO_MANIFESTO, prossimaVersione: prossimaDelModulo, chiaviDoppie: doppieDelModulo,
-  testoChiaviDoppie: testoDoppie, mappaSorgente, tagliaElemento, applica, modificheInCima,
+  testoChiaviDoppie: testoDoppie, mappaSorgente, tagliaElemento, applica, modificheInCima, CHIAVI,
+  aggiunteSottoUscite: aggiunteDelModulo,
 } = globalThis.SN_NOVITA_FUSIONE;
 
 export const FILE_NOVITA = FILE;
 export const CAMPO = CAMPO_MANIFESTO;
 const A_B_C = /^\d+\.\d+\.\d+$/;
-const CHIAVI = ['features', 'fixes'];
 
 /** La prossima versione con la regola del server che la pubblica: `prossimaVersione` di primo livello, o patch+1. `{ versione, dichiarata }` | `{ errore }`. PURA. */
 export const prossimaVersione = prossimaDelModulo;
