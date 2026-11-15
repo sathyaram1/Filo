@@ -10,6 +10,7 @@ import { join, resolve, relative } from 'node:path';
 import { createInterface } from 'node:readline';
 import * as d from './driver.mjs';
 import { getApiKey } from './llm.mjs';
+import { preparaFilo } from './provaPreparazione.mjs';
 import {
   USO, leggiArgomenti, sistema, messaggioPasso, leggiMossa, rigaMossa, servitoDa, esitoFinale, resoconto, argomentiModello,
 } from './provaRegole.mjs';
