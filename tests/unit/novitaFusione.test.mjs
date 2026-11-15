@@ -115,7 +115,7 @@ test('sul registro vero: una riga del ramo sotto il secondo blocco va in cima, e
   assert.equal(r.ok, true, r.motivo);
   const dopo = dati(r.src);
   assert.equal(dopo.length, prima.length);
-  assert.deepEqual(dopo[0].features.at(-1), { testo: 'Una riga del ramo finita sotto una versione uscita.', segnalazione: 2543 });
+  assert.deepEqual(dopo[0][t[1]].at(-1), { testo: 'Una riga del ramo finita sotto una versione uscita.', segnalazione: 2543 });
   assert.deepEqual(dopo.slice(1), prima.slice(1));
   // Lo stesso esito dello spostamento del riallineamento: la stessa riga, nello stesso blocco.
   const s = spostaInCima(ramo, { prima, manifesto, oggi: OGGI });
