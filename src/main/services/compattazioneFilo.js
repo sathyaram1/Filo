@@ -342,8 +342,9 @@ async function eventiDopoCancellazione(s, incognito) {
   let tolte = null;
   try { tolte = await F().cancellazioni({ incognito }); } catch (_) { return null; }
   if (tolte == null || tolte === s.tolte || !s.da) return null;
+  const da = Date.parse(s.fontiDa) < Date.parse(s.da) ? s.fontiDa : s.da;
   try {
-    const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
+    const [acc, pag] = await Promise.all([F().accaduti({ da }, { incognito }), F().pagine({ da, a: null }, { incognito })]);
     s.tolte = tolte;
     return new Set([...acc, ...pag].map((ev) => ev && ev.id));
   } catch (_) { return null; }
