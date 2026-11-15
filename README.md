@@ -138,7 +138,7 @@ e un modulo nuovo va aggiunto lì.
 
 Le API `chrome.*` usate dal codice nato nell'estensione sono ricreate in tre
 posti, uno per contesto: `src/main/shim/chrome-api.js` nel main,
-`src/preload/internal-preload.js` nelle pagine `filo://` (passa ogni chiamata
+`src/preload/chrome-shim.js` nelle pagine `filo://` (passa ogni chiamata
 al main via IPC), `src/preload/page-preload.js` nelle pagine web. Lo storage è
 un file JSON, `storage.json`, nella cartella dati dell'app
 (`app.getPath('userData')`), che cambia da un sistema all'altro.

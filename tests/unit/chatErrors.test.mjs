@@ -275,7 +275,7 @@ test('l’errore dello stream porta gli stessi campi della risposta dell’IPC, 
   for (const campo of ['message', 'code', 'status', 'provider', 'userMessage']) {
     assert.match(invio[1], new RegExp(`\\b${campo}\\s*:`), `lo stream non manda più ${campo}`);
   }
-  for (const f of ['page-preload.js', 'internal-preload.js']) {
+  for (const f of ['page-preload.js', 'chrome-shim.js']) {
     const src = readFileSync(join(ROOT, 'src', 'preload', f), 'utf8');
     const m = /onMessage\(\{\s*type:\s*'error',([^}]*)\}\)/.exec(src);
     assert.ok(m, `${f} non inoltra più l'errore dello stream`);
