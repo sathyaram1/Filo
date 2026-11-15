@@ -91,6 +91,14 @@ test('un ramo che toglie, riscrive o cambia altro nel registro non si unisce a m
   assert.match(uniscaNovita({ base, main, ramo: base, manifesto: { version: '0.2.10' }, oggi: 'ieri' }).motivo, /data/);
 });
 
+test('sotto le versioni uscite: le righe che la fusione aggiunge a un blocco già pubblicato, e solo quelle', () => {
+  const main = registro(blocco('0.2.12', { features: ["'di main'"] }), blocco('0.2.11', { features: ["'a'"] }));
+  const fuso = registro(blocco('0.2.12', { features: ["'di main'", "'in cima, va bene'"] }), blocco('0.2.11', { features: ["'a'", "'del ramo'"] }));
+  assert.deepEqual(sottoUscite({ main, fuso, uscita: '0.2.11' }), [{ version: '0.2.11', chiave: 'features', riga: "'del ramo'" }]);
+  assert.deepEqual(sottoUscite({ main, fuso: main, uscita: '0.2.11' }), []);
+  assert.throws(() => sottoUscite({ main, fuso, uscita: 'x' }), /a\.b\.c/);
+});
+
 test('una riga che si sposta è solo un dato: stringa su una riga, o { testo, segnalazione }', () => {
   for (const ok of ["'x'", '"x \\" y"', "'l\\'altra'", "{ testo: 'x', segnalazione: 12 }", "{ testo: \"x\" }"]) assert.equal(rigaDiDati(ok), true, ok);
   for (const no of ['`x${a}`', "'a' + b", "{ testo: 'x', segnalazione: f() }", "{ testo: 'x', altro: 1 }", "x()", "'a'\n'b'"]) assert.equal(rigaDiDati(no), false, no);
