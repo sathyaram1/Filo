@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { fileConsegna } from '../helpers/consegnaDiProva.mjs';
 
 const {
   writeBranchState, withCheckpoint, writeExpectation, readBranchState, ensureSessionExcludes,
