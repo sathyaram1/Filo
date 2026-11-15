@@ -3976,13 +3976,16 @@
   function caricaAttesiFuori() {
     if (!ATT || !isAdmin || !dataLoaded) return;
     const mancano = [];
+    const compiti = new Set();
     for (const fb of allFeedbacks) {
       for (const w of ATT.atteseDi(fb)) {
+        if (ATT.eCompito(w.id)) { compiti.add(w.id); continue; }
         if (attesiChiesti.has(w.id) || allFeedbacks.some((f) => f._id === w.id)) continue;
         attesiChiesti.add(w.id);
         mancano.push(w.id);
       }
     }
+    if (compiti.size) caricaCompitiAttesi(compiti);
     if (!mancano.length) return;
     (async () => {
       let righe = await FB.getMany(mancano, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 });
