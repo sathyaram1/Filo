@@ -944,6 +944,12 @@ async function main() {
       if (esito.ferma) process.exit(1);
       unitRossi = esito.rosso;
     }
+    // 1b. Le prove importanti (#2501), su ogni ramo: sono loro a decidere la pubblicazione, col loro tetto di durata.
+    const importanti = join(albero.dir, 'scripts', 'test-importanti.mjs');
+    if (existsSync(importanti) && !run(process.execPath, [importanti], 'Prove importanti', undefined, albero.dir)) {
+      console.error('\n✗ Prove importanti rosse, o sopra il tetto di durata: non pubblico. Sistema e rilancia.');
+      process.exit(1);
+    }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     const memoria = memoriaSpecVerdi(ROOT, shaProvato);
