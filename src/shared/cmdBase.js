@@ -357,7 +357,7 @@
   Object.assign(P, {
     CHAIN_RE, CANCELLANO, PROGRAMMI_RETE, ALWAYS_3, ARBITRARY_CODE, VERSION_TOKENS, isVersionQuery, LEVEL1, LEVEL1_MUTATES,
     treeUscita, opzioneLunga, uniqUscita, LEVEL2, PS_READ, PS_PIPE_ONLY, eWhereExe, qualeWhere, SENZA_CONTESTO,
-    segmentIsRead, splitSafePipeline, DANGEROUS_FLAG_RE, LUNGHE_PERICOLOSE, lungaPericolosa, ROBOCOPY_DESTRUCTIVE_RE,
+    segmentIsRead, splitSafePipeline, splitSafeSequence, DANGEROUS_FLAG_RE, LUNGHE_PERICOLOSE, lungaPericolosa, ROBOCOPY_DESTRUCTIVE_RE,
     CURL_OUTPUT_RE, CURL_DUMP_RE, CURL_ACCESSORY_WRITE_RE, CURL_WRITE_OUT_FILE_RE, CURL_CONFIG_RE, curlCambiaIlServer,
     tokens, unquote, dequote, programOf, isBareName, subcommandOf,
   });
