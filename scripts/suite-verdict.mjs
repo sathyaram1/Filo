@@ -296,10 +296,10 @@ export function classificaErroriGlobali(errori, ciSonoRossiNuovi) {
  */
 export function verdetto(json, noti) {
   const casi = raccogliCasi(json);
-  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [], avvisi: [] };
+  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [], avvisi: [], instabili: [] };
   for (const c of casi) {
     if (c.stato === 'expected') v.verdi += 1;
-    else if (c.stato === 'flaky') v.flaky += 1;
+    else if (c.stato === 'flaky') { v.flaky += 1; v.instabili.push(c); }
     else if (c.stato === 'skipped') v.saltati += 1;
     else {
       const voce = vocePerCaso(c, noti);
