@@ -120,7 +120,6 @@ async function run() {
     if (o.start) await d.navigate(app, shell, o.start);
     let fuoco = null;
     let nota = '';
-    let invalide = 0;
     for (let n = 1; n <= o.passi; n++) {
       if (Date.now() >= scadenza) { tetto = 'tempo'; break; }
       const { map } = await d.markInteractables(app, shell);
