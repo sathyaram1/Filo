@@ -554,7 +554,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
       if (s.errore) return { errore: s.errore, mainSha };
       scelti = s.file;
-      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 };
+      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0, ...(novita ? { novita } : {}) };
       scrivi(`▸ Solo gli unit toccati dal ramo (${scelti.length} file): ${scelti.join(', ')}`);
     }
     const quali = scelti ? { file: scelti } : {};
