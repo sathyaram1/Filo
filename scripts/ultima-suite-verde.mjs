@@ -114,17 +114,17 @@ export function rigaCorsa(r) {
 export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, scartata, corse, esecuzione, erroreApi } = {}) {
   const giorni = Math.floor((oreDallUltima || 0) / 24);
   const righe = [
-    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit, ma nessuno ha la suite verde (.github/workflows/suite.yml: Playwright su Linux e unit test su Windows). Il lavoro di pubblicazione pubblica solo un commit con la suite verde, quindi gli utenti restano fermi a ${tag}.`,
+    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit, ma nessuno ha le prove importanti verdi (.github/workflows/${WORKFLOW_VERDE}: prove importanti e catena degli aggiornamenti su Linux, unit test su Windows). Il lavoro di pubblicazione pubblica solo un commit con quella corsa verde, quindi gli utenti restano fermi a ${tag}.`,
     '',
     verde
-      ? `Ultimo commit di main con la suite verde: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}, che non è più nuovo di ${tag}.`
-      : 'Fra le ultime corse riuscite della suite su main non c\'è nessun commit verde.',
+      ? `Ultimo commit di main con le prove importanti verdi: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}, che non è più nuovo di ${tag}.`
+      : 'Fra le ultime corse riuscite delle prove importanti su main non c\'è nessun commit verde.',
   ];
   if (scartata?.head_sha) {
-    righe.push(`La corsa riuscita più nuova, su ${scartata.head_sha}${scartata.html_url ? ` (${scartata.html_url})` : ''}, non ha passato gli unit test su Windows (o è di prima che la suite li provasse): il cancello di pubblicazione rifarebbe quei controlli su Windows, quindi non conta come verde.`);
+    righe.push(`La corsa riuscita più nuova, su ${scartata.head_sha}${scartata.html_url ? ` (${scartata.html_url})` : ''}, non ha passato gli unit test su Windows: il cancello di pubblicazione rifarebbe quei controlli su Windows, quindi non conta come verde.`);
   }
-  if (erroreApi) righe.push(`Attenzione: le corse della suite non si sono lette (${erroreApi}); la scelta è stata fatta senza.`);
-  righe.push('', 'Ultime corse della suite su main:');
+  if (erroreApi) righe.push(`Attenzione: le corse delle prove importanti non si sono lette (${erroreApi}); la scelta è stata fatta senza.`);
+  righe.push('', 'Ultime corse delle prove importanti su main:');
   const elenco = Array.isArray(corse) ? corse : [];
   righe.push(...(elenco.length ? elenco.map((r) => `  ${rigaCorsa(r)}`) : ['  (nessuna letta)']));
   righe.push(
