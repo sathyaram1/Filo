@@ -2302,7 +2302,10 @@
       ...(c.at ? [{ etichetta: 'Quando', valore: String(c.at) }] : []),
     ];
     const d = c.dettaglio && typeof c.dettaglio === 'object' ? c.dettaglio : null;
-    const nomi = (global.SN_CONSEGNA && global.SN_CONSEGNA.CRITERI) || [];
+    // Azioni e segnalazioni dalla regola che la consegna ha controllato: una copia qui divergerebbe in silenzio.
+    const K = global.SN_CONSEGNA || {};
+    const nomi = K.CRITERI || [];
+    const segnalato = (x) => !!(K.casoSegnalato && K.casoSegnalato(x));
     const nomeDi = (n) => (nomi.find((k) => k.n === Number(n)) || {}).nome || `criterio ${n}`;
     const criteri = d && Array.isArray(d.criteri) ? d.criteri.slice().sort((a, b) => Number(a.criterio) - Number(b.criterio)).map((r) => ({
       n: Number(r.criterio), nome: nomeDi(r.criterio), esito: String(r.esito || ''),
