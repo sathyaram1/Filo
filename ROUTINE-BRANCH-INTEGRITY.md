@@ -395,7 +395,8 @@ tempo in più sembrava accettabile) ed è **tornata** il 2026-09-10: la suite è
 cresciuta a ~390 spec e ~1.600 casi, e sulla macchina di chi sviluppa Filo dura
 quasi sette ore con un solo worker. Dal 2026-09-15 vale **ovunque**: la suite
 intera non la lancia più nessuno, né i ruoli delle routine né le sessioni
-locali. Si lancia `npm run finish:check` (unit test più gli spec delle aree
-toccate dal ramo) più le prove del giro; la suite intera gira in GitHub a ogni
-fusione su main, un suo rosso nuovo diventa un feedback, e si pubblica solo un
-commit con la suite verde.
+locali. Si lancia `npm run finish:check` (unit test, prove importanti e gli
+spec delle aree toccate dal ramo) più le prove del giro. Dal 2026-11-14 (#2501)
+si pubblica il commit più nuovo con le prove importanti e gli unit verdi; la
+suite intera gira in GitHub a ogni fusione su main senza aprire feedback, e un
+compito settimanale la riporta verde.
