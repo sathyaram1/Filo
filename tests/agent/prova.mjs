@@ -128,21 +128,22 @@ async function run() {
       await d.captureComposite(app, join(out, nome));
       await d.clearMarks(app, shell);
       const testo = messaggioPasso({ compito: o.compito, passo: n, passi: o.passi, secondiRestanti: (scadenza - Date.now()) / 1000, map, notaUltima: nota });
-      const r = await modello.chiedi(testo, join(out, nome), scadenza - Date.now());
+      // Una risposta che non si esegue torna al modello sulla stessa schermata: non consuma un passo.
+      let letta = null;
+      let r = await modello.chiedi(testo, join(out, nome), scadenza - Date.now());
+      for (let tentativo = 1; ; tentativo++) {
+        if (r.tempo || r.errore) break;
+        ultimo = r.risultato;
+        const servito = servitoDa(ultimo.modelUsage);
+        if (servito.violazione) { r = { errore: `modello fuori politica: ${servito.violazione}` }; break; }
+        if (ultimo.is_error) { r = { errore: `il modello ha risposto con un errore: ${String(ultimo.result || ultimo.subtype).slice(0, 300)}` }; break; }
+        letta = leggiMossa(ultimo.result, map.map((m) => m.i));
+        if (letta.ok) break;
+        if (tentativo >= INVALIDE_DI_FILA) { r = { errore: `${INVALIDE_DI_FILA} risposte non eseguibili di fila (l'ultima: ${letta.errore}; testo: ${String(ultimo.result).slice(0, 200)})` }; break; }
+        r = await modello.chiedi(`La risposta non va: ${letta.errore}. Stessa schermata di prima: rispondi col JSON.`, null, scadenza - Date.now());
+      }
       if (r.tempo) { tetto = 'tempo'; passi.push({ n, schermata: nome, vedo: '', mossa: { azione: 'aspetta il modello' }, nota: 'tempo finito mentre il modello rispondeva' }); break; }
       if (r.errore) { errore = r.errore; break; }
-      ultimo = r.risultato;
-      const servito = servitoDa(ultimo.modelUsage);
-      if (servito.violazione) { errore = `modello fuori politica: ${servito.violazione}`; break; }
-      if (ultimo.is_error) { errore = `il modello ha risposto con un errore: ${String(ultimo.result || ultimo.subtype).slice(0, 300)}`; break; }
-      const letta = leggiMossa(ultimo.result, map.map((m) => m.i));
-      if (!letta.ok) {
-        passi.push({ n, schermata: nome, vedo: '', mossa: { azione: 'risposta non valida' }, nota: letta.errore });
-        nota = `${letta.errore}. Rispondi col JSON richiesto.`;
-        if (++invalide >= INVALIDE_DI_FILA) { errore = `${INVALIDE_DI_FILA} risposte non valide di fila (l'ultima: ${letta.errore})`; break; }
-        continue;
-      }
-      invalide = 0;
       nota = '';
       const passo = { n, schermata: nome, vedo: letta.mossa.vedo, mossa: letta.mossa };
       passi.push(passo);
