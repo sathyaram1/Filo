@@ -61,10 +61,11 @@ git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
   per il ramo di Filo, non per questo: `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
   `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
   e spinta come sotto.
-- Suite di GitHub del server rossa senza niente da cambiare nel server (provava il ramo di Filo com'era prima del
-  rebase, o il rosso non si ripete nelle prove del server qui): la suite riparte solo con una spinta nuova, quindi
-  `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server` come sotto. Un
-  rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel report, e lo giudica chi verifica.
+- Suite di GitHub del server rossa senza niente da cambiare nel server. Se provava il ramo di Filo com'era prima del
+  rebase, non serve niente: la rifà il cancello sulla parte dell'app nuova. Se il rosso non si ripete nelle prove del
+  server qui, serve una punta nuova: `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e
+  riga `ramo-server` come sotto. Un rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel
+  report, e lo giudica chi verifica.
 
 ### Prove, spinta, registro
 
