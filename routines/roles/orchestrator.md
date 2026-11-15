@@ -175,8 +175,10 @@ qualunque motivo (fine coda, contesto pieno, guasto, crash). Il pacemaker se
 ne accorge dai battiti e riaccende lui.
 
 (Niente `npm test` qui, e nemmeno altrove: dal 2026-09-15 la suite completa
-non la lancia nessun ruolo. Gira in GitHub a ogni fusione su main; un rosso
-nuovo lì diventa un feedback, e si pubblica solo un commit con la suite verde. Chi risolve fa unit test e spec mirati; chi verifica lancia
+non la lancia nessun ruolo. Gira in GitHub a ogni fusione su main e registra i
+suoi rossi, che un compito settimanale riporta verdi; si pubblica un commit con
+le prove importanti verdi (`npm run test:importanti`, dentro `finish:check`).
+Chi risolve fa unit test e spec mirati; chi verifica lancia
 `npm run finish:check` e le prove del giro. Un rosso fuori dalla lista dei
 rossi noti torna in correzione con l'elenco degli spec rotti.)
 
