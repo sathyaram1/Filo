@@ -126,6 +126,8 @@ trovi.
 
 <!-- includi: _criteri-verifica.md -->
 
+<!-- includi: _prova-da-utente.md -->
+
 Dopo il verdetto, una lettura del diff con la tua richiesta davanti si chiede
 in più:
 

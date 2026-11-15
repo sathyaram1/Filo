@@ -17,6 +17,7 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:explore": "node tests/agent/explore.mjs",
+    "test:prova": "node tests/agent/prova.mjs",
     "test:daily": "node tests/agent/daily.mjs",
     "test:shoot": "node tests/agent/shoot.mjs",
     "finish": "node scripts/finish-local.mjs",

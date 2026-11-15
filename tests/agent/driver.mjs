@@ -26,7 +26,7 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
-import { paginaDellaScheda } from '../helpers/schede.mjs';
+import { paginaDellaScheda, bersaglioDi } from '../helpers/schede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -214,16 +214,16 @@ async function captureCompositeLinux(app, outPath, dove) {
   return captureCompositeElectron(app, outPath);
 }
 
-// Composizione fatta da Electron, senza schermo: ogni superficie (la shell, le
-// viste nell'ordine in cui stanno, poi le finestre figlie come menu e fumetti)
-// fotografata con capturePage e sovrapposta col suo alfa. Non vede quello che
-// disegna il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
-export async function captureCompositeElectron(app, outPath) {
-  const esito = await app.evaluate(async ({ BrowserWindow, nativeImage }) => {
+// Le superfici che si vedono ora, dal basso in alto: una copia sola per schermata e segni numerati, che divergendo
+// davano al modello segni di cose fuori dalla schermata. Prova: tests/prova-da-utente-filo.spec.mjs.
+async function elencoSuperfici(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
     const all = BrowserWindow.getAllWindows();
     const win = all.find((w) => w._filoTabs) || all[0];
-    if (!win) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
+    if (!win) return null;
     const cb = win.getContentBounds();
+    const tm = win._filoTabs;
+    const attiva = tm?.tabs?.find((t) => t.id === tm.activeId)?.view?.webContents || null;
     const conTetto = (p, ms, riserva) => Promise.race([p, new Promise((r) => setTimeout(() => r(riserva), ms))]);
 
     const strati = [];
@@ -233,14 +233,16 @@ export async function captureCompositeElectron(app, outPath) {
       const r = Math.min(a.x + a.w, b.x + b.w), g = Math.min(a.y + a.h, b.y + b.h);
       return { x, y, w: Math.max(0, r - x), h: Math.max(0, g - y) };
     };
-    const aggiungi = (wc, rect, clip) => {
+    const aggiungi = (wc, rect, clip, tipo) => {
       if (!wc || wc.isDestroyed() || visti.has(wc.id)) return;
       visti.add(wc.id);
-      strati.push({ wc, rect, clip });
+      strati.push({ wc, rect, clip, tipo: tipo || (wc === attiva ? 'view' : 'strato') });
     };
     // Una vista figlia si vede solo dentro la madre: il ritaglio scende con la discesa.
     const discendi = (view, ox, oy, clip) => {
       for (const c of view.children || []) {
+        // Nascosta con setVisible(false), come la home lasciata per una pagina: senza schermo vero la pagina si dice «visible».
+        if (typeof c.getVisible === 'function' && !c.getVisible()) continue;
         const b = c.getBounds();
         const rect = { x: ox + b.x, y: oy + b.y, w: b.width, h: b.height };
         const dentro = interseca(rect, clip);
@@ -250,7 +252,7 @@ export async function captureCompositeElectron(app, outPath) {
       }
     };
     const tutta = { x: 0, y: 0, w: cb.width, h: cb.height };
-    aggiungi(win.webContents, tutta, tutta);
+    aggiungi(win.webContents, tutta, tutta, 'shell');
     discendi(win.contentView, 0, 0, tutta);
     for (const f of win.getChildWindows()) {
       if (f.isDestroyed() || !f.isVisible()) continue;
@@ -266,19 +268,37 @@ export async function captureCompositeElectron(app, outPath) {
     // Se è «hidden» anche la shell, il sistema crede coperta la finestra intera e la pagina non dice niente.
     const visibilita = (wc) => conTetto(wc.executeJavaScript('document.visibilityState').catch(() => 'visible'), 1000, 'visible');
     const pagineAttendibili = (await visibilita(win.webContents)) !== 'hidden';
+    const superfici = [];
+    for (const s of strati) {
+      if (s.tipo !== 'shell' && pagineAttendibili && (await visibilita(s.wc)) === 'hidden') continue;
+      superfici.push({ id: s.wc.id, bersaglio: s.wc.getOrCreateDevToolsTargetId(), rect: s.rect, clip: s.clip, tipo: s.tipo });
+    }
+    return { larghezza: cb.width, altezza: cb.height, superfici };
+  });
+}
+
+// Ogni superficie di elencoSuperfici fotografata e sovrapposta col suo alfa, senza schermo. Non vede quello che disegna
+// il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
+export async function captureCompositeElectron(app, outPath) {
+  const elenco = await elencoSuperfici(app);
+  if (!elenco) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
+  const esito = await app.evaluate(async ({ webContents, nativeImage }, { larghezza, altezza, superfici }) => {
+    const conTetto = (p, ms, riserva) => Promise.race([p, new Promise((r) => setTimeout(() => r(riserva), ms))]);
     const saltate = [];
     const immagini = [];
-    for (const s of strati) {
-      if (s.wc !== win.webContents && pagineAttendibili && (await visibilita(s.wc)) === 'hidden') continue;
-      const img = await conTetto(s.wc.capturePage().catch(() => null), 5000, null);
-      if (!img || img.isEmpty()) { saltate.push(s.wc.getURL()); continue; }
+    for (const s of superfici) {
+      const wc = webContents.fromId(s.id);
+      if (!wc || wc.isDestroyed()) continue;
+      const img = await conTetto(wc.capturePage().catch(() => null), 5000, null);
+      if (!img || img.isEmpty()) { saltate.push(wc.getURL()); continue; }
       const k = Math.max(...(img.getScaleFactors?.() || [1]));
       immagini.push({ ...s, size: img.getSize(k), bmp: img.toBitmap({ scaleFactor: k }) });
     }
-    if (!immagini.length || immagini[0].wc !== win.webContents) {
+    if (!immagini.length || immagini[0].tipo !== 'shell') {
       throw new Error('captureCompositeElectron: la shell non si lascia fotografare');
     }
 
+    const cb = { width: larghezza, height: altezza };
     const K = immagini[0].size.width / cb.width;
     const W = Math.round(cb.width * K), H = Math.round(cb.height * K);
     const tela = Buffer.alloc(W * H * 4);
@@ -303,7 +323,7 @@ export async function captureCompositeElectron(app, outPath) {
     }
     const png = nativeImage.createFromBitmap(tela, { width: W, height: H, scaleFactor: 1 }).toPNG();
     return { png: png.toString('base64'), saltate };
-  });
+  }, elenco);
   // In un clone pulito la cartella delle foto non c'è ancora.
   mkdirSync(dirname(resolve(outPath)), { recursive: true });
   writeFileSync(outPath, Buffer.from(esito.png, 'base64'));
@@ -333,10 +353,23 @@ export async function activeView(app, shell) {
   }
 }
 
-// Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
-function COLLECT_FN() {
+// Gli interagibili visibili, anche negli shadow root chiusi di Filo (la sua conferma): visti, devono avere un segno.
+// `soloFilo`: solo quelli nelle radici di Filo, per il mondo isolato dei siti.
+function COLLECT_FN(soloFilo = false) {
   const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
-  const els = Array.from(document.querySelectorAll(sel));
+  const UI = globalThis.SN_FILO_UI;
+  const radici = [];
+  const giu = (radice, diFilo) => {
+    radici.push({ radice, diFilo });
+    for (const el of radice.querySelectorAll('*')) {
+      let r = el.shadowRoot;
+      let nostra = diFilo;
+      if (!r && UI && UI.ombraDi) { try { r = UI.ombraDi(el); nostra = true; } catch (_) {} }
+      if (r) giu(r, nostra);
+    }
+  };
+  giu(document, false);
+  const els = radici.filter((x) => !soloFilo || x.diFilo).flatMap((x) => Array.from(x.radice.querySelectorAll(sel)));
   const out = [];
   for (const el of els) {
     const r = el.getBoundingClientRect();
@@ -369,20 +402,77 @@ function DRAW_FN(marks) {
 
 function CLEAR_FN() { const l = document.getElementById('__filo_marks__'); if (l) l.remove(); }
 
-// Disegna i badge numerati su shell+view e ritorna la mappa.
-// Ritorna [{ i, page:'shell'|'view', x, y, tag, label, cx, cy }] dove (cx,cy) sono
+// Le superfici di elencoSuperfici con la loro Page: senza gli strati sopra la scheda (il menu del tasto destro sulle
+// pagine web, i riquadri) un modello vedeva voci che non poteva cliccare.
+async function superficiVisibili(app, shell, view) {
+  const elenco = await elencoSuperfici(app);
+  if (!elenco) return [];
+  const perBersaglio = new Map();
+  for (const page of app.windows()) {
+    const b = await bersaglioDi(page);
+    if (b) perBersaglio.set(b, page);
+  }
+  // Una scheda appena nata può non avere ancora il suo bersaglio fra le pagine: la sua Page la dà activeView.
+  const riserva = { shell, view };
+  return elenco.superfici
+    .map((s) => ({ id: s.id, tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) || riserva[s.tipo] }))
+    .filter((s) => s.pagina);
+}
+
+// Sui siti i pezzi di Filo (la conferma, i riquadri) stanno in radici chiuse che vede solo il mondo dei suoi content
+// script (lo stesso di tests/helpers/riquadri.mjs).
+const MONDO_CONTENT_SCRIPT = 999;
+async function segniNelMondoDiFilo(app, id) {
+  const code = `(${COLLECT_FN.toString()})(true)`;
+  try {
+    return await app.evaluate(async ({ webContents }, { id, mondo, code }) => {
+      const wc = webContents.fromId(id);
+      if (!wc || wc.isDestroyed()) return [];
+      const r = await Promise.race([
+        wc.executeJavaScriptInIsolatedWorld(mondo, [{ code }]).catch(() => []),
+        new Promise((ok) => setTimeout(() => ok([]), 2000)),
+      ]);
+      return Array.isArray(r) ? r : [];
+    }, { id, mondo: MONDO_CONTENT_SCRIPT, code });
+  } catch (_) { return []; }
+}
+
+const pagineSegnate = new Set();
+
+// Disegna i badge numerati su ogni superficie visibile e ritorna la mappa.
+// Ritorna [{ i, page:'shell'|'view'|'strato', x, y, tag, label, cx, cy }] dove (cx,cy) sono
 // coordinate COMPOSITE (per riferimento del modello) e (x,y) di pagina (per il click).
+// La Page di ogni segno sta in `m.pagina`, non enumerabile: la mappa resta stampabile.
 export async function markInteractables(app, shell) {
   const view = await activeView(app, shell);
-  const shellMarks = await shell.evaluate(COLLECT_FN);
-  const viewMarks = view ? await view.evaluate(COLLECT_FN) : [];
+  const superfici = await superficiVisibili(app, shell, view);
+  // Solo se l'elenco non si è potuto fare: una scheda che l'elenco ha scartato non si vede neanche nella schermata.
+  if (!superfici.length) {
+    superfici.push({ tipo: 'shell', x: 0, y: 0, pagina: shell });
+    if (view) superfici.push({ tipo: 'view', x: 0, y: SHELL_HEIGHT, pagina: view });
+  }
   const map = [];
   let i = 0;
-  for (const m of shellMarks) map.push({ i: ++i, page: 'shell', ...m, cx: Math.round(m.x), cy: Math.round(m.y) });
-  for (const m of viewMarks) map.push({ i: ++i, page: 'view', ...m, cx: Math.round(m.x), cy: Math.round(m.y) + SHELL_HEIGHT });
-  // disegna
-  await shell.evaluate(DRAW_FN, map.filter((m) => m.page === 'shell').map((m) => ({ i: m.i, x: m.x, y: m.y, w: m.w, h: m.h })));
-  if (view) await view.evaluate(DRAW_FN, map.filter((m) => m.page === 'view').map((m) => ({ i: m.i, x: m.x, y: m.y, w: m.w, h: m.h })));
+  for (const s of superfici) {
+    let segni = [];
+    try { segni = await s.pagina.evaluate(COLLECT_FN); } catch (_) { continue; }
+    if (s.id != null && !/^filo:/.test(s.pagina.url())) {
+      const gia = new Set(segni.map((m) => `${Math.round(m.x)},${Math.round(m.y)}`));
+      for (const m of await segniNelMondoDiFilo(app, s.id)) if (!gia.has(`${Math.round(m.x)},${Math.round(m.y)}`)) segni.push(m);
+    }
+    const qui = [];
+    for (const m of segni) {
+      const cx = m.x + s.x;
+      const cy = m.y + s.y;
+      // Un elemento nella parte della superficie tagliata via dalla madre o dalla finestra non sta nella schermata.
+      if (s.clip && (cx < s.clip.x || cy < s.clip.y || cx > s.clip.x + s.clip.w || cy > s.clip.y + s.clip.h)) continue;
+      const voce = { i: ++i, page: s.tipo, ...m, cx: Math.round(cx), cy: Math.round(cy) };
+      Object.defineProperty(voce, 'pagina', { value: s.pagina, enumerable: false });
+      map.push(voce);
+      qui.push({ i: voce.i, x: m.x, y: m.y, w: m.w, h: m.h });
+    }
+    try { await s.pagina.evaluate(DRAW_FN, qui); pagineSegnate.add(s.pagina); } catch (_) {}
+  }
   return { map, view };
 }
 
@@ -390,16 +480,24 @@ export async function clearMarks(app, shell) {
   try { await shell.evaluate(CLEAR_FN); } catch (_) {}
   const view = await activeView(app, shell);
   if (view) { try { await view.evaluate(CLEAR_FN); } catch (_) {} }
+  for (const p of pagineSegnate) {
+    pagineSegnate.delete(p);
+    if (p === shell || p === view || p.isClosed()) continue;
+    try { await p.evaluate(CLEAR_FN); } catch (_) {}
+  }
 }
 
 // Click su un mark dalla mappa (coordinate di pagina → robusto, niente pixel-hunting).
-export async function clickMark(app, shell, map, index) {
+// `opzioni` come in page.mouse.click ({ button: 'right' }, { clickCount: 2 }); ritorna la Page cliccata, quella che
+// riceve i tasti dopo.
+export async function clickMark(app, shell, map, index, opzioni = {}) {
   const m = map.find((x) => x.i === index);
   if (!m) throw new Error('mark ' + index + ' inesistente');
   await clearMarks(app, shell);
-  const page = m.page === 'shell' ? shell : await activeView(app, shell);
-  await page.mouse.click(m.x, m.y);
+  const page = m.pagina && !m.pagina.isClosed() ? m.pagina : (m.page === 'shell' ? shell : await activeView(app, shell));
+  await page.mouse.click(m.x, m.y, opzioni);
   await sleep(400);
+  return page;
 }
 
 // Click libero in coordinate composite.
@@ -414,16 +512,15 @@ export async function clickComposite(app, shell, cx, cy) {
   await sleep(400);
 }
 
-export async function typeText(app, shell, text) {
-  const view = await activeView(app, shell);
-  const page = view || shell;
+// `dove`: la Page che ha il fuoco (quella dell'ultimo clic, per esempio la barra indirizzi nella shell); senza, la scheda.
+export async function typeText(app, shell, text, dove = null) {
+  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
   await page.keyboard.type(text, { delay: 10 });
   await sleep(200);
 }
 
-export async function pressKey(app, shell, key) {
-  const view = await activeView(app, shell);
-  const page = view || shell;
+export async function pressKey(app, shell, key, dove = null) {
+  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
   await page.keyboard.press(key);
   await sleep(200);
 }
