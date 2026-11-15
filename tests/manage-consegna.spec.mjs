@@ -45,7 +45,12 @@ test('la busta della consegna la apre il main; la classe si vede sulla scheda e 
   const pub = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('raw', pair.publicKey))).toString('base64url');
   const priv = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', pair.privateKey))).toString('base64');
   const testo = await globalThis.SN_FEEDBACK_CRYPTO.encryptForOwner(JSON.stringify(dettaglio), pub);
-  await app.evaluate((_e, k) => { process.env.FILO_FEEDBACK_PRIVKEY = k; }, priv);
+  await app.evaluate((_e, k) => {
+    process.env.FILO_FEEDBACK_PRIVKEY = k;
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'))('./auth/google-auth').isAdmin = () => true;
+  }, priv);
 
   const page = await openTab(MANAGE);
   await apri(page, []);
