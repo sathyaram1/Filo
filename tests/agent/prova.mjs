@@ -4,7 +4,6 @@
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve, relative } from 'node:path';
 import { createInterface } from 'node:readline';
