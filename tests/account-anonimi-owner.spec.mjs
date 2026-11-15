@@ -62,7 +62,11 @@ test.beforeAll(async () => {
         if (data.op === 'cancella') {
           stato.pulizia = { stato: 'in_corso', chiestaIl: '2026-11-15T11:00:00.000Z', attesi: data.attesi, cancellati: 30_000, falliti: 0 };
         }
-        if (data.op === 'ferma' && stato.pulizia) stato.pulizia = { ...stato.pulizia, stato: 'fermata', fermataIl: '2026-11-15T11:01:00.000Z' };
+        // Come il server: fermata dopo qualche cancellazione, il conto è da rifare.
+        if (data.op === 'ferma' && stato.pulizia) {
+          stato.pulizia = { ...stato.pulizia, stato: 'fermata', fermataIl: '2026-11-15T11:01:00.000Z' };
+          if (stato.pulizia.cancellati > 0 && stato.censimento) stato.censimento.superato = true;
+        }
         return json(res, 200, { result: { ok: true, censimento: stato.censimento, pulizia: stato.pulizia } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
