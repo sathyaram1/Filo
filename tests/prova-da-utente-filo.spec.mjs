@@ -47,6 +47,10 @@ test('la conferma di Filo ha i segni sui suoi pulsanti, e il clic sul segno di O
   const okM = map.find((m) => /^OK$/i.test(m.label));
   console.log('DBG el', await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e && (e.className || e.tagName); }, [okM.x, okM.y]));
   await clickMark(app, shell, map, map.find((m) => /^OK$/i.test(m.label)).i);
+  console.log('DBG dopo', await page.evaluate(() => [window.__esitoConferma, !!document.querySelector('.sn-confirm-host')]));
+  await page.mouse.click(okM.x, okM.y);
+  await new Promise((r) => setTimeout(r, 700));
+  console.log('DBG dopo2', await page.evaluate(() => [window.__esitoConferma, !!document.querySelector('.sn-confirm-host')]));
   await expect.poll(() => page.evaluate(() => window.__esitoConferma)).toBe(true);
 });
 
