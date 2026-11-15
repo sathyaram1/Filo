@@ -316,7 +316,8 @@ nemmeno una sessione locale: gira in GitHub a ogni fusione su main
 (`suite.yml`), e ogni sei ore si pubblica il commit più nuovo con la suite
 verde; un rosso nuovo (fuori dai rossi noti del contenitore) diventa un
 feedback e si corregge con calma, mentre la pubblicazione resta sull'ultimo verde. Una regressione è rara: non vale un'ora
-d'attesa a ogni consegna.
+d'attesa a ogni consegna. Dal 2026-11-14 (#2501) la pubblicazione la decidono le prove importanti e un rosso della suite
+non apre più feedback: CLAUDE.md § Verifica.
 
 Dentro il giro: chi scrive codice fa unit test e spec mirati, e le regressioni
 incrociate restano responsabilità di chi le introduce. Il verificatore, prima
