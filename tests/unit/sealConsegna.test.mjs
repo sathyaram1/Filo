@@ -59,7 +59,7 @@ test('deliver status (primo passaggio) lascia il punto fermo sulla consegna', as
     const r = await new Promise((done) => {
       execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'),
         'deliver', 'biglietto-di-prova', 'status',
-        '--status', 'revision_capability', '--notes', 'report', '--branch', 'worker/900',
+        '--status', 'revision_capability', '--notes', 'report', '--branch', 'worker/900', ...argomentiConsegna(casa, { base: base }),
       ], {
         env: {
           ...process.env,
