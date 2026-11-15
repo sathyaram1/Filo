@@ -290,7 +290,7 @@ contesto): una riga che non nasce da nessuna è una promessa («il supporto per 
 lavoro già nell'ordine o a priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link
 che non stesse nelle righe originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con
 `novita consegna <file>`: lo strumento rifiuta prima del server una riga senza fonte che non sia una promessa
-dichiarata, o una promessa fuori dall'ordine, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
+dichiarata, o una promessa fuori dall'ordine, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con le prove importanti verdi, che la pubblicazione costruisce
 o supera, e la consegna porta il suo `commit`: la pubblicazione mette la riscrittura al posto delle righe lette (una
 riga fusa dopo resta accanto). Se il contesto dice che quel commit non si è trovato, le righe sono quelle della
 cartella: una pubblicazione che non le ha tutte fa uscire quelle dei worker. Dalla prima lettura della pubblicazione, o uscita la versione, la riscrittura non si
