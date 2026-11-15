@@ -138,11 +138,6 @@ Gestione → Automazioni.
    iniziato non si mette in attesa di un lavoro non iniziato**: finisce da solo.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
-8. **Compiti nell'ordine.** Una revisione, un censimento, una verifica sistematica è un compito senza feedback:
-   `compito "<titolo>" -` lo apre e risponde col suo id (`C-12`), che metti nell'ordine accanto ai numeri
-   (`accendi 812,C-12,815`): il server lo accende nella sua posizione. Un feedback può aspettare un compito
-   (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
-   correggere un hover.
 6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
    nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
    mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
