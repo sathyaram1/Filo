@@ -148,16 +148,35 @@ export function rigaFuori(fuori, giorni) {
 }
 
 /** L'ordine con lo stato di ogni numero secondo l'indice: chi non è fra gli aperti il server lo salta. PURA. */
-export function rigaOrdine(numeri, indice) {
-  if (!numeri.length) return 'Nessun ordine: il pacemaker accende per priorità, come ripiego.';
+export function rigaOrdine(numeri, indice, pronti = undefined) {
+  if (!numeri.length) return 'Nessun ordine: il pacemaker accende per urgenza, come ripiego, con le priorità basse chiuse fino al rinnovo.';
   const perNum = new Map((indice || []).map((f) => [String(f.num), f]));
   const conIndice = (indice || []).length > 0;
-  const voce = (n) => (!conIndice ? `#${n}` : perNum.has(n) ? `#${n} (${perNum.get(n).stato || 'aperto'})` : `#${n} (non fra gli aperti)`);
-  const vivi = conIndice ? numeri.filter((n) => perNum.has(n)).length : numeri.length;
+  const eCompito = (n) => COMPITO_RE.test(String(n));
+  const voce = (n) => (eCompito(n) ? `compito ${n}` : !conIndice ? `#${n}` : perNum.has(n) ? `#${n} (${perNum.get(n).stato || 'aperto'})` : `#${n} (non fra gli aperti)`);
+  const feedback = numeri.filter((n) => !eCompito(n));
+  const vivi = conIndice ? feedback.filter((n) => perNum.has(n)).length : feedback.length;
   const coda = !conIndice ? ' Senza l\'indice delle schede non so quali sono ancora aperti.'
-    : vivi ? (numeri.length - vivi ? ` Fuori dagli aperti: ${numeri.length - vivi}, il server li salta.` : '')
-    : ' Nessuno è fra gli aperti: il server fa come senza ordine, per priorità.';
-  return `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti; un ordine senza feedback aperti vale come nessun ordine.${coda}`.trim();
+    : vivi ? (feedback.length - vivi ? ` Fuori dagli aperti: ${feedback.length - vivi}, il server li salta.` : '')
+    : feedback.length ? ' Nessun feedback è fra gli aperti.' : '';
+  return [
+    `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che può partire, a qualunque priorità, una priorità 3 fuori ordine davanti; fuori dall'ordine non comincia nient'altro. Un ordine senza lavori pronti vale come nessun ordine: la coda per urgenza.${coda}`.trim(),
+    ...(pronti === undefined ? [] : [rigaPronti(pronti)]),
+  ].join('\n');
+}
+
+/**
+ * I lavori dell'ordine che possono partire subito contro i 2×N che il ruolo chiede a ogni accensione (#2269), come li
+ * conta il server: chi aspetta, è fermo, resta locale o è già preso non conta. PURA.
+ */
+export function rigaPronti(p) {
+  if (p === null) return 'Pronti nell\'ordine: il server non ha letto la coda, contali dalle schede.';
+  if (!p || !Array.isArray(p.pronti)) return 'Pronti nell\'ordine: il server non li conta ancora.';
+  const n = p.pronti.length;
+  const elenco = n ? `: ${p.pronti.map((v) => (COMPITO_RE.test(String(v)) ? v : `#${v}`)).join(', ')}` : '';
+  return n >= p.servono
+    ? `Pronti nell'ordine: ${n}, ne servono almeno ${p.servono} (2×N)${elenco}.`
+    : `ORDINE CORTO: pronti ${n}, ne servono almeno ${p.servono} (2×N)${elenco}. Allungalo coi criteri del mattino.`;
 }
 
 const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistamento: 'in smistamento' });
