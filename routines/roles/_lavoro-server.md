@@ -81,10 +81,11 @@ git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
   `ramo-server` come sotto. Quelle della critica si spingono e si registrano prima di registrare la critica: il
   verdetto prende come punta verificata del server l'ultima registrata.
 - Il conto delle prove, app e server insieme, sui commit dei due rami: `node scripts/conta-prove.mjs --server "<CLONE>"`.
-- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La suite di GitHub del server prova il
-  ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se non c'è): per questo la
-  spinta manda prima da sé il ramo dell'app su origin, compresi i file nati da shell, e se quello non arriva il ramo
-  del server non parte. Subito dopo, a ogni spinta e prima di consegnare:
+- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La spinta non accende la suite di
+  GitHub del server: la accende il cancello sulla punta che fonde, e prova il ramo di Filo con lo stesso nome com'è in
+  quel momento (main di Filo se non c'è). La spinta manda comunque prima da sé il ramo dell'app su origin, compresi i
+  file nati da shell, e se quello non arriva il ramo del server non parte. Subito dopo, a ogni spinta e prima di
+  consegnare:
 
 ```bash
 node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
