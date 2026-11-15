@@ -573,8 +573,8 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
   });
 
   // #2148: la suite dura ore, e una fusione arrivata intanto può aver già corretto i rossi del commit provato.
-  describe('a fine suite i rossi si rifanno su Windows sulla punta di main', () => {
-    const punta = senzaCommenti(job('unit-windows-punta', SUITE_YML));
+  describe('i rossi si rifanno su Windows sulla punta di main', () => {
+    const punta = senzaCommenti(job('unit-windows-punta', IMP_YML));
     const passiPunta = passi(punta);
     const rifai = passiPunta.find((p) => p.id === 'rifai');
     const se = (punta.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
