@@ -1211,7 +1211,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return 0;
     }
     case 'contesto': case 'sveglia': case 'chat': {
-      const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
+      const [st, tac, sc] = await Promise.all([chiama(cred, 'stato', { pronti: true }), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
       const r = rami();
       const indice = indiceDalServer(sc.schede);
