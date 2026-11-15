@@ -274,7 +274,9 @@ function opzione(argv, nome) {
 
 // Il segno «lavoro server» lo mette chi apre (#2217): dice dove sta il codice, non la fiducia, che resta dell'owner.
 export const OPZIONI_SERVER = Object.freeze(['--server', '--lavoro-server']);
-const OPZIONI_DI = Object.freeze({ feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER] });
+const OPZIONI_DI = Object.freeze({
+  feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER], compito: ['--urgenza', '--alle', '--ambito', '--ticket'],
+});
 export const vuoleServer = (argv) => (argv || []).some((a) => OPZIONI_SERVER.includes(String(a)));
 /** Le opzioni di `cmd` che npm si è preso (`npm_config_*`), come le riprende lo strumento della sessione locale. */
 export async function opzioniDaNpm(cmd, env = {}) {
