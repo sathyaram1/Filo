@@ -25,7 +25,9 @@ const INVALIDE_DI_FILA = 3;
 // Haiku in una conversazione sola (stream-json): ogni turno è una schermata, la risposta è la mossa.
 function apriModello(claude, modello, prompt) {
   const cwd = tmpdir();
-  const figlio = spawn(claude, argomentiModello(modello, prompt), { cwd, env: envFiglio(process.env, { cwd }), stdio: ['pipe', 'pipe', 'pipe'] });
+  // Un FILO_CLAUDE_BIN che è uno script (il finto delle prove) parte con Node, su ogni sistema.
+  const [cmd, args] = /\.m?js$/.test(claude) ? [process.execPath, [claude, ...argomentiModello(modello, prompt)]] : [claude, argomentiModello(modello, prompt)];
+  const figlio = spawn(cmd, args, { cwd, env: envFiglio(process.env, { cwd }), stdio: ['pipe', 'pipe', 'pipe'] });
   let attesa = null;
   let stderr = '';
   let uscito = '';
