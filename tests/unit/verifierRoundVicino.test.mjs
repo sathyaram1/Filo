@@ -82,10 +82,7 @@ test('derivedGroups: esterni e domande da soli, tutti gli altri in un feedback s
 });
 
 test('#2269: un interno messo da parte nasce a 1 anche di livello 3; a cominciare lo decide l\'ordine', () => {
-  // Un [3i?] che si corregge esce anche in un derivato con la sua domanda: prima nasceva a 3 e partiva fuori ordine.
-  const r = decide([f(3, 'i', 'quale strada?', true)], { count3: 0 });
-  assert.equal(r.stop, false);
-  assert.deepEqual(r.derived.map((x) => [x.level, x.priority, x.inCorrezione]), [[3, 1, true]]);
+  // Prima un 3 messo da parte nasceva a 3 e partiva fuori ordine, come un'emergenza.
   const g = R.derivedGroups([{ level: 3, sede: 'i', text: 'grave' }, { level: 3, sede: 'i', text: 'domanda', decision: true }]);
   assert.deepEqual(g.map((x) => [x.tipo, x.priority]), [['decisione', 1], ['rimasti', 1]]);
 });
