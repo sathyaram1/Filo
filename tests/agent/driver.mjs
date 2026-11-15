@@ -355,10 +355,23 @@ export async function activeView(app, shell) {
   }
 }
 
-// Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
-function COLLECT_FN() {
+// Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect. Scende anche negli shadow root,
+// i chiusi di Filo compresi (la conferma «Filo chiede conferma» sta lì): visti nella schermata, devono avere un segno.
+// `soloFilo`: solo quello che sta nelle radici di Filo, per il mondo isolato dei siti dove vivono i suoi pezzi.
+function COLLECT_FN(soloFilo = false) {
   const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
-  const els = Array.from(document.querySelectorAll(sel));
+  const UI = globalThis.SN_FILO_UI;
+  const radici = [];
+  const giu = (radice) => {
+    radici.push(radice);
+    for (const el of radice.querySelectorAll('*')) {
+      let r = el.shadowRoot;
+      if (!r && UI && UI.ombraDi) { try { r = UI.ombraDi(el); } catch (_) {} }
+      if (r) giu(r);
+    }
+  };
+  giu(document);
+  const els = (soloFilo ? radici.slice(1) : radici).flatMap((r) => Array.from(r.querySelectorAll(sel)));
   const out = [];
   for (const el of els) {
     const r = el.getBoundingClientRect();
