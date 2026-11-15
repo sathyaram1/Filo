@@ -346,7 +346,7 @@ jobs:
       # Si costruisce il commit PROVATO, non la punta di main (#641): il numero
       # che il server ha appena scritto su main si applica qui, in locale, al
       # manifesto di questo albero, e non si spinge niente. Le fusioni entrate
-      # dopo il commit verde escono quando la loro suite e' verde.
+      # dopo il commit verde escono quando le loro prove importanti sono verdi.
       - name: Applica il numero al commit provato (in locale)
         if: steps.check.outputs.should_release == 'true'
         id: applica
