@@ -210,7 +210,7 @@ jobs:
         shell: bash
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
-          # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: se ogni rosso e' gia' verde
+          # Il commit provato e' l'ultimo di main con le prove importanti verdi, a volte giorni indietro: se ogni rosso e' gia' verde
           # sulla punta, il feedback chiederebbe un lavoro fatto e si riaprirebbe a ogni chiusura (#1185). Nel dubbio si apre.
           PROVATO=$(git rev-parse --short HEAD)
           GIA_VERDI=""
