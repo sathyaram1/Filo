@@ -393,7 +393,7 @@ function CLEAR_FN() { const l = document.getElementById('__filo_marks__'); if (l
 
 // Le superfici di elencoSuperfici con la loro Page: senza gli strati sopra la scheda (il menu del tasto destro sulle
 // pagine web, i riquadri) un modello vedeva voci che non poteva cliccare.
-async function superficiVisibili(app) {
+async function superficiVisibili(app, shell, view) {
   const elenco = await elencoSuperfici(app);
   if (!elenco) return [];
   const perBersaglio = new Map();
@@ -401,8 +401,10 @@ async function superficiVisibili(app) {
     const b = await bersaglioDi(page);
     if (b) perBersaglio.set(b, page);
   }
+  // Una scheda appena nata può non avere ancora il suo bersaglio fra le pagine: la sua Page la dà activeView.
+  const riserva = { shell, view };
   return elenco.superfici
-    .map((s) => ({ tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) }))
+    .map((s) => ({ tipo: s.tipo, x: s.rect.x, y: s.rect.y, clip: s.clip, pagina: perBersaglio.get(s.bersaglio) || riserva[s.tipo] }))
     .filter((s) => s.pagina);
 }
 
