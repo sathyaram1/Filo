@@ -11,7 +11,7 @@ import { aggiunteSottoUscite, registroDa, spostaInCima } from '../../scripts/lib
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 createRequire(import.meta.url)(join(ROOT, 'src', 'shared', 'novitaFusione.js'));
-const { uniscaNovita, rigaDiDati } = globalThis.SN_NOVITA_FUSIONE;
+const { uniscaNovita, rigaDiDati, sottoUscite } = globalThis.SN_NOVITA_FUSIONE;
 
 const blocco = (version, { features = [], fixes = [] } = {}) => [
   '    {',
