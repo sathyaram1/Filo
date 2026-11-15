@@ -269,7 +269,8 @@ npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
 npm test                   # SUITE COMPLETA (~730 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
-npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
+npm run test:importanti    # i cammini principali, un avvio solo, tetto 4 minuti
+npm run finish:check       # unit + prove importanti + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
 
