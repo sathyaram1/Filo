@@ -29,6 +29,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 import '../../src/shared/feedbackThread.js';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { argomentiConsegna } from '../helpers/consegnaDiProva.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
