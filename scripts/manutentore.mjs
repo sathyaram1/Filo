@@ -1039,7 +1039,7 @@ export function lavoriPromettibili(schede, ordine = []) {
 export function contestoRedattore({ blocco, capacita = '', schede = [], ordine = [], commit = '', motivo = '' }) {
   const b = blocco || {};
   const da = commit
-    ? [`Le righe sono quelle del commit ${unaRiga(commit).slice(0, 12)}, l'ultimo di main con la suite verde: la pubblicazione costruisce lui o uno dopo, e le righe fuse dopo restano accanto alla riscrittura.`]
+    ? [`Le righe sono quelle del commit ${unaRiga(commit).slice(0, 12)}, l'ultimo di main con le prove importanti verdi: la pubblicazione costruisce lui o uno dopo, e le righe fuse dopo restano accanto alla riscrittura.`]
     : [`Non so quale commit costruirà la pubblicazione (${unaRiga(motivo || 'nessun motivo')}): le righe sono quelle di questa cartella. Se la pubblicazione costruisce un commit che non le ha tutte, la riscrittura non esce.`];
   const promettibili = lavoriPromettibili(schede, ordine);
   const titoli = (l) => l.map((s) => `#${unaRiga(s.num)}${s.titolo ? ` ${unaRiga(s.titolo)}` : ''}`);
