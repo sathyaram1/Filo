@@ -962,6 +962,13 @@ async function main() {
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
     }
+    // 2b. Le prove importanti (#2501), su ogni ramo: decidono la pubblicazione, col loro tetto di durata.
+    const importanti = join(albero.dir, 'scripts', 'test-importanti.mjs');
+    if (existsSync(importanti) && !run(process.execPath, [importanti], 'Prove importanti', undefined, albero.dir)) {
+      console.error('\n✗ Prove importanti rosse, o sopra il tetto di durata: non pubblico. Sistema e rilancia.');
+      if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
+      process.exit(1);
+    }
   }
 
   // 3. La VERIFICA avversariale: un'istanza diversa da chi ha scritto il codice
