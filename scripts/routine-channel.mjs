@@ -2361,6 +2361,16 @@ if (isMain) {
       if (!p.ok) { console.error(p.errore); process.exit(1); }
       data.piano = p.testo;
     }
+    // La consegna con la prova accanto (#2505): la messa in revisione la porta sempre, tranne quando una domanda la ferma.
+    const inRevisione = intento === 'status' && data.status === 'revision_capability';
+    if (data.consegna !== undefined || (inRevisione && !(data.domanda && data.domanda.blocca !== false))) {
+      const { FORMA_CONSEGNA, leggiConsegna } = await import('./lib/consegna.mjs');
+      if (!inRevisione) { console.error('--consegna vale solo con deliver status --status revision_capability (la ripresa la porta su dispatch --record-fixed): non ho consegnato niente.'); process.exit(1); }
+      if (typeof data.consegna !== 'string') { console.error(`La messa in revisione vuole --consegna <file.json>, ${FORMA_CONSEGNA}: non ho consegnato niente.`); process.exit(1); }
+      const l = leggiConsegna(data.consegna, ROOT);
+      if (l.errore) { console.error(`${l.errore}\nNon ho consegnato niente.`); process.exit(1); }
+      data.consegna = l.consegna;
+    }
     // Già risolto su main: chiude senza ramo, con la fusione che lo prova, il report e la frase.
     if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined)) {
       const manca = data.status !== 'done' || data.reason !== 'gia_risolto' ? 'va con --status done --reason gia_risolto'
