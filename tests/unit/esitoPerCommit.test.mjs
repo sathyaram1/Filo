@@ -38,6 +38,7 @@ import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { argomentiConsegna } from '../helpers/consegnaDiProva.mjs';
 
 const {
   applySecaudit,
