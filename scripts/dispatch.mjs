@@ -908,6 +908,8 @@ export function serialAwarenessNote(role, history, dropped = 0) {
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
 
 const LAVORO_SERVER_FILE = '_lavoro-server.md';
+// Il primo lavoro di un fidato non segnato (#2500, busta `lavoroServer.seServe`): il server solo se il lavoro lo tocca.
+const LAVORO_SERVER_SE_SERVE_FILE = '_lavoro-server-se-serve.md';
 
 export { cloneDentroIlRepo, cartellaCloneServer };
 
