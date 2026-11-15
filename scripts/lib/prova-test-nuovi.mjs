@@ -98,6 +98,7 @@ export function corriFile(dir, voce, { lancia = spawnSync, prepara = preparaLanc
   if (voce.tipo === 'unit') {
     const r = lancia(process.execPath, ['--test', '--test-reporter=tap', rel], { cwd, env: pulito, encoding: 'utf8', timeout: TETTO_FILE_MS, maxBuffer: 1 << 26 });
     if (r.error && r.error.code === 'ETIMEDOUT') return { esiti: new Map(), partito: false, errore: 'oltre il tetto di tempo' };
+    if (r.error) return { esiti: new Map(), partito: false, errore: `node non parte (${r.error.code || r.error.message})` };
     return { esiti: esitiDaTap(r.stdout), partito: true };
   }
   const rapporto = join(dirname(dir), `rapporto-${Math.random().toString(36).slice(2)}.json`);
