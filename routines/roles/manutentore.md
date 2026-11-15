@@ -68,13 +68,13 @@ A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi a
 ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
-**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire
-adesso (vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa delle ultime 24
-ore, sommata sugli account (`spesa`), sta sotto il ritmo sostenibile fino ai rinnovi (il conto unico «sostenibile fino
-ai rinnovi ≈ … $/giorno» del mattino: con «prima B, poi A» un account sopra il suo ritmo non ferma l'altro), riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole
-(decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e riscrivi
-l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo lo racconta. Una rosa vuota a metà giornata con la quota
-che avanza sono ore di lavoro perse fino al rinnovo (06/11: quattordici). In una giornata a secco no.
+**L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene almeno **2×N** lavori che possono
+partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano. Il conto lo fa il server
+(`stato` e `ordine`: «Pronti nell'ordine», o «ORDINE CORTO» quando mancano). Se mancano, allunghi l'ordine coi criteri
+del mattino (decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e
+riscrivi l'ordine. La spesa si regola con N, non svuotando l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo
+lo racconta. Un ordine senza lavori pronti con la quota che avanza sono ore di lavoro perse fino al rinnovo (06/11:
+quattordici). In una giornata a secco no.
 
 ## La sessione accesa dal pacemaker
 
