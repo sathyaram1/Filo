@@ -34,11 +34,13 @@ test.beforeAll(async () => {
 test.afterAll(() => server && server.close());
 
 /** Lancia la prova col copione dato → { codice, uscita, esito, cartella }. */
-async function prova(copione, argomenti = [], { fornitore } = {}) {
+async function prova(copione, argomenti = [], { fornitore, home = false } = {}) {
   const cartella = cartellaTemporanea('filo-prova-spec-');
-  const env = { ...process.env, FILO_CLAUDE_BIN: FINTO, FILO_CLAUDE_FINTO: JSON.stringify(copione) };
+  // Una chiave finta: Filo si accende coi modelli di prova, e nessuna chiamata vera parte da qui.
+  const env = { ...process.env, OPENROUTER_API_KEY: 'k-test', FILO_CLAUDE_BIN: FINTO, FILO_CLAUDE_FINTO: JSON.stringify(copione) };
   if (fornitore) env.FILO_CLAUDE_FINTO_FORNITORE = fornitore;
-  const figlio = spawn(process.execPath, [join(ROOT, 'tests', 'agent', 'prova.mjs'), '--start', `${base}/modulo`, '--out', cartella, ...argomenti], { cwd: ROOT, env });
+  const inizio = home ? [] : ['--start', `${base}/modulo`];
+  const figlio = spawn(process.execPath, [join(ROOT, 'tests', 'agent', 'prova.mjs'), ...inizio, '--out', cartella, ...argomenti], { cwd: ROOT, env });
   let uscita = '';
   figlio.stdout.on('data', (b) => { uscita += b; });
   figlio.stderr.on('data', (b) => { uscita += b; });
