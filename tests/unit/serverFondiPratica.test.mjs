@@ -544,6 +544,11 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.equal(classifyServerMerge(403, {}).outcome, 'denied');
   assert.equal(classifyServerMerge(0, {}).outcome, 'unreachable');
   assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
+  // #2533: le spinte sui rami non accendono più la suite, e il PC non deve aspettare una corsa che non parte.
+  const senzaCorse = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'assente' });
+  assert.equal(senzaCorse.suite, 'assente');
+  assert.match(messageForServerMerge(senzaCorse, 'worker/x'), /non è mai partita: avviala da Actions di filo-security .*Run workflow sul ramo worker\/x/);
+  assert.match(messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'in_corso' })), /non è ancora verde/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
   // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
