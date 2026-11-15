@@ -15,10 +15,15 @@ export function consegnaBuona(extra = {}) {
   };
 }
 
-/** Gli argomenti `--consegna <file>` per una messa in revisione da `casa`; `base`: dove il ramo si stacca da main. */
-export function argomentiConsegna(casa, { base = 'main', consegna = consegnaBuona() } = {}) {
-  execFileSync('git', ['update-ref', 'refs/remotes/origin/main', base], { cwd: casa });
+/** Il file JSON di una consegna, fuori da ogni deposito. */
+export function fileConsegna(consegna = consegnaBuona()) {
   const file = join(cartellaTemporanea('filo-consegna-prova-'), 'consegna.json');
   writeFileSync(file, JSON.stringify(consegna));
-  return ['--consegna', file];
+  return file;
+}
+
+/** Gli argomenti `--consegna <file>` per una messa in revisione da `casa` senza remoto; `base`: dove il ramo si stacca. */
+export function argomentiConsegna(casa, { base = 'main', consegna = consegnaBuona() } = {}) {
+  execFileSync('git', ['update-ref', 'refs/remotes/origin/main', base], { cwd: casa });
+  return ['--consegna', fileConsegna(consegna)];
 }
