@@ -492,8 +492,8 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
 // #1184: il cancello di pubblicazione rifà gli unit su Windows; se la suite non li prova, il «verde» scelto può essere
 // un commit che il cancello rifiuta a ogni giro, e la pubblicazione si ferma per giorni.
-describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
-  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
+describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
+  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, IMP_YML));
   const elenco = passi(lavoro);
   const unit = elenco.find((p) => p.id === 'unit');
 
