@@ -34,9 +34,17 @@ test('ogni campo di una scheda resta su una riga: un a capo dal feedback non scr
 test('l\'ordine dice quali numeri sono ancora aperti, e che un ordine senza aperti vale come nessuno', () => {
   const indice = [{ num: '812', stato: 'todo' }];
   assert.match(M.rigaOrdine(['812', '8120'], indice), /#812 \(todo\), #8120 \(non fra gli aperti\).*il server li salta/);
-  assert.match(M.rigaOrdine(['700'], indice), /Nessuno è fra gli aperti: il server fa come senza ordine/);
+  assert.match(M.rigaOrdine(['700'], indice), /Nessun feedback è fra gli aperti/);
   assert.match(M.rigaOrdine(['700'], []), /Senza l'indice delle schede non so quali sono ancora aperti/);
   assert.match(M.rigaOrdine([], indice), /Nessun ordine/);
+  // #2269: i compiti stanno nell'ordine col loro id, e i pronti si contano contro i 2×N.
+  const conCompito = M.rigaOrdine(['812', 'C-5'], indice, { pronti: ['812', 'C-5'], servono: 4 });
+  assert.match(conCompito, /#812 \(todo\), compito C-5\. .*a qualunque priorità/);
+  assert.doesNotMatch(conCompito, /non fra gli aperti/, 'un compito non è un feedback da cercare fra le schede');
+  assert.match(conCompito, /\nORDINE CORTO: pronti 2, ne servono almeno 4 \(2×N\): #812, C-5\. Allungalo/);
+  assert.match(M.rigaPronti({ pronti: ['1', '2'], servono: 2 }), /^Pronti nell'ordine: 2, ne servono almeno 2 \(2×N\): #1, #2\.$/);
+  assert.match(M.rigaPronti(null), /il server non ha letto la coda/);
+  assert.match(M.rigaPronti(undefined), /il server non li conta ancora/);
 });
 
 test('i rami lasciati fuori si dicono, e un ramo coi suoi feedback non ne perde nessuno in silenzio', () => {
