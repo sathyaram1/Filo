@@ -85,8 +85,9 @@ describe('A — nomi di branch unici per tentativo', () => {
     // se preferredBase o le basi feature/* riappaiono, questo diventa rosso.
     const src = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
     assert.ok(!src.includes('preferredBase'), 'dispatch non deve più calcolare basi dal numero del feedback');
-    assert.match(src, /base: precedenti\.scelto \? precedenti\.scelto\.ramo : '',/,
-      'la base di un lavoro nuovo è il tentativo precedente dello stesso feedback (#2152), se no la linea principale');
+    assert.match(src, /const sorgente = precedenti\.scelto \|\| \(legato\.stato === 'presente' \? \{ ramo: legato\.ramo, propri: legato\.propri \} : null\);/,
+      'la base di un lavoro nuovo è il tentativo precedente dello stesso feedback (#2152), se no il ramo legato (#2516)');
+    assert.match(src, /base: sorgente \? sorgente\.ramo : '',/, 'e senza nessuno dei due la linea principale');
   });
 });
 
