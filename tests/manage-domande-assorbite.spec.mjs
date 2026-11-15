@@ -59,3 +59,52 @@ test('la superata dice in quale domanda è stata assorbita e la apre; quella che
   await page.locator('#mgDomandeLista .mg-domanda[data-id="D-45"]').click();
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-45"] .mg-dq-esito')).toHaveText('Superata da un’altra domanda.');
 });
+
+// L'assorbimento è una decisione automatica della revisione: l'owner lo disfa con «Riapri», dalla scheda e dal tasto
+// destro; una superata da una domanda nata al suo posto no.
+test('una domanda assorbita per sbaglio si riapre, e quella che la assorbiva non la elenca più', async ({ app, openTab }) => {
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [DENTRO, ASSORBITA, VECCHIA, SOSTITUITA].map((d) => Object.assign({}, d)) });
+  await app.evaluate(({ ipcMain }) => {
+    const sotto = ipcMain._invokeHandlers.get('filo:message');
+    globalThis.__mandati = [];
+    ipcMain.removeHandler('filo:message');
+    ipcMain.handle('filo:message', async (event, msg) => {
+      const s = globalThis.__mgFinto;
+      if (msg && msg.type === 'domanda_riapri') {
+        globalThis.__mandati.push(msg);
+        const d = s.domande.find((x) => x.id === msg.id);
+        Object.assign(d, { stato: 'aperta', esito: null, modificataIl: Date.now() });
+        const dentro = s.domande.find((x) => x.id === 'D-40');
+        Object.assign(dentro, { assorbite: dentro.assorbite.filter((x) => x !== msg.id), modificataIl: Date.now() });
+        return { ok: true, domanda: JSON.parse(JSON.stringify(d)) };
+      }
+      return sotto(event, msg);
+    });
+  });
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+
+  const riga = (id) => page.locator(`#mgDomandeLista .mg-domanda[data-id="${id}"]`);
+  const scheda = (id) => page.locator(`#mgDomandaDettaglio .mg-dq[data-id="${id}"]`);
+  await riga('D-43').click();
+  await expect(scheda('D-43').locator('button[data-fai="riapri"]')).toHaveCount(0);
+  await riga('D-42').click();
+  await expect(scheda('D-42').locator('button[data-fai="riapri"]'), 'anche un’assorbita di prima del legame').toHaveCount(1);
+  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
+  await riga('D-41').click({ button: 'right' });
+  await expect(menu).toContainText('Riapri');
+  await page.keyboard.press('Escape');
+
+  await riga('D-41').click();
+  const k = scheda('D-41');
+  await expect(k.locator('button[data-fai="riapri"]')).toHaveAttribute('title', /assorbita in D-40/);
+  await k.locator('button[data-fai="riapri"]').click();
+  await expect(k.locator('.mg-dq-msg')).toHaveText('Riaperta: ora è fra quelle da rispondere.');
+  expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_riapri', id: 'D-41' });
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (2)');
+  await page.locator('.mg-tab[data-tab="domande"]').click();
+  await riga('D-40').click();
+  await expect(scheda('D-40').locator('.mg-dq-assorbite-sez .mg-dq-legame')).toHaveText(['D-42']);
+});
