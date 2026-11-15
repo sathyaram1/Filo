@@ -148,6 +148,8 @@ che nessuno ha chiesto, non si fa — lo scrivi nel report e diventerà un
 feedback suo. È ciò che una correzione aggiunge a generare i rilievi del giro
 dopo, e un difetto in un'aggiunta è tuo.
 
+<!-- includi: _consegna-con-prova.md -->
+
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi
 prima di consegnare, e il rilascio aspetta che sia finito.
