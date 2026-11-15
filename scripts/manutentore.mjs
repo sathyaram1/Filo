@@ -1171,7 +1171,7 @@ export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = 
     }
   };
   try {
-    const corse = await api(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&status=success&per_page=100`);
+    const corse = await api(`repos/${repo}/actions/workflows/${WORKFLOW_VERDE}/runs?branch=main&status=success&per_page=100`);
     const lavori = new Map();
     for (const sha of primo) {
       const r = (corse.workflow_runs || []).find((x) => x && x.head_sha === sha);
