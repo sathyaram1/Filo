@@ -9,7 +9,9 @@
   const MAX = 20;
   const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
   const NUM_RE = /^#?(\d{1,7})(?:\.(\d{1,6}))?$/;
+  // L'id di un compito senza feedback (`C-12`), che un feedback può aspettare e l'ordine può portare (#2269).
   const COMPITO_RE = /^C-[1-9]\d{0,8}$/;
+  const eCompito = (id) => COMPITO_RE.test(String(id == null ? '' : id));
   // Il giro di attese si cerca fino in fondo; oltre questi documenti si rifiuta invece di scrivere un giro non visto.
   const MAX_VISITATI = 2000;
   // Parole che si scrivono fra i numeri e non sono numeri.
