@@ -311,3 +311,27 @@ test('un aspettato cancellato non blocca le altre attese: resta', async ({ openT
   await expect(page.locator('#mgAtteseLista')).toContainText('#13');
   expect((await page.evaluate(() => window.__updates)).map(gesto)).toEqual([['f12'], '13']);
 });
+
+// #2269: un feedback può aspettare un compito. La pagina legge il suo stato dall'elenco dei compiti, non fra i feedback:
+// aperto finché l'elenco lo porta, e quando chiude la pratica torna In coda senza ricaricare.
+test('un’attesa su un compito si legge aperta, non «cancellata», e si scioglie quando il compito chiude', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb({ waitsFor: [{ id: 'C-12', num: 'C-12' }] }), ...LISTA.slice(1)], { compitiAperti: ['C-12'] });
+  await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (1)');
+  await tabBtn(page, 'waiting').click();
+  const badge = page.locator('.mg-item[data-id="f903"] .mg-attesa-badge');
+  await expect(badge).toHaveText('⏳ il compito C-12');
+  await expect(badge).toHaveAttribute('title', /il compito C-12 \(aperto\)/);
+  await expect(badge).not.toHaveAttribute('title', /cancellat/);
+
+  // Il compito chiude: alla rilettura (al più ogni minuto) la pratica esce da «Aspettano».
+  await page.evaluate(() => {
+    window.__compitiAperti = [];
+    const ora = Date.now;
+    Date.now = () => ora() + 61 * 1000;
+    window.__mgTest.setTab('queue');
+  });
+  await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (0)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
+  expect(await page.evaluate(() => window.__elenchiCompiti)).toBe(2);
+});
