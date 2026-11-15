@@ -5,9 +5,36 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { leggiArgomenti, verdettoImportanti, TETTO_S, SPEC, CATENA_AGGIORNAMENTI } from '../../scripts/test-importanti.mjs';
+import {
+  leggiArgomenti, verdettoImportanti, controllaElenco, TETTO_S, SPEC, CATENA_AGGIORNAMENTI, CAMMINI,
+} from '../../scripts/test-importanti.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+test('lo spec ha esattamente i cammini dell\'elenco; uno tolto, aggiunto o saltato fa rossa la corsa', () => {
+  const spec = readFileSync(resolve(ROOT, SPEC), 'utf8');
+  assert.equal(CAMMINI.length, 7, 'l\'elenco di partenza dell\'owner: sette cammini');
+  assert.deepEqual(controllaElenco(spec), { ok: true, testo: '' });
+  const senzaMenu = spec.replace('test(\'il tasto destro apre il suo menu\'', 'test.skip(\'il tasto destro apre il suo menu\'');
+  assert.match(controllaElenco(senzaMenu).testo, /mancano: «il tasto destro apre il suo menu».*saltato/);
+  const tolto = spec.replace(/test\('la chat di Filo risponde'[\s\S]*?\n\}\);\n/, '');
+  assert.match(controllaElenco(tolto).testo, /mancano: «la chat di Filo risponde»/);
+  const inPiu = `${spec}\ntest('un cammino nuovo', async () => {});\n`;
+  assert.match(controllaElenco(inPiu).testo, /in più: «un cammino nuovo»/);
+  const saltatoDentro = spec.replace('const h = await home(app);', 'test.skip(true, \'per ora\');\n  const h = await home(app);');
+  assert.equal(controllaElenco(saltatoDentro).ok, false, 'un salto dentro un cammino lo spegne lo stesso');
+});
+
+test('il controllo di fine lavoro lancia le prove importanti su ogni ramo, e rosse ferma', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
+  const i = src.indexOf("join(albero.dir, 'scripts', 'test-importanti.mjs')");
+  assert.ok(i > 0, 'il controllo di fine lavoro non lancia più le prove importanti');
+  const passo = src.slice(i, src.indexOf('\n    }\n', i));
+  assert.match(passo, /run\(process\.execPath, \[importanti\], 'Prove importanti'/);
+  assert.match(passo, /process\.exit\(1\)/, 'prove importanti rosse devono fermare la consegna');
+  const prima = src.slice(src.lastIndexOf('\n  }\n', i), i);
+  assert.doesNotMatch(prima, /if \(checkOnly\)|if \(!checkOnly\)/, 'girano anche col solo controllo, quello delle routine');
+});
 
 test('il tetto è di quattro minuti, e sopra la corsa è rossa anche con le prove verdi', () => {
   assert.equal(TETTO_S, 240);
