@@ -86,6 +86,28 @@ test('al tetto dei passi si ferma e dice dove è arrivato', async () => {
   togliCartella(r.cartella);
 });
 
+test('un modello che non risponde più ferma la prova al tetto dei minuti, e l\'esito dice dove era arrivata', async () => {
+  const t0 = Date.now();
+  const r = await prova([{ azione: 'aspetta', secondi: 1 }, { muto: true }], ['--compito', 'aspetta', '--minuti', '0.5']);
+  expect([r.codice, r.esito.esito], r.uscita).toEqual([1, 'fermo']);
+  expect(r.esito.riga).toMatch(/tetto dei 0\.5 minuti al passo 2/);
+  expect(Date.now() - t0).toBeLessThan(60_000);
+  togliCartella(r.cartella);
+});
+
+// La home di Filo spento chiede di riscattare un invito e non ha i moduli: lì ogni funzione che passa da un modello
+// fallisce per questo, non per il lavoro provato.
+for (const modo of ['utente', 'chat']) {
+  test(`modo ${modo}: la prova parte da Filo acceso, la home coi moduli e senza l'invito da riscattare`, async () => {
+    const conInvito = await prova([{ azione: 'fine', seBadge: ':Apri Crediti$' }], ['--compito', 'guarda', '--modo', modo], { home: true });
+    expect(conInvito.esito.esito, `${conInvito.esito.riga}\n${conInvito.uscita}`).toBe('non riuscito');
+    togliCartella(conInvito.cartella);
+    const coiModuli = await prova([{ azione: 'fine', seBadge: ':(Scrivi|Preferenze)$' }], ['--compito', 'guarda', '--modo', modo], { home: true });
+    expect(coiModuli.esito.esito, `${coiModuli.esito.riga}\n${coiModuli.uscita}`).toBe('riuscito');
+    togliCartella(coiModuli.cartella);
+  });
+}
+
 test('una risposta servita da chi la politica non ammette interrompe la prova', async () => {
   const r = await prova([{ azione: 'fine', esito: 'riuscito' }], ['--compito', 'x'], { fornitore: 'Amazon Bedrock' });
   expect([r.codice, r.esito.esito], r.uscita).toEqual([3, 'interrotto']);
