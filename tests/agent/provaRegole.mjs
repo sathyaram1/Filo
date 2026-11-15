@@ -194,10 +194,11 @@ export function esitoFinale({ fine = null, passi = [], tetto = '', errore = '', 
 }
 
 /** Il resoconto in Markdown della cartella. PURA. */
-export function resoconto({ opzioni, esito, passi, servito, costo, secondi, finale }) {
+export function resoconto({ opzioni, esito, passi, servito, costo, secondi, finale, avviso = '' }) {
   const righe = [
     `# Prova da utente: ${esito.esito}`,
     '',
+    ...(avviso ? [`**Attenzione**: ${avviso}`, ''] : []),
     `- Compito: ${opzioni.compito}`,
     `- Modo: ${opzioni.modo === 'chat' ? 'chiedendo a Filo nella chat' : 'da utente, con clic e tasti'}`,
     `- Esito: ${esito.riga}`,
