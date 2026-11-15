@@ -2790,7 +2790,7 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato, mancante, baseVecchia })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
-  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer(), seServe: ctx.lavoroServer.seServe === true }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
   const cartella = preparaIntestazione(ROOT, { strumenti: TOOLS_ROOT });
