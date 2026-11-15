@@ -1092,7 +1092,7 @@ export const SOTTOCOMANDI = Object.freeze([
   'contesto', 'sveglia', 'stato', 'schede', 'leggi', 'rapporti', 'rami', 'incroci', 'ordine', 'accendi', 'parallelo',
   'priorita', 'attesa', 'pacchetto', 'nota', 'sblocca', 'archivia', 'taccuino', 'indicazione', 'sveglia-tra',
   'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat', 'transizione',
-  'feedback', 'domanda', 'domanda-fine', 'registro', 'spesa',
+  'feedback', 'compito', 'domanda', 'domanda-fine', 'registro', 'spesa',
 ]);
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
