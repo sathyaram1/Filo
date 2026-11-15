@@ -164,8 +164,45 @@ test('la pulizia parte solo dopo il secondo sì, col numero letto sul tasto, e s
   await riga(page).getByRole('button', { name: 'Ferma' }).click();
   await expect(riga(page)).toContainText('Pulizia fermata dopo 30.000.', { timeout: 15_000 });
   expect(stato.chiamate.filter((c) => c.op === 'ferma')).toHaveLength(1);
-  // Fermata, il tasto torna: l'owner può riprenderla quando vuole.
-  await expect(riga(page).getByRole('button', { name: 'Cancella 230.000 account' })).toBeVisible();
+  // Fermata dopo qualche cancellazione il numero sul tasto non vale più: si aspetta il conto nuovo, e i numeri restano.
+  await expect(riga(page)).toContainText('Il server li riconta a breve.');
+  await expect(riga(page).getByRole('button', { name: /^Cancella/ })).toHaveCount(0);
+  await expect(page.locator('#ownerAnonimi .sn-wallet-numero')).toHaveCount(4);
+});
+
+test('a pulizia in corso il conto si rilegge da solo, e a pulizia finita dice quanti e quando', async ({ app, openTab }) => {
+  const page = await apriOwner(app, openTab);
+  await page.clock.install();
+  await ricaricaSu(page, 'utenti');
+  await riga(page).getByRole('button', { name: 'Cancella 230.000 account' }).click({ timeout: 15_000 });
+  await riga(page).getByRole('button', { name: 'Cancella', exact: true }).click();
+  await expect(riga(page)).toContainText('Cancellati 30.000 su circa 230.000…', { timeout: 15_000 });
+
+  stato.pulizia = { ...stato.pulizia, cancellati: 120_000 };
+  const prima = stato.chiamate.length;
+  await page.clock.runFor(31_000);
+  await expect(riga(page)).toContainText('Cancellati 120.000 su circa 230.000…', { timeout: 15_000 });
+  expect(stato.chiamate.slice(prima).every((c) => c.op === 'stato')).toBe(true);
+
+  stato.pulizia = { ...stato.pulizia, stato: 'finita', cancellati: 230_000, finitaIl: '2026-11-15T11:30:00.000Z' };
+  stato.censimento.superato = true;
+  await page.clock.runFor(31_000);
+  await expect(riga(page)).toContainText('Cancellati 230.000 il', { timeout: 15_000 });
+  await expect(riga(page)).toContainText('Il server li riconta a breve.');
+  // Finita, il conto non si rilegge più da solo.
+  const dopo = stato.chiamate.length;
+  await page.clock.runFor(90_000);
+  expect(stato.chiamate.length).toBe(dopo);
+});
+
+test('i criteri della pulizia si dicono coi numeri del server; la fermata per i portafogli dice perché', async ({ app, openTab }) => {
+  stato.censimento.criteri.rientroOre = 6;
+  stato.pulizia = { stato: 'fermata', motivo: 'portafogli', portafogliLetti: 0, portafogli: 5, cancellati: 1_000, fermataIl: '2026-11-15T11:01:00.000Z' };
+  const page = await apriOwner(app, openTab);
+  const tasto = riga(page).getByRole('button', { name: 'Cancella 230.000 account' });
+  await expect(tasto).toHaveAttribute('title', /mai tornati dopo le prime 6 ore e nati prima del/, { timeout: 15_000 });
+  await expect(riquadro(page, 'mai tornati, senza portafoglio')).toHaveAttribute('title', /Nessun accesso dopo le prime 6 ore/);
+  await expect(riga(page)).toContainText('Pulizia fermata dal server dopo 1.000: ha letto 0 portafogli invece di 5, e non sapeva più chi salvare.');
 });
 
 test('un rifiuto motivato del server si legge con le sue parole, e niente è partito', async ({ app, openTab }) => {
