@@ -240,8 +240,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   } catch (_) {}
   const prima = { a: s.a, da: s.da, fontiDa: s.fontiDa };
   s.ore.push(...letto.ore);
-  // Il pezzo comincia dal suo primo messaggio, citato o no: le pagine attaccate sopra stanno da lì, e `sezione` le
-  // cerca da `da` (una pagina prima di `da` farebbe uscire la riga come cancellata).
+  // Il pezzo comincia dal suo primo messaggio, citato o no: è quello che il tratto conta come compattato.
   s.da = s.da || new Date(Math.min(Date.parse(pezzo[0].ts), Date.parse(letto.ore[0].da))).toISOString();
   s.a = lista[fine] ? lista[fine].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
   // Da dove `sezione` cerca le fonti delle righe: una cosa successa prima di `da`, letta in testa al primo messaggio,
