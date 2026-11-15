@@ -353,9 +353,8 @@ export async function activeView(app, shell) {
   }
 }
 
-// Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect. Scende anche negli shadow root,
-// i chiusi di Filo compresi (la conferma «Filo chiede conferma» sta lì): visti nella schermata, devono avere un segno.
-// `soloFilo`: solo quello che sta nelle radici di Filo, per il mondo isolato dei siti dove vivono i suoi pezzi.
+// Gli interagibili visibili, anche negli shadow root chiusi di Filo (la sua conferma): visti, devono avere un segno.
+// `soloFilo`: solo quelli nelle radici di Filo, per il mondo isolato dei siti.
 function COLLECT_FN(soloFilo = false) {
   const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
   const UI = globalThis.SN_FILO_UI;
