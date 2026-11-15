@@ -106,8 +106,8 @@ test('nel modo chat il compito si chiede a Filo, non si fa a mano', () => {
 });
 
 test('la cartella delle prove non finisce nel repo', () => {
-  const ignorato = execFileSync('git', ['check-ignore', '-q', 'tests/agent/.out/prova-x/passo-01.png', '&&', 'echo'].slice(0, 3), { cwd: ROOT, stdio: 'pipe' });
-  assert.equal(String(ignorato), '');
+  // check-ignore esce 1 (e execFileSync lancia) se il file non è ignorato.
+  execFileSync('git', ['check-ignore', '-q', '--no-index', 'tests/agent/.out/prova-x/passo-01.png'], { cwd: ROOT, stdio: 'pipe' });
 });
 
 test('chi lavora lo trova: lo script npm e una riga fra le prove della lamentela nei ruoli di chi risolve', () => {
