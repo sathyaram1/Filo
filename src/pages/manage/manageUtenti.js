@@ -433,11 +433,11 @@
     return li;
   }
 
-  function bottone(testo, classe, titolo, azione) {
+  function bottone(etichetta, classe, titolo, azione) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `sn-btn ${classe}`;
-    b.textContent = testo;
+    b.textContent = etichetta;
     if (titolo) b.title = titolo;
     b.addEventListener('click', () => { if (!b.disabled) azione(b); });
     return b;
