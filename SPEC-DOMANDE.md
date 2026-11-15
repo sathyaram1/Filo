@@ -878,8 +878,9 @@ Com'è fatto dal #1153:
 
 ### 4.2 Due canali di aggiornamento
 
-- **Veloce** (com'è oggi): una versione ogni sei ore, il commit più nuovo con la
-  suite verde.
+- **Veloce** (com'è oggi): una versione ogni sei ore, il commit più nuovo con le
+  prove importanti e gli unit verdi (#2501; la suite completa la riporta verde
+  un compito settimanale, e a suite verde la versione si segna «stabile»).
 - **Stabile** (nuovo): una versione minor il lunedì alle 00:00. Esce solo se non
   c'è nessun feedback di sicurezza a priorità 3 aperto. La domenica l'audit li
   cerca; le routine hanno 24 ore per chiuderli. Se ne resta uno aperto, quella
