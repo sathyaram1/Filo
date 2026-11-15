@@ -86,8 +86,11 @@ async function run() {
   const claude = trovaClaude();
   if (!claude) { console.error('Claude Code non si trova (PATH o FILO_CLAUDE_BIN): senza, Haiku non parte.'); return 3; }
   let chiave = '';
-  if (o.modo === 'chat') {
-    try { chiave = getApiKey(); } catch (e) { console.error(`Il modo chat fa rispondere la chat di Filo con un modello vero. ${e.message}`); return 2; }
+  let avviso = '';
+  try { chiave = getApiKey(); } catch (e) {
+    if (o.modo === 'chat') { console.error(`Il modo chat fa rispondere la chat di Filo con un modello vero. ${e.message}`); return 2; }
+    avviso = `Filo è spento, senza modelli: le funzioni che passano da un modello non rispondono. ${e.message}`;
+    console.log(avviso);
   }
 
   const schermo = await accendiSchermo({ worker: datiWorker({ root: d.APP_ROOT }) });
