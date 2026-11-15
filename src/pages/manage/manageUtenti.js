@@ -469,16 +469,23 @@
         const tot = Number(o.totale) || 0;
         const corseLette = Object.entries(c.corse || {}).filter(([, v]) => v && v.completo === false)
           .map(([f]) => NOMI_WORKFLOW[f] || f);
+        // Le corse coprono una parte grande del tempo: la quota dentro si legge solo accanto a quella del tempo coperto.
+        const copre = Number.isFinite(o.copertura) ? Math.round(o.copertura * 100) : null;
+        const orari = o.natiPerOra || {};
         const spiega = [
+          ...(copre != null ? [`Le corse coprono il ${copre}% del tempo: con le nascite slegate dalle prove la quota dentro sarebbe circa quella.`] : []),
+          ...(orari.dentro != null || orari.fuori != null
+            ? [`Nati all'ora: ${orari.dentro != null ? formatInt(Math.round(orari.dentro)) : '—'} durante le corse, ${orari.fuori != null ? formatInt(Math.round(orari.fuori)) : '—'} fuori.`] : []),
           ...Object.entries(per).map(([f, n]) => `${conMaiuscola(NOMI_WORKFLOW[f] || f)}: ${formatInt(n)}`),
           `Fuori dalle prove: ${formatInt(o.fuori)}`,
           ...(corseLette.length ? [`Corse lette in parte: ${corseLette.join(', ')}.`] : []),
         ].join('\n');
         lista.appendChild(riquadroAnonimi(tot ? `${Math.round((inCorsa * 100) / tot)}%` : '—',
           `nati dentro le prove in ${o.giorni} giorni`, spiega, tot ? inCorsa : null,
-          { nota: `${formatInt(inCorsa)} su ${formatInt(tot)}` }));
+          { nota: `${formatInt(inCorsa)} su ${formatInt(tot)}${copre != null ? `, corse sul ${copre}% del tempo` : ''}` }));
         const giorni = (Array.isArray(o.perGiorno) ? o.perGiorno : []).slice(-7).reverse()
-          .map((g) => `${giornoBreve(g.giorno)}: ${formatInt(g.nati)}, ${formatInt(g.inCorsa)} nelle prove`);
+          .map((g) => `${giornoBreve(g.giorno)}: ${formatInt(g.nati)}, ${formatInt(g.inCorsa)} nelle prove`
+            + (Number.isFinite(g.copertura) ? ` (corse sul ${Math.round(g.copertura * 100)}% del giorno)` : ''));
         lista.appendChild(riquadroAnonimi(formatInt(o.ultime24h), 'nati nel giorno prima del conto',
           ['Account anonimi nati nelle 24 ore prima del conto.', ...giorni].join('\n'), o.ultime24h));
       }
