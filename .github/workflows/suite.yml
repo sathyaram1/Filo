@@ -196,7 +196,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout del commit provato (coi tag)
+      # Lo strumento è quello di main, col token che scrive: il commit chiesto a mano entra solo come dato.
+      - name: Checkout di main (coi tag)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -211,5 +212,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROVATO: ${{ inputs.commit || github.sha }}
         shell: bash
-        run: node scripts/segna-stabile.mjs --commit "${GITHUB_SHA}" --corsa "$CORSA"
+        run: |
+          if ! git merge-base --is-ancestor "$PROVATO" HEAD 2>/dev/null; then
+            echo "::error::$PROVATO non sta nella storia di main: non segno niente."
+            exit 1
+          fi
+          node scripts/segna-stabile.mjs --commit "$PROVATO" --corsa "$CORSA"
