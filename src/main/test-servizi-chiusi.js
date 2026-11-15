@@ -1,4 +1,4 @@
-// Nelle prove (NODE_ENV=test, o FILO_SERVIZI_CHIUSI=1 dal pilota): i servizi veri di Filo (schede, funzioni, identità)
+// Nelle prove (NODE_ENV=test, FILO_SERVIZI_CHIUSI=1 dal pilota, GitHub Actions):i servizi veri di Filo (schede, funzioni, identità)
 // non si raggiungono da nessuna porta, né dalle pagine né dal main: una prova parte uguale ovunque e non paga la produzione
 // (#735.1, #2470). Chi li vuole li finge sopra (FILO_FUNCTIONS_BASE e simili). Sentinella: tests/unit/testServiziChiusi.test.mjs.
 
