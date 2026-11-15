@@ -660,7 +660,7 @@
       if (!da) testo = 'Superata da un’altra domanda.';
       else {
         const p = el('p', 'mg-dq-esito');
-        p.append(da.assorbita ? 'Assorbita in ' : 'Superata da ', legame('domanda', da.id), ': rispondi lì.');
+        p.append(da.assorbita ? 'Assorbita in ' : 'Superata da ', legame('domanda', da.id), '.');
         return p;
       }
     }
