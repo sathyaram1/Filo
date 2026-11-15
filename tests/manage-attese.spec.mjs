@@ -63,7 +63,7 @@ async function apri(page, lista = LISTA, { compitiAperti } = {}) {
       }
       return orig(msg);
     };
-  }, ID_DEL_NUMERO);
+  }, { ids: ID_DEL_NUMERO, aperti: compitiAperti });
   await page.evaluate((l) => {
     for (const f of l) if (f.waitsFor) window.__sulServer[f._id] = f.waitsFor.map((w) => ({ ...w }));
     window.__mgTest.setAdmin(true);
