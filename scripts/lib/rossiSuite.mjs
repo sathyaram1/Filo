@@ -134,7 +134,9 @@ export function testoElenco(r, { fusioni = () => [] } = {}) {
   righe.push(`Corse lette: ${r.lette}; senza registro: ${r.senzaRegistro}.`, '');
   righe.push(`Prove rosse adesso: ${r.rossi.length}`);
   for (const x of r.rossi) {
-    righe.push(`- ${x.prova}${x.instabile ? ' (anche instabile in altre corse)' : ''}`);
+    const nota = [x.instabile ? 'anche instabile in altre corse' : '', x.daRicontrollare ? 'da ricontrollare: l\'ultima corsa, incompleta, non l\'ha data rossa' : '']
+      .filter(Boolean).join('; ');
+    righe.push(`- ${x.prova}${nota ? ` (${nota})` : ''}`);
     righe.push(`  rossa dalla corsa su ${breve(x.rottaDa.sha)} ${x.rottaDa.url}`.trimEnd());
     if (x.ultimaVerde) {
       const elenco = fusioni(x.ultimaVerde.sha, x.rottaDa.sha);
