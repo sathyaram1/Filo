@@ -3,9 +3,16 @@
 
 import { SEGNO_REGISTRO } from '../suite-verdict.mjs';
 
-/** Il registro di una corsa letto dal suo log, o null se il log non ne ha (corsa di prima, o verdetto mai partito). PURA. */
+/** Le righe di una corsa che non arriva in fondo: dicono la corsa, non una prova. */
+const RIGA_DI_CORSA = /^parte \d+ di \d+ della suite senza esito|^la suite ha passato il suo tetto di tempo/;
+
+/**
+ * Il registro di una corsa letto dal suo log, o null se il log non ne ha (corsa di prima, o verdetto mai partito);
+ * `commit` è il commit provato, se il registro lo scrive. PURA.
+ */
 export function leggiRegistro(log) {
   let esito = '';
+  let commit = '';
   const rossi = new Set();
   const instabili = new Set();
   for (const riga of String(log || '').split(/\r?\n/)) {
