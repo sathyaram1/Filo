@@ -557,6 +557,20 @@ function preamboloPerCompattare(m) {
   const memo = preamboli.get(FC().chiave(m));
   return memo && memo.eventi ? memo.eventi.testo || '' : '';
 }
+// Le cose successe che il modello ha davanti in testa a ogni messaggio dell'utente, da `da`: quelle già scritte nel suo
+// preambolo più quelle che la regola di `componi` ci metterebbe adesso. → { perMessaggio: chiave → eventi, eventi }.
+async function eventiDavanti(da, incognito) {
+  const eventi = await eventiDa(da, incognito);
+  const calcolati = TV().eventiPerMessaggi(messaggiDi(await F().chats({ incognito })), eventi, { da, chiave: FC().chiave });
+  const perId = new Map(eventi.filter((ev) => ev && ev.id).map((ev) => [ev.id, ev]));
+  const perMessaggio = new Map();
+  for (const [k, suoi] of calcolati) {
+    const memo = preamboli.get(k);
+    const scritti = memo && memo.eventi && Array.isArray(memo.eventi.ids) ? memo.eventi.ids.map((i) => perId.get(i)).filter(Boolean) : [];
+    perMessaggio.set(k, [...new Set([...scritti, ...suoi])]);
+  }
+  return { perMessaggio, eventi };
+}
 // Quanto pesa, in caratteri, tutto quello che il tratto scrive in testa al messaggio: i ricordi ripescati compresi, che
 // da soli valgono più di metà di un turno pesante e il peso del turno deve contarli.
 function caratteriPreambolo(m) {
