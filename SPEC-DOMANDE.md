@@ -861,11 +861,13 @@ del lavoro (§ 4.3) può lanciare riordino e potatura anche fuori cadenza.
 
 Com'è fatto dal #1153:
 
-- il server semina la tabella una volta, coi testi di `ruoli/` del suo repo; da
+- il server semina ogni ricorrente della tabella una volta, coi testi di
+  `ruoli/` del suo repo, anche quello aggiunto dopo la prima semina (#2501); da
   lì un ricorrente si cambia, si spegne, si toglie o si aggiunge solo in Routine
   → Compiti ricorrenti, e uno tolto non torna. Le ore della tabella: revisione
   delle domande 07:00, gestione del lavoro 06:00, addetto comunicazioni 09:00,
-  riordino lunedì 01:00, potatura lunedì 02:00, audit domenica 00:30;
+  riordino lunedì 01:00, potatura lunedì 02:00, suite completa lunedì 03:00,
+  audit domenica 00:30;
 - nascono spenti la gestione del lavoro e l'addetto comunicazioni, i cui
   strumenti arrivano coi punti 9 e 14 (§ 13): un'istanza senza i suoi strumenti
   spende e basta;
