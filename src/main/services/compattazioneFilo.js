@@ -208,19 +208,37 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     console.warn('[Filo] compattazione: risposta illeggibile, il tratto resta com\'è');
     return { fatto: false, motivo: 'illeggibile' };
   }
-  // Le cose successe nel pezzo (pagine, azioni fuori dalla chat) vanno con la riga delle ore della loro ora: tolte dal
-  // filo, la riga esce con loro.
+  // Le cose successe (pagine, azioni fuori dalla chat) vanno con le righe del messaggio in testa al quale il modello le
+  // legge, anche se accadute prima del pezzo: tolte dal filo, quelle righe escono con loro. Quelle che nessun messaggio
+  // porta (dentro un turno) vanno con la riga della loro ora.
+  let fontiDa = Infinity;
   try {
-    const eventi = await CF().eventiDa(pezzo[0].ts, incognito);
+    const rigaDellOra = (t) => letto.ore.find((o) => t <= Date.parse(o.a)) || letto.ore[letto.ore.length - 1];
+    const lega = (ev, righe) => {
+      const t0 = Date.parse(ev && ev.ts);
+      if (!ev || !ev.id || !Number.isFinite(t0) || ev.tipo === 'cambio') return;
+      for (const r of righe) if (!r.fonti.includes(ev.id)) r.fonti.push(ev.id);
+      fontiDa = Math.min(fontiDa, t0);
+    };
+    const da = new Date(FC().taglio(Math.min(ora, Date.parse(pezzo[0].ts)), t.giorni)).toISOString();
+    const { perMessaggio, eventi } = await CF().eventiDavanti(da, incognito);
+    const davanti = new Set([...perMessaggio.values()].flat());
+    for (const m of pezzo) {
+      const k = FC().chiave(m);
+      const suoi = perMessaggio.get(k) || [];
+      if (!suoi.length) continue;
+      const sue = letto.ore.filter((o) => o.fonti.includes(k));
+      for (const ev of suoi) lega(ev, sue.length ? sue : [rigaDellOra(Date.parse(m.ts))]);
+    }
+    const inizio = Date.parse(pezzo[0].ts);
     const limite = Date.parse(lista[fine] ? lista[fine].ts : pezzo[pezzo.length - 1].ts);
     for (const ev of eventi) {
       const t0 = Date.parse(ev && ev.ts);
-      if (!ev || !ev.id || !Number.isFinite(t0) || t0 >= limite || ev.tipo === 'cambio') continue;
-      const r = letto.ore.find((o) => t0 <= Date.parse(o.a)) || letto.ore[letto.ore.length - 1];
-      if (!r.fonti.includes(ev.id)) r.fonti.push(ev.id);
+      if (davanti.has(ev) || !(t0 >= inizio && t0 < limite)) continue;
+      lega(ev, [rigaDellOra(t0)]);
     }
   } catch (_) {}
-  const prima = { a: s.a, da: s.da };
+  const prima = { a: s.a, da: s.da, fontiDa: s.fontiDa };
   s.ore.push(...letto.ore);
   // Il pezzo comincia dal suo primo messaggio, citato o no: le pagine attaccate sopra stanno da lì, e `sezione` le
   // cerca da `da` (una pagina prima di `da` farebbe uscire la riga come cancellata).
