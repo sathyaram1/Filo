@@ -28,6 +28,7 @@
     overviewLoaded = true;
     loadOverview().catch(() => {});
     loadInstallazioni().catch(() => {});
+    loadAnonimi().catch(() => {});
   }
 
   async function load() {
