@@ -61,6 +61,83 @@ test('un ramo senza prove nuove lo dice, non inventa casi', () => {
   } finally { togliCartella(root); }
 });
 
+test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza il lavoro e verde con', () => {
+  const { root, base } = ramoDiProva();
+  const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
+  try {
+    symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
+    writeFileSync(join(root, '.gitignore'), 'node_modules\n');
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    writeFileSync(join(root, 'tests', 'somma.spec.mjs'), [
+      "import { test, expect } from '@playwright/test';",
+      "import { somma } from '../src/somma.mjs';",
+      "test('la somma nello spec', () => { expect(somma(2, 3)).toBe(5); });",
+      '',
+    ].join('\n'));
+    g('add', '-A'); g('commit', '-qm', 'spec');
+    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD') });
+    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' });
+  } finally { togliCartella(root); }
+});
+
+test('uno spec che non parte esce «errore», non un rosso senza il lavoro che sembra quello atteso', () => {
+  const voce = { file: 'tests/x.spec.mjs', tipo: 'spec', casi: ['x'] };
+  const muto = () => ({ status: 1, stdout: '', stderr: 'Error: Cannot find module @playwright/test' });
+  const s = corriFile(cartellaTemporanea('filo-prova-muta-'), voce, { lancia: muto, prepara: (cmd, args) => ({ ok: true, cmd, args }) });
+  assert.equal(s.partito, false);
+  assert.match(s.errore, /non ha scritto il rapporto.*Cannot find module/);
+  assert.deepEqual(esitoDelCaso('x', s, s), { senza: 'errore', con: 'errore' });
+  const n = corriFile(cartellaTemporanea('filo-prova-muta-'), { ...voce, tipo: 'unit' }, { lancia: () => ({ error: Object.assign(new Error('x'), { code: 'ENOENT' }) }) });
+  assert.match(n.errore, /node non parte \(ENOENT\)/);
+});
+
+test('l\'esito salvato: ripreso per la stessa punta e dopo la sola riga delle novità o un .md; rifatto dopo del codice', () => {
+  const { root } = ramoDiProva();
+  const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
+  const vecchio = process.env.FILO_SERVER_CLONE;
+  process.env.FILO_SERVER_CLONE = join(root, 'nessun-server');
+  try {
+    g('update-ref', 'refs/remotes/origin/main', 'main');
+    const e = provaDelRamo(root, { log: () => {} });
+    assert.equal(e.app.casi.length, 2);
+    assert.equal(e.server, undefined);
+    assert.ok(esitoSalvato(root), 'stessa punta: si riprende');
+    mkdirSync(join(root, 'src', 'shared'), { recursive: true });
+    writeFileSync(join(root, 'src', 'shared', 'patchNotes.js'), '// novità\n');
+    writeFileSync(join(root, 'NOTE.md'), 'note\n');
+    g('add', '-A'); g('commit', '-qm', 'novità');
+    assert.ok(esitoSalvato(root), 'solo testi dopo la prova: si riprende');
+    writeFileSync(join(root, 'src', 'somma.mjs'), 'export const somma = (a, b) => b + a;\n');
+    g('add', '-A'); g('commit', '-qm', 'codice');
+    assert.equal(esitoSalvato(root), null, 'codice dopo la prova: si rifà');
+  } finally {
+    if (vecchio === undefined) delete process.env.FILO_SERVER_CLONE; else process.env.FILO_SERVER_CLONE = vecchio;
+    togliCartella(root);
+  }
+});
+
+test('in un lavoro server la prova rifatta dopo un commit di codice tiene la parte del server', () => {
+  const app = ramoDiProva();
+  const srv = ramoDiProva();
+  const ga = (...a) => execFileSync('git', a, { cwd: app.root, encoding: 'utf8' }).trim();
+  const gs = (...a) => execFileSync('git', a, { cwd: srv.root, encoding: 'utf8' }).trim();
+  try {
+    ga('update-ref', 'refs/remotes/origin/main', 'main');
+    gs('update-ref', 'refs/remotes/origin/main', 'main');
+    mkdirSync(join(srv.root, 'functions', 'test'), { recursive: true });
+    writeFileSync(join(srv.root, 'functions', 'package.json'), '{ "name": "f", "private": true }\n');
+    writeFileSync(join(srv.root, 'functions', 'test', 'somma.test.js'), "const { test } = require('node:test');\nconst assert = require('node:assert/strict');\ntest('due più tre nel server', async () => { const { somma } = await import('../../src/somma.mjs'); assert.equal(somma(2, 3), 5); });\n");
+    gs('add', '-A'); gs('commit', '-qm', 'prova del server');
+    const prima = provaDelRamo(app.root, { server: srv.root, log: () => {} });
+    assert.equal(prima.server.casi.length, 1);
+    writeFileSync(join(app.root, 'src', 'somma.mjs'), 'export const somma = (a, b) => b + a;\n');
+    ga('add', '-A'); ga('commit', '-qm', 'codice');
+    assert.equal(esitoSalvato(app.root), null);
+    const dopo = provaDelRamo(app.root, { server: cloneDellUltimaProva(app.root), log: () => {} });
+    assert.deepEqual(dopo.server.casi.map((c) => [c.caso, c.senza, c.con]), [['due più tre nel server', 'rosso', 'verde']]);
+  } finally { togliCartella(app.root); togliCartella(srv.root); }
+});
+
 test('i rapporti: TAP di node --test e JSON di Playwright, saltati esclusi', () => {
   const tap = ['ok 1 - uno', 'not ok 2 - due', 'ok 3 - tre # SKIP manca', '    not ok 1 - dentro'].join('\n');
   assert.deepEqual([...esitiDaTap(tap)], [['uno', 'verde'], ['due', 'rosso'], ['dentro', 'rosso']]);
