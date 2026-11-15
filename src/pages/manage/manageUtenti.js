@@ -461,7 +461,7 @@
       lista.appendChild(riquadroAnonimi(`${almeno}${formatInt(c.anonimi)}`, 'account anonimi',
         `Senza accesso Google né email, su ${formatInt(c.totale)} account in tutto. Contati ${formatDateTime(c.at)}.`, c.anonimi));
       lista.appendChild(riquadroAnonimi(`${almeno}${formatInt(c.maiRientrati)}`, 'mai tornati, senza portafoglio',
-        'Nessun accesso dopo la prima ora e nessun portafoglio: account che nessuno usa.', c.maiRientrati));
+        `Nessun accesso dopo ${finestraRientro(c)} e nessun portafoglio: account che nessuno usa.`, c.maiRientrati));
       const o = c.origine || null;
       if (o) {
         const per = o.perWorkflow || {};
