@@ -16,5 +16,14 @@ export async function preparaFilo(app, shell, chiave) {
     await chrome.storage.local.set({ filo_onboarding: { done: true } });
     await SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: chiave }, models, modelRegistry: registry });
   }, { chiave, registry, models });
-  await d.navigate(app, shell, 'filo://newtab/');
+  // La home del primo avvio può ancora caricare: la navigazione allora si interrompe (did-fail-load -3) e va ripetuta.
+  const suHome = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)?._filoTabs;
+    const wc = tm?.tabs?.find((t) => t.id === tm.activeId)?.view?.webContents;
+    return Boolean(wc && !wc.isDestroyed() && wc.getURL().startsWith('filo://newtab') && !wc.isLoading());
+  });
+  for (let tentativo = 0; tentativo < 3; tentativo++) {
+    await d.navigate(app, shell, 'filo://newtab/');
+    for (const fine = Date.now() + 4000; Date.now() < fine; await d.sleep(200)) if (await suHome()) return;
+  }
 }
