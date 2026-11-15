@@ -162,6 +162,29 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
   return { ok: true, scelto, altri, superati: [...superati] };
 }
 
+const NOME_DI_RAMO = /^(?!.*\.\.)(?!.*\/\.)(?!.*\.lock$)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+
+/**
+ * Il ramo a cui il server aveva legato il feedback (`payload.ramoLegato`), per un lavoro nuovo che riparte da una
+ * fermata (#2516): il piano e la ripresa danno per fatto quello che sta lì sopra, quindi la sua assenza va detta.
+ * Un no di origin è un «non so». → { ok:true, stato: 'nessuno'|'perso'|'vuoto'|'presente', ramo, propri, head }
+ */
+export function ramoLegatoDaRiprendere({ root, legato, mainBranch = 'main', escludi = '' }) {
+  const ramo = String(legato || '').trim();
+  if (!ramo || ramo === escludi || !NOME_DI_RAMO.test(ramo) || isProtectedBranch(ramo, mainBranch)) return { ok: true, stato: 'nessuno', ramo: '' };
+  const su = ramoSuOrigin(root, ramo);
+  if (su.errore) return { ok: false, errore: su.errore };
+  if (!su.presente) return { ok: true, stato: 'perso', ramo };
+  const g = gitIn(root);
+  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`, `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]);
+  if (!f.ok) return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+  const head = g(['rev-parse', `refs/remotes/origin/${ramo}`]);
+  const n = g(['rev-list', '--count', `origin/${mainBranch}..origin/${ramo}`]);
+  if (!head.ok || !n.ok) return { ok: false, errore: rigaDiErrore(head.ok ? n.out : head.out, 'ramo illeggibile') };
+  const propri = Number(n.out) || 0;
+  return { ok: true, stato: propri ? 'presente' : 'vuoto', ramo, propri, head: head.out };
+}
+
 /** I rami su origin che rispondono a `glob` → { ok, rami: [{ head, ramo }] }. */
 function tentativiSuOrigin(root, glob) {
   try {
