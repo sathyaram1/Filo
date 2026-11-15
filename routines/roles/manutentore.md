@@ -132,10 +132,17 @@ Gestione → Automazioni.
 3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
    chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
    nuovo può unire il vecchio e il doppione.
-4. **I rami in corso.** Prima di accendere un feedback guarda se un ramo vivo tocca i suoi file probabili
-   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
+4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
+   tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
+   entra uno di classe più bassa in un'area libera. Un compito può stare davanti a un feedback. **Un lavoro già
+   iniziato non si mette in attesa di un lavoro non iniziato**: finisce da solo.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
+8. **Compiti nell'ordine.** Una revisione, un censimento, una verifica sistematica è un compito senza feedback:
+   `compito "<titolo>" -` lo apre e risponde col suo id (`C-12`), che metti nell'ordine accanto ai numeri
+   (`accendi 812,C-12,815`): il server lo accende nella sua posizione. Un feedback può aspettare un compito
+   (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
+   correggere un hover.
 6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
    nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
    mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
