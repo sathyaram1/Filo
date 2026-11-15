@@ -306,6 +306,20 @@ test('una proposta sola lo dice al singolare; una riga tolta non torna, e dopo i
   await expect(tenuta).toHaveCount(1, { timeout: 10000 });
   await tenuta.locator('.qd-testo').click({ button: 'right' });
   await expect(menuDi(q).voce('Vai al punto del filo')).toBeVisible();
+  await q.keyboard.press('Escape');
+
+  // Una proposta che passa la lunghezza di una lezione (la compattazione ne tiene di più lunghe): il sì dice il perché vero.
+  const lunga = `Cucina spesso ${'piatti della tradizione di famiglia, '.repeat(24)}la domenica.`;
+  expect(lunga.length).toBeGreaterThan(800);
+  expect(lunga.length).toBeLessThanOrEqual(1000);
+  expect(await compattaConProposte(app, { chat: 'cucina2', t0: t0 + 20 * 60000, utente: 'cucino i piatti di famiglia', memorie: [[lunga, 'piatti di famiglia']] })).toBe(1);
+  await q.reload();
+  const troppo = q.locator('[data-gruppo="proposte"] .qd-riga').filter({ hasText: 'piatti della tradizione' });
+  await expect(troppo).toHaveCount(1, { timeout: 10000 });
+  await troppo.hover();
+  await troppo.getByRole('button', { name: 'Tienila in memoria' }).click();
+  await expect(q.locator('#esito')).toHaveText(/^Non l'ho scritta: la lezione è lunga \d[\d.]* caratteri e il massimo è 800\.$/, { timeout: 10000 });
+  expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('piatti della tradizione');
 });
 
 // Quanto pesano strumenti e parte fissa: le soglie delle prove si misurano da lì, non da un numero scritto oggi.

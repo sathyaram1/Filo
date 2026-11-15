@@ -208,24 +208,45 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     console.warn('[Filo] compattazione: risposta illeggibile, il tratto resta com\'è');
     return { fatto: false, motivo: 'illeggibile' };
   }
-  // Le cose successe nel pezzo (pagine, azioni fuori dalla chat) vanno con la riga delle ore della loro ora: tolte dal
-  // filo, la riga esce con loro.
+  // Le cose successe (pagine, azioni fuori dalla chat) vanno con le righe del messaggio in testa al quale il modello le
+  // legge, anche se accadute prima del pezzo: tolte dal filo, quelle righe escono con loro. Quelle che nessun messaggio
+  // porta (dentro un turno) vanno con la riga della loro ora.
+  let fontiDa = Infinity;
   try {
-    const eventi = await CF().eventiDa(pezzo[0].ts, incognito);
+    const rigaDellOra = (t) => letto.ore.find((o) => t <= Date.parse(o.a)) || letto.ore[letto.ore.length - 1];
+    const lega = (ev, righe) => {
+      const t0 = Date.parse(ev && ev.ts);
+      if (!ev || !ev.id || !Number.isFinite(t0) || ev.tipo === 'cambio') return;
+      for (const r of righe) if (!r.fonti.includes(ev.id)) r.fonti.push(ev.id);
+      fontiDa = Math.min(fontiDa, t0);
+    };
+    const da = new Date(FC().taglio(Math.min(ora, Date.parse(pezzo[0].ts)), t.giorni)).toISOString();
+    const { perMessaggio, eventi } = await CF().eventiDavanti(da, incognito);
+    const davanti = new Set([...perMessaggio.values()].flat());
+    for (const m of pezzo) {
+      const k = FC().chiave(m);
+      const suoi = perMessaggio.get(k) || [];
+      if (!suoi.length) continue;
+      const sue = letto.ore.filter((o) => o.fonti.includes(k));
+      for (const ev of suoi) lega(ev, sue.length ? sue : [rigaDellOra(Date.parse(m.ts))]);
+    }
+    const inizio = Date.parse(pezzo[0].ts);
     const limite = Date.parse(lista[fine] ? lista[fine].ts : pezzo[pezzo.length - 1].ts);
     for (const ev of eventi) {
       const t0 = Date.parse(ev && ev.ts);
-      if (!ev || !ev.id || !Number.isFinite(t0) || t0 >= limite || ev.tipo === 'cambio') continue;
-      const r = letto.ore.find((o) => t0 <= Date.parse(o.a)) || letto.ore[letto.ore.length - 1];
-      if (!r.fonti.includes(ev.id)) r.fonti.push(ev.id);
+      if (davanti.has(ev) || !(t0 >= inizio && t0 < limite)) continue;
+      lega(ev, [rigaDellOra(t0)]);
     }
   } catch (_) {}
-  const prima = { a: s.a, da: s.da };
+  const prima = { a: s.a, da: s.da, fontiDa: s.fontiDa };
   s.ore.push(...letto.ore);
-  // Il pezzo comincia dal suo primo messaggio, citato o no: le pagine attaccate sopra stanno da lì, e `sezione` le
-  // cerca da `da` (una pagina prima di `da` farebbe uscire la riga come cancellata).
+  // Il pezzo comincia dal suo primo messaggio, citato o no: è quello che il tratto conta come compattato.
   s.da = s.da || new Date(Math.min(Date.parse(pezzo[0].ts), Date.parse(letto.ore[0].da))).toISOString();
   s.a = lista[fine] ? lista[fine].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
+  // Da dove `sezione` cerca le fonti delle righe: una cosa successa prima di `da`, letta in testa al primo messaggio,
+  // non ritrovata farebbe uscire la riga come cancellata. `da` resta l'inizio dei messaggi compattati. Un millisecondo
+  // prima: gli accaduti si cercano dopo `da`, esclusa.
+  if (Number.isFinite(fontiDa) && !(Date.parse(s.fontiDa) < fontiDa)) s.fontiDa = new Date(fontiDa - 1).toISOString();
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
@@ -253,6 +274,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     s.ore.splice(s.ore.length - letto.ore.length, letto.ore.length);
     s.a = prima.a;
     s.da = prima.da;
+    s.fontiDa = prima.fontiDa;
     console.warn('[Filo] livelli del filo non salvati, il tratto resta com\'è:', e?.message || e);
     return { fatto: false, motivo: 'disco' };
   }
@@ -321,8 +343,9 @@ async function eventiDopoCancellazione(s, incognito) {
   let tolte = null;
   try { tolte = await F().cancellazioni({ incognito }); } catch (_) { return null; }
   if (tolte == null || tolte === s.tolte || !s.da) return null;
+  const da = Date.parse(s.fontiDa) < Date.parse(s.da) ? s.fontiDa : s.da;
   try {
-    const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
+    const [acc, pag] = await Promise.all([F().accaduti({ da }, { incognito }), F().pagine({ da, a: null }, { incognito })]);
     s.tolte = tolte;
     return new Set([...acc, ...pag].map((ev) => ev && ev.id));
   } catch (_) { return null; }
