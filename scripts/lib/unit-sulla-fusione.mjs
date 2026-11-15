@@ -123,9 +123,10 @@ export function uniscaNovitaNellAlbero({ git, dir, mainSha, punta, conflitto = f
   let manifesto;
   try { manifesto = JSON.parse(blob(mainSha, 'package.json')); } catch (_) { return { ok: false, motivo: 'non leggo il package.json di main' }; }
   const percorso = join(dir, ...FILE_NOVITA.split('/'));
+  const { sottoUscite, uniscaNovita } = novitaFusione();
   if (!conflitto) {
     let sotto;
-    try { sotto = aggiunteSottoUscite(registroDa(main), registroDa(readFileSync(percorso, 'utf8')), String(manifesto.version || '')); } catch (_) { return null; }
+    try { sotto = sottoUscite({ main, fuso: readFileSync(percorso, 'utf8'), uscita: String(manifesto.version || '') }); } catch (_) { return null; }
     if (!sotto.length) return null;
   }
   const b = git(['merge-base', mainSha, punta]);
