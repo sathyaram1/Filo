@@ -274,11 +274,16 @@ export function rigaSegnoServer(chiesto, r) {
   if (r && r.lavoroServer === true && r.fiducia === 'fidato') return 'Segnato lavoro server: è fidato, lo prendono i lavori server.';
   // Non fidato nessuna routine lo prende: il server lo porta nei Ricevuti dell'owner a chiedere il timbro (#2217).
   if (r && r.lavoroServer === true) return 'Segnato lavoro server, non fidato: va nei Ricevuti dell\'owner a chiedere la fiducia, e col suo timbro lo prendono i lavori server.';
-  return 'SEGNO NON MESSO: il server non ha confermato «lavoro server» (forse non lo conosce ancora). Il feedback esiste: non riaprirlo, chiedi all\'owner di segnarlo lavoro server in Gestione.';
+  // Il segno non aspetta l'owner (#2269, regola 6 del ruolo): se fidato entra nell'ordine lo stesso.
+  return 'SEGNO NON MESSO: il server non ha confermato «lavoro server» (forse non lo conosce ancora). Il feedback esiste: non riaprirlo e non chiedere il segno all\'owner. Se è fidato mettilo nell\'ordine lo stesso: il primo giro consegna «design --reason locale» e il server lo segna da sé.';
 }
 
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
 const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim().replace(/^#/, '') : '');
+// Un compito senza feedback nell'ordine e nelle attese (#2269): il suo id, come lo dà il comando `compito`.
+const COMPITO_RE = /^C-[1-9]\d{0,8}$/i;
+/** Un numero di feedback senza «#», o l'id di un compito (`C-12`); '' se non è né l'uno né l'altro. PURA. */
+export const voceDi = (v) => (COMPITO_RE.test(String(v || '').trim()) ? String(v).trim().toUpperCase() : numeroDi(v));
 
 // ── I rapporti e il costo dei lavori (#2083) ────────────────────────────────
 
