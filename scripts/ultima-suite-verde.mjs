@@ -295,7 +295,7 @@ async function main() {
     process.exit(1);
   }
   if (erroreApi) {
-    console.log(`::error::le corse della suite non si sono lette (${erroreApi}): senza, nessun commit risulta verde.`);
+    console.log(`::error::le corse delle prove importanti non si sono lette (${erroreApi}): senza, nessun commit risulta verde.`);
     process.exit(1);
   }
 }
