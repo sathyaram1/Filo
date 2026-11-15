@@ -30,22 +30,25 @@ test.describe('profilo nuovo', () => {
   });
 });
 
-test('una vista tagliata fuori dalla finestra non dà segni, una dentro sì', async ({ app, shell }) => {
+// La home lasciata per una pagina resta una vista nascosta grande quanto la scheda: dava i suoi segni sopra la pagina.
+test('una vista tagliata fuori dalla finestra o nascosta non dà segni, una dentro sì', async ({ app, shell }) => {
   await app.evaluate(async ({ BrowserWindow, WebContentsView }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const [larga] = win.getContentSize();
-    const vista = async (bounds, testo) => {
+    const vista = async (bounds, testo, visibile = true) => {
       const v = new WebContentsView();
       win.contentView.addChildView(v);
       v.setBounds(bounds);
+      v.setVisible(visibile);
       await v.webContents.loadURL(`data:text/html,<button style="width:120px;height:40px">${testo}</button>`);
     };
     await vista({ x: 200, y: 200, width: 300, height: 120 }, 'Dentro');
     await vista({ x: larga + 40, y: 200, width: 300, height: 120 }, 'Fuori');
+    await vista({ x: 200, y: 400, width: 300, height: 120 }, 'Nascosta', false);
   });
   await expect.poll(async () => {
     const { map } = await markInteractables(app, shell);
     await clearMarks(app, shell);
-    return map.map((m) => m.label).filter((l) => /^(Dentro|Fuori)$/.test(l)).sort();
+    return map.map((m) => m.label).filter((l) => /^(Dentro|Fuori|Nascosta)$/.test(l)).sort();
   }, { timeout: 10_000 }).toEqual(['Dentro']);
 });
