@@ -93,8 +93,9 @@ Il main di adesso è già dentro, se si fondeva senza conflitti; se no
 `git merge origin/main`, risolvi quei conflitti e poi lavora.
 
 Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:
-il testo è la spec, con cosa cambia per ognuna e come si verifica. Passa o non
-passa intero, e alla fusione il server chiude le segnalazioni unite con la tua
+quelli nuovi li fa nascere il server, col testo che elenca numeri e titoli, e la
+richiesta sta nelle schede delle unite; in quelli di prima il testo è la spec.
+Passa o non passa intero, e alla fusione il server chiude le segnalazioni unite con la tua
 frase: scrivila per chi ha mandato una qualunque di loro.
 
 Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
