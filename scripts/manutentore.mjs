@@ -1120,17 +1120,18 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   // Una riga nata da righe con la segnalazione la tiene: senza, nella pagina Novità il tasto destro non la apre più.
   const fontiDi = (r) => (daValido(daDi(r)) ? daDi(r).map((n) => lette[n - 1])
     : lette.filter((l) => unaRiga(testoRiga(l)) === unaRiga(testoRiga(r))));
+  // Da più righe con segnalazioni diverse le prende tutte, fino al tetto: oltre, chi riscrive divide la riga.
   const segnalazioneDa = new Map();
-  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && !segnalazioneRiga(x))) {
-    const daFonti = [...new Set(fontiDi(r).map(segnalazioneRiga).filter(Boolean))];
-    if (daFonti.length === 1) segnalazioneDa.set(r, daFonti[0]);
-    else if (daFonti.length > 1) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}» nasce da righe con segnalazioni diverse (${daFonti.join(', ')}) e una riga ne porta una: dividila, o scrivi quale tiene in segnalazione`);
+  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && !(segnalazioniRiga(x) || []).length)) {
+    const daFonti = [...new Set(fontiDi(r).flatMap((x) => segnalazioniRiga(x) || []))];
+    if (daFonti.length > PN.SEGNALAZIONI_MAX) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}» nasce da righe con ${daFonti.length} segnalazioni, una riga ne porta al più ${PN.SEGNALAZIONI_MAX}: dividila`);
+    else if (daFonti.length) segnalazioneDa.set(r, daFonti);
   }
   if (errori.length) return { ok: false, errori };
   const pulita = (r) => {
     const t = typeof r === 'string' ? r.trim() : r.testo.trim();
-    const n = segnalazioneRiga(r) || segnalazioneDa.get(r);
-    return n ? { testo: t, segnalazione: n } : t;
+    const l = (segnalazioniRiga(r) || []).length ? segnalazioniRiga(r) : (segnalazioneDa.get(r) || []);
+    return l.length ? { testo: t, segnalazione: comeCampo(l) } : t;
   };
   return {
     ok: true,
