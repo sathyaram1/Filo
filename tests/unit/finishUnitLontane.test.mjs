@@ -33,7 +33,8 @@ function repoFinto({ conSpec = false } = {}) {
   scrivi('package.json', JSON.stringify({ name: 'finto', version: '0.0.1', private: true, scripts: { 'test:unit': 'node scripts/run-unit-tests.mjs' } }));
   scrivi('.gitignore', 'node_modules\n.claude\n');
   scrivi('tests/unit/base.test.mjs', "import { test } from 'node:test';\ntest('base', () => {});\n");
-  const git = (...a) => execFileSync('git', a, { cwd: lavoro, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  if (conSpec) scrivi('src/pages/options/options.js', 'export const x = 1;\n');
+  const git =(...a) => execFileSync('git', a, { cwd: lavoro, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   git('init', '-q', '--initial-branch=main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false'], ['core.autocrlf', 'false'], ['core.hooksPath', senzaHook]]) git('config', k, v);
   // origin dice GitHub, come sul PC dell'owner; git lo porta al deposito locale.
