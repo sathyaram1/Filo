@@ -135,6 +135,7 @@ test('#1737 giro 3: i segni di routine che il repo porta da main non fanno crede
     r.scrivi('.claude/routine-ticket.json', biglietto);
     r.git('add', '-f', '.filo-repo-root', '.claude/routine-ticket.json');
     r.git('commit', '-qm', 'main: segni di routine portati da un lavoro fidato');
+    r.git('push', '-q', 'origin', 'main');
     r.git('checkout', '-q', 'claude/owner');
     r.git('merge', '-q', '--no-edit', 'main');
     assert.equal(unitLontane(r.lavoro, { env: ambienteDelPc() }), true);
