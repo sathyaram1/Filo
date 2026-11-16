@@ -310,7 +310,8 @@ test('il contesto intero e quello piccolo portano anche i rami del server, coi f
 });
 
 test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
-  const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  // Non sotto src/: lì va il collegamento al repo vero.
+  const repo = repoConRami([['claude/app', 'app/a.js', 'auto: #30']]);
   t.after(() => togliCartella(repo));
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
   // File che su main ci sono, così l'elenco li stampa: i nuovi si contano e basta (#2337).
