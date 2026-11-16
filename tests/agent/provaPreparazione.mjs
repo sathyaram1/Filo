@@ -25,7 +25,7 @@ export async function preparaFilo(app, shell, chiave) {
   const suHome = async () => (await statoHome()) === 'home';
   // Navigare mentre la home del primo avvio carica la interrompe (did-fail-load -3), e la Page di Playwright di quella
   // scheda resta poi con l'indirizzo vuoto: chi la cerca per indirizzo non la trova più (#2550). Prima si aspetta.
-  for (const fine = Date.now() + 10_000; Date.now() < fine && (await statoHome()) === 'carica'; await d.sleep(100));
+  for (const fine = Date.now() + 10_000; Date.now() < fine && ['carica', 'assente'].includes(await statoHome()); await d.sleep(100));
   for (let tentativo = 0; tentativo < 3; tentativo++) {
     await d.navigate(app, shell, 'filo://newtab/');
     for (const fine = Date.now() + 4000; Date.now() < fine; await d.sleep(200)) if (await suHome()) return;
