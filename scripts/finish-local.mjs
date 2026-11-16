@@ -998,7 +998,7 @@ async function main() {
       if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
       console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
         + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.'
-        + (specRemoti.length ? `\n  Nella stessa corsa GitHub prova anche ${specRemoti.length} spec delle aree toccate che il ramo non cambia; qui giro solo quelli del ramo (${specs.length}).` : ''));
+        + (specRemoti.length ? `\n  Nella stessa corsa GitHub prova anche ${specRemoti.length} spec delle aree toccate che il ramo non cambia; qui giro solo quelli del ramo (${qui.length}).` : ''));
     } else if (specRemoti.length) {
       console.log(`\n▸ Spec delle aree toccate che il ramo non cambia (${specRemoti.length}): sul tuo PC non li giro, li prova GitHub quando chiudi il lavoro.`);
     }
