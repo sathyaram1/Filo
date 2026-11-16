@@ -63,7 +63,7 @@ test('strumenti di main, ramo dal suo sha, titolo che il server cerca', () => {
 
 // #2225: tre rossi di Windows nati su main da fusioni verdi su Linux.
 test('Linux e Windows provano in parallelo, e la riga per il server la scrive solo `unit`, con entrambi gli esiti', () => {
-  assert.deepEqual(Object.keys(LAVORI).sort(), ['linux', 'unit', 'windows']);
+  assert.deepEqual(Object.keys(LAVORI).sort(), ['linux', 'spec', 'unit', 'windows']);
   assert.match(LAVORI.linux, /runs-on: ubuntu-latest/);
   assert.match(LAVORI.windows, /runs-on: windows-latest/);
   assert.match(LAVORI.windows, /defaults:\n {6}run:\n {8}shell: bash/);
