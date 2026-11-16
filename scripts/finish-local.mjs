@@ -1064,6 +1064,14 @@ async function main() {
     }
   }
 
+  if (lontane) {
+    const prova = await attendiProvaRemota(avvioRemoto);
+    const g = giudizioRemoto({ prova, rossiQui });
+    (g.ferma ? console.error : console.log)(`\n${g.messaggio}`);
+    if (g.ferma) process.exit(1);
+    provaDelRamo = { prova, punta: shaProvato };
+  }
+
   if (unitRossi) {
     console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
     process.exit(1);
