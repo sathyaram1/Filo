@@ -18,9 +18,10 @@ singoli lavori. Tre facce dello stesso compito:
   strumenti falliscono, quanto aspettano i modelli, dove si spende senza
   fondere), propone e fa esperimenti dal vivo, misura cosa hanno portato.
 
-Il suo contesto è testo scritto da chiunque, quindi è **non fidato**: non
-scrive codice, non fonde, non approva L5. Scrive ordini che il server applica
-e apre feedback che le routine lavorano.
+Il suo contesto è testo scritto da chiunque: non scrive codice, non fonde,
+non approva L5. Scrive ordini che il server applica e apre feedback che le
+routine lavorano. Per decisione dell'owner (#2215.1) è un ruolo **fidato**:
+quello che scrive, note comprese, non sporca i lavori server.
 
 Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
 consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
@@ -279,7 +280,8 @@ Il minimo di feedback; chi li prende usa sotto-agenti per area.
 
 **Server (filo-security), primo:**
 - chiave di classe «manutentore» sul canale delle routine, coi poteri del § 3
-  e niente altro; una sessione con quella chiave è non fidata;
+  e niente altro; una sessione con quella chiave scrive note che non sporcano
+  (#2215.1, § 1);
 - operazione che dà a quella chiave schede, testi e note di un feedback a
   scelta, e i rapporti dei biglietti (oggi servono il token admin e la chiave
   di decifratura, solo sul PC dell'owner);

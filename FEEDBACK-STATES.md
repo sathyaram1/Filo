@@ -263,7 +263,7 @@ illegale.
 
 ### 3b. Il manutentore (SPEC-MANUTENTORE.md, #1958, #1959)
 
-Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** con la sua chiave (classe
+Rivede il § 3a dove dice altro. Il manutentore è un ruolo **fidato** (decisione dell'owner, #2215.1) con la sua chiave (classe
 `manutentore`, endpoint `routineManutentore`) o col biglietto che il pacemaker lega alla sessione accesa per lui
 (ruolo `manutentore`, contesto piccolo nel payload): legge schede, testi e rapporti (testi e rapporti solo
 nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
@@ -293,9 +293,9 @@ all'owner, il freno.
   server scrive sul feedback `restaLocale { motivi, ruolo, atMs }`, che Gestione mostra come «Fermo: resta locale»
   col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce. Le schede del manutentore lo
   mostrano come fermo `resta_locale`, e un lavoro fidato che ci resta più di un'ora lo sveglia (segnale
-  `resta_locale`, #2215). Il contenuto scritto da un biglietto sporco o dal manutentore conta solo per i ruoli che
-  leggono le note: il controllo di sicurezza nasce pulito lo stesso. Le note del manutentore che l'owner ha letto le
-  copre lui: `npm run fiducia:copri -- <N> [--dal-vero]`.
+  `resta_locale`, #2215). Il contenuto scritto da un biglietto sporco conta solo per i ruoli che leggono le note: il
+  controllo di sicurezza nasce pulito lo stesso. Quello che scrive il manutentore, note comprese, non sporca: un lavoro
+  server riparte dopo la sua risposta senza un gesto dell'owner (#2215.1).
 - **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
