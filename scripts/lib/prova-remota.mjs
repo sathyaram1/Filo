@@ -151,11 +151,11 @@ export async function avviaProvaRemota({ root, punta, spec = [], env = process.e
   }
   const corsa = nomeCorsa({ ramo, main, ora });
   try {
-    await chiama(`repos/${repo}/dispatches`, { metodo: 'POST', corpo: richiestaDispatch({ ramo, main, corsa, windows: env.FILO_FINISH_UNIT_WINDOWS }) });
+    await chiama(`repos/${repo}/dispatches`, { metodo: 'POST', corpo: richiestaDispatch({ ramo, main, corsa, windows: env.FILO_FINISH_UNIT_WINDOWS, spec }) });
   } catch (e) {
     return { errore: `GitHub non ha acceso la corsa (${String((e && e.message) || e).slice(0, 300)})`, main };
   }
-  return { repo, ramo, main, corsa, api: chiama, partita: ora };
+  return { repo, ramo, main, corsa, api: chiama, partita: ora, spec: Array.isArray(spec) ? [...spec] : [] };
 }
 
 const dormi = (ms) => new Promise((ok) => setTimeout(ok, ms));
