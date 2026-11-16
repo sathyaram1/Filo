@@ -8,7 +8,7 @@ import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { corriFile, esitiDaPlaywright, esitiDaTap, esitoDelCaso, provaTestNuovi, testNuoviDelRamo, testoDellaProva } from '../../scripts/lib/prova-test-nuovi.mjs';
+import { apriCopia, corriFile, esitiDaPlaywright, esitiDaTap, esitoDelCaso, provaTestNuovi, testNuoviDelRamo, testoDellaProva } from '../../scripts/lib/prova-test-nuovi.mjs';
 import { cloneDellUltimaProva, esitoSalvato, provaDelRamo } from '../../scripts/prova-test-nuovi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
