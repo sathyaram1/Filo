@@ -77,6 +77,25 @@ fidato) e **si sporca** appena il server gli consegna qualcosa di non fidato:
 Uno sporco non torna pulito. Quello che un biglietto scrive prende la fiducia
 che il biglietto ha **in quel momento**.
 
+Vale anche per ogni **nota** della conversazione di un feedback (#1919):
+consegne delle routine, note delle sessioni locali, allarmi. Il server, quando
+ne scrive una da un biglietto pulito o da sé, aggiunge l'impronta del turno a
+`noteFidate`; le note dell'owner (i suoi turni) sono fidate, tranne quelle che
+il server scrive come sue risposte per chi non è fidato (la chiave
+owner-non-fidato, una sessione sporca): di quelle l'impronta va nel campo col
+prefisso `!`, e valgono non fidate. Chi legge un
+feedback si sporca solo per il testo non fidato: quello del feedback, se non è
+fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
+(anche una scritta prima del campo, o riscritta dopo) vale non fidata.
+Una sessione locale che scrive la nota da sé la fa segnare con l'op
+`notaFidata` del biglietto locale: il server la segna solo da un biglietto
+aperto e pulito, e solo per l'ultimo turno non dell'owner.
+Le routine, a cui la conversazione la consegna il server, restano per ora sul
+segno `scrittoSporco`, anche quando leggono i testi dal cloud (compito di
+gestione del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
+note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco.
+Passano alla regola delle note col timbro delle note di prima (#1918).
+
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
 
@@ -209,6 +228,16 @@ lo può scrivere anche un agente pulito.
   commit lo dice la traccia che la copia scrive alla sua nascita (`scripts/lib/spinte.mjs`): un commit
   senza traccia è arrivato da fuori, e uno che porta il lavoro di un'altra sessione o di un commit arrivato
   da fuori (uno squash, un cherry-pick anche con conflitto) non lo dichiara chi spinge.
+- `noteFidate: [impronta… | !impronta…]` sul feedback (§ 1.2; `!` = turno
+  dell'owner registrato per chi non è fidato): lo SHA-256 esadecimale del
+  turno sotto il suo marcatore, righe-allegato comprese, a capo in `\n` e senza
+  spazi ai bordi. Lo calcola `improntaDelTurnoAggiunto` di
+  `src/shared/feedbackThread.js` (note di prima e di dopo la scrittura) e lo
+  legge `fiduciaDelleNote`; il server ne tiene uno specchio, con la prova che
+  dia le stesse impronte del modulo dell'app (incorporarlo col bake lo
+  renderebbe una fonte protetta). I casi fissati (impronte, fiducia e motivo)
+  stanno in `tests/fixtures/fiducia-note-casi.json`, provati dalle due parti.
+  Scritto come `fiducia`.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione

@@ -912,7 +912,8 @@
   // `text` resta nella proiezione di proposito: è il titolo di ripiego dei
   // feedback senza `name` ed è il campo su cui cercano tutte e due le pagine.
   // Toglierlo svuoterebbe la ricerca invece di alleggerirla.
-  const CAMPI_DETTAGLIO = ['notes', 'livelli', 'reviewComment', 'images', 'files'];
+  // `noteFidate` va con `notes`: le impronte delle note fidate (#1919) contano solo accanto al testo che le ha.
+  const CAMPI_DETTAGLIO = ['notes', 'noteFidate', 'livelli', 'reviewComment', 'images', 'files'];
 
   // I campi che un elenco mostra, ordina o filtra: tutti quelli che le regole
   // Firestore ammettono meno quelli di dettaglio, più `pipeline` (lo scrive il
