@@ -201,7 +201,8 @@ Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indi
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
 deve girare fra i riservati). Se chiude con «ancora fuori», l'indice c'è lo stesso: rilancia quando il server risponde.
 
-Le schede: `aspetta #P` e `pacchetto di …` dicono chi è già in un pacchetto. `aspetta` porta solo le attese che
+Le schede: `pacchetto di …` dice chi è un pacchetto; gli originali assorbiti non hanno più una scheda (il loro lavoro è
+il pacchetto, e alla sua fusione si chiudono come risolti). `aspetta #P` resta sui pacchetti di prima. `aspetta` porta solo le attese che
 bloccano ancora, ognuna col suo stato; `aspettava` quelle già fuse, che non fermano niente; «attese che non fermano
 una priorità 3» le tue su una 3, che parte lo stesso (tornano a fermare se la priorità scende). Una «chiuso senza
 fusione» blocca per sempre: spostala sull'originale (`attesa <B> <vecchio> --togli`, poi `attesa <B> <originale>`). Una scheda «non riletta» non basta per
