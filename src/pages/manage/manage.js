@@ -3754,6 +3754,7 @@
       mgWorkState.innerHTML = mostra ? workStateHtml(progress, fb) : '';
       if (mostra) aggiungiDichiara(fb);
     }
+    reflectAssorbite(fb);
 
     renderThread(fb);
 
