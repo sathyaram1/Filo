@@ -90,6 +90,11 @@ fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
 Una sessione locale che scrive la nota da sé la fa segnare con l'op
 `notaFidata` del biglietto locale: il server la segna solo da un biglietto
 aperto e pulito, e solo per l'ultimo turno non dell'owner.
+Una sessione che legge un feedback attraverso il server conta solo la fiducia
+delle note, non il segno `scrittoSporco` (#1919.3). Una nota scritta da una
+sessione segna il feedback solo se entra davvero: un passaggio respinto o un
+testo già presente non lo segnano. La nota del manutentore nasce fidata (D-297);
+quella della chiave owner-non-fidato no.
 Le routine, a cui la conversazione la consegna il server, restano per ora sul
 segno `scrittoSporco`, anche quando leggono i testi dal cloud (compito di
 gestione del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
