@@ -21,7 +21,9 @@ export function riferimenti(file, testo, esiste) {
   const dir = posix.dirname(file);
   const out = new Set();
   const norma = (p) => posix.normalize(p).replace(/^\.\//, '');
-  for (const m of String(testo || '').matchAll(IMPORT)) {
+  // Le righe di solo commento non rimandano a niente: un esempio di codice citato lì faceva un arco falso.
+  const codice = String(testo || '').split('\n').filter((r) => !/^\s*(?:\/\/|\/?\*)/.test(r)).join('\n');
+  for (const m of codice.matchAll(IMPORT)) {
     const s = m[1] || m[2] || m[3] || m[4];
     if (!/^\.{1,2}\//.test(s)) continue;
     const base = norma(posix.join(dir, s));
