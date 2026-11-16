@@ -1030,6 +1030,15 @@ async function main() {
     }
   }
 
+  if (lontane) {
+    const prova = await attendiProvaRemota(avvioRemoto);
+    console.log(`\n${testoProvaRemota(prova)}`);
+    const g = giudizioRemoto({ prova, rossiQui });
+    (g.ferma ? console.error : console.log)(`\n${g.messaggio}`);
+    if (g.ferma) process.exit(1);
+    provaDelRamo = { prova, punta: shaProvato };
+  }
+
   // 3. La VERIFICA avversariale: un'istanza diversa da chi ha scritto il codice
   //    ha provato a romperlo, senza vedere il diff. È l'unico controllo che
   //    trova i lavori "verdi ma sbagliati": i test qui sopra li ha scritti chi
