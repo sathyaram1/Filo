@@ -163,7 +163,7 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
-- `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
+- `revision_security` —routine PASS secaudit (o non richiesto, #2508)+merge→ `done`; —FAIL fixer-loop→ `design`
   (`statusReason: loop`); —conflitto di fusione, o unit rossi sul risultato
   della fusione→ `revision_capability` (riallineamento: main è avanzato e il
   merge non passa più da solo — non è una bocciatura di qualità, il contatore M
