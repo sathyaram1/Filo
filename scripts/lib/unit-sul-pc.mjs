@@ -2,7 +2,8 @@
 // arrivati da main anche senza il suo sì e girano su GitHub (prova-remota.mjs), lontano dalle sue credenziali.
 // Sentinella: tests/unit/unitSulPc.test.mjs.
 
-import { relative, sep } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { basename, dirname, relative, sep } from 'node:path';
 import { isRoutineInstance } from './routine-role.mjs';
 import { gitIn, refspecMain } from './unit-sulla-fusione.mjs';
 
