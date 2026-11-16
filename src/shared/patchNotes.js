@@ -1997,6 +1997,12 @@
     }
     return out;
   }
+  // Com'è scritto nel registro: un intero positivo, o un elenco da 1 a SEGNALAZIONI_MAX interi positivi diversi.
+  function segnalazioneValida(s) {
+    if (Number.isInteger(s)) return s > 0;
+    return Array.isArray(s) && s.length >= 1 && s.length <= SEGNALAZIONI_MAX && s.every((n) => Number.isInteger(n) && n > 0)
+      && new Set(s).size === s.length;
+  }
   function riga(r) {
     if (r && typeof r === 'object') return { testo: String(r.testo || ''), segnalazioni: segnalazioniDi(r.segnalazione) };
     return { testo: String(r == null ? '' : r), segnalazioni: [] };
