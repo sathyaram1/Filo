@@ -654,7 +654,10 @@ La regola, uguale per tutti e due:
   su questa macchina parla di un altro commit. Dal #929 `ownerMerge` porta anche
   `provaUnit`: gli unit girati da chi chiede sul risultato della fusione con
   origin/main (`scripts/lib/unit-sulla-fusione.mjs`); per le routine, dal #1207,
-  la prova la legge il server da GitHub. Il server fonde solo se main è ancora lo
+  la prova la legge il server da GitHub. Dal #1497.3 (D-185) il PC dell'owner
+  non la fa più: accende lui la stessa corsa di GitHub e ne manda l'esito
+  (`scripts/lib/prova-remota.mjs`), e in locale gira solo gli unit che il suo
+  ramo cambia (`scripts/lib/unit-sul-pc.mjs`). Il server fonde solo se main è ancora lo
   sha provato (`main_moved` altrimenti, e la prova si rifà, al massimo tre
   volte); rossi solo sulla fusione → riallineamento con l'elenco dei test
   (`unit_rossi`); senza prova fonde come prima e lo scrive nel log
