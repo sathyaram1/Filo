@@ -1855,7 +1855,8 @@
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, opzSezioni()));
+    // Un assorbito in un pacchetto (#2270) non sta in nessuna scheda: si apre dove si è.
+    if (sezioniAttendibili() && !MR.assorbito(fb)) selectTab(MR.manageTabFor(fb, opzSezioni()));
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
