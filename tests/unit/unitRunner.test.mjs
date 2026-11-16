@@ -511,8 +511,7 @@ test('fermo è il primo file partito e non finito: gli altri aspettano lui', () 
 test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto di node', () => {
   const casa = cartellaTemporanea('filo-copia-lanciatore-');
   try {
-    const lib = ['riga-di-comando', 'unit-sul-pc', 'routine-role', 'routine-ticket', 'tools-pin', 'unit-sulla-fusione'].map((n) => `scripts/lib/${n}.mjs`);
-    for (const f of ['scripts/run-unit-tests.mjs', ...lib]) {
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
       mkdirSync(dirname(join(casa, f)), { recursive: true });
       writeFileSync(join(casa, f), readFileSync(join(ROOT, f)));
     }
