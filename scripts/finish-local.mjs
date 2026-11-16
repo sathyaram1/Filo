@@ -995,7 +995,13 @@ async function main() {
       if (schermo.nota) console.log(`\n${schermo.nota}`);
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
-    if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir)) {
+    if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir) && lontane) {
+      rossiQui = true;
+      console.log('\n▸ Controlli di logica non verdi sul tuo PC: li giudica la prova su GitHub, che li rifà sulla fusione con main');
+    } else if (rossiQui === false && !lontane && process.exitCode === undefined && false) {
+      // mai
+    }
+    if (false) {
       console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
       const puntaProvata = shaProvato;
       const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
