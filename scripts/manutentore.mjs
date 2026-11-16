@@ -1006,12 +1006,18 @@ export function linkDi(testo) {
 }
 
 const testoRiga = (r) => (r && typeof r === 'object' ? r.testo : r);
-const segnalazioneRiga = (r) => {
-  const n = Number(String(r && typeof r === 'object' && r.segnalazione != null ? r.segnalazione : '').replace(/^#/, ''));
-  return Number.isInteger(n) && n > 0 ? n : null;
+// Le segnalazioni di una riga, sempre come elenco (una riga di pacchetto ne porta più d'una, #2270): [] senza; null se il
+// campo c'è ma non è un numero intero né un elenco da 1 a SEGNALAZIONI_MAX di interi (SN_PATCH_NOTES.segnalazioneValida).
+const segnalazioniRiga = (r) => {
+  if (!r || typeof r !== 'object' || r.segnalazione == null) return [];
+  const grezze = Array.isArray(r.segnalazione) ? r.segnalazione : [r.segnalazione];
+  const numeri = grezze.map((x) => Number(String(x == null ? '' : x).replace(/^#/, '')));
+  return PN.segnalazioneValida(Array.isArray(r.segnalazione) ? numeri : numeri[0]) ? [...new Set(numeri)] : null;
 };
+const comeCampo = (numeri) => (numeri.length === 1 ? numeri[0] : numeri);
+const tagSegnalazioni = (l) => (l && l.length ? `[segnalazion${l.length === 1 ? 'e' : 'i'} ${l.join(', ')}] ` : '');
 // Il numero è quello che la riga riscritta cita in `da`: features e fixes contati di seguito, come in controllaNovita.
-const rigaPerIlRedattore = (r, n) => `${n}. ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
+const rigaPerIlRedattore = (r, n) => `${n}. ${tagSegnalazioni(segnalazioniRiga(r))}${unaRiga(testoRiga(r))}`;
 
 /**
  * Su quali lavori una promessa delle novità si può fare (#2269, al posto della rosa): le schede a priorità 3 e quelle
