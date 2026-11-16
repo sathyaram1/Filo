@@ -89,7 +89,8 @@ test('avviaProvaRemota accende la corsa per la coppia giusta, e dice perché qua
   assert.match((await avviaProvaRemota({ root: '.', punta: 'corta', git: gitFinto(), api })).errore, /punta del ramo non valida/);
   const rifiuta = async () => { throw new Error('GitHub risponde 403'); };
   assert.match((await avviaProvaRemota({ root: '.', punta: R, git: gitFinto(), api: rifiuta })).errore, /GitHub non ha acceso la corsa \(GitHub risponde 403\)/);
-  assert.match((await avviaProvaRemota({ root: '.', punta: R, git: gitFinto(), env: {} , api: null })).errore || 'token', /nessun accesso a GitHub|token/);
+  assert.equal(tokenGitHub({ GH_TOKEN: ' t1 ', GITHUB_TOKEN: 't2' }), 't1');
+  assert.equal(tokenGitHub({ GITHUB_TOKEN: 't2' }), 't2');
 });
 
 /** Un orologio finto: ogni attesa lo sposta in avanti, senza dormire davvero. */
