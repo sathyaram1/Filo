@@ -73,6 +73,8 @@ test('i campi che una riga mostra, ordina o filtra ci sono', () => {
     'restaLocale',
     // La classe del mittente (§10): le Statistiche la contano anche dalle righe aggiornate dal vivo.
     'mittenteClasse', 'mittenteRuolo',
+    // Il server (#2270): senza, gli originali assorbiti in un pacchetto restano nelle liste e nei conteggi.
+    'unisce', 'unitoIn',
   ]) {
     assert.ok(FB.CAMPI_LISTA.includes(f), `${f} serve alle righe d'elenco`);
   }
