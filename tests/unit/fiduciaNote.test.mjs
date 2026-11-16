@@ -86,14 +86,17 @@ test('il turno ripetuto non aggiunge impronte, e tante note non fidate restano n
 
 test('leggi-feedback: un feedback fidato con sole note fidate si stampa senza sporcare', async () => {
   const { notes, noteFidate } = await scrivi([{ testo: 'Report.', fidato: true }, { testo: 'Verdetto.', fidato: true }]);
-  const rete = (impronte) => async () => ({ ok: true, status: 200, json: async () => ({
-    name: 'projects/p/databases/(default)/documents/feedback/x',
-    fields: {
+  // Come Firestore: torna solo i campi della maschera, così un campo tolto dall'elenco fa rosso (#1919.3).
+  const rete = (impronte) => async (url) => {
+    const chiesti = new URL(url).searchParams.getAll('mask.fieldPaths');
+    const tutti = {
       status: { stringValue: 'todo' }, text: { stringValue: 'testo' }, clientId: { stringValue: 'owner:me' },
       senderProof: { stringValue: 'admin' }, fiducia: { stringValue: 'fidato' }, notes: { stringValue: notes },
       ...(impronte ? { noteFidate: { arrayValue: { values: impronte.map((s) => ({ stringValue: s })) } } } : {}),
-    },
-  }) });
+    };
+    const fields = Object.fromEntries(Object.entries(tutti).filter(([k]) => chiesti.includes(k)));
+    return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/x', fields }) };
+  };
   const pulita = await LF.leggi('x', { bearer: 't', segno: 'n1', decifra: async (g) => ({ ...g }), fetchImpl: rete(noteFidate) });
   assert.equal(pulita.codice, 0);
   assert.deepEqual(pulita.motivi, []);
