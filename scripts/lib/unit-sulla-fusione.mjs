@@ -31,6 +31,10 @@ export const TENTATIVI = 3;
 // La storia intera del repo da una rete lenta: due minuti non bastano.
 export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
+// Gli esiti di una prova fatta con cui il finish va avanti, sul PC e in cloud; il server fonde anche su `main_contenuto`,
+// che dice «nessuna prova serviva» (unit-fusione-azione.mjs). L'unico posto della regola: #1737 giro 1.
+export const ESITI_CHE_PROSEGUONO = Object.freeze(['verde', 'rosso_anche_su_main']);
+export const unitProseguono = (p) => !!p && !p.errore && !p.saltata && ESITI_CHE_PROSEGUONO.includes(p.esito);
 export const TETTO_ROSSI = 40;
 const MAIN = 'main';
 // Esplicito: in un clone a ramo singolo `fetch origin main` muove solo FETCH_HEAD, e origin/main resta vecchio (#2237.3).
