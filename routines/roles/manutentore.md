@@ -364,14 +364,12 @@ dell'orchestratore; un pacchetto lo conta tutto sul suo numero.
 
 Oltre un tetto il server rifiuta col numero: in quel caso si stringe la finestra.
 
-Un pacchetto con la spec è un `feedback` nuovo che dice per ogni segnalazione cosa cambia e come si verifica, seguito
-da `pacchetto <nuovo> <N,M,…>`; `pacchetto` da solo unisce senza spec nuova. La spec sta nel testo: le note del
-feedback non arrivano a nessuna sessione di lavoro. Un feedback che deve fondersi prima va in `attesa`, non solo nel
-testo. Area, tetto e urgenti li controlli tu. Nella sessione locale c'è anche
-`npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815` (spec lunga in un `--allega`, chi deve fondersi
-prima in `--aspetta`): rifiuta una spec che manda alle note, che non nomina ogni unita o che mette prima un feedback che
-non aspetta, e copia nel pacchetto gli allegati delle unite (al più 5 immagini e 5 documenti in tutto: oltre, dividi il
-pacchetto).
+Il testo del pacchetto lo scrive il server, coi numeri e i titoli degli originali: niente testo tuo. Chi lo lavora
+riceve nel fascicolo testo, conversazione, decisioni dell'owner e allegati di ogni originale. Il pacchetto è fidato
+solo se lo sono tutti gli originali. Le attese passano a lui: chi aspettava un originale aspetta il pacchetto, e il
+pacchetto aspetta quello che aspettavano gli originali, meno loro stessi. Un feedback che deve fondersi prima va in
+`attesa` sul pacchetto. Area, tetto e urgenti li controlli tu. La forma di prima (`pacchetto <P> <N,M>`),
+`feedback:apri --pacchetto` e l'unione del riordino rispondono solo col motivo.
 
 ## Alla fine di ogni accensione
 
