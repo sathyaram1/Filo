@@ -371,7 +371,7 @@
   function esitoAudit(fb) {
     var l4 = fb && fb.livelli && fb.livelli.l4;
     var e = String((l4 && l4.esito) || '').trim();
-    return (e === 'pass' || e === 'fail' || e === 'saltato') ? e : '';
+    return (e === 'pass' || e === 'fail' || e === 'saltato' || e === 'non_richiesto') ? e : '';
   }
 
   /**
