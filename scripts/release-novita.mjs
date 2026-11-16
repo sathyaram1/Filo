@@ -131,10 +131,12 @@ export function leggiNote(sorgente) {
   } catch (_) { return null; }
 }
 
-// La stessa forma di SN_PATCH_NOTES.segnalazioneValida (qui il registro non si esegue): un intero, o un elenco da 1 a 20
-// interi diversi, uno per segnalazione assorbita da un pacchetto (#2270). PURA.
+// La stessa forma di SN_PATCH_NOTES.segnalazioneValida, copiata perché qui il registro non si esegue: un intero, o un
+// elenco di interi diversi, uno per segnalazione assorbita da un pacchetto (#2270). Il tetto uguale a quello del
+// registro lo tiene tests/unit/releaseNovita.test.mjs. PURA.
+export const SEGNALAZIONI_MAX = 20;
 const segnalazioneValida = (s) => (Number.isInteger(s) ? s > 0
-  : Array.isArray(s) && s.length >= 1 && s.length <= 20 && s.every((n) => Number.isInteger(n) && n > 0) && new Set(s).size === s.length);
+  : Array.isArray(s) && s.length >= 1 && s.length <= SEGNALAZIONI_MAX && s.every((n) => Number.isInteger(n) && n > 0) && new Set(s).size === s.length);
 
 /** Una riga del server com'è nel registro: testo, o { testo, segnalazione }; null se non è nessuna delle due. PURA. */
 function rigaValida(r) {
