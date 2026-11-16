@@ -139,7 +139,7 @@ export function readRole(root, { now = Date.now() } = {}) {
  * chiamata della shell riparte senza l'export (#1966): valgono anche biglietto e ruolo che dispatch scrive nella
  * cartella, e gli strumenti che girano dalla copia fissata dal preflight, che esiste solo in un giro.
  */
-export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = () => !!pinnedRepoRoot(), conta = () => true } = {}) {
+export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = (o = {}) => !!pinnedRepoRoot() && (!o.conta || o.conta(repoMarkFile())), conta = () => true } = {}) {
   const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
   if (dichiarata && dichiarata !== '0') return true;
   if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
