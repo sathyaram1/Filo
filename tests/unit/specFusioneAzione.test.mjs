@@ -7,12 +7,21 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { leggiArgomenti, campoDaVerdetto, provaSpec, TETTO_SPEC } from '../../scripts/spec-fusione-azione.mjs';
+import { leggiArgomenti, campoDaVerdetto, provaSpec, TETTO_SPEC, ambienteDegliSpec } from '../../scripts/spec-fusione-azione.mjs';
 import { unisciParti } from '../../scripts/unit-fusione-azione.mjs';
 import { conGliSpec, richiestaDispatch } from '../../scripts/lib/prova-remota.mjs';
+import { COMANDI_DI_ACTIONS } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
+
+test('#1737 giro 3: gli spec provati non vedono i file con cui Actions raccoglie gli esiti, come gli unit', () => {
+  const fuori = Object.fromEntries(COMANDI_DI_ACTIONS.map((k) => [k, `/runner/${k}`]));
+  const env = ambienteDegliSpec({ ...fuori, PATH: '/bin' }, '/tmp/esito.json');
+  for (const k of COMANDI_DI_ACTIONS) assert.equal(env[k], undefined, `${k} arriva agli spec provati: potrebbero scrivere l'esito della propria prova`);
+  assert.deepEqual([env.PATH, env.PLAYWRIGHT_JSON_OUTPUT_NAME, env.ELECTRON_DISABLE_SANDBOX], ['/bin', '/tmp/esito.json', '1']);
+  assert.ok(COMANDI_DI_ACTIONS.includes('GITHUB_OUTPUT'));
+});
 
 test('argomenti: nomi di spec senza barre né spazi, e oltre il tetto si rifiuta col numero', () => {
   const ok = leggiArgomenti(['--root', 'prova', '--ramo', A, '--main', B, '--spec', 'options-x,tabs']);
