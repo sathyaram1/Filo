@@ -511,14 +511,15 @@ test('fermo è il primo file partito e non finito: gli altri aspettano lui', () 
 test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto di node', () => {
   const casa = cartellaTemporanea('filo-copia-lanciatore-');
   try {
-    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+    const lib = ['riga-di-comando', 'unit-sul-pc', 'routine-role', 'routine-ticket', 'tools-pin', 'unit-sulla-fusione'].map((n) => `scripts/lib/${n}.mjs`);
+    for (const f of ['scripts/run-unit-tests.mjs', ...lib]) {
       mkdirSync(dirname(join(casa, f)), { recursive: true });
       writeFileSync(join(casa, f), readFileSync(join(ROOT, f)));
     }
     mkdirSync(join(casa, 'tests', 'unit'), { recursive: true });
     writeFileSync(join(casa, 'package.json'), '{"type":"module"}\n');
     writeFileSync(join(casa, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n");
-    const env = { ...process.env };
+    const env = { ...process.env, FILO_UNIT_LONTANE: '0' };
     delete env.NODE_TEST_CONTEXT;
     delete env.FILO_UNIT_DIR;
     const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
