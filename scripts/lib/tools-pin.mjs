@@ -198,9 +198,13 @@ export function pinWorkerTools(clone, n, { da = TOOLS_ROOT, base = pinnedDir(), 
  * Il progetto a cui questi strumenti si riferiscono, se sono una copia fissata.
  * '' quando gli strumenti sono quelli del repo (in locale, o prima del pin).
  */
+export function repoMarkFile(toolsRoot = TOOLS_ROOT) {
+  return resolve(toolsRoot, REPO_MARK);
+}
+
 export function pinnedRepoRoot(toolsRoot = TOOLS_ROOT) {
   try {
-    const f = resolve(toolsRoot, REPO_MARK);
+    const f = repoMarkFile(toolsRoot);
     if (!existsSync(f)) return '';
     const v = String(readFileSync(f, 'utf8') || '').trim();
     return v && existsSync(v) ? resolve(v) : '';
