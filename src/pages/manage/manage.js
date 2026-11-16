@@ -7406,7 +7406,7 @@
       ricevuti: stat.copertura.feedbackLetti !== false,
       lavorati: !ko,
       lanci: !ko,
-      audit: ((a.pass || 0) + (a.fail || 0) + (a.saltato || 0)) > 0,
+      audit: ((a.pass || 0) + (a.fail || 0) + (a.saltato || 0) + (a.non_richiesto || 0)) > 0,
     };
   }
 
