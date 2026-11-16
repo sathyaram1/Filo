@@ -79,7 +79,7 @@ async function githubFinto({ dispatch = 204, registro }) {
         return json(200, { workflow_runs: corsa ? [{ id: 11, display_title: `unit-fusione ${corsa}`, status: 'completed', conclusion: 'success', html_url: 'https://github.com/proprietario/filo/actions/runs/11' }] : [] });
       }
       if (url.pathname === '/repos/proprietario/filo/actions/runs/11/jobs') return json(200, { jobs: [{ id: 22, name: 'unit' }] });
-      if (url.pathname === '/repos/proprietario/filo/actions/jobs/22/logs') { res.writeHead(200); return res.end(registro(coppia)); }
+      if (url.pathname === '/repos/proprietario/filo/actions/jobs/22/logs') { res.writeHead(200); return res.end(registro(coppia, chiesta)); }
       return json(404, { message: 'Not Found' });
     });
   });
