@@ -1433,7 +1433,11 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
   Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
   collegati e la rete limitata:
   - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
-    riceve solo lavori server fidati; le altre chiavi non
+    riceve i lavori server fidati e, dal #2500, il primo lavoro di ogni
+    feedback fidato anche non segnato: se tocca il server, la stessa sessione
+    fa app e server; il segno arriva con la prima spinta registrata. Le altre
+    chiavi lo ricevono solo se nessuna voce server si può accendere, o se
+    dalla chiave server nascerebbe sporco. Le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare. Lo prende una parola d'ordine normale a
     rete limitata, e il pacemaker lo conta sull'account che ne ha almeno una

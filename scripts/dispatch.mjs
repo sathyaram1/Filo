@@ -908,6 +908,8 @@ export function serialAwarenessNote(role, history, dropped = 0) {
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
 
 const LAVORO_SERVER_FILE = '_lavoro-server.md';
+// Il primo lavoro di un fidato non segnato (#2500, busta `lavoroServer.seServe`): il server solo se il lavoro lo tocca.
+const LAVORO_SERVER_SE_SERVE_FILE = '_lavoro-server-se-serve.md';
 
 export { cloneDentroIlRepo, cartellaCloneServer };
 
@@ -922,11 +924,13 @@ export function rigaCartellaDiPartenza(cwd, root) {
 }
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
-export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs'), seServe = false } = {}) {
   const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
   if (!existsSync(f)) return '';
   const avanti = (p) => String(p).split('\\').join('/');
-  const testo = readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+  const prima = resolve(ROLES_DIR, LAVORO_SERVER_SE_SERVE_FILE);
+  const pezzi = [seServe && existsSync(prima) ? readFileSync(prima, 'utf8').trim() : '', readFileSync(f, 'utf8')].filter(Boolean);
+  const testo = pezzi.join('\n\n').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
   return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
@@ -2786,7 +2790,7 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato, mancante, baseVecchia })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
-  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer(), seServe: ctx.lavoroServer.seServe === true }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
   const cartella = preparaIntestazione(ROOT, { strumenti: TOOLS_ROOT });

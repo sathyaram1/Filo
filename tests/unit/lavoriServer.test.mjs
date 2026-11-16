@@ -165,6 +165,22 @@ test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, m
   assert.equal(serverCtx({ role: 'secaudit' }, busta).lavoroServer, undefined);
 });
 
+test('#2500: il primo lavoro di un fidato riceve il server «se serve»: niente clone se resta nell’app, niente ripresa se lo tocca', () => {
+  const busta = { payload: { feedback: { text: 'x' }, lavoroServer: { repo: 'sathyaram1/filo-security', seServe: true } } };
+  assert.deepEqual(serverCtx({ role: 'new-work' }, busta).lavoroServer, { repo: 'sathyaram1/filo-security', seServe: true });
+  const certo = testoLavoroServer({ clone: '/home/user/filo-security' });
+  const seServe = testoLavoroServer({ clone: '/home/user/filo-security', seServe: true });
+  assert.doesNotMatch(certo, /solo se il lavoro lo tocca/i, 'un lavoro server certo non riceve il paragrafo');
+  assert.ok(seServe.endsWith(certo.trim()) || seServe.includes(certo.trim()), 'le istruzioni intere del lavoro server restano');
+  const prima = seServe.slice(0, seServe.indexOf(certo.trim()));
+  assert.match(prima, /Se resta tutto nell'app[^]*niente clone/, 'se il lavoro resta nell’app non si clona');
+  assert.match(prima, /«Serve il codice del server»[^]*non è\s+la tua/, 'il ripiego della ripresa non è la sua strada');
+  assert.match(prima, /ramo-server[^]*diventa lavoro\s+server/, 'la spinta registrata segna il feedback');
+  // La busta arriva da dispatch con il campo del server: il paragrafo entra nelle istruzioni stampate.
+  const src = readFileSync(join(REPO, 'scripts', 'dispatch.mjs'), 'utf8');
+  assert.match(src, /testoLavoroServer\(\{ clone: cartellaCloneServer\(\), seServe: ctx\.lavoroServer\.seServe === true \}\)/);
+});
+
 test('una sessione partita sopra i cloni: il preflight manda l’orchestratore nella radice di Filo (#1761)', () => {
   const sopra = resolve('/home/user');
   const filo = join(sopra, 'Filo');
