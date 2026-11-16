@@ -112,15 +112,15 @@ function readMarkerFrom(dir) {
  * un'altra cartella, ma il marcatore l'ha scritto il dispatcher nel checkout
  * principale.
  */
-export function readMarker(root, { now = Date.now() } = {}) {
+export function readMarker(root, { now = Date.now(), conta = () => true } = {}) {
   const here = readMarkerFrom(root);
-  if (isFresh(here, now)) return here;
+  if (isFresh(here, now) && conta(roleFile(root))) return here;
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) {
       const main = readMarkerFrom(resolve(common, '..'));
-      if (isFresh(main, now)) return main;
+      if (isFresh(main, now) && conta(roleFile(resolve(common, '..')))) return main;
     }
   } catch (_) { /* niente git o repo nudo: pazienza */ }
   return null;
