@@ -132,7 +132,7 @@ export function apiGitHub({ token, base = process.env.FILO_GITHUB_API || API, fe
  * Accende la corsa per (punta, origin/main di adesso). → { repo, ramo, main, corsa, api } | { errore }.
  * La punta dev'essere già su origin: la corsa la scarica da lì.
  */
-export async function avviaProvaRemota({ root, punta, env = process.env, git = gitIn(root), api = null, ora = Date.now() } = {}) {
+export async function avviaProvaRemota({ root, punta, spec = [], env = process.env, git = gitIn(root), api = null, ora = Date.now() } = {}) {
   const ramo = String(punta || '').toLowerCase();
   if (!SHA.test(ramo)) return { errore: 'punta del ramo non valida' };
   const url = git(['config', '--get', 'remote.origin.url']);
