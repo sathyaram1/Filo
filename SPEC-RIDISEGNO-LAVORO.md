@@ -41,18 +41,14 @@ nasce con il feedback (un agente Haiku alla nascita, Opus rilegge solo quelle
 che tolgono lavoro) e si rifà quando il feedback cambia; il manutentore le
 legge tutte, Haiku gli serve anche per le letture di massa che non decidono.
 
-**Pacchetto.** Un feedback che contiene più segnalazioni della stessa area, non
-ancora lavorate, con il testo che è una spec: cosa cambia, per ogni
-segnalazione unita, e come si verifica. La spec sta nel testo o in un allegato,
-mai nelle note, e un feedback che deve fondersi prima sta nelle attese: lo
-strumento rifiuta il resto alla nascita (FEEDBACK-STATES.md § 3a). Porta con sé gli allegati delle
-segnalazioni unite, col nome che dice da dove viene ognuno (tetto: quello di un
-feedback, oltre il pacchetto non nasce); alla sua nascita le unite si archiviano
-con la nota «Unito nel pacchetto #P: il lavoro continua lì» e il rimando
-`unitoIn`, senza frase per chi le ha segnalate, e chi le aspettava aspetta il
-pacchetto (decisione dell'owner del 30/10; regole in FEEDBACK-STATES.md § 3a).
-Alla fusione non resta niente da chiudere: il messaggio cita le unite, e la
-ricerca «già risolto su main» le trova. Un feedback scorrelato
+**Pacchetto** (#2270: una strada sola). Un feedback nuovo che assorbe più
+segnalazioni della stessa area, non ancora lavorate. Lo chiede solo il
+manutentore (`pacchetto <N,M,…>`); il testo lo scrive il server coi numeri e i
+titoli degli originali (scelta dell'owner del 07/11), e chi lavora riceve nel
+fascicolo testo, conversazione, decisioni e allegati di ognuno. Gli originali
+escono da coda, liste e conteggi e chi li aspettava aspetta il pacchetto; alla
+fusione si chiudono come risolti con la frase del pacchetto, e il messaggio li
+cita. Regole in FEEDBACK-STATES.md § 3a. Un feedback scorrelato
 resta da solo. Un problema urgente (sicurezza, difetto che blocca l'uso) non
 entra in nessun pacchetto: si lavora appena arriva.
 
