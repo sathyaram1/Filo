@@ -254,6 +254,9 @@
     WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
+    // ACCOUNT_ANONIMI (#2067, solo owner): il censimento degli account anonimi e la loro pulizia, dal server.
+    //   { op: 'stato' } | { op: 'cancella', attesi } | { op: 'ferma' } → { ok, censimento, pulizia } | { ok:false, error }
+    ACCOUNT_ANONIMI: 'account_anonimi',
     // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
     //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
     //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }; sotto le cinque

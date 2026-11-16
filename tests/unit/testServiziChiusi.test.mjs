@@ -130,7 +130,10 @@ test('il main chiude i servizi fuori da ogni condizione: decide il modulo, anche
 test('le prove chiudono i servizi in modalità test o su richiesta del pilota, il resto no', () => {
   assert.equal(S.serviziChiusiRichiesti({ NODE_ENV: 'test' }), true);
   assert.equal(S.serviziChiusiRichiesti({ FILO_SERVIZI_CHIUSI: '1' }), true);
-  for (const env of [{}, { NODE_ENV: 'production' }, { FILO_SERVIZI_CHIUSI: '0' }, { FILO_SERVIZI_CHIUSI: '' }, null]) {
+  // #2067: verifica-linux apre il pacchetto vero senza NODE_ENV=test, e ogni corsa creava un utente anonimo vero.
+  assert.equal(S.serviziChiusiRichiesti({ GITHUB_ACTIONS: 'true', CI: 'true' }), true);
+  for (const env of [{}, { NODE_ENV: 'production' }, { FILO_SERVIZI_CHIUSI: '0' }, { FILO_SERVIZI_CHIUSI: '' },
+    { GITHUB_ACTIONS: 'false' }, { CI: 'true' }, null]) {
     assert.equal(S.serviziChiusiRichiesti(env), false, JSON.stringify(env));
   }
 });

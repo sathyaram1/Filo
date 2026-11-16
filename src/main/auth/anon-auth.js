@@ -172,6 +172,13 @@ async function refresh() {
     // Anche persa, non se ne crea un'altra qui: il portafoglio è legato a questa.
     const testo = await res.text().catch(() => '');
     if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
+    // Account cancellato (la pulizia degli anonimi mai tornati, #2067) e nessun portafoglio su disco: niente da staccare,
+    // si riparte con uno nuovo. Disattivato o revocato resta perso: l'ha deciso qualcuno.
+    if (guasti.codiceRifiuto(testo) === 'USER_NOT_FOUND' && !walletStore.suDisco()) {
+      resetIdentity();
+      await signUpAnonymous();
+      return session.idToken;
+    }
     lost = true;
     contaGuasto('identity_lost');
     throw erroreIdentita('identity_lost');

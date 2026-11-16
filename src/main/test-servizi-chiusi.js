@@ -1,4 +1,4 @@
-// Nelle prove (NODE_ENV=test, o FILO_SERVIZI_CHIUSI=1 dal pilota): i servizi veri di Filo (schede, funzioni, identità)
+// Nelle prove (NODE_ENV=test, FILO_SERVIZI_CHIUSI=1 dal pilota, GitHub Actions):i servizi veri di Filo (schede, funzioni, identità)
 // non si raggiungono da nessuna porta, né dalle pagine né dal main: una prova parte uguale ovunque e non paga la produzione
 // (#735.1, #2470). Chi li vuole li finge sopra (FILO_FUNCTIONS_BASE e simili). Sentinella: tests/unit/testServiziChiusi.test.mjs.
 
@@ -48,9 +48,13 @@ function chiudiFetch(target = globalThis, avvisa = () => {}) {
   return true;
 }
 
-/** Vero in modalità test e quando chi apre Filo per una prova lo chiede a parte (il pilota degli agenti non è in modalità test). */
+/**
+ * Vero in modalità test, quando chi apre Filo per una prova lo chiede a parte (il pilota degli agenti non è in modalità
+ * test) e dentro GitHub Actions: lì Filo è sempre una prova, anche il pacchetto vero che verifica-linux apre (#2067).
+ */
 function serviziChiusiRichiesti(env = process.env) {
-  return require('./test-window-mode').inModalitaTest(env) || (!!env && env.FILO_SERVIZI_CHIUSI === '1');
+  return require('./test-window-mode').inModalitaTest(env)
+    || (!!env && (env.FILO_SERVIZI_CHIUSI === '1' || env.GITHUB_ACTIONS === 'true'));
 }
 
 /**

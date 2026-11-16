@@ -692,6 +692,11 @@ module.exports = function register(on, ctx) {
     return volo;
   }
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await vistaOwner({ fresca: true }) })));
+  on(MSG.ACCOUNT_ANONIMI, ownerOnly(async (msg) => {
+    const op = ['stato', 'cancella', 'ferma'].includes(msg && msg.op) ? msg.op : 'stato';
+    const r = await callable('ownerAccountAnonimi', op === 'cancella' ? { op, attesi: Number(msg.attesi) } : { op }, { asOwner: true });
+    return { censimento: (r && r.censimento) || null, pulizia: (r && r.pulizia) || null };
+  }));
 
   // Gli avvisi all'owner fra le notifiche della home (#855). Una carta per caso; quali marcatori sono già stati detti
   // sta su disco, così una situazione che resta quella non si ridice a ogni avvio. Il portafoglio è dell'installazione:
