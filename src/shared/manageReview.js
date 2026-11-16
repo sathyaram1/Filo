@@ -1081,7 +1081,7 @@
     const counts = { inbox: 0, queue: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
     for (const f of filtraFiducia(list, opts && opts.soloNonFidate)) {
-      const tab = manageTabFor(f, opts);
+      const tab = schedaInElenco(f, opts);
       if (tab === 'inbox') inbox.push(f);
       else if (tab === 'queue' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
