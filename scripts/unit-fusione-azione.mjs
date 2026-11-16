@@ -94,7 +94,10 @@ export function unisciParti({ ramo, main, parti = [] } = {}) {
     if (c.esito === 'non_provata') { mancate.push(`${nome}: ${String(c.motivo || 'prova non fatta')}`); continue; }
     lette.push({ nome, c });
   }
-  const base = { ramo, main };
+  // La parte degli spec (spec-fusione-azione.mjs) dice quanti ne ha avuti: il PC che li ha chiesti lo controlla.
+  const spec = lette.find((l) => l.nome === 'spec');
+  const conta = spec && Number.isInteger(spec.c.specChiesti) ? { specChiesti: spec.c.specChiesti, specProvati: intero(spec.c.specProvati) } : {};
+  const base = { ramo, main, ...conta };
   const conSha = lette.find((l) => SHA.test(String(l.c.mainSha || '')));
   const mainSha = conSha ? conSha.c.mainSha : main;
   const conStoriaParte = lette.find((l) => l.nome === 'linux' && l.c.storia) || lette.find((l) => l.c.storia);
