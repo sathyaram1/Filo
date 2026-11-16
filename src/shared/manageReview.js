@@ -2291,7 +2291,7 @@
     // stessa domanda, quindi la stessa funzione — una seconda copia sarebbe la
     // copia che un giorno dice di sì dove questa dice di no.
     classifyLegacyBlock,
-    classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
+    classifyBlock, sortReview, REASONS, manageTabFor, assorbito, assorbitiDi, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
