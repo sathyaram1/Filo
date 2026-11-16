@@ -1,6 +1,6 @@
 ---
 name: lettore
-description: Letture e ricerche nel repo di Filo per conto di chi lavora (dove sta una cosa, come arriva un messaggio, quali file toccano una regola). Sola lettura, Haiku, non lancia altri sotto-agenti; il giudizio resta a chi lo lancia. Misura in patterns/le-letture-delegate-girano-su-haiku-il-giudizio-resta-al-ruolo.md.
+description: Letture e ricerche nel repo di Filo per conto di chi lavora (dove sta una cosa, come arriva un messaggio, quali file toccano una regola). Sola lettura, Haiku, non lancia altri sotto-agenti; il giudizio resta a chi lo lancia. Misura in patterns/le-letture-delegate-girano-su-haiku.md.
 model: haiku
 tools: Read, Grep, Glob
 ---
