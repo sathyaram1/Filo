@@ -999,17 +999,16 @@ async function main() {
       if (lontane) {
         rossiQui = true;
         console.log('\n▸ Controlli di logica non verdi sul tuo PC: li giudica la prova su GitHub, che li rifà sulla fusione con main');
+      } else {
+        console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
+        const puntaProvata = shaProvato;
+        const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
+        provaDelRamo = { prova, punta: puntaProvata };
+        const esito = esitoUnitDelRamo({ checkOnly, prova });
+        (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
+        if (esito.ferma) process.exit(1);
+        unitRossi = esito.rosso;
       }
-    }
-    if (rossiQui === false && !lontane && process.exitCode === undefined && false) {
-      console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
-      const puntaProvata = shaProvato;
-      const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
-      provaDelRamo = { prova, punta: puntaProvata };
-      const esito = esitoUnitDelRamo({ checkOnly, prova });
-      (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
-      if (esito.ferma) process.exit(1);
-      unitRossi = esito.rosso;
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
