@@ -708,6 +708,17 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
   ].join('\n');
 }
 
+/**
+ * Gli spec scelti per area divisi fra PC e GitHub, col conto del lanciatore degli unit (cambiatiDelRamo): senza main
+ * fresco sul PC non ne gira nessuno (#1737 giro 3). → { qui, lontani, nota }.
+ */
+export function specDelPc({ lontane, specs, dir }) {
+  if (!lontane) return { qui: specs, lontani: [], nota: '' };
+  const delRamo = specs.length ? cambiatiDelRamo(dir, 'tests') : null;
+  const nota = delRamo && delRamo.errore ? `▸ Spec delle aree toccate: non so quali cambia il ramo (${delRamo.errore}), sul tuo PC non ne giro nessuno.` : '';
+  return { ...specSulPc({ specs, cambiati: delRamo && !delRamo.errore ? delRamo.cambiati : null }), nota };
+}
+
 /** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
 export function fermoDopoLaProva(prova) {
   const p = prova || {};
