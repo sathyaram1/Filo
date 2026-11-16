@@ -159,6 +159,27 @@ function git(args, opts = {}) {
   }
 }
 
+/**
+ * Spedisce il ramo su origin e controlla che lì ci sia `cur`. '' = fatto, se no il perché. È l'unico punto in cui
+ * questa macchina scrive su origin: qualunque cosa sia successa prima, il ramo principale non parte.
+ */
+function spedisciIlRamo({ branch, cur, principale }) {
+  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
+  let copie = [];
+  try { installaControlloSpedizione(ROOT); } catch (_) { /* per i push a mano dopo: questo lo controlla la riga sotto */ }
+  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
+  if (copie.length) return avvisoSpedizione(copie);
+  if (isProtectedBranch(branch, principale)) return `'${branch}' è il ramo principale: da qui non si spedisce.`;
+  // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la configurazione locale di git.
+  const pushed = git(pushArgs(branch));
+  if (!pushed.ok) return `Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`;
+  // Se `origin/<ramo>` non si risolve, `out` è il testo dell'errore di git, non uno sha.
+  const rem = git(['rev-parse', `origin/${branch}`]);
+  if (!rem.ok) return `Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`;
+  if (rem.out !== cur) return `Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`;
+  return '';
+}
+
 /** Il ramo di default di origin secondo il repo ('' se non lo sa). */
 function defaultBranch() {
   const r = git(['rev-parse', '--abbrev-ref', 'origin/HEAD']);
