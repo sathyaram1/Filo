@@ -929,6 +929,8 @@
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
     'updatedAt', 'waitsFor', 'walletPseudonym', 'workingResets', 'workingSince',
+    // Li scrive solo il server (#2270): il pacchetto e il rimando dei suoi originali, che le liste non contano.
+    'unisce', 'unitoIn',
   ];
 
   // Un documento letto con la proiezione della lista porta questo marchio: chi
