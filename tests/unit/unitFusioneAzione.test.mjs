@@ -74,13 +74,22 @@ test('Linux e Windows provano in parallelo, e la riga per il server la scrive so
   }
   assert.match(LAVORI.linux, /--parte linux --unit tutti$/m, 'su Linux la corsa intera, come prima');
   assert.match(LAVORI.windows, /--parte windows --unit "\$MODO"$/m);
-  assert.match(LAVORI.unit, /needs: \[linux, windows\]\n {4}if: \$\{\{ !cancelled\(\) \}\}/, 'anche con una parte caduta la riga si scrive');
-  for (const n of ['LINUX', 'WINDOWS']) {
+  assert.match(LAVORI.unit, /needs: \[linux, windows, spec\]\n {4}if: \$\{\{ !cancelled\(\) \}\}/, 'anche con una parte caduta la riga si scrive');
+  for (const n of ['LINUX', 'WINDOWS', 'SPEC']) {
     const p = n.toLowerCase();
     assert.match(LAVORI.unit, new RegExp(`CAMPO_${n}: \\$\\{\\{ needs\\.${p}\\.outputs\\.campo \\}\\}`));
     assert.match(LAVORI.unit, new RegExp(`RISULTATO_${n}: \\$\\{\\{ needs\\.${p}\\.result \\}\\}`));
   }
-  assert.match(LAVORI.unit, /run: node strumenti\/scripts\/unit-fusione-azione\.mjs --unisci linux,windows --ramo "\$RAMO" --main "\$MAIN"$/m);
+  assert.match(LAVORI.unit, /run: node strumenti\/scripts\/unit-fusione-azione\.mjs --unisci linux,windows,spec --ramo "\$RAMO" --main "\$MAIN"$/m);
+  // #1737: gli spec delle aree che il PC dell'owner non gira più, solo quando la richiesta li elenca (il server no).
+  const s = LAVORI.spec;
+  assert.match(s, /^ {4}if: \$\{\{ github\.event\.client_payload\.spec \}\}$/m);
+  assert.doesNotMatch(s, /needs:/);
+  assert.match(s, /ref: \$\{\{ github\.sha \}\}\n {10}path: strumenti/);
+  assert.match(s, /ref: \$\{\{ env\.RAMO \}\}\n {10}path: prova\n {10}fetch-depth: 0/);
+  assert.match(s, /if \[\[ ! "\$RAMO" =~ \^\[0-9a-f\]\{40\}\$ \|\| ! "\$MAIN" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
+  assert.match(s, /outputs:\n {6}campo: \$\{\{ steps\.prova\.outputs\.campo \}\}/);
+  assert.match(s, /id: prova\n {8}run: xvfb-run -a node strumenti\/scripts\/spec-fusione-azione\.mjs --root prova --ramo "\$RAMO" --main "\$MAIN" --spec "\$SPEC"$/m);
   assert.equal((W.match(/--unisci/g) || []).length, 1);
 });
 
