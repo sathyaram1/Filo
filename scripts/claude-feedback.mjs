@@ -305,7 +305,7 @@ export function rigaAperto({ soloLocale = false, server = false, r = {} } = {}) 
   const ref = r.seq || r.id;
   if (soloLocale) return `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${ref} (o npm run finish -- --feedback ${ref}).`;
   if (!server) return 'Aperto per le routine.';
-  return !r.nonFidato && r.biglietto === 'pulito'
+  return r.biglietto === 'pulito'
     ? 'Aperto come lavoro server: lo prendono le routine dei lavori server, se in Automazioni sono accese.'
     : 'Aperto come lavoro server, non fidato: dopo i giudici va nei Ricevuti a chiedere la fiducia, e col tuo timbro lo prendono i lavori server.';
 }
