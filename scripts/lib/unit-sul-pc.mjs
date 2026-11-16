@@ -6,14 +6,19 @@ import { relative, sep } from 'node:path';
 import { isRoutineInstance } from './routine-role.mjs';
 import { gitIn, refspecMain } from './unit-sulla-fusione.mjs';
 
-/** Forza la regola del PC dell'owner: la passa il finish al lanciatore, e le prove. */
+/**
+ * `1` forza la regola del PC dell'owner (il finish la passa al lanciatore); `0` la toglie a chi sceglie i file da sé,
+ * come la prova sulla fusione, che sul PC dell'owner non gira più.
+ */
 export const VAR_LONTANE = 'FILO_UNIT_LONTANE';
 const DIR = 'tests/unit';
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
 
 /** Siamo sul PC dell'owner? Una routine e GitHub Actions no: lì non ci sono le sue credenziali. */
 export function unitLontane(root, { env = process.env, routine = isRoutineInstance } = {}) {
-  if (String(env[VAR_LONTANE] || '') === '1') return true;
+  const forzata = String(env[VAR_LONTANE] || '');
+  if (forzata === '1') return true;
+  if (forzata === '0') return false;
   if (String(env.GITHUB_ACTIONS || '') === 'true') return false;
   return !routine(root, { env });
 }
