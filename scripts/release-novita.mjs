@@ -158,7 +158,8 @@ function testoDelBlocco(blocco, rientro) {
   const r1 = `${rientro}  `;
   const r2 = `${rientro}    `;
   const chiave = (k) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
-  const riga = (r) => (typeof r === 'string' ? JSON.stringify(r) : `{ testo: ${JSON.stringify(r.testo)}, segnalazione: ${r.segnalazione} }`);
+  const numeri = (s) => (Array.isArray(s) ? `[${s.join(', ')}]` : String(s));
+  const riga = (r) => (typeof r === 'string' ? JSON.stringify(r) : `{ testo: ${JSON.stringify(r.testo)}, segnalazione: ${numeri(r.segnalazione)} }`);
   const lista = (nome, l) => (l.length ? `${r1}${nome}: [\n${l.map((r) => `${r2}${riga(r)},\n`).join('')}${r1}],\n` : `${r1}${nome}: [],\n`);
   const altre = Object.keys(blocco).filter((k) => !['version', 'features', 'fixes'].includes(k))
     .map((k) => `${chiave(k)}: ${JSON.stringify(blocco[k])}`);
