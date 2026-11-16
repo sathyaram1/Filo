@@ -36,6 +36,24 @@ function problemiInCima(manifesto, notes) {
       : `. Un salto di versione si dichiara nel manifesto, col campo «${CAMPO}»`)];
 }
 
+// #2270: `segnalazione` è un numero o l'elenco dei numeri (la riga di un pacchetto collega ogni assorbito nato da un
+// utente). La forma la decide una regola sola, che registro, pubblicazione e redattore chiamano.
+test('segnalazione: un numero, o un elenco di numeri diversi entro il tetto; la riga li porta tutti, puliti', () => {
+  assert.equal(PN.segnalazioneValida(1956), true);
+  assert.equal(PN.segnalazioneValida([1956, 1960]), true);
+  for (const storta of [[], [1956, 1956], [0], ['12'], Array.from({ length: PN.SEGNALAZIONI_MAX + 1 }, (_, i) => i + 1), '12', 0, null]) {
+    assert.equal(PN.segnalazioneValida(storta), false, JSON.stringify(storta));
+  }
+  assert.deepEqual(PN.riga({ testo: 'Il menu si apre.', segnalazione: [1956, '#1960', 1956] }), { testo: 'Il menu si apre.', segnalazioni: [1956, 1960] });
+  assert.deepEqual(PN.riga({ testo: 'Uno.', segnalazione: 12 }).segnalazioni, [12]);
+  assert.deepEqual(PN.riga('Solo testo.').segnalazioni, []);
+  for (const n of PN.NOTES) {
+    for (const r of [...(n.features || []), ...(n.fixes || [])].filter((x) => x && typeof x === 'object')) {
+      assert.ok(PN.segnalazioneValida(r.segnalazione), `${n.version}: «${String(r.testo).slice(0, 60)}» ha una segnalazione storta`);
+    }
+  }
+});
+
 // Una riga può essere { testo, segnalazione }: le guardie confrontano il testo.
 const righe = (n) => [...(n.features || []), ...(n.fixes || [])].map(PN.testo);
 const righeDi = (notes) => notes.flatMap(righe);
