@@ -972,6 +972,25 @@ test('la fetta «3 o più» sa quante critiche ha avuto ogni lavoro', () => {
   assert.deepEqual(g3.critiche, { w4: 3, w7: 6 });
 });
 
+// #2508: il manutentore misura quanti controlli la regola ha risparmiato ai lavori fidati.
+test('i controlli non richiesti si contano a parte, con le loro segnalazioni', () => {
+  const r = S.compute({
+    range: S.rangeOf('7g', ORA),
+    feedbacks: [
+      fb({ _id: 'n3', seq: 3, status: 'done', livelli: { l4: { esito: 'non_richiesto', perche: 'fidato_fuori_zone' } } }),
+      fb({ _id: 'p4', seq: 4, status: 'done', livelli: { l4: { esito: 'pass', perche: 'zona_delicata' } } }),
+    ],
+    workerLog: [
+      { role: 'new-work', startedAt: g(3), num: '3' }, { role: 'verifier', startedAt: g(2), num: '3' },
+      { role: 'new-work', startedAt: g(3), num: '4' }, { role: 'secaudit', startedAt: g(2), num: '4' },
+    ],
+  });
+  assert.equal(r.audit.non_richiesto, 1);
+  assert.deepEqual(r.auditIds.non_richiesto, ['n3']);
+  assert.equal(r.audit.pass, 1);
+  assert.equal(S.esitoAudit({ livelli: { l4: { esito: 'non_richiesto' } } }), 'non_richiesto');
+});
+
 test('una riga d\'elenco non porta l\'esito del controllo: il conto non è zero ma ignoto', () => {
   const registro = [
     { role: 'new-work', startedAt: g(3), num: '2' },
