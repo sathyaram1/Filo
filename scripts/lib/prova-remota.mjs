@@ -82,7 +82,21 @@ export function provaDalCampo(c, remota = {}) {
   if (Array.isArray(c.rossi)) out.rossi = c.rossi.map(String);
   if (Array.isArray(c.file)) out.file = c.file.map(String);
   if (c.storia && typeof c.storia === 'object') out.storia = c.storia;
+  for (const k of ['specChiesti', 'specProvati']) if (Number.isInteger(c[k])) out[k] = c[k];
   return out;
+}
+
+/**
+ * Chiesti degli spec, la corsa deve dire di averli provati tutti: un main che non sa ancora provarli risponde coi soli
+ * unit, e quel verde non vale per gli spec. PURA. → la prova, o { errore }.
+ */
+export function conGliSpec(prova, chiesti) {
+  const n = Array.isArray(chiesti) ? chiesti.length : 0;
+  if (!n || prova.errore) return prova;
+  if (prova.specChiesti !== n) {
+    return { errore: `la corsa su GitHub non ha provato i ${n} spec delle aree toccate che le ho chiesto (ne dice ${Number.isInteger(prova.specChiesti) ? prova.specChiesti : 'nessuno'})`, mainSha: prova.mainSha || '', ...(prova.remota ? { remota: prova.remota } : {}) };
+  }
+  return prova;
 }
 
 /** Il token per l'API: quello dell'ambiente, o quello di GitHub CLI. '' se non c'è. */
