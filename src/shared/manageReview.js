@@ -1019,7 +1019,7 @@
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti"; `opts.soloNonFidate` è il filtro
   // della fiducia, `opts.livelli` quello dei Ricevuti.
   function listForManageTab(feedbacks, tab, opts) {
-    const items = filtraFiducia((feedbacks || []).filter((f) => manageTabFor(f, opts) === tab), opts && opts.soloNonFidate);
+    const items = filtraFiducia((feedbacks || []).filter((f) => schedaInElenco(f, opts) === tab), opts && opts.soloNonFidate);
     if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
