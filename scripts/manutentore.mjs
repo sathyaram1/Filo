@@ -1619,7 +1619,7 @@ export function controlliLocali(cmd, argv) {
       return ignote(cmd) || (senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'compito vuole il titolo, poi - e le istruzioni da stdin');
     }
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
-    case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).motivo || '');
+    case 'pacchetto': return ignote(cmd) || datiDelPacchetto(argv.slice(1)).motivo || '';
     case 'taccuino': {
       // La forma del nome la giudica solo il server (manutentoreRegole.validaSezione): qui basta che ci sia.
       if (a === 'sezione' && (!String(b ?? '').trim() || b === '-' || String(b).startsWith('--'))) return 'taccuino sezione vuole il nome della sezione, come nelle intestazioni del taccuino (stato, problemi…), prima del «-»';
