@@ -967,16 +967,8 @@ async function main() {
   const lontane = unitLontane(ROOT);
   let avvioRemoto = null;
   let rossiQui = false;
+  let specRemoti = [];
   if (lontane) process.env[VAR_LONTANE] = '1';
-  if (lontane && (checkOnly || v.ok)) {
-    // La corsa scarica il ramo da origin.
-    const fermo = spedisciIlRamo({ branch, cur: shaProvato, principale });
-    if (fermo) { console.error(`\n✗ ${fermo}\n  GitHub non avrebbe il commit da provare.`); process.exit(1); }
-    avvioRemoto = await avviaProvaRemota({ root: ROOT, punta: shaProvato });
-    if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
-    console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
-      + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.');
-  }
 
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
@@ -985,11 +977,29 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
+    const { specs: scelti, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
-    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: scelti.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
+    // Sul PC dell'owner gli spec arrivati da main li prova GitHub, come gli unit (D-185, #1737 giro 1).
+    const delRamo = lontane ? git(['diff', '--name-only', `${base}...HEAD`], { cwd: albero.dir }) : null;
+    const divisi = lontane ? specSulPc({ specs: scelti, cambiati: delRamo.ok ? delRamo.out.split('\n').filter(Boolean) : null }) : { qui: scelti, lontani: [] };
+    const specs = divisi.qui;
+    specRemoti = divisi.lontani;
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
+    // La corsa parte adesso e l'esito si legge dopo la verifica, che senza --check ferma prima e la corsa non serve.
+    if (lontane && (checkOnly || v.ok)) {
+      // La corsa scarica il ramo da origin.
+      const fermo = spedisciIlRamo({ branch, cur: shaProvato, principale });
+      if (fermo) { console.error(`\n✗ ${fermo}\n  GitHub non avrebbe il commit da provare.`); process.exit(1); }
+      avvioRemoto = await avviaProvaRemota({ root: ROOT, punta: shaProvato, spec: specRemoti });
+      if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
+      console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
+        + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.'
+        + (specRemoti.length ? `\n  Nella stessa corsa GitHub prova anche ${specRemoti.length} spec delle aree toccate che il ramo non cambia; qui giro solo quelli del ramo (${specs.length}).` : ''));
+    } else if (specRemoti.length) {
+      console.log(`\n▸ Spec delle aree toccate che il ramo non cambia (${specRemoti.length}): sul tuo PC non li giro, li prova GitHub quando chiudi il lavoro.`);
+    }
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
