@@ -1,0 +1,56 @@
+// Quali unit girano sul PC dell'owner (#1497.3, D-185): solo i file di tests/unit che il suo ramo cambia. Gli altri sono
+// arrivati da main anche senza il suo sì e girano su GitHub (prova-remota.mjs), lontano dalle sue credenziali.
+// Sentinella: tests/unit/unitSulPc.test.mjs.
+
+import { relative, sep } from 'node:path';
+import { isRoutineInstance } from './routine-role.mjs';
+import { gitIn, refspecMain } from './unit-sulla-fusione.mjs';
+
+/** Forza la regola del PC dell'owner: la passa il finish al lanciatore, e le prove. */
+export const VAR_LONTANE = 'FILO_UNIT_LONTANE';
+const DIR = 'tests/unit';
+const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
+
+/** Siamo sul PC dell'owner? Una routine e GitHub Actions no: lì non ci sono le sue credenziali. */
+export function unitLontane(root, { env = process.env, routine = isRoutineInstance } = {}) {
+  if (String(env[VAR_LONTANE] || '') === '1') return true;
+  if (String(env.GITHUB_ACTIONS || '') === 'true') return false;
+  return !routine(root, { env });
+}
+
+/** I file di `tutti` (assoluti) che stanno fra `cambiati` (relativi alla radice, barre normali). PURA. */
+export function soloDelRamo({ tutti = [], cambiati = [], root }) {
+  const set = new Set(cambiati.map((f) => String(f).replace(/\\/g, '/')));
+  return tutti.filter((f) => set.has(relative(root, f).split(sep).join('/')));
+}
+
+/**
+ * I file di unit che il ramo cambia rispetto a origin/main appena scaricato, modifiche non ancora committate e file
+ * nuovi compresi. Senza main fresco si ferma: con una copia vecchia i file arrivati da main sembrerebbero del ramo.
+ * → { file, base } | { errore }.
+ */
+export function unitDelRamo(root, tutti, { git = gitIn(root) } = {}) {
+  const f = git(['fetch', '--quiet', 'origin', refspecMain()]);
+  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
+  const mb = git(['merge-base', 'refs/remotes/origin/main', 'HEAD']);
+  if (!mb.ok) return { errore: `non trovo la base comune con origin/main (${primaRiga(mb.out)})` };
+  const base = mb.out.trim();
+  const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', base, '--', DIR]);
+  const n = git(['-c', 'core.quotepath=false', 'ls-files', '--others', '--exclude-standard', '--', DIR]);
+  if (!d.ok || !n.ok) return { errore: `non riesco a leggere i file cambiati dal ramo (${primaRiga(d.ok ? n.out : d.out)})` };
+  const cambiati = [...d.out.split(/\r?\n/), ...n.out.split(/\r?\n/)].filter(Boolean);
+  return { file: soloDelRamo({ tutti, cambiati, root }), base };
+}
+
+/** Cosa dice il lanciatore sul PC dell'owner. PURA. */
+export function testoSulPc(scelta, totale) {
+  if (scelta.errore) {
+    return `[test:unit] Sul tuo PC giro solo gli unit che il ramo cambia, e non so quali sono: ${scelta.errore}.\n`
+      + '[test:unit] Non ne lancio nessuno. Per lanciarne alcuni: npm run test:unit -- --solo <file>';
+  }
+  const quanti = scelta.file.length;
+  const resto = `gli altri ${totale - quanti}, arrivati da main, girano su GitHub quando chiudi il lavoro (npm run finish)`;
+  return quanti
+    ? `[test:unit] Sul tuo PC giro solo gli unit che il ramo cambia (${quanti} di ${totale}): ${resto}.`
+    : `[test:unit] Il ramo non cambia nessun file di unit: qui non ne giro, ${resto}.`;
+}
