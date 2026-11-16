@@ -40,9 +40,9 @@ export function soloDelRamo({ tutti = [], cambiati = [], root }) {
 }
 
 /**
- * I file di unit che il ramo cambia rispetto a origin/main appena scaricato, modifiche non ancora committate e file
- * nuovi compresi. Senza main fresco si ferma: con una copia vecchia i file arrivati da main sembrerebbero del ramo.
- * → { file, base } | { errore }.
+ * I file sotto `dir` che il ramo cambia rispetto a origin/main appena scaricato, modifiche non ancora committate e file
+ * nuovi compresi: l'unico conto di cosa può girare sul PC, per unit e spec. Senza main fresco si ferma: con una copia
+ * vecchia i file arrivati da main sembrerebbero del ramo. → { cambiati, base } | { errore }.
  */
 export function cambiatiDelRamo(root, dir, { git = gitIn(root) } = {}) {
   const f = git(['fetch', '--quiet', 'origin', refspecMain()]);
