@@ -922,9 +922,9 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    const { specs, soloCommenti } = specDellaScelta({ changed, base, root: albero.dir });
+    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
-    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
