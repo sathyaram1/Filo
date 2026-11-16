@@ -74,7 +74,7 @@ test('la cartella spostata su main durante finish:check: la prova resta sul comm
   try {
     const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
     const p = spawn(process.execPath, [join(lavoro, 'scripts', 'finish-local.mjs'), '--check'], {
-      cwd: lavoro, env: { ...env, FILO_PROVA_SEGNALI: segnali, FILO_ROUTINE: '' },
+      cwd: lavoro, env: { ...env, FILO_PROVA_SEGNALI: segnali, FILO_ROUTINE: '', FILO_UNIT_LONTANE: '0' },
     });
     let out = '';
     p.stdout.on('data', (c) => { out += c; });
@@ -105,7 +105,7 @@ test('un file nuovo fuori dai commit ferma finish:check col suo nome: la prova s
     writeFileSync(join(lavoro, 'tests', 'unit', 'rosso.test.mjs'), "import { test } from 'node:test';\ntest('rosso', () => { throw new Error('rosso'); });\n");
     const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
     const r = spawnSync(process.execPath, [join(lavoro, 'scripts', 'finish-local.mjs'), '--check'], {
-      cwd: lavoro, encoding: 'utf8', env: { ...env, FILO_PROVA_SEGNALI: segnali, FILO_ROUTINE: '' },
+      cwd: lavoro, encoding: 'utf8', env: { ...env, FILO_PROVA_SEGNALI: segnali, FILO_ROUTINE: '', FILO_UNIT_LONTANE: '0' },
     });
     const out = `${r.stdout}${r.stderr}`;
     assert.equal(r.status, 1, out);
