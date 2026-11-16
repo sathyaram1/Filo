@@ -27,8 +27,21 @@ const FINTO = [
 test('le versioni uscite arrivano dalla più recente, senza il blocco della prossima', () => {
   const v = N.uscite(FINTO, '0.3.1');
   assert.deepEqual(v.map((x) => x.version), ['0.3.1', '0.3.0']);
-  assert.deepEqual(v[0].features[0], { testo: 'La pagina Novità elenca tutte le versioni.', segnalazione: 1956 });
-  assert.deepEqual(v[0].fixes[0], { testo: 'Il download riparte dopo un\'interruzione.', segnalazione: null });
+  assert.deepEqual(v[0].features[0], { testo: 'La pagina Novità elenca tutte le versioni.', segnalazioni: [1956] });
+  assert.deepEqual(v[0].fixes[0], { testo: 'Il download riparte dopo un\'interruzione.', segnalazioni: [] });
+});
+
+// #2270: la riga di un pacchetto collega ogni segnalazione assorbita nata da un utente.
+test('una riga con l’elenco delle segnalazioni le porta tutte, senza doppioni; «#» e numeri storti si puliscono', () => {
+  assert.deepEqual(PN.riga({ testo: 'Il menu si apre.', segnalazione: [1956, '#1960', 1956, 0, 'x'] }), { testo: 'Il menu si apre.', segnalazioni: [1956, 1960] });
+  assert.deepEqual(PN.riga({ testo: 'Uno.', segnalazione: '#12' }).segnalazioni, [12]);
+  assert.equal(PN.segnalazioneValida([1956, 1960]), true);
+  assert.equal(PN.segnalazioneValida(1956), true);
+  for (const storta of [[], [1956, 1956], [0], ['12'], Array.from({ length: PN.SEGNALAZIONI_MAX + 1 }, (_, i) => i + 1), '12', 0]) {
+    assert.equal(PN.segnalazioneValida(storta), false, JSON.stringify(storta));
+  }
+  const v = N.uscite([{ version: '1.0.0', date: '', features: [{ testo: 'Il menu si apre.', segnalazione: [1956, 1960] }], fixes: [] }], '1.0.0');
+  assert.deepEqual(v[0].features[0].segnalazioni, [1956, 1960]);
 });
 
 test('sul registro vero ci sono almeno due versioni, e nessuna sopra quella installata', () => {
