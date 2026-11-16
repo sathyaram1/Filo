@@ -32,7 +32,7 @@ export function riferimenti(file, testo, esiste) {
     out.add(trovato || base);
   }
   // Uno script lanciato con spawn(process.execPath, [join(ROOT, 'tests', 'agent', 'prova.mjs')]) non è un import.
-  for (const m of String(testo || '').matchAll(PERCORSO)) {
+  for (const m of codice.matchAll(PERCORSO)) {
     const pezzi = [...m[1].matchAll(LETTERALE)].map((l) => l[1]);
     if (!pezzi.length || !JS.test(pezzi[pezzi.length - 1])) continue;
     const rel = pezzi.join('/');
