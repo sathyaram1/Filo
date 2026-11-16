@@ -79,7 +79,7 @@ import { specCheUsano, leggiSorgenti, SOGLIA_SPEC_DI_UN_MODULO } from './lib/spe
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { unitLontane, VAR_LONTANE } from './lib/unit-sul-pc.mjs';
-import { avviaProvaRemota, attendiProvaRemota, provaRemota, testoProvaRemota } from './lib/prova-remota.mjs';
+import { avviaProvaRemota, attendiProvaRemota, provaRemota } from './lib/prova-remota.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
