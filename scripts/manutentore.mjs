@@ -1459,8 +1459,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     }
     case 'pacchetto': {
       const server = vuoleServer(argv);
-      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).numeri, ...(server ? { lavoroServer: true } : {}) });
-      const fatto = esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      const r = await chiama(cred, 'pacchetto', Object.assign(datiDelPacchetto(argv.slice(1)), server ? { lavoroServer: true } : {}));
+      const fatto = esito(r, (x) => [
+        `Nato il pacchetto #${x.pacchetto} (${x.fiducia}): assorbe ${x.unisce.map((n) => `#${n}`).join(', ')}, che escono dalla coda e alla sua fusione si chiudono come risolti.`,
+        x.attese && x.attese.length ? `Aspetta ${x.attese.join(', ')}, come gli originali.` : '',
+        x.attesePassate ? `${x.attesePassate === 1 ? 'Un feedback che aspettava un originale aspetta' : `${x.attesePassate} feedback che aspettavano un originale aspettano`} il pacchetto.` : '',
+        x.fuori && x.fuori.length ? `RESTANO FUORI (cambiati nel frattempo): ${x.fuori.join('; ')}.` : '',
+      ].filter(Boolean).join('\n'));
       if (!fatto) segnoServer(server, r);
       return fatto;
     }
