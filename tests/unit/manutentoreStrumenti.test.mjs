@@ -109,7 +109,7 @@ test('pacchetto <P> <N,M> manda la forma vecchia, che il server rifiuta; uno sol
 
 // #2217 giro 1: il segno con l'uguale non lo accende `vuoleServer`, quindi si rifiuta invece di perderlo in silenzio.
 test('--server=valore non parte: il segno non prende valori', () => {
-  for (const argv of [['feedback', 'Titolo', '-', '--server=true'], ['pacchetto', '2220', '2215', '--lavoro-server=si']]) {
+  for (const argv of [['feedback', 'Titolo', '-', '--server=true'], ['pacchetto', '2220,2215', '--lavoro-server=si']]) {
     const r = lancia(argv, {}, 'Testo.');
     assert.notEqual(r.status, 0, argv.join(' '));
     assert.deepEqual(r.inviati, []);
