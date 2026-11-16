@@ -41,7 +41,7 @@ test('la coppia del server non entra mai in una shell come testo', () => {
   const righe = W.split('\n').filter((r) => r.includes('client_payload'));
   assert.ok(righe.length >= 3);
   for (const r of righe) {
-    assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN|MODO): |\s{4}if: github\.event\.client_payload\.windows != 'spento'$)/, `client_payload fuori da run-name, env e la parte spenta: ${r.trim()}`);
+    assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN|MODO|SPEC): |\s{4}if: github\.event\.client_payload\.windows != 'spento'$|\s{4}if: \$\{\{ github\.event\.client_payload\.spec \}\}$)/, `client_payload fuori da run-name, env e le parti spente: ${r.trim()}`);
   }
   assert.doesNotMatch(W, /run:[^\n]*\$\{\{/, 'un\'espressione dentro `run:` diventa codice della shell');
 });
