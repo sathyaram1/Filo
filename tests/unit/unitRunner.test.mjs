@@ -132,7 +132,7 @@ describe('il lanciatore lanciato da fuori', () => {
     const altrove = cartellaTemporanea('filo-altrove-');
     try {
       const r = spawnSync(process.execPath, [LANCIATORE, '--list'], {
-        cwd: altrove, encoding: 'utf8',
+        cwd: altrove, encoding: 'utf8', env: { ...process.env, FILO_UNIT_LONTANE: '0' },
       });
       assert.equal(r.status, 0, `uscita ${r.status}: ${r.stderr}`);
       const righe = r.stdout.split(/\r?\n/).filter(Boolean);
