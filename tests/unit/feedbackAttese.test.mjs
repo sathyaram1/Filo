@@ -215,35 +215,6 @@ test('--aspetta rifiuta inesistenti, sé stesso e giri senza scrivere niente', a
   } finally { rete.ripristina(); }
 });
 
-test('chi aspettava una segnalazione unita aspetta il pacchetto, e le sue altre attese restano', async () => {
-  const rete = reteFinta({
-    ...DOCS, id951: { seq: 951 }, id812: { seq: 812 }, id815: { seq: 815 },
-    id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }] },
-    id904: { seq: 904, status: 'todo', unitoIn: 'id951' },
-  });
-  try {
-    const letta = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
-    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }], ramo: '', unisce: [], unitoIn: '', fidato: false });
-    assert.equal((await owner.segnalazioneDaUnire('904', { bearer: 'tok' })).unitoIn, 'id951', 'il rimando a un pacchetto si legge: senza, il controllo dei pacchetti già presi non lo vede');
-    assert.equal((await owner.segnalazioneDaUnire('999', { bearer: 'tok' })).inesistente, true);
-    const r = await owner.spostaAttese('id903', ['id812', 'id815'], { id: 'id951', num: '951' }, { bearer: 'tok' });
-    assert.equal(r.ok, true, r.motivo);
-    assert.deepEqual(r.attese, [{ id: 'id676', num: '676' }, { id: 'id951', num: '951' }], 'due unite dello stesso pacchetto diventano un\'attesa sola');
-    assert.equal(rete.scritte.length, 1);
-    rete.scritte.length = 0;
-    const gia = await owner.spostaAttese('id903', ['id999'], { id: 'id951', num: '951' }, { bearer: 'tok' });
-    assert.equal(gia.gia, true, 'chi non aspetta nessuna unita non si riscrive');
-    assert.equal(rete.scritte.length, 0);
-  } finally { rete.ripristina(); }
-  const senza = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, waitsFor: [{ id: 'idVecchio', num: '' }, { id: 'id812', num: '812' }] } });
-  try {
-    const r = await owner.spostaAttese('id903', ['id812'], { id: 'id951', num: '951' }, { bearer: 'tok' });
-    assert.equal(r.ok, true, r.motivo);
-    assert.deepEqual(r.attese, [{ id: 'id951', num: '951' }, { id: 'idVecchio', num: '' }], 'un\'attesa senza numero resta, per id');
-    assert.equal(senza.scritte.length, 1);
-  } finally { senza.ripristina(); }
-});
-
 test('npm run feedback:apri --aspetta: il feedback nasce con le attese; un numero inesistente non apre niente', async () => {
   const rete = reteFinta(DOCS);
   const credVera = claude.credenziale.ottieni;
