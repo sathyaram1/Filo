@@ -6383,8 +6383,9 @@
   const stopLive = () => live.stop();
   const aggiornaSeguiti = () => live.aggiornaSeguiti();
 
+  // Un originale assorbito in un pacchetto non sta in nessuna scheda (#2270): si apre dove si è.
   function sezioneDi(fb) {
-    if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
+    if (!sezioniAttendibili() || !statoLeggibile(fb) || MR.assorbito(fb)) return null;
     return MR.manageTabFor(fb, opzSezioni());
   }
 
