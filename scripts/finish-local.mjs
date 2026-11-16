@@ -1032,7 +1032,6 @@ async function main() {
 
   if (lontane) {
     const prova = await attendiProvaRemota(avvioRemoto);
-    console.log(`\n${testoProvaRemota(prova)}`);
     const g = giudizioRemoto({ prova, rossiQui });
     (g.ferma ? console.error : console.log)(`\n${g.messaggio}`);
     if (g.ferma) process.exit(1);
