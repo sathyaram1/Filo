@@ -13,7 +13,8 @@ test('i difetti rimasti di una verifica non nascono a priorità 2 in nessun test
   assert.doesNotMatch(leggi('src/pages/manage/manage.html'), /figli del lavoro, a priorità 2/);
   assert.doesNotMatch(leggi('routines/roles/_critica-e-livelli.md'), /con la priorità uguale al livello/);
   assert.doesNotMatch(leggi('src/shared/verifierRound.js'), /con priorità uguale al livello\./);
-  assert.match(leggi('FEEDBACK-STATES.md'), /un 2 che nasce a 1/);
+  // Dal #2269 nascono tutti a 1: a cominciare lo decide l'ordine del manutentore.
+  assert.match(leggi('FEEDBACK-STATES.md'), /priorità 1 a ogni livello: a cominciare lo decide l'ordine del manutentore/);
 });
 
 test('il ruolo del manutentore non chiede una routine sua', () => {

@@ -31,9 +31,9 @@
   // La SEDE: `i` se il difetto riguarda l'obiettivo del feedback o l'ha introdotto il ramo, e solo lui prende un
   // livello; `e` tutto il resto, che esce in un feedback nuovo senza livello, classificato dopo come ogni altro.
   const SEDI = ['i', 'e'];
-  // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
-  // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
-  const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
+  // Un interno messo da parte nasce a 1 a ogni livello (#2269): a cominciare lo decide l'ordine del manutentore, non il
+  // livello. Il livello resta quello scritto; un'emergenza esterna la classifica a 3 il giudice, come ogni feedback nuovo.
+  const prioritaDiNascita = () => 1;
   // La scala delle priorità dei feedback (0-3) non è quella dei livelli dei rilievi.
   const PRIORITA = [0, 1, 2, 3];
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se il difetto riguarda l\'obiettivo del feedback o l\'ha introdotto il ramo (per esempio [2i], [1i?]); tutto il resto è esterno e si scrive [e], senza livello';
@@ -591,7 +591,7 @@
    * e con `priority: null` (il feedback nuovo lo classifica chi classifica gli
    * altri, #2339), in ogni esito. Un esterno col `?` non ferma niente: la
    * domanda viaggia nel suo feedback. I rilievi messi da parte (`derived`)
-   * portano la `priority` del livello SCRITTO; come diventano feedback lo dice
+   * nascono a priorità 1, a ogni livello (#2269); come diventano feedback lo dice
    * derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1}, counts:{count3,count2,count1} }
@@ -680,7 +680,8 @@
    *   - `decisione`: un interno col `?`, da solo (anche un 2 col `?` che
    *     intanto si corregge: porta `inCorrezione`);
    *   - `rimasti`: TUTTI gli altri interni messi da parte dal bilancio in un
-   *     feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
+   *     feedback solo. Un interno nasce a 1 a ogni livello (prioritaDiNascita); una
+   *     priorità già scritta sul rilievo vince, e il gruppo prende la più alta.
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
    * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
    * più `sede`, `level`, `priority` e `decision` canonici (lo stato della scala
@@ -814,7 +815,7 @@
     const applicate = gruppi.filter((g) => g.tipo === 'decisione' && g.findings[0].inCorrezione === true).length;
     const domande = gruppi.filter((g) => g.tipo === 'decisione').length - applicate;
     if (domande) {
-      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
+      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, a priorità 1: quando lavorarlo lo decide il manutentore, con l'ordine.`);
     }
     if (applicate) {
       parts.push(`${applicate === 1 ? 'Un rilievo di livello 2 chiede una tua decisione' : `${applicate} rilievi di livello 2 chiedono una tua decisione`} senza fermare il lavoro: chi corregge applica intanto l'opzione consigliata dal verificatore, e la domanda esce in un feedback a parte. Se scegli diversamente, quel feedback cambia il codice già fuso.`);
@@ -825,7 +826,7 @@
       const voci = rimasti.findings.map((f) => `${findingTag(f)} ${primaFrase(f.text, 80)}`).join('; ');
       parts.push(n === 1
         ? `Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità ${rimasti.priority}: ${voci}`
-        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (la più alta fra loro): ${voci}`);
+        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority}: ${voci}`);
     }
     const due = d.stop ? '' : dueDaParteRiga(d.derived);
     if (due) parts.push(due);

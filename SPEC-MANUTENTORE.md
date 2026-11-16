@@ -34,14 +34,26 @@ La priorità non è più una coda: dice quanto una cosa conta oggi.
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno: i feedback più importanti fra tutti, scelti ogni mattina leggendo tutte le schede | manutentore | sempre nel suo contesto; fra questi decide ordine, pacchetti e quanti insieme |
-| **1** | da fare, ma non oggi | manutentore (e owner) | aspettano una prossima rosa |
-| **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | non si lavorano; ne esistono infiniti, e oggi conta più un'analisi per velocizzare Filo che correggerli |
+| **2** | importante: da mettere presto nell'ordine | manutentore (e owner) | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
+| **1** | da fare | manutentore, owner, giudici | parte quando il manutentore la mette nell'ordine |
+| **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | non entra nell'ordine; ne esistono infiniti, e oggi conta più un'analisi per velocizzare Filo che correggerli |
+
+**L'ordine è l'unica condizione per cominciare** (#2269). Un primo lavoro
+nell'ordine parte a qualunque priorità da 0 a 2; fuori dall'ordine parte solo
+una 3. Con l'ordine vuoto, o senza lavori che possano partire, il server dà la
+coda per urgenza, e solo lì le priorità 0 e 1 restano chiuse fino all'ultimo
+giorno prima del rinnovo. Non c'è una rosa delle 2: la stessa scelta si
+scriveva tre volte (classe nel taccuino, priorità 2, ordine), e un primo
+lavoro a 1 nell'ordine non partiva. I compiti senza feedback stanno nell'ordine
+col loro id (`C-12`) accanto ai numeri, e un feedback può aspettare un compito:
+l'attesa si scioglie quando il compito chiude. Le sessioni libere (compiti,
+sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi i
+lavori già iniziati (finiscono da soli, dentro o fuori dall'ordine), poi
+l'ordine, poi il resto per urgenza.
 
 La soglia fra i livelli si muove con la maturità di Filo e con i token
-disponibili: con dieci account, o con un modello piccolo al livello di Opus,
-molti 0 diventano 1 e molti 1 diventano 2. Lo decide il manutentore, e lo
-scrive nel taccuino quando cambia il criterio.
+disponibili. Lo decide il manutentore, e lo scrive nel taccuino quando cambia
+il criterio.
 
 **Tetti.** I tetti per priorità di oggi (6 lavori a priorità 3 insieme, 4 a
 priorità 2) spariscono: li sostituiscono le priorità 3 che partono sempre e il
@@ -52,19 +64,20 @@ crescente del pacemaker sulle accensioni nate morte e il tetto sulle richieste
 al minuto.
 
 **Transizione.** Le centinaia di priorità 2 in coda oggi scendono a 1 in un
-colpo; la prima mattina il manutentore promuove la rosa. Nessuna segnalazione
-si perde: cambia solo quante 2 si vedono in Gestione.
+colpo. Nessuna segnalazione si perde: cambia solo quante 2 si vedono in
+Gestione. Il primo mattino dopo #2269 il manutentore toglie dal taccuino le
+regole sulla rosa.
 
 ## 3. Cosa può fare, e cosa no
 
 Può, da solo e senza passare dall'owner:
 
-- scrivere l'**ordine** dei feedback e il **parallelismo N**; il server accende
-  una sessione per feedback nell'ordine, fino a N, come in #1680;
+- scrivere l'**ordine** dei feedback e dei compiti e il **parallelismo N**; il
+  server accende una sessione per voce dell'ordine, fino a N, come in #1680;
 - cambiare le **priorità** (0, 1, 2; creare 3; mai abbassare una 3);
 - comporre **pacchetti** (SPEC-RIDISEGNO-LAVORO § 3.1) e mettere **attese**
-  fra feedback;
-- aprire feedback e domande; archiviare doppioni e mettere note; **sbloccare
+  fra feedback, o di un feedback su un compito;
+- aprire feedback, compiti e domande; archiviare doppioni e mettere note; **sbloccare
   un lavoro fermo per guasto** (§ 7);
 - **spegnere e riaccendere** un account o le routine, e scegliere quale account
   usare prima (di norma B, poi A: non c'è più la riserva del 10% su A, perché
@@ -82,8 +95,8 @@ d'emergenza.
 
 **La decisione del mattino, ogni giorno.** Legge tutte le schede (una riga per
 feedback, ~800 oggi), le indicazioni dell'owner nel taccuino, i rami vivi coi
-loro file, la spesa della settimana per account. Scrive: la rosa (priorità 2),
-l'ordine, N, i pacchetti, le attese. È l'unica lettura intera: ~240k token,
+loro file, la spesa della settimana per account. Scrive: l'ordine (almeno 2×N
+lavori pronti), N, i pacchetti, le attese. È l'unica lettura intera: ~240k token,
 una volta al giorno. Prima della lettura il censimento delle schede parte da
 lui: Haiku scrive quelle mancanti o vecchie, Opus rilegge quelle che tolgono
 lavoro e un campione.
@@ -95,7 +108,7 @@ nel recap. La toglie la decisione del mattino del giorno dopo, o l'owner.
 
 **Fra una decisione e l'altra non resta sveglio: si fa svegliare.** Ogni
 accensione è una sessione nuova con un contesto piccolo (ruolo, taccuino,
-schede a priorità 3 e 2, rami vivi, segnali dall'ultima volta: ~25k token) e
+schede delle 3 e dei lavori nell'ordine, rami vivi, segnali dall'ultima volta: ~25k token) e
 la memoria nel taccuino (§ 5). Si accende:
 
 - a un **battito** ogni 55 minuti al massimo, per guardare biglietti, guasti,
@@ -107,15 +120,19 @@ la memoria nel taccuino (§ 5). Si accende:
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
 
-**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se
-nell'ordine non resta un lavoro che possa partire adesso (vuoto, o solo lavori
-fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa
-dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino
-ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del
-mattino e riscrive l'ordine; lo annota nel taccuino, e il recap del giorno
-dopo lo racconta. Non in una giornata a secco. Il 06/11 la rosa del mattino si
-è svuotata a metà giornata, nessun battito l'ha riempita e le quote sono
-rimaste ferme per quattordici ore circa.
+**L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene
+almeno 2×N lavori che possono partire subito; quelli in attesa, fermi, che
+restano locali o in mano all'owner non contano. Il conto lo fa il server (lo
+stato e il comando `ordine` dicono i pronti contro i 2×N). Se mancano, il
+manutentore allunga l'ordine con i criteri del mattino; lo annota nel
+taccuino, e il recap del giorno dopo lo racconta. La spesa si regola con N,
+non svuotando l'ordine. Non in una giornata a secco. La classe è il primo
+criterio, non un filtro: un lavoro che tocca i file di un ramo vivo aspetta, e
+intanto entra uno di classe più bassa in un'area libera; un compito può stare
+davanti a un feedback; un lavoro già iniziato non si mette in attesa di uno
+non iniziato. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
+nessun battito l'ha riempita e le quote sono rimaste ferme per quattordici ore
+circa.
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
@@ -235,10 +252,10 @@ Oggi ogni worker scrive la sua riga alla consegna e il rilascio le pubblica
 com'erano. Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un
 **redattore**: un sotto-agente del manutentore con un contesto piccolo e
 apposito, non quello intero. Riceve le righe dei worker dall'ultimo rilascio,
-il manifesto delle capacità e i titoli della rosa e delle priorità 3 in corso.
-Riordina per argomento, dà spazio a ciò che conta, condensa. Può aggiungere una
-promessa («il supporto per altri formati è in arrivo») **solo** su un lavoro
-già nella rosa o a priorità 3: non ogni rilascio ne ha una.
+il manifesto delle capacità e i titoli dei lavori nell'ordine e delle priorità
+3 in corso. Riordina per argomento, dà spazio a ciò che conta, condensa. Può
+aggiungere una promessa («il supporto per altri formati è in arrivo») **solo**
+su un lavoro già nell'ordine o a priorità 3: non ogni rilascio ne ha una.
 
 Le novità le leggono tutti gli utenti e il redattore lavora su testo scritto
 da chiunque: il server accetta la riscrittura solo se non contiene link che
@@ -257,7 +274,8 @@ operazione del server che gli dà schede e testi; in locale funziona da subito
 con `npm run manutentore -- contesto` più il taccuino.
 
 **Il recap del mattino.** Breve, in Gestione → Automazioni, un foglio al
-giorno: fusioni e spesa di ieri, scelte prese (rosa, N, pacchetti) e perché,
+giorno: fusioni e spesa di ieri, scelte prese (ordine, N, pacchetti) e perché,
+le ore con posti liberi e l'ordine senza lavori pronti (l'obiettivo è nessuna),
 esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che
 sta seguendo, come ha applicato le indicazioni dell'owner. **Mai cose da fare
 per l'owner né domande**: quelle vanno nelle domande. Il recap è per ciò che

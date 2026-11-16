@@ -135,11 +135,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   si legge con 0 → 1 e vicino → esterno). Ciò che il lavoro non corregge diventa
   SUBITO un feedback, aperto dal server in ogni esito: ogni esterno un feedback
   nuovo senza livello, classificato dopo come ogni altro; per ogni interno col `?` un
-  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, a
-  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore
+  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riscriva, a
+  priorità 1 a ogni livello: a cominciare lo decide l'ordine del manutentore (#2269)
   (quello col `?` aspetta la risposta alla sua domanda: sopra, Pipeline); UNO solo per
-  tutti gli altri interni messi da parte dal bilancio, a priorità = il livello
-  scritto più alto fra loro, con la stessa regola sul 2); —critica con rilievi
+  tutti gli altri interni messi da parte dal bilancio, anche lui a priorità 1); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
@@ -269,10 +268,14 @@ Rivede il § 3a dove dice altro. Il manutentore è un ruolo **fidato** (decision
 nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
 all'owner, il freno.
 
-- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
-  scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
-  lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare né archiviare: la toglie solo l'owner,
-  e il limite vale per ogni automazione, riordino del lunedì compreso, giudice di priorità e risposte
+- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = importante; 1 = da
+  fare; 0 = rimandato a lungo. A cominciare lo decide l'ordine del manutentore (#2269): dentro un primo lavoro parte
+  a qualunque priorità da 0 a 2, fuori solo una 3; un ordine vuoto o senza lavori pronti vale come nessun ordine, e
+  solo in quella coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del rinnovo. L'ordine
+  porta anche i compiti senza feedback (`C-12`), e un feedback può aspettare un compito (`waitsFor` col suo id:
+  l'attesa si scioglie quando il compito chiude). I giudici assegnano 3 o lasciano 1. Una 3 il manutentore la
+  può creare, non abbassare né archiviare: la toglie solo l'owner, e il limite vale per ogni automazione,
+  riordino del lunedì compreso, giudice di priorità e risposte
   automatiche delle domande (#2000, #2291; regola unica in `src/shared/prioritaTre.js`, che il server incorpora e
   ricontrolla sul documento al momento della scrittura, e che rifiuta anche chi scrive senza sapere la priorità di
   adesso). Archiviarla dentro un lavoro che resta a 3 (doppione di una 3 che avanza, unione col figlio a 3) non la

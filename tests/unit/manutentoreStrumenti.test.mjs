@@ -159,15 +159,15 @@ test('gli elenchi del rilascio tengono quanto il server accetta', () => {
   assert.equal(dentroBudget(voci).length, 200);
 });
 
-test('una promessa scritta con parole comuni senza il suo lavoro nella rosa si rifiuta', () => {
+test('una promessa scritta con parole comuni senza il suo lavoro nell\'ordine si rifiuta', () => {
   const blocco = { version: '0.2.255', features: [{ testo: 'Le schede si trascinano.' }], fixes: [] };
-  const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const schede = [{ num: '812', priorita: 1 }, { num: '900', priorita: 2 }];
+  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['I formati audio arriveranno con il prossimo aggiornamento.', 'Nella prossima versione: i formati audio.',
     'Stiamo preparando i formati audio.', 'In futuro anche i formati audio.', 'Coming soon: audio.', 'Sarà disponibile anche l\'audio.']) {
     assert.equal(prova(riga).ok, false, riga);
-    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nell'ordine)`);
+    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   assert.equal(prova({ testo: 'Ora il prossimo video parte da solo.', da: [1] }).ok, true);
 });
@@ -199,14 +199,14 @@ test('una promessa al futuro non dichiarata si riconosce anche fuori dall\'elenc
 test('una promessa si riconosce dal non avere fonte, non dalle parole: ogni riga dice da quali righe dei worker nasce', () => {
   const blocco = { version: '0.2.256', features: ['Le schede si trascinano fra le finestre.', 'Il menu si apre più in fretta.'], fixes: ['Il download non si blocca.'] };
   const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['Tra poco potrai allegare i PDF.', 'Stiamo per portare la chat sul telefono.', 'Il supporto ai PDF è quasi pronto.',
     'I PDF sono il prossimo passo.', 'Tra qualche giorno anche i PDF.', 'Potremo leggere i PDF nel prossimo giro.']) {
     const r = prova([riga]);
     assert.equal(r.ok, false, riga);
     assert.match(r.errori.join('\n'), /non dice da quali righe dei worker nasce/, riga);
-    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nell'ordine)`);
+    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   // Una riga copiata uguale ha già la sua fonte; una riscritta la cita, features e fixes contati di seguito.
   assert.equal(prova(['Il menu si apre più in fretta.']).ok, true);

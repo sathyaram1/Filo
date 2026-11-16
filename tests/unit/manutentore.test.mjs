@@ -34,9 +34,17 @@ test('ogni campo di una scheda resta su una riga: un a capo dal feedback non scr
 test('l\'ordine dice quali numeri sono ancora aperti, e che un ordine senza aperti vale come nessuno', () => {
   const indice = [{ num: '812', stato: 'todo' }];
   assert.match(M.rigaOrdine(['812', '8120'], indice), /#812 \(todo\), #8120 \(non fra gli aperti\).*il server li salta/);
-  assert.match(M.rigaOrdine(['700'], indice), /Nessuno è fra gli aperti: il server fa come senza ordine/);
+  assert.match(M.rigaOrdine(['700'], indice), /Nessun feedback è fra gli aperti/);
   assert.match(M.rigaOrdine(['700'], []), /Senza l'indice delle schede non so quali sono ancora aperti/);
   assert.match(M.rigaOrdine([], indice), /Nessun ordine/);
+  // #2269: i compiti stanno nell'ordine col loro id, e i pronti si contano contro i 2×N.
+  const conCompito = M.rigaOrdine(['812', 'C-5'], indice, { pronti: ['812', 'C-5'], servono: 4 });
+  assert.match(conCompito, /#812 \(todo\), compito C-5\. .*a qualunque priorità/);
+  assert.doesNotMatch(conCompito, /non fra gli aperti/, 'un compito non è un feedback da cercare fra le schede');
+  assert.match(conCompito, /\nORDINE CORTO: pronti 2, ne servono almeno 4 \(2×N\): #812, C-5\. Allungalo/);
+  assert.match(M.rigaPronti({ pronti: ['1', '2'], servono: 2 }), /^Pronti nell'ordine: 2, ne servono almeno 2 \(2×N\): #1, #2\.$/);
+  assert.match(M.rigaPronti(null), /il server non ha letto la coda/);
+  assert.match(M.rigaPronti(undefined), /il server non li conta ancora/);
 });
 
 test('i rami lasciati fuori si dicono, e un ramo coi suoi feedback non ne perde nessuno in silenzio', () => {
@@ -123,8 +131,11 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
 
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
   assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
-  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
+  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback né id di compiti \(C-12\): menu/);
   assert.equal(M.leggiOrdine('').ok, false);
+  // #2269: un compito sta nell'ordine col suo id; in un pacchetto no.
+  assert.deepEqual(M.leggiOrdine('C-12, 812, c-12').numeri, ['C-12', '812']);
+  assert.match(M.leggiOrdine('812,C-12', { compiti: false }).motivo, /non sono numeri di feedback: C-12/);
   const tanti = Array.from({ length: M.ORDINE_MAX + 1 }, (_, i) => String(i + 1)).join(',');
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
 });
@@ -264,20 +275,22 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
-test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segnali e il taccuino, sotto il tetto', () => {
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
-    rami: [{ ramo: 'worker/x', feedback: ['5'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
+test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, non le 2 (#2269)', () => {
+  const stato = { ...STATO, ordine: ['40', '7', 'C-5', '31'], pronti: { pronti: ['40', 'C-5'], servono: 6 } };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
+    rami: [{ ramo: 'worker/x', feedback: ['40'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
   assert.equal(p.ok, true);
   assert.ok(p.token < M.PICCOLO_TETTO_TOKEN, `${p.token} token`);
-  assert.match(p.testo, /Schede a priorità 3 e 2, e le ferme \(30 di 800\)/);
-  assert.match(p.testo, /^#1 · p3 · todo/m);
-  assert.match(p.testo, /^#29 · p1 · todo · FERMO \(guasto: guasto: npm\)/m);
-  assert.doesNotMatch(p.testo, /^#(3[1-9]|[4-9]\d|\d{3}) · /m, 'niente schede a 0 e a 1');
+  assert.match(p.testo, /Schede a priorità 3, dei lavori nell'ordine e le ferme \(8 di 800\)/);
+  const righe = p.testo.split('\n').filter((r) => /^(\[\d+° nell'ordine\] )?#\d+ · /.test(r)).map((r) => r.replace(/ · .*/, ''));
+  assert.deepEqual(righe, ['#1', '#2', '#3', '[1° nell\'ordine] #40', '[2° nell\'ordine] #7', '[4° nell\'ordine] #31', '#29', '#30'],
+    'le 3, poi l\'ordine nella sua sequenza, poi le ferme; niente 2 fuori ordine');
+  assert.match(p.testo, /ORDINE CORTO: pronti 2, ne servono almeno 6 \(2×N\): #40, C-5\./);
   assert.match(p.testo, /criterio: grafica prima/);
   assert.match(p.testo, /Versione 4/);
   assert.match(p.testo, /s1 guasto/);
   assert.match(p.testo, /^worker\/x/m);
-  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
+  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori dell\'ordine e delle 3');
 });
 
 test('la scheda del server dice perché un lavoro non parte: resta locale coi motivi e l’ora, attesa del server, domande (#2258)', () => {
@@ -295,15 +308,17 @@ test('la scheda del server dice perché un lavoro non parte: resta locale coi mo
 });
 
 test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
-  const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
+  const tutte = ottocento().map((s) => ({ ...s, titolo: s.titolo.repeat(3) }));
+  const lungo800 = { ...STATO, ordine: tutte.map((s) => s.num) };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: lungo800, taccuino: { testo: '', versione: 0 }, schede: tutte });
   assert.equal(p.ok, false);
-  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede delle 3 e dell'ordine \\(\\d+ token\\)\\. Togli dall'ordine`));
+  const tutte2 = tutte;
   // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
   const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
   assert.equal(lungo.ok, false);
   assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
-  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
+  assert.doesNotMatch(lungo.motivo, /Togli dall'ordine/);
 });
 
 test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
@@ -418,6 +433,35 @@ test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => 
   assert.equal(s.corpi.length, n);
 });
 
+test('#2269: l\'ordine e le attese portano gli id dei compiti, e compito ne apre uno con le istruzioni da stdin', async (t) => {
+  const s = serverFinto(t, {
+    ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 2, pronti: { pronti: ['812'], servono: 4 } }],
+    attesa: [200, { ok: true, numero: '815', aspetta: 'C-12' }],
+    compito: [200, { ok: true, compito: 'C-13', fiducia: 'non_fidato' }],
+  });
+  assert.equal(await M.main(['accendi', '812,c-12,815'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /compito C-12.*\nORDINE CORTO: pronti 1, ne servono almeno 4/);
+  assert.equal(await M.main(['attesa', '815', 'C-12'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /#815 aspetta il compito C-12: parte quando il compito chiude\./);
+  const { Readable } = await import('node:stream');
+  const stdin = Object.getOwnPropertyDescriptor(process, 'stdin');
+  Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(Readable.from([Buffer.from('Rivedi tutti gli hover.\n')]), { isTTY: false }) });
+  t.after(() => Object.defineProperty(process, 'stdin', stdin));
+  assert.equal(await M.main(['compito', 'Revisione', 'degli', 'hover', '-', '--urgenza', '30'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
+    ['ordine', { ordine: ['812', 'C-12', '815'] }], ['attesa', { numero: '815', aspetta: 'C-12' }],
+    ['compito', { titolo: 'Revisione degli hover', istruzioni: 'Rivedi tutti gli hover.', urgenza: 30 }],
+  ]);
+  assert.match(s.out.join('\n'), /Aperto il compito C-13 \(non_fidato\): mettilo nell'ordine/);
+  // Gli storti non partono.
+  const n = s.corpi.length;
+  assert.equal(await M.main(['compito', 'x', '-', '--urgenza', 'alta'], CHIAVE), 1);
+  assert.equal(await M.main(['compito', '-'], CHIAVE), 1);
+  assert.equal(await M.main(['attesa', '815', 'C-0'], CHIAVE), 1);
+  assert.equal(await M.main(['pacchetto', '900', '812,C-12'], CHIAVE), 1, 'un compito non sta in un pacchetto');
+  assert.equal(s.corpi.length, n);
+});
+
 test('senza chiave né biglietto del manutentore non si chiama il server, e si dice come averla', async (t) => {
   const s = serverFinto(t, {});
   assert.equal(await M.main(['stato'], { env: {}, root: cartellaTemporanea('manutentore-senza') }), 1);
@@ -449,26 +493,27 @@ test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e ris
   assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
 });
 
-test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si rifiuta, come un link nuovo', () => {
+test('il redattore: una promessa su un lavoro che non è nell\'ordine né a 3 si rifiuta, come un link nuovo (#2269)', () => {
   const blocco = { version: '0.2.255', features: ['Le schede si trascinano. Guida su https://filo.app/guida'], fixes: ['Il menu si apre.'] };
-  const schede = [schedaServer(812, 2), schedaServer(900, 1), schedaServer(950, 3)];
+  const schede = [schedaServer(812, 1), schedaServer(813, 0), schedaServer(900, 2), schedaServer(950, 3)];
+  const ordine = ['813', 'C-4', '812'];
   const base = { versione: '0.2.255', features: [{ testo: 'Le schede si trascinano (guida su https://filo.app/guida).', da: [1] }], fixes: ['Il menu si apre.'] };
-  assert.equal(M.controllaNovita(base, { blocco, schede }).ok, true);
-  const fuoriRosa = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede });
-  assert.equal(fuoriRosa.ok, false);
-  assert.match(fuoriRosa.errori.join('\n'), /promessa su #900, che non è nella rosa né a priorità 3/);
-  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede });
+  assert.equal(M.controllaNovita(base, { blocco, schede, ordine }).ok, true);
+  const fuori = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine });
+  assert.equal(fuori.ok, false);
+  assert.match(fuori.errori.join('\n'), /promessa su #900, che non è nell'ordine né a priorità 3/, 'una 2 fuori ordine non è più la rosa');
+  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede, ordine });
   assert.match(taciuta.errori.join('\n'), /non dice da quali righe dei worker nasce/);
-  for (const n of ['812', '950']) {
-    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede }).ok, true, `#${n}`);
+  for (const n of ['812', '813', '950']) {
+    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine }).ok, true, `#${n}`);
   }
-  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede });
+  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede, ordine });
   assert.match(link.errori.join('\n'), /link che le righe dei worker non avevano: www\.altro\.example\/x/);
-  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede }).errori[0], /il blocco in cima è 0\.2\.255/);
-  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede });
-  assert.match(ctx, /## La rosa \(priorità 2\)\n\n#812 /);
+  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede, ordine }).errori[0], /il blocco in cima è 0\.2\.255/);
+  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede, ordine });
+  assert.match(ctx, /## I lavori nell'ordine\n\n#813 .*\n#812 /, 'nella sequenza dell\'ordine');
   assert.match(ctx, /## Priorità 3 in corso\n\n#950 /);
-  assert.doesNotMatch(ctx, /#900/);
+  assert.doesNotMatch(ctx, /#900|rosa/);
 });
 
 test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
@@ -568,28 +613,52 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
 });
 
-// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261).
-test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti e la spesa lo consente, non a secco (#2261)', () => {
+// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261). Dal
+// #2269 non c'è più la rosa: l'ordine è l'unica condizione, e a ogni accensione ha almeno 2×N lavori pronti.
+test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe è un criterio, niente rosa (#2269)', () => {
   const piatto = (t) => t.replace(/\s+/g, ' ');
+  const ruolo = piatto(RUOLO);
   const ritmo = piatto(RUOLO.slice(RUOLO.indexOf('## Il ritmo'), RUOLO.indexOf('## La sessione accesa dal pacemaker')));
-  const regola = ritmo.slice(ritmo.indexOf('**La rosa si riempie anche di giorno.**'));
-  assert.ok(ritmo.includes('**La rosa si riempie anche di giorno.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
-  assert.match(regola, /A ogni battito e sveglia/);
-  assert.match(regola, /nell'ordine non resta un lavoro che possa partire adesso \(vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner\)/);
-  // Il conto è unico come al mattino: con «prima B, poi A» la condizione su ogni account lascerebbe la rosa vuota.
-  assert.match(regola, /spesa delle ultime 24 ore, sommata sugli account .*sotto il ritmo sostenibile fino ai rinnovi/);
-  assert.doesNotMatch(regola, /(ultime 24 ore|ultimo giorno) di ogni account/);
-  assert.match(regola, /riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole/);
+  const regola = ritmo.slice(ritmo.indexOf('**L\'ordine non resta mai corto.**'));
+  assert.ok(ritmo.includes('**L\'ordine non resta mai corto.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
+  assert.match(regola, /A ogni battito e sveglia l'ordine contiene almeno \*\*2×N\*\* lavori che possono partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano/);
+  assert.match(regola, /La spesa si regola con N, non svuotando l'ordine/);
   for (const r of ['decisione incrementale', 'scala delle classi', 'classe ereditata da chi blocca', 'incroci coi rami vivi', 'riscrivi l\'ordine', 'taccuino', 'recap del giorno dopo']) {
     assert.ok(regola.includes(r), r);
   }
   assert.match(regola, /In una giornata a secco no\./);
+  // L'ordine è l'unica condizione per cominciare, e nessuna 2 da scegliere ogni mattina.
+  assert.match(ruolo, /\*\*L'ordine è l'unica condizione per cominciare\.\*\* Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2; fuori dall'ordine parte solo una 3/);
+  assert.doesNotMatch(ruolo.replace(/\*\*Una volta sola\*\* \(#2269[^]*?contano come importanti\./, ''), /\b(la|una|nella|della|alla) rosa\b/i,
+    'la rosa resta nominata solo per dire che non c\'è più e per toglierla dal taccuino');
+  assert.doesNotMatch(ruolo, /la 2 è solo tua|Scrivi la rosa|priorità 3 e 2/);
+  // La classe è il primo criterio, non un filtro.
+  const ordine = piatto(RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')));
+  assert.match(ordine, /\*\*La classe è il primo criterio, non un filtro\.\*\*.*tocca i file probabili di un ramo vivo \(`incroci <N>`\) aspetta.*entra uno di classe più bassa in un'area libera/);
+  assert.match(ordine, /Un compito può stare davanti a un feedback/);
+  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
+  // La sequenza del server mette i lavori già iniziati davanti all'ordine: il ruolo la dice uguale.
+  assert.match(ordine, /prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza/);
+  assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
+  // Il primo mattino toglie dal taccuino le regole sulla rosa.
+  assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);
+  // I rilievi messi da parte nascono a 1.
+  assert.match(ruolo, /Un interno messo da parte nasce a 1, a ogni livello: se serve, lo metti tu nell'ordine/);
   const spec = piatto(readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'));
   const quattro = spec.slice(spec.indexOf('## 4. Ritmo'), spec.indexOf('## 5.'));
-  assert.match(quattro, /\*\*La rosa si riempie anche di giorno\.\*\* A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire adesso/);
-  assert.match(quattro, /dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
-  assert.doesNotMatch(quattro, /ultimo giorno di ogni account/);
-  assert.match(quattro, /Non in una giornata a secco\./);
+  assert.match(quattro, /\*\*L'ordine non resta mai corto\.\*\* A ogni battito e sveglia l'ordine contiene almeno 2×N lavori che possono partire subito/);
+  assert.match(quattro, /La classe è il primo criterio, non un filtro/);
+  assert.match(spec, /\*\*L'ordine è l'unica condizione per cominciare\*\* \(#2269\)/);
+  assert.doesNotMatch(spec, /la rosa \(priorità 2\)|promuove la rosa|aspettano una prossima rosa/);
+});
+
+// Il segno «lavoro server» non aspetta l'owner (#2269 punto 6): neanche lo strumento lo deve far chiedere a lui.
+test('un segno «lavoro server» non confermato non si chiede all\'owner: un fidato entra nell\'ordine lo stesso (#2269)', () => {
+  const riga = M.rigaSegnoServer(true, { ok: true, numero: '900' });
+  assert.match(riga, /^SEGNO NON MESSO/);
+  assert.match(riga, /non chiedere il segno all'owner/);
+  assert.match(riga, /mettilo nell'ordine lo stesso: il primo giro consegna «design --reason locale» e il server lo segna da sé/);
+  assert.doesNotMatch(riga, /chiedi all'owner/);
 });
 
 // Il segno lo mette il server alla consegna design + locale: aspettarlo dall'owner tiene fuori un fidato per giorni (#2261).

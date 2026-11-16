@@ -218,6 +218,11 @@
   // #903: gli aspettati che l'elenco non ha caricato, letti a parte una volta (id → riga, o { missing: true }).
   const attesiFuori = new Map();
   const attesiChiesti = new Set();
+  // I compiti aspettati (#2269) non sono feedback: il loro stato viene dall'elenco dei compiti, riletto al più ogni minuto
+  // perché chi li aspetta esca da «Aspettano» quando chiudono.
+  const COMPITI_ATTESI_OGNI_MS = 60 * 1000;
+  let compitiAttesiLettiMs = 0;
+  let compitiAttesiInLettura = false;
   let atteseApertePer = '';     // la pratica su cui l'owner ha aperto la casella delle attese
 
   // Etichette/testi vuoto per le tab-lista (DB1).
@@ -283,7 +288,7 @@
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
-    // server uno per rilievo, figli #N.k, priorità dal livello (un 2 nasce a 1): categoria
+    // server uno per rilievo, figli #N.k, a priorità 1 (#2269): categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
@@ -3971,13 +3976,16 @@
   function caricaAttesiFuori() {
     if (!ATT || !isAdmin || !dataLoaded) return;
     const mancano = [];
+    const compiti = new Set();
     for (const fb of allFeedbacks) {
       for (const w of ATT.atteseDi(fb)) {
+        if (ATT.eCompito(w.id)) { compiti.add(w.id); continue; }
         if (attesiChiesti.has(w.id) || allFeedbacks.some((f) => f._id === w.id)) continue;
         attesiChiesti.add(w.id);
         mancano.push(w.id);
       }
     }
+    if (compiti.size) caricaCompitiAttesi(compiti);
     if (!mancano.length) return;
     (async () => {
       let righe = await FB.getMany(mancano, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 });
@@ -3993,10 +4001,31 @@
     })().catch(() => { /* restano «stato non letto»: chi li aspetta resta fra quelli che aspettano, come per la coda */ });
   }
 
+  // Aperto se l'elenco dei compiti aperti lo porta, chiuso altrimenti: la regola della coda (un compito chiuso scioglie
+  // l'attesa, qualunque esito). Su un errore restano «stato non letto», e chi li aspetta resta fra quelli che aspettano.
+  function caricaCompitiAttesi(ids) {
+    if (compitiAttesiInLettura) return;
+    const nuovi = [...ids].some((id) => !attesiChiesti.has(id));
+    if (!nuovi && Date.now() - compitiAttesiLettiMs < COMPITI_ATTESI_OGNI_MS) return;
+    for (const id of ids) attesiChiesti.add(id);
+    compitiAttesiInLettura = true;
+    (async () => {
+      const r = await sendToMain({ type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.COMPITI_ELENCO) || 'compiti_elenco' });
+      compitiAttesiLettiMs = Date.now();
+      if (!r || !r.ok || !Array.isArray(r.aperti)) return;
+      const aperti = new Set(r.aperti.map((c) => String((c && c.id) || '')));
+      for (const id of ids) attesiFuori.set(id, { _id: id, compito: true, status: aperti.has(id) ? 'todo' : 'done' });
+      renderList();
+      const aperto = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (aperto) reflectAttese(aperto);
+    })().catch(() => {}).finally(() => { compitiAttesiInLettura = false; });
+  }
+
   function numeroDi(doc) {
     return doc ? FB.formatNum(doc.seq, doc.subSeq) : '';
   }
   function statoAttesaTesto(w) {
+    if (ATT.eCompito(w.id)) return w.stato === ATT.STATO.APERTO ? 'aperto' : w.stato === ATT.STATO.FUSO ? 'chiuso' : ATT.ETICHETTA[w.stato] || w.stato;
     if (w.stato !== ATT.STATO.APERTO) return ATT.ETICHETTA[w.stato] || w.stato;
     const doc = trovaAtteso(w.id);
     const info = doc && window.SN_FB_STATUS && window.SN_FB_STATUS.STATUSES[MR.normalizeStatus(doc).status];

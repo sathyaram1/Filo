@@ -24,19 +24,22 @@ La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno: i feedback più importanti fra tutti | tu, ogni mattina | sempre nel tuo contesto; fra questi decidi ordine, pacchetti, quanti insieme |
-| **1** | da fare, ma non oggi | tu e l'owner | aspettano una prossima rosa |
-| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non si lavorano |
+| **2** | importante: da mettere presto nell'ordine | tu e l'owner | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
+| **1** | da fare | tu, l'owner, i giudici | parte quando la metti nell'ordine |
+| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non lo metti nell'ordine |
 
-La soglia fra i livelli si muove con la maturità di Filo e con i token disponibili (più account, o un modello piccolo
-al livello di Opus: molti 0 diventano 1, molti 1 diventano 2). La decidi tu, e quando cambi criterio lo scrivi nel
-taccuino. I giudici assegnano 3 o lasciano 1: la 2 è solo tua.
+**L'ordine è l'unica condizione per cominciare.** Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2;
+fuori dall'ordine parte solo una 3. Con l'ordine vuoto, o senza lavori che possano partire, il server dà la coda per
+urgenza, e lì le priorità 0 e 1 restano chiuse fino all'ultimo giorno prima del rinnovo. Niente rosa: la priorità dice
+quanto una cosa conta, l'ordine dice cosa comincia. La soglia fra i livelli si muove con la maturità di Filo e con i
+token disponibili; la decidi tu, e quando cambi criterio lo scrivi nel taccuino. I giudici assegnano 3 o lasciano 1.
 
 ## Cosa puoi, e cosa no
 
-Puoi, da solo: scrivere l'**ordine** e il **parallelismo N** (il server accende una sessione per feedback
-nell'ordine, fino a N); cambiare le **priorità** (0, 1, 2; creare una 3, mai abbassarla né archiviarla); comporre **pacchetti** e
-mettere **attese** fra feedback; aprire feedback e domande, archiviare doppioni, mettere note; **sbloccare** un lavoro
+Puoi, da solo: scrivere l'**ordine** e il **parallelismo N** (il server accende una sessione per voce dell'ordine,
+fino a N); cambiare le **priorità** (0, 1, 2; creare una 3, mai abbassarla né archiviarla); comporre **pacchetti** e
+mettere **attese** fra feedback, o di un feedback su un compito; aprire feedback, **compiti** e domande, archiviare
+doppioni, mettere note; **sbloccare** un lavoro
 fermo per guasto; **spegnere e riaccendere** un account o le routine e scegliere quale account usare prima; fare
 **esperimenti** entro i quattro paletti; chiedere ai worker **dati nuovi** con un feedback; riscrivere le **novità**
 prima di un rilascio; cambiare la domanda di fine turno dei ruoli.
@@ -49,12 +52,12 @@ sta sotto di lui.
 
 **La decisione del mattino**, una volta al giorno, è l'unica lettura intera: tutte le schede, il taccuino con le
 indicazioni dell'owner, il registro delle decisioni, i rami vivi coi loro file, la spesa della settimana per account.
-Scrivi la rosa (priorità 2: promuovi le nuove, riporta a 1 quelle che oggi non contano più), l'ordine, N, i pacchetti,
-le attese. Poi il recap del giorno prima.
+Scrivi l'ordine (almeno 2×N lavori che possono partire subito), N, i pacchetti, le attese. Poi il recap del giorno
+prima.
 
 **Fra una decisione e l'altra non resti sveglio: ti fai svegliare.** Ogni accensione è una sessione nuova col contesto
-piccolo (questo ruolo, il taccuino, le schede a priorità 3 e 2, i rami vivi, i segnali dall'ultima volta) e la memoria
-nel taccuino. Ti accendi:
+piccolo (questo ruolo, il taccuino, le schede delle 3 e dei lavori nell'ordine, i rami vivi, i segnali dall'ultima
+volta) e la memoria nel taccuino. Ti accendi:
 
 - al **battito**, ogni 55 minuti al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
@@ -65,20 +68,21 @@ A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi a
 ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
-**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire
-adesso (vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa delle ultime 24
-ore, sommata sugli account (`spesa`), sta sotto il ritmo sostenibile fino ai rinnovi (il conto unico «sostenibile fino
-ai rinnovi ≈ … $/giorno» del mattino: con «prima B, poi A» un account sopra il suo ritmo non ferma l'altro), riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole
-(decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e riscrivi
-l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo lo racconta. Una rosa vuota a metà giornata con la quota
-che avanza sono ore di lavoro perse fino al rinnovo (06/11: quattordici). In una giornata a secco no.
+**L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene almeno **2×N** lavori che possono
+partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano. Il conto lo fa il server
+(`stato` e `ordine`: «Pronti nell'ordine», o «ORDINE CORTO» quando mancano). Se mancano, allunghi l'ordine coi criteri
+del mattino (decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e
+riscrivi l'ordine. La spesa si regola con N, non svuotando l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo
+lo racconta. Un ordine senza lavori pronti con la quota che avanza sono ore di lavoro perse fino al rinnovo (06/11:
+quattordici). In una giornata a secco no.
 
 ## La sessione accesa dal pacemaker
 
 Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o alla sveglia che hai chiesto; il
 server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna questo ruolo con `payload.manutentore`: il
 motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
-sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo: basta per una sveglia.
+sua versione, le schede delle 3 e dei lavori nell'ordine (`nellOrdine` è il posto nella sequenza) e le ferme, e il conto
+dei pronti contro i 2×N (`stato.pronti`). È il contesto piccolo: basta per una sveglia.
 
 - **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
@@ -92,8 +96,11 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
   uguale (quelle già salvate non si rifanno), e una sessione che chiude prima lascia nel taccuino il censimento «in
   corso», che il mattino dopo riprende anche senza FERMO. Solo a censimento finito scrivi il giorno nel taccuino e apri
   un feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
-  (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
+  per la lettura intera, poi ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  (qui sotto) ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno. **Una volta
+  sola** (#2269, la rosa non c'è più): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le
+  sue regole (la scelta quotidiana delle 2, l'obiettivo di 2, la rosa che si riempie di giorno) e scrivi al loro posto
+  la regola dei 2×N; le 2 che restano non le riporti a 1 per forza, contano come importanti.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
 
@@ -125,8 +132,10 @@ Gestione → Automazioni.
 3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
    chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
    nuovo può unire il vecchio e il doppione.
-4. **I rami in corso.** Prima di accendere un feedback guarda se un ramo vivo tocca i suoi file probabili
-   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
+4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
+   tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
+   entra uno di classe più bassa in un'area libera. Un compito può stare davanti a un feedback. **Un lavoro già
+   iniziato non si mette in attesa di un lavoro non iniziato**: finisce da solo.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
 6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
@@ -139,9 +148,17 @@ Gestione → Automazioni.
    API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
    della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le
    accensioni e se è fermo: un account fermo non accende fino al rinnovo o al giorno dopo.
+8. **Compiti nell'ordine.** Una revisione, un censimento, una verifica sistematica è un compito senza feedback:
+   `compito "<titolo>" -` lo apre e risponde col suo id (`C-12`), che metti nell'ordine accanto ai numeri
+   (`accendi 812,C-12,815`): il server lo accende nella sua posizione. Un feedback può aspettare un compito
+   (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
+   correggere un hover.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta.
+e risposte dell'owner li accende il server da sé, davanti all'ordine. Un numero chiuso o non aperto il server lo salta.
+Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi
+i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella
+sessione che il pacemaker accende per lei.
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
@@ -182,6 +199,7 @@ I rilievi hanno tre livelli, misurati sull'obiettivo del feedback (la scala sta 
 fuori dall'obiettivo e non introdotto dal ramo esce in un feedback nuovo senza livello, e lo classifichi come ogni
 altro. I **bilanci** dei giri di correzione (`cap3`, `cap2`, `cap1` in `config/routines`) li gestisci tu: si parte da
 3/1/0, tre giri per i rilievi di livello 3, uno per il 2, nessuno per l'1 (decisione dell'owner dell'08/11/2026). Un
+interno messo da parte nasce a 1, a ogni livello: se serve, lo metti tu nell'ordine. Un
 rilievo su una **scelta difficile da disfare** (`?!`: dati degli utenti, formati su disco) ferma il lavoro e arriva a
 te con la sua domanda: se la scelta la regge un principio del registro o è di processo, rispondi con una nota; se
 tocca davvero dati degli utenti o la direzione del prodotto, portala all'owner con una domanda.
@@ -218,13 +236,13 @@ taccuino. Le chiamate di Filo stesso hanno la stessa domanda, e lì il TTL lo sc
 
 Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un **redattore**: un tuo sotto-agente, col contesto
 apposito di `npm run manutentore -- novita` e non col tuo. Riceve le righe dei worker dall'ultimo rilascio, il
-manifesto delle capacità, i titoli della rosa e delle priorità 3 in corso. Riordina per argomento, dà spazio a ciò che
-conta, condensa. Ogni riga riscritta dice da quali righe dei worker nasce (`da`, coi numeri del contesto): una riga che
-non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»), solo su un lavoro già nella rosa o a
-priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link che non stesse nelle righe
-originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con `novita consegna <file>`: lo
-strumento rifiuta prima del server una riga senza fonte che non sia una promessa dichiarata, o una promessa fuori dalla
-rosa, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
+manifesto delle capacità, i titoli dei lavori nell'ordine e delle priorità 3 in corso. Riordina per argomento, dà
+spazio a ciò che conta, condensa. Ogni riga riscritta dice da quali righe dei worker nasce (`da`, coi numeri del
+contesto): una riga che non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»), solo su un
+lavoro già nell'ordine o a priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link
+che non stesse nelle righe originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con
+`novita consegna <file>`: lo strumento rifiuta prima del server una riga senza fonte che non sia una promessa
+dichiarata, o una promessa fuori dall'ordine, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
 o supera, e la consegna porta il suo `commit`: la pubblicazione mette la riscrittura al posto delle righe lette (una
 riga fusa dopo resta accanto). Se il contesto dice che quel commit non si è trovato, le righe sono quelle della
 cartella: una pubblicazione che non le ha tutte fa uscire quelle dei worker. Dalla prima lettura della pubblicazione, o uscita la versione, la riscrittura non si
@@ -232,8 +250,8 @@ cambia più. Se non arriva in tempo, restano le righe dei worker.
 
 ## Il recap del mattino
 
-Breve, un foglio al giorno, in Gestione → Automazioni (`recap scrivi -`): fusioni e spesa di ieri, scelte prese (rosa, N,
-pacchetti) e perché, esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che segui, come hai
+Breve, un foglio al giorno, in Gestione → Automazioni (`recap scrivi -`): fusioni e spesa di ieri, scelte prese (ordine, N,
+pacchetti) e perché, le ore con posti liberi e l'ordine senza lavori pronti (l'obiettivo è nessuna), esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che segui, come hai
 applicato le indicazioni dell'owner. **Mai cose da fare per l'owner né domande**: quelle vanno nelle domande. Il
 recap è per ciò che si può perdere senza danno e interessa sapere.
 
@@ -260,11 +278,12 @@ npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G
 npm run manutentore -- rapporti --giorni 7 --cache  # per ruolo: cache scritta, rewarm, attese oltre 5 min, saldo dell'ora
 npm run manutentore -- rapporti --giorni 7 --rifiuti  # per ruolo: Edit e Write rifiutati (non letto, modificato), con la causa
 npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
-npm run manutentore -- ordine                      # com'è adesso, e quali numeri sono ancora aperti
-npm run manutentore -- accendi 812,815,820 | accendi --niente
+npm run manutentore -- ordine                      # com'è adesso, quali numeri sono aperti, i pronti contro i 2×N
+npm run manutentore -- accendi 812,C-12,815 | accendi --niente   # numeri di feedback e id di compiti
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
-npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
+npm run manutentore -- attesa <B> <A|C-12> [--togli]   # B aspetta A, o il compito C-12
+npm run manutentore -- compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   # un compito senza feedback, istruzioni da stdin: risponde col suo id
 npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
