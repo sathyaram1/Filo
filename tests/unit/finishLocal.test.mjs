@@ -341,8 +341,13 @@ describe('da qui sul ramo principale non si scrive', () => {
     assert.ok(push > 0, 'la spedizione del ramo deve esistere');
     const guardia = codice.lastIndexOf('isProtectedBranch(branch', push);
     assert.ok(guardia > 0, 'prima di spedire si controlla che non sia il ramo principale');
-    assert.match(codice.slice(guardia, push), /exit\(1\)/, 'e il controllo deve FERMARE, non avvisare');
+    assert.match(codice.slice(guardia, push), /exit\(1\)|return `'\$\{branch\}' è il ramo principale/, 'e il controllo deve FERMARE, non avvisare');
     assert.ok(push - guardia < 400, 'la guardia sta attaccata alla spedizione, non a mezzo file di distanza');
+    // La spedizione vive in una funzione sola (anche il PC dell'owner spedisce prima della prova su GitHub): chi la
+    // chiama si ferma sul suo rifiuto.
+    const chiamate = [...codice.matchAll(/const fermo = spedisciIlRamo\(/g)].map((m) => m.index);
+    assert.ok(chiamate.length >= 2, `spedisciIlRamo chiamata ${chiamate.length} volte`);
+    for (const i of chiamate) assert.match(codice.slice(i, i + 220), /\n\s*if \(fermo\) \{[^}]*process\.exit\(1\)/);
   });
 });
 
