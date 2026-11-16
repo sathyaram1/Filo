@@ -116,6 +116,7 @@
   const mgLivelliRow  = document.getElementById('mgLivelliRow');
   const mgForme       = document.getElementById('mgForme');
   const mgWorkState   = document.getElementById('mgWorkState');
+  const mgAssorbite   = document.getElementById('mgAssorbite');
   const mgThread      = document.getElementById('mgThread');
 
   const mgSideEmpty  = document.getElementById('mgSideEmpty');
