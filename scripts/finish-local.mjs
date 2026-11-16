@@ -979,16 +979,16 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    const { specs: scelti, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
+    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
-    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: scelti.length }) : '';
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
     // Sul PC dell'owner gli spec arrivati da main li prova GitHub, come gli unit (D-185, #1737 giro 1).
     const delRamo = lontane ? git(['diff', '--name-only', `${base}...HEAD`], { cwd: albero.dir }) : null;
-    const divisi = lontane ? specSulPc({ specs: scelti, cambiati: delRamo.ok ? delRamo.out.split('\n').filter(Boolean) : null }) : { qui: scelti, lontani: [] };
-    const specs = divisi.qui;
+    const divisi = lontane ? specSulPc({ specs, cambiati: delRamo.ok ? delRamo.out.split('\n').filter(Boolean) : null }) : { qui: specs, lontani: [] };
+    const qui = divisi.qui;
     specRemoti = divisi.lontani;
-    const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
+    const { blocking, informative } = splitKnownRed(qui, readKnownRed(albero.dir));
     // La corsa parte adesso e l'esito si legge dopo la verifica, che senza --check ferma prima e la corsa non serve.
     if (lontane && (checkOnly || v.ok)) {
       // La corsa scarica il ramo da origin.
