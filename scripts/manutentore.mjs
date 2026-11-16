@@ -352,6 +352,18 @@ export function senzaOpzioni(args) {
 }
 export const numeriDiAccendi = senzaOpzioni;
 
+/**
+ * `pacchetto <N,M,…>` → { unisce } coi numeri; la forma di prima (`pacchetto <P> <N,M>`, più parole) va al server com'era,
+ * che la rifiuta dicendo la nuova (#2270): letta come lista, assorbirebbe anche P. → { unisce, numero?, motivo? }. PURA.
+ */
+export function datiDelPacchetto(args) {
+  const parole = senzaOpzioni(args);
+  if (parole.length > 1) return { numero: numeroDi(parole[0]), unisce: leggiOrdine(parole.slice(1).join(','), { compiti: false }).numeri };
+  const l = leggiOrdine(parole.join(','), { compiti: false });
+  if (l.motivo) return { unisce: [], motivo: l.motivo };
+  return l.numeri.length >= 2 ? { unisce: l.numeri } : { unisce: l.numeri, motivo: 'pacchetto vuole almeno due numeri, separati da virgole: pacchetto 812,815' };
+}
+
 function opzione(argv, nome) {
   const i = argv.findIndex((a) => a === nome || a.startsWith(`${nome}=`));
   if (i < 0) return undefined;
