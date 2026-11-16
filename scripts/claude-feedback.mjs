@@ -445,8 +445,7 @@ export async function main(argvIn) {
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
   console.log(rigaAperto({ soloLocale, server, r }));
   // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
-  console.log(r.nonFidato ? `Nasce non fidato perché ${r.nonFidato}: passa dai giudici e la fusione aspetta il tuo sì.`
-    : r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
+  console.log(r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
       : r.biglietto === 'sporco' ? 'Biglietto della sessione sporco: nasce non fidato, passa dai giudici e la fusione aspetta il tuo sì.'
         : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
