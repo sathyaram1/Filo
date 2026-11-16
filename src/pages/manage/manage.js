@@ -7689,7 +7689,7 @@
     // stanno sui documenti dei lavori) non si sanno: trattino e motivo.
     const fbKo = stat.copertura.feedbackLetti === false;
     const nonLetti = stat.audit.nonLetti || 0;
-    let auditSotto = `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`;
+    let auditSotto = `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te · ${fsNum(stat.audit.non_richiesto)} non richiesti`;
     if (ko) auditSotto = noto;
     else if (fbKo) auditSotto = 'segnalazioni non lette';
     else if (nonLetti) auditSotto = `esito non letto su ${fsNum(nonLetti)} ${nonLetti === 1 ? 'lavoro' : 'lavori'}`;
