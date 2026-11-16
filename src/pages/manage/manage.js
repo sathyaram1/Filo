@@ -7378,6 +7378,7 @@
         { key: 'pass',    n: stat.audit.pass,    ids: stat.auditIds.pass,    label: 'Passati' },
         { key: 'fail',    n: stat.audit.fail,    ids: stat.auditIds.fail,    label: 'Bocciati' },
         { key: 'saltato', n: stat.audit.saltato, ids: stat.auditIds.saltato, label: 'Saltati da te' },
+        { key: 'non_richiesto', n: stat.audit.non_richiesto, ids: stat.auditIds.non_richiesto, label: 'Non richiesti (fidati)' },
       ].filter((v) => v.n > 0), 'audit') };
     }
     if (fsAperto === 'lanci') {
