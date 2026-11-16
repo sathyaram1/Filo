@@ -7780,7 +7780,7 @@
       else if (desc.gruppo === 'stati') v = trova(fsStat.lavorati.stati, chiave);
       else if (desc.gruppo === 'audit') {
         const ids = (fsStat.auditIds && fsStat.auditIds[chiave]) || [];
-        const nomi = { pass: 'Controllo di sicurezza passato', fail: 'Controllo di sicurezza bocciato', saltato: 'Controllo di sicurezza saltato da te' };
+        const nomi = { pass: 'Controllo di sicurezza passato', fail: 'Controllo di sicurezza bocciato', saltato: 'Controllo di sicurezza saltato da te', non_richiesto: 'Controllo di sicurezza non richiesto' };
         v = ids.length ? { label: nomi[chiave] || chiave, ids } : null;
       }
       if (!v) return null;
