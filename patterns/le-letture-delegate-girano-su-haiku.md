@@ -13,10 +13,18 @@ lancia, sul modello del suo ruolo.
 Le routine mettono `CLAUDE_CODE_SUBAGENT_MODEL=opus`: un sotto-agente lanciato
 senza dire il modello gira su Opus, e le esplorazioni che CLAUDE.md chiede di
 delegare sono la maggior parte dei lanci. Il modello scritto nella definizione
-vince su quella variabile (la perde solo con `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`,
-che le routine tolgono), quindi il modello sta nella definizione e non nel
-parametro `model` del lancio, che non tutte le versioni dello strumento
-espongono.
+vince su quella variabile, ma non su `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`: con
+quella accesa Claude Code ignora definizione e parametro `model` (che sparisce
+dallo strumento Agent) e mette a tutti il modello della variabile.
+
+Misurato il 16 novembre 2026 (Claude Code 2.1.325), con una definizione
+`model: haiku` e `CLAUDE_CODE_SUBAGENT_MODEL=opus`: FORCE assente o `0` → il
+sotto-agente gira su Haiku; FORCE `1` → Opus. Un `"0"` nell'`env` dei settings
+non spegne un FORCE che arriva dall'ambiente del processo. Nel contenitore
+cloud delle routine FORCE arriva così, dalle variabili dell'ambiente cloud:
+finché c'è, il `lettore` gira su Opus come prima, e lo stesso vale per il
+modello per fase che il gancio mette sul lancio dei worker. Toglierla è un
+passo dell'owner.
 
 ## La misura (#2122, 16 novembre 2026)
 
