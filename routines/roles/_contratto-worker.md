@@ -110,6 +110,13 @@ Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
 Agent (senza, vale il default); la catena arriva a tre livelli sotto
 l'orchestratore, tu compreso.
 
+**Una lettura o una ricerca che deleghi** (dove sta una cosa, come arriva un
+messaggio, quali file toccano una regola) va a `subagent_type: lettore`, col
+percorso della tua cartella nel compito: legge soltanto, costa una frazione e
+ti porta i fatti con percorso e riga. Il giudizio (cosa cambiare, se un
+rilievo regge, un verdetto) resta a te, e così un sotto-agente che deve
+decidere, scrivere o lanciarne altri.
+
 **Si lanciano in primo piano**, con `run_in_background: false` scritto nella
 chiamata: senza, lo strumento li manda in sottofondo. Quando sono indipendenti
 ne lanci più d'uno nello stesso messaggio: girano insieme, e la tua chiamata
