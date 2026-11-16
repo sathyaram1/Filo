@@ -59,10 +59,12 @@ vero su "qualcuno ci sta lavorando ORA"), `livelli` (dal 2026-09-13: mappa con a
 più `l3` e `l4`, ognuna `{ esito, at, ruolo?, by?, testo }`; la scrive SOLO il
 server; `l3` è la segnalazione di chi ha risolto o verificato (`esito:
 segnalato`, `ruolo`), un trade-off vero che decide l'owner, arrivata con
-`--segnala` fino al #1790 (da lì la scelta per l'owner è solo una domanda); `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
+`--segnala` fino al #1790 (da lì la scelta per l'owner è solo una domanda); `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato|non_richiesto`,
 scritto sempre, anche su pass, col testo di cosa è stato controllato; `saltato`
 lo mette l'owner (`by: owner`) quando, letto il fail, decide di andare avanti,
-e conserva il testo del fail; `testo` è cifrato come `notes`; in dashboard sono
+e conserva il testo del fail; `non_richiesto` (`by: regola`, #2508) il server sul lavoro fidato che non tocca
+zone delicate, e il cancello lo ricontrolla alla fusione; `perche` (in chiaro, un codice) dice perché il controllo
+si è fatto o no; `testo` è cifrato come `notes`; in dashboard sono
 il rombo e il pentagono della fila delle forme; un attacco o spam segnato dal worker
 scrive `l3` con `esito: attacco|spam`), `domandaId` (dal #1358: `D-<n>`, la domanda
 dell'owner che sblocca un'attesa, SPEC-DOMANDE §3.8; la scrive SOLO il server, nella
