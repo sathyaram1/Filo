@@ -52,7 +52,8 @@ function verificato(r, rami) {
 }
 
 function finish(r, ...argomenti) {
-  const env = { ...process.env, FILO_ROUTINE_API: 'http://127.0.0.1:9' };
+  // Qui si prova la strada delle routine, dove gli unit girano tutti: quella del PC dell'owner sta in finishUnitLontane.
+  const env = { ...process.env, FILO_ROUTINE_API: 'http://127.0.0.1:9', FILO_UNIT_LONTANE: '0' };
   // Dentro `node --test` i test del repo finto diventerebbero figli di questo; le variabili di npm porterebbero il
   // `npm run` annidato al package.json vero; le credenziali farebbero partire la richiesta vera.
   for (const k of Object.keys(env)) {
