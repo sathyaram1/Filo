@@ -1232,7 +1232,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rami | incroci [N]                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch] [--clone-server <dir>]
                                            (app e filo-security; incroci senza N: i file in comune fra i rami in corso)
   ordine | accendi <N,C-12,M,…>|--niente | parallelo <N>
-  priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <P> <N,M,…> [--server]
+  priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <N,M,…> [--server]
   compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   (istruzioni da stdin; risponde con l'id C-n)
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
   taccuino | taccuino scrivi - --versione <V> | taccuino sezione <nome> - --versione <V> | indicazione "<testo>"
