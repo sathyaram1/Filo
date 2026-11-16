@@ -452,8 +452,13 @@ le note di P lo dicono), la versione e lo sha della fusione. Il premio e l'annun
 a sua volta un pacchetto chiude prima le sue. Una in un altro stato, assorbita in un altro
 pacchetto o che non aspetta più P, resta dove sta e le note lo dicono. Il messaggio della
 fusione cita le unite (`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già
-risolto su main» le trova. P archiviato senza fusione: gli assorbiti restano archiviati; se
-il lavoro serve ancora li rimette in coda l'owner, da Gestione (`archived → todo`).
+risolto su main» le trova. P risolto senza la sua fusione (il «già risolto», il «Risolto»
+dell'owner) chiude lo stesso gli assorbiti, con la sua frase; le unite dei pacchetti di prima
+invece tornano in coda quando l'attesa si scioglie. Un assorbito archiviato non ha scheda
+pubblica: la prende quando si chiude risolto, così chi l'ha segnalato riceve «risolta» con la
+frase invece di un «chiusa» muto. P archiviato senza fusione: gli assorbiti restano
+archiviati; se il lavoro serve ancora li rimette in coda l'owner, da Gestione (`archived →
+todo`), e uno rimesso in coda può entrare in un pacchetto nuovo.
 
 I pacchetti nati prima restano come sono: quelli con la spec nei turni «SPEC DEL PACCHETTO»
 (#2038) la consegnano fra i documenti, se P è fidato e nato dall'owner o da una sessione.
