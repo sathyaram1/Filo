@@ -140,7 +140,10 @@ function repoConRami(rami) {
   const repo = cartellaTemporanea('manutentore-rami');
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
   g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
-  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  // I file dei rami ci sono già su main: un file nuovo non si mostra (#2337), e qui si provano i file in chiaro.
+  writeFileSync(join(repo, 'x.txt'), 'x');
+  for (const [, file] of rami) { mkdirSync(join(repo, file, '..'), { recursive: true }); writeFileSync(join(repo, file), 'x'); }
+  g('add', '-A'); g('commit', '-qm', 'inizio');
   g('update-ref', 'refs/remotes/origin/main', 'HEAD');
   for (const [ramo, file, msg] of rami) {
     g('checkout', '-q', '-B', 'tmp', 'main');
