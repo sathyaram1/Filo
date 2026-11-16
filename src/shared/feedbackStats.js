@@ -910,11 +910,12 @@
         pass: auditNonLetti ? null : seNotiTutti(audit.pass),
         fail: auditNonLetti ? null : seNotiTutti(audit.fail),
         saltato: auditNonLetti ? null : seNotiTutti(audit.saltato),
+        non_richiesto: auditNonLetti ? null : seNotiTutti(audit.non_richiesto),
         nonLetti: auditNonLetti,
       },
       auditIds: auditNonLetti
-        ? { pass: [], fail: [], saltato: [], nonLetti: auditNonLettiIds }
-        : { pass: auditIds.pass, fail: auditIds.fail, saltato: auditIds.saltato, nonLetti: [] },
+        ? { pass: [], fail: [], saltato: [], non_richiesto: [], nonLetti: auditNonLettiIds }
+        : { pass: auditIds.pass, fail: auditIds.fail, saltato: auditIds.saltato, non_richiesto: auditIds.non_richiesto, nonLetti: [] },
       arenati: { lavorazioni: seNotiTutti(arenamenti), feedback: seNotiTutti(feedbackArenati), ids: arenatiIds },
       copertura: {
         logDa: logDa,
