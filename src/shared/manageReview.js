@@ -1578,10 +1578,12 @@
       });
     }
     const righe = [riga('Esito', info.etichetta)];
+    const perche = L4_PERCHE[String(l.perche || '')];
+    if (perche) righe.push(riga('Perché', perche));
     // Il commit che l'audit ha letto: il salto lo rimanda al server, che salta solo quello (#1502).
     const sha = /^[0-9a-f]{40}$/.test(String(l.sha || '')) ? String(l.sha) : '';
-    if (sha) righe.push(riga('Commit esaminato', sha.slice(0, 8)));
-    if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : String(l.by)));
+    if (sha) righe.push(riga(esito === 'non_richiesto' ? 'Commit' : 'Commit esaminato', sha.slice(0, 8)));
+    if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : l.by === 'regola' ? 'la regola dei lavori fidati' : String(l.by)));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim();
     return forma('l4', 'pentagono', titolo, info.classe, esito, {
