@@ -44,17 +44,23 @@ export function soloDelRamo({ tutti = [], cambiati = [], root }) {
  * nuovi compresi. Senza main fresco si ferma: con una copia vecchia i file arrivati da main sembrerebbero del ramo.
  * → { file, base } | { errore }.
  */
-export function unitDelRamo(root, tutti, { git = gitIn(root) } = {}) {
+export function cambiatiDelRamo(root, dir, { git = gitIn(root) } = {}) {
   const f = git(['fetch', '--quiet', 'origin', refspecMain()]);
   if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
   const mb = git(['merge-base', 'refs/remotes/origin/main', 'HEAD']);
   if (!mb.ok) return { errore: `non trovo la base comune con origin/main (${primaRiga(mb.out)})` };
   const base = mb.out.trim();
-  const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', base, '--', DIR]);
-  const n = git(['-c', 'core.quotepath=false', 'ls-files', '--others', '--exclude-standard', '--', DIR]);
+  const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', base, '--', dir]);
+  const n = git(['-c', 'core.quotepath=false', 'ls-files', '--others', '--exclude-standard', '--', dir]);
   if (!d.ok || !n.ok) return { errore: `non riesco a leggere i file cambiati dal ramo (${primaRiga(d.ok ? n.out : d.out)})` };
-  const cambiati = [...d.out.split(/\r?\n/), ...n.out.split(/\r?\n/)].filter(Boolean);
-  return { file: soloDelRamo({ tutti, cambiati, root }), base };
+  return { cambiati: [...d.out.split(/\r?\n/), ...n.out.split(/\r?\n/)].filter(Boolean), base };
+}
+
+/** Gli unit di `tutti` che il ramo cambia (cambiatiDelRamo su tests/unit). → { file, base } | { errore }. */
+export function unitDelRamo(root, tutti, { git = gitIn(root) } = {}) {
+  const c = cambiatiDelRamo(root, DIR, { git });
+  if (c.errore) return c;
+  return { file: soloDelRamo({ tutti, cambiati: c.cambiati, root }), base: c.base };
 }
 
 /**
