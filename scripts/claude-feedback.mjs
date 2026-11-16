@@ -713,16 +713,6 @@ export async function main(argvIn) {
   // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
   // un errore d'uso o una prova a vuoto non toccano la rete.
   const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
-  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033). I feedback
-  // messi prima si guardano qui solo a vuoto: aprendo, dopo aver letto le attese che il pacchetto prende dalle unite.
-  const testoSpec = [testo, ...testoDegliAllegati(allegati)].join('\n');
-  if (numeriUnite.numeri.length && String(testo || '').trim()) {
-    const difetti = difettiDellaSpec(testoSpec, { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, prerequisiti: !deposita, aVuoto: dryRun });
-    if (difetti.length) {
-      console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
-      return EXIT.USO;
-    }
-  }
   const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
   if (deposita && !cred.idToken) {
     console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
