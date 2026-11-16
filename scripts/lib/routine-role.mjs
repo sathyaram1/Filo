@@ -139,13 +139,14 @@ export function readRole(root, { now = Date.now() } = {}) {
  * chiamata della shell riparte senza l'export (#1966): valgono anche biglietto e ruolo che dispatch scrive nella
  * cartella, e gli strumenti che girano dalla copia fissata dal preflight, che esiste solo in un giro.
  */
-export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = () => !!pinnedRepoRoot() } = {}) {
+export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = () => !!pinnedRepoRoot(), conta = () => true } = {}) {
   const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
   if (dichiarata && dichiarata !== '0') return true;
   if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
   if (normalizeRole(env && env.FILO_ROUTINE_ROLE)) return true;
+  // `conta(file)`: chi decide un confine di fiducia scarta i segni che il repo stesso può portare (unit-sul-pc.mjs).
   const biglietto = leggiMarcatoreBiglietto(root);
-  if (biglietto && String(biglietto.ticket || '').trim()) return true;
-  if (readMarker(root, { now })) return true;
-  return !!copiaDelGiro();
+  if (biglietto && String(biglietto.ticket || '').trim() && conta(ticketFile(root))) return true;
+  if (readMarker(root, { now, conta })) return true;
+  return !!copiaDelGiro({ conta });
 }
