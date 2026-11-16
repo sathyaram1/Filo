@@ -187,3 +187,70 @@ test('finish sul PC dell\'owner, fino alla richiesta: la prova di GitHub vale an
     togliCartella(r.casa);
   }
 });
+
+// #1737 giro 1: gli spec scelti per area sono prove anche loro.
+const conSpec = (c, chiesta) => (chiesta && chiesta.spec ? { specChiesti: chiesta.spec.split(',').length, specProvati: chiesta.spec.split(',').length } : {});
+
+test('finish sul PC dell\'owner: uno spec arrivato da main nell\'area che il ramo tocca non gira qui, lo prova GitHub', async () => {
+  const r = repoFinto({ conSpec: true });
+  let chiesta = null;
+  const gh = await githubFinto({ registro: (c, q) => { chiesta = q; return riga({ ...c, esito: 'verde', mainSha: c.main, ...conSpec(c, q) }); } });
+  try {
+    const c = await finish(r, gh, '--check');
+    assert.equal(c.status, 0, c.out);
+    assert.ok(!existsSync(r.segnoSpec), `lo spec arrivato da main è girato sul PC:\n${c.out}`);
+    assert.equal(chiesta && chiesta.spec, 'options-da-main', 'lo spec va nella corsa su GitHub');
+    assert.match(c.out, /GitHub prova anche 1 spec delle aree toccate che il ramo non cambia/);
+    assert.match(c.out, /Unit su GitHub \(con 1 spec delle aree toccate\), sulla fusione/);
+  } finally {
+    await gh.chiudi();
+    togliCartella(r.casa);
+  }
+});
+
+test('finish sul PC dell\'owner: una corsa che non dice di aver provato gli spec chiesti ferma', async () => {
+  const r = repoFinto({ conSpec: true });
+  const gh = await githubFinto({ registro: (c) => riga({ ...c, esito: 'verde', mainSha: c.main }) });
+  try {
+    const c = await finish(r, gh, '--check');
+    assert.equal(c.status, 1, c.out);
+    assert.match(c.out, /non ha provato i 1 spec delle aree toccate[\s\S]*Sul tuo PC non li eseguo al posto suo/);
+    assert.ok(!existsSync(r.segnoSpec), c.out);
+    assert.doesNotMatch(c.out, /Controlli passati/);
+  } finally {
+    await gh.chiudi();
+    togliCartella(r.casa);
+  }
+});
+
+test('main che si muove durante l\'attesa: sul PC dell\'owner la prova rifatta la chiede di nuovo a GitHub, con gli stessi spec', async () => {
+  const { chiediLaFusione } = await import('../../scripts/finish-local.mjs');
+  const r = repoFinto();
+  const chieste = [];
+  const gh = await githubFinto({ registro: (c, q) => { chieste.push(q); return riga({ ...c, esito: 'verde', mainSha: c.main, ...conSpec(c, q) }); } });
+  const prima = { ...process.env };
+  Object.assign(process.env, { FILO_UNIT_LONTANE: '1', FILO_GITHUB_API: gh.base, GH_TOKEN: 'token-finto' });
+  const alServer = [];
+  try {
+    const giro = await chiediLaFusione({
+      root: r.lavoro, branch: 'claude/owner', cur: r.punta, specRemoti: ['tests/options-x'],
+      provaDelRamo: { prova: { esito: 'verde', mainSha: r.main }, punta: r.punta },
+    }, {
+      log: () => {},
+      of: {},
+      registraNelRegistro: async () => [],
+      askServerMerge: async (q) => { alServer.push(q.provaUnit); return alServer.length === 1 ? { outcome: 'main_moved', mainSha: r.main } : { outcome: 'merged', sha: 'c'.repeat(40) }; },
+    });
+    assert.ok(!existsSync(r.segno), 'la prova rifatta è girata sul PC');
+    assert.equal(chieste.length, 1, 'la seconda prova la fa GitHub');
+    assert.equal(chieste[0].spec, 'options-x', 'con gli stessi spec della prima');
+    assert.equal(alServer.length, 2);
+    assert.equal(alServer[1].esito, 'verde');
+    assert.equal(giro.reply.outcome, 'merged');
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in prima)) delete process.env[k];
+    Object.assign(process.env, prima);
+    await gh.chiudi();
+    togliCartella(r.casa);
+  }
+});
