@@ -256,7 +256,8 @@
       return;
     } else if (e.key === 'Enter') {
       const d = datiDi.get(li);
-      if (d && apribile(d.riga.segnalazione)) { e.preventDefault(); apriSegnalazione(d.riga.segnalazione); }
+      const n = d ? apribili(d.riga)[0] : 0;
+      if (n) { e.preventDefault(); apriSegnalazione(n); }
       return;
     } else return;
     e.preventDefault();
