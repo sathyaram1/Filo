@@ -17,6 +17,7 @@ test('r1 il documento PDF di prova lancia lo spec della lettura documenti', () =
 });
 
 test('r1 il preload letto da new URL lancia lo spec che lo inietta', () => {
-  const { specs } = specDellaScelta({ changed: ['src/preload/page-preload.js'], base: 'HEAD', root: ROOT });
+  // La base è prima dell'ultima modifica vera del preload: con base HEAD il file non cambia e la scelta lo scarta.
+  const { specs } = specDellaScelta({ changed: ['src/preload/page-preload.js'], base: '9e4257200d^', root: ROOT });
   expect(specs).toContain('tests/fingerprint-incognito');
 });
