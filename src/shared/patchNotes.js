@@ -2043,5 +2043,5 @@
       .filter((n) => n.features.length || n.fixes.length);
   }
 
-  global.SN_PATCH_NOTES = { NOTES, SEGNALAZIONI_MAX, cmpVersion, since, countBehind, latestVersion, segnalazioniDi, riga, testo, impronta, fotografia, recap };
+  global.SN_PATCH_NOTES = { NOTES, SEGNALAZIONI_MAX, cmpVersion, since, countBehind, latestVersion, segnalazioniDi, segnalazioneValida, riga, testo, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
