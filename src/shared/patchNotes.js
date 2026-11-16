@@ -1984,14 +1984,21 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
-  // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione (il suo numero): la pagina
-  // Novità la apre dal tasto destro. Recap e impronte vedono solo il testo.
-  function riga(r) {
-    if (r && typeof r === 'object') {
-      const n = Number(String(r.segnalazione == null ? '' : r.segnalazione).replace(/^#/, ''));
-      return { testo: String(r.testo || ''), segnalazione: Number.isInteger(n) && n > 0 ? n : null };
+  // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione: il suo numero, o l'elenco dei
+  // numeri per la riga di un pacchetto, uno per ogni segnalazione assorbita (#2270). La pagina Novità li apre dal tasto
+  // destro, uno per uno; recap e impronte vedono solo il testo. `segnalazioni` è sempre un elenco, senza doppioni.
+  const SEGNALAZIONI_MAX = 20;
+  function segnalazioniDi(v) {
+    const out = [];
+    for (const x of Array.isArray(v) ? v : (v == null ? [] : [v])) {
+      const n = Number(String(x == null ? '' : x).replace(/^#/, ''));
+      if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
     }
-    return { testo: String(r == null ? '' : r), segnalazione: null };
+    return out.slice(0, SEGNALAZIONI_MAX);
+  }
+  function riga(r) {
+    if (r && typeof r === 'object') return { testo: String(r.testo || ''), segnalazioni: segnalazioniDi(r.segnalazione) };
+    return { testo: String(r == null ? '' : r), segnalazioni: [] };
   }
   function testo(r) { return riga(r).testo; }
   function soloTesto(n) { return { ...n, features: (n.features || []).map(testo), fixes: (n.fixes || []).map(testo) }; }
