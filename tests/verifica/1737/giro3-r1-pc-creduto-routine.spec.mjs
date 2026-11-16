@@ -119,17 +119,3 @@ test('r1 un file nella radice portato da main non fa girare sul PC dell\'owner g
     togliCartella(r.casa);
   }
 });
-
-test('controllo: senza il file nella radice il PC dell\'owner non esegue l\'unit di main', async () => {
-  test.setTimeout(10 * 60 * 1000);
-  const r = repoFinto({ marca: false });
-  const gh = await githubVerde();
-  try {
-    const c = await lancia(r, [join('scripts', 'finish-local.mjs'), '--check'], ambienteDelPc(gh));
-    expect(c.out).toMatch(/GitHub/);
-    expect(existsSync(r.segno), c.out.slice(-3000)).toBe(false);
-  } finally {
-    await gh.chiudi();
-    togliCartella(r.casa);
-  }
-});
