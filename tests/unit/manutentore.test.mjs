@@ -267,11 +267,11 @@ test('nelle routine il clone del server si aggiorna da sé, anche poco profondo 
   spingi('claude/due', '#32 due');
   assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
   const out = leggi();
-  assert.match(out, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
-  assert.match(out, /^claude\/due sul server \(#32\)/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#32\)/m);
   assert.doesNotMatch(out, /NON aggiornati/);
   assert.equal(await M.main(['incroci', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
-  assert.match(leggi(), /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+  assert.match(leggi(), /claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\) e claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
 });
 
 test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce lo dice, col clone com\'era (#2340)', async (t) => {
