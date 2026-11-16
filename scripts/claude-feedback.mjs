@@ -228,10 +228,9 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese, unisce,
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
-    biglietto: b && b.fp ? (nonFidato ? 'tolto' : b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
-    nonFidato,
+    biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
   };
 }
 
