@@ -119,6 +119,9 @@
     },
     archived: {
       todo: ['owner'],      // ripristino
+      // Un originale assorbito in un pacchetto (`unitoIn`, #2270): lo chiude come risolto il server alla fusione del
+      // pacchetto, con la sua frase (FEEDBACK-STATES.md §3a).
+      done: ['pipeline'],
     },
     attack_confirmed: {
       todo: ['owner'],      // "era legittimo"
