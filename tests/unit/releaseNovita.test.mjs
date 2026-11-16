@@ -59,6 +59,18 @@ describe('applicaNovita sul registro vero', () => {
     assert.deepEqual(dopo.slice(1), NOTE.slice(1));
   });
 
+  // #2270: la riga di un pacchetto porta l'elenco dei numeri, uno per segnalazione assorbita.
+  test('una riga con l’elenco delle segnalazioni si scrive e si rilegge uguale; un elenco storto no', () => {
+    const r = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'Il menu si apre.', segnalazione: [1956, 1960] }], fixes: [], originali: righeDi(TOP).map(impronta) }]);
+    assert.equal(r.ok, true, r.reason);
+    assert.match(r.testo, /\{ testo: "Il menu si apre\.", segnalazione: \[1956, 1960\] \}/);
+    assert.deepEqual(note(r.testo)[0].features[0], { testo: 'Il menu si apre.', segnalazione: [1956, 1960] });
+    for (const storta of [[1956, 1956], [], [0], Array.from({ length: 21 }, (_, i) => i + 1)]) {
+      const s = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'X.', segnalazione: storta }], fixes: [], originali: [] }]);
+      assert.equal(s.ok === true && /segnalazione: \[/.test(s.testo || ''), false, JSON.stringify(storta));
+    }
+  });
+
   test('le versioni vecchie tornano riscritte a ogni costruzione; senza impronte la riscrittura copre il blocco', () => {
     const r = applicaNovita(SORGENTE, [{ versione: VECCHIO.version, features: ['Vecchia, riscritta.'], fixes: [] }]);
     assert.equal(r.ok, true, r.reason);
