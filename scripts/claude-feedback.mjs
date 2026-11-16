@@ -174,19 +174,6 @@ export function exitCodeForError(err) {
 export { PRIORITA_AMMESSE, parsePriorita };
 
 /**
- * Cosa il feedback porta del biglietto della sessione `b`. PURA. Uno sporco rimasto solo in locale il server non lo
- * vede, e `nonFidato` porta scritti di chi non è fidato (SPEC-DOMANDE § 1.3): lì il biglietto va per il solo segno
- * riservato, che non dà fiducia. Il segno rimasto sul PC si dichiara: il server ancora non ce l'ha (#2027.4).
- */
-export function campiDelBiglietto(b, { nonFidato = '' } = {}) {
-  if (!b || !b.fp) return {};
-  return Object.assign(
-    b.inAttesa || nonFidato ? { bigliettoDelSegno: b.fp } : { bigliettoLocale: b.fp },
-    b.riservatoInAttesa ? { riservatoDichiarato: true } : {},
-  );
-}
-
-/**
  * Deposita il feedback. Ritorna { ok, id, seq } oppure { ok:false, ... }.
  *
  * `seq` è il numero leggibile (#N): è best-effort già nell'app (se la query di
@@ -229,13 +216,11 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
       ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
-      // Un pacchetto porta tutti gli allegati delle unite o non nasce: un caricamento mancato ferma prima del documento.
-      ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })), interi: true } : {}),
-      ...campiDelBiglietto(b, { nonFidato }),
+      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
+      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
-    const motivo = String((e && e.message) || e);
-    return { ok: false, motivo: e && e.allegatiFalliti ? `${motivo}. Il pacchetto non è nato: rilancia` : motivo, codice: exitCodeForError(e) };
+    return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
   }
   // Un allegato che non si è caricato NON è silenzioso: il feedback esiste,
   // ma senza il documento per cui magari è stato aperto. Si riporta.
