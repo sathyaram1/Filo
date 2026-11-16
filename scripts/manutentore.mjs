@@ -1078,14 +1078,14 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   if (String(c.versione || '') !== String(b.version || '')) errori.push(`versione «${unaRiga(c.versione)}»: il blocco in cima è ${unaRiga(b.version)}`);
   const righe = (k) => (Array.isArray(c[k]) ? c[k] : []);
   const lette = [...(b.features || []), ...(b.fixes || [])];
-  const segnalazioni = new Set(lette.map(segnalazioneRiga).filter(Boolean));
+  const segnalazioni = new Set(lette.flatMap((r) => segnalazioniRiga(r) || []));
   for (const k of ['features', 'fixes']) {
     if (c[k] !== undefined && !Array.isArray(c[k])) errori.push(`${k} è una lista di righe`);
     if (righe(k).some((r) => typeof testoRiga(r) !== 'string' || !testoRiga(r).trim())) errori.push(`${k} ha una riga vuota o che non è testo`);
     for (const r of righe(k).filter((x) => x && typeof x === 'object' && x.segnalazione != null)) {
-      const n = segnalazioneRiga(r);
-      if (!n) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956)`);
-      else if (!segnalazioni.has(n)) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
+      const l = segnalazioniRiga(r);
+      if (!l) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956), o l'elenco dei numeri (da 1 a ${PN.SEGNALAZIONI_MAX}, diversi)`);
+      else for (const n of l.filter((x) => !segnalazioni.has(x))) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
     }
   }
   const copiate = new Set(lette.map((r) => unaRiga(testoRiga(r))));
