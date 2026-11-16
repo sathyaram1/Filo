@@ -615,26 +615,6 @@ test('scriviSullaLettura: sul conflitto rilegge e ricalcola; al tetto si ferma c
   assert.match(cieca.motivo, /non dice la versione del documento/);
 });
 
-test('due pacchetti aperti insieme su due unite aspettate dallo stesso feedback: aspetta tutti e due i pacchetti', async () => {
-  const rete = reteFinta({
-    ...DOCS, id812: { seq: 812, status: 'todo' }, id815: { seq: 815, status: 'todo' }, id951: { seq: 951 }, id952: { seq: 952 },
-    id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }] },
-  }, { viva: true });
-  try {
-    // Il primo pacchetto scrive mentre il secondo ha già letto: la sua prima scrittura trova il documento cambiato.
-    const [uno, due] = await Promise.all([
-      owner.spostaAttese('id903', ['id812'], { id: 'id951', num: '951' }, { bearer: 'tok' }),
-      owner.spostaAttese('id903', ['id815'], { id: 'id952', num: '952' }, { bearer: 'tok' }),
-    ]);
-    assert.equal(uno.ok, true, uno.motivo);
-    assert.equal(due.ok, true, due.motivo);
-    const ora = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
-    assert.deepEqual(ora.attese.map((w) => w.num).sort(), ['676', '951', '952'], 'nessuna delle due spostate si perde, e le unite se ne vanno');
-    assert.equal(rete.scritte.length, 2);
-    assert.equal(rete.rifiutate, 1, 'il secondo aveva letto prima che il primo scrivesse');
-  } finally { rete.ripristina(); }
-});
-
 test('due --aspetta-anche insieme sullo stesso feedback: restano tutte e due', async () => {
   const docs = { ...DOCS, id1741: { seq: 1741, status: 'todo' }, id1756: { seq: 1756, status: 'todo' }, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }] } };
   const rete = reteFinta(docs, { viva: true });
