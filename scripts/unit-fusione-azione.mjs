@@ -5,10 +5,9 @@
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI, ESITI_CHE_PROSEGUONO } from './lib/unit-sulla-fusione.mjs';
+import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI, ESITI_CHE_PROSEGUONO, MARCA } from './lib/unit-sulla-fusione.mjs';
 
-// Il server cerca la riga che COMINCIA così, l'ultima del registro: l'uscita dei test provati è rientrata, mai in colonna.
-export const MARCA = 'FILO-UNIT-FUSIONE';
+export { MARCA };
 // La riga di una parte: non comincia come MARCA, così il server non la scambia per l'esito.
 export const MARCA_PARTE = 'ESITO-PARTE-UNIT';
 const SHA = /^[0-9a-f]{40}$/;
