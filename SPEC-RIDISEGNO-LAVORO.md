@@ -141,8 +141,8 @@ verifica leggera dopo riallineamento pulito; spesa per account al manutentore.
 
 App e script: ruolo del manutentore (prompt, schede in contesto, file dei rami
 da git); ruolo del primo lavoro con piano nelle note; il ruolo della scheda e lo
-script del censimento in `scripts/`; `feedback:apri … --pacchetto N,M,…` che
-mette le attese; FEEDBACK-STATES.md per pacchetti e motivo del correttore.
+script del censimento in `scripts/`; `manutentore pacchetto N,M,…` (#2270);
+FEEDBACK-STATES.md per pacchetti e motivo del correttore.
 
 Ogni voce è un lavoro per le sessioni cloud di fase 1; l'ordine lo decide il
 manutentore.
