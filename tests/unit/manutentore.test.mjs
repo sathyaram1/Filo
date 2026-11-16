@@ -750,7 +750,7 @@ test('#2269: l\'ordine e le attese portano gli id dei compiti, e compito ne apre
   assert.equal(await M.main(['compito', 'x', '-', '--urgenza', 'alta'], CHIAVE), 1);
   assert.equal(await M.main(['compito', '-'], CHIAVE), 1);
   assert.equal(await M.main(['attesa', '815', 'C-0'], CHIAVE), 1);
-  assert.equal(await M.main(['pacchetto', '900', '812,C-12'], CHIAVE), 1, 'un compito non sta in un pacchetto');
+  assert.equal(await M.main(['pacchetto', '812,C-12'], CHIAVE), 1, 'un compito non sta in un pacchetto');
   assert.equal(s.corpi.length, n);
 });
 
