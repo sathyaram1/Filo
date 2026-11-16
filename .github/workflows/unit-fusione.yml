@@ -208,4 +208,4 @@ jobs:
           node-version: 20
 
       - name: L'esito per il server
-        run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows --ramo "$RAMO" --main "$MAIN"
+        run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows,spec --ramo "$RAMO" --main "$MAIN"
