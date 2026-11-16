@@ -411,7 +411,7 @@ service cloud.firestore {
         // `riservato`, `tipo`, `unisce` e `unitoIn`: il segno che segue il testo riservato, la segnalazione, gli originali
         // di un pacchetto e il loro rimando (#2270: il pacchetto lo fa nascere solo il server). Come la fiducia, li scrive
         // solo il server, e così le radici da cui la fiducia discende (#1918) e `noteFidate`, la fiducia delle note (#1919).
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'radici', 'radiciSuperate', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unisce', 'unitoIn', 'noteFidate'])
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'radici', 'radiciSuperate', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'noteFidate', 'unisce', 'unitoIn'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
