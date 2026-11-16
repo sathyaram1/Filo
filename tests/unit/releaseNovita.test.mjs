@@ -65,7 +65,13 @@ describe('applicaNovita sul registro vero', () => {
     assert.equal(r.ok, true, r.reason);
     assert.match(r.testo, /\{ testo: "Il menu si apre\.", segnalazione: \[1956, 1960\] \}/);
     assert.deepEqual(note(r.testo)[0].features[0], { testo: 'Il menu si apre.', segnalazione: [1956, 1960] });
-    for (const storta of [[1956, 1956], [], [0], Array.from({ length: 21 }, (_, i) => i + 1)]) {
+    createRequire(import.meta.url)(FILE);
+    const MAX = globalThis.SN_PATCH_NOTES.SEGNALAZIONI_MAX;
+    assert.equal(SEGNALAZIONI_MAX, MAX, 'il tetto della pubblicazione è quello del registro');
+    const piena = Array.from({ length: MAX }, (_, i) => i + 1);
+    const p = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'X.', segnalazione: piena }], fixes: [], originali: righeDi(TOP).map(impronta) }]);
+    assert.deepEqual(note(p.testo)[0].features[0], { testo: 'X.', segnalazione: piena }, 'al tetto la riga entra intera');
+    for (const storta of [[1956, 1956], [], [0], Array.from({ length: MAX + 1 }, (_, i) => i + 1)]) {
       const s = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'X.', segnalazione: storta }], fixes: [], originali: [] }]);
       assert.equal(s.ok === true && /segnalazione: \[/.test(s.testo || ''), false, JSON.stringify(storta));
     }
