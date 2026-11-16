@@ -15,8 +15,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVONO = ['scripts', 'src/shared', 'src/main/auth', 'src/main/services/mergeApprovalSignal.js'];
 const GITHUB = 'https://github.com/proprietario/filo.git';
 
-function repoFinto() {
+function repoFinto({ conSpec = false } = {}) {
   const casa = cartellaTemporanea('filo-1497-');
+  const segnoSpec = join(casa, 'spec-di-main-eseguito');
   const origin = join(casa, 'origin.git');
   const lavoro = join(casa, 'lavoro');
   const senzaHook = join(casa, 'nessun-hook');
