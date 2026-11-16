@@ -646,7 +646,8 @@ export function provaDaRiusare({ fatta, punta } = {}) {
 export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s), primaProva = null } = {}) {
   let ultima = null;
   for (let i = 1; i <= tentativi; i++) {
-    ultima = i === 1 && primaProva ? primaProva : prova({ root, punta, scrivi });
+    // `await`: la prova del PC dell'owner la fa GitHub, e arriva tardi (prova-remota.mjs).
+    ultima = i === 1 && primaProva ? primaProva : await prova({ root, punta, scrivi });
     scrivi(testoProva(ultima));
     if (fermaSe(ultima)) return { prova: ultima, fermo: true, tentativi: i };
     const reply = await chiedi(campoPerIlServer(ultima));
