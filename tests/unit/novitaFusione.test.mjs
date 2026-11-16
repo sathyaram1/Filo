@@ -133,8 +133,8 @@ test('sul registro vero: una riga del ramo sotto il secondo blocco va in cima, e
   assert.ok(t && t.index < vero.indexOf('version:', i + 10), `il blocco ${seconda} non ha un elenco scritto su più righe`);
   const dove = t.index + t[0].length;
   const ramo = `${vero.slice(0, dove)}        ${riga},\n${vero.slice(dove)}`;
-  const manifesto = { ...pkg, version: seconda };
-  delete manifesto.prossimaVersione;
+  // Main salta versioni senza blocco (0.2.281 → 0.2.285): la prossima si dichiara, non si deduce da patch+1.
+  const manifesto = { ...pkg, version: seconda, prossimaVersione: prima[0].version };
   const r = uniscaNovita({ base: vero, main: vero, ramo, manifesto, oggi: OGGI });
   assert.equal(r.ok, true, r.motivo);
   const dopo = dati(r.src);
