@@ -752,51 +752,6 @@ export async function main(argvIn) {
         : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
   if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
-  if (delPacchetto.ereditate.length) {
-    console.log(`Attese prese dalle unite: ${delPacchetto.ereditate.map((e) => `${globalThis.SN_FB_ATTESE.testoAttese([e])} (da ${e.da.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
-  }
-  // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
-  // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
-  let incompleto = false;
-  const cheAspetta = (x, num) => `npm run feedback -- ${x.num} --aspetta ${[...x.tenute, num].join(',')} --sostituisci`;
-  if (unite.length && !r.seq) {
-    incompleto = true;
-    const passi = [
-      ...aspettanti.map((x) => cheAspetta(x, '<numero del pacchetto>')),
-      ...unite.map((u) => `npm run feedback -- ${u.num} archived "${notaUnita('<numero del pacchetto>')}"`),
-    ];
-    console.error(`UNITE NON ARCHIVIATE: il pacchetto è nato senza numero (la numerazione non ha risposto), e attese e note lo nominano. ${unite.map((u) => `#${u.num}`).join(', ')} restano in coda. Quando ce l'ha, in quest'ordine:\n${passi.map((x) => `  ${x}`).join('\n')}`);
-  } else if (unite.length) {
-    const voce = { id: r.id, num: String(r.seq) };
-    const nota = notaUnita(voce.num);
-    // Prima le attese: una unita archiviata che qualcuno aspetta ancora manderebbe quel qualcuno all'owner (attesa chiusa).
-    const spostate = await Promise.all(aspettanti.map(async (x) => {
-      try { return { x, e: await pacchetto.sposta(x, voce, cred.idToken) }; } catch (e) { return { x, e: { ok: false, motivo: msg(e) } }; }
-    }));
-    const ferme = new Set(spostate.filter((s) => !s.e.ok).flatMap((s) => s.x.togli));
-    const fatte = spostate.filter((s) => s.e.ok);
-    if (fatte.length) console.log(`Attese spostate sul pacchetto: ${fatte.map(({ x }) => `#${x.num} (aspettava ${x.quali.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
-    for (const { x, e } of spostate.filter((s) => !s.e.ok)) {
-      incompleto = true;
-      console.error(`ATTESA NON SPOSTATA su #${x.num} (${e.motivo}): aspetta ancora ${x.quali.map((n) => `#${n}`).join(', ')}. Rimedia con: ${cheAspetta(x, voce.num)}`);
-    }
-    const archiviate = await Promise.all(unite.filter((u) => !ferme.has(u.id)).map(async (u) => {
-      try { return { u, e: await pacchetto.archivia(u, nota, cred.idToken) }; } catch (e) { return { u, e: { ok: false, motivo: msg(e) } }; }
-    }));
-    const riuscite = archiviate.filter((a) => a.e.ok).map((a) => `#${a.u.num}`);
-    if (riuscite.length) console.log(`Archiviate ${riuscite.join(', ')} con la nota «${nota}».`);
-    for (const { u, e } of archiviate.filter((a) => !a.e.ok)) {
-      incompleto = true;
-      console.error(`ARCHIVIAZIONE NON RIUSCITA su #${u.num} (${e.motivo}): resta in coda, e una routine la lavorerebbe da sola. Rimedia con: npm run feedback -- ${u.num} archived "${nota}"`);
-    }
-    for (const u of unite.filter((x) => ferme.has(x.id))) {
-      incompleto = true;
-      console.error(`#${u.num} NON ARCHIVIATA: qualcuno la aspetta ancora (sopra). Dopo aver spostato quell'attesa: npm run feedback -- ${u.num} archived "${nota}"`);
-    }
-  }
-  if (copie && copie.immagini.length + copie.documenti.length) {
-    console.log(`Allegati copiati dalle unite: ${copie.immagini.length} immagini, ${copie.documenti.length} documenti; da dove viene ognuno sta in coda alla spec.`);
-  }
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
