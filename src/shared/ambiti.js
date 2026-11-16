@@ -20,7 +20,12 @@
     'server.spingi': op('spingere un ramo su filo-security', { pv: true, ex: true }),
     'feedback.apri': op('aprire feedback'),
     'domanda.apri': op('aprire domande per l’owner'),
-    'feedback.metadati': op('leggere numeri, stati, date e rami dei feedback, senza i testi'),
+    'feedback.metadati': op('leggere numeri, stati, date e rami dei feedback, senza i testi', {
+      parametri: '{} gli aperti in ordine di id; {"tutti":true} tutti, dal numero più alto; «limite» da 1 a 1000 (di base 1000). '
+        + 'A pagine: se la risposta ha «troncato»: true, si richiede con «dopo» uguale al suo «seguente», finché «troncato» è false. '
+        + '{"ids":[…]} (fino a 1000, da solo) rende i feedback chiesti, e in «mancanti» gli id che non ci sono. '
+        + '«illeggibili» elenca gli id che il server non ha potuto decifrare. Un parametro diverso si rifiuta.',
+    }),
     'feedback.leggi': op('leggere il testo di un feedback', { nf: true, rs: true }),
     'coda.elenco': op('leggere l’elenco dei feedback in coda, coi titoli', { nf: true, rs: true }),
     'coda.leggi': op('leggere un feedback in coda', { nf: true, rs: true }),
