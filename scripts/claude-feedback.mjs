@@ -32,7 +32,6 @@
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
 //                                                         [--aspetta 676,663.2]
-//                                                         [--pacchetto 812,815]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
