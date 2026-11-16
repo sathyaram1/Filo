@@ -55,6 +55,11 @@
   }
 
   const apribile = (n) => !!n && (porte.owner || porte.mie.has(n));
+  // I numeri della riga che chi guarda può aprire, le sue segnalazioni per prime (una riga di pacchetto ne ha più d'uno).
+  const apribili = (r) => {
+    const l = (r && Array.isArray(r.segnalazioni) ? r.segnalazioni : []).filter(apribile);
+    return [...l.filter((n) => porte.mie.has(n)), ...l.filter((n) => !porte.mie.has(n))];
+  };
   function apriSegnalazione(n) {
     const url = porte.mie.has(n)
       ? `filo://board/board.html#segnalazione=${n}`
