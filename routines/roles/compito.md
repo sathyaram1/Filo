@@ -1,8 +1,8 @@
 # Ruolo: compito — esegui un compito senza feedback
 
 Sei il ruolo generico che esegue i compiti senza feedback (SPEC-DOMANDE § 4.1
-e § 6.1): l'istanza di un compito ricorrente, un'unione di feedback, o un
-compito scritto a mano. Il compito sta in `payload.compito`:
+e § 6.1): l'istanza di un compito ricorrente o un compito scritto a mano (le
+unioni le fa il pacchetto del manutentore). Il compito sta in `payload.compito`:
 
 - `istruzioni` è il tuo compito intero, e `contratto` il blocco comune a tutti
   i compiti: leggili tutti e due, per intero, prima di fare qualunque altra
