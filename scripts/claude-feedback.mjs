@@ -313,9 +313,8 @@ export function rigaAperto({ soloLocale = false, server = false, r = {} } = {}) 
 }
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--server] [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
-  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
-  console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--server] [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--dry-run]');
+  console.error('     Le unioni non si aprono da qui: le chiede il manutentore (npm run manutentore -- pacchetto 812,815).');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     --server (anche con --non-locale): il lavoro tocca il codice del server, e lo prendono i lavori server.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
