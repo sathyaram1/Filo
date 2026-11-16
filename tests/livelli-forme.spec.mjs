@@ -479,6 +479,30 @@ test('il pentagono verde dice cosa ha controllato l’audit, e non offre di salt
   await expect(page.locator('#mgSaltaL4Btn')).toHaveCount(0);
 });
 
+// #2508: il lavoro fidato fuori dalle zone delicate non passa dal controllo, e la scheda dice che non si è fatto e perché.
+test('il pentagono blu dice che il controllo non era richiesto, e perché', async ({ openTab }) => {
+  const fb = Object.assign({}, FB_COMPLETO, {
+    _id: 'fb-livelli-nonrichiesto',
+    livelli: { l4: { esito: 'non_richiesto', by: 'regola', perche: 'fidato_fuori_zone', sha: SHA, at: '2026-11-14T19:00:00Z', testo: 'Controllo di sicurezza non richiesto: lavoro fidato che non tocca zone delicate.' } },
+  });
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  const pen = page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]');
+  await expect(pen).not.toHaveClass(/vuot/);
+  await pen.click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('Non richiesto');
+  await expect(corpo).toContainText('Lavoro fidato che non tocca zone delicate');
+  await expect(corpo).toContainText('la regola dei lavori fidati');
+  await expect(page.locator('#mgSaltaL4Btn')).toHaveCount(0);
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgSide').screenshot({ path: `tests/.shots/livelli-pentagono-non-richiesto-${tema}.png` });
+    await page.locator('#mgLivelliRow').screenshot({ path: `tests/.shots/livelli-fila-non-richiesto-${tema}.png` });
+  }
+});
+
 test('il click su un giudice apre QUEL giudice, come sempre', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);
