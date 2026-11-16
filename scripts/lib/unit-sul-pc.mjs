@@ -47,6 +47,17 @@ export function unitDelRamo(root, tutti, { git = gitIn(root) } = {}) {
   return { file: soloDelRamo({ tutti, cambiati, root }), base };
 }
 
+/**
+ * Gli spec scelti per area (`tests/<nome>`, senza estensione): sul PC solo quelli che il ramo cambia, gli altri li prova
+ * GitHub nella corsa degli unit (#1737 giro 1). `cambiati` null = non si sa cosa cambia il ramo: niente qui. PURA.
+ */
+export function specSulPc({ specs = [], cambiati = null }) {
+  if (!Array.isArray(cambiati)) return { qui: [], lontani: [...specs] };
+  const set = new Set(cambiati.map((f) => String(f).replace(/\\/g, '/')));
+  const qui = specs.filter((s) => set.has(`${s}.spec.mjs`));
+  return { qui, lontani: specs.filter((s) => !qui.includes(s)) };
+}
+
 /** Cosa dice il lanciatore sul PC dell'owner. PURA. */
 export function testoSulPc(scelta, totale) {
   if (scelta.errore) {
