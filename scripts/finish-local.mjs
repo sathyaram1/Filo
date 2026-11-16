@@ -791,7 +791,7 @@ export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null
   let tentativo = 0;
   const giro = await chiediConProva({
     root, punta: cur, primaProva,
-    ...(deps.prova ? { prova: deps.prova } : {}),
+    ...(prova ? { prova } : {}),
     fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
     chiedi: (provaUnit) => {
       const pendingParts = tentativo++ === 0 ? fuori : inSospeso();
