@@ -288,11 +288,11 @@
         type: 'item', icon: icona('copy', 16), label: 'Copia il testo', azione: 'patch-notes',
         onClick: () => copia(riga.testo, 'Riga copiata'),
       }];
-      const n = riga.segnalazione;
-      if (apribile(n)) {
-        voci.push(porte.mie.has(n)
-          ? { type: 'item', icon: icona('feedback', 16), label: 'Apri la tua segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) }
-          : { type: 'item', icon: icona('feedback', 16), label: 'Apri la segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) });
+      const numeri = apribili(riga);
+      // Con più numeri la voce dice quale apre; con uno solo resta com'era.
+      for (const n of numeri) {
+        const label = `${porte.mie.has(n) ? 'Apri la tua segnalazione' : 'Apri la segnalazione'}${numeri.length > 1 ? ` #${n}` : ''}`;
+        voci.push({ type: 'item', icon: icona('feedback', 16), label, azione: 'patch-notes', onClick: () => apriSegnalazione(n) });
       }
       voci.push(copiaVersione(versione));
       return voci;
