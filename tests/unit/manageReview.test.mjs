@@ -1566,6 +1566,27 @@ test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio n
   assert.match(niente.pannello.testo, /non ancora fatto/);
 });
 
+// #2508: il controllo che la regola non chiede al lavoro fidato si vede come tale, e ogni esito dice perché.
+test('livelli L4: «Non richiesto» per il fidato fuori dalle zone, e il perché accanto a ogni esito', () => {
+  const nr = MR.livelloL4({ livelli: { l4: { esito: 'non_richiesto', by: 'regola', perche: 'fidato_fuori_zone', sha: 'cd34'.repeat(10), testo: 'x' } } });
+  assert.equal(nr.vuoto, false);
+  assert.equal(nr.colore, MR.LIVELLO_COLORI ? MR.LIVELLO_COLORI.aligned : nr.colore);
+  const righe = Object.fromEntries(nr.pannello.righe.map((r) => [r.etichetta, r.valore]));
+  assert.equal(righe.Esito, 'Non richiesto');
+  assert.equal(righe['Perché'], 'Lavoro fidato che non tocca zone delicate');
+  assert.equal(righe['Deciso da'], 'la regola dei lavori fidati');
+  assert.equal(righe.Commit, 'cd34cd34');
+  assert.deepEqual(nr.pannello.azioni, [], 'niente da saltare');
+
+  const fatto = MR.livelloL4({ livelli: { l4: { esito: 'pass', perche: 'zona_delicata', testo: 'Letto.' } } });
+  assert.equal(fatto.pannello.righe.find((r) => r.etichetta === 'Perché').valore, 'Il lavoro tocca zone delicate');
+  const nonFidato = MR.livelloL4({ livelli: { l4: { esito: 'fail', perche: 'non_fidato', testo: 'x' } } });
+  assert.equal(nonFidato.pannello.righe.find((r) => r.etichetta === 'Perché').valore, 'Il feedback non è fidato');
+  // Un codice che non si conosce non diventa una riga.
+  const strano = MR.livelloL4({ livelli: { l4: { esito: 'pass', perche: '<b>x</b>', testo: 'x' } } });
+  assert.equal(strano.pannello.righe.some((r) => r.etichetta === 'Perché'), false);
+});
+
 // ── L5: il cancello di fusione ────────────────────────────────────────────
 
 const RICHIESTA = {
