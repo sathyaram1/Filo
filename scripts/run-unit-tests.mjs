@@ -595,7 +595,8 @@ async function main() {
 
   let files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
   // Sul PC dell'owner la cartella intera no: quello che è arrivato da main senza il suo sì gira su GitHub (D-185).
-  if (!solo && !process.env.FILO_UNIT_DIR && files.length) {
+  // Con `FILO_UNIT_LONTANE=0` i file li ha scelti chi lancia (la prova sulla fusione): niente regola, niente libreria.
+  if (!solo && !process.env.FILO_UNIT_DIR && process.env.FILO_UNIT_LONTANE !== '0' && files.length) {
     const { unitLontane, unitDelRamo, testoSulPc } = await import('./lib/unit-sul-pc.mjs');
     if (unitLontane(REPO_ROOT)) {
       const scelta = unitDelRamo(REPO_ROOT, files);
