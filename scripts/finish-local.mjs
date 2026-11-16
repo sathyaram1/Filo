@@ -770,7 +770,9 @@ export async function dopoLaFusioneDellApp({ reply, id, ramo }, { of, inSospeso 
  * richiesta: quando main si muove e la prova si rifà, il server può essere arrivato intanto. `deps` è per le prove.
  * @returns {Promise<{ fermo?: true, prova, reply?, riga: string }>}
  */
-export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null }, deps = {}) {
+export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null, specRemoti = [] }, deps = {}) {
+  // Sul PC dell'owner anche la prova rifatta perché main si è mosso la fa GitHub, con gli stessi spec (#1737 giro 1).
+  const prova = deps.prova || (unitLontane(root) ? (o) => provaRemota({ ...o, spec: specRemoti }) : null);
   const log = deps.log || ((s) => console.log(s));
   const of = deps.of || await import('./owner-feedback.mjs');
   const chiedi = deps.askServerMerge || askServerMerge;
