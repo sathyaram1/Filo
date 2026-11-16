@@ -46,7 +46,8 @@ function proveDellaPunta(root, base, head, cartella) {
 
 /** Una copia staccata di `sha` con le dipendenze collegate e i file generati che git ignora. { dir, chiudi } */
 export function apriCopia(root, sha, { moduli = ['node_modules'] } = {}) {
-  const base = mkdtempSync(join(tmpdir(), 'filo-prova-nuovi-'));
+  // Forma lunga: la temporanea di Windows può essere quella corta 8.3 (RUNNER~1), e lì Playwright non trova i casi.
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-prova-nuovi-')));
   const dir = join(base, 'albero');
   mkdirSync(join(base, 'ganci'));
   git(root, ['-c', `core.hooksPath=${join(base, 'ganci')}`, 'worktree', 'add', '-q', '--detach', dir, sha]);
