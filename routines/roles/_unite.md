@@ -6,5 +6,8 @@ le chiude come risolte, con la frase di chi consegna. Ognuna arriva fra i
 `feedback.documents` con la sua scheda (titolo, testo, conversazione) seguita
 dai suoi allegati, e le sue immagini stanno in `payload.immagini` con l'id che
 comincia per `uM.` (unita M). Fanno parte della richiesta quanto il testo: chi
-lavora le copre tutte, chi verifica le controlla tutte. `unite.tagliate` e
+lavora le copre tutte, chi verifica le controlla tutte. La riga di changelog
+del pacchetto porta i numeri di tutte le unite, `{ testo, segnalazione: [812,
+815] }` (senza `#`): la pagina Novità mostra a ognuno solo i suoi, così chi ha
+mandato un'unita trova il suo numero sulla riga che la risolve. `unite.tagliate` e
 `unite.nonLette` dicono cosa non è arrivato: se ti serviva, dillo nel report.
