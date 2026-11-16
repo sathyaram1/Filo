@@ -75,6 +75,7 @@ import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { cambiatiSoloNeiCommenti } from './lib/solo-commenti.mjs';
+import { specCheUsano, leggiSorgenti, SOGLIA_SPEC_DI_UN_MODULO } from './lib/spec-che-usano.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
@@ -433,25 +434,37 @@ function elencoCorto(file, mostrati = 8) {
  * Perché la scelta degli spec è quella, quando non è ovvio: nessuno spec, o file tolti perché cambiano solo nei
  * commenti. Un lavoro sul server fa girare qui solo gli unit, e chi legge deve sapere perché (#2425). PURA.
  */
-export function motivoDellaScelta({ changed = [], soloCommenti = [], specs = 0 }) {
+export function motivoDellaScelta({ changed = [], soloCommenti = [], troppoLarghi = [], specs = 0 }) {
   const tolti = soloCommenti.filter((f) => changed.includes(f));
-  if (specs > 0) return tolti.length ? `▸ Cambiano solo nei commenti, e non scelgono spec: ${elencoCorto(tolti)}.` : '';
+  const larghi = troppoLarghi.filter((l) => changed.includes(l.file));
+  // Un modulo che quasi ogni spec usa non è «non provato da nessuno spec»: lo prova la suite intera, che qui non parte.
+  const rigaLarghi = larghi.length
+    ? `▸ Non lancio gli spec che usano ${larghi.map((l) => `${l.file} (${l.spec})`).join(', ')}: oltre ${SOGLIA_SPEC_DI_UN_MODULO} sono quasi la suite intera, che gira su main a ogni fusione.`
+    : '';
+  const conLarghi = (riga) => [riga, rigaLarghi].filter(Boolean).join('\n');
+  if (specs > 0) return conLarghi(tolti.length ? `▸ Cambiano solo nei commenti, e non scelgono spec: ${elencoCorto(tolti)}.` : '');
   if (!changed.length) return '▸ Nessuno spec da lanciare: il ramo non cambia file rispetto alla linea principale. Corro solo gli unit.';
-  const altri = changed.filter((f) => !tolti.includes(f));
+  const altri = changed.filter((f) => !tolti.includes(f) && !larghi.some((l) => l.file === f));
   const parti = [
     ...(tolti.length ? [`${tolti.length} cambiano solo nei commenti (${elencoCorto(tolti)})`] : []),
-    ...(altri.length ? [`${tolti.length ? 'gli altri' : `tutti (${changed.length})`} non li prova nessuno spec (${elencoCorto(altri)})`] : []),
+    ...(altri.length ? [`${tolti.length || larghi.length ? 'gli altri' : `tutti (${changed.length})`} non li prova nessuno spec (${elencoCorto(altri)})`] : []),
   ];
-  return `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.`;
+  return conLarghi(parti.length ? `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.` : '▸ Nessuno spec da lanciare, corro solo gli unit.');
 }
 
-/** Gli spec da lanciare per `changed`, fra quelli tracciati in `root`, e i file che non scelgono perché cambiano solo nei commenti. */
+/**
+ * Gli spec da lanciare per `changed`, fra quelli tracciati in `root`: per area e nome, più quelli che importano o
+ * lanciano un modulo cambiato (#2551). Con loro i file che non scelgono perché cambiano solo nei commenti, e i moduli
+ * usati da troppi spec per lanciarli tutti.
+ */
 export function specDellaScelta({ changed, base, root = ROOT }) {
   // `ls-files` e filtro in memoria: `--error-unmatch` stampava un errore per ogni spec inesistente, e sembrava un guasto.
   const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: root }).out.split('\n').filter(Boolean));
   const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
-  const specs = specsForChangedFiles(changed.filter((f) => !soloCommenti.includes(f)), [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
-  return { specs, soloCommenti };
+  const veri = changed.filter((f) => !soloCommenti.includes(f));
+  const perUso = specCheUsano(veri, leggiSorgenti(root));
+  const specs = [...new Set([...specsForChangedFiles(veri, [...tracked]), ...perUso.specs])].filter((s) => tracked.has(`${s}.spec.mjs`));
+  return { specs, soloCommenti, troppoLarghi: perUso.troppoLarghi };
 }
 
 /**
@@ -909,9 +922,9 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    const { specs, soloCommenti } = specDellaScelta({ changed, base, root: albero.dir });
+    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
-    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, specs: specs.length }) : '';
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
