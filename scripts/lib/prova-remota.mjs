@@ -38,9 +38,15 @@ export function nomeCorsa({ ramo, main, ora = Date.now() }) {
   return `pc-${String(ramo).slice(0, 12)}-${String(main).slice(0, 12)}-${Number(ora).toString(36)}`;
 }
 
+/** Gli spec per la corsa (`tests/<nome>` → `<nome>`), separati da virgola; '' = nessuno, e la parte degli spec non parte. PURA. */
+export function specPerLaCorsa(spec) {
+  return (Array.isArray(spec) ? spec : []).map((s) => String(s).replace(/\\/g, '/').replace(/^tests\//, '').replace(/\.spec\.mjs$/, '')).join(',');
+}
+
 /** La richiesta per repository_dispatch. PURA. */
-export function richiestaDispatch({ ramo, main, corsa, windows = 'tutti' }) {
-  return { event_type: EVENTO, client_payload: { ramo, main, corsa, windows: modoWindows(windows) } };
+export function richiestaDispatch({ ramo, main, corsa, windows = 'tutti', spec = [] }) {
+  const s = specPerLaCorsa(spec);
+  return { event_type: EVENTO, client_payload: { ramo, main, corsa, windows: modoWindows(windows), ...(s ? { spec: s } : {}) } };
 }
 
 /** La corsa col titolo della richiesta, la più nuova. PURA. */
