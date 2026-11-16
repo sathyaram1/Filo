@@ -84,6 +84,14 @@ test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza i
   } finally { togliCartella(root); }
 });
 
+test('la copia nasce nella forma lunga del percorso: con la temporanea corta di Windows Playwright non trova i casi', () => {
+  const { root, base } = ramoDiProva();
+  const copia = apriCopia(root, base);
+  try {
+    assert.equal(copia.dir, realpathSync.native(copia.dir));
+  } finally { copia.chiudi(); togliCartella(root); }
+});
+
 test('uno spec che non parte esce «errore», non un rosso senza il lavoro che sembra quello atteso', () => {
   const voce = { file: 'tests/x.spec.mjs', tipo: 'spec', casi: ['x'] };
   const muto = () => ({ status: 1, stdout: '', stderr: 'Error: Cannot find module @playwright/test' });
