@@ -113,12 +113,12 @@ test('una riga legata a una segnalazione resta testo per il recap e le impronte'
   }
 });
 
-test('ogni riga del registro è testo, o un oggetto con testo e numero di segnalazione', () => {
+test('ogni riga del registro è testo, o un oggetto con testo e numero (o elenco di numeri) di segnalazione', () => {
   for (const n of PN.NOTES) {
     for (const r of [...(n.features || []), ...(n.fixes || [])]) {
       if (typeof r === 'string') continue;
       assert.equal(typeof r.testo, 'string', `${n.version}: riga senza testo`);
-      assert.ok(Number.isInteger(r.segnalazione) && r.segnalazione > 0, `${n.version}: «${r.testo.slice(0, 60)}» ha un numero di segnalazione non valido`);
+      assert.ok(PN.segnalazioneValida(r.segnalazione), `${n.version}: «${r.testo.slice(0, 60)}» ha un numero di segnalazione non valido`);
       assert.deepEqual(Object.keys(r).sort(), ['segnalazione', 'testo'], `${n.version}: campi in più`);
     }
   }
