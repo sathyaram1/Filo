@@ -154,12 +154,15 @@ Gestione → Automazioni.
 
 1. **Le priorità 3 partono da sole.** Non entrano in nessun pacchetto e non stanno nell'ordine: il server le accende
    subito.
-2. **Pacchetti.** Stessa area; tutte le segnalazioni in coda (`todo`) e non ancora lavorate; nessuna a priorità 3.
-   Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback scorrelato resta da solo. Un pacchetto passa o non
-   passa intero. Niente figli (#N.M) per spezzare un lavoro: il contenitore è il pacchetto.
+2. **Pacchetti.** La sola strada per unire è `pacchetto <N,M,…>`: nasce un feedback nuovo col testo del server (numeri
+   e titoli), che assorbe gli originali; il server rifiuta col motivo quelli già iniziati (ramo, biglietto vivo), a
+   priorità 3, locali, già assorbiti, oltre 20, e un giro di attese. Tu aggiungi: stessa area; una catena di attese (A e
+   C aspettano B, o A aspetta B che aspetta C) si unisce solo se il lavoro si fa davvero in un colpo; due originali che
+   si contraddicono non si uniscono: apri una domanda. Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback
+   scorrelato resta da solo. Un pacchetto passa o non passa intero. Niente figli (#N.M) per spezzare un lavoro.
 3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
-   chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
-   nuovo può unire il vecchio e il doppione.
+   chiude con la prova. Un doppione di un lavoro non iniziato si unisce con lui in un pacchetto; un pacchetto già aperto
+   non si allarga, ma uno nuovo può assorbire il vecchio (se non è iniziato) e il doppione.
 4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
    tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
    entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
