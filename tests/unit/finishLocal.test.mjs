@@ -347,7 +347,7 @@ describe('da qui sul ramo principale non si scrive', () => {
     // chiama si ferma sul suo rifiuto.
     const chiamate = [...codice.matchAll(/const fermo = spedisciIlRamo\(/g)].map((m) => m.index);
     assert.ok(chiamate.length >= 2, `spedisciIlRamo chiamata ${chiamate.length} volte`);
-    for (const i of chiamate) assert.match(codice.slice(i, i + 220), /\n\s*if \(fermo\) \{[^}]*process\.exit\(1\)/);
+    for (const i of chiamate) assert.match(codice.slice(i, i + 320), /^[^\n]*\n\s*if \(fermo\) \{[\s\S]{0,220}?process\.exit\(1\)/);
   });
 });
 
