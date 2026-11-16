@@ -211,7 +211,7 @@ test('rami e incroci leggono anche i rami del clone di filo-security, e se il cl
   const assente = join(schede, 'filo-security');
   assert.equal(await M.main(['rami', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
   const senza = leggi();
-  assert.match(senza, /^claude\/app/m, 'i rami dell\'app restano');
+  assert.match(senza, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#30\)/m, 'i rami dell\'app restano');
   assert.ok(senza.includes(`Rami del server NON letti: nessun clone di filo-security in ${assente}`), senza);
   assert.equal(await M.main(['incroci', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
   assert.match(leggi(), /Rami del server NON letti/);
