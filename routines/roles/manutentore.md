@@ -330,7 +330,7 @@ npm run manutentore -- parallelo <N>               # quante sessioni insieme, so
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
 npm run manutentore -- attesa <B> <A|C-12> [--togli]   # B aspetta A, o il compito C-12
 npm run manutentore -- compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   # un compito senza feedback, istruzioni da stdin: risponde col suo id
-npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
+npm run manutentore -- pacchetto <N,M,…> [--server]   # nasce un feedback nuovo che assorbe gli originali non iniziati
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N|C-n> [nota]      # un lavoro (o un compito) fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato; una 3 solo se l'originale è a 3 e avanza
