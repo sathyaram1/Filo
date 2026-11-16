@@ -59,6 +59,7 @@ async function githubFinto({ dispatch = 204, registro }) {
   const richieste = [];
   let corsa = '';
   let coppia = null;
+  let chiesta = null;
   const server = createServer((req, res) => {
     let corpo = '';
     req.on('data', (c) => { corpo += c; });
