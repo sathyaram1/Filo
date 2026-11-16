@@ -74,14 +74,14 @@
     li.className = 'nv-riga';
     li.tabIndex = -1;
     li.appendChild(document.createTextNode(r.testo));
-    if (apribile(r.segnalazione)) {
+    for (const n of apribili(r)) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'nv-segn';
-      b.textContent = `#${r.segnalazione}`;
-      b.title = porte.mie.has(r.segnalazione) ? 'Apri la tua segnalazione' : 'Apri la segnalazione';
+      b.textContent = `#${n}`;
+      b.title = porte.mie.has(n) ? 'Apri la tua segnalazione' : 'Apri la segnalazione';
       b.tabIndex = -1;
-      b.addEventListener('click', () => apriSegnalazione(r.segnalazione));
+      b.addEventListener('click', () => apriSegnalazione(n));
       li.appendChild(b);
     }
     datiDi.set(li, { riga: r, versione: v });
