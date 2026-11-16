@@ -1002,8 +1002,8 @@ async function main() {
     } else if (specRemoti.length) {
       console.log(`\n▸ Spec delle aree toccate che il ramo non cambia (${specRemoti.length}): sul tuo PC non li giro, li prova GitHub quando chiudi il lavoro.`);
     }
-    console.log(`\n${stimaDurataControlli(specs.length).testo}`);
-    if (specs.length) {
+    console.log(`\n${stimaDurataControlli(qui.length).testo}`);
+    if (qui.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
       if (schermo.nota) console.log(`\n${schermo.nota}`);
