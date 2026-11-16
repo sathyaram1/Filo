@@ -953,21 +953,6 @@ async function main() {
     if (nota) console.log(`\n${nota}`);
   }
 
-  // Sul PC dell'owner gli unit arrivati da main girano su GitHub (D-185): la corsa parte adesso e l'esito si legge dopo
-  // gli spec. Qui il lanciatore prende solo i file che il ramo cambia, e la corsa scarica il ramo da origin.
-  const lontane = unitLontane(ROOT);
-  let avvioRemoto = null;
-  let rossiQui = false;
-  if (lontane) {
-    process.env[VAR_LONTANE] = '1';
-    const fermo = spedisciIlRamo({ branch, cur: shaProvato, principale });
-    if (fermo) { console.error(`\n✗ ${fermo}\n  GitHub non avrebbe il commit da provare.`); process.exit(1); }
-    avvioRemoto = await avviaProvaRemota({ root: ROOT, punta: shaProvato });
-    if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
-    console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
-      + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.');
-  }
-
   // L'esito della verifica si legge PRIMA dei controlli: è lui a dire se gli
   // spec delle aree sono già stati corsi su questo contenuto (il cancello vero
   // resta più sotto, dopo i controlli, dov'è sempre stato).
@@ -975,6 +960,22 @@ async function main() {
   const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
   let unitRossi = false;
   let provaDelRamo = null;
+
+  // Sul PC dell'owner gli unit arrivati da main girano su GitHub (D-185): la corsa parte adesso e l'esito si legge dopo
+  // la verifica, che senza --check ferma prima e la corsa non serve. Qui il lanciatore prende solo i file del ramo.
+  const lontane = unitLontane(ROOT);
+  let avvioRemoto = null;
+  let rossiQui = false;
+  if (lontane) process.env[VAR_LONTANE] = '1';
+  if (lontane && (checkOnly || v.ok)) {
+    // La corsa scarica il ramo da origin.
+    const fermo = spedisciIlRamo({ branch, cur: shaProvato, principale });
+    if (fermo) { console.error(`\n✗ ${fermo}\n  GitHub non avrebbe il commit da provare.`); process.exit(1); }
+    avvioRemoto = await avviaProvaRemota({ root: ROOT, punta: shaProvato });
+    if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
+    console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
+      + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.');
+  }
 
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
