@@ -438,6 +438,9 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
     // Le spinte sui rami di lavoro non accendono la suite (#2533): su una punta senza corse la si avvia a mano.
     case 'aspetta_suite': return r.suite === 'assente'
       ? `Su ${sha || 'quel commit'} la suite di filo-security non è mai partita: avviala da Actions di filo-security («Suite del server», Run workflow sul ramo ${ramo}), poi rilancia lo stesso comando.`
+      // #2540: lavori chiusi senza un passo, di solito pagamenti o limite di spesa: non è un rosso del ramo.
+      : r.suite === 'non_partita'
+      ? `GitHub ha chiuso la suite di filo-security su ${sha || 'quel commit'} senza avviarla${r.url ? ` (${r.url})` : ''}: non è un rosso del ramo, di solito sono i pagamenti dell’account GitHub o il limite di spesa di Actions. Sistemati quelli, rilancia la suite da Actions di filo-security («Suite del server», Run workflow sul ramo ${ramo}) e poi lo stesso comando.`
       : `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
     case 'suite_rossa': return `La suite di filo-security è rossa su ${sha || 'quel commit'}${r.url ? ` (${r.url})` : ''}: correggi il ramo, spingi e rilancia.`;
     case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
