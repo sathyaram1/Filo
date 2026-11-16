@@ -669,9 +669,7 @@
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
     // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
     const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
-    // Le segnalazioni unite da un pacchetto (SPEC-RIDISEGNO-LAVORO.md § 2): stessa forma e stesso tetto delle attese.
-    const unite = (opts && Array.isArray(opts.unisce) && opts.unisce.length) ? attesePerScrittura(opts.unisce) : [];
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length || unite.length);
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
