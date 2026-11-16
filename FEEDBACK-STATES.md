@@ -411,79 +411,52 @@ porta in testa anche la riga «doppione di #M». Al contrario, il rifiuto di un 
 che non cita il feedback o che precede la sua nascita, quando l'oggetto nomina un altro feedback chiuso
 («merge-gate: #M» o il suo ramo), indica `--doppione-di M` con la stessa fusione (#2583).
 
-**Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
-segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
-`npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
-chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole). Lo
-strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
-fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
-dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
-il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
-priorità 3, un lavoro locale, chi P stesso aspetta. Area, tetto e
-urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
-priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
-o non passa intero.
+**Pacchetti** (#2270: una strada sola). Un pacchetto P unisce più segnalazioni della stessa
+area in un lavoro solo. Lo chiede solo il manutentore, `pacchetto <N,M,…>` sulla sua chiave:
+il server fa nascere un feedback nuovo col campo `unisce: [{ id, num }]` (in chiaro; ai
+client le regole lo vietano alla nascita, come `unitoIn` e la fiducia) e un testo suo, coi
+soli numeri e titoli degli originali. Le altre strade rispondono col motivo e non fanno
+niente: `pacchetto <P> <N,M>` su un feedback esistente (dice la forma nuova),
+`feedback:apri --pacchetto` e il pacchetto dal cloud (dicono che le unioni le chiede il
+manutentore), `coda.unione` e il biglietto d'unione del riordino.
 
-*La spec sta nel testo* (#2033): chi lavora P, chi lo verifica e i lavori server ricevono
-testo e allegati, mai le note. Prima della rete, anche a vuoto, lo strumento legge il testo
-insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una frase che
-manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
-un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
-«prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
-dà P da lavorare con quello fuori da main. Un'attesa che P prende da un'unita vale quanto `--aspetta`: aprendo,
-quel controllo si fa dopo aver letto le unite; a vuoto no, e il rifiuto lo dice. Il rimedio sta nel messaggio: la spec nel testo
-o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
-segnalazione qualunque racconta un problema, e può citare note e attese di altri.
-I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
-PACCHETTO» (#2038), la consegnano lo stesso: il server la mette fra i documenti di chi lavora
-e di chi verifica, le parti nell'ordine, solo se P è fidato e nato dall'owner o da una
-sessione. Quei turni li apre solo l'owner o una sessione: nel testo di una routine la stessa
-riga resta citata.
+*I controlli, prima di scrivere niente.* Il server rifiuta col motivo, tutti insieme, gli
+originali che non può assorbire: non `todo`, con un ramo o un biglietto vivo, a priorità 3
+(o che non si legge), un lavoro locale, già assorbiti o già dentro un pacchetto aperto; e
+meno di 2 o più di 20. Rifiuta anche un giro di attese: P aspetta quello che aspettavano gli
+originali, meno loro stessi, e se una di quelle attese porta, anche a catena, a un
+originale, P aspetterebbe sé stesso. Oltre le 20 attese di un feedback non nasce e lo dice
+col numero. Il ruolo aggiunge le sue regole (stessa area, catene di attese, originali che si
+contraddicono): routines/roles/manutentore.md.
 
-*Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
-Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
-conversazione di ogni unita e li carica in P: i documenti col nome «#N — nome», le
-immagini (che un nome non l'hanno) nel campo delle immagini, con da dove viene ognuna in
-un blocco in coda alla spec. Il tetto è quello di un feedback, 5 immagini e 5 documenti
-compresi quelli di `--allega`: oltre, o con un allegato che non si apre o che un feedback
-non ammette, non apre niente e lo dice; un caricamento che non riesce ferma la nascita
-(`submit` con `interi`): niente pacchetto monco. Con allegati di una unita non fidata, o
-della conversazione di una scritta anche da routine o sessioni, P nasce non fidato anche
-da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
-non fidati (SPEC-DOMANDE.md § 1.3).
+*La nascita.* P è fidato solo se lo sono tutti gli originali (sono i suoi `genitori`), ha la
+priorità più alta fra loro (quella scelta dall'owner vince e resta sua), e il segno dei
+lavori server se lo chiede il manutentore o se un originale lo porta. Poi ogni originale va
+`todo → archived` (routine) con `unitoIn` = P e la nota «Assorbito nel pacchetto #P»: è
+**assorbito**, non eliminato. Esce dalla coda, dalle liste e dai conteggi di Gestione e dalle
+schede del manutentore; la scheda di P in Gestione li elenca (numero, titolo) e li apre, e la
+scheda di un assorbito riporta a P. Nessun documento si cancella: l'app di chi ha segnalato
+riconosce la sua segnalazione dall'id. Chi aspettava un originale passa ad aspettare P;
+un'attesa scritta dopo su un assorbito la sposta su P la coda, invece di mandare all'owner
+chi aspetta (`attesa_chiusa`).
 
-*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). P nasce con le
-attese delle unite insieme a quelle di `--aspetta` (#1903.1): archiviate, le loro non
-conterebbero più da nessuna parte, e P partirebbe prima di ciò che una di loro aspettava.
-Quelle su un'altra unita cadono; il tetto delle 20 si conta su P, e oltre non apre e dice i
-conti per unita. Chi aspettava una
-unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
-restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
-#P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
-aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
-una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
-per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
-P, anche per un'attesa presa da un'altra unita o a catena (P aspetta A, A aspetta lui), si rifiuta prima di
-aprire con la catena (si aspetterebbero a vicenda); P nato senza numero non
-archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
-nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
-dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
-Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi` non filtra
-per stato, e dal cloud `routineFeedback` (#1785) coi numeri espliciti non esclude gli
-archiviati e ne dà gli allegati testuali; delle immagini dà il conteggio, e le porta P.
+*Chi lavora P* riceve nel fascicolo, per ogni originale, titolo, testo, conversazione con le
+decisioni dell'owner e allegati, con l'intestazione che dice che fanno parte della richiesta
+(#2267): tetti larghi, e quello che resta fuori lo dice.
 
-Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
-nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
-(pipeline, `statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase
-di ripiego, e le note di P lo dicono) e la versione di P se ne ha una, PRIMA di scrivere P
-in `done`, così l'attesa sciolta non le rimette in coda, con un gancio solo per ogni
-strada che porta P a `done` dopo una fusione; un'unita che è a sua volta un pacchetto
-chiude prima le sue. Una unita archiviata col rimando a P non è un'eccezione da scrivere
-nelle note di P; una in un altro stato, o che non aspetta più P, resta dove sta e le note
-lo dicono. Il messaggio della fusione di P cita le unite (`merge-gate: #P via server
-(unisce #N, #M)`), così la ricerca «già risolto su main» le trova. P archiviato senza
-fusione: le unite restano archiviate; se il lavoro serve ancora le rimette in coda l'owner,
-da Gestione (`archived → todo`).
+*Alla fusione di P* (`done`) il server chiude ogni unita PRIMA di scrivere P: un assorbito
+`archived → done`, una dei pacchetti di prima che aspetta P `todo → done`; tutte (pipeline,
+`statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase di ripiego, e
+le note di P lo dicono), la versione e lo sha della fusione. Il premio e l'annuncio
+«risolta» a chi ha segnalato partono dal `done`, come per ogni altro feedback. Un'unita che è
+a sua volta un pacchetto chiude prima le sue. Una in un altro stato, assorbita in un altro
+pacchetto o che non aspetta più P, resta dove sta e le note lo dicono. Il messaggio della
+fusione cita le unite (`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già
+risolto su main» le trova. P archiviato senza fusione: gli assorbiti restano archiviati; se
+il lavoro serve ancora li rimette in coda l'owner, da Gestione (`archived → todo`).
+
+I pacchetti nati prima restano come sono: quelli con la spec nei turni «SPEC DEL PACCHETTO»
+(#2038) la consegnano fra i documenti, se P è fidato e nato dall'owner o da una sessione.
 
 **Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
 prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più
