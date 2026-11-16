@@ -624,11 +624,22 @@ export function rigaNotaOSblocco(x) {
   return `#${x.numero}: nota scritta${x.sbloccato ? `, il lavoro fermo (${x.sbloccato}) riparte con chi lo prende dopo` : ''}.`;
 }
 
-/** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
+/**
+ * `sblocca 812 riparato il registro` → { ok, numero, testo }; `sblocca C-3915 …` → { ok, compito, testo }: un compito
+ * fermo per guasto (#2303). Testo '' = quello di default del server. PURA.
+ */
 export function richiestaSblocca(args) {
   const [n, ...resto] = senzaOpzioni(args);
-  if (!numeroDi(n)) return { ok: false, motivo: 'sblocca vuole il numero del feedback fermo (sblocca 812 [nota])' };
-  return { ok: true, numero: numeroDi(n), testo: resto.join(' ').trim() };
+  const testo = resto.join(' ').trim();
+  const c = /^C-(\d{1,9})$/i.exec(String(n || '').trim());
+  if (c) return { ok: true, compito: `C-${c[1]}`, testo };
+  if (!numeroDi(n)) return { ok: false, motivo: 'sblocca vuole il numero del feedback fermo o il compito (sblocca 812 [nota], sblocca C-3915 [nota])' };
+  return { ok: true, numero: numeroDi(n), testo };
+}
+
+/** I dati di `sblocca` per il server: il feedback col suo numero, o il compito. PURA. */
+export function datiSblocca(q, testo) {
+  return { ...(q.compito ? { compito: q.compito } : { numero: q.numero }), ...(testo ? { testo } : {}) };
 }
 
 // ── Il canale del manutentore ───────────────────────────────────────────────
@@ -1265,9 +1276,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const q = richiestaSblocca(argv.slice(1));
     const { chiamaOwner } = await import('./domanda.mjs');
     try {
-      await chiamaOwner({ op: 'sblocca', numero: q.numero, ...(q.testo ? { testo: q.testo } : {}) }, { funzione: 'ownerManutentore' });
+      await chiamaOwner({ op: 'sblocca', ...datiSblocca(q, q.testo) }, { funzione: 'ownerManutentore' });
     } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
-    console.log(`#${q.numero} sbloccato: lo riprende chi arriva dopo.`);
+    console.log(`${q.compito || `#${q.numero}`} sbloccato: lo riprende chi arriva dopo.`);
     return 0;
   }
   // L'indicazione dell'owner dalla chat: col suo canale se c'è, se no con la chiave (stessa riga datata).
@@ -1392,7 +1403,15 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       if (!fatto) segnoServer(server, r);
       return fatto;
     }
-    case 'nota': case 'sblocca': {
+    case 'sblocca': {
+      const q = richiestaSblocca(argv.slice(1));
+      if (q.compito) {
+        const r = await chiama(cred, cmd, datiSblocca(q, q.testo || 'Sbloccato dal manutentore: riprendi.'));
+        return esito(r, (x) => `${x.compito}: sbloccato, riparte con chi lo prende dopo.`);
+      }
+    }
+    // falls through: un feedback si sblocca con la sua nota
+    case 'nota': {
       const testo = cmd === 'nota' ? (await leggiStdin()).trim() : richiestaSblocca(argv.slice(1)).testo;
       if (!testo && cmd === 'nota') { console.error('RIFIUTATO: la nota vuole il testo da stdin (nota 812 - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
       const r = await chiama(cred, cmd, { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
@@ -1519,7 +1538,8 @@ export function controlliLocali(cmd, argv) {
     return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})${senzaValore}` : '';
   };
   switch (cmd) {
-    case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
+    case 'leggi': case 'nota': return num(a, cmd);
+    case 'sblocca': { const q = richiestaSblocca(argv.slice(1)); return q.ok ? '' : q.motivo; }
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';

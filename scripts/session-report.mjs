@@ -268,6 +268,22 @@ export const ELENCO_MAX_VOCI = 200;
 export const ELENCO_MAX_BYTE = 60_000;
 const RIGA_ERRORE_MAX = 120;
 const RIGA_COSA_MAX = 60;
+// Il nome con cui un'attesa dichiarata dal fornitore sta fra le attese degli strumenti.
+export const ATTESA_FORNITORE = 'API';
+
+/**
+ * L'attesa che Claude Code dichiara prima di ritentare una richiesta al fornitore (limite di frequenza, servizio
+ * sovraccarico): la riga di sistema `api_error` col suo `retryInMs` (#2303). PURA.
+ * @returns {{ inizioMs: number, finoMs: number, tentativo: number, di: number } | null}
+ */
+export function attesaDichiarata(o) {
+  if (!o || o.type !== 'system' || o.subtype !== 'api_error') return null;
+  const ms = Date.parse(String(o.timestamp || ''));
+  const attesa = Number(o.retryInMs);
+  if (!Number.isFinite(ms) || !Number.isFinite(attesa) || attesa <= 0) return null;
+  const intero = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+  return { inizioMs: ms, finoMs: ms + attesa, tentativo: intero(o.retryAttempt), di: intero(o.maxRetries) };
+}
 
 /**
  * Una riga da mettere nel rapporto: una riga sola, corta, senza le stringhe lunghe che potrebbero essere un biglietto o
@@ -649,6 +665,15 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     const ms = e.timestamp ? Date.parse(e.timestamp) : NaN;
     if (Number.isFinite(sinceMs) && Number.isFinite(ms) && ms < sinceMs) continue;
     if (Number.isFinite(ms)) { if (ms < primoMs) primoMs = ms; if (ms > ultimoMs) ultimoMs = ms; }
+    const fornitore = attesaDichiarata(e);
+    if (fornitore) {
+      const s = Math.round((fornitore.finoMs - fornitore.inizioMs) / 1000);
+      if (s > ATTESA_MIN_S) {
+        rep.atteseOltre30 += 1;
+        const tentativo = fornitore.tentativo ? `, tentativo ${fornitore.tentativo}${fornitore.di ? ` di ${fornitore.di}` : ''}` : '';
+        rep.attese.push({ strumento: ATTESA_FORNITORE, cosa: `attesa dichiarata dal fornitore${tentativo}`, s });
+      }
+    }
     const msg = e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg) continue;
     // Le righe col modello «<synthetic>» (una richiesta interrotta, un errore
@@ -795,6 +820,23 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
 /** Le righe di un file, una alla volta. */
 function righeDelFile(file) {
   return createInterface({ input: createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
+}
+
+/**
+ * I dollari spesi finora nei transcript `file` da `since` (ISO), col listino del rapporto: la misura in corsa del tetto
+ * di costo di un compito (#2303). Un file illeggibile non conta e si dice in `illeggibili`.
+ */
+export async function costoDeiFile(file, { since = '' } = {}) {
+  let usd = 0;
+  let illeggibili = 0;
+  for (const f of Array.isArray(file) ? file : []) {
+    try {
+      usd += Number((await analizzaRighe(righeDelFile(f), { since })).costUsd) || 0;
+    } catch (_) {
+      illeggibili += 1;
+    }
+  }
+  return { usd: Math.round(usd * 10000) / 10000, illeggibili };
 }
 
 /**

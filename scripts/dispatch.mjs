@@ -93,7 +93,7 @@ import { accendi as accendiClone, cloneDelGiro, preparaIntestazione, preparaPerI
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
-  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito,
+  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito, annotaTetto,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
@@ -2747,6 +2747,16 @@ async function finalizeBucket(bucket, fromServer) {
 let lastEmitted = null;
 export function lastChoice() { return lastEmitted; }
 
+/**
+ * Il tetto di costo della corsa di un compito (#2303) va dove la veglia di chi guida il giro lo legge: il marcatore del
+ * biglietto. Un compito senza tetto lo toglie, così un marcatore riusato non ne porta uno vecchio.
+ */
+export function tettoNelMarcatore(root, bucket, ctx) {
+  if (!bucket || bucket.role !== 'compito') return false;
+  const mk = leggiMarcatoreBiglietto(root);
+  return !!(mk && mk.ticket) && annotaTetto(root, mk.ticket, ctx && ctx.compito && ctx.compito.tettoUsd);
+}
+
 export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443): resta come
   // traccia locale di chi sta girando adesso in questa directory. La
@@ -2780,6 +2790,7 @@ export function emit(bucket, ctx) {
       main: riallinea ? mainAllaPresa() : '',
     });
   }
+  tettoNelMarcatore(ROOT, bucket, ctx);
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.

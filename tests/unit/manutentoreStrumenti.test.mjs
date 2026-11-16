@@ -53,6 +53,21 @@ test('con la sola chiave il manutentore apre feedback e domande e scrive la doma
   assert.equal(togli.inviati[0].dati.testo, null);
 });
 
+// #2303: lo sblocco di un compito fermo per guasto è la strada normale per farlo ripartire; un feedback resta sulla nota.
+test('sblocca C-n manda al server il compito con la nota, e un feedback resta sblocco con la sua nota', () => {
+  const c = lancia(['sblocca', 'C-3915', 'clone', 'tornato'], { sblocca: { ok: true, compito: 'C-3915', sbloccato: 'guasto' } });
+  assert.equal(c.status, 0, c.out);
+  assert.deepEqual(c.inviati, [{ op: 'sblocca', dati: { compito: 'C-3915', testo: 'clone tornato' }, cred: 'chiave' }]);
+  assert.match(c.out, /C-3915: sbloccato, riparte con chi lo prende dopo\./);
+  const vuota = lancia(['sblocca', 'c-12'], { sblocca: { ok: true, compito: 'C-12', sbloccato: 'guasto' } });
+  assert.deepEqual(vuota.inviati, [{ op: 'sblocca', dati: { compito: 'C-12', testo: 'Sbloccato dal manutentore: riprendi.' }, cred: 'chiave' }]);
+  const no = lancia(['sblocca', 'C-12'], { sblocca: { ok: false, errore: 'niente_da_sbloccare', dettaglio: 'C-12 non è fermo per un guasto' } });
+  assert.notEqual(no.status, 0, 'un rifiuto del server non si legge come sbloccato');
+  assert.doesNotMatch(no.out, /sbloccato, riparte/);
+  const fb = lancia(['sblocca', '812', 'riparato'], { sblocca: { ok: true, numero: '812', sbloccato: 'guasto' } });
+  assert.deepEqual(fb.inviati, [{ op: 'sblocca', dati: { numero: '812', testo: 'riparato' }, cred: 'chiave' }]);
+});
+
 // #2217: il segno «lavoro server» lo manda chi apre, e un server che non lo conferma non lo perde in silenzio.
 test('feedback e pacchetto con --server mandano il segno lavoro server, e dicono se il server non l\'ha messo', () => {
   const f = lancia(['feedback', 'Il pacemaker sbaglia', '-', '--server', '--priorita', '3'], { feedback: { ok: true, numero: '2215', fiducia: 'non fidato', lavoroServer: true } }, 'Tutto in functions/src.');

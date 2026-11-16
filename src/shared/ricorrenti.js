@@ -10,6 +10,9 @@
   // Abbondanti e rifiutati col numero: il testo di un ricorrente è un ruolo intero (il più lungo di oggi ne ha 13.000).
   const TETTI = Object.freeze({ nome: 120, testo: 40000, domandaFineTurno: 4000 });
   const ORA_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  // Il tetto di costo di una corsa (#2303): scritto dall'owner, o `perMediana` volte la mediana delle ultime `corse`.
+  // Largo apposta: ferma una corsa impazzita, non una che costa un po' più del solito.
+  const TETTO_COSTO = Object.freeze({ max: 10000, corse: 10, perMediana: 2 });
 
   const no = (errore, dettaglio) => ({ ok: false, errore, dettaglio });
   const testo = (v) => (typeof v === 'string' ? v : '');
@@ -113,11 +116,59 @@
     if (raw.attivo !== undefined && typeof raw.attivo !== 'boolean') return no('attivo_non_valido', 'attivo è vero o falso');
     const c = validaCadenza({ giorni: raw.giorni, ora: raw.ora });
     if (!c.ok) return c;
-    return { ok: true, campi: { nome, testo: corpo, domandaFineTurno: domanda, attivo: raw.attivo !== false, giorni: c.cadenza.giorni, ora: c.cadenza.ora } };
+    const t = validaTetto(raw.tettoUsd);
+    if (!t.ok) return t;
+    return {
+      ok: true,
+      campi: { nome, testo: corpo, domandaFineTurno: domanda, attivo: raw.attivo !== false, giorni: c.cadenza.giorni, ora: c.cadenza.ora, tettoUsd: t.tetto },
+    };
+  }
+
+  /** Il tetto scritto dall'owner, in dollari (anche «12,5»); vuoto vale null, cioè quello automatico. */
+  function validaTetto(v) {
+    if (v === undefined || v === null || (typeof v === 'string' && !v.trim())) return { ok: true, tetto: null };
+    const n = typeof v === 'number' ? v : (typeof v === 'string' ? Number(v.trim().replace(',', '.')) : NaN);
+    if (!Number.isFinite(n) || n < 0.01 || n > TETTO_COSTO.max) {
+      return no('tetto_non_valido', `il tetto di costo è un numero di dollari da 0,01 a ${TETTO_COSTO.max}, o vuoto per quello automatico`);
+    }
+    return { ok: true, tetto: Math.round(n * 100) / 100 };
+  }
+
+  /** I dollari delle ultime corse che contano: positivi, al più TETTO_COSTO.corse, dalla più vecchia. */
+  function corseValide(costi) {
+    const xs = (Array.isArray(costi) ? costi : []).map(Number).filter((x) => Number.isFinite(x) && x > 0);
+    return xs.slice(-TETTO_COSTO.corse);
+  }
+
+  function mediana(xs) {
+    if (!xs.length) return 0;
+    const s = xs.slice().sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  /** Il tetto automatico: `perMediana` volte la mediana delle ultime corse, arrotondato al dollaro sopra; 0 senza corse. */
+  function tettoAutomatico(costi) {
+    const xs = corseValide(costi);
+    return xs.length ? Math.ceil(mediana(xs) * TETTO_COSTO.perMediana) : 0;
+  }
+
+  /**
+   * Il tetto che vale per una corsa del ricorrente `r` ({ tettoUsd, costiCorse }): `usd` 0 vuol dire nessun tetto;
+   * `mediana` e `corse` sono la sua stima, da mostrare accanto al campo.
+   */
+  function tettoDi(r) {
+    const x = r && typeof r === 'object' ? r : {};
+    const xs = corseValide(x.costiCorse);
+    const stima = { mediana: Math.round(mediana(xs) * 100) / 100, corse: xs.length };
+    const scritto = Number(x.tettoUsd);
+    if (Number.isFinite(scritto) && scritto > 0) return Object.assign({ usd: scritto, da: 'owner' }, stima);
+    const auto = tettoAutomatico(xs);
+    return Object.assign({ usd: auto, da: auto > 0 ? 'corse' : '' }, stima);
   }
 
   global.SN_RICORRENTI = Object.freeze({
-    TZ, GIORNI, TETTI, ORA_RE,
-    partiRoma, daOraRoma, validaCadenza, prossimaIl, cadenzaTesto, quandoTesto, validaCampi,
+    TZ, GIORNI, TETTI, ORA_RE, TETTO_COSTO,
+    partiRoma, daOraRoma, validaCadenza, prossimaIl, cadenzaTesto, quandoTesto, validaCampi, validaTetto, corseValide, tettoAutomatico, tettoDi,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);
