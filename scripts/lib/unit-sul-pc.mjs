@@ -14,13 +14,22 @@ export const VAR_LONTANE = 'FILO_UNIT_LONTANE';
 const DIR = 'tests/unit';
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
 
+/**
+ * Un segno di routine su disco vale solo se git non lo traccia: uno tracciato l'ha portato il repo, magari da main
+ * senza il sì dell'owner, e farebbe credere al suo PC di essere una routine (#1737 giro 3).
+ */
+export function nonTracciato(file) {
+  const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', basename(file)], { cwd: dirname(file), stdio: 'ignore', windowsHide: true });
+  return r.status !== 0;
+}
+
 /** Siamo sul PC dell'owner? Una routine e GitHub Actions no: lì non ci sono le sue credenziali. */
-export function unitLontane(root, { env = process.env, routine = isRoutineInstance } = {}) {
+export function unitLontane(root, { env = process.env, routine = isRoutineInstance, conta = nonTracciato } = {}) {
   const forzata = String(env[VAR_LONTANE] || '');
   if (forzata === '1') return true;
   if (forzata === '0') return false;
   if (String(env.GITHUB_ACTIONS || '') === 'true') return false;
-  return !routine(root, { env });
+  return !routine(root, { env, conta });
 }
 
 /** I file di `tutti` (assoluti) che stanno fra `cambiati` (relativi alla radice, barre normali). PURA. */
