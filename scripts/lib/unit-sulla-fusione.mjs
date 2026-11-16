@@ -639,8 +639,8 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
  */
 export function provaDaRiusare({ fatta, punta } = {}) {
   const p = fatta && fatta.prova;
-  if (!p || !punta || fatta.punta !== punta || p.contenuto || p.errore || p.saltata) return null;
-  return p.esito === 'verde' || p.esito === 'rosso_anche_su_main' ? p : null;
+  if (!p || !punta || fatta.punta !== punta || p.contenuto) return null;
+  return unitProseguono(p) ? p : null;
 }
 
 /**
