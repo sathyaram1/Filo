@@ -701,10 +701,7 @@ export async function main(argvIn) {
   if (argv.includes('--aspetta') && !String(aspettaRaw || '').trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2). Non ho aperto niente.'); return EXIT.USO; }
   const numeriAttesa = globalThis.SN_FB_ATTESE.leggiNumeri(aspettaRaw || '');
   if (!numeriAttesa.ok) { console.error(`RIFIUTATO: --aspetta: ${numeriAttesa.motivo}. Non ho aperto niente.`); return EXIT.USO; }
-  const pacchettoRaw = flag('pacchetto');
-  if (argv.includes('--pacchetto') && !String(pacchettoRaw || '').trim()) { console.error('RIFIUTATO: --pacchetto vuole i numeri delle segnalazioni che unisce (--pacchetto 812,815). Non ho aperto niente.'); return EXIT.USO; }
-  const numeriUnite = globalThis.SN_FB_ATTESE.leggiNumeri(pacchettoRaw || '');
-  if (!numeriUnite.ok) { console.error(`RIFIUTATO: --pacchetto: ${numeriUnite.motivo.replace('un feedback ne aspetta', 'un pacchetto ne unisce')}. Non ho aperto niente.`); return EXIT.USO; }
+  if (argv.includes('--pacchetto')) { console.error(PACCHETTO_TOLTO); return EXIT.USO; }
 
   if (percorsiAllegati.length > MAX_ALLEGATI) {
     console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
