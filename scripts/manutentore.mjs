@@ -360,7 +360,8 @@ export const numeriDiAccendi = senzaOpzioni;
  */
 export function datiDelPacchetto(args) {
   const parole = senzaOpzioni(args);
-  if (parole.length > 1) return { numero: numeroDi(parole[0]), unisce: leggiOrdine(parole.slice(1).join(','), { compiti: false }).numeri };
+  // «812, 815»: una virgola in fondo alla prima parola dice che è già la lista, scritta con lo spazio.
+  if (parole.length > 1 && !/,$/.test(parole[0])) return { numero: numeroDi(parole[0]), unisce: leggiOrdine(parole.slice(1).join(','), { compiti: false }).numeri };
   const l = leggiOrdine(parole.join(','), { compiti: false });
   if (l.motivo) return { unisce: [], motivo: l.motivo };
   return l.numeri.length >= 2 ? { unisce: l.numeri } : { unisce: l.numeri, motivo: 'pacchetto vuole almeno due numeri, separati da virgole: pacchetto 812,815' };
