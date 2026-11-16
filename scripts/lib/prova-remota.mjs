@@ -191,7 +191,7 @@ export async function attendiProvaRemota(avvio, { scrivi = (s) => console.log(s)
         return { errore: `non riesco a leggere il registro della corsa (${String((e && e.message) || e).slice(0, 300)})`, mainSha: main, remota };
       }
       const c = campoDalRegistro(registro, { ramo, main });
-      return provaDalCampo(c.errore ? { ...c, main } : c, remota);
+      return conGliSpec(provaDalCampo(c.errore ? { ...c, main } : c, remota), avvio.spec);
     }
     const passato = adesso() - inizio;
     if (!corsaVista && passato >= tettoPartenza) {
