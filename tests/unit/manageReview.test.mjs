@@ -1570,7 +1570,7 @@ test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio n
 test('livelli L4: «Non richiesto» per il fidato fuori dalle zone, e il perché accanto a ogni esito', () => {
   const nr = MR.livelloL4({ livelli: { l4: { esito: 'non_richiesto', by: 'regola', perche: 'fidato_fuori_zone', sha: 'cd34'.repeat(10), testo: 'x' } } });
   assert.equal(nr.vuoto, false);
-  assert.equal(nr.colore, MR.LIVELLO_COLORI ? MR.LIVELLO_COLORI.aligned : nr.colore);
+  assert.equal(nr.colore, MR.LIVELLO_COLORI.aligned);
   const righe = Object.fromEntries(nr.pannello.righe.map((r) => [r.etichetta, r.valore]));
   assert.equal(righe.Esito, 'Non richiesto');
   assert.equal(righe['Perché'], 'Lavoro fidato che non tocca zone delicate');
