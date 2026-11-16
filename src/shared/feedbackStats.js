@@ -806,8 +806,8 @@
     var mediaGiri = giriValori.length ? somma / giriValori.length : null;
 
     // ── Audit di sicurezza, arenamenti, stato di oggi (sui lavori della finestra) ──
-    var audit = { pass: 0, fail: 0, saltato: 0 };
-    var auditIds = { pass: [], fail: [], saltato: [] };
+    var audit = { pass: 0, fail: 0, saltato: 0, non_richiesto: 0 };
+    var auditIds = { pass: [], fail: [], saltato: [], non_richiesto: [] };
     var auditNonLetti = 0;
     var auditNonLettiIds = [];
     var arenamenti = 0;
