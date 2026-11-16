@@ -1016,45 +1016,11 @@ async function main() {
   //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
   //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
-  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
-  let copie = [];
-  try { installaControlloSpedizione(ROOT); } catch (_) { /* per i push a mano dopo: questo lo controlla la riga sotto */ }
-  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
-  if (copie.length) {
-    console.error(`\n✗ ${avvisoSpedizione(copie)}`);
-    process.exit(1);
-  }
   {
-    // Ultimo controllo prima dell'unica riga di questo script che scrive su
-    // origin: qualunque cosa sia successa sopra, quello che si spedisce non
-    // può essere il ramo principale. È una guardia doppia, e va bene così: è
-    // l'unico punto in cui questa macchina potrebbe scrivere sul ramo da cui
-    // si costruiscono le versioni degli utenti.
-    if (isProtectedBranch(branch, principale)) {
-      console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
-      process.exit(1);
-    }
-    // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la
-    // configurazione locale di git (vedi il commento lì sopra).
-    const pushed = git(pushArgs(branch));
-    if (!pushed.ok) {
-      console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
-      console.error('  Senza il ramo su origin il server non ha niente da fondere.');
-      process.exit(1);
-    }
-    // L'esito di questa lettura VA GUARDATO: se `origin/<ramo>` non si risolve,
-    // `out` è il testo dell'errore di git, e finiva stampato all'utente come se
-    // fosse uno sha ("è a origin/c"). Un ramo appena spedito che origin non
-    // mostra è un guasto vero, non un dettaglio: si ferma.
-    const rem = git(['rev-parse', `origin/${branch}`]);
-    if (!rem.ok) {
-      console.error(`\n✗ Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`);
+    const fermo = spedisciIlRamo({ branch, cur, principale });
+    if (fermo) {
+      console.error(`\n✗ ${fermo}`);
       console.error('  Il server non avrebbe la versione appena controllata.');
-      process.exit(1);
-    }
-    if (rem.out !== cur) {
-      console.error(`\n✗ Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
-      console.error('  Il server fonderebbe una versione diversa da quella controllata.');
       process.exit(1);
     }
   }
