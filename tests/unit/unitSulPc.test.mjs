@@ -91,8 +91,10 @@ test('unitDelRamo: i file del ramo, anche fuori dai commit, mai quelli arrivati 
   }
 });
 
-const lancia = (r, args = [], env = {}) => {
-  const base = { ...process.env, ...env };
+// `intero`: env sostituisce quello del padre, così le variabili tolte non tornano da lì (sotto Actions GITHUB_ACTIONS e
+// FILO_UNIT_LONTANE=0 della prova sulla fusione).
+const lancia = (r, args = [], env = {}, { intero = false } = {}) => {
+  const base = intero ? { ...env } : { ...process.env, ...env };
   for (const k of ['NODE_TEST_CONTEXT', 'FILO_UNIT_DIR']) delete base[k];
   return spawnSync(process.execPath, [join(r.lavoro, 'scripts', 'run-unit-tests.mjs'), ...args], { cwd: r.lavoro, encoding: 'utf8', env: base });
 };
