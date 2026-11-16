@@ -123,7 +123,7 @@ test('le opzioni che npm si è preso si riprendono dall\'ambiente e si dice; un 
   assert.equal(f.status, 0, f.out);
   assert.deepEqual(f.inviati[0].dati, { titolo: 'Titolo', testo: 'Testo.', priorita: 2, lavoroServer: true });
   assert.match(f.out, /finite a npm invece che a me/);
-  const p = lancia(['pacchetto', '2220', '2215'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215'], lavoroServer: true } }, '', { npm_config_lavoro_server: 'true' });
+  const p = lancia(['pacchetto', '2220,2215'], { pacchetto: { ok: true, pacchetto: '2240', unisce: ['2220', '2215'], lavoroServer: true } }, '', { npm_config_lavoro_server: 'true' });
   assert.equal(p.inviati[0].dati.lavoroServer, true, p.out);
   // `--priorita 2` spezzato da npm: il 2 finirebbe nel titolo.
   const s = lancia(['feedback', 'Titolo', '2', '-'], {}, 'Testo.', { npm_config_priorita: 'true' });
