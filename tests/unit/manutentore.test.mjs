@@ -313,9 +313,14 @@ test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#
   const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
   t.after(() => togliCartella(repo));
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
-  g('checkout', '-q', '-B', 'lungo', 'main');
+  // File che su main ci sono, così l'elenco li stampa: i nuovi si contano e basta (#2337).
+  const tanti = Array.from({ length: 700 }, (_, i) => join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`));
   mkdirSync(join(repo, 'f'));
-  for (let i = 0; i < 700; i += 1) writeFileSync(join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`), String(i));
+  for (const f of tanti) writeFileSync(f, 'x');
+  g('add', '-A'); g('commit', '-qm', 'tanti file su main');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  g('checkout', '-q', '-B', 'lungo', 'main');
+  tanti.forEach((f, i) => writeFileSync(f, String(i)));
   g('add', '-A'); g('commit', '-qm', 'tanti file (#1)');
   g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
   g('checkout', '-q', 'main');
