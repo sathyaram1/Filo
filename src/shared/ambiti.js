@@ -7,7 +7,7 @@
 
   // La triade (§5.1): nf legge testo non fidato, pv vede segreti o dati privati, ex agisce verso l'esterno.
   // rs: il server consegna testo riservato, quindi vale solo nell'ambiente dei riservati (§1.2).
-  // parametri: cosa accetta e cosa rende, per chi la chiama; il server li arriva a chi lavora con le operazioni (#2549).
+  // parametri: cosa accetta e cosa rende; il server li consegna a chi lavora insieme all'operazione (#2549).
   function op(descr, t) {
     const f = t || {};
     return Object.freeze({ descr, nf: !!f.nf, pv: !!f.pv || !!f.rs, ex: !!f.ex, rs: !!f.rs, attiva: f.attiva !== false, parametri: f.parametri || '' });
