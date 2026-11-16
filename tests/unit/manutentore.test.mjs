@@ -281,12 +281,12 @@ test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce
   const { origine, clone, spingi } = serverConOrigine(t, { corto: true });
   spingi('claude/uno', '#31 uno');
   assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
-  assert.match(leggi(), /^claude\/uno sul server \(#31\)/m);
+  assert.match(leggi(), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\)/m);
   // Un'origine che non risponde: l'avviso, e i rami di prima restano.
   togliCartella(origine);
   assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
   const out = leggi();
-  assert.match(out, /^claude\/uno sul server/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\)/m);
   assert.match(out, /Rami del server NON aggiornati \(.+\): sono quelli del clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\./);
   // Un clone poco profondo che non si completa lo dice: i lavori del server probabilmente mancano.
   const { origine: o2, clone: c2 } = serverConOrigine(t, { corto: true });
