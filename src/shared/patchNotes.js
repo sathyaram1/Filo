@@ -1986,7 +1986,8 @@
 
   // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione: il suo numero, o l'elenco dei
   // numeri per la riga di un pacchetto, uno per ogni segnalazione assorbita (#2270). La pagina Novità li apre dal tasto
-  // destro, uno per uno; recap e impronte vedono solo il testo. `segnalazioni` è sempre un elenco, senza doppioni.
+  // destro, uno per uno; recap e impronte vedono solo il testo. `segnalazioni` è sempre un elenco, senza doppioni; il
+  // tetto (quello delle unite di un pacchetto) lo tengono la sentinella del registro e chi scrive le righe, mai un taglio.
   const SEGNALAZIONI_MAX = 20;
   function segnalazioniDi(v) {
     const out = [];
@@ -1994,7 +1995,7 @@
       const n = Number(String(x == null ? '' : x).replace(/^#/, ''));
       if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
     }
-    return out.slice(0, SEGNALAZIONI_MAX);
+    return out;
   }
   function riga(r) {
     if (r && typeof r === 'object') return { testo: String(r.testo || ''), segnalazioni: segnalazioniDi(r.segnalazione) };
