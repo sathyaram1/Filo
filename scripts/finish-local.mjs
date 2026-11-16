@@ -537,7 +537,7 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
   const p = prova || {};
   const m = String(p.mainSha || '').slice(0, 8);
   const ins = Array.isArray(p.instabili) && p.instabili.length;
-  if (!p.errore && !p.saltata && (p.esito === 'verde' || p.esito === 'rosso_anche_su_main')) {
+  if (unitProseguono(p)) {
     let perche;
     if (p.esito === 'rosso_anche_su_main') perche = 'sono rossi uguali anche su main da solo, senza test rotti in più';
     else if (p.contenuto) perche = `rifatti sul ramo (che contiene già main ${m}) in una cartella pulita sono verdi`;
