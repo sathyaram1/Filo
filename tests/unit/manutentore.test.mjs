@@ -814,8 +814,14 @@ test('il redattore: una riga tiene la segnalazione delle righe lette, e la conse
   const dimenticata = M.controllaNovita({ ...base, features: [{ testo: 'Novità e menu.', da: [1, 2] }, 'Le novità in una pagina.'] }, { blocco, schede: [] });
   assert.deepEqual(dimenticata.novita.features, [{ testo: 'Novità e menu.', segnalazione: 1956 }, { testo: 'Le novità in una pagina.', segnalazione: 1956 }]);
   const due = { version: '0.2.255', features: [{ testo: 'A.', segnalazione: 1956 }, { testo: 'B.', segnalazione: 1960 }], fixes: [] };
-  assert.match(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2] }] }, { blocco: due, schede: [] }).errori.join('\n'), /segnalazioni diverse \(1956, 1960\)/);
+  // #2270: da righe con segnalazioni diverse la riga le tiene tutte, come la riga di un pacchetto.
+  assert.deepEqual(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2] }] }, { blocco: due, schede: [] }).novita.features, [{ testo: 'A e B.', segnalazione: [1956, 1960] }]);
   assert.equal(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2], segnalazione: 1960 }] }, { blocco: due, schede: [] }).ok, true);
+  const elenco = M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2], segnalazione: [1956, 1960] }] }, { blocco: due, schede: [] });
+  assert.deepEqual(elenco.novita.features, [{ testo: 'A e B.', segnalazione: [1956, 1960] }]);
+  assert.match(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A.', segnalazione: [1956, 42] }] }, { blocco: due, schede: [] }).errori.join('\n'), /la segnalazione 42 non sta/);
+  assert.match(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A.', segnalazione: [1956, 1956] }] }, { blocco: due, schede: [] }).errori.join('\n'), /l'elenco dei numeri/);
+  assert.match(M.contestoRedattore({ blocco: { version: '0.2.255', features: [{ testo: 'A e B.', segnalazione: [1956, 1960] }], fixes: [] }, schede: [] }), /1\. \[segnalazioni 1956, 1960\] A e B\./);
 });
 
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
