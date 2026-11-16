@@ -188,18 +188,20 @@ test('rami e incroci leggono anche i rami del clone di filo-security, e se il cl
 
   assert.equal(await M.main(['rami', ...opz], { root: app, env: {} }), 0);
   const rami = leggi();
-  assert.match(rami, /^claude\/app \(#30\), 1 commit, .*: src\/a\.js$/m);
-  assert.match(rami, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  // Rami che il server non ha nominato: il nome resta nascosto anche sul server (#2337), numero e file no.
+  assert.match(rami, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#30\), 1 commit, .*: src\/a\.js$/m);
+  assert.match(rami, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(rami, /claude\/(app|uno|due|tre)\b/);
   assert.doesNotMatch(rami, /NON letti/);
 
   assert.equal(await M.main(['incroci', ...opz], { root: app, env: {} }), 0);
   const fra = leggi();
-  assert.match(fra, /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
-  assert.doesNotMatch(fra, /claude\/tre/, 'su un file che nessun altro tocca non c\'è incrocio');
-  assert.doesNotMatch(fra, /claude\/app/);
+  assert.match(fra, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\) e claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\): filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(fra, /#33/, 'su un file che nessun altro tocca non c\'è incrocio');
+  assert.doesNotMatch(fra, /#30/);
 
   assert.equal(await M.main(['incroci', '40', ...opz], { root: app, env: {} }), 0);
-  assert.match(leggi(), /^claude\/tre sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
+  assert.match(leggi(), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
 
   const solo = repoConRami([['claude/uno', 'functions/src/x.js', '#31'], ['claude/tre', 'functions/src/y.js', '#33']]);
   t.after(() => togliCartella(solo));
