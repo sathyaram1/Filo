@@ -28,7 +28,7 @@ function repoFinto() {
   }
   symlinkSync(join(ROOT, 'node_modules'), join(lavoro, 'node_modules'), 'junction');
   const scrivi = (file, testo) => { mkdirSync(dirname(join(lavoro, file)), { recursive: true }); writeFileSync(join(lavoro, file), testo, 'utf8'); };
-  scrivi('package.json', JSON.stringify({ name: 'finto', version: '0.0.1', private: true, type: 'module', scripts: { 'test:unit': 'node scripts/run-unit-tests.mjs' } }));
+  scrivi('package.json', JSON.stringify({ name: 'finto', version: '0.0.1', private: true, scripts: { 'test:unit': 'node scripts/run-unit-tests.mjs' } }));
   scrivi('.gitignore', 'node_modules\n.claude\n');
   scrivi('tests/unit/base.test.mjs', "import { test } from 'node:test';\ntest('base', () => {});\n");
   scrivi('src/pages/options/options.js', 'export const x = 1;\n');
