@@ -36,9 +36,6 @@ export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_m
 export const ESITI_CHE_PROSEGUONO = Object.freeze(['verde', 'rosso_anche_su_main']);
 export const unitProseguono = (p) => !!p && !p.errore && !p.saltata && ESITI_CHE_PROSEGUONO.includes(p.esito);
 export const TETTO_ROSSI = 40;
-// Il server cerca la riga che COMINCIA così, l'ultima del registro: l'uscita dei test provati è rientrata, mai in colonna.
-// Sta qui e non nello strumento della corsa su GitHub, così il PC dell'owner che la legge non carica quello strumento.
-export const MARCA = 'FILO-UNIT-FUSIONE';
 const MAIN = 'main';
 // Esplicito: in un clone a ramo singolo `fetch origin main` muove solo FETCH_HEAD, e origin/main resta vecchio (#2237.3).
 export const refspecMain = (main = MAIN) => `+refs/heads/${main}:refs/remotes/origin/${main}`;
