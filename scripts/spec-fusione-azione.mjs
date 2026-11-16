@@ -80,13 +80,20 @@ export function provaSpec({ root, ramo, main, spec, noti = [], lancia = lanciaPl
   return campoDaVerdetto({ ramo, main, v: verdetto(l.json, noti), chiesti: spec.length, provati: file.length });
 }
 
+/** L'ambiente degli spec provati: senza i file dei comandi di Actions, come per gli unit (#2225). PURA. */
+export function ambienteDegliSpec(env, out) {
+  const e = { ...env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' };
+  for (const k of COMANDI_DI_ACTIONS) delete e[k];
+  return e;
+}
+
 function lanciaPlaywright(root, file) {
   const out = join(mkdtempSync(join(tmpdir(), 'filo-spec-')), 'esito.json');
   const cli = join(root, 'node_modules', '@playwright', 'test', 'cli.js');
   if (!existsSync(cli)) return { errore: 'Playwright non è installato nel ramo' };
   const r = spawnSync(process.execPath, [cli, 'test', '--reporter=list,json', ...file], {
     cwd: root, stdio: ['ignore', 'inherit', 'inherit'], timeout: 150 * 60 * 1000,
-    env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' },
+    env: ambienteDegliSpec(process.env, out),
   });
   if (r.error) return { errore: `Playwright non è partito (${r.error.message})` };
   try { return { json: JSON.parse(readFileSync(out, 'utf8')) }; } catch (_) {
