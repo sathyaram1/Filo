@@ -599,7 +599,7 @@ async function main() {
     const { unitLontane, unitDelRamo, testoSulPc } = await import('./lib/unit-sul-pc.mjs');
     if (unitLontane(REPO_ROOT)) {
       const scelta = unitDelRamo(REPO_ROOT, files);
-      console.log(testoSulPc(scelta, files.length));
+      console.error(testoSulPc(scelta, files.length));
       if (scelta.errore) { process.exitCode = 1; return; }
       if (!scelta.file.length) { process.exitCode = 0; return; }
       files = scelta.file;
