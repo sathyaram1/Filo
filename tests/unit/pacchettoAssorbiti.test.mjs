@@ -46,6 +46,18 @@ test('il pacchetto elenca i suoi originali nell’ordine, col titolo di quelli l
   assert.deepEqual(MR.assorbitiDi(DATI[3], DATI), []);
 });
 
+test('chi ha mandato un assorbito non riceve «chiusa» all’assorbimento: la scheda pubblica nasce con la fusione, risolta', () => {
+  for (const m of ['constants.js', 'feedbackClientIdHash.js', 'feedbackPublicView.js']) require(join(ROOT, 'src', 'shared', m));
+  const V = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
+  const base = { _id: 'a9', seq: 9, subSeq: 0, name: 'Il menu', createdAt: '2026-11-10T10:00:00Z', clientIdHash: 'h', priority: 1 };
+  assert.equal(V.cardFor({ ...base, status: 'archived', unitoIn: 'p3' }), null);
+  const risolta = V.cardFor({ ...base, status: 'done', unitoIn: 'p3', userNote: 'Adesso il menu si apre.', resolvedInVersion: '0.2.300' });
+  assert.equal(risolta.status, 'done');
+  assert.equal(risolta.userNote, 'Adesso il menu si apre.');
+  assert.notEqual(V.cardFor({ ...base, status: 'archived' }), null, 'un archiviato qualunque ha la sua scheda come prima');
+  assert.deepEqual(V.planSync([], [{ ...base, status: 'archived', unitoIn: 'p3' }], { complete: true }).upsert, []);
+});
+
 test('archived→done è del solo server, alla fusione del pacchetto', () => {
   assert.equal(FS.canTransition('archived', 'done', 'pipeline'), true);
   assert.equal(FS.canTransition('archived', 'done', 'owner'), false);
