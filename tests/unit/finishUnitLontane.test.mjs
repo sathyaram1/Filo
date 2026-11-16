@@ -72,6 +72,7 @@ async function githubFinto({ dispatch = 204, registro }) {
         const j = JSON.parse(corpo);
         corsa = j.client_payload.corsa;
         coppia = { ramo: j.client_payload.ramo, main: j.client_payload.main };
+        chiesta = j.client_payload;
         res.writeHead(204); return res.end();
       }
       if (url.pathname === '/repos/proprietario/filo/actions/workflows/unit-fusione.yml/runs') {
