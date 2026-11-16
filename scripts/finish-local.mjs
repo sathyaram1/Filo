@@ -1125,8 +1125,7 @@ async function main() {
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
   //    un'identità che qui non esiste.
-  // Sul PC dell'owner anche la prova rifatta perché main si è mosso la fa GitHub.
-  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo }, lontane ? { prova: provaRemota } : {});
+  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo, specRemoti });
   if (giro.fermo) {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
