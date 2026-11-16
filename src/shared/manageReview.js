@@ -1548,6 +1548,18 @@
     pass:    { classe: 'design', etichetta: 'Passato' },
     fail:    { classe: 'attack', etichetta: 'Bocciato' },
     saltato: { classe: 'spam',   etichetta: 'Saltato dall’owner' },
+    // Il lavoro fidato fuori dalle zone delicate non passa dal controllo (#2508).
+    non_richiesto: { classe: 'aligned', etichetta: 'Non richiesto' },
+  };
+
+  // Perché il controllo si è fatto o no: il codice che il server scrive accanto all'esito (#2508).
+  const L4_PERCHE = {
+    fidato_fuori_zone: 'Lavoro fidato che non tocca zone delicate',
+    non_fidato: 'Il feedback non è fidato',
+    biglietto_non_fidato: 'Chi ha verificato aveva un biglietto non fidato',
+    ramo_non_fidato: 'Sul ramo ha lavorato un biglietto non fidato',
+    zona_delicata: 'Il lavoro tocca zone delicate',
+    diff_non_letto: 'Le modifiche non si sono potute leggere',
   };
 
   /** Livello 4: l'audit di sicurezza sul lavoro fatto. PURA. */
