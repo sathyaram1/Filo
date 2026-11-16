@@ -14,7 +14,7 @@ export const MARCA_PARTE = 'ESITO-PARTE-UNIT';
 const SHA = /^[0-9a-f]{40}$/;
 const NOME_PARTE = /^[a-z]{1,20}$/;
 // Gli esiti con cui il server porta il lavoro alla fusione: la corsa verde li dice anche a chi guarda Actions.
-const SI_FONDE = new Set(['verde', 'main_contenuto', 'rosso_anche_su_main']);
+const SI_FONDE = new Set([...ESITI_CHE_PROSEGUONO, 'main_contenuto']);
 const NON_SI_FONDE = new Set(['rosso_sulla_fusione', 'conflitto']);
 // Fra due esiti che fondono vale quello che dice di più: un rosso anche su main non si perde dietro un verde.
 const PESO_SI_FONDE = ['main_contenuto', 'verde', 'rosso_anche_su_main'];
