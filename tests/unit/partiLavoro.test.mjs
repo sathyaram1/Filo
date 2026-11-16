@@ -101,7 +101,7 @@ test('finish manda al server le parti del server che mancano, solo con la pratic
   const src = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   // Il passo 5 per intero, coi rami veri del server, ha le sue prove in praticaRiaperta.test.mjs («finish per intero»):
   // qui si tiene che il finish passi da lì.
-  assert.match(src, /await chiediLaFusione\(\{ branch, cur, pratica, provaDelRamo \}[,)]/);
+  assert.match(src, /await chiediLaFusione\(\{ branch, cur, pratica, provaDelRamo(?:, specRemoti)? \}[,)]/);
 
   process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
   const corpi = [];
