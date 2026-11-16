@@ -3,7 +3,8 @@
 // Sentinelle: tests/unit/provaRemota.test.mjs e tests/unit/finishUnitLontane.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { ESITI, MARCA, gitIn, refspecMain } from './unit-sulla-fusione.mjs';
+import { MARCA } from '../unit-fusione-azione.mjs';
+import { ESITI, gitIn, refspecMain } from './unit-sulla-fusione.mjs';
 
 export const WORKFLOW = 'unit-fusione.yml';
 export const EVENTO = 'unit-fusione';
