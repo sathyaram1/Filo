@@ -61,10 +61,11 @@ git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
   per il ramo di Filo, non per questo: `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
   `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
   e spinta come sotto.
-- Suite di GitHub del server rossa senza niente da cambiare nel server (provava il ramo di Filo com'era prima del
-  rebase, o il rosso non si ripete nelle prove del server qui): la suite riparte solo con una spinta nuova, quindi
-  `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server` come sotto. Un
-  rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel report, e lo giudica chi verifica.
+- Suite di GitHub del server rossa senza niente da cambiare nel server. Se provava il ramo di Filo com'era prima del
+  rebase, non serve niente: la rifà il cancello sulla parte dell'app nuova. Se il rosso non si ripete nelle prove del
+  server qui, serve una punta nuova: `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e
+  riga `ramo-server` come sotto. Un rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel
+  report, e lo giudica chi verifica.
 
 ### Prove, spinta, registro
 
@@ -80,10 +81,11 @@ git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
   `ramo-server` come sotto. Quelle della critica si spingono e si registrano prima di registrare la critica: il
   verdetto prende come punta verificata del server l'ultima registrata.
 - Il conto delle prove, app e server insieme, sui commit dei due rami: `node scripts/conta-prove.mjs --server "<CLONE>"`.
-- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La suite di GitHub del server prova il
-  ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se non c'è): per questo la
-  spinta manda prima da sé il ramo dell'app su origin, compresi i file nati da shell, e se quello non arriva il ramo
-  del server non parte. Subito dopo, a ogni spinta e prima di consegnare:
+- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La spinta non accende la suite di
+  GitHub del server: la accende il cancello sulla punta che fonde, e prova il ramo di Filo con lo stesso nome com'è in
+  quel momento (main di Filo se non c'è). La spinta manda comunque prima da sé il ramo dell'app su origin, compresi i
+  file nati da shell, e se quello non arriva il ramo del server non parte. Subito dopo, a ogni spinta e prima di
+  consegnare:
 
 ```bash
 node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
