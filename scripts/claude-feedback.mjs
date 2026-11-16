@@ -193,7 +193,7 @@ export function campiDelBiglietto(b, { nonFidato = '' } = {}) {
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [], unisce = [], nonFidato = '' } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [] } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
