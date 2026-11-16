@@ -720,11 +720,6 @@
         failed.push({ name: fname, ...motivoCaricamento(e) });
       }
     }
-    // `interi`: chi chiama vuole tutti gli allegati o niente feedback (un pacchetto non nasce monco, FEEDBACK-STATES.md
-    // § 3a). Il documento non esiste ancora; i blob già saliti restano cifrati e non li nomina nessuno.
-    if (opts && opts.interi && failed.length) {
-      throw Object.assign(new Error(`allegati non caricati: ${failed.map((f) => `${f.name} (${f.reason})`).join(', ')}`), { allegatiFalliti: failed });
-    }
     if (!String(text || '').trim() && !uploaded.length && !uploadedFiles.length) throw new ErroreVuoto(failed);
 
     // Best-effort: il feedback parte anche senza numero, invece di bloccare l'invio.
