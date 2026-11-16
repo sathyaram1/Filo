@@ -2,13 +2,15 @@
 // sveglie e novità, tutti verso l'endpoint del manutentore con la sua chiave (o il biglietto della sua sessione), mai col
 // token admin. Regole: tests/unit/manutentore.test.mjs; i sottocomandi in SOTTOCOMANDI, l'uso in `npm run manutentore`.
 
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaCloneServer } from './lib/git-server.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
-import { incroci, ramiInCorso } from './lib/su-main.mjs';
+import { fileConRepo, incroci, incrociFraRami, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
@@ -129,11 +131,66 @@ export function senzaChiusi(rami, indice, fuori = {}) {
   });
 }
 
-/** Un ramo in corso in una riga. PURA. */
+/** Un ramo in corso in una riga; uno di filo-security lo dice, e i suoi file portano il prefisso. PURA. */
 export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
-  return `${r.ramo}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.join(', ') || '(nessun file)'}`;
+  const dove = r.repo === 'server' ? ' sul server' : '';
+  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ') || '(nessun file)'}`;
+}
+
+/**
+ * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no quello dei lavori server
+ * (cartellaCloneServer), se no accanto al checkout di Filo anche da una sua worktree (cartellaDelServer, la ricerca di
+ * chiusura e verifica locali). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ */
+export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
+  const dato = String(scelta || '').trim();
+  const accanto = dato ? '' : cartellaDelServer(root, esiste);
+  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security')];
+  const dir = cercati.find((d) => esiste(join(d, '.git')));
+  return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
+}
+
+/** Quando il clone ha visto il server l'ultima volta: l'ultimo fetch, o il clone stesso. NaN se non si sa. */
+function ultimoAggiornamentoDel(dir) {
+  for (const f of ['FETCH_HEAD', 'packed-refs', 'HEAD']) {
+    try { return statSync(join(dir, '.git', f)).mtimeMs; } catch (_) { /* il prossimo */ }
+  }
+  return NaN;
+}
+
+/** L'avviso dei rami del server letti da un clone che non si è aggiornato. PURA. */
+export function rigaCloneComEra(dir, ms, { motivo = '', corto = false } = {}) {
+  const quando = Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'un momento che non so';
+  const parziale = corto ? ' È un clone poco profondo, come quello con cui parte una sessione cloud: probabilmente ha solo main e il ramo della sessione, e i lavori del server mancano.' : '';
+  return `Rami del server NON aggiornati${motivo ? ` (${motivo})` : ''}: sono quelli del clone ${dir} com'era alle ${quando}.${parziale}`;
+}
+
+/** Un lavoro in un incrocio: il ramo, dove sta e il primo feedback. PURA. */
+export function rigaLavoro(l) {
+  const dove = l.repo === 'server' ? ' sul server' : l.repo === 'app e server' ? ' (app e server)' : '';
+  return `${l.ramo}${dove}${l.feedback && l.feedback.length ? ` (#${l.feedback[0]})` : ''}`;
+}
+
+/**
+ * Aggiorna in sola lettura tutti i rami del clone del server col git della sessione: in locale quello dell'owner, nelle
+ * routine il proxy della sessione, che filo-security lo serve già (git-server al biglietto del manutentore dice no, #2340).
+ * Il clone di partenza di una sessione cloud è poco profondo e ha solo main: si completa, o la base con main non si trova.
+ * → l'avviso da mettere in coda se non riesce, o ''.
+ */
+function aggiornaCloneServer(dir) {
+  const corto = existsSync(join(dir, '.git', 'shallow'));
+  const r = spawnSync('git', ['-C', dir, 'fetch', '--prune', '--quiet', ...(corto ? ['--unshallow'] : []), 'origin', '+refs/heads/*:refs/remotes/origin/*'],
+    { encoding: 'utf8', timeout: 300_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  if (r.status === 0) return '';
+  const motivo = String(r.stderr || (r.error && r.error.message) || '').trim().split('\n').filter(Boolean).pop() || `uscito con ${r.status}`;
+  return rigaCloneComEra(dir, ultimoAggiornamentoDel(dir), { motivo, corto });
+}
+
+/** La riga che dice che i rami del server mancano, e perché: senza, un elenco senza di loro sembrerebbe completo. PURA. */
+export function rigaServerAssente(cercati) {
+  return `Rami del server NON letti: nessun clone di filo-security in ${(cercati || []).join(' né in ')}. Gli incroci coi lavori del server non si vedono: passa la cartella con --clone-server <dir> o FILO_SERVER_CLONE.`;
 }
 
 /** Cosa l'elenco dei rami lascia fuori (ramiInCorso, `fuori`), in una riga; '' se niente. PURA. */
@@ -251,7 +308,7 @@ async function domandeFerme(cred, indice, ordine = []) {
   }
 }
 
-const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite', '--urgenza', '--alle', '--ambito'];
+const CON_VALORE = ['--cartella', '--clone-server', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite', '--urgenza', '--alle', '--ambito'];
 
 /** Gli argomenti senza le opzioni né i loro valori: un `--ticket X` non deve finire in un testo scritto. PURA. */
 export function senzaOpzioni(args) {
@@ -694,7 +751,7 @@ export function righeCorseFerme(cf) {
 }
 
 const testoTaccuino = (t) => (t && typeof t.testo === 'string'
-  ? [`Versione ${Number(t.versione) || 0} (la passi a «taccuino scrivi --versione» per riscriverlo).`, '', t.testo.trim() || '(vuoto)']
+  ? [`Versione ${Number(t.versione) || 0} (la passi a «taccuino sezione <nome> --versione», o a «taccuino scrivi --versione» per riscriverlo intero).`, '', t.testo.trim() || '(vuoto)']
   : [String(t || 'Non letto.')]);
 
 /** Il contesto intero della decisione del mattino e della chat (§ 4, § 9). PURA rispetto ai suoi ingressi. */
@@ -1101,12 +1158,13 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rapporti --rifiuti [--giorni G | --da D [--a D]] [--json] (per ruolo: Edit e Write rifiutati, con la causa)
-  rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
+  rami | incroci [N]                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch] [--clone-server <dir>]
+                                           (app e filo-security; incroci senza N: i file in comune fra i rami in corso)
   ordine | accendi <N,C-12,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <P> <N,M,…> [--server]
   compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   (istruzioni da stdin; risponde con l'id C-n)
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
-  taccuino | taccuino scrivi - --versione <V> | indicazione "<testo>"
+  taccuino | taccuino scrivi - --versione <V> | taccuino sezione <nome> - --versione <V> | indicazione "<testo>"
   sveglia-tra <minuti> [--perche "…"] | sveglia-togli | segnali-letti
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
@@ -1131,35 +1189,58 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   if (daNpm.nota) console.error(daNpm.nota);
   const argv = daNpm.args.length ? [...argvIn, ...daNpm.args] : argvIn;
   const [cmd, arg] = argv;
-  if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
+  if (!SOTTOCOMANDI.includes(cmd) || (['leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
     console.error(USO);
     return 1;
   }
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   const g = opzione(argv, '--giorni');
   const giorni = g !== undefined && Number.isFinite(Number(g)) && Number(g) >= 0 ? Number(g) : 30;
-  const rami = () => {
-    if (!argv.includes('--senza-fetch')) {
+  const senzaFetch = argv.includes('--senza-fetch');
+  // I rami vivi dell'app e di filo-security insieme (#2340): i lavori del server si incrociano come gli altri.
+  const leggiRami = async (indice) => {
+    if (!senzaFetch) {
       try { execFileSync('git', ['-C', root, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
         console.error(`AVVISO: git fetch non è riuscito (${String(e.message).split('\n')[0]}): i rami sono quelli dell'ultima volta.`);
       }
     }
-    return { fuori: {} };
+    const fuori = {};
+    const numeri = numeriDellIndice(indice);
+    const app = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori, numeri }), indice), indice, fuori);
+    const c = cloneDelServer({ root, env, scelta: opzione(argv, '--clone-server') });
+    if (!c.dir) return { lista: app, fuori, server: { avviso: rigaServerAssente(c.cercati) } };
+    const aggiornato = senzaFetch ? '' : aggiornaCloneServer(c.dir);
+    const fuoriServer = {};
+    try {
+      const delServer = senzaChiusi(conNumeri(ramiInCorso(c.dir, { giorni, fuori: fuoriServer, numeri }), indice), indice, fuoriServer);
+      const resto = rigaFuori(fuoriServer, giorni);
+      const avviso = [aggiornato, resto ? `Sul server. ${resto}` : ''].filter(Boolean).join('\n');
+      return { lista: [...app, ...delServer.map((r) => ({ ...r, repo: 'server' }))], fuori, server: { avviso } };
+    } catch (e) {
+      return { lista: app, fuori, server: { avviso: `Rami del server NON letti dal clone ${c.dir}: ${String(e.message).split('\n')[0]}` } };
+    }
   };
   // Rami e incroci vengono da git e dalle schede locali: non serve il server.
   if (cmd === 'rami' || cmd === 'incroci') {
-    const r = rami();
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
-    if (cmd === 'rami') { console.log([lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n')); return 0; }
+    const r = await leggiRami(indice);
+    if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean).join('\n')); return 0; }
+    const coda = [r.server.avviso].filter(Boolean);
+    if (!arg || String(arg).startsWith('--')) {
+      const coppie = incrociFraRami(r.lista);
+      console.log([coppie.length
+        ? coppie.map((c) => `${rigaLavoro(c.a)} e ${rigaLavoro(c.b)}: ${c.comuni.join(', ')}`).join('\n')
+        : `Nessun file in comune fra i rami in corso (${r.lista.length}).`, ...coda].join('\n'));
+      return 0;
+    }
     const num = String(arg).replace(/^#/, '');
     const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
     if (!s) { console.error(`Nessuna scheda per #${num} in ${cartella}: npm run feedback:schede -- scrivi --solo ${num}.`); return 1; }
-    const comuni = incroci(lista, s.file_probabili);
-    console.log(comuni.length
-      ? comuni.map((c) => `${c.ramo}${c.feedback.length ? ` (#${c.feedback[0]})` : ''}: ${c.comuni.join(', ')}`).join('\n')
-      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`);
+    const comuni = incroci(r.lista, s.file_probabili);
+    console.log([comuni.length
+      ? comuni.map((c) => `${rigaLavoro(c)}: ${c.comuni.map((f) => fileConRepo(c, f)).join(', ')}`).join('\n')
+      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
     return 0;
   }
   // Il controllo sui numeri prima della credenziale: un comando storto si dice anche senza chiave.
@@ -1234,9 +1315,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'contesto': case 'sveglia': case 'chat': {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato', { pronti: true }), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
-      const r = rami();
-      const indice = indiceDalServer(sc.schede);
-      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
+      const r = await leggiRami(indiceDalServer(sc.schede));
+      const lista = r.lista;
+      if (r.server.avviso) console.error(`AVVISO: ${r.server.avviso}`);
       const dirRuoli = join(ROOT, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
@@ -1333,6 +1414,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
         if (!testo.trim()) { console.error('RIFIUTATO: il taccuino da stdin è vuoto, e riscriverlo così lo cancellerebbe tutto (taccuino scrivi - --versione V <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
         const r = await chiama(cred, 'taccuino.scrivi', { testo, versione: Number(opzione(argv, '--versione')) });
         return esito(r, (x) => `Taccuino riscritto (versione ${x.versione}).`);
+      }
+      if (arg === 'sezione') {
+        const sezione = String(argv[2]);
+        const testo = await leggiStdin();
+        if (!testo.trim()) { console.error(`RIFIUTATO: la sezione «${sezione}» da stdin è vuota: se non resta niente scrivi «nessuno» (taccuino sezione ${sezione} - --versione V <<'FINE' … FINE). Non ho scritto niente.`); return 1; }
+        const r = await chiama(cred, 'taccuino.sezione', { sezione, testo, versione: Number(opzione(argv, '--versione')) });
+        return esito(r, (x) => `Sezione «${x.sezione || sezione}» riscritta, il resto del taccuino com'era (versione ${x.versione}).`);
       }
       const r = await chiama(cred, 'taccuino');
       return esito(r, (x) => testoTaccuino(x).join('\n'));
@@ -1446,7 +1534,12 @@ export function controlliLocali(cmd, argv) {
     }
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).motivo || '');
-    case 'taccuino': return a === 'scrivi' && !/^\d+$/.test(String(opzione(argv, '--versione') ?? '')) ? 'taccuino scrivi vuole --versione <V>, il numero che hai letto col taccuino: senza, un\'indicazione dell\'owner scritta in mezzo sparirebbe' : '';
+    case 'taccuino': {
+      // La forma del nome la giudica solo il server (manutentoreRegole.validaSezione): qui basta che ci sia.
+      if (a === 'sezione' && (!String(b ?? '').trim() || b === '-' || String(b).startsWith('--'))) return 'taccuino sezione vuole il nome della sezione, come nelle intestazioni del taccuino (stato, problemi…), prima del «-»';
+      const versione = /^\d+$/.test(String(opzione(argv, '--versione') ?? ''));
+      return (a === 'scrivi' || a === 'sezione') && !versione ? `taccuino ${a} vuole --versione <V>, il numero che hai letto col taccuino: senza, un'indicazione dell'owner scritta in mezzo sparirebbe` : '';
+    }
     case 'sveglia-tra': return Number(a) >= 5 ? '' : 'la sveglia più vicina è fra 5 minuti';
     case 'account': return a === 'primo' ? (['A', 'B', 'alterna'].includes(b) ? '' : 'account primo A, B o alterna')
       : (['A', 'B'].includes(a) && ['spento', 'acceso'].includes(b) ? '' : 'account <A|B> spento|acceso');
@@ -1465,4 +1558,10 @@ export function controlliLocali(cmd, argv) {
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
-if (isMain) process.exit(await main(process.argv.slice(2)));
+// L'uscita si chiude dopo che stdout e stderr hanno scritto tutto: in una pipe un exit subito tagliava ai primi 64 KB
+// proprio le righe in coda (rami del server, avvisi). Sentinella: tests/unit/manutentore.test.mjs.
+if (isMain) {
+  const codice = await main(process.argv.slice(2));
+  await Promise.all([process.stdout, process.stderr].map((s) => new Promise((fatto) => s.write('', fatto))));
+  process.exit(codice);
+}

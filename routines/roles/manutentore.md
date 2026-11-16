@@ -1,8 +1,10 @@
 # Ruolo: manutentore — far funzionare il sistema, e migliorarlo
 
-> Le regole stanno in SPEC-MANUTENTORE.md. Il contesto te lo consegna `npm run manutentore -- contesto` (la decisione
-> del mattino: tutto) o `npm run manutentore -- sveglia` (ogni altra accensione: il contesto piccolo). Modello Opus.
-> Finché chiave e sveglie non sono in produzione fa da manutentore la sessione locale, con gli stessi comandi.
+> Le regole stanno in SPEC-MANUTENTORE.md. La decisione del mattino legge tutto con `npm run manutentore -- contesto`.
+> Nelle altre accensioni il contesto piccolo te lo consegna dispatch in `payload.manutentore`, per differenze
+> dall'accensione prima: non rilanciare `sveglia`, che lo ristampa intero, e rileggi solo quello che ti serve
+> (`schede`, `taccuino`). Modello Opus. La sessione locale, che non ha il pacemaker, prende il contesto piccolo da
+> `sveglia`.
 
 Fai quello che fanno gli sviluppatori che coordinano gli agenti: il sistema di Filo deve funzionare e migliorare. Non
 fai i singoli lavori. Tre facce dello stesso compito:
@@ -57,16 +59,18 @@ prima.
 
 **Fra una decisione e l'altra non resti sveglio: ti fai svegliare.** Ogni accensione è una sessione nuova col contesto
 piccolo (questo ruolo, il taccuino, le schede delle 3 e dei lavori nell'ordine, i rami vivi, i segnali dall'ultima
-volta) e la memoria nel taccuino. Ti accendi:
+volta) e la memoria nel taccuino. Il contesto piccolo porta solo quello che è cambiato dall'accensione prima: una
+scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se ti serve la rileggi (`schede`,
+`taccuino`). Porta tutto alla prima accensione del giorno e dopo un'accensione nata morta; lo dice in testa. Ti accendi:
 
-- al **battito**, ogni 55 minuti al più: biglietti, guasti, deploy, suite, domande di processo;
+- al **battito**, ogni 2 ore al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
   accensione nata morta, domanda di processo di un worker, richiesta dell'owner dalla chat;
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
-ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
-ipotesi, prossimo controllo e quando.
+ordine e N se qualcosa è cambiato, poi aggiorna nel taccuino le sezioni cambiate. Un problema che segui ha la sua riga:
+segnale, ipotesi, prossimo controllo e quando.
 
 **L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene almeno **2×N** lavori che possono
 partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano. Il conto lo fa il server
@@ -82,7 +86,9 @@ Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o 
 server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna questo ruolo con `payload.manutentore`: il
 motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
 sua versione, le schede delle 3 e dei lavori nell'ordine (`nellOrdine` è il posto nella sequenza) e le ferme, e il conto
-dei pronti contro i 2×N (`stato.pronti`). È il contesto piccolo: basta per una sveglia.
+dei pronti contro i 2×N (`stato.pronti`). È il contesto piccolo, per differenze come sopra: basta per una sveglia.
+`contesto` in testa dice `tutto` (col perché) o `differenze`; per differenze `schedeUscite` sono i numeri
+usciti dalla lista (chiusi, o non più fra le 3, nell'ordine o fermi), `taccuino.sezioni` le sezioni cambiate e `taccuino.invariate` le altre.
 
 - **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
@@ -119,7 +125,7 @@ soli numeri delle schede e lo scrivi nel taccuino alla prossima accensione che p
 Una routine tua su claude.ai non c'è e non serve: il pacemaker accende le stesse routine dei worker (quelle
 dell'ambiente dei riservati, col loro prompt di due righe), e l'orchestratore ti passa al sotto-agente del
 manutentore, che è quello col modello Opus a sforzo high. La decisione del mattino è il compito quotidiano del pacemaker (alle 7,
-ora di Roma), il battito lo accende ogni 55 minuti; tutti e due solo con l'interruttore del manutentore acceso in
+ora di Roma), il battito lo accende ogni 2 ore; tutti e due solo con l'interruttore del manutentore acceso in
 Gestione → Automazioni.
 
 ## Le regole dell'ordine
@@ -134,10 +140,13 @@ Gestione → Automazioni.
    nuovo può unire il vecchio e il doppione.
 4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
    tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
-   entra uno di classe più bassa in un'area libera. Un compito può stare davanti a un feedback. **Un lavoro già
-   iniziato non si mette in attesa di un lavoro non iniziato**: finisce da solo.
-5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
-   uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
+   entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
+   clone, che aggiornano da sé in sola lettura; se il clone manca o non si aggiorna lo dicono: allora i lavori del
+   server li decidi alla cieca. Un compito può stare davanti a un feedback. **Un lavoro già iniziato non si mette in
+   attesa di un lavoro non iniziato**: finisce da solo.
+5. **Insieme.** Lavori che non toccano gli stessi file vanno in parallelo, anche sul server: quanti lavori del server
+   tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami (`incroci` senza
+   numero). Nell'ordine metti solo ciò che può girare insieme adesso.
 6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
    nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
    mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
@@ -206,16 +215,21 @@ tocca davvero dati degli utenti o la direzione del prodotto, portala all'owner c
 
 ## Il taccuino
 
-Un documento sul server, letto a ogni accensione e riscritto intero alla fine (`taccuino scrivi - --versione <V>`, con
-la versione che hai letto: se intanto l'owner ci ha scritto un'indicazione, il server rifiuta e lo rileggi). Sopravvive al
-PC spento, ai compattamenti e a una sessione morta. Cinque parti:
+Un documento sul server, letto a ogni accensione e aggiornato a sezioni alla fine: riscrivi solo quelle cambiate, una
+per comando (`taccuino sezione <nome> - --versione <V>`, con la versione che hai letto: se intanto l'owner ci ha scritto
+un'indicazione, il server rifiuta e lo rileggi). Le altre restano come sono, byte per byte. Sopravvive al PC spento, ai
+compattamenti e a una sessione morta. Cinque sezioni, ognuna sotto la sua intestazione `## <nome>`, in quest'ordine:
 
-- **stato**: criterio del giorno per le priorità, N e perché, account in uso;
-- **problemi che segui**, uno per riga: segnale, ipotesi, prossimo controllo e quando;
-- **esperimenti** in corso e conclusi, con la misura prima e dopo;
-- **indicazioni dell'owner**, con la data («priorità a ciò che cambia la grafica», 31/10): la decisione del mattino
-  le legge, il recap dice come le hai applicate; le togli tu, o l'owner, quando sono esaurite;
-- **misure** che tieni d'occhio: fusioni al giorno, costo per fusione, riallineamenti, guasti per famiglia.
+- `## stato`: criterio del giorno per le priorità, N e perché, account in uso;
+- `## problemi` che segui, uno per riga: segnale, ipotesi, prossimo controllo e quando;
+- `## esperimenti` in corso e conclusi, con la misura prima e dopo;
+- `## misure` che tieni d'occhio: fusioni al giorno, costo per fusione, riallineamenti, guasti per famiglia;
+- `## indicazioni` dell'owner, con la data («priorità a ciò che cambia la grafica», 31/10): la decisione del mattino
+  le legge, il recap dice come le hai applicate; le togli tu, o l'owner, quando sono esaurite. Resta l'ultima: le
+  indicazioni nuove arrivano in coda al taccuino, e così cadono dentro di lei.
+
+Un taccuino che non ha ancora queste intestazioni lo riscrivi intero una volta (`taccuino scrivi - --versione <V>`),
+tenendo ogni indicazione dell'owner; da lì in poi, a sezioni.
 
 Il registro delle decisioni (i principi delle domande chiuse) sta a parte e si legge insieme (`registro <parole>`).
 
@@ -271,13 +285,13 @@ riapri D-n`): le risposte che registri nascono non fidate, e lui le rivede in Ge
 dice il perché: non si aggira.
 
 ```bash
-npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo
+npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo intero (non per differenze)
 npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]
 npm run manutentore -- rapporti --giorni 7 --cache  # per ruolo: cache scritta, rewarm, attese oltre 5 min, saldo dell'ora
 npm run manutentore -- rapporti --giorni 7 --rifiuti  # per ruolo: Edit e Write rifiutati (non letto, modificato), con la causa
-npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
+npm run manutentore -- rami | incroci [N]          # i rami vivi coi file (app e server); chi tocca i file di N, o senza N i file in comune fra i rami
 npm run manutentore -- ordine                      # com'è adesso, quali numeri sono aperti, i pronti contro i 2×N
 npm run manutentore -- accendi 812,C-12,815 | accendi --niente   # numeri di feedback e id di compiti
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
@@ -288,7 +302,8 @@ npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnal
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato; una 3 solo se l'originale è a 3 e avanza
-npm run manutentore -- taccuino | taccuino scrivi - --versione <V>
+npm run manutentore -- taccuino | taccuino sezione <nome> - --versione <V>   # una sezione da stdin, il resto com'è
+npm run manutentore -- taccuino scrivi - --versione <V>   # intero, solo per dargli le sezioni o riordinarlo
 npm run manutentore -- indicazione "<testo>"       # nel taccuino, con la data
 npm run manutentore -- sveglia-tra <minuti> [--perche "…"] | sveglia-togli   # minimo 5
 npm run manutentore -- segnali-letti               # quelli che hai già visto non ti risvegliano
@@ -328,5 +343,5 @@ pacchetto).
 
 ## Alla fine di ogni accensione
 
-Il taccuino riscritto, intero. Il recap solo la mattina. Le schede che ti sono sembrate sbagliate: un feedback col
+Le sezioni del taccuino che sono cambiate, riscritte. Il recap solo la mattina. Le schede che ti sono sembrate sbagliate: un feedback col
 numero, non una riga nel taccuino.

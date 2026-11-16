@@ -3,12 +3,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { join, resolve } from 'node:path';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 
 const M = await import('../../scripts/manutentore.mjs');
+const { incrociFraRami } = await import('../../scripts/lib/su-main.mjs');
+const { cartellaCloneServer } = await import('../../scripts/lib/git-server.mjs');
+const RADICE_DEL_REPO = fileURLToPath(new URL('../..', import.meta.url));
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
   file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
@@ -120,13 +124,204 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   g('update-ref', 'refs/remotes/origin/claude/lavoro', 'HEAD');
   writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['src/a.js'] })));
   writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
-  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  const env = { FILO_SERVER_CLONE: join(dir, 'nessun-clone') };
+  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
-  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
-  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
+});
+
+// #2340: i lavori del server si aprono in parallelo se i loro rami non si toccano, quindi rami e incroci li vedono.
+function repoConRami(rami) {
+  const repo = cartellaTemporanea('manutentore-rami');
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  for (const [ramo, file, msg] of rami) {
+    g('checkout', '-q', '-B', 'tmp', 'main');
+    mkdirSync(join(repo, file, '..'), { recursive: true });
+    writeFileSync(join(repo, file), ramo); g('add', '-A'); g('commit', '-qm', msg);
+    g('update-ref', `refs/remotes/origin/${ramo}`, 'HEAD');
+  }
+  g('checkout', '-q', 'main');
+  return repo;
+}
+function catturaConsole(t) {
+  const out = [];
+  const [l, e] = [console.log, console.error];
+  console.log = (...a) => out.push(a.join(' ')); console.error = (...a) => out.push(a.join(' '));
+  t.after(() => { console.log = l; console.error = e; });
+  return () => { const s = out.join('\n'); out.length = 0; return s; };
+}
+
+test('incroci fra i rami: due rami del server sullo stesso file si incrociano coi file, su file diversi no (#2340)', () => {
+  const s = (ramo, file, feedback = []) => ({ ramo, repo: 'server', file, feedback });
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js', 'functions/src/y.js'], ['10']), s('claude/b', ['functions/src/x.js'], ['11'])]),
+    [{ a: { ramo: 'claude/a', feedback: ['10'], repo: 'server' }, b: { ramo: 'claude/b', feedback: ['11'], repo: 'server' }, comuni: ['filo-security:functions/src/x.js'] }]);
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js']), s('claude/b', ['functions/src/y.js'])]), []);
+  // Lo stesso percorso in due repo è due file diversi.
+  assert.deepEqual(incrociFraRami([{ ramo: 'claude/app', file: ['package.json'] }, s('claude/b', ['package.json'])]), []);
+  // Un lavoro dell'app col gemello sul server incrocia un lavoro solo del server sui file del server.
+  const coppie = incrociFraRami([{ ramo: 'worker/A-1', file: ['scripts/x.mjs'], feedback: ['20'] }, s('worker/A-1', ['functions/src/z.js']), s('claude/b', ['functions/src/z.js'], ['21'])]);
+  assert.equal(coppie.length, 1);
+  assert.equal(M.rigaLavoro(coppie[0].a), 'worker/A-1 (app e server) (#20)');
+  assert.equal(M.rigaLavoro(coppie[0].b), 'claude/b sul server (#21)');
+  assert.deepEqual(coppie[0].comuni, ['filo-security:functions/src/z.js']);
+});
+
+test('rami e incroci leggono anche i rami del clone di filo-security, e se il clone manca lo dicono (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  const server = repoConRami([['claude/uno', 'functions/src/x.js', '#31 uno'], ['claude/due', 'functions/src/x.js', '#32 due'], ['claude/tre', 'functions/src/y.js', '#33 tre']]);
+  const schede = cartellaTemporanea('manutentore-schede');
+  t.after(() => { togliCartella(app); togliCartella(server); togliCartella(schede); });
+  writeFileSync(join(schede, '40.json'), JSON.stringify(scheda(40, { file_probabili: ['functions/src/y.js'] })));
+  const opz = ['--cartella', schede, '--senza-fetch', '--clone-server', server];
+
+  assert.equal(await M.main(['rami', ...opz], { root: app, env: {} }), 0);
+  const rami = leggi();
+  assert.match(rami, /^claude\/app \(#30\), 1 commit, .*: src\/a\.js$/m);
+  assert.match(rami, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(rami, /NON letti/);
+
+  assert.equal(await M.main(['incroci', ...opz], { root: app, env: {} }), 0);
+  const fra = leggi();
+  assert.match(fra, /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+  assert.doesNotMatch(fra, /claude\/tre/, 'su un file che nessun altro tocca non c\'è incrocio');
+  assert.doesNotMatch(fra, /claude\/app/);
+
+  assert.equal(await M.main(['incroci', '40', ...opz], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/tre sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
+
+  const solo = repoConRami([['claude/uno', 'functions/src/x.js', '#31'], ['claude/tre', 'functions/src/y.js', '#33']]);
+  t.after(() => togliCartella(solo));
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--clone-server', solo], { root: app, env: {} }), 0);
+  assert.match(leggi(), /Nessun file in comune fra i rami in corso \(3\)\./);
+
+  const assente = join(schede, 'filo-security');
+  assert.equal(await M.main(['rami', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  const senza = leggi();
+  assert.match(senza, /^claude\/app/m, 'i rami dell\'app restano');
+  assert.ok(senza.includes(`Rami del server NON letti: nessun clone di filo-security in ${assente}`), senza);
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  assert.match(leggi(), /Rami del server NON letti/);
+});
+
+test('il clone del server si cerca dove lo mettono le routine e la sessione locale', () => {
+  const c = (dir) => (p) => p === join(resolve(dir), '.git');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: resolve('/srv/fs') });
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: [resolve('/a')] },
+    'la cartella scelta vale da sola');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: resolve('/x/filo-security') });
+  // La cartella delle routine è quella dei lavori server: se si sposta il loro clone, il manutentore lo segue.
+  for (const env of [{}, { FILO_SERVER_CLONE: '/srv/fs' }]) {
+    assert.equal(M.cloneDelServer({ root: '/x/Filo', env, esiste: () => false }).cercati[0], cartellaCloneServer(env));
+  }
+});
+
+test('il clone del server si cerca accanto al repo anche da una sua worktree, come fanno chiusura e verifica locali', () => {
+  const ci = new Set([join(resolve('/x/filo-security'), '.git'), join(resolve('/x/filo-security'), 'functions', 'tools', 'server-fondi.js')]);
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo/.claude/worktrees/w', env: {}, esiste: (p) => ci.has(p) }), { dir: resolve('/x/filo-security') });
+});
+
+// Il server su un'origine locale: main, poi lavori spinti dopo che il clone è nato (come nella sessione cloud).
+function serverConOrigine(t, { corto = false } = {}) {
+  const base = cartellaTemporanea('manutentore-origine');
+  t.after(() => togliCartella(base));
+  const origine = join(base, 'server.git');
+  const lavoro = join(base, 'lavoro');
+  const g = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '--bare', origine], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '-b', 'main', lavoro], { stdio: 'ignore' });
+  g(lavoro, 'config', 'user.email', 't@t'); g(lavoro, 'config', 'user.name', 't'); g(lavoro, 'config', 'commit.gpgsign', 'false');
+  mkdirSync(join(lavoro, 'functions', 'src'), { recursive: true });
+  writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), 'x'); g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'inizio');
+  g(lavoro, 'remote', 'add', 'origin', origine); g(lavoro, 'push', '-q', 'origin', 'main');
+  const clone = join(base, 'filo-security');
+  execFileSync('git', ['clone', '-q', ...(corto ? ['--depth', '1'] : []), '--single-branch', '--branch', 'main', pathToFileURL(origine).href, clone], { stdio: 'ignore' });
+  g(clone, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+  const spingi = (ramo, msg) => {
+    g(lavoro, 'checkout', '-q', '-B', 'tmp', 'main');
+    writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), ramo); g(lavoro, 'commit', '-qam', msg);
+    g(lavoro, 'push', '-q', 'origin', `tmp:refs/heads/${ramo}`);
+  };
+  return { origine, clone, spingi };
+}
+
+test('nelle routine il clone del server si aggiorna da sé, anche poco profondo e con solo main: i lavori nati dopo si vedono (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(app));
+  const { clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  spingi('claude/due', '#32 due');
+  assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.match(out, /^claude\/due sul server \(#32\)/m);
+  assert.doesNotMatch(out, /NON aggiornati/);
+  assert.equal(await M.main(['incroci', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+});
+
+test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce lo dice, col clone com\'era (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(app));
+  const { origine, clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/uno sul server \(#31\)/m);
+  // Un'origine che non risponde: l'avviso, e i rami di prima restano.
+  togliCartella(origine);
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server/m);
+  assert.match(out, /Rami del server NON aggiornati \(.+\): sono quelli del clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\./);
+  // Un clone poco profondo che non si completa lo dice: i lavori del server probabilmente mancano.
+  const { origine: o2, clone: c2 } = serverConOrigine(t, { corto: true });
+  togliCartella(o2);
+  assert.equal(await M.main(['rami', '--clone-server', c2], { root: app, env: {} }), 0);
+  assert.match(leggi(), /clone poco profondo.*i lavori del server mancano/);
+});
+
+test('il contesto intero e quello piccolo portano anche i rami del server, coi file col prefisso (#2340)', () => {
+  const rami = [
+    { ramo: 'worker/A-1', repo: 'server', data: '2026-11-11T10:00:00Z', avanti: 2, file: ['functions/src/x.js'], feedback: ['900'] },
+    { ramo: 'worker/A-1', data: '2026-11-11T10:00:00Z', avanti: 1, file: ['scripts/y.mjs'], feedback: ['900'] },
+  ];
+  const intero = M.testoIntero({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [], rami });
+  assert.match(intero, /## Rami in corso \(2\)/);
+  assert.match(intero, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  const piccolo = M.testoPiccolo({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [{ num: '900', priorita: 3 }], rami });
+  assert.ok(piccolo.ok, piccolo.motivo);
+  assert.match(piccolo.testo, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  assert.match(piccolo.testo, /^worker\/A-1 \(#900\), 1 commit, 2026-11-11: scripts\/y\.mjs$/m);
+});
+
+test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
+  const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(repo));
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('checkout', '-q', '-B', 'lungo', 'main');
+  mkdirSync(join(repo, 'f'));
+  for (let i = 0; i < 700; i += 1) writeFileSync(join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`), String(i));
+  g('add', '-A'); g('commit', '-qm', 'tanti file (#1)');
+  g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
+  g('checkout', '-q', 'main');
+  // Il comando vero, con la radice nel repo finto: --preserve-symlinks la tiene lì.
+  for (const d of ['scripts', 'src', 'node_modules']) collegaCartella(join(RADICE_DEL_REPO, d), join(repo, d));
+  const env = { ...process.env };
+  delete env.FILO_SERVER_CLONE;
+  const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath, '--preserve-symlinks', '--preserve-symlinks-main',
+    join(repo, 'scripts', 'manutentore.mjs'), 'rami', '--senza-fetch', '--clone-server', join(repo, 'manca')],
+  { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: TETTO_ATTESA_MS });
+  assert.ok(r.stdout.length > 64 * 1024, `uscita di ${r.stdout.length} byte`);
+  assert.match(r.stdout.slice(-400), /Rami del server NON letti/);
 });
 
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
@@ -257,9 +452,9 @@ test('#2215: dopo lo sblocco di un guasto la riga non dice «nota scritta»: nel
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve as risolvi } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const RADICE = risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const RADICE =risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schedaServer = (num, priorita, extra = {}) => ({
   num: String(num), stato: 'todo', motivo: '', priorita, prioritaOwner: false, titolo: `Titolo del feedback numero ${num} con qualche parola in più`,
   fiducia: 'fidato', ramo: '', aspetta: [], unisce: [], lavoroServer: false, riservato: false, inLavorazione: false, aggiornatoIl: null, ...extra,
@@ -273,6 +468,13 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
   return schedaServer(n, n % 2);
 });
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
+test('le accensioni del pacemaker prendono il contesto per differenze dal payload, non lo ristampano intero (#2340)', () => {
+  const testa = RUOLO.split('\n').filter((r) => r.startsWith('>')).join(' ');
+  assert.match(testa, /payload\.manutentore/);
+  assert.match(testa, /non rilanciare `sveglia`/);
+  assert.doesNotMatch(testa, /ogni altra accensione: il contesto piccolo/);
+});
+
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
 test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, non le 2 (#2269)', () => {
@@ -699,4 +901,30 @@ test('lo stato elenca le corse in coda senza lavori: repository, workflow, sha, 
   const sporco = M.righeCorseFerme({ sogliaMin: 20, corse: [{ repo: 'app\n## Spesa', workflow: 'x', sha: '', id: 1, minuti: 30, feedback: '' }], errori: [] });
   assert.ok(sporco.every((r) => !r.includes('\n')));
   assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, corseFerme }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /la aspetta #2258/);
+});
+
+// #2340, decisione dell'owner dell'08/11: lavori server in parallelo, battito a 2 ore, contesto e taccuino a pezzi.
+test('i lavori server non vanno più uno alla volta: si decide sui file in comune fra i rami (#2340)', () => {
+  const ordine = RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')).replace(/\s+/g, ' ');
+  assert.doesNotMatch(ordine, /alla volta/);
+  assert.match(ordine, /quanti lavori del server tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami \(`incroci` senza numero\)/);
+  assert.match(ordine, /`rami` e `incroci` leggono anche i rami di filo-security/);
+});
+
+test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a sezioni, nel ruolo e nelle spec (#2340)', () => {
+  const testi = { ruolo: RUOLO, spec: readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'),
+    stati: readFileSync(risolvi(RADICE, 'FEEDBACK-STATES.md'), 'utf8'), domande: readFileSync(risolvi(RADICE, 'SPEC-DOMANDE.md'), 'utf8') };
+  for (const [nome, t] of Object.entries(testi)) assert.doesNotMatch(t.replace(/\s+/g, ' '), /ogni 55 minuti/, nome);
+  const ruolo = RUOLO.replace(/\s+/g, ' ');
+  assert.match(ruolo, /al \*\*battito\*\*, ogni 2 ore al più/);
+  assert.match(ruolo, /Il contesto piccolo porta solo quello che è cambiato dall'accensione prima/);
+  assert.match(ruolo, /Porta tutto alla prima accensione del giorno e dopo un'accensione nata morta/);
+  assert.match(ruolo, /`taccuino sezione <nome> - --versione <V>`/);
+  assert.doesNotMatch(ruolo, /riscrivi il taccuino intero|Il taccuino riscritto, intero/);
+  // L'indicazione dell'owner arriva in coda: la sezione delle indicazioni è l'ultima, o finirebbe nelle misure.
+  const sezioni = [...RUOLO.matchAll(/^- `## ([a-z]+)`/gm)].map((m) => m[1]);
+  assert.deepEqual(sezioni, ['stato', 'problemi', 'esperimenti', 'misure', 'indicazioni']);
+  const spec = testi.spec.replace(/\s+/g, ' ');
+  assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
+  assert.match(spec, /battito\*\* ogni due ore al massimo/);
 });
