@@ -396,6 +396,8 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   // I file dei comandi di Actions no: il codice provato scriverebbe l'esito della propria prova (#2225).
   const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
   for (const k of COMANDI_DI_ACTIONS) delete env[k];
+  // I file li sceglie la prova (tutti, o `file`): la regola del PC dell'owner non li riduce (unit-sul-pc.mjs).
+  env.FILO_UNIT_LONTANE = '0';
   let r;
   try {
     const reporter = ['--test-reporter=spec', '--test-reporter-destination=stdout', `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`];
