@@ -80,7 +80,7 @@ test('una parola sbagliata di una lettera trova lo stesso, e la risposta lo dice
 
 test('i tratti da evidenziare cadono sulle lettere giuste, anche con gli accenti', () => {
   const testo = 'La pagina Novità elenca le novità.';
-  const r = N.filtra([{ version: '1.0.0', date: '', features: [{ testo, segnalazione: null }], fixes: [] }], 'novita');
+  const r = N.filtra([{ version: '1.0.0', date: '', features: [{ testo, segnalazioni: [] }], fixes: [] }], 'novita');
   const tratti = N.tratti(testo, r.termini);
   assert.deepEqual(tratti.map(([a, b]) => testo.slice(a, b)), ['Novità', 'novità']);
 });
