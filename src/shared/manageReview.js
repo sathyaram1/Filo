@@ -615,6 +615,29 @@
     return m;
   }
 
+  // Un originale assorbito in un pacchetto (#2270): archiviato col rimando `unitoIn`, o chiuso dalla fusione del
+  // pacchetto. Il suo lavoro è il pacchetto: esce da liste e conteggi, e si apre dalla scheda del pacchetto. PURA.
+  function assorbito(fb) {
+    if (!fb || typeof fb.unitoIn !== 'string' || !fb.unitoIn.trim()) return false;
+    const { status } = normalizeStatus(fb);
+    return status === 'archived' || status === 'done';
+  }
+  // La scheda in cui una riga si elenca e si conta: quella di manageTabFor, nessuna per un assorbito.
+  const schedaInElenco = (fb, opts) => (assorbito(fb) ? null : manageTabFor(fb, opts));
+
+  /**
+   * Gli originali che il pacchetto `fb` ha assorbito, nell'ordine di `unisce`, con quello che la scheda ne sa:
+   * [{ id, num, titolo, presente }]; `presente` è falso se il documento non è fra quelli letti. PURA.
+   */
+  function assorbitiDi(fb, tutti) {
+    const voci = fb && Array.isArray(fb.unisce) ? fb.unisce : [];
+    const perId = new Map((Array.isArray(tutti) ? tutti : []).map((f) => [String(f && f._id), f]));
+    return voci.filter((v) => v && typeof v === 'object' && v.id).map((v) => {
+      const f = perId.get(String(v.id));
+      return { id: String(v.id), num: `#${String(v.num || '').replace(/^#/, '')}`, titolo: f ? String(f.name || f.title || '') : '', presente: !!f };
+    });
+  }
+
   /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
   function domandeBloccantiDi(fb) {
     return DOM().domandeBloccantiDi(fb);
