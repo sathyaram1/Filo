@@ -141,7 +141,7 @@ test('#1737 giro 3: i segni di routine che il repo porta da main non fanno crede
     r.git('checkout', '-q', 'claude/owner');
     r.git('merge', '-q', '--no-edit', 'main');
     assert.equal(unitLontane(r.lavoro, { env: ambienteDelPc() }), true);
-    const p = lancia(r, [], ambienteDelPc());
+    const p = lancia(r, [], ambienteDelPc(), { intero: true });
     assert.equal(p.status, 0, p.stdout + p.stderr);
     assert.ok(!existsSync(r.segno), `la prova arrivata da main è girata sul PC dell'owner:\n${p.stderr}`);
 
