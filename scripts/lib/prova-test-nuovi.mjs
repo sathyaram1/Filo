@@ -2,7 +2,7 @@
 // con (verde atteso). Non decide niente: scrive l'esito che la consegna porta. Prove: tests/unit/provaTestNuovi.test.mjs.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { confrontaCasi, PROVE_APP, PROVE_SERVER } from './conta-prove.mjs';
