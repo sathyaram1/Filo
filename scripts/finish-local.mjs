@@ -984,8 +984,10 @@ async function main() {
     const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
     // Sul PC dell'owner gli spec arrivati da main li prova GitHub, come gli unit (D-185, #1737 giro 1).
-    const delRamo = lontane ? git(['diff', '--name-only', `${base}...HEAD`], { cwd: albero.dir }) : null;
-    const divisi = lontane ? specSulPc({ specs, cambiati: delRamo.ok ? delRamo.out.split('\n').filter(Boolean) : null }) : { qui: specs, lontani: [] };
+    // Lo stesso conto del lanciatore degli unit: senza main fresco qui non gira nessuno spec (#1737 giro 3).
+    const delRamo = lontane && specs.length ? cambiatiDelRamo(albero.dir, 'tests') : null;
+    if (delRamo && delRamo.errore) console.log(`\n▸ Spec delle aree toccate: non so quali cambia il ramo (${delRamo.errore}), sul tuo PC non ne giro nessuno.`);
+    const divisi = lontane ? specSulPc({ specs, cambiati: delRamo && !delRamo.errore ? delRamo.cambiati : null }) : { qui: specs, lontani: [] };
     const qui = divisi.qui;
     specRemoti = divisi.lontani;
     const { blocking, informative } = splitKnownRed(qui, readKnownRed(albero.dir));
