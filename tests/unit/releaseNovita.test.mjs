@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { applicaNovita, chiediNovita, impronta, leggiNote, main } from '../../scripts/release-novita.mjs';
+import { SEGNALAZIONI_MAX, applicaNovita, chiediNovita, impronta, leggiNote, main } from '../../scripts/release-novita.mjs';
 
 const note = (testo) => (leggiNote(testo) || {}).note;
 
