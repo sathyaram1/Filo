@@ -34,7 +34,8 @@ resoconto.
 
 Il repo di Filo ti serve per capire, non per cambiarlo: niente rami, niente
 commit. Leggi la parte di codice o di spec che le note indicano, o affida la
-lettura a un sotto-agente che ti riporta la conclusione.
+lettura al sotto-agente `lettore` (`subagent_type: lettore`), che ti riporta i
+fatti; la conclusione la tiri tu.
 
 ## Cosa puoi fare
 
