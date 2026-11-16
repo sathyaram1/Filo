@@ -593,7 +593,18 @@ async function main() {
   const solo = argv.includes(SOLO);
   const flags = argv.filter((a) => a !== '--list' && a !== SOLO);
 
-  const files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
+  let files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
+  // Sul PC dell'owner la cartella intera no: quello che è arrivato da main senza il suo sì gira su GitHub (D-185).
+  if (!solo && !process.env.FILO_UNIT_DIR && files.length) {
+    const { unitLontane, unitDelRamo, testoSulPc } = await import('./lib/unit-sul-pc.mjs');
+    if (unitLontane(REPO_ROOT)) {
+      const scelta = unitDelRamo(REPO_ROOT, files);
+      console.log(testoSulPc(scelta, files.length));
+      if (scelta.errore) { process.exitCode = 1; return; }
+      if (!scelta.file.length) { process.exitCode = 0; return; }
+      files = scelta.file;
+    }
+  }
   if (!files.length) {
     console.error(solo ? `[test:unit] ${SOLO} senza file da lanciare: mi fermo.` : `[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
     console.error('[test:unit] zero test eseguiti non è un successo — controlla la cartella.');
