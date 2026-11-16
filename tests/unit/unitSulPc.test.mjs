@@ -119,6 +119,66 @@ test('npm run test:unit sul PC dell\'owner: gira la prova del ramo, non quella a
   }
 });
 
+// Il PC vero: nessuna variabile che forzi la regola o dica routine.
+const ambienteDelPc = () => {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (k === 'GITHUB_ACTIONS' || /^FILO_(ROUTINE$|ROUTINE_TICKET|ROUTINE_ROLE|TOOLS_ROOT|UNIT_LONTANE)/.test(k)) delete env[k];
+  return env;
+};
+
+test('#1737 giro 3: i segni di routine che il repo porta da main non fanno credere al PC dell\'owner di essere una routine', () => {
+  const r = repo();
+  try {
+    const biglietto = `${JSON.stringify({ ticket: 'tk-da-main' })}\n`;
+    r.git('checkout', '-q', 'main');
+    r.scrivi('.filo-repo-root', '.\n');
+    r.scrivi('.claude/routine-ticket.json', biglietto);
+    r.git('add', '-f', '.filo-repo-root', '.claude/routine-ticket.json');
+    r.git('commit', '-qm', 'main: segni di routine portati da un lavoro fidato');
+    r.git('checkout', '-q', 'claude/owner');
+    r.git('merge', '-q', '--no-edit', 'main');
+    assert.equal(unitLontane(r.lavoro, { env: ambienteDelPc() }), true);
+    const p = lancia(r, [], ambienteDelPc());
+    assert.equal(p.status, 0, p.stdout + p.stderr);
+    assert.ok(!existsSync(r.segno), `la prova arrivata da main è girata sul PC dell'owner:\n${p.stderr}`);
+
+    // Lo stesso segno scritto da dispatch, che git non traccia, resta quello di una routine.
+    r.git('rm', '-q', '--cached', '.claude/routine-ticket.json');
+    r.scrivi('.claude/routine-ticket.json', biglietto);
+    assert.equal(unitLontane(r.lavoro, { env: ambienteDelPc() }), false);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+test('#1737 giro 3: gli spec sul PC si scelgono col conto degli unit; senza main fresco nessuno', async () => {
+  const { specDelPc } = await import('../../scripts/finish-local.mjs');
+  const r = repo();
+  try {
+    r.git('checkout', '-q', 'main');
+    r.scrivi('tests/opzioni-da-main.spec.mjs', '// da main\n');
+    r.git('add', '-A');
+    r.git('commit', '-qm', 'main: uno spec');
+    r.git('push', '-q', 'origin', 'main');
+    r.git('checkout', '-q', 'claude/owner');
+    r.git('merge', '-q', '--no-edit', 'main');
+    r.scrivi('tests/opzioni-del-ramo.spec.mjs', '// del ramo\n');
+    r.git('add', '-A');
+    r.git('commit', '-qm', 'il ramo: uno spec');
+    const specs = ['tests/opzioni-da-main', 'tests/opzioni-del-ramo'];
+    assert.deepEqual(specDelPc({ lontane: true, specs, dir: r.lavoro }), { qui: ['tests/opzioni-del-ramo'], lontani: ['tests/opzioni-da-main'], nota: '' });
+    // La copia di main resta indietro e lo scaricamento non riesce: lo spec di main sembrerebbe del ramo.
+    r.git('update-ref', 'refs/remotes/origin/main', 'main~1');
+    r.git('remote', 'set-url', 'origin', join(r.casa, 'non-esiste.git'));
+    const d = specDelPc({ lontane: true, specs, dir: r.lavoro });
+    assert.deepEqual([d.qui, d.lontani], [[], specs]);
+    assert.match(d.nota, /non so quali cambia il ramo \(non riesco a scaricare main da origin/);
+    assert.deepEqual(specDelPc({ lontane: false, specs, dir: r.lavoro }).qui, specs);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
 test('npm run test:unit sul PC dell\'owner senza main da origin: rosso e nessuna prova eseguita', () => {
   const r = repo();
   try {
