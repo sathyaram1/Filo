@@ -21,8 +21,10 @@ import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
 import '../src/shared/prioritaTre.js';
+import '../src/shared/patchNotes.js';
 
 const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
+const PN = globalThis.SN_PATCH_NOTES;
 
 const QUI = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Dalla copia fissata degli strumenti git e i marcatori del giro stanno nel progetto che la copia ricorda (#2340.2).
