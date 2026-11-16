@@ -48,12 +48,18 @@ function repoFinto({ conSpec = false } = {}) {
   // Un lavoro fidato porta su main una prova nuova; il ramo dell'owner nasce dopo e cambia solo la sua.
   scrivi('tests/unit/da-main.test.mjs', "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\n"
     + `test('arrivata da main', () => writeFileSync(${JSON.stringify(segno)}, 'eseguita'));\n`);
+  // #1737: e uno spec dell'area delle opzioni, che il ramo dell'owner tocca.
+  if (conSpec) {
+    scrivi('tests/options-da-main.spec.mjs', "import { test } from '@playwright/test';\nimport { writeFileSync } from 'node:fs';\n"
+      + `test('arrivato da main', () => writeFileSync(${JSON.stringify(segnoSpec)}, 'eseguito'));\n`);
+  }
   const main = commit('main: una prova nuova da un lavoro fidato');
   git('push', '-q', 'origin', 'main');
   git('checkout', '-q', '-b', 'claude/owner');
   scrivi('tests/unit/del-ramo.test.mjs', "import { test } from 'node:test';\ntest('del ramo', () => {});\n");
+  if (conSpec) scrivi('src/pages/options/options.js', 'export const x = 2;\n');
   const punta = commit('il ramo dell\'owner');
-  return { casa, lavoro, git, scrivi, segno, main, punta };
+  return { casa, lavoro, git, scrivi, segno, segnoSpec, main, punta };
 }
 
 /** Un GitHub finto: accende la corsa e risponde con `registro(coppia)` come registro del lavoro che unisce. */
