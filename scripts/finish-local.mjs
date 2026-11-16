@@ -568,16 +568,17 @@ export function giudizioRemoto({ prova, rossiQui = false }) {
   const p = prova || {};
   const link = p.remota && p.remota.url ? `\n  La corsa: ${p.remota.url}` : '';
   const m = String(p.mainSha || '').slice(0, 8);
+  const spec = Number(p.specChiesti) > 0 ? ` (con ${p.specProvati} spec delle aree toccate)` : '';
   if (p.errore) {
     return { ferma: true, messaggio: `✗ Gli unit arrivati da main non sono provati: GitHub non ha dato l'esito (${p.errore}).\n`
       + `  Sul tuo PC non li eseguo al posto suo. Rilancia quando GitHub risponde.${link}` };
   }
-  if (p.esito === 'verde' || p.esito === 'rosso_anche_su_main') {
+  if (unitProseguono(p)) {
     const come = p.esito === 'verde' ? 'verdi' : 'rossi uguali anche su main da solo, senza test rotti in più';
     const qui = rossiQui ? ' Quelli rossi qui sul tuo PC lassù passano: proseguo.' : ' Proseguo.';
-    return { ferma: false, messaggio: `▸ Unit su GitHub, sulla fusione con main ${m}: ${come}.${qui}${link}` };
+    return { ferma: false, messaggio: `▸ Unit su GitHub${spec}, sulla fusione con main ${m}: ${come}.${qui}${link}` };
   }
-  if (p.esito === 'rosso_sulla_fusione') return { ferma: true, messaggio: `${testoProva(p)}\n✗ Unit rossi su GitHub: non pubblico. Sistema e rilancia.${link}` };
+  if (p.esito === 'rosso_sulla_fusione') return { ferma: true, messaggio: `${testoProva(p)}\n✗ Unit rossi su GitHub${spec}: non pubblico. Sistema e rilancia.${link}` };
   if (p.esito === 'conflitto') return { ferma: true, messaggio: `${testoProva(p)}\n✗ Riallinea il ramo su origin/main e rilancia.${link}` };
   return { ferma: true, messaggio: `✗ La corsa su GitHub ha risposto «${p.esito || 'niente'}», che non dice se gli unit passano: non pubblico.${link}` };
 }
