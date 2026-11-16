@@ -34,7 +34,7 @@
     const PN = global.SN_PATCH_NOTES;
     const tutte = Array.isArray(notes) ? notes : (PN ? PN.NOTES : []);
     const cmp = PN ? PN.cmpVersion : (a, b) => (a === b ? 0 : (a < b ? -1 : 1));
-    const riga = PN && PN.riga ? PN.riga : (r) => ({ testo: String(r), segnalazione: null });
+    const riga = PN && PN.riga ? PN.riga : (r) => ({ testo: String(r), segnalazioni: [] });
     return tutte
       .filter((n) => n && n.version && (!current || cmp(n.version, current) <= 0))
       .slice()
