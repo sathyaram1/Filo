@@ -56,7 +56,7 @@ test('il filtro tiene le sole righe con tutte le parole, senza badare a maiuscol
   const v = N.uscite(FINTO, '0.3.1');
   const r = N.filtra(v, 'NOVITA versioni');
   assert.equal(r.righe, 1);
-  assert.equal(r.versioni[0].features[0].segnalazione, 1956);
+  assert.deepEqual(r.versioni[0].features[0].segnalazioni, [1956]);
   assert.deepEqual(r.approssimati, []);
   assert.equal(N.filtra(v, '   ').righe, 4, 'un campo di soli spazi non filtra niente');
   assert.equal(N.filtra(v, 'novità colore').righe, 0, 'due parole di righe diverse non fanno una riga');
