@@ -79,14 +79,6 @@ export function provaDalCampo(c, remota = {}) {
   return out;
 }
 
-/** La riga che dice dove sta la prova. PURA. */
-export function testoProvaRemota(p) {
-  const r = (p && p.remota) || {};
-  const link = r.url ? ` ${r.url}` : '';
-  if (p && p.errore) return `✗ Unit su GitHub: niente esito (${p.errore}).${link}`;
-  return `▸ Unit sulla fusione provati su GitHub, senza le tue credenziali: ${p.esito}.${link}`;
-}
-
 /** Il token per l'API: quello dell'ambiente, o quello di GitHub CLI. '' se non c'è. */
 export function tokenGitHub(env = process.env) {
   const daEnv = String(env.GH_TOKEN || env.GITHUB_TOKEN || '').trim();
