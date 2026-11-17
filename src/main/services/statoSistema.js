@@ -384,14 +384,14 @@ function Rispondi([string]$cosa) {
   } elseif ($cosa -eq 'wifi') {
     $r = [ordered]@{ cosa = 'wifi' }
     try {
-      if (-not $script:wlanPronta) {
+      if (-not $global:wlanPronta) {
         Add-Type -TypeDefinition @'
 __WLAN__'@
-        $script:wlanPronta = $true
+        $global:wlanPronta = $true
       }
       $w = [FiloWlan.Wlan]::Elenco()
       $r.codice = $w.Codice; $r.interfacce = $w.Interfacce; $r.reti = @($w.Reti); $r.attuale = $w.Attuale
-    } catch { if ($script:wlanPronta) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
+    } catch { if ($global:wlanPronta) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
     $null = Scrivi ([ordered]@{ elenco = $r })
   }
 }
