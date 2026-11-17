@@ -278,6 +278,25 @@
     return fatto ? frase('Carta', ' spostata nella home') : frase('Spostare la carta', ' nella home');
   }
 
+  const OP_BARRA_SITI = { metti: 'aggiungi', aggiungi: 'aggiungi', togli: 'togli', rimuovi: 'togli', rinomina: 'rinomina', sposta: 'sposta', elenca: 'elenca', leggi: 'elenca' };
+  function opBarraSiti(a) { return OP_BARRA_SITI[String((a && (a.operazione ?? a.op)) || '').trim().toLowerCase()] || ''; }
+  // Il programma si mostra col percorso intero: è quello che partirà al clic.
+  function descriviBarraSiti(a, fatto) {
+    const op = opBarraSiti(a);
+    const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 80 ? `${x.slice(0, 79)}…` : x; };
+    const percorso = String((a && a.percorso) || '').trim();
+    const sito = corto(a && (a.indirizzo ?? a.url));
+    const voce = corto(a && a.voce);
+    const frase = (parti) => (fatto ? piatto(parti) : parti);
+    if (op === 'elenca') return fatto ? 'Letta la barra dei siti' : 'Leggere la barra dei siti';
+    if (op === 'aggiungi' && percorso) return frase([fatto ? 'Messo nella barra dei siti il programma ' : 'Mettere nella barra dei siti il programma ', cit(percorso, true)]);
+    if (op === 'aggiungi') return frase([fatto ? 'Messo nella barra dei siti ' : 'Mettere nella barra dei siti ', ...(sito ? [cit(sito)] : ['un sito'])]);
+    const chi = voce ? [cit(voce)] : ['una voce'];
+    if (op === 'togli') return frase([fatto ? 'Tolto dalla barra dei siti ' : 'Togliere dalla barra dei siti ', ...chi]);
+    if (op === 'rinomina') return frase([fatto ? 'Rinominato nella barra dei siti ' : 'Rinominare nella barra dei siti ', ...chi, ...(a && a.nome ? [' in ', cit(corto(a.nome))] : [])]);
+    return frase([fatto ? 'Spostato nella barra dei siti ' : 'Spostare nella barra dei siti ', ...chi]);
+  }
+
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
   // Si misura la cartella che la ricerca leggerà: `_cartella` la risolve il main come la risolve l'indice ('' = una di
   // serie o nessuna); senza, il nome pulito come lo pulisce lui (#1499).
