@@ -1,5 +1,5 @@
 // Le azioni di Filo sulle schede e sulle pagine (aprire, cercare, riaprire, zoom, stile, audio).
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const PageRead = require('../pageRead');
 const { daFilo, origineDi } = require('../handlers/origine');

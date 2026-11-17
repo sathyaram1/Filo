@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -619,7 +620,7 @@ describe('quello che da fuori arriva a un modello conta come letto, per qualunqu
     await gate.complete({ action: 'x', messages });
     await gate.stream({ action: 'x', messages });
     assert.deepEqual(visti, [messages, messages]);
-    const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+    const handlers = sorgenteHandlers();
     assert.ok(/ricordaEsterni:\s*\(messages\)\s*=>\s*SegretiLetti\.ricordaBuste\(messages\)/.test(handlers), 'il cancello di Filo non ricorda il contenuto esterno');
   });
 
@@ -916,7 +917,7 @@ function corpo(sorgente, inizio) {
 }
 
 describe('sentinella: ogni uscita passa dalla porta unica', () => {
-  const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const handlers = sorgenteHandlers();
   // executeFiloAction dichiara solo la provenienza dei cambi (#867) e passa tutto a eseguiAzioneFilo.
   const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
 
@@ -1005,7 +1006,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   // porta nel main, dove si apre davvero, qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta).
   test('ogni indirizzo che una pagina di Filo apre o legge passa prima dalla porta delle uscite', () => {
     const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
-    const handlers = src('main', 'services', 'handlers.js');
+    const handlers = sorgenteHandlers();
     const apri = corpo(handlers, 'async function apriDaFilo(');
     assert.ok(apri.indexOf('controllaUscita(') > 0 && apri.indexOf('controllaUscita(') < apri.indexOf('apri()'), 'apriDaFilo apre prima della porta');
     assert.match(handlers, /const SCHEMI_USCITA = \/\^\(\?:https\?\|mailto\|tel\|sms\):\/i;/);
@@ -1075,7 +1076,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.ok(!/dispatchEvent|inputEl\.value =|handleSlashCommand/.test(clic), 'il suggerimento passa dalla casella come se l\'avesse scritto l\'utente');
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
-    const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+    const handlers = sorgenteHandlers();
     assert.match(handlers, /(?:const|let) paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello && !m\.riga && !m\.daPagina\)/,
       'né la riga di un\'altra app né quello scritto nell\'Aiuto sopra un sito sono parole dell\'utente (#1508)');
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
@@ -1274,7 +1275,7 @@ test('la home riceve dal filo i verdetti delle frasi di Filo, anche dopo un riav
 
 describe('sentinella: nessun chiamante della porta prende un guasto per via libera', () => {
   const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
-  const handlers = src('main', 'services', 'handlers.js');
+  const handlers = sorgenteHandlers();
 
   test('la porta è costruita chiusa a guasto, e chi la chiama non la avvolge in un try', () => {
     assert.match(handlers, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);

@@ -1,4 +1,4 @@
-// I domini dei messaggi del main: ognuno registra i suoi tipi con on(tipo, fn) e riceve handlerCtx.
+// I domini dei messaggi del main, elenco nato da handlers.js: ognuno registra i suoi tipi con on(tipo, fn).
 // Ognuno si carica al suo turno, come prima della divisione: l'ordine è quello di registrazione, e un tipo
 // registrato due volte ferma l'avvio (on() in handlers.js).
 const DOMINI = [

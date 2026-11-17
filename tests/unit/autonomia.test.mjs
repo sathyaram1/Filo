@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -163,7 +164,7 @@ test('lezioni automatiche: con (a) partono a compito pulito anche senza guardian
   assert.equal(A.SENZA_GUARDIANO, 'pulito');
   assert.equal(A.parteSenzaChiedere(A.decideDettaglio({ livello: 'default', stato: 'pulito', costo: 2 }), 'pulito'), true);
   // Il main passa da qui.
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?SN_AUTONOMIA\.parteSenzaChiedere\(/);
 });
 
@@ -824,7 +825,7 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
     }
   }
   // Il dispatch: una sola sospensione, dopo la risposta del modulo.
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   const corpo = h.slice(h.indexOf('async function executeFiloAction('), h.indexOf("    switch (type) {\n      case 'NAVIGA'"));
   assert.equal((h.match(/\bneedsConfirm:/g) || []).length, 1, 'needsConfirm si decide in un posto solo');
   assert.ok(corpo.indexOf('decisioneAutonomia(') > 0 && corpo.indexOf('decisioneAutonomia(') < corpo.indexOf('needsConfirm:'),
@@ -954,7 +955,7 @@ test('il messaggio che Filo scrive da sé conta come lettura, ma non per il cost
   assert.equal(stato(4, [racconto, misto]), 'contaminato');
   const filoParla = readFileSync(join(ROOT, 'src', 'main', 'services', 'filoParla.js'), 'utf8');
   assert.match(filoParla, /const ESTERNO = globalThis\.SN_FILO_CONTESTO\.ESTERNO_RACCONTO/, 'un segno solo, scritto in filoContesto');
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   assert.match(h, /A\.fontiPerCosto\(fonti, c\)/, 'decisioneAutonomia filtra le fonti col costo dell\'azione');
 });
 
@@ -963,7 +964,7 @@ test('il costo che decide si calcola in un punto solo: la decisione e le letture
   assert.equal(A.costoReale({ costo: 2, campo: 'web', manopole: { web: { grave: true } } }), 3);
   assert.equal(A.costoReale({ costo: 3, campo: 'web', manopole: { web: { grave: true } } }), 3, 'la manopola non porta al 4');
   assert.equal(A.costoReale({ costo: 9 }), null);
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   assert.doesNotMatch(h, /costoEffettivo\(|difesa \? A\.COSTO_MAX/, 'il main chiede il costo a costoReale, non lo rifà');
   assert.match(h, /A\.costoReale\(/);
 });

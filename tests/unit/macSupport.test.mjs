@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -581,7 +582,7 @@ test('il sistema arriva al prompt dal main process', () => {
   // Il valore lo sa solo il main (`process.platform`): la pagina che manda il
   // payload non ha `process`. Se questo passaggio salta, il prompt ricade sul
   // ripiego Windows e su un Mac l\'assistente torna a proporre `C:\\`.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const src = sorgenteHandlers();
   assert.match(src, /sistema:\s*process\.platform/,
     'handlers.js non passa più il sistema al prompt della chat');
 });

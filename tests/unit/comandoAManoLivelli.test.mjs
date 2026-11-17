@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
@@ -30,7 +31,7 @@ test('il main lancia un comando scritto a mano solo dopo la risposta di SN_AUTON
 });
 
 test('la decisione è quella dei comandi di Filo: registro delle azioni e SN_AUTONOMIA, nella cartella della sessione', () => {
-  const h = leggi('src', 'main', 'services', 'handlers.js');
+  const h = sorgenteHandlers();
   const corpo = corpoDa(h, 'async function decisioneComandoAMano(', '\n}\n');
   assert.match(corpo, /type: 'ESEGUI_COMANDO'/);
   assert.match(corpo, /Levels\.ingressi\(action/);
@@ -54,7 +55,7 @@ test('#1840: la chiave in un comando battuto a mano l\'ha scritta l\'utente (la 
   const risposta = (richiesta) => A.decideDettaglio({ ...AL.ingressi({ type: 'ESEGUI_COMANDO', comando: cmd }, { richiesta }), livello: 'default', stato: 'pulito' }).risposta;
   assert.equal(risposta(cmd), 'conferma', 'battuto a mano: come il link con la stessa chiave scritta dall\'utente');
   assert.equal(risposta(''), 'no', 'incollato: la chiave non l\'ha scritta lui');
-  const corpo = corpoDa(leggi('src', 'main', 'services', 'handlers.js'), 'async function decisioneComandoAMano(', '\n}\n');
+  const corpo = corpoDa(sorgenteHandlers(), 'async function decisioneComandoAMano(', '\n}\n');
   assert.match(corpo, /Levels\.ingressi\(action, \{ impostazioni, richiesta: daFuori === true \? '' : cmd \}\)/);
 });
 

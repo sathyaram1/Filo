@@ -10,6 +10,7 @@ import { dirname, resolve, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import * as Letture from '../../scripts/lib/letture-esterne.mjs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
@@ -98,7 +99,7 @@ test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => 
 });
 
 test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privacy lo dice', () => {
-  const chiede = /ACTIONS\.HELP[\s\S]{0,600}Paths\.listByDomain\(/.test(leggi('src', 'main', 'services', 'handlers.js'));
+  const chiede = /ACTIONS\.HELP[\s\S]{0,600}Paths\.listByDomain\(/.test(sorgenteHandlers());
   legame(chiede, privacy, 'Filo chiede al server i percorsi già noti per quel sito', 'lettura dei percorsi dal server');
   legame(chiede, privacy, 'il nome del sito su cui apri l\'Aiuto', 'nome del sito fra le cose che arrivano al server');
   legame(chiede, privacy, 'Per chi usa l\'app fa sei cose', 'i percorsi fra i compiti del server');
@@ -219,7 +220,7 @@ test('a fine chat un modello le dà nome e tipo, dopo ogni scambio un altro sceg
   const require = createRequire(import.meta.url);
   require(join(ROOT, 'src', 'shared', 'constants.js'));
   require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
-  const H = leggi('src', 'main', 'services', 'handlers.js');
+  const H = sorgenteHandlers();
   const tetto = globalThis.SN_CONST.FILO_CHAT_TRIAGE_CHARS;
   const nomina = H.includes('ChatArchive.transcriptForTriage(messages, SN_CONST.FILO_CHAT_TRIAGE_CHARS)')
     && H.includes('runOneShot(ACTIONS.FILO_CHAT_TRIAGE, prompt)');

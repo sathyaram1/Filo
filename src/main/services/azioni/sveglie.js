@@ -1,5 +1,5 @@
 // Le azioni di Filo su timer, sveglie ed eventi del calendario.
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { broadcastLiveUpdate } = require('../broadcast');

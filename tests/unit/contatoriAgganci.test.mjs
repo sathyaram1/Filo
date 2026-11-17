@@ -7,6 +7,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -195,7 +196,7 @@ test('i menu a comparsa contano apertura, scelta con il posto e chiusura senza s
 // la sua via; una chiusura senza via non si conterebbe.
 test('la home manda reazioni e copie dell’elenco chiuso, e ogni chiusura di una chat dice come è finita', () => {
   const home = leggi('src', 'pages', 'dashboard', 'dashboard.js');
-  const handlers = leggi('src', 'main', 'services', 'handlers.js');
+  const handlers = sorgenteHandlers();
   const filo = leggi('src', 'main', 'services', 'handlers', 'filo.js');
   const dette = [...home.matchAll(/contaReazione\('([a-z_]+)'\)/g)].map((m) => m[1]);
   assert.deepEqual(dette.filter((v) => !C.REAZIONI.includes(v)), []);

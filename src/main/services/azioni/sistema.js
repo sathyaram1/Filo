@@ -1,5 +1,5 @@
 // Le azioni di Filo sul computer: comandi, schermo, aggiornamento, volume e reti, desktop, finestra.
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const PageRead = require('../pageRead');
 const Registro = require('../registroCambi');

@@ -1,5 +1,5 @@
 // Le azioni di Filo su preferenze, aspetto, intervista, segnalazioni, account e home.
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const Registro = require('../registroCambi');
 const { SN_CONST, SN_MSG } = globalThis;

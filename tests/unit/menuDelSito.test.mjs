@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -209,6 +210,6 @@ test('dalla chat: aggiungi e togli un sito, costo 1 come l\'annullo, e «questo 
   assert.equal(s.costo, 1);
   assert.equal(K.voce('menuDelSito.siti').livello, 1);
   const fs = require('node:fs');
-  const handlers = fs.readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const handlers = sorgenteHandlers();
   assert.match(handlers, /setter\.scrive\.includes\('menuDelSito\.siti'\)/);
 });

@@ -8,6 +8,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -342,7 +343,7 @@ test('ogni posa delle icone passa da una porta sola, e ognuna dice la sua via', 
   const viaBarra = [...barra.matchAll(/this\._posa\(([^;]*)\);/g)].map((m) => m[1]).join('\n');
   assert.match(viaBarra, /via: 'rimessa_nel_menu'/);
   assert.match(viaBarra, /origine: 'icona_barra'/);
-  assert.match(leggi('src/main/services/handlers.js'), /layoutIcone'\)\.posa\([\s\S]{0,200}via: 'chat'/);
+  assert.match(sorgenteHandlers(), /layoutIcone'\)\.posa\([\s\S]{0,200}via: 'chat'/);
   // «Altro…» della barra: le aperture e l'icona scelta lì.
   assert.match(barra, /'altro_del_menu', \{ aperto: true \}/);
   assert.match(barra, /'altro_del_menu', \{ icona: id \}/);

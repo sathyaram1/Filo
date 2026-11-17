@@ -1,5 +1,5 @@
 // I pezzi comuni ai moduli nati da handlers.js: finestre e schede del mittente, lo schermo, i contatori d'uso.
-// Libreria: niente registrazioni di messaggi qui.
+// Libreria nata da handlers.js: niente registrazioni di messaggi qui.
 
 const { BrowserWindow } = require('electron');
 

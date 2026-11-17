@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -405,7 +406,7 @@ test('l\'indirizzo di un\'azione che esce in rete si legge da un posto solo, per
   assert.equal(AL.indirizzoDi({ url: '', indirizzo: 'https://y.it' }), 'https://y.it');
   assert.ok(AL.describe({ type: 'LEGGI_PAGINA', indirizzo: 'https://z.it/?d=1', _exfil: true }).includes('https://z.it/?d=1'));
   const { readFileSync } = require('node:fs');
-  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const src = sorgenteHandlers();
   assert.ok(!/action\.url\s*(\?\?|\|\|)/.test(src), 'handlers.js legge l\'indirizzo con SN_ACTION_LEVELS.indirizzoDi');
 });
 

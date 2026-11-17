@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const R = require('../../src/shared/restanoAperte.js');
@@ -25,7 +26,7 @@ test('la frase nomina ogni motivo col suo numero', () => {
 test('chat e menu della linguetta usano lo stesso modulo, senza copie', () => {
   // Le parole del diario, in diretta e nella chat riaperta, le dice SN_ESITO (#1294).
   const diario = readFileSync(new URL('../../src/shared/esitoAzione.js', import.meta.url), 'utf8');
-  const handlers = readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
+  const handlers = sorgenteHandlers();
   const shell = readFileSync(new URL('../../src/renderer/shell.js', import.meta.url), 'utf8');
   assert.match(diario, /SN_RESTANO_APERTE/);
   for (const f of ['../../src/shared/esitoAzione.js', '../../src/shared/righeAttivita.js', '../../src/pages/dashboard/dashboard-attivita.js']) {

@@ -1,5 +1,5 @@
 // Le azioni di Filo sul proxy per paese delle schede e dei domini.
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const { winOf, targetWebTab, refreshProxyRulesAllWindows } = require('../handlersComuni');
 const { proxyNonDisponibile } = require('../osservazioniPerModello');

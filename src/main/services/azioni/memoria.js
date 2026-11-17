@@ -1,5 +1,5 @@
 // Le azioni di Filo sulla memoria, sulle chat archiviate e sulle pagine del filo.
-// Ogni file esporta la tabella tipo -> funzione che eseguiAzioneFilo (handlers.js) consulta dopo il preambolo.
+// Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const Defaults = require('../defaultsStore');
 const { SN_CONST, SN_MSG } = globalThis;

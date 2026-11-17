@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -31,7 +32,7 @@ test('l\'handler, il «Riprova» e il manifesto chiedono all\'interruttore', () 
   assert.match(handler, /funzioniBuild'\)\.salvaVideoInStreaming\) return \{ ok: false, spento: true \}/);
   const riprova = misc.slice(misc.indexOf('quandoRiprovaStreaming('));
   assert.match(riprova.slice(0, riprova.indexOf('Streaming.salva(')), /funzioniBuild'\)\.salvaVideoInStreaming\) return;/);
-  const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const handlers = sorgenteHandlers();
   assert.match(handlers, /aperti\.streaming = require\('\.\/funzioniBuild'\)\.salvaVideoInStreaming/);
 });
 
