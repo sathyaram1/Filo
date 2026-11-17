@@ -140,6 +140,7 @@ test('un elenco che il sistema non finisce in tempo dice cosa è successo; uno a
   await voce(page, 'bluetooth').click();
   await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 8_000 });
   await expect(riquadro(page).locator('.dash-sis-parziale')).toHaveText(/ne può mancare qualcuno/);
+  await riquadro(page).screenshot({ path: 'tests/.shots/2394-bluetooth-parziale.png' }).catch(() => {});
   const prima = (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
   await opzione(page, 'Rileggi l\'elenco').click();
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(prima + 1);
