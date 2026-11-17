@@ -3105,6 +3105,7 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       Sistema.applicaImpostazioni(settings);
+      BarraSiti.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
     } catch (_) {}
