@@ -241,6 +241,26 @@ test('un albero senza lo script del driver non resta mai col lato di main muto: 
   git(s.work, ['rebase', '--abort']);
 });
 
+test('uno script del driver che non arriva in fondo (node che non parte, un errore) lascia i marcatori, mai il solo lato di main', () => {
+  const s = scena();
+  git(s.work, ['checkout', '-qb', 'worker/rotto']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'il lavoro');
+  s.suMain((d) => {
+    scrivi(d, SCRIPT, "throw new Error('driver rotto');\n");
+    scrivi(d, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'di main'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  });
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  assert.notEqual(r.status, 0);
+  assert.deepEqual(inConflitto(s.work), [NOVITA]);
+  const testo = leggi(s.work);
+  assert.match(testo, /^<<<<<<< /m);
+  assert.match(testo, /'del ramo'/, 'la riga del ramo resta davanti a chi risolve');
+  assert.match(testo, /'di main'/);
+  git(s.work, ['rebase', '--abort']);
+});
+
 test('la config: idempotente, e il comando è quello del modulo', () => {
   const s = scena();
   assert.deepEqual(ensureDriverNovita(s.work), { ok: true, cambiato: false });
