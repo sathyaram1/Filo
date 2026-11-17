@@ -181,6 +181,7 @@ const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
 
 function chiudiFinestra() {
   const win = finestrellaDavanti() || finestra();
+  if (win && nonVista(win)) { require('./window').portaDavanti(win); return; }
   try { win && win.close(); } catch (_) {}
 }
 
