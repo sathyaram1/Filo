@@ -118,6 +118,36 @@ class AvvisiSopraPagina {
     this._invia();
   }
 
+  // #2390 — la colonna della home è della finestra: ogni sua home la riceve quando cambia.
+  _allaHome() {
+    const firma = JSON.stringify(this.stato.colonna);
+    if (firma === this.firmaColonna) return;
+    this.firmaColonna = firma;
+    const M = globalThis.SN_MSG && globalThis.SN_MSG.MSG;
+    if (!M) return;
+    const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
+    for (const { wc, inVista } of homeDi(this.win)) {
+      try { spingiAllaScheda(wc, { type: M.AVVISI_COLONNA, carte: this.stato.colonna }, { inVista }); } catch (_) {}
+    }
+  }
+
+  // Chi è la home che chiede: una di questa finestra, o nessuna.
+  dellaFinestra(wc) {
+    return homeDi(this.win).some((v) => v.wc === wc);
+  }
+
+  colonna() { return this.stato.colonna; }
+
+  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista.
+  azioneDallaHome(id, azione) {
+    const i = testo(id);
+    const a = testo(azione);
+    if (!AZIONE_HOME.test(a) || !this.stato.colonna.some((c) => c.id === i)) return false;
+    if (!this.win || this.win.isDestroyed()) return false;
+    try { this.win.webContents.send('avvisi:azione', { id: i, azione: a }); } catch (_) { return false; }
+    return true;
+  }
+
   // Ogni carta che la cornice mette a schermo, o il cui testo cambia, è un avviso visto: entra nel filo da qui, chiunque
   // l'abbia mandato (#1561). Una rinnovata con lo stesso testo no.
   _nelFilo(carte) {
