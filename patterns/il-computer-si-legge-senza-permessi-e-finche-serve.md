@@ -83,6 +83,27 @@ con Internet o con un gateway (quelle virtuali lato computer non ne hanno). Una
 rotta che non si riesce a leggere non dice offline. Wi-Fi o cavo e il nome li
 dice la piattaforma.
 
+## Uno stato vecchio non si mostra come vero (#2394)
+
+Con la home lasciata a lungo il lettore dormiva e lo stato restava quello di
+ore prima: riaperta la home, il Bluetooth acceso da Windows nel frattempo
+risultava «spento». Adesso il main dà Bluetooth e Wi-Fi letti più di due giri
+fa in `vecchio`, e la home li dice «Leggo lo stato…» senza interruttore finché
+la lettura nuova arriva (annunciata anche se uguale a quella di prima).
+«Unknown» di Windows vale «non so», non spento. L'acceso letto con l'elenco dei
+dispositivi è una lettura vera della radio e rinfresca il main.
+
+## Su Windows gli elenchi li legge il lettore già acceso (#2394)
+
+Avviare un PowerShell nuovo per ogni apertura del riquadro costava da solo
+decine di secondi sul PC dell'owner. Gli elenchi (dispositivi abbinati, reti
+conosciute) si chiedono al PowerShell del lettore, una riga su stdin, e la
+risposta torna come riga `{"elenco": …}`; lo script a parte resta la riserva se
+il lettore non può. Le reti conosciute usano wlanapi, che vuole la posizione:
+il lettore le legge solo su richiesta, mai nel suo giro, e la home non le
+precarica (gli abbinati sì, all'apertura). La sentinella è in
+`tests/unit/statoSistema.test.mjs`.
+
 ## Su Windows lo script raccoglie, la scelta la fa il JavaScript (#1114)
 
 Col Wi-Fi collegato la home mostrava il globo: il gestore delle reti, chiamato da
