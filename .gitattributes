@@ -40,6 +40,10 @@
 # script che non parte. Dichiarato a parte perche' si legga senza dedurlo.
 *.sh text eol=lf
 
+# Nel rebase un conflitto sul solo registro delle novità lo risolve il driver, tenendo le righe dei due lati (#2224).
+# Dove il driver non è impostato (Actions, GitHub) git fa la sua fusione di testo: scripts/lib/driver-novita.mjs.
+src/shared/patchNotes.js merge=novita
+
 # Binari: niente conversione, nemmeno per sbaglio. `text=auto` li riconosce da
 # solo, ma scriverlo evita che un file "quasi testo" ci finisca dentro.
 *.png binary
