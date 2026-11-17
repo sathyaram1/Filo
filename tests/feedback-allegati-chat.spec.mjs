@@ -86,6 +86,7 @@ test('un\'immagine che la chat non ha non si inventa, e una tolta nel riquadro n
   expect((await confirmState(page)).notaAllegati).toContain('«immagine 7» non è in questa chat');
   expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.allegato('immagine:1'))).toBe(true);
   expect((await confirmState(page)).allegati[0].tolto).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/feedback-allegati-chat-scuro.png' });
   await conferma(page);
 
   await expect.poll(async () => (await depositati(app)).length, { timeout: 10_000 }).toBe(1);
