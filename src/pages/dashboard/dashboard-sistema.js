@@ -258,7 +258,6 @@
       righeInfo(box.info, x);
       box.info.dataset.testo = testo;
     }
-    box.copia = x.copia;
     aggiornaComandi(x);
   }
 
