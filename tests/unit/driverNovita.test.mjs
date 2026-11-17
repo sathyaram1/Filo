@@ -9,7 +9,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } fro
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { COMANDO, NOME, SCRIPT, ensureDriverNovita, etichettaDaFatti, unisciNelRebase } from '../../scripts/lib/driver-novita.mjs';
+import { COMANDO, NOME, SCRIPT, ensureDriverNovita, etichettaDaFatti, hunkDa, mossaSuOurs, unisciNelRebase } from '../../scripts/lib/driver-novita.mjs';
 import { registroDa } from '../../scripts/lib/novita-in-cima.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
