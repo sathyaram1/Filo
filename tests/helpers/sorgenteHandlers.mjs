@@ -29,3 +29,19 @@ export function percorsiDiHandlers() {
 export function sorgenteHandlers() {
   return fileDiHandlers().map((f) => readFileSync(f, 'utf8')).join('\n');
 }
+
+// I casi di eseguiAzioneFilo, uno per tipo: le tabelle tipo -> funzione di services/azioni/ e il corpo di ogni funzione.
+export function casiDelleAzioni() {
+  const casi = [];
+  for (const f of fileDiHandlers().filter((p) => /[\\/]azioni[\\/]/.test(p))) {
+    const testo = readFileSync(f, 'utf8');
+    const tabella = /\nmodule\.exports = \{\n([\s\S]*?)\n\};/.exec(testo);
+    if (!tabella) throw new Error(`${relative(ROOT, f)} non esporta più la tabella in \`module.exports = { TIPO: funzione }\``);
+    for (const [, tipo, nome] of tabella[1].matchAll(/^\s+([A-Z_]+): (\w+),$/gm)) {
+      const i = testo.indexOf(`async function ${nome}(`);
+      if (i < 0) throw new Error(`${relative(ROOT, f)}: ${tipo} punta a ${nome}, che non c'è`);
+      casi.push({ tipo, corpo: testo.slice(i, testo.indexOf('\n}\n', i) + 2) });
+    }
+  }
+  return casi;
+}
