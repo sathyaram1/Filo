@@ -205,6 +205,8 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
   await modelloFinto(app, [
     { toolCalls: [{ id: 'b1', name: 'BARRA_SITI', arguments: JSON.stringify({ operazione: 'aggiungi', indirizzo: 'youtube.com', nome: 'YouTube' }) }] },
     { text: 'Fatto, YouTube è nella barra.' },
+    { toolCalls: [{ id: 'b2', name: 'BARRA_SITI', arguments: JSON.stringify({ operazione: 'ripiega' }) }] },
+    { text: 'Ripiegata.' },
   ]);
   try {
     await page.locator('#input').fill('metti youtube nella barra');
@@ -212,12 +214,13 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
     await expect(page.locator('.dash-bubble-filo', { hasText: 'YouTube è nella barra' })).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#barraSiti .dash-barra-voce[aria-label="YouTube"]')).toBeVisible();
     expect((await salvate(app)).map((v) => v.url)).toEqual(['https://youtube.com/']);
+    // Ripiegare chiesto a Filo è la stessa impostazione della freccia; la risposta arrivata intanto accende la freccia.
+    await page.locator('#input').fill('ripiega la chat');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('#threadView')).toBeHidden({ timeout: 10_000 });
+    await expect(page.locator('#ripiegaChat')).toHaveAttribute('data-nuovo', '1');
+    expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).chatRipiegata)).toBe(true);
   } finally { await ripristina(app); }
-  // Ripiegare chiesto a Filo è la stessa impostazione della freccia.
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ chatRipiegata: true }));
-  const r = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('ripiega la chat', 'sì'));
-  expect(r.partial).toEqual({ chatRipiegata: true });
-  await expect(page.locator('#threadView')).toBeHidden();
   // Nascondere la barra dalle Preferenze la toglie dalla home.
   await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ barraSiti: { visibile: false }, chatRipiegata: false }));
   await expect(page.locator('#barraSiti')).toBeHidden();
