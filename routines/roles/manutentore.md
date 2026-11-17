@@ -262,8 +262,9 @@ la ripresa, con la stessa consegna del primo lavoro, purché il ramo non porti n
 
 I rilievi hanno tre livelli, misurati sull'obiettivo del feedback (la scala sta nel ruolo di chi verifica); un difetto
 fuori dall'obiettivo e non introdotto dal ramo esce in un feedback nuovo senza livello, e lo classifichi come ogni
-altro. I **bilanci** dei giri di correzione (`cap3`, `cap2`, `cap1` in `config/routines`) li gestisci tu: si parte da
-3/1/0, tre giri per i rilievi di livello 3, uno per il 2, nessuno per l'1 (decisione dell'owner dell'08/11/2026). Un
+altro. I **bilanci** dei giri di correzione (`cap3`, `cap2`, `cap1` in `config/routines`) e il tetto totale li
+gestisci tu (`bilanci`): si parte da 3/1/0, tre giri per i rilievi di livello 3, uno per il 2, nessuno per l'1
+(decisione dell'owner dell'08/11/2026), e da un tetto di 6 verifiche. Un
 interno messo da parte nasce a 1, a ogni livello: se serve, lo metti tu nell'ordine. Un
 rilievo su una **scelta difficile da disfare** (`?!`: dati degli utenti, formati su disco) ferma il lavoro e arriva a
 te con la sua domanda: se la scelta la regge un principio del registro o è di processo, rispondi con una nota; se
