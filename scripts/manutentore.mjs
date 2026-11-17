@@ -1314,6 +1314,8 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   novita | novita consegna <file.json> | chat [--stampa]
   feedback "<titolo>" - [--priorita P] [--server]   (testo da stdin; --server: il codice sta nel server) | domanda <file.json> | domanda-fine <ruolo> - | --togli
   registro [parole] | spesa
+  l5 | l5 approva <id> | l4 | l4 salta <N> <sha>   (L5 e controllo bocciato: solo lavori fidati a catena pulita)
+  bilanci [--cap3 N] [--cap2 N] [--cap1 N] [--tetto N] | passa <N> [perché]   (giri finiti: fallo passare con un figlio)
   transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
 async function leggiStdin() {
