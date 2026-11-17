@@ -889,6 +889,16 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
   });
+  // #2390 — con Filo non davanti l'avviso della shell diventa una notifica del sistema; se non può, resta nella finestra.
+  const AvvisoSistema = require('./services/avvisoSistema');
+  AvvisoSistema.avvia();
+  ipcMain.handle('avvisi:davanti', () => AvvisoSistema.davanti());
+  ipcMain.handle('avvisi:sistema', (event, d) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win || !d || typeof d !== 'object') return false;
+    const testo = (v) => (typeof v === 'string' ? v : '');
+    return AvvisoSistema.mostra(win, { uid: testo(d.uid).slice(0, 80), testo: testo(d.testo), titolo: testo(d.titolo), chiave: testo(d.chiave).slice(0, 200) });
+  });
 
   // ─── conferme di Filo chieste da un sito (sopra la sua scheda, #592.6) ───────
   ipcMain.handle('filo:conferma', (event, richiesta) => chiediConferma(event, richiesta));
