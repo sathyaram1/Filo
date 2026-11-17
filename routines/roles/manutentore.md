@@ -118,7 +118,8 @@ scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se
   (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
-A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
+A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, decidi le
+approvazioni in attesa (`l5` e `l4`: scadono in una settimana, e finché non decidi le decide l'owner), correggi
 ordine e N se qualcosa è cambiato, poi aggiorna nel taccuino le sezioni cambiate. Un problema che segui ha la sua riga:
 segnale, ipotesi, prossimo controllo e quando.
 
