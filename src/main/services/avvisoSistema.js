@@ -4,8 +4,11 @@
 
 const path = require('node:path');
 
-// Nelle prove la finestra non si mostra e non ha mai il fuoco: lì Filo è davanti finché una prova non dice altro.
-let perProva = process.env.FILO_TEST_DAVANTI === '1' ? true : null;
+// Nelle prove la finestra non si mostra e non ha mai il fuoco: lì Filo è davanti finché una prova non dice altro, e
+// la notifica si scrive in `registroProva` invece di arrivare al sistema (sul contenitore non c'è chi la mostra).
+const IN_PROVA = process.env.NODE_ENV === 'test';
+let perProva = IN_PROVA ? true : null;
+const registroProva = [];
 let annunciato = null;
 let programmato = false;
 let avviato = false;
