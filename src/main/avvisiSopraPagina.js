@@ -109,6 +109,7 @@ class AvvisiSopraPagina {
   aggiorna(stato) {
     this.stato = pulisci(stato);
     this._nelFilo(this.stato.carte);
+    this._allaHome();
     if (!this.stato.carte.length) {
       if (this.vista) { this._invia(); this.posa(); }
       return;
