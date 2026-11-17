@@ -333,7 +333,8 @@ class AvvisiSopraPagina {
 
   _invia() {
     if (!this.pronta || !this.vista) return;
-    try { this.vista.webContents.send('avvisi:stato', this.stato); } catch (_) {}
+    const carte = this.stato.carte.map((c) => ({ ...c, svg: svgIcona(c.icona) }));
+    try { this.vista.webContents.send('avvisi:stato', { ...this.stato, carte, colonna: undefined }); } catch (_) {}
   }
 
   _vista() {
