@@ -76,7 +76,7 @@ function etichette(cwd) {
  * blocco in cima della base nuova. PURA. → { ok: true, src } | { ok: false, motivo }
  */
 export function unisciNelRebase({ base, ours, theirs, manifesto, oggi }) {
-  const r = uniscaNovita({ base, main: ours, ramo: theirs, manifesto, oggi });
+  const r = novitaFusione().uniscaNovita({ base, main: ours, ramo: theirs, manifesto, oggi });
   return r.ok ? { ok: true, src: r.src } : { ok: false, motivo: r.motivo };
 }
 
