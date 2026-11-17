@@ -746,7 +746,23 @@
         selectionBg,
         // Un sì vero (clic o invio) vale solo da qui: prima è il gesto partito per altro (#592).
         pronto: !!(active.pronto && active.pronto()),
+        allegati: Array.from(active.root.querySelectorAll('.sn-confirm-allegato')).map((t) => {
+          const img = t.querySelector('img');
+          return {
+            id: t.dataset.id || '', tolto: t.classList.contains('sn-tolto'), immagine: !!img,
+            caricata: !!(img && img.complete && img.naturalWidth > 0), larghezza: t.getBoundingClientRect().width,
+          };
+        }),
+        notaAllegati: (q('.sn-confirm-allegati-nota') && !q('.sn-confirm-allegati-nota').hidden && q('.sn-confirm-allegati-nota').textContent) || '',
       };
+    },
+    // Toglie o rimette un allegato, come un clic sulla sua miniatura.
+    allegato(id) {
+      if (!active) return false;
+      const t = Array.from(active.root.querySelectorAll('.sn-confirm-allegato')).find((x) => x.dataset.id === String(id));
+      if (!t) return false;
+      t.click();
+      return true;
     },
     // Clicca un bottone: which = 'ok' | 'cancel' | 'danger' | 'altro'.
     // Ritorna false se non c'è dialogo, bottone assente o disabilitato.
