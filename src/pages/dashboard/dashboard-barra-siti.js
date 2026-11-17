@@ -282,7 +282,7 @@
       e.preventDefault();
       e.stopPropagation();
       const url = String(dt.getData('text/uri-list') || '').split(/\r?\n/).find((r) => r && !r.startsWith('#'));
-      if (url) muovi({ tipo: 'aggiungi', url, nome: String(dt.getData('text/plain') || '').trim() === url ? '' : '' });
+      if (url) muovi({ tipo: 'aggiungi', url });
     }
   }
   // Fuori dalla barra (non nel campo, che prende l'indirizzo) una voce trascinata si toglie; Esc non lascia niente.
