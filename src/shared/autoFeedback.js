@@ -159,6 +159,10 @@
       .replace(/([aeiou])'(?![a-z0-9])/g, '$1');
   }
 
+  function isHowtoQuestion(text) {
+    return HOWTO_QUESTION_RE.test(normalizzaDomanda(text));
+  }
+
   // Match puro coi titoli e le descrizioni del manifesto: l'id stabile della voce, o null.
   function guessCapabilityId(replyNorm, capabilities) {
     if (!capabilities || !Array.isArray(capabilities)) return null;
