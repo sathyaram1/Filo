@@ -386,7 +386,10 @@
       titolo: a.titolo || TITOLO_DA_ICONA[a.icona] || 'Filo', stato: a.testo, lungo: true,
       principale: azioni[0] ? { ...azioni[0], forte: true } : { etichetta: 'Chiudi', fai: chiudi },
       secondaria: azioni[0] ? (azioni[1] || { etichetta: 'Chiudi', fai: chiudi }) : null,
-      altreVoci: azioni.slice(2),
+      // Come «Chiudi tutti» della pila nell'angolo: più avvisi volati qui si tolgono con un gesto.
+      altreVoci: dati.cornice.length > 1
+        ? [...azioni.slice(2), { etichetta: 'Chiudi tutti gli avvisi', fai: () => { for (const x of dati.cornice) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); } }]
+        : azioni.slice(2),
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: a.testo,
     };
