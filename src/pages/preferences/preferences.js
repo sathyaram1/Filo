@@ -1975,6 +1975,7 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('barraSitiVisibile').addEventListener('change', persist);
     for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
