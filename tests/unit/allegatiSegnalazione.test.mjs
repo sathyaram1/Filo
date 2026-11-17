@@ -91,7 +91,7 @@ test('oltre i limiti non si taglia: si rifiuta col numero', () => {
   assert.equal(AS.oltreIlimiti(sei.slice(0, 5)), '');
   const grosso = 'data:image/png;base64,' + 'A'.repeat(Math.ceil((4 * 1024 * 1024 + 10) * 4 / 3));
   const g = AS.payload({ text: 'x' }, [{ id: 'immagine:1', tipo: 'immagine', nome: 'grande.png', dataUrl: grosso }]);
-  assert.match(g.errore, /«grande\.png» non può partire \(troppo grande: 4,0 MB, al massimo 4,0 MB\)/);
+  assert.match(g.errore, /«grande\.png» non può partire \(troppo grande: 4,1 MB, al massimo 4,0 MB\)/);
   const rotto = AS.payload({ text: 'x' }, [{ id: 'file:/a/x.html', tipo: 'file', nome: 'x.html', problema: 'tipo di file non ammesso' }]);
   assert.match(rotto.errore, /tipo di file non ammesso/);
 });
