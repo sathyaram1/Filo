@@ -380,8 +380,8 @@
   // si legge già quando la home si apre, prima del clic.
   const ultimiElenchi = { bluetooth: null, wifi: null };
   const ELENCO_FRESCO_MS = 60 * 1000;
-  function leggiElenco(cosa) {
-    const p = comanda({ cosa, elenca: true });
+  function leggiElenco(cosa, { precarica = false } = {}) {
+    const p = comanda({ cosa, elenca: true, ...(precarica ? { precarica: true } : {}) });
     p.then((r) => { if (r && r.ok && Array.isArray(r.elenco)) ultimiElenchi[cosa] = { r, quando: Date.now() }; });
     return p;
   }
