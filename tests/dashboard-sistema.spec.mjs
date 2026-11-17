@@ -181,7 +181,7 @@ test('un sito non legge il nome della rete né dei dispositivi', async ({ app })
   expect(JSON.stringify(r)).not.toContain('Casa di Anna');
 });
 
-test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquadro e dalle Preferenze', async ({ app, shell }) => {
+test('tasto destro: dettagli, nascondi; la voce torna dallo stesso riquadro e dalle Preferenze', async ({ app, shell }) => {
   await finto(app, PIENO);
   const page = await newtab(app);
   await expect(voce(page, 'batteria')).toBeVisible({ timeout: 8_000 });
