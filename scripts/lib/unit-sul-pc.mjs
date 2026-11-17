@@ -5,7 +5,8 @@
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, relative, sep } from 'node:path';
 import { isRoutineInstance } from './routine-role.mjs';
-import { gitIn, refspecMain } from './unit-sulla-fusione.mjs';
+// Da git-main e non da unit-sulla-fusione: run-unit-tests gira coi segreti e non deve caricare chi maneggia le novità.
+import { gitIn, refspecMain } from './git-main.mjs';
 
 /**
  * `1` forza la regola del PC dell'owner (il finish la passa al lanciatore); `0` la toglie a chi sceglie i file da sé,
