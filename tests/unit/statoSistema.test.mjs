@@ -379,8 +379,18 @@ test('Windows: un PowerShell che muore subito si riprova tre volte, poi il letto
 
 test('Windows: lo script non chiede permessi e non usa le API del Wi-Fi, e scrive solo ASCII', () => {
   const s = L.SCRIPT_WINDOWS;
-  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s),
+  // Le reti conosciute (wlanapi, che da Windows 11 24H2 vuole la posizione) solo quando l'utente apre il riquadro del
+  // Wi-Fi e la pagina lo chiede (#2394): il giro delle letture non le tocca.
+  const giro = s.slice(s.indexOf('while ($true)'));
+  const risposte = /function Rispondi[\s\S]*?\n}\n/.exec(s)[0];
+  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s.replace(risposte, '')),
     'una lettura che vuole un permesso (radio, posizione) si omette, non si chiede');
+  assert.ok(!/Wlan|Rispondi \$|ElencoBt/.test(giro.replace(/Rispondi \$riga\.Trim\(\)/, '')), 'il giro risponde solo alle richieste, non legge elenchi da sé');
+  for (const parte of [L.scriptWindows(1)]) assert.ok(!/RequestAccessAsync|netsh|Geolocat|GetConnectedSsid/i.test(parte));
+  assert.ok(!/"/.test(require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'))._interni.PS_ELENCO_BT),
+    'niente virgolette doppie neanche nell\'elenco dei dispositivi, che il lettore incorpora');
+  // La riga di comando di Windows sta in 32.767 caratteri, virgolette protette comprese.
+  assert.ok(JSON.stringify(L.scriptWindows(123456)).length < 30000);
   assert.match(s, /GetProcessById\(\$genitore\)/);
   assert.match(s, /\[regex\]::Replace\(\$json, '\[\^ -~\]'/, 'l\'uscita è tutta ASCII: la console non può storpiare un nome');
   assert.match(s, /OutputEncoding/);
