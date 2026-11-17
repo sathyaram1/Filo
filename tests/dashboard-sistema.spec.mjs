@@ -194,17 +194,16 @@ test('tasto destro: dettagli, nascondi; la voce torna dallo stesso riquadro e da
   await page.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
 
-  // Da tastiera: Invio apre lo stesso riquadro, le frecce scorrono le voci, Copia copia la frase.
+  // Da tastiera: Invio apre lo stesso riquadro, le frecce scorrono le voci. «Copia» non c'è più (#2394).
   await voce(page, 'rete').focus();
   await page.keyboard.press('Enter');
   await expect(box.locator('.dash-sis-info')).toContainText('Collegato al Wi-Fi «Casa di Anna»');
-  // Prima di Copia ci sono i comandi della voce (#874): le frecce li attraversano.
-  const copiaInFuoco = () => box.getByText('Copia', { exact: true }).evaluate((el) => el === document.activeElement);
-  for (let i = 0; i < 10 && !(await copiaInFuoco()); i++) await page.keyboard.press('ArrowDown');
-  await expect(box.getByText('Copia', { exact: true })).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(box.getByText('Copiato', { exact: true })).toBeVisible();
-  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Collegato al Wi-Fi «Casa di Anna»');
+  await expect(box.getByText('Copia', { exact: true })).toHaveCount(0);
+  // Prima di Nascondi ci sono i comandi della voce (#874): le frecce li attraversano.
+  const nascondi = box.getByText('Nascondi la rete', { exact: true });
+  for (let i = 0; i < 10 && !(await nascondi.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('ArrowDown');
+  await expect(nascondi).toBeFocused();
+  await page.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
 
   await voce(page, 'batteria').click({ button: 'right' });
