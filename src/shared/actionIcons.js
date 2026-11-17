@@ -66,6 +66,7 @@
     RIMEDIO_CREDITI: 'credits',
     PULSANTE_PREFERENZE: 'options',
     CARTA_HOME: 'home',
+    BARRA_SITI: 'pin',
     ZOOM_PAGINA: 'zoomPagina',
     VOLUME: 'volume',
     BLUETOOTH: 'bluetooth',
