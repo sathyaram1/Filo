@@ -263,7 +263,7 @@
       const v = trascinata;
       const p = cadePrima(e.clientX, e.clientY);
       fineTrascino();
-      muovi({ tipo: 'sposta', id: v.id, prima: p });
+      muovi({ tipo: 'sposta', id: v.id, prima: p, cosa: v.nome });
       return;
     }
     if (portaFile(dt)) {
