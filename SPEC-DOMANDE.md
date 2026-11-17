@@ -550,7 +550,10 @@ rispondere.
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
-  d'origine con conversazione e note; `vive`, le altre domande vive
+  d'origine con conversazione e note (di uno riservato il testo arriva solo
+  nell'ambiente dei riservati, e segna il biglietto; fuori ne escono numero,
+  stato, motivo, priorità e fiducia, col segno `riservato`: § 5.1, #1928.5);
+  `vive`, le altre domande vive
   (`in_smistamento`, `aperta`, `in_lavorazione`) sullo stesso feedback
   d'origine, provvisorie comprese (#1928): dalla più recente, al più 20, con
   `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
