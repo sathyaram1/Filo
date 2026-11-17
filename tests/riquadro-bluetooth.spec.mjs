@@ -78,7 +78,10 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   await page.evaluate(() => {
     window.__visti = [];
     const el = document.querySelector('#sistema .dash-sis-voce[data-voce="bluetooth"]');
-    new MutationObserver(() => window.__visti.push(el.dataset.stato)).observe(el, { attributes: true, attributeFilter: ['data-stato'] });
+    // Solo i cambi: la voce ridisegnata uguale non è uno stato nuovo mostrato.
+    let ultimo = el.dataset.stato;
+    new MutationObserver(() => { if (el.dataset.stato !== ultimo) window.__visti.push((ultimo = el.dataset.stato)); })
+      .observe(el, { attributes: true, attributeFilter: ['data-stato'] });
     // La home torna davanti: chiede subito lo stato.
     document.dispatchEvent(new Event('visibilitychange'));
   });
