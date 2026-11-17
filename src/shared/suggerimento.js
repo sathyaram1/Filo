@@ -193,7 +193,9 @@
 
   const FOGLIO = `
     .tip {
-      box-sizing: border-box; display: block; max-width: 320px; max-height: var(--fumetto-altezza, 90vh); overflow: hidden;
+      box-sizing: border-box; display: block; max-width: 320px; max-height: var(--fumetto-altezza, 90vh);
+      overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain;
+      scrollbar-color: color-mix(in srgb, var(--fumetto-testo, CanvasText) 35%, transparent) transparent;
       padding: 4px 8px; border-radius: var(--sn-radius, 6px);
       font: 12px/1.35 var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
       white-space: pre-line; overflow-wrap: anywhere; text-align: left;
