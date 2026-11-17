@@ -38,14 +38,34 @@ export function ensureDriverNovita(root) {
   return { ok: true, cambiato };
 }
 
+function percorsoGit(cwd, nome) {
+  const p = gitIn(cwd, ['rev-parse', '--git-path', nome]);
+  if (!p.ok) return '';
+  const percorso = p.out.trim();
+  return isAbsolute(percorso) ? percorso : join(cwd, percorso);
+}
+
 /** Un rebase in corso nell'albero `cwd`: solo lì «ours» è la base nuova e «theirs» il commit del ramo. */
 export function inRebase(cwd) {
   return ['rebase-merge', 'rebase-apply'].some((d) => {
-    const p = gitIn(cwd, ['rev-parse', '--git-path', d]);
-    if (!p.ok) return false;
-    const percorso = p.out.trim();
-    return existsSync(isAbsolute(percorso) ? percorso : join(cwd, percorso));
+    const p = percorsoGit(cwd, d);
+    return Boolean(p) && existsSync(p);
   });
+}
+
+/** Il nome del commit in corso nel rebase, come lo scrive git nei marcatori («abc1234 (titolo)»). PURA. */
+export function etichettaDaFatti(fatti) {
+  const righe = String(fatti || '').split(/\r?\n/).filter((r) => /^\s*(p|pick|r|reword|e|edit|s|squash|f|fixup)\s+[0-9a-f]{4,}/.test(r));
+  const m = righe.length ? /^\s*\S+\s+([0-9a-f]+)\s*(?:#\s*)?(.*)$/.exec(righe[righe.length - 1]) : null;
+  if (!m) return 'theirs';
+  return m[2] ? `${m[1]} (${m[2].trim()})` : m[1];
+}
+
+// Git 2.43 non passa i nomi dei lati al driver (%X e %Y restano letterali): li ricostruisce chi fa la fusione di testo.
+function etichette(cwd) {
+  let fatti = '';
+  try { fatti = readFileSync(join(percorsoGit(cwd, 'rebase-merge'), 'done'), 'utf8'); } catch (_) { /* fusione, o rebase senza elenco */ }
+  return ['HEAD', 'base', fatti ? etichettaDaFatti(fatti) : (existsSync(percorsoGit(cwd, 'MERGE_HEAD')) ? 'MERGE_HEAD' : 'theirs')];
 }
 
 /**
