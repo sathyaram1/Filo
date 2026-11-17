@@ -217,11 +217,13 @@ test('Preferenze: i contatori sono accesi di serie, spenti buttano quello che as
   await pref.locator('#contatoriAttivi').scrollIntoViewIfNeeded();
   await pref.locator('#sec-contatori').screenshot({ path: `${SHOTS}/contatori-preferenze-scuro.png` });
 
-  // Dal link della sezione alla pagina Privacy, che dice cosa esce e come si spengono.
+  // «Cosa esce, nel dettaglio» porta alla privacy completa, sulla sezione dei contatori: la privacy breve non li
+  // racconta (#2563).
   await pref.locator('#contatoriPrivacy').click();
-  await expect.poll(() => pref.url(), { timeout: 8_000 }).toContain('transparency/transparency.html?doc=privacy');
+  await expect.poll(() => pref.url(), { timeout: 8_000 }).toContain('transparency/transparency.html?doc=privacy-completa#contatori-e-percorsi');
   await expect(pref.locator('body')).toContainText('Si spengono', { timeout: 8_000 });
   await expect(pref.locator('body')).toContainText('Manda i contatori anonimi');
+  await expect(pref.locator('#contatori-e-percorsi')).toBeInViewport({ timeout: 8_000 });
 });
 
 test('«spegni i contatori» in chat li spegne, butta quello che aspettava, e le Preferenze aperte seguono', async ({ app, shell, openTab }) => {
