@@ -1644,17 +1644,23 @@ async function segnaPreferito(d, si) {
 
 async function bluetooth(q) {
   if (q.acceso != null) return radio(q);
-  const elenco = await computer().btElenco();
-  if (!elenco.ok) return fallito(elenco.errore, q);
-  if (q.elenca) return { ok: true, cosa: 'bluetooth', elenco: elenco.dispositivi, acceso: elenco.acceso };
+  const letto = await computer().btElenco();
+  if (!letto.ok) return fallito(letto.errore, { ...q, elenca: true });
+  radioLetta('bluetooth', letto.acceso);
+  const elenco = { ...letto, dispositivi: rifinisciDispositivi(letto.dispositivi) };
+  const parziale = elenco.parziale ? { parziale: true } : {};
+  if (q.elenca) return { ok: true, cosa: 'bluetooth', elenco: elenco.dispositivi, acceso: elenco.acceso, ...parziale };
   const nomi = elenco.dispositivi.map((d) => d.nome);
-  const s = scegliNome(q.nome, nomi);
-  if (!s.scelto) {
-    const f = fallito(s.candidati ? 'ambiguo' : 'nessun-dispositivo', { ...q, nome: q.nome });
-    return { ...f, candidati: s.candidati || nomi };
+  const stesso = (a, b) => a === b || (!!normalizzaIndirizzo(a) && normalizzaIndirizzo(a) === normalizzaIndirizzo(b));
+  let d = q.indirizzo ? elenco.dispositivi.find((x) => stesso(x.indirizzo, q.indirizzo)) : null;
+  if (!d) {
+    const s = q.nome ? scegliNome(q.nome, nomi) : {};
+    if (!s.scelto) {
+      const errore = s.candidati ? 'ambiguo' : elenco.parziale ? 'elenco-parziale' : 'nessun-dispositivo';
+      return { ...fallito(errore, { ...q, nome: q.nome }), candidati: s.candidati || nomi };
+    }
+    d = elenco.dispositivi.find((x) => x.nome === s.scelto);
   }
-  const d = (q.indirizzo && elenco.dispositivi.find((x) => x.indirizzo === q.indirizzo && x.nome === s.scelto))
-    || elenco.dispositivi.find((x) => x.nome === s.scelto);
   if (q.preferito != null) {
     await segnaPreferito(d, q.preferito);
     return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, preferito: q.preferito };
