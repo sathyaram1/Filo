@@ -213,7 +213,8 @@ function shellInvocation(shell, command) {
 
 // Con la cartella tracciata PowerShell legge da stdin, come la dashboard: con `-Command <testo>` un throw
 // salterebbe la sonda, a meno di un try che però cambia gli errori (righePowerShell). Il resto va in argv.
-function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
+// `preludio: false` solo per chi scrive già tutto in ASCII (gli script di comandiSistema.js): chcp costa un secondo.
+function invocazione(shell, command, { trackCwd = false, mark = '', preludio = true } = {}) {
   if (trackCwd && resolveShell(shell) === 'powershell') {
     return {
       file: 'powershell.exe',
