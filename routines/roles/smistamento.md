@@ -12,7 +12,9 @@ Nel payload:
   esplorato: leggile prima di cercare da capo), e `legata` e `blocca` se ferma
   un lavoro;
 - `feedback`: il feedback da cui viene, se c'è, con stato, testo, note e
-  conversazione;
+  conversazione. Di uno riservato, fuori dall'ambiente dei riservati, arrivano
+  solo numero, stato, motivo e priorità, col segno `riservato`: non sai cosa
+  chiede;
 - `vive`: le altre domande vive (in smistamento, aperte, in lavorazione) su
   quel feedback, provvisorie comprese, ognuna con stato, titolo, problema,
   opzioni, consiglio, `blocca` e `provvisoria`, senza le note per gli agenti;
