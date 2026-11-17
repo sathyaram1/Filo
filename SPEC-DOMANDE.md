@@ -1152,7 +1152,10 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
     registro delle decisioni (§ 3.6), che è testo di altre domande, o il
-    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2);
+    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2)
+    o di un feedback d'origine riservato (§ 3.5, #1928.5). La domanda del
+    terzo guasto (§ 3.8) la compone il server: nasce riservata se lo è il
+    feedback su cui nasce o il biglietto che ha scritto il guasto;
     l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
     riservato, cosa che il server sa già quando li crea. Le eccezioni sono
     due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,
