@@ -183,8 +183,8 @@
     const y = e && e.clientY ? e.clientY : r.bottom;
     const lista = [{ etichetta: v.tipo === 'app' ? `Avvia ${v.nome}` : `Apri ${v.nome}`, fai: () => apri(v) }];
     lista.push({ etichetta: 'Rinomina…', fai: () => rinomina(v, n) });
-    if (i > 0) lista.push({ etichetta: 'Sposta a sinistra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'su' }) });
-    if (i < voci.length - 1) lista.push({ etichetta: 'Sposta a destra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'giu' }) });
+    if (i > 0) lista.push({ etichetta: 'Sposta a sinistra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'su', cosa: v.nome }) });
+    if (i < voci.length - 1) lista.push({ etichetta: 'Sposta a destra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'giu', cosa: v.nome }) });
     if (v.tipo === 'sito') lista.push({ etichetta: 'Copia l\'indirizzo', fai: () => copia(v.url) });
     lista.push(null, { etichetta: 'Togli dalla barra', fai: () => togli(v) });
     global.SN_DASH_CARTE.apriMenu(x, y, lista);
