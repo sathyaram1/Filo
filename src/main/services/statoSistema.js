@@ -376,7 +376,7 @@ function Scrivi($oggetto) {
   return $j
 }
 __ELENCO_BT__
-$wlanPronta = $false
+$global:wlanPronta = $false
 function Rispondi([string]$cosa) {
   if ($cosa -eq 'bluetooth') {
     try { $e = ElencoBt } catch { $e = [ordered]@{ errore = 'eccezione' } }
