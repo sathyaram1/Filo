@@ -313,7 +313,13 @@ test('su Mac, senza la finestra principale, «Vai a un indirizzo» la ridà e ap
 // Con la finestrella di accesso davanti le voci della scheda agiscono su di lei, con la principale aperta o chiusa: chi
 // sta nella finestrella è nella stessa situazione (#2031.2). Il sito dietro, che aspetta l'accesso, non si tocca: ha
 // una pagina prima e un segno che una ricarica porterebbe via, così una voce finita su di lui si vede.
-const segnaPagina = (hash) => `(() => { location.hash = ${JSON.stringify(hash)}; window.__segno2031 = 1; return true; })()`;
+// Col gesto dell'utente: un passo di storia nato senza lo salta l'Indietro del browser, e la prova non vedrebbe niente.
+const segnaPagina = (app, finestrella, hash) => app.evaluate(async ({ BrowserWindow }, [b, h]) => {
+  const tutte = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const w = b ? tutte.find((x) => !x._filoTabs && x.webContents.getURL().startsWith(b)) : tutte.find((x) => x._filoTabs && !x._filoIncognito);
+  const wc = b ? w.webContents : w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId).view.webContents;
+  await wc.executeJavaScript(`location.hash = ${JSON.stringify(h)}; window.__segno2031 = 1; true`, true);
+}, [finestrella, hash]);
 
 const laFinestrella = (app, base) => app.evaluate(async ({ BrowserWindow }, b) => {
   const f = BrowserWindow.getAllWindows().find((w) => { try { return !w.isDestroyed() && !w._filoTabs && w.webContents.getURL().startsWith(b); } catch (_) { return false; } });
