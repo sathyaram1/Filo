@@ -701,11 +701,11 @@
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
   // Nel range, o null se non è un numero (un campo vuoto non è uno zero).
-  function clampCap(n, min = AUTOMATION.CAP_MIN) {
+  function clampCap(n, min = AUTOMATION.CAP_MIN, max = AUTOMATION.CAP_MAX) {
     if (n === '' || n === null || n === undefined) return null;
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return null;
-    return Math.min(AUTOMATION.CAP_MAX, Math.max(min, n));
+    return Math.min(max, Math.max(min, n));
   }
 
   const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
