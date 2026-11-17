@@ -53,6 +53,7 @@ function avvisoQuandoPronta(testo, { chiave, entroMs = 5 * 60 * 1000, detto, azi
 
 // Toglie dalle cornici l'avviso con questa chiave, quando lo stato che diceva non c'è più.
 function ritiraAvviso(chiave) {
+  try { require('./avvisoSistema').ritira(chiave); } catch (_) {}
   try {
     const { BrowserWindow } = require('electron');
     for (const win of BrowserWindow.getAllWindows()) {
