@@ -1947,25 +1947,14 @@
       type: 'inline',
       onMount(el) {
         el.classList.add('sn-menu-segno', segno.segno === 'errore' ? 'sn-menu-segno-errore' : 'sn-menu-segno-suggerimento');
+        // Le righe le scrive il correttore: il fumetto del valore di un segnaposto dice le stesse (#1642).
         const scrivi = (s) => {
           el.textContent = '';
-          const perche = document.createElement('div');
-          const ripiego = s.cercando ? 'spell_segnaposto_cerco' : s.segno !== 'errore' ? 'spell_ocra_controlla'
-            : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
-          perche.textContent = s.motivo || I18n.t(ripiego);
-          el.appendChild(perche);
-          // La fonte del valore di un segnaposto (#1448), col giorno a cui il dato si riferisce.
-          if (s.fonteDato && s.fonteDato.nome) {
-            const fonte = document.createElement('div');
-            fonte.className = 'sn-menu-segno-citazione';
-            fonte.textContent = I18n.t('spell_segnaposto_fonte', [s.fonteDato.nome, s.fonteDato.data].filter(Boolean).join(', '));
-            el.appendChild(fonte);
-          }
-          if (s.citazione) {
-            const prova = document.createElement('div');
-            prova.className = 'sn-menu-segno-citazione';
-            prova.textContent = I18n.t('spell_ocra_prima', s.citazione);
-            el.appendChild(prova);
+          for (const r of SpellCheck.righeDelPerche(s)) {
+            const riga = document.createElement('div');
+            if (r.citazione) riga.className = 'sn-menu-segno-citazione';
+            riga.textContent = r.testo;
+            el.appendChild(riga);
           }
         };
         scrivi(segno);
