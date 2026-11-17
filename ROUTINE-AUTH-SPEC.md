@@ -283,6 +283,17 @@ rispettare.
   inventata, e il server non lo distingue ancora da una vera: la fiducia per
   sessione (§ 2, principio 6) ferma chi usa la propria sessione o la toglie,
   non chi la inventa. Aperto in #2044.
+- **Una sessione locale decide da sola se il suo biglietto nasce pulito**
+  (#1924.1, limite accettato dall'owner con D-263). La parola d'ordine di
+  sessione le toglie le azioni di consenso (segnare fidato, approvare fusioni,
+  archiviare), ma il biglietto locale nasce pulito se la sessione non dice di
+  essere sporca, e uno nuovo si prende quando si vuole. Una sessione che ha
+  letto un testo non fidato e ne segue le istruzioni prende un biglietto
+  pulito: quello che apre nasce fidato, i rami che dichiara risultano fidati e
+  la loro fusione salta L5. Il server non sa cosa la sessione ha letto prima di
+  chiedere. Chiuderlo vuole un gesto dell'owner a ogni biglietto pulito (nasce
+  non fidato, lo pulisce lui dalla Gestione): scartato perché costa ogni
+  giorno, contro un attacco mirato che sappia come si riparte puliti.
 
 ---
 

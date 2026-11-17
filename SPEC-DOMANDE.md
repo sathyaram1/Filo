@@ -141,7 +141,9 @@ Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
 Alla fine (hook) chiudono il biglietto se è sporco; uno pulito resta, perché la
 sessione si può riprendere senza nascere sporca. Quelli fermi da più di 30
 giorni, o di sessioni morte senza l'hook di fine, li chiude l'avvio di una
-sessione successiva.
+sessione successiva. Se il biglietto nasce pulito lo decide la sessione, e
+può prenderne uno nuovo quando vuole: limite accettato dall'owner (D-263),
+scritto in ROUTINE-AUTH-SPEC.md § 7.
 
 ### 1.3 Unire senza sporcare: la delega
 
