@@ -26,8 +26,10 @@ function svgIcona(nome) {
   if (!nome) return '';
   try {
     if (!globalThis.SN_ICONS) require('../shared/icons.js');
-    const f = globalThis.SN_ICONS && globalThis.SN_ICONS[nome];
-    return typeof f === 'function' ? f(16) : '';
+    const I = globalThis.SN_ICONS;
+    const f = I && Object.prototype.hasOwnProperty.call(I, nome) ? I[nome] : null;
+    const svg = typeof f === 'function' ? f(16) : '';
+    return typeof svg === 'string' && svg.startsWith('<svg') ? svg : '';
   } catch (_) { return ''; }
 }
 
