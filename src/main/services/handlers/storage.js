@@ -277,6 +277,7 @@ module.exports = function register(on, ctx) {
       () => scritte.has(K.CLIPBOARD_HISTORY) && clipboardChanged(),
       () => scritte.has('sitePermissions') && ctx.broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI }),
       () => scritte.has(K.FILO_CARTE_HOME) && require('../carteHome').leggi().then((l) => ctx.annunciaCarteHome(l, sender)),
+      () => scritte.has(K.FILO_BARRA_SITI) && require('../barraSiti').leggi().then((v) => ctx.annunciaBarraSiti(v, sender)),
       () => scritte.has(K.ICON_LAYOUT) && require('../layoutIcone').leggi().then((l) => l && require('../layoutIcone').annuncia(l)),
       () => [K.FILO_MEMORY, K.FILO_MEMORY_FONTI, K.FILO_LESSONS_BUFFER].some((k) => scritte.has(k))
         && globalThis.SN_FILO_MEMORY.viewForUser().then((v) => ctx.broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v })),
