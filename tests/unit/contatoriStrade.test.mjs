@@ -126,7 +126,7 @@ test('le pagine sono quelle di FILO_TAB_LABELS più quelle del feedback, e le fa
 
 test('ogni strada ha chi la conta, e le chiusure delle schede hanno la loro', () => {
   const sorgenti = ['src/main/shortcuts.js', 'src/main/tabs.js', 'src/main/tabs/tabZoom.js', 'src/main/window.js', 'src/main/menu.js',
-    'src/main/barraLaterale.js', 'src/main/ipc.js', 'src/main/services/handlers.js', 'src/main/services/handlers/nav.js',
+    'src/main/barraLaterale.js', 'src/main/ipc.js', ...percorsiDiHandlers(), 'src/main/services/handlers/nav.js',
     'src/main/services/handlers/contatori.js', 'src/renderer/shell.js', 'src/content/content.js', 'src/content/actions.js',
     'src/preload/page-preload.js', 'src/pages/dashboard/dashboard-comandi.js', 'src/pages/dashboard/dashboard-carte.js',
     'src/pages/dashboard/dashboard-attivita.js', 'src/pages/dashboard/dashboard.js'].map(leggi).join('\n');
