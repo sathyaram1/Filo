@@ -1102,7 +1102,15 @@ function offline() {
 
 // Le prove staccano il caricatore e la rete di un computer finto: il giro, l'annuncio e la home restano quelli veri.
 const _perProve = {
-  usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; ultimoPerFilo = null; return leggiAdesso(); },
+  usaLettore(fn) {
+    lettoreProve = typeof fn === 'function' ? fn : null; firma = null; ultimoPerFilo = null; letteRadio.bluetooth = 0; letteRadio.wifi = 0;
+    return leggiAdesso();
+  },
+  // Lo stato come se l'ultima lettura fosse di `ms` fa: il lettore che ha dormito.
+  invecchia(ms) {
+    if (stato) stato = { ...stato, letto: (stato.letto || 0) - ms };
+    for (const v of RADIO) letteRadio[v] = Math.max(0, (letteRadio[v] || 0) - ms);
+  },
   leggiOra: () => leggiAdesso(),
   attivo: () => !!giro,
   veglia(ms) { vegliaMs = Number(ms) > 0 ? Number(ms) : VEGLIA_MS; },
