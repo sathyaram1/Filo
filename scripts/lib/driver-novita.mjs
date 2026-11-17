@@ -76,24 +76,58 @@ function etichette(cwd) {
 }
 
 /**
- * I tre lati del registro nel rebase: le righe che il commit del ramo aggiunge rispetto al suo genitore, in fondo al
- * blocco in cima della base nuova. PURA. → { ok: true, src } | { ok: false, motivo }
+ * I tre lati del registro nel rebase, più `forcella` (il registro dove il ramo si era staccato da main) e `onto` (quello
+ * di main su cui si riporta). Il ramo intero, fino a questo commit, si unisce a `onto` con la regola del cancello: così
+ * una riga scritta e poi ritoccata, o spostata in cima, conta come una riga aggiunta. Vale solo se «ours» è esattamente
+ * quella regola applicata al commit prima (nessuna mano è passata sul registro); altrimenti le righe che questo commit
+ * aggiunge al suo genitore, in fondo al blocco in cima di «ours». PURA. → { ok: true, src } | { ok: false, motivo }
  */
-export function unisciNelRebase({ base, ours, theirs, manifesto, oggi }) {
-  const r = novitaFusione().uniscaNovita({ base, main: ours, ramo: theirs, manifesto, oggi });
+export function unisciNelRebase({ base, ours, theirs, manifesto, oggi, forcella = null, onto = null, manifestoOnto = null }) {
+  const { uniscaNovita } = novitaFusione();
+  if (forcella !== null && onto !== null && manifestoOnto) {
+    const prima = uniscaNovita({ base: forcella, main: onto, ramo: base, manifesto: manifestoOnto, oggi });
+    if (prima.ok && prima.src === ours) {
+      const tutto = uniscaNovita({ base: forcella, main: onto, ramo: theirs, manifesto: manifestoOnto, oggi });
+      if (tutto.ok) return { ok: true, src: tutto.src };
+    }
+  }
+  const r = uniscaNovita({ base, main: ours, ramo: theirs, manifesto, oggi });
   return r.ok ? { ok: true, src: r.src } : { ok: false, motivo: r.motivo };
 }
 
-/** Quello che fa il driver lanciato da git, nella cartella `cwd`. → il codice d'uscita: 0 risolto, altro in conflitto. */
+const json = (r) => { try { return r.ok ? JSON.parse(r.out) : null; } catch (_) { return null; } };
+
+/** Il main su cui il rebase riporta il ramo e il punto dove il ramo se n'era staccato, dai file del rebase in corso. */
+function capiDelRebase(cwd) {
+  for (const d of ['rebase-merge', 'rebase-apply']) {
+    const dir = percorsoGit(cwd, d);
+    let onto = '';
+    let testa = '';
+    try {
+      onto = readFileSync(join(dir, 'onto'), 'utf8').trim();
+      testa = readFileSync(join(dir, 'orig-head'), 'utf8').trim();
+    } catch (_) { continue; }
+    const mb = gitIn(cwd, ['merge-base', onto, testa]);
+    if (mb.ok && mb.out.trim()) return { onto, forcella: mb.out.trim() };
+  }
+  return null;
+}
+
+/** Quello che fa il driver lanciato da git, nella cartella `cwd`. → 0 risolto, CONFLITTO coi marcatori scritti. */
 export function driver({ base, ours, theirs, marcatori = '7', cwd = process.cwd(), oggi = new Date().toISOString().slice(0, 10) }) {
   if (inRebase(cwd)) {
-    const pkg = gitIn(cwd, ['show', 'HEAD:package.json']);
-    let manifesto = null;
-    try { manifesto = pkg.ok ? JSON.parse(pkg.out) : null; } catch (_) { manifesto = null; }
+    const manifesto = json(gitIn(cwd, ['show', 'HEAD:package.json']));
     if (manifesto) {
       let r = { ok: false };
       try {
-        r = unisciNelRebase({ base: readFileSync(base, 'utf8'), ours: readFileSync(ours, 'utf8'), theirs: readFileSync(theirs, 'utf8'), manifesto, oggi });
+        const capi = capiDelRebase(cwd);
+        const FILE = novitaFusione().FILE;
+        const forcella = capi ? gitIn(cwd, ['show', `${capi.forcella}:${FILE}`]) : null;
+        const onto = capi ? gitIn(cwd, ['show', `${capi.onto}:${FILE}`]) : null;
+        const lati = forcella && forcella.ok && onto && onto.ok
+          ? { forcella: forcella.out, onto: onto.out, manifestoOnto: json(gitIn(cwd, ['show', `${capi.onto}:package.json`])) }
+          : {};
+        r = unisciNelRebase({ base: readFileSync(base, 'utf8'), ours: readFileSync(ours, 'utf8'), theirs: readFileSync(theirs, 'utf8'), manifesto, oggi, ...lati });
       } catch (_) { /* un lato che non si legge: resta la fusione di testo */ }
       if (r.ok) {
         writeFileSync(ours, r.src, 'utf8');
@@ -104,5 +138,7 @@ export function driver({ base, ours, theirs, marcatori = '7', cwd = process.cwd(
   const [lA, lO, lB] = etichette(cwd);
   const misura = /^\d+$/.test(String(marcatori)) ? marcatori : '7';
   const m = gitIn(cwd, ['merge-file', `--marker-size=${misura}`, '-L', lA, '-L', lO, '-L', lB, ours, base, theirs]);
-  return m.status === 0 ? 0 : 1;
+  if (m.status === 0) return 0;
+  // Da 1 a 127 sono i conflitti contati, coi marcatori scritti; un errore di merge-file non ha scritto niente.
+  return m.status > 0 && m.status < 128 ? CONFLITTO : 2;
 }
