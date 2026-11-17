@@ -177,8 +177,9 @@ test('su un sito l\'avviso resta nell\'angolo e se ne va: non diventa una carta;
 
 for (const tema of ['light', 'dark']) {
   test(`aspetto ${tema}: l'avviso nell'angolo con icona e la carta volata nella home`, async ({ app, shell, avvisi, openTab, testServer }) => {
-    await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
     const home = await homePage(app);
+    await shell.emulateMedia({ colorScheme: tema });
+    await home.emulateMedia({ colorScheme: tema });
     await shell.evaluate(() => window.filoNotify('Non sono riuscito ad aprire il file: forse è stato spostato', {
       durationSec: 1, errore: true, actions: [{ label: 'Apri cartella', onClick() {} }],
     }));
