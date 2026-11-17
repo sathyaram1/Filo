@@ -1137,6 +1137,12 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // #2390 — gli avvisi della barra volati nella colonna della home (il modello sta nella shell della finestra), solo
+    // pagine filo://. LEGGI {} → { ok, carte }; AZIONE { id, azione: 'chiudi' | 'assorbi' | indice } → { ok };
+    // COLONNA è l'annuncio { carte } alle home della finestra a ogni cambio.
+    AVVISI_COLONNA: 'avvisi_colonna',
+    AVVISI_COLONNA_LEGGI: 'avvisi_colonna_leggi',
+    AVVISI_COLONNA_AZIONE: 'avvisi_colonna_azione',
     // «Installa» sulla carta della versione nuova (#786): scarica, e si installa alla chiusura. {} → { ok } | { ok:false, error }
     FILO_INSTALLA_AGGIORNAMENTO: 'filo_installa_aggiornamento',
     // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
