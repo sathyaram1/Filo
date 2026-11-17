@@ -47,7 +47,7 @@ test('immagine incollata, «manda questo come feedback»: miniatura nel riquadro
   test.setTimeout(90_000);
   const page = await home(app);
   await depositoFinto(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ immagini: [1] })] }, { text: 'Inviata, con la tua immagine.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ['1'] })] }, { text: 'Inviata, con la tua immagine.' }]);
   await incolla(page, ['#c45a3b']);
   await chiedi(page, 'manda questo come feedback');
 
@@ -74,7 +74,7 @@ test('un\'immagine che la chat non ha non si inventa, e una tolta nel riquadro n
   test.setTimeout(90_000);
   const page = await home(app);
   await depositoFinto(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ immagini: [1, 7] })] }, { text: 'Inviata.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ["1", "7"] })] }, { text: 'Inviata.' }]);
   await incolla(page, ['#3b7ac4']);
   await chiedi(page, 'segnala questo bug con l\'immagine');
 
@@ -97,7 +97,7 @@ test('oltre le 5 immagini il riquadro dice quante togliere e l\'OK aspetta la sc
   test.setTimeout(90_000);
   const page = await home(app);
   await depositoFinto(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ immagini: [1, 2, 3, 4, 5, 6] })] }, { text: 'Inviata.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ["1", "2", "3", "4", "5", "6"] })] }, { text: 'Inviata.' }]);
   await incolla(page, ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666']);
   await chiedi(page, 'manda un feedback con tutte queste');
 
