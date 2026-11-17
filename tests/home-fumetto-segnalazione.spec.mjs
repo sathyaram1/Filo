@@ -74,6 +74,11 @@ test('#1635 la segnalazione proposta e quella inviata mostrano titolo e testo ne
     if (await page.locator(`${CONFIRM_HOST} input`).count()) await fillConfirmInput(page, 'conferma');
     await scrollConfirmToEnd(page);
     await clickConfirm(page, 'ok');
+    // Partita, il tasto spuntato dice ancora cosa è partito; e così la riga del diario, aperto il blocco del lavoro.
+    const spuntato = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: '✓' }).first();
+    await expect(spuntato).toBeVisible({ timeout: 10_000 });
+    await fumettoDellaSegnalazione(page, spuntato, 'partita');
+    await page.getByRole('button', { name: /Ha preparato una segnalazione/ }).first().click();
     const riga = page.locator('.dash-bubble-filo .dash-activity-row', { hasText: `Segnalazione inviata · ${TITOLO}` }).first();
     await expect(riga).toBeVisible({ timeout: 10_000 });
     await fumettoDellaSegnalazione(page, riga, 'inviata');
