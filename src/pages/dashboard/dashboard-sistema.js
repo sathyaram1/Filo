@@ -668,9 +668,10 @@
     else if (firma !== null && box.firma === undefined && box.letture) box.firma = firma;
     if (box.radio.classList.contains('dash-sis-occupato')) return;
     if (box.voce === 'bluetooth') {
-      // Finché non si sa se è acceso, nessun interruttore: quale dei due mostrare lo dice la lettura che arriva.
-      box.radio.hidden = !!x.ignoto;
-      box.radio.textContent = x.spento ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
+      // Mentre rilegge, nessun interruttore: quale dei due lo dice la lettura che arriva. Se il sistema non sa dire se è
+      // acceso, «Accendi» (su una radio già accesa non cambia niente).
+      box.radio.hidden = !!x.leggendo;
+      box.radio.textContent = x.spento || x.ignoto ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
       return;
     }
     const etichetta = etichettaRadioWifi(x);
