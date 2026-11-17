@@ -63,25 +63,26 @@ async function passata(incognito) {
     try { require('./accaduti').timerScattato(t, { incognito }); } catch (_) {}
     // Filo lo scrive anche nel filo (#869), fuori dall'incognito per la stessa ragione della notifica qui sotto.
     if (!incognito) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'timer', testo: `${t.kind === 'alarm' ? 'sveglia' : 'timer'}${t.label ? ` «${t.label}»` : ''}` }); } catch (_) {} }
-    // Niente notifica di sistema per una scadenza incognito: titolo ed etichetta
-    // resterebbero nel centro notifiche del sistema, cioè una traccia su questo
-    // computer di quello che si è fatto in incognito.
-    if (incognito) continue;
-    try {
-      if (Notification.isSupported()) {
-        const isAlarm = t.kind === 'alarm';
-        const n = new Notification({
-          title: isAlarm ? '⏰ Sveglia' : '⏱ Timer scaduto',
-          body: t.label || (isAlarm ? 'È ora.' : ''),
-        });
-        // Con Filo ridotto a icona questa notifica è l'unica cosa che l'utente
-        // vede, e il pulsante che ferma la suoneria sta nella finestra.
-        n.on('click', () => { try { mostraFinestra(); } catch (_) {} });
-        n.show();
-      }
-    } catch (_) { /* best-effort: la card ringing in dashboard resta comunque */ }
+    // La forma la sceglie la shell (#2390): carta che si fa notare nella home, angolo su una pagina, notifica del
+    // sistema con Filo non davanti (mai per l'incognito, che lascerebbe una traccia nel centro notifiche).
+    try { avvisa(t, incognito); } catch (_) { /* best-effort: la carta che suona nella home resta comunque */ }
   }
   try { require('./handlers').broadcastLiveUpdate(); } catch (_) {}
+}
+
+const chiaveAvviso = (id) => `timer:${id}`;
+function ritiraAvviso(chiave) {
+  try { require('./avvisoFinestra').ritiraAvviso(chiave); } catch (_) {}
+}
+function avvisa(t, incognito) {
+  const sveglia = t.kind === 'alarm';
+  const nome = t.label ? ` «${t.label}»` : '';
+  const testo = sveglia ? `Sveglia${nome}: è ora` : `Timer${nome} scaduto`;
+  // La suoneria c'è già (la shell, finché suona): l'avviso non aggiunge il suo tono.
+  require('./avvisoFinestra').avvisoNellaFinestra(testo, {
+    chiave: chiaveAvviso(t.id), carta: chiaveAvviso(t.id), icona: sveglia ? 'alarm' : 'timer', tipo: sveglia ? 'sveglia' : 'timer',
+    durataSec: 0, suono: false, incognito, azioni: [{ label: 'Ferma', fermaTimer: String(t.id) }],
+  });
 }
 
 // A tutto schermo la pagina copre la fila di tab, cioè l'unico posto da cui si
