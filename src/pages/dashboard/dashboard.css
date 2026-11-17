@@ -706,11 +706,10 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   gap: 2px;
   padding: 2px;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   border-radius: 12px;
   transition: background calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease;
 }
-.dash-barra-siti::-webkit-scrollbar { display: none; }
 .dash[data-barra-siti="0"] .dash-barra-siti { display: none; }
 .dash-barra-voce {
   flex: none;
