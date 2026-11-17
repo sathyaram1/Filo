@@ -2032,10 +2032,12 @@
         gemella.dataset.trascina = opts.trascinaDownloadId ? String(opts.trascinaDownloadId) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        segni(gemella, opts);
         gemella._durata = durata;
-        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
-        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
-        avviaTempo(gemella, durata);
+        // Rinnovata mentre aspettava dietro il «+N» (o nella colonna): è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1' || luogo(gemella) === 'colonna') { delete gemella.dataset.attesa; hostEl().appendChild(gemella); }
+        colloca(gemella);
+        disponi();
         return gemella;
       }
 
