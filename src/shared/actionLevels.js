@@ -1298,6 +1298,18 @@
       describe: (a) => descriviCarta(a, false),
       describeDone: (a) => descriviCarta(a, true),
     },
+    // #1803 — la barra dei siti della nuova scheda. Un sito si toglie con un gesto: costo 1. Un programma messo dalla
+    // chat parte poi a un clic: costo 3, così lo conferma chi l'ha chiesto e mai solo un testo letto in una pagina.
+    BARRA_SITI: {
+      costo: (a) => {
+        const op = opBarraSiti(a);
+        if (op === 'elenca') return 0;
+        return op === 'aggiungi' && String((a && a.percorso) || '').trim() ? 3 : 1;
+      },
+      campo: (a) => (opBarraSiti(a) === 'aggiungi' && String((a && a.percorso) || '').trim() ? 'file' : null),
+      describe: (a) => descriviBarraSiti(a, false),
+      describeDone: (a) => descriviBarraSiti(a, true),
+    },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando
     // ("scrivi in grassetto tutti i titoli"). Costo 1: si applica subito, vale
