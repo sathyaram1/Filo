@@ -281,7 +281,7 @@ class AvvisiSopraPagina {
       if (carta.indirizzo) {
         let host = '';
         try { host = new URL(carta.indirizzo).hostname.replace(/^www\./, ''); } catch (_) { host = ''; }
-        if (host) voci.push({ label: `Apri ${host}`, icon: 'openTab', action: 'avviso:apri' });
+        if (host) voci.push({ label: `Apri ${host}`, action: 'avviso:apri' });
       }
       if (voci.length) voci.push({ type: 'separator' });
       voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
