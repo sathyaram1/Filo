@@ -173,6 +173,9 @@
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
+    // Il tetto totale delle verifiche di un lavoro (`tettoVerifiche`, #2338): almeno una; lo stesso intervallo del server.
+    TETTO_VERIFICHE_MIN: 1,
+    TETTO_VERIFICHE_MAX: 50,
     // Quante sessioni delle routine possono lavorare insieme (config/routines,
     // campo `maxSessions`). Intervallo SUO, non quello dei bilanci qui sopra:
     // uno zero sarebbe un interruttore master di nascosto, e quello esiste già.
