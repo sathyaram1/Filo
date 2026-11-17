@@ -492,7 +492,9 @@ async function eseguiAzioneFilo(action, {
       }
     } else if (!nome && q.acceso === false && !confirmed) {
       const letto = globalThis.SN_SISTEMA_MAIN && typeof globalThis.SN_SISTEMA_MAIN.stato === 'function' ? globalThis.SN_SISTEMA_MAIN.stato() : null;
-      const radio = letto && (type === 'WIFI' ? letto.wifi : letto.bluetooth);
+      // Una radio letta prima di una pausa del lettore (`vecchio`) non è «già spenta»: si chiede la conferma (#2394).
+      const vecchia = letto && Array.isArray(letto.vecchio) && letto.vecchio.includes(type === 'WIFI' ? 'wifi' : 'bluetooth');
+      const radio = letto && !vecchia && (type === 'WIFI' ? letto.wifi : letto.bluetooth);
       gia = !!radio && radio.acceso === false;
     }
     action._richiestaSistema = { ...q, ...(nome ? { nome } : {}), ...(gia ? { gia: true } : {}) };
