@@ -319,10 +319,14 @@
     if (!global.MutationObserver || !d.bubbles) return;
     new MutationObserver((cambi) => {
       if (!ripiegata || !pronta) return;
-      const nuova = cambi.some((c) => [...c.addedNodes].some((n) => n.nodeType === 1
-        && (n.matches('.dash-bubble-filo') || n.querySelector('.dash-bubble-filo'))));
+      // Anche la risposta che cresce in una bolla nata prima del ripiego (lo streaming scrive dentro, non aggiunge bolle).
+      const diFilo = (n) => {
+        const e = n && (n.nodeType === 1 ? n : n.parentElement);
+        return !!(e && (e.closest('.dash-bubble-filo') || (e.querySelector && e.querySelector('.dash-bubble-filo'))));
+      };
+      const nuova = cambi.some((c) => diFilo(c.target) || [...c.addedNodes].some(diFilo));
       if (nuova) d.freccia.dataset.nuovo = '1';
-    }).observe(d.bubbles, { childList: true, subtree: true });
+    }).observe(d.bubbles, { childList: true, subtree: true, characterData: true });
   }
 
   function applicaImpostazioni(s) {
