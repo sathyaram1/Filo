@@ -268,8 +268,8 @@ test('un sito tolto dai segnati per il campo password non è più delicato per q
 
 test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anche la spiegazione preparata alla selezione', async () => {
   const { readFile } = await import('node:fs/promises');
-  const testo = await readFile(new URL('../../transparency/privacy.md', import.meta.url), 'utf8');
-  const da = testo.indexOf('**Quello che parte senza che tu lo chieda.**');
+  const testo = await readFile(new URL('../../transparency/privacy-completa.md', import.meta.url), 'utf8');
+  const da = testo.indexOf('## Quello che parte senza che tu lo chieda');
   assert.ok(da >= 0);
   const sezione = testo.slice(da, testo.indexOf('\n\n', testo.indexOf('\n- ', da) + 1) + 1 || undefined);
   const voci = sezione.split('\n').filter((r) => r.startsWith('- **'));
