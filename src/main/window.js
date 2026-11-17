@@ -59,9 +59,15 @@ function assicuraFinestraNormale() {
 function mostraFinestraNormale() {
   const win = assicuraFinestraNormale();
   if (!win || win.isDestroyed()) return null;
+  portaDavanti(win);
+  return win;
+}
+
+// Come torna davanti una finestra ridotta a icona o finita dietro, per Dock, seconda apertura, invito e voci della barra
+// dei menu (#2031): prima la si ripristina, poi la si mostra.
+function portaDavanti(win) {
   try { if (win.isMinimized()) win.restore(); } catch (_) {}
   revealWindow(win);
-  return win;
 }
 
 // Su Mac riaprire Filo acceso (Dock, Launchpad, Finder) arriva come `activate`, non come seconda copia: chi clicca
