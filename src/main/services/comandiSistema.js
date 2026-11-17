@@ -1145,12 +1145,12 @@ function interpretaWifiElenco(u, piattaforma) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
   if (piattaforma === 'win32') {
-    const codice = intero(u.primo('codice'));
-    if (codice) return { ok: false, errore: erroreWlan(codice) };
-    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
-    const attuale = u.primo('attuale');
-    const reti = u.voci.filter((v) => v.k === 'rete' && v.v).map((v) => ({ nome: v.v, attiva: v.v === attuale }));
-    return { ok: true, acceso: null, reti, attuale: attuale || null };
+    return elencoWifiWindows({
+      codice: intero(u.primo('codice')),
+      interfacce: intero(u.primo('interfacce')),
+      reti: u.voci.filter((v) => v.k === 'rete').map((v) => v.v),
+      attuale: u.primo('attuale'),
+    });
   }
   const righe = u.blocco('reti');
   let reti = [];
