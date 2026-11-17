@@ -204,11 +204,13 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      if (n === 1) {
-        try { onToolCall && onToolCall({ id: 't1', name: 'filo_su_di_se' }); } catch (_) {}
+      if (n <= 2) {
+        const id = `t${n}`;
+        const doc = n === 1 ? 'privacy' : 'privacy-completa';
+        try { onToolCall && onToolCall({ id, name: 'filo_su_di_se' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 't1', name: 'filo_su_di_se', arguments: '{"azione":"documento","doc":"privacy"}' }],
+          toolCalls: [{ id, name: 'filo_su_di_se', arguments: JSON.stringify({ azione: 'documento', doc }) }],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
