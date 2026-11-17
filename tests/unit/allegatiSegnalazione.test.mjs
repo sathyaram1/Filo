@@ -27,17 +27,17 @@ const messaggi = [
 const memoria = { t1: [PNG, JPG], t3: [PNG], t4: [PNG] };
 const fotoDi = (m) => memoria[m.ts] || null;
 
-test('lo strumento accetta immagini, file e schermata come indicazioni, mai byte', () => {
-  const d = T.definitions ? T.definitions() : [];
-  const testo = JSON.stringify(d);
-  assert.match(testo, /"immagini":\{"type":"array","items":\{"type":"integer"\}\}/);
-  assert.match(testo, /"schermata":\{"type":"boolean"\}/);
+test('lo strumento accetta gli allegati come indicazioni (numero, percorso, «schermata»), mai byte', () => {
+  const d = T.definitions().find((x) => x.function.name === 'filo_su_di_se');
+  assert.deepEqual(d.function.parameters.properties.allegati, { type: 'array', items: { type: 'string' } });
+  assert.match(d.function.description, /feedback\(testo, titolo, allegati\?\)/);
   const [a] = T.toolCallsToActions([{ id: 'c1', name: 'filo_su_di_se', arguments: JSON.stringify({
-    azione: 'feedback', titolo: 'Zoom rotto', testo: 'non va', immagini: [1], file: ['/home/u/note.txt'], schermata: true,
+    azione: 'feedback', titolo: 'Zoom rotto', testo: 'non va', allegati: ['1', 3, '#3', '/home/u/note.txt', 'schermata', ' '],
   }) }]);
   assert.equal(a.type, 'INVIA_FEEDBACK');
   assert.equal(a._argsError, undefined);
-  assert.deepEqual(AS.richiesti(a), { immagini: [1], file: ['/home/u/note.txt'], schermata: true });
+  assert.deepEqual(AS.richiesti(a), { immagini: [1, 3], file: ['/home/u/note.txt'], schermata: true });
+  assert.equal(AS.haAllegati({ testo: 'x' }), false);
 });
 
 test('l\'inventario conta le immagini dell\'utente in ordine e salta quelle scritte dal modello', () => {
