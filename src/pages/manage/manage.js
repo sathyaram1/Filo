@@ -784,9 +784,9 @@
     // Un campo vuoto non è uno zero (per il livello 3 lo 0 ferma il lavoro
     // al primo rilievo) e non è nemmeno «torno al default»: un default non
     // c'è più (2026-09-16). Vuoto = non si salva, e la scritta lo dice.
-    const val = clampCap(f.input.value, f.min);
+    const val = clampCap(f.input.value, f.min, f.max);
     if (val === null) {
-      setCapMsg(field, 'Vuoto o non numerico: non salvato. Scrivi un numero, 0 compreso.', 'err');
+      setCapMsg(field, `Vuoto o non numerico: non salvato. Scrivi un numero${f.min === 0 ? ', 0 compreso' : ''}.`, 'err');
       return;
     }
     f.input.value = String(val); // normalizza eventuali fuori-range
