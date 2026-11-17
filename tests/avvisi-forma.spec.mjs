@@ -114,7 +114,7 @@ test('nella home un avviso senza carta: angolo, poi volo in cima alla colonna; a
   // Il volo è finito: la carta vera è a posto e la copia non c'è più.
   await expect(home.locator('.dash-carta-in-volo')).toHaveCount(0, { timeout: 3_000 });
   await home.waitForTimeout(300);
-  const larghezze = await home.evaluate(() => { cancelAnimationFrame(window.__giro); return [...window.__larghezze]; });
+  const larghezze = await home.evaluate(() => { clearInterval(window.__giro); return [...window.__larghezze]; });
   expect(larghezze).toHaveLength(1);
 
   await carta.click({ button: 'right' });
