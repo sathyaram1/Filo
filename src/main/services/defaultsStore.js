@@ -597,7 +597,7 @@ async function setLavoriServer(on, idToken) {
 // nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
 // da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
 // è un valore valido per tutti.
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
   const out = { fixInstructions: '', giroStretto: false };
@@ -862,7 +862,8 @@ async function setJudgeBudget(patch, idToken) {
 // `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
 // della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
 async function getWorkerLog(idToken, { severo = false } = {}) {
-  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  // Il giro della Gestione lo chiede ogni minuto: il resto del documento (bilanci, manopole) non serve (#2470).
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken, { campi: ['workerLog'] });
   if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
   const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];

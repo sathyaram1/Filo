@@ -101,7 +101,7 @@ test('la scheda in pausa riparte, dietro, senza aprirne una nuova; il modello la
   expect(dopo.activeId, 'la musica riparte dietro: la chat resta davanti').toBe(idHome);
   const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
   expect(prompt).toMatch(/\[AUDIO FERMO\] Musica/);
-  expect(prompt).toContain('RIPRENDI_AUDIO');
+  expect(prompt).toContain('scheda(riprendi_audio)');
   const riga = chat.locator('.dash-activity').last();
   await expect(riga).toContainText('Ripartita', { timeout: 10_000 });
   await expect(riga).toContainText('Musica');

@@ -142,7 +142,7 @@ test('al modello entra la riga all’ora d’inizio, non lo scambio; i ricordi n
   assert.ok(righe[0].riga);
   assert.equal(righe[0].ts, fa(100));
   assert.match(righe[0].text, /conversazione nell'Editor su «tesi»: 2 messaggi/);
-  assert.match(righe[0].text, /CERCA_CHAT e id "ed1"/);
+  assert.match(righe[0].text, /filo\(cerca\) e id "ed1"/);
   const tratto = FC.finestra(filo, { ora: ORA, giorni: 3, token: 100000 }).messaggi.map((m) => m.content).join('\n');
   assert.ok(!tratto.includes('SEGRETO-DEL-CAPITOLO'), 'lo scambio intero non deve entrare nel contesto');
   assert.ok(tratto.includes("conversazione nell'Editor su «tesi»"));

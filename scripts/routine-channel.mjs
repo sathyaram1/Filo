@@ -563,6 +563,7 @@ export async function release(t, fault = '', opts, report = null, spedito = null
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   const processo = String((opts && opts.processo) || '').trim();
   if (processo) payload.domandaProcesso = processo;
+  if (opts && opts.oltreTetto) payload.oltreTetto = opts.oltreTetto;
   if (spedito && typeof spedito.branch === 'string' && spedito.branch && /^[0-9a-f]{40}$/.test(String(spedito.sha || ''))) {
     payload.branch = spedito.branch;
     payload.sha = spedito.sha;
@@ -595,6 +596,15 @@ const ATTESA_SOPRA_S = 30;
 export const PROCESSO_MAX = 4000;
 // I ruoli il cui biglietto non porta un feedback (server: guasti.domandaDiProcesso lo vuole).
 export const RUOLI_SENZA_FEEDBACK = Object.freeze(['compito', 'risposta', 'smistamento', 'manutentore', 'orchestrator']);
+
+/** «131.2:120» (spesi e tetto, in dollari) → { usd, tettoUsd } per il server (#2303), o null se non si legge. PURA. */
+export function leggiOltreTetto(v) {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$/.exec(typeof v === 'string' ? v : '');
+  if (!m) return null;
+  const usd = Number(m[1].replace(',', '.'));
+  const tettoUsd = Number(m[2].replace(',', '.'));
+  return tettoUsd > 0 ? { usd, tettoUsd } : null;
+}
 
 /**
  * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
@@ -1030,6 +1040,31 @@ export function spedisciAppPrimaDelServer(root, biglietto, { exec = execFileSync
   const p = pushRamoCorrente(root, { exec, env });
   if (p.avviso) righe.push(p.avviso);
   return { ...p, righe };
+}
+
+/**
+ * Una fermata (`status design`) lascia il ramo a chi riparte: prima che il server la registri il ramo va su origin, alla
+ * punta della cartella, o il piano dà per fatto quello che nessuno ritroverà (#2516). Solo nella cartella del biglietto.
+ * → { ok, skipped, branch, punta, reason, righe }: un `ok` falso ferma la consegna.
+ */
+export function spedisciPrimaDellaFermata(root, biglietto, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (!marcatore || !marcatore.ticket || String(marcatore.ticket) !== String(biglietto || '') || bigliettoFinito(marcatore)) {
+    return { ok: true, skipped: true, branch: '', reason: 'non è la cartella di un biglietto vivo', righe: [] };
+  }
+  const p = spedisciAppPrimaDelServer(root, biglietto, { exec, env });
+  if (!p.ok || p.skipped) return p;
+  let remoto = '';
+  try {
+    remoto = String(exec('git', ['ls-remote', 'origin', `refs/heads/${p.branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '');
+  } catch (e) {
+    return { ...p, ok: false, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(String((e && (e.stderr || e.message)) || ''))}` };
+  }
+  const su = (remoto.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === `refs/heads/${p.branch}`) || [])[0] || '';
+  if (!p.punta || su.toLowerCase() !== p.punta.toLowerCase()) {
+    return { ...p, ok: false, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${String(p.punta || '?').slice(0, 9)}` };
+  }
+  return p;
 }
 
 /**
@@ -1611,7 +1646,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1637,7 +1672,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1947,19 +1982,26 @@ if (isMain) {
     const { stopBeat } = await import('./lib/routine-beat.mjs');
     const ticket = args[0];
     const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+    const rilascioForzato = (extra, mio, env = {}) => {
+      const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+        ...extra, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, ...env } });
+      const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+      if (!ok) stopBeat(ROOT, { ticket });
+      const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+      return { ok, motivo };
+    };
     const esito = await veglia({
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
-      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
-      rilascia: (guasto, mio, quadro) => {
-        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
-          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, [ENV_QUADRO_FERMO]: String(quadro || '') } });
-        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
-        if (!ok) stopBeat(ROOT, { ticket });
-        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
-        return { ok, motivo };
+      rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
+      // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
+      costo: async (s) => {
+        const { costoDeiFile } = await import('./session-report.mjs');
+        return costoDeiFile((s.tracce && s.tracce.file) || [], { since: Number.isFinite(s.dalMs) ? new Date(s.dalMs).toISOString() : '' });
       },
+      rilasciaOltre: (oltre, mio) => rilascioForzato(['--oltre-tetto', `${oltre.usd}:${oltre.tettoUsd}`], mio),
     });
     console.log(esito.testo);
     process.exit(esito.uscita);
@@ -2003,6 +2045,12 @@ if (isMain) {
     // Il server lega la domanda al feedback del biglietto: da un ruolo che non ne lavora uno non sveglierebbe nessuno.
     if (processo && RUOLI_SENZA_FEEDBACK.includes(String(data.role || ''))) {
       console.error(`--processo vale per chi lavora un feedback: il ruolo ${data.role} non ne ha uno, e la domanda non arriverebbe al manutentore. Scrivila con «segnala». Non ho rilasciato niente.`);
+      process.exit(1);
+    }
+    // `--oltre-tetto "<spesi>:<tetto>"`: la veglia ferma un compito oltre il tetto di costo della corsa (#2303).
+    const oltreTetto = data['oltre-tetto'] === undefined ? null : leggiOltreTetto(data['oltre-tetto']);
+    if (data['oltre-tetto'] !== undefined && !oltreTetto) {
+      console.error('--oltre-tetto vuole i dollari spesi e il tetto: --oltre-tetto "131.2:120". Non ho rilasciato niente.');
       process.exit(1);
     }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
@@ -2090,6 +2138,7 @@ if (isMain) {
     const opzioniRilascio = {
       ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
       ...(processo ? { processo } : {}),
+      ...(oltreTetto ? { oltreTetto } : {}),
     };
     const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined, spedito);
     if (r.avviso) console.error(r.avviso);
@@ -2315,6 +2364,15 @@ if (isMain) {
     }
     const fermata = fermataSenzaDomanda(intento, data);
     if (fermata) { console.error(fermata); process.exit(1); }
+    if (intento === 'status' && data.status === 'design') {
+      const sped = spedisciPrimaDellaFermata(ROOT, biglietto);
+      for (const riga of sped.righe || []) console.error(riga);
+      if (!sped.ok) {
+        console.error(`Il ramo${sped.branch ? ` '${sped.branch}'` : ''} NON è su origin: ${sped.reason}`);
+        console.error('Non ho consegnato la fermata: chi riparte cercherebbe il lavoro su un ramo che non lo ha. Se la causa sta nel ramo (detta qui sopra) sistemala e rilancia lo stesso comando; altrimenti è un guasto da dichiarare nel rilascio. Non spingere a mano.');
+        process.exit(1);
+      }
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su

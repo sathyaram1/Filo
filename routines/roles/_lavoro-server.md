@@ -41,6 +41,17 @@ registrare la critica, e il lavoro torna a un'altra verifica quando esce dal fer
 Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --abbrev-ref HEAD` nel checkout di Filo).
 
 - Lavoro nuovo: `git -C "<CLONE>" checkout -b <ramo> origin/main`.
+- Lavoro nuovo con `payload.ripartenza`: il ramo del server nasce lo stesso da `origin/main`, mai dalla punta del
+  tentativo di prima. Il registro conta solo i commit dichiarati sotto il nome del tuo ramo: quelli del vecchio, e i
+  riallineamenti che il cancello ci ha scritto, lo renderebbero non fidato, e il ramo del server non si riscrive. Il
+  lavoro di prima lo porti come un commit tuo, per `ripartenza.ramo` e per ogni ramo di `ripartenza.altri` che ti
+  serve (se il fetch risponde «couldn't find remote ref», quel tentativo non aveva una parte server):
+
+```bash
+node "<CANALE>" git-server fetch "<CLONE>" <ripartenza.ramo>
+git -C "<CLONE>" merge --squash origin/<ripartenza.ramo>
+git -C "<CLONE>" commit -m "<ripartenza.ramo> portato sul ramo nuovo"
+```
 - Verifica o correzione: `node "<CANALE>" git-server fetch "<CLONE>" <ramo>` e
   `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`. Se sul server il ramo non c'è (git: «couldn't find remote
   ref»), il lavoro sta tutto nell'app.
@@ -50,21 +61,31 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
   per il ramo di Filo, non per questo: `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
   `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
   e spinta come sotto.
-- Suite di GitHub del server rossa senza niente da cambiare nel server (provava il ramo di Filo com'era prima del
-  rebase, o il rosso non si ripete nelle prove del server qui): la suite riparte solo con una spinta nuova, quindi
-  `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server` come sotto. Un
-  rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel report, e lo giudica chi verifica.
+- Suite di GitHub del server rossa senza niente da cambiare nel server. Se provava il ramo di Filo com'era prima del
+  rebase, non serve niente: la rifà il cancello sulla parte dell'app nuova. Se il rosso non si ripete nelle prove del
+  server qui, serve una punta nuova: `git -C "<CLONE>" commit --allow-empty -m "rilancio della suite"`, poi spinta e
+  riga `ramo-server` come sotto. Un rosso che chiede di cambiare il server segue la regola del ruolo sui rossi: nel
+  report, e lo giudica chi verifica.
 
 ### Prove, spinta, registro
 
 - Le prove del server: `npm ci` la prima volta, poi `npm test` in `<CLONE>/functions`, con `FILO_PUBLIC_REPO` uguale
   al checkout di Filo. Se il lavoro tocca anche l'app, le prove dell'app come sempre.
-- Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo.
+- Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo, col nome e i titoli dei
+  casi delle prove del giro dell'app, preceduti da `verifica-<numero>-` e con `.test.js` in fondo: è così che il
+  cancello le riconosce come prove del giro.
+- Le prove del giro sul server si tolgono come quelle dell'app, e nello stesso momento: quelle che escono in ogni esito
+  nel commit della critica, quelle che la risposta del server elenca (anche dopo un pass) appena la leggi. La
+  suite di GitHub del server le corre tutte, e una rossa lasciata lì la tiene rossa per sempre. Nel clone un commit
+  che toglie solo quelle (un file intero, o il caso di un rilievo da una prova che ne copre altri), poi spinta e riga
+  `ramo-server` come sotto. Quelle della critica si spingono e si registrano prima di registrare la critica: il
+  verdetto prende come punta verificata del server l'ultima registrata.
 - Il conto delle prove, app e server insieme, sui commit dei due rami: `node scripts/conta-prove.mjs --server "<CLONE>"`.
-- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La suite di GitHub del server prova il
-  ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se non c'è): per questo la
-  spinta manda prima da sé il ramo dell'app su origin, compresi i file nati da shell, e se quello non arriva il ramo
-  del server non parte. Subito dopo, a ogni spinta e prima di consegnare:
+- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`. La spinta non accende la suite di
+  GitHub del server: la accende il cancello sulla punta che fonde, e prova il ramo di Filo con lo stesso nome com'è in
+  quel momento (main di Filo se non c'è). La spinta manda comunque prima da sé il ramo dell'app su origin, compresi i
+  file nati da shell, e se quello non arriva il ramo del server non parte. Subito dopo, a ogni spinta e prima di
+  consegnare:
 
 ```bash
 node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
@@ -79,6 +100,7 @@ node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
 ### Dopo la verifica
 
 Un lavoro server passato va al controllo di sicurezza, che legge anche il diff del server. Poi il cancello, solo con la
-suite di GitHub verde sullo sha esatto della punta registrata (l'ultima spinta, con la sua riga `ramo-server`), porta
+suite di GitHub verde sullo sha esatto della punta registrata (l'ultima spinta, con la sua riga `ramo-server`: quella
+verificata, o una che da lì toglie soltanto prove del giro, file interi o casi, e niente aggiunge o cambia), porta
 prima la parte dell'app su main di Filo, coi controlli di sempre, e poi il ramo del server su main di filo-security. La
 pubblicazione la fa GitHub, e incorpora main di Filo che ha già la parte dell'app. Non chiedere la fusione del server da qui.

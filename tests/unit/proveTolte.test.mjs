@@ -82,10 +82,10 @@ test('il nome di una prova del giro dice quali rilievi riproduce', () => {
 test('il numero di un rilievo è il suo posto nella critica, interni ed esterni insieme', () => {
   const tutti = [
     { level: 2, sede: 'i', text: 'a' }, { level: 1, sede: 'i', text: 'b', decision: true },
-    { level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'e', text: 'x' }, { level: 1, sede: 'i', text: 'c' },
+    { level: 1, sede: 'i', text: 'c' }, { level: null, sede: 'e', text: 'x' }, { level: 1, sede: 'i', text: 'c' },
   ];
   const n = (parte) => numeraRilievi(tutti, parte).map((f) => f.n);
-  assert.deepEqual(n([{ level: 1, sede: 'e', text: 'x', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'b', decision: true }]), [4, 2]);
+  assert.deepEqual(n([{ level: null, sede: 'e', text: 'x', priority: null, num: '#9.1' }, { level: 1, sede: 'i', text: 'b', decision: true }]), [4, 2]);
   assert.deepEqual(n([{ level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'i', text: 'c' }]), [3, 5], 'due rilievi uguali, due numeri');
   assert.deepEqual(n([{ level: 2, sede: 'i', text: 'non c\'è' }]), [null]);
 });
@@ -494,7 +494,7 @@ function giroLocaleAperto({ external = [], derived = [] } = {}) {
 const REPORT = 'Corretto il rilievo del giro: il pulsante ora salva anche col titolo vuoto, provato a mano e con la prova.';
 
 test('con un rilievo esterno nel giro, una prova cancellata ancora rossa ferma lo stesso la consegna', () => {
-  const { dir, g, scrivi, cartella, vl } = giroLocaleAperto({ external: [{ level: 1, sede: 'e', text: 'Il bordo del menu è grigio' }] });
+  const { dir, g, scrivi, cartella, vl } = giroLocaleAperto({ external: [{ level: null, sede: 'e', text: 'Il bordo del menu è grigio' }] });
   try {
     g('rm', '-q', `${cartella}/giro1-rilievo.spec.mjs`);
     scrivi('codice.js', 'module.exports = 1;\n');
@@ -591,7 +591,7 @@ function giroCriticato({ prove, critica }) {
   g('add', '-A'); g('commit', '-qm', 'prove del giro');
   const shaCritica = g('rev-parse', 'HEAD');
   const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: avvio }), ramo, {
-    critique: critica, sha: shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
+    critique: critica, sha: shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1 },
   });
   assert.equal(r.outcome, 'fix', r.reason);
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
@@ -632,7 +632,7 @@ test('una domanda per l\'owner senza prova sua non lascia uscire la prova rossa 
 test('un rilievo esterno non allarga la pulizia fino alla prova rossa di un rilievo da correggere', () => {
   const { dir, g, cartella, shaCritica, vl } = giroCriticato({
     prove: { 'giro1-r1-a': ['a'], 'giro1-r2-b': ['b'], 'giro1-r3-c': ['c'] },
-    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.\n[1e] un difetto di un altro lavoro.',
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.\n[e] un difetto di un altro lavoro.',
   });
   try {
     g('rm', '-q', `${cartella}/giro1-r2-b.spec.mjs`, `${cartella}/giro1-r3-c.spec.mjs`); g('commit', '-qm', 'pulizia larga');

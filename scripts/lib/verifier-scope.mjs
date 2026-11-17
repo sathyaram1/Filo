@@ -2,6 +2,8 @@
 // ruolo riceve e come si scrive il suo perimetro. Lo usano dispatch (routine) e
 // verify-local (giro locale): una regola sola per le due strade.
 
+import { createRequire } from 'node:module';
+
 // Un valore che non conosco vale «pieno»: mai meno verifica per un valore storto.
 export const VERIFIER_SCOPE_FILE = {
   pieno: 'verifier.md',
@@ -24,8 +26,12 @@ const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
 const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(unaRiga(v)) ? unaRiga(v) : '');
 
 // Livello E sede, come il lettore della critica li pretende: un perimetro
-// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
-const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
+// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta. Il modulo condiviso si carica solo
+// qui, quando chi chiama non passa il suo: la copia degli strumenti fissati importa questo file anche senza src/.
+function formatoMinimo(list) {
+  if (!globalThis.SN_VERIFIER_ROUND) createRequire(import.meta.url)('../../src/shared/verifierRound.js');
+  return list.map((f) => `- ${globalThis.SN_VERIFIER_ROUND.findingTag(f)} ${unaRiga(f.text)}`).join('\n');
+}
 
 // La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
 function lineaServer(ramo, sha) {

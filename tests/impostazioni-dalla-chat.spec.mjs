@@ -135,7 +135,8 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
   await scrivi(chat, 'com\'è impostato il blocco della pubblicità?');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Adesso blocco di pubblicità e tracker: spento.' })).toBeVisible({ timeout: 10_000 });
   const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
-  expect(esito).toContain('- blocco di pubblicità e tracker: spento [chiave blocco_pubblicita, chiede conferma]');
+  // Una lettura mirata porta anche i valori ammessi (#1564), fra la chiave e la conferma.
+  expect(esito).toMatch(/- blocco di pubblicità e tracker: spento \[chiave blocco_pubblicita; valori: true \| false[^\]]*, chiede conferma\]/);
   expect(esito).not.toContain('k-test');
 
   // Annulla dal segno: il blocco torna acceso, anche nella pagina aperta.

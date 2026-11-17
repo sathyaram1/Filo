@@ -351,12 +351,14 @@ function loadTools() {
   return globalThis.SN_ACTION_TOOLS;
 }
 
+// filo_su_di_se(documento): la sua riga nella descrizione dello strumento e il parametro `doc`.
 function toolTrasparenza() {
   const Tools = loadTools();
-  const def = Tools.definitions()
-    .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
-  assert.ok(def, 'LEGGI_TRASPARENZA non è più uno strumento del modello');
-  return def.function;
+  const def = Tools.definitions().find((d) => d.function.name === 'filo_su_di_se');
+  assert.ok(def, 'filo_su_di_se non è più uno strumento del modello');
+  const riga = def.function.description.split('\n').find((r) => r.startsWith('- documento('));
+  assert.ok(riga, 'filo_su_di_se(documento) non c\'è più');
+  return { description: riga, parameters: { properties: { doc: { description: '', ...def.function.parameters.properties.doc } } } };
 }
 
 test('lo strumento della chat promette esattamente i documenti che esistono', () => {
@@ -473,7 +475,7 @@ test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
   // lascerebbe l'istruzione a puntare nel vuoto, in silenzio.
   const { T } = loadModules();
   const src = readFileSync(join(ROOT, 'src', 'shared', 'onboarding.js'), 'utf8');
-  const citati = [...src.matchAll(/LEGGI_TRASPARENZA\s+doc\s+"([^"]+)"/g)].map((m) => m[1]);
+  const citati = [...src.matchAll(/filo_su_di_se\(documento\)\s+doc\s+"([^"]+)"/g)].map((m) => m[1]);
   assert.ok(citati.length, 'l\'accoglienza non cita più nessun documento: aggiorna questo test');
   for (const id of citati) {
     assert.ok(T.ids().includes(id), `l'accoglienza manda l'agente a leggere "${id}", che non esiste`);
@@ -544,16 +546,17 @@ test('le fonti si leggono come testo, sulla pagina e per il modello', () => {
 
 // #515 — Presentato col sottotitolo («le motivazioni etiche…»), il documento
 // sui modelli sembrava non rispondere a «che fine fanno i miei dati?».
-test('lo strumento dice al modello cosa c\'è dentro ogni documento, e di leggerlo prima di dire che non c\'è', () => {
+// Da #1564 i titoli delle sezioni non stanno nello strumento (tetto degli strumenti): ogni documento ci sta col suo
+// titolo, dal registro; una frase scritta a mano sugli argomenti lasciava fuori la Sicurezza.
+test('lo strumento dice al modello di cosa parlano i documenti, e di leggerli prima di rispondere', () => {
   const { T } = loadModules();
   const fn = toolTrasparenza();
   for (const d of T.all()) {
-    for (const s of d.sections) {
-      assert.ok(fn.description.includes(s.title), `"${d.id}": lo strumento non nomina la sezione «${s.title}»`);
-    }
     if (d.subtitle) {
       assert.ok(!fn.description.includes(d.subtitle), `"${d.id}": presentato con la frase scritta per la pagina`);
     }
+    assert.ok(fn.description.includes(`${d.id} «${d.title}»`), `"${d.id}": manca il suo titolo`);
   }
+  assert.match(fn.description, /security «Sicurezza»/);
   assert.match(fn.description, /leggilo prima di rispondere/);
 });

@@ -120,6 +120,9 @@ test('punti 2 e 3: il riallineamento di un lavoro server dice quale ramo col reb
   assert.match(t, /Il ramo di Filo si riallinea col rebase del tuo ruolo, anche quando la critica parla solo del server/);
   assert.match(t, /il divieto di `git merge` del ruolo vale per il ramo di Filo, non per questo/);
   assert.match(t, /commit --allow-empty -m "rilancio della suite"`, poi spinta e riga `ramo-server`/);
+  // #2533: la suite la accende il cancello, e una rossa di prima del rebase la rifà lui.
+  assert.match(t, /Se provava il ramo di Filo com'era prima del rebase, non serve niente: la rifà il cancello/);
+  assert.match(t, /La spinta non accende la suite di GitHub del server: la accende il cancello sulla punta che fonde/);
 });
 
 test('punto 3: a chi verifica un riallineamento col commit verificato uguale alla punta si dice quale diff leggere', async () => {

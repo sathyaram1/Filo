@@ -249,17 +249,18 @@
   function splitNotes(notes) {
     const lines = righe(notes || '');
     const segments = [];
-    let current = { role: 'model', ts: null, lines: [], atts: [] };
+    let current = { role: 'model', ts: null, lines: [], atts: [], raw: [] };
     for (const line of lines) {
       const mu = USER_TURN_RE.exec(line);
       const mm = mu ? null : MODEL_TURN_RE.exec(line);
       if (mu) {
         segments.push(current);
-        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [] };
+        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [], raw: [] };
       } else if (mm) {
         segments.push(current);
-        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [] };
+        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [], raw: [] };
       } else {
+        current.raw.push(line);
         const att = parseAttachmentLine(line);
         if (att) current.atts.push(att);
         else current.lines.push(line);
@@ -267,7 +268,8 @@
     }
     segments.push(current);
     return segments
-      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts }))
+      // `grezzo`: il turno com'è sotto il suo marcatore, righe-allegato comprese; è il testo che l'impronta copre.
+      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts, grezzo: s.raw.join('\n').trim() }))
       // Si tiene anche il segmento di soli allegati: una risposta può essere una sola immagine.
       .filter((s) => s.body.length > 0 || s.attachments.length > 0);
   }
@@ -298,6 +300,40 @@
       });
     }
     return turns;
+  }
+
+  // ── La fiducia delle note (#1919, SPEC-DOMANDE §1.2) ──
+  // Il testo delle note lo riscrive anche chi non è il server; `noteFidate`, le impronte dei turni scritti da un
+  // biglietto pulito, solo il server. Una nota d'altri vale fidata solo se la sua impronta è lì.
+  // Il server ne tiene uno specchio, e la sua suite prova che le impronte siano queste: cambiarle è un lavoro server.
+  const CAMPO_NOTE_FIDATE = 'noteFidate';
+
+  async function improntaTurno(grezzo) {
+    const dati = new TextEncoder().encode(righe(grezzo).join('\n').trim());
+    const h = await globalThis.crypto.subtle.digest('SHA-256', dati);
+    return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Per chi scrive le note: l'impronta del turno che `dopo` aggiunge a `prima`, null se non ne aggiunge.
+  async function improntaDelTurnoAggiunto(prima, dopo) {
+    if (String(dopo == null ? '' : dopo) === String(prima == null ? '' : prima)) return null;
+    const turni = splitNotes(dopo);
+    return turni.length ? improntaTurno(turni[turni.length - 1].grezzo) : null;
+  }
+
+  // Un turno da risposta dell'owner che il server ha scritto per chi non è fidato (la chiave owner-non-fidato, una
+  // sessione sporca) ha nel campo la sua impronta con questo prefisso: non vale fidato da sé.
+  const PREFISSO_OWNER_NON_FIDATO = '!';
+
+  // Ogni nota con `numero` (da 1) e `fidata`: un turno dell'owner non segnato col prefisso, la riga fissa del taglio, o
+  // un'impronta del server. Senza il campo (note scritte prima) nessuna nota d'altri è fidata.
+  async function fiduciaDelleNote(notes, noteFidate) {
+    const fidate = new Set(Array.isArray(noteFidate) ? noteFidate.map(String) : []);
+    return Promise.all(splitNotes(notes).map(async (t, i) => {
+      const h = await improntaTurno(t.grezzo);
+      const owner = t.role === 'user' && !fidate.has(PREFISSO_OWNER_NON_FIDATO + h);
+      return Object.assign({}, t, { numero: i + 1, fidata: owner || t.grezzo === TRIM_MARK || fidate.has(h) });
+    }));
   }
 
   // Centralizzato qui così il parser e chi scrive restano allineati su una sola forma.
@@ -541,6 +577,11 @@
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
+    CAMPO_NOTE_FIDATE,
+    PREFISSO_OWNER_NON_FIDATO,
+    improntaTurno,
+    improntaDelTurnoAggiunto,
+    fiduciaDelleNote,
     explanationForReporter,
     reportUnreadable,
     isFromModel,

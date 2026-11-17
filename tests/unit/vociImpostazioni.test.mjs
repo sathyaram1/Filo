@@ -115,7 +115,7 @@ test('i permessi dei siti si leggono (anche cercando il permesso o il sito) e la
   const altrove = { permessiSiti: ['meet.google.com · microfono: consentito', 'xn--mnchen-3ya.de · posizione: negato'] };
   const riga = (r) => r.righe.find((x) => x.startsWith('- permessi dei siti')) || '';
   for (const cerca of ['microfono', 'quali siti possono usare la fotocamera?', 'permessi dei siti', 'meet.google.com']) {
-    assert.match(riga(V.righePerModello(S, { cerca, altrove })), /2 voci.*meet\.google\.com · microfono: consentito, münchen\.de · posizione: negato.*\[TOGLI_PERMESSO_SITO/, cerca);
+    assert.match(riga(V.righePerModello(S, { cerca, altrove })), /2 voci.*meet\.google\.com · microfono: consentito, münchen\.de · posizione: negato.*\[impostazioni\(togli_permesso\)/, cerca);
   }
   assert.match(riga(V.righePerModello(S, { altrove: { permessiSiti: [] } })), /: elenco vuoto \[/);
   // Senza chi le tiene non si inventa un «nessuno».
@@ -154,7 +154,8 @@ test('una voce naturale scritta a mano, come nella pagina, si imposta anche a pa
 });
 
 test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la scrive davvero', () => {
-  const estetica = Tools.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'IMPOSTA_ESTETICA').function.description;
+  // I token si leggono con impostazioni(leggi), ognuno col suo nome per impostazioni(aspetto) (#1564).
+  const comeDelToken = new Map(V.voci().filter((v) => v.percorso.startsWith('themeTokens.')).map((v) => [v.percorso.slice(12), v.come]));
   let contate = 0;
   for (const def of Object.values(V.PAGINE)) {
     for (const percorso of [...Object.values(def.campi), ...Object.values(def.gruppi)].flatMap(V.espandi)) {
@@ -162,7 +163,7 @@ test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la sc
       if (percorso.startsWith('themeTokens.')) {
         const nome = percorso.slice(12);
         assert.ok(T.get(nome), `${percorso}: token sconosciuto`);
-        assert.ok(estetica.includes(`• ${nome} (`), `il token ${nome} della pagina non è nella descrizione di IMPOSTA_ESTETICA`);
+        assert.equal(comeDelToken.get(nome), `impostazioni(aspetto) token ${nome}`, `il token ${nome} della pagina non si legge per la chat`);
         continue;
       }
       const s = P.setterDi(percorso);
@@ -227,11 +228,16 @@ test('la segnalazione automatica è fra le impostazioni di serie, accesa', () =>
   assert.equal(C.DEFAULT_SETTINGS.security.autoFeedback, true);
 });
 
-test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e lo stesso livello dell\'annullo', () => {
-  const descr = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+test('ogni chiave scrive quello che dichiara, la chat la trova coi suoi valori e ha lo stesso livello dell\'annullo', () => {
+  // Le chiavi non stanno più tutte nello strumento (#1564): le porta impostazioni(leggi), voce per voce coi valori;
+  // quella che nessuna voce mostra la nomina la descrizione di impostazioni(imposta).
+  const descr = Tools.TOOLS.IMPOSTA_PREFERENZA.description({});
+  const conVoce = new Map(V.voci().filter((v) => v.chiave).map((v) => [v.chiave, v]));
   for (const s of P.PREF_SETTERS) {
     assert.ok(s.aiuto, `${s.keys[0]}: manca \`aiuto\`, la riga che la chat legge`);
-    assert.ok(descr.includes(`• ${s.keys[0]}: `), `${s.keys[0]}: non compare nella descrizione di IMPOSTA_PREFERENZA`);
+    const v = conVoce.get(s.keys[0]);
+    assert.ok(v || descr.includes(s.keys[0]), `${s.keys[0]}: né impostazioni(leggi) né la descrizione di impostazioni(imposta) la nominano`);
+    if (v) assert.ok(v.ammessi && !/undefined/.test(v.ammessi), `${s.keys[0]}: la lettura non dice i valori ammessi`);
     const scritti = percorsiScrittiDa(s);
     for (const p of s.scrive || []) {
       // Un percorso jolly (`models.*`, una chiave per funzione) vale scritto se ne è scritta una foglia.
@@ -243,7 +249,7 @@ test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e
       if (voce && !voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
     }
   }
-  assert.ok(descr.includes('LEGGI_IMPOSTAZIONI'), 'la descrizione dice come leggere il valore di adesso');
+  assert.match(descr, /valori ammessi con leggi/, 'la descrizione dice dove si leggono chiavi e valori');
 });
 
 test('lettura: «com\'è impostato il blocco della pubblicità?» ha la risposta vera, e cambia col valore', () => {
@@ -251,7 +257,7 @@ test('lettura: «com\'è impostato il blocco della pubblicità?» ha la risposta
   let r = V.righePerModello(S, { cerca: 'blocco della pubblicità' });
   assert.ok(r.trovate >= 1);
   const riga = () => r.righe.find((x) => x.startsWith('- blocco di pubblicità e tracker:'));
-  assert.match(riga(), /: attivo \[chiave blocco_pubblicita, chiede conferma\]/);
+  assert.match(riga(), /: attivo \[chiave blocco_pubblicita; valori: true \| false[^\]]*, chiede conferma\]/);
   S.security.adblock.enabled = false;
   r = V.righePerModello(S, { cerca: 'blocchi la pubblicità?' });
   assert.match(riga(), /: spento \[/);
@@ -425,7 +431,7 @@ test('una chiave o un valore che non si applicano hanno il loro perché, per l\'
   assert.match(v.perModello, /"off" \| "default" \| "privacy"/);
   const k = P.spiegaNonValida('boh', 1);
   assert.match(k.rifiuto, /«boh» non è un'impostazione/);
-  assert.match(k.perModello, /LEGGI_IMPOSTAZIONI/);
+  assert.match(k.perModello, /impostazioni\(leggi\)/);
 });
 
 test('un\'ora di inattività si scrive al singolare', () => {
@@ -441,7 +447,9 @@ test('la domanda dell\'utente passata com\'è come ricerca: il pezzo eliso e la 
   assert.ok(!tutto.righe.join('\n').includes('con la ricerca'), '«com» di «com\'è» non è un sito da cercare');
   const tema = V.righePerModello({ theme: 'dark' }, { cerca: 'che tema ho?' });
   assert.ok(tema.trovate > 0 && tema.trovate < tema.totale);
-  assert.ok(tema.righe.includes('- tema: scuro [chiave tema]'));
+  // Una lettura mirata porta anche i valori ammessi: la chiave sola non basta più a cambiarla (#1564, gli strumenti
+  // non li elencano).
+  assert.ok(tema.righe.includes('- tema: scuro [chiave tema; valori: "sistema" | "chiaro" | "scuro"]'));
   const anteprima = V.righePerModello({}, { cerca: 'com\'è la dimensione dell\'anteprima?' }).righe.join('\n');
   assert.match(anteprima, /dimensione dell'anteprima delle schede: media/);
   assert.doesNotMatch(anteprima, /stile dell'agente|IP locale/);

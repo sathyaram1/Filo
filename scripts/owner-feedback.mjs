@@ -797,6 +797,10 @@ export const sessione = {
     const { togliFiducia } = await import('./lib/togli-fiducia.mjs');
     return togliFiducia(id);
   },
+  async segnaNota(id, impronta) {
+    const { segnaNotaFidata } = await import('./lib/biglietto-locale.mjs');
+    return segnaNotaFidata(id, impronta);
+  },
 };
 
 /** Perché il biglietto di chi scrive non è pulito; '' se lo è. Assente, sporco, in attesa o illeggibile non lo sono. PURA. */
@@ -889,12 +893,14 @@ export async function scrivi(id, to, nota, opts = {}) {
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
   // sulla sua macchina, che la chiave non ce l'ha.
   let notaNuova = false;
+  let impronta = null;
   if (typeof testoNota === 'string' && testoNota.trim()) {
     // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
     const esistenti = await notePrecedentiInChiaro(doc);
     const fuse = THREAD ? THREAD.mergeModelReport(esistenti, testoNota) : testoNota;
     notaNuova = fuse !== esistenti;
     const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
+    if (notaNuova && THREAD) impronta = await THREAD.improntaDelTurnoAggiunto(esistenti, capped);
     if (CRYPTO?.isEnabled?.()) {
       try { set('notes', await CRYPTO.encryptForOwner(capped)); }
       catch (e) { return { ok: false, motivo: `cifratura del report fallita: ${e?.message || e}` }; }
@@ -981,7 +987,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   const errore = await scriviCampi(daScrivere);
   if (errore && respinta && !fiduciaTolta) return { ok: false, cambiata: true, motivo: cambiataDaAllora, from };
   if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
-  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  // La nota prende la fiducia del biglietto di adesso (#1919): senza il segno del server chi la legge si sporca.
+  const notaNonFidata = impronta ? await sessione.segnaNota(id, impronta).catch((e) => String((e && e.message) || e)) : '';
+  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}),
+    ...(notaNonFidata ? { notaNonFidata } : {}) };
 }
 
 /** «#553» dai campi del documento, '' senza numero: l'avviso deve nominare la pratica come la mostra la Gestione. */
@@ -1222,6 +1231,7 @@ if (isMain) {
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
   if (r.dryRun && r.fiduciaTolta) console.log(avvisoFiduciaTolta(riferimento, r.fiduciaTolta, { dryRun: true }));
+  if (r.notaNonFidata) console.log(`La nota resta non fidata (${r.notaNonFidata}): chi legge il feedback si sporca per lei.`);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });

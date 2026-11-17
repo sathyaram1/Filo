@@ -40,8 +40,11 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
     `npm run test:unit; if ($?) { git commit … }`. Niente `2>&1` su un
     eseguibile: rende `$?` falso anche a esito 0.
 - **Le esplorazioni si delegano** a un sotto-agente; qui resta la conclusione.
-  Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
-  pestano sui lock del salvataggio automatico.
+  Letture e ricerche vanno a `subagent_type: lettore` (Haiku, sola lettura),
+  il giudizio resta al ruolo: misura in
+  `patterns/le-letture-delegate-girano-su-haiku.md`. Più sotto-agenti insieme
+  solo se leggono soltanto: due che scrivono si pestano sui lock del
+  salvataggio automatico.
 - **Si legge la parte, non il file**: intervalli di righe, uscite filtrate. Un
   file da modificare si legge con Read (`offset` e `limit`): Edit rifiuta quello
   letto dalla shell, e il rifiuto costa un turno.
@@ -255,7 +258,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~690 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~730 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```

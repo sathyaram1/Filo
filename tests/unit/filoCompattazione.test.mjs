@@ -181,7 +181,7 @@ test('oltre il listino escono per primi gli esiti dei turni passati, il testo de
   const senza = FC.finestra(lista, { ora, giorni: 3, token: 100000, esiti, osserva, senzaEsiti: true });
   assert.match(JSON.stringify(con.messaggi), /Guanciale/);
   assert.doesNotMatch(JSON.stringify(senza.messaggi), /Guanciale/);
-  assert.match(senza.messaggi[1].content, /esiti sono stati tolti per stare nel contesto.*CERCA_CHAT/);
+  assert.match(senza.messaggi[1].content, /esiti sono stati tolti per stare nel contesto.*filo\(cerca\)/);
   assert.equal(senza.messaggi[0].content, con.messaggi[0].content, 'il messaggio dell\'utente non cambia');
 });
 
@@ -767,4 +767,75 @@ test('una pagina cancellata porta via subito le righe del diario nate da lei, an
   for (let i = 0; i < 50 && /gatti e di una ricetta/.test(disco()); i++) await new Promise((r) => setTimeout(r, 20));
   assert.doesNotMatch(disco(), /gatti e di una ricetta/, 'la riga esce dal file del diario');
   assert.equal(await Comp.dimenticaPagine(false), 0, 'senza una cancellazione nuova non rilegge niente');
+});
+
+// #1563.7: una pagina va con le righe del pezzo che la legge in testa a un suo messaggio, non con quelle della sua ora.
+const compattatoreDelleCene = () => azzera({
+  chiama: async ({ messages }) => {
+    const testo = messages[1].content;
+    const righe = [...testo.matchAll(/^\[(\d+)\]/gm)].map((m) => Number(m[1]));
+    return JSON.stringify({ ore: [{ testo: /che si mangia/.test(testo) ? '19:00 letta la carbonara' : '14:00 parlato dei gatti', righe }], memorie: [] });
+  },
+});
+const visitaCarbonara = (ts) => globalThis.SN_IL_FILO.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(ts).toISOString() }, { incognito: false });
+const togliVisita = (v) => globalThis.SN_IL_FILO.cancellaVisite([{ ts: v.ts, url: v.url }], { incognito: false });
+
+test('una pagina aperta subito prima del messaggio da cui riparte il grezzo esce con la riga che la racconta, non con quella prima', async () => {
+  compattatoreDelleCene();
+  const ora = Date.now() - 6 * ORA_MS;
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  const visita = await visitaCarbonara(ora - 70 * 60000);
+  await scrivi('ab12', 'user', 'che si mangia stasera?', new Date(ora - 60 * 60000).toISOString());
+  await componi(ora - 60 * 60000 + 100);
+  await scrivi('ab12', 'filo', 'Una carbonara.', new Date(ora - 60 * 60000 + 1000).toISOString());
+  await componi(ora);
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi(), forza: true });
+  const [gatti] = (await Comp.righe(false)).ore;
+  assert.match(gatti.testo, /gatti/);
+  assert.ok(!gatti.fonti.includes(visita.id), 'la riga dei gatti non ha letto la pagina');
+  await componi(ora + 5 * ORA_MS);
+  await Comp.compatta({ incognito: false, ora: ora + 5 * ORA_MS, tetti: tettiDi(), forza: true });
+  assert.ok((await Comp.righe(false)).ore[1].fonti.includes(visita.id), 'la pagina va con la riga della domanda che la porta in testa');
+  await togliVisita(visita);
+  const sezione = await Comp.sezione(false);
+  assert.doesNotMatch(sezione, /carbonara/);
+  assert.match(sezione, /parlato dei gatti/);
+});
+
+test('al primo giro una pagina aperta prima del primo messaggio del pezzo va con la sua riga, e cancellarne un\'altra non la toglie', async () => {
+  compattatoreDelleCene();
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  const visita = await visitaCarbonara(t0 - 10 * 60000);
+  await scrivi('ab12', 'user', 'che si mangia stasera?', new Date(t0).toISOString());
+  await scrivi('ab12', 'filo', 'Una carbonara.', new Date(t0 + 1000).toISOString());
+  const altra = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://meteo.example/', titolo: 'Meteo', ts: new Date(ora - 30 * 60000).toISOString() }, { incognito: false });
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi(), forza: true });
+  const [riga] = (await Comp.righe(false)).ore;
+  assert.deepEqual(riga.fonti.filter((f) => !f.includes('|')), [visita.id], 'solo la pagina che il messaggio porta in testa');
+  // La pagina sta prima del primo messaggio compattato: la ricerca delle cancellazioni deve ritrovarla.
+  await togliVisita(altra);
+  assert.match(await Comp.sezione(false), /letta la carbonara/, 'una pagina che c\'è ancora non fa uscire la riga');
+  await togliVisita(visita);
+  assert.doesNotMatch(await Comp.sezione(false), /carbonara/);
+});
+
+test('dopo una pausa che aveva riassunto tutto, una pagina aperta prima del messaggio nuovo va con la riga del pezzo nuovo', async () => {
+  compattatoreDelleCene();
+  const ora = Date.now();
+  await scrivi('ab12', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 9 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Che bei nomi.', new Date(ora - 9 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora: ora - 6 * ORA_MS, tetti: tettiDi(), forza: true });
+  assert.equal((await Comp.righe(false)).ore.length, 1);
+  const visita = await visitaCarbonara(ora - 4 * ORA_MS);
+  await scrivi('ab12', 'user', 'che si mangia stasera?', new Date(ora - 4 * ORA_MS + 10 * 60000).toISOString());
+  await scrivi('ab12', 'filo', 'Una carbonara.', new Date(ora - 4 * ORA_MS + 10 * 60000 + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi(), forza: true });
+  const ore = (await Comp.righe(false)).ore;
+  assert.ok(ore[1].fonti.includes(visita.id) && !ore[0].fonti.includes(visita.id));
+  await togliVisita(visita);
+  const sezione = await Comp.sezione(false);
+  assert.doesNotMatch(sezione, /carbonara/);
+  assert.match(sezione, /parlato dei gatti/);
 });

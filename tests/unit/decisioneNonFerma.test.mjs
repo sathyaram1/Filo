@@ -13,7 +13,7 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 require(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2 };
 const F = (s) => R.parseFindings(s).findings;
 const decide = (s, counts = {}, caps = CAPS) => R.decideRound({ findings: F(s), caps, counts });
 const tag = (list) => list.map(R.findingTag);
@@ -21,10 +21,10 @@ const tag = (list) => list.map(R.findingTag);
 // ── Il segno «!» ────────────────────────────────────────────────────────────
 
 test('il lettore accetta il «!» dopo il «?», anche nell\'ordine inverso o col «?» prima della lettera', () => {
-  const p = R.parseFindings('Provato.\n[2i?!] cambia il formato del file salvato\n[2?i!] b\n- [3i!?] c\n[1v?] d');
+  const p = R.parseFindings('Provato.\n[2i?!] cambia il formato del file salvato\n[2?i!] b\n- [3i!?] c\n[e?] d');
   assert.deepEqual(p.rifiutati, []);
   assert.deepEqual(p.findings.map((f) => [f.level, f.sede, f.decision, f.irreversibile === true]), [
-    [2, 'i', true, true], [2, 'i', true, true], [3, 'i', true, true], [1, 'v', true, false],
+    [2, 'i', true, true], [2, 'i', true, true], [3, 'i', true, true], [null, 'e', true, false],
   ]);
   assert.equal(p.findings[0].text, 'cambia il formato del file salvato');
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i?!] a\n[2?i!] b'), []);
@@ -67,46 +67,56 @@ test('[2i?] non ferma: va nella correzione E nel derivato con la domanda; paga i
   assert.doesNotMatch(nota, /Bilancio delle correzioni di livello 2|bilancio delle correzioni di livello 2/);
 });
 
-test('[2i?!] e [3i?] fermano; [1i?!] e [0i?] vanno da parte senza fermare', () => {
-  for (const riga of ['[2i?!] sui dati salvati', '[3i?] chiavi SSH', '[3i?!] chiavi SSH']) {
+test('[3i?] ferma per l\'owner; un «?!» ferma a ogni livello, per il manutentore; [1i?] va da parte senza fermare', () => {
+  const casi = [
+    ['[2i?!] sui dati salvati', 'manutentore'], ['[1i?!] formato del registro', 'manutentore'],
+    ['[3i?] chiavi SSH', 'owner'], ['[3i?!] chiavi SSH', 'manutentore'],
+  ];
+  for (const [riga, destinatario] of casi) {
     const d = decide(`Provato.\n${riga}\n[1i] lieve`);
     assert.equal(d.stop, true, riga);
     assert.deepEqual(d.fix, [], `${riga}: a lavoro fermo non si corregge niente`);
     assert.deepEqual(tag(d.sospesi), ['[1i]']);
+    assert.deepEqual(d.blocking.map((f) => f.destinatario), [destinatario], riga);
   }
-  const lieve = decide('Provato.\n[1i?!] formato del registro\n[0i?] gusto');
+  const lieve = decide('Provato.\n[1i?] gusto\n[e?] altrove, da decidere');
   assert.equal(lieve.stop, false);
   assert.deepEqual(lieve.fix, []);
-  assert.deepEqual(tag(lieve.derived), ['[1i?!]', '[0i?]']);
+  assert.deepEqual(tag(lieve.derived), ['[1i?]']);
+  assert.deepEqual(tag(lieve.external), ['[e?]'], 'un esterno col ? non ferma');
   assert.ok(lieve.derived.every((f) => f.inCorrezione !== true), 'niente si applica: la domanda e basta');
 });
 
 test('[2i?] a bilanci finiti dal 2 in giù va da parte come un 2: domanda nel suo feedback, niente applicato, niente fermo', () => {
-  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
+  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5 });
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix, []);
   assert.equal(d.derived.length, 1);
   assert.notEqual(d.derived[0].inCorrezione, true);
   // Con un 3 da correggere nello stesso giro, invece, entra: il giro lo paga il 3.
-  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
+  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5 });
   assert.deepEqual(tag(conTre.fix), ['[3i]', '[2i?]']);
   assert.equal(conTre.consume, 'cap3');
   assert.equal(conTre.derived[0].inCorrezione, true);
 });
 
-test('decisioneFerma: ferma un 3 o un 2 su una scelta difficile da disfare', () => {
+test('decisioneFerma: ferma un 3 col ?, o una scelta difficile da disfare a ogni livello; destinatarioDelFermo la manda al manutentore', () => {
   assert.equal(R.decisioneFerma({ level: 3, decision: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true, irreversibile: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true }), false);
-  assert.equal(R.decisioneFerma({ level: 1, decision: true, irreversibile: true }), false);
+  assert.equal(R.decisioneFerma({ level: 1, decision: true, irreversibile: true }), true, '#2339: il ! ferma anche su un 1');
+  assert.equal(R.decisioneFerma({ level: 1, decision: true }), false);
   assert.equal(R.decisioneFerma({ level: 3, decision: false }), false, 'senza «?» non è una domanda');
+  assert.equal(R.destinatarioDelFermo({ level: 1, decision: true, irreversibile: true }), 'manutentore');
+  assert.equal(R.destinatarioDelFermo({ level: 3, decision: true }), 'owner');
+  assert.equal(R.destinatarioDelFermo({ level: 3, decision: false }), 'owner', 'un 3 a bilanci finiti va all\'owner');
 });
 
 // ── Gli strumenti: dispatch e verifica locale ───────────────────────────────
 
 test('dispatch: la risposta dice di applicare l\'opzione consigliata, e la pulizia lascia la prova del rilievo in correzione', async () => {
   const { verifierReplyText, messiDaParte, DECISIONE_IN_CORREZIONE_NOTE } = await import('../../scripts/dispatch.mjs');
-  const critica = F('Provato.\n[2i?] A o B? Consiglio A.\n[1e] bordo storto altrove');
+  const critica = F('Provato.\n[2i?] A o B? Consiglio A.\n[e] bordo storto altrove');
   const d = R.decideRound({ findings: critica, caps: CAPS, counts: {} });
   // Come li rimanda il server: col numero del feedback, e col posto nella critica che dispatch ci rimette.
   const posto = (f) => critica.findIndex((c) => c.text === f.text) + 1;
@@ -128,7 +138,7 @@ test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pul
   const VL = await import('../../scripts/verify-local.mjs');
   const SHA = 'a'.repeat(40);
   const s = VL.withRequest({}, 'r', { request: 'x', sha: SHA });
-  const r = VL.withCritique(s, 'r', { critique: 'Provato.\n[2i?] A o B? Consiglio A.\n[1e] altrove', sha: SHA, caps: CAPS });
+  const r = VL.withCritique(s, 'r', { critique: 'Provato.\n[2i?] A o B? Consiglio A.\n[e] altrove', sha: SHA, caps: CAPS });
   assert.equal(r.outcome, 'fix');
   assert.deepEqual(VL.numeriMessiDaParte(r.state.r), [2], 'solo l\'esterno: il 2 col ? si corregge');
   const coda = VL.codaText({ findings: r.decision.fix, derived: r.decision.derived, external: r.decision.external, budgets: r.decision.budgets, branch: 'r', instructions: 'CODA' });
@@ -136,8 +146,8 @@ test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pul
   // Nessun commit dopo la critica: il 2 non è stato corretto, e un 2 interno lasciato lì ferma, come sempre.
   const c = VL.withFixed(r.state, 'r', { report: 'niente di nuovo', sha: SHA });
   assert.equal(c.outcome, 'stop');
-  // Un vicino da solo non fa partire niente nemmeno qui, con cap0 sopra zero.
-  const v = VL.withCritique(VL.withRequest({}, 'v', { request: 'x', sha: SHA }), 'v', { critique: 'Provato.\n[2v] nel file vicino', sha: SHA, caps: { ...CAPS, cap0: 3 } });
+  // Un esterno da solo non fa partire niente nemmeno qui, anche con un cap0 rimasto dalla scala vecchia.
+  const v = VL.withCritique(VL.withRequest({}, 'v', { request: 'x', sha: SHA }), 'v', { critique: 'Provato.\n[e] nel file che il ramo modifica', sha: SHA, caps: { ...CAPS, cap0: 3 } });
   assert.equal(v.outcome, 'pass');
 });
 

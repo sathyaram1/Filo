@@ -7,6 +7,8 @@
 //      e ogni gesto arriva al main come `lavoriServer` vero/falso; un salvataggio fallito torna indietro e lo dice.
 //   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
 //   4. Fase 2 (#1222): la scheda dice anche quando aspetta la suite del server o la pubblicazione da GitHub.
+//   5. #2258: un lavoro fermo «resta locale» ha nel dettaglio «Dichiara fidato com'è»: prima il server dice cosa, la
+//      conferma rimanda quello che l'owner ha visto, e il fermo sparisce; un rifiuto lo dice e lascia riprovare.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -168,7 +170,7 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z --server');
   const rigaSporca = page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server');
   await expect(rigaSporca).toHaveText('Fermo: resta locale');
-  await expect(rigaSporca).toHaveAttribute('title', /non torna pulito: lo porta avanti una sessione locale/);
+  await expect(rigaSporca).toHaveAttribute('title', /non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è»/);
   await expect(rigaSporca).not.toHaveAttribute('title', /riparte da solo|sanatoria/i);
   await expect(page.locator('.mg-item[data-id="srv-6"] b')).toHaveCount(0);
   await expect(page.locator('.mg-item[data-id="srv-7"]')).toBeVisible();
@@ -215,4 +217,119 @@ test('#1222: la scheda dice quando il server aspetta la suite; un segno di attes
   await expect(page.locator('.mg-item[data-id="srv-4"] .mg-attesa-server')).toHaveCount(0);
   await expect(page.locator('.mg-item[data-id="srv-5"]')).toBeVisible();
   await expect(page.locator('.mg-item[data-id="srv-5"] .mg-attesa-server')).toHaveCount(0);
+});
+
+const PUNTA_APP = 'a'.repeat(40);
+const PUNTA_SRV = 'b'.repeat(40);
+
+async function stubDichiara(page, { rifiutaLaPrima = false, niente = false } = {}) {
+  await page.evaluate((cfg) => {
+    window.__dichiara = [];
+    let rifiuti = cfg.rifiutaLaPrima ? 1 : 0;
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (!msg || msg.type !== 'fiducia_dichiara') return orig(msg);
+      window.__dichiara.push(Object.fromEntries(Object.entries(msg).filter(([k]) => k !== 'type')));
+      if (cfg.niente) return { ok: true, niente: true };
+      if (msg.prova) {
+        const scritti = [{ at: Date.parse('2026-11-06T13:32:00Z'), ruolo: 'fixer' }, { at: Date.parse('2026-11-07T08:10:00Z'), ruolo: 'manutentore' }];
+        return { ok: true, stato: 2, scritti, visto: { stato: 2, app: cfg.app, server: cfg.srv }, rami: [
+          { repo: 'app', punta: cfg.app, motivo: 'una voce di biglietti non fidati' },
+          { repo: 'server', punta: cfg.srv, motivo: '<b>la punta</b> non è l’ultima registrata' },
+        ] };
+      }
+      if (rifiuti-- > 0) return { ok: false, error: 'il lavoro è cambiato da quando l’hai guardato: riguardalo prima di dichiararlo fidato' };
+      return { ok: true, rami: [], stato: 2 };
+    };
+  }, { rifiutaLaPrima, niente, app: PUNTA_APP, srv: PUNTA_SRV });
+}
+
+async function apriFermo(page, opzioni) {
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  // Coi lavori server spenti il segno rimasto non è un fermo (#2036.1): qui sono accesi.
+  await stubAutomazioni(page, { lavoriServer: true });
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await stubDichiara(page, opzioni);
+  const fermo = fb({ _id: 'srv-8', seq: 1160, status: 'todo', branch: 'worker/srv-8-20261029T090000Z',
+    restaLocale: { motivi: ['ramo non pulito', 'contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-07T10:00:00Z') } });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fermo]);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await page.evaluate(() => window.__mgTest.openDetail('srv-8'));
+}
+
+test('#2258: l’owner dichiara fidato com’è un lavoro fermo «resta locale»: vede cosa, conferma, e il fermo sparisce', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriFermo(page, { rifiutaLaPrima: true });
+  const stato = page.locator('#mgWorkState');
+  // In coda (todo) non c'è iter: il fermo si dice lo stesso, nell'elenco e nel dettaglio.
+  await expect(page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server')).toHaveText('Fermo: resta locale');
+  await expect(stato.locator('.mg-attesa-server')).toHaveText('Fermo: resta locale');
+  const btn = page.locator('#mgDichiaraBtn');
+  await expect(btn).toBeVisible();
+  await expect(btn).toHaveAttribute('title', /riparte al giro dopo/);
+  await btn.click();
+  const cosa = stato.locator('.mg-dichiara-cosa li');
+  await expect(cosa).toHaveText([
+    'Ramo dell’app, all’ultimo commit aaaaaaa: una voce di biglietti non fidati',
+    'Ramo del server, all’ultimo commit bbbbbbb: <b>la punta</b> non è l’ultima registrata',
+    // Quando e da chi: l'owner trova le note da leggere senza rileggerle tutte.
+    /^2 scritti di biglietti non fidati fra note e critiche: Correzione 0\d\/11\/2026 \d\d:32; Manutenzione 0\d\/11\/2026 \d\d:10$/,
+  ]);
+  await expect(stato.locator('.mg-dichiara b')).toHaveCount(0);
+  // Si dichiara dopo aver letto: ogni ramo apre le sue modifiche rispetto a main, nel suo repo.
+  await expect(cosa.nth(0).locator('a')).toHaveAttribute('href', 'https://github.com/sathyaram1/Filo/compare/main...worker/srv-8-20261029T090000Z');
+  await expect(cosa.nth(1).locator('a')).toHaveAttribute('href', 'https://github.com/sathyaram1/filo-security/compare/main...worker/srv-8-20261029T090000Z');
+  await expect(cosa.nth(0).locator('a')).toHaveAttribute('target', '_blank');
+  await expect(cosa.nth(2).locator('a')).toHaveCount(0);
+  await page.locator('#mgWorkState').screenshot({ path: 'tests/.shots/manage-dichiara-fidato-2258.png' });
+  // Il primo sì trova il lavoro cambiato: lo dice, e la conferma resta lì per riprovare.
+  await page.locator('#mgDichiaraSi').click();
+  await expect(page.locator('#mgManageMsg')).toHaveText(/Non dichiarato fidato: il lavoro è cambiato/);
+  await expect(page.locator('#mgDichiaraSi')).toBeEnabled();
+  await page.locator('#mgDichiaraSi').click();
+  await expect(page.locator('#mgManageMsg')).toHaveText('Ramo e note del lavoro di #1160 sono fidati: riparte al prossimo giro, se non lo ferma altro.');
+  await expect(stato.locator('.mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('#mgDichiaraBtn')).toHaveCount(0);
+  await expect(page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server')).toHaveCount(0);
+  const visto = { stato: 2, app: PUNTA_APP, server: PUNTA_SRV };
+  expect(await page.evaluate(() => window.__dichiara)).toEqual([
+    { feedbackId: 'srv-8', prova: true }, { feedbackId: 'srv-8', visto }, { feedbackId: 'srv-8', visto },
+  ]);
+});
+
+test('#2258: annullare torna al tasto senza scrivere; se ramo e note sono già puliti lo dice, col motivo che resta', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriFermo(page);
+  await page.locator('#mgDichiaraBtn').click();
+  await page.locator('#mgDichiaraNo').click();
+  await expect(page.locator('#mgDichiaraBtn')).toBeVisible();
+  await expect(page.locator('.mg-dichiara-cosa')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__dichiara)).toEqual([{ feedbackId: 'srv-8', prova: true }]);
+
+  const altra = await openTab(MANAGE);
+  await apriFermo(altra, { niente: true });
+  await altra.locator('#mgDichiaraBtn').click();
+  await expect(altra.locator('#mgManageMsg')).toHaveText('Ramo e note sono già puliti: lo tiene fermo altro (ramo non pulito, contenuto scritto da un biglietto sporco).');
+  await expect(altra.locator('#mgWorkState .mg-attesa-server')).toHaveText('Fermo: resta locale');
+});
+
+test('#2258: senza essere l’owner il tasto non c’è', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriFermo(page);
+  await page.evaluate(() => { window.__mgTest.setAdmin(false); window.__mgTest.openDetail('srv-8'); });
+  await expect(page.locator('#mgWorkState .mg-attesa-server')).toHaveText('Fermo: resta locale');
+  await expect(page.locator('#mgDichiaraBtn')).toHaveCount(0);
+});
+
+test('#2258: coi lavori server spenti il segno rimasto non è un fermo, e il tasto non c’è: la stessa regola della riga', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriFermo(page);
+  await expect(page.locator('#mgDichiaraBtn')).toBeVisible();
+  await page.evaluate(() => { window.__auto.lavoriServer = false; return window.__mgTest.loadAutoMode(); });
+  await page.evaluate(() => window.__mgTest.openDetail('srv-8'));
+  await expect(page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('#mgWorkState .mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('#mgDichiaraBtn')).toHaveCount(0);
 });

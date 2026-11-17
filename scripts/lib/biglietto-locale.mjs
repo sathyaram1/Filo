@@ -7,6 +7,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import '../../src/shared/feedbackThread.js';
 
 export const CARTELLA = join('.claude', 'biglietti');
 export const ENV_FILE = 'FILO_BIGLIETTO_FILE';
@@ -183,30 +184,31 @@ export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), se
   return daEnv;
 }
 
-// I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
-const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
-const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
+// Oltre, i numeri delle note non fidate si contano soltanto: il motivo ha 300 caratteri sul server.
+const NOTE_NEL_MOTIVO = 12;
 
-/**
- * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
- * l'ha scritto un biglietto sporco (`scrittoSporco`), da qui no: nel dubbio, chi la stampa si sporca.
- */
-export function noteConScrittiDiAltri(notes) {
-  let altri = true;
-  for (const riga of String(notes || '').split(/\r?\n/)) {
-    if (TURNO_OWNER_RE.test(riga)) { altri = false; continue; }
-    if (TURNO_ALTRI_RE.test(riga)) { altri = true; continue; }
-    if (riga.startsWith('@@filo-attachment ')) continue;
-    if (altri && riga.trim()) return true;
-  }
-  return false;
+/** Il campo `noteFidate` di un documento letto via REST (`doc.fields`), in lista di impronte. PURA. */
+export function noteFidateDaCampi(fields) {
+  const v = fields && fields[globalThis.SN_FEEDBACK_THREAD.CAMPO_NOTE_FIDATE];
+  const valori = (v && v.arrayValue && v.arrayValue.values) || [];
+  return valori.map((x) => x && x.stringValue).filter((s) => typeof s === 'string' && s);
 }
 
-/** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
-export function motiviDiLettura({ fiducia, notes } = {}) {
+/** I numeri (da 1) delle note non fidate della conversazione (#1919). `noteFidate` è il campo del server. */
+export async function noteNonFidate(notes, noteFidate) {
+  const turni = await globalThis.SN_FEEDBACK_THREAD.fiduciaDelleNote(notes, noteFidate);
+  return turni.filter((t) => !t.fidata).map((t) => t.numero);
+}
+
+/** Perché chi stampa questo feedback si sporca (§1.2): il suo testo non fidato, e le note non fidate col loro numero. */
+export async function motiviDiLettura({ fiducia, notes, noteFidate } = {}) {
   const out = [];
   if (fiducia !== 'fidato') out.push('testo di un feedback non fidato');
-  if (noteConScrittiDiAltri(notes)) out.push('conversazione con scritti di routine o sessioni');
+  const nf = await noteNonFidate(notes, noteFidate);
+  if (nf.length) {
+    const altre = nf.length > NOTE_NEL_MOTIVO ? ` e altre ${nf.length - NOTE_NEL_MOTIVO}` : '';
+    out.push(`${nf.length === 1 ? 'nota non fidata' : 'note non fidate'} nella conversazione: ${nf.slice(0, NOTE_NEL_MOTIVO).join(', ')}${altre}`);
+  }
   return out;
 }
 
@@ -312,6 +314,22 @@ export async function rigaSporco(cosa, motivi, opts = {}) {
   if (r.sporcati) return `Biglietto della sessione sporcato (${motivi.join('; ')}): da qui ciò che scrivi nasce non fidato.`;
   if (r.inAttesa) return `Server non raggiunto (${r.errori.join('; ')}): lo sporco (${motivi.join('; ')}) è annotato in locale e parte alla prossima chiamata; intanto ciò che scrivi da qui nasce non fidato.`;
   return `Biglietto NON sporcato (${r.errori.join('; ')}): dichiaralo con node scripts/biglietto.mjs sporca "${cosa}".`;
+}
+
+/**
+ * Chiede al server di segnare fidata la nota che questa sessione ha appena scritto (#1919): `noteFidate` lo scrive solo
+ * lui, da un biglietto pulito e per un'impronta che sta nelle note. → '' se l'ha segnata, altrimenti il motivo.
+ */
+export async function segnaNotaFidata(feedbackId, impronta, { env, cwd, deps = {} } = {}) {
+  try {
+    const b = await trovaBiglietto({ env, cwd, deps });
+    if (!b) return 'questa sessione non ha un biglietto';
+    if (b.fiducia !== 'fidato') return 'il biglietto della sessione è sporco';
+    await chiama('notaFidata', { ticket: b.ticket, feedbackId: String(feedbackId || ''), impronta: String(impronta || '') }, deps);
+    return '';
+  } catch (e) {
+    return String((e && e.message) || e);
+  }
 }
 
 /** 'fidato' solo con un biglietto pulito: senza biglietto, o con un guasto, 'non_fidato'. */

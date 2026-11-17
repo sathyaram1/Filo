@@ -153,6 +153,32 @@ test('una domanda chiusa come attuata da un lavoro fuso dice quale, senza un pri
   await expect(tab(page, 'domande')).toHaveText('Da rispondere (1)');
 });
 
+// #2149.1: una risposta col principio che non sposta il lavoro dice cosa gli è successo, come quando risponde l'owner.
+test('una risposta automatica su un lavoro archiviato, accodato o rimandato in verifica lo dice accanto al principio', async ({ app, openTab }) => {
+  const auto = (n, esito) => domanda(n, {
+    stato: 'chiusa', titolo: `Automatica ${n}`,
+    opzioni: AUTOMATICA.opzioni, consiglio: AUTOMATICA.consiglio,
+    esito: Object.assign({ ok: true, automatica: true, principio: 'D-41', applicataIl: Date.now() }, esito),
+  });
+  const casi = [
+    [auto(70, { lavoroArchiviato: true }), 'Risposta automatica col principio di D-41. Il lavoro è archiviato: la risposta non lo riapre.'],
+    [auto(71, { accodata: true, statoLavoro: 'todo' }), /^Risposta automatica col principio di D-41\. Fatto .+: la prende il prossimo giro di lavoro\.$/],
+    [auto(72, { rimandata: true }), /^Risposta automatica col principio di D-41\. Fatto .+: il lavoro torna in verifica con la risposta\.$/],
+    [auto(73, {}), 'Risposta automatica col principio di D-41.'],
+  ];
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [FONTE, ...casi.map(([d]) => d)] });
+  const page = await openTab(MANAGE);
+  await apriDomande(page);
+  await tab(page, 'domande-automatiche').click();
+  for (const [d, atteso] of casi) {
+    await riga(page, d.id).click();
+    const a = dq(page, d.id);
+    await expect(a.locator('.mg-dq-esito')).toHaveCount(1);
+    await expect(a.locator('.mg-dq-esito').first()).toHaveText(atteso);
+    if (d.id === 'D-70') await a.screenshot({ path: 'tests/.shots/manage-domande-automatica-archiviato.png' });
+  }
+});
+
 test('«non riscritta», «Testo originale» in cima senza scorrere, niente pulsanti doppi, la riga sotto la casella', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);

@@ -53,6 +53,8 @@ porta solo l'ultima.
 
 <!-- includi: _criteri-verifica.md -->
 
+<!-- includi: _prova-da-utente.md -->
+
 <!-- includi: _criteri-struttura.md -->
 
 <!-- includi: _segnala.md -->

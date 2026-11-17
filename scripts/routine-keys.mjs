@@ -107,7 +107,7 @@ async function main() {
       const stato = k.revoked ? 'REVOCATA' : 'attiva';
       // L'account claude.ai della routine: senza, il suo consumo non va su nessun account (crediti, #1156).
       const account = k.scope === 'routine' ? `account ${k.account || '—'}`.padEnd(10) : ''.padEnd(10);
-      // Solo a rete limitata i biglietti nascono puliti; la chiave server prende solo lavori server (#1253).
+      // Solo a rete limitata i biglietti nascono puliti; la chiave server prende i lavori server e i primi fidati (#1253, #2500).
       const rete = k.scope === 'routine' ? `rete ${k.rete || 'aperta'}`.padEnd(14) : ''.padEnd(14);
       const lavori = k.scope === 'routine' && k.lavori === 'server' ? 'lavori server  ' : ''.padEnd(15);
       // L'ambiente dei riservati (#1153): solo lì il server consegna testo riservato, e solo compiti. Quello a rete
@@ -175,8 +175,8 @@ async function main() {
     }
     await chiama({ op: 'lavori', slug: nome, lavori: potere });
     console.log(potere === 'server'
-      ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
-      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`);
+      ? `"${nome}" è la chiave della routine server: riceve i lavori server fidati e il primo lavoro di ogni feedback fidato, e solo a rete limitata.`
+      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata; il primo lavoro di un feedback fidato solo se le routine server sono spente.`);
     return;
   }
 

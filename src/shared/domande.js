@@ -493,6 +493,18 @@
   }
 
   /**
+   * La domanda che ha assorbito questa (§3.6), '' se non è un'assorbita: il segno del server, e per le assorbite prima
+   * del segno il motivo che scriveva. Una superata da una nata al suo posto non è un'assorbita. PURA.
+   */
+  function assorbitaIn(domanda) {
+    if (!isOggetto(domanda) || domanda.stato !== 'superata' || !isOggetto(domanda.esito)) return '';
+    const e = domanda.esito;
+    if (e.assorbita === true && numeroDi(e.superataDa) !== null) return String(e.superataDa).trim();
+    const m = /^assorbita in (D-[1-9]\d{0,8})$/.exec(String(e.superata || ''));
+    return m ? m[1] : '';
+  }
+
+  /**
    * La domanda coi testi degli autori non fidati passati da `visibile` (#1502): titolo, contesto, opzioni e turni di una
    * domanda non fidata, e i turni non fidati di ogni domanda. Azioni, id e testi dell'owner restano com'erano. PURA.
    */
@@ -538,7 +550,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };
 

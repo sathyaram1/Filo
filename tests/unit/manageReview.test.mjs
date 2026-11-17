@@ -2181,7 +2181,10 @@ test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno p
   assert.match(ramo, /fiducia:sana -- worker\/x-1;/);
   assert.match(MR.sbloccoFermo('ramo del server non pulito', 'worker/x-1'), /fiducia:sana -- worker\/x-1 --server/);
   assert.match(MR.sbloccoFermo('ramo non pulito'), /fiducia:sana -- <ramo>/, 'senza ramo noto non inventa un nome');
-  assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito.*sessione locale/);
+  // Lo sporco lo toglie il gesto di #2258 in Gestione, non una sessione sul PC.
+  assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito da solo.*«Dichiara fidato com’è»/);
+  assert.match(ramo, /biglietto sporco, «Dichiara fidato com’è»/);
+  assert.doesNotMatch(ramo, /sessione locale/);
   assert.doesNotMatch(MR.sbloccoFermo('ramo scritto da un biglietto sporco'), /sanatoria/, 'uno sporco non si sana');
   assert.match(MR.sbloccoFermo('feedback non fidato'), /segni fidato/);
   for (const m of ['note per gli agenti di una domanda non fidata', 'testo di una domanda aperta non fidata']) {

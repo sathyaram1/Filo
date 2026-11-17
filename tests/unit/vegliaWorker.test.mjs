@@ -14,7 +14,7 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
 const {
-  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti,
+  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti, oltreIlTetto,
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
   chiusuraDi, SOGLIA_CHIUSO_MS,
 } = await import('../../scripts/lib/veglia-worker.mjs');
@@ -211,6 +211,41 @@ describe('i segni di vita, letti dove stanno', () => {
   });
 });
 
+// #2303: l'audit fermo per venti minuti, padre e sotto-agenti insieme, era probabilmente su un limite del fornitore. Un
+// worker che aspetta un ritentativo dichiarato non è fermo fino alla fine dell'attesa; dopo, il silenzio torna a contare.
+describe('l\'attesa dichiarata dal fornitore', () => {
+  /** Una traccia ferma da `fa` minuti, la cui ultima riga dichiara un ritentativo fra `attesaMin` minuti (null: nessuna). */
+  const inAttesa = ({ fa, attesaMin }) => {
+    const dir = cartella('filo-veglia-fornitore-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const ora = Date.now() - fa * MIN;
+    const f = join(sub, 'agent-w1.jsonl');
+    const errore = attesaMin === null ? [] : [{ type: 'system', subtype: 'api_error', level: 'error', timestamp: new Date(ora).toISOString(), retryInMs: attesaMin * MIN, retryAttempt: 4, maxRetries: 10 }];
+    writeFileSync(f, righe(uso('t1', 'Bash', { command: 'ls' }, ora - MIN), risposta('t1', ora - MIN + 500), ...errore));
+    utimesSync(f, new Date(ora), new Date(ora));
+    return dir;
+  };
+  const segni = (configDir) => segniDiVita({ root: clone({ prima: 60 }).work, ticket: B, sessione: SID, configDir });
+
+  test('fermo da venticinque minuti dentro un\'attesa di un\'ora: lavora, e il battito dice «adesso»', () => {
+    const adesso = Date.now();
+    const v = segni(inAttesa({ fa: 25, attesaMin: 60 }));
+    assert.equal(giudica({ ...v, adesso }).stato, 'lavora');
+    assert.equal(attivitaPerBattito(v, adesso).attivitaMs, adesso);
+    assert.equal(giudica({ ...segni(inAttesa({ fa: 25, attesaMin: null })), adesso }).stato, 'fermo', 'lo stesso silenzio senza attesa dichiarata');
+  });
+
+  test('a attesa finita da venti minuti è fermo, e il quadro la dice', () => {
+    const v = segni(inAttesa({ fa: 45, attesaMin: 24 }));
+    const g = giudica({ ...v, adesso: Date.now() });
+    assert.equal(g.stato, 'fermo');
+    assert.ok(g.fermoMs >= 20 * MIN && g.fermoMs < 22 * MIN, `fermo da ${g.fermoMs}`);
+    assert.match(quadroDelFermo(v), /Ultima attesa dichiarata dal fornitore: dalle \d\d:\d\d:\d\d UTC alle \d\d:\d\d:\d\d UTC, tentativo 4 di 10\./);
+    assert.doesNotMatch(quadroDelFermo(segni(inAttesa({ fa: 45, attesaMin: null }))), /attesa dichiarata/);
+  });
+});
+
 function fintoServer() {
   const ricevute = [];
   const srv = createServer((req, res) => {
@@ -370,11 +405,14 @@ describe('il quadro del worker fermo', () => {
 
   test('l\'ultimo passo: lo strumento chiamato per ultimo con la sua risposta, il tipo dell\'ultima riga, il modello', () => {
     const l = [conModello(uso('a', 'Bash', { command: 'npm run test:unit' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 2000)];
-    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5' });
+    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5', attesa: null });
     const p = ultimoPasso([...l, testo('segreto del worker', ORA + 5000), { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 6000).toISOString() }]);
     assert.deepEqual(p.passo, { cosa: 'sistema api_error', ms: ORA + 6000 });
+    assert.equal(p.attesa, null, 'un errore senza ritentativo dichiarato non è un\'attesa');
+    const ritenta = { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 7000).toISOString(), retryInMs: 90_000, retryAttempt: 2, maxRetries: 10 };
+    assert.deepEqual(ultimoPasso([...l, ritenta]).attesa, { inizioMs: ORA + 7000, finoMs: ORA + 97_000, tentativo: 2, di: 10 });
     assert.equal(ultimoPasso([testo('x', ORA)]).passo.cosa, 'testo del modello');
-    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '' });
+    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '', attesa: null });
   });
 
   test('un transcript che finisce dopo una risposta di strumento: il guasto dice quale, a che ora, con risposta, e il modello', () => {
@@ -532,5 +570,97 @@ describe('il worker che ha chiuso senza rilasciare', () => {
     const chiuso = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir: dir, leggiProcessi: () => [] });
     assert.ok(Number.isFinite(chiuso.chiusoMs));
     assert.equal(giudica({ ...chiuso, adesso: Date.now() }).stato, 'chiuso');
+  });
+});
+
+// #2303: un compito ricorrente ha un tetto di costo per corsa. Chi guida il giro misura i dollari dei transcript del
+// worker e, oltre il tetto, rilascia il biglietto con l'esito «oltre il tetto»: il server chiude l'istanza.
+describe('il tetto di costo di un compito', () => {
+  const s = (extra = {}) => ({ mio: true, finito: false, tempi: [ADESSO - MIN], processi: 0, tracce: { viste: true, attesa: null, file: ['a.jsonl'] }, ...extra });
+  const orologio = () => { let t = ADESSO; return { adesso: () => t, dorme: async (ms) => { t += ms; } }; };
+
+  test('oltre il tetto sì, sotto o senza tetto o senza misura no', () => {
+    assert.deepEqual(oltreIlTetto({ tettoUsd: 120 }, { usd: 131.234 }), { usd: 131.23, tettoUsd: 120 });
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, { usd: 119.99 }), null);
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, { usd: 120 }), null, 'al tetto esatto non si ferma');
+    assert.equal(oltreIlTetto({}, { usd: 500 }), null);
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, null), null);
+  });
+
+  test('un compito oltre il tetto: rilascio con l\'esito, 3, e a chi guida i soli numeri', async () => {
+    const o = orologio();
+    const rilasci = [];
+    const e = await veglia({
+      ...o, leggi: () => s({ tettoUsd: 120 }), rilascia: () => assert.fail('nessun guasto'),
+      costo: async (x) => { assert.deepEqual(x.tracce.file, ['a.jsonl']); return { usd: 131.2 }; },
+      rilasciaOltre: (oltre, mio) => { rilasci.push({ oltre, mio }); return { ok: true }; },
+    });
+    assert.deepEqual(rilasci, [{ oltre: { usd: 131.2, tettoUsd: 120 }, mio: true }]);
+    assert.equal(e.uscita, USCITA_FERMO);
+    assert.deepEqual(e.oltreTetto, { usd: 131.2, tettoUsd: 120 });
+    assert.match(e.testo, /^Compito oltre il tetto di costo della corsa \(131\.2 \$ su 120 \$\): biglietto rilasciato, il compito non riparte\./);
+    // Il biglietto chiuso non ferma un worker in sottofondo: chi guida il giro deve fermarlo, e sapere come (#2303).
+    assert.match(e.testo, /fermalo adesso con lo strumento TaskStop[^.]*id che ti ha dato il suo lancio/);
+  });
+
+  test('le istruzioni di chi guida il giro dicono di fermare il worker oltre il tetto, e con cosa', async () => {
+    const { AL_POSTO_VIVO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+    const ruolo = readFileSync(join(REPO, 'routines', 'roles', '_veglia.md'), 'utf8');
+    assert.match(ruolo, /oltre\s+il tetto di costo[\s\S]{0,200}Ferma il worker prima di chiudere, con lo strumento TaskStop/);
+    assert.match(AL_POSTO_VIVO, /oltre il tetto di costo\): se ti dice di fermare il worker fermalo con TaskStop/);
+  });
+
+  test('sotto il tetto lavora: una misura per fetta, e senza tetto nessuna', async () => {
+    const o = orologio();
+    let misure = 0;
+    const sotto = await veglia({
+      ...o, fetta: 90_000, passo: 10_000, leggi: () => s({ tettoUsd: 120 }), rilascia: () => assert.fail('nessun guasto'),
+      costo: async () => { misure += 1; return { usd: 80 }; }, rilasciaOltre: () => assert.fail('sotto il tetto non si ferma'),
+    });
+    assert.equal(sotto.uscita, USCITA_LAVORA);
+    assert.equal(misure, 1, 'i transcript si leggono una volta per fetta, non a ogni sguardo');
+    const senza = await veglia({
+      ...o, fetta: 30_000, leggi: () => s(), rilascia: () => assert.fail('nessun guasto'),
+      costo: async () => assert.fail('senza tetto non si misura'), rilasciaOltre: () => assert.fail('niente da fermare'),
+    });
+    assert.equal(senza.uscita, USCITA_LAVORA);
+  });
+
+  test('il tetto sta nel marcatore del biglietto, scritto da dispatch: i segni lo portano con l\'inizio del biglietto', async () => {
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    const { work } = clone();
+    assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) }).tettoUsd, undefined);
+    assert.equal(annotaTetto(work, 'un-altro-biglietto', 50), false, 'solo sul marcatore di quel biglietto');
+    assert.equal(annotaTetto(work, B, 124), true);
+    const v = segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) });
+    assert.equal(v.tettoUsd, 124);
+    assert.ok(Number.isFinite(v.dalMs));
+    assert.equal(v.tracce.file.length, 1);
+    assert.equal(annotaTetto(work, B, 0), true);
+    assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) }).tettoUsd, undefined, 'un tetto nullo lo toglie');
+  });
+
+  test('da riga di comando: i dollari del transcript passano il tetto → rilascio con oltreTetto e senza guasto, exit 3', async () => {
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    const { srv, port, ricevute } = await fintoServer();
+    const { work } = clone();
+    annotaTetto(work, B, 1);
+    const configDir = claude({ fa: 1 });
+    // Un milione di token in uscita su Opus: decine di dollari, ben oltre il tetto di 1 $.
+    const f = join(configDir, 'projects', '-home-user-Filo', SID, 'subagents', 'agent-w1.jsonl');
+    appendFileSync(f, righe({ type: 'assistant', timestamp: new Date().toISOString(), sessionId: SID, message: { id: 'caro', model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1_000_000 }, content: [{ type: 'text', text: 'x' }] } }));
+    try {
+      const r = await cli(['veglia', B], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_SESSION_ID: SID,
+      });
+      assert.equal(r.code, USCITA_FERMO, `stdout: ${r.so}\nstderr: ${r.se}`);
+      assert.match(r.so, /^Compito oltre il tetto di costo della corsa \(\d+(\.\d+)? \$ su 1 \$\): biglietto rilasciato, il compito non riparte\./);
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.ok(rilascio, 'il server ha ricevuto il rilascio');
+      assert.equal(rilascio.body.fault, undefined, 'non è un guasto');
+      assert.equal(rilascio.body.oltreTetto.tettoUsd, 1);
+      assert.ok(rilascio.body.oltreTetto.usd > 1, JSON.stringify(rilascio.body.oltreTetto));
+      assert.ok(rilascio.body.report, 'con il rapporto di fine sessione, parziale');
+    } finally { srv.close(); }
   });
 });

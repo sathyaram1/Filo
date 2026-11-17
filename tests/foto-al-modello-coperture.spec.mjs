@@ -348,7 +348,158 @@ test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password res
   expect(await pixelDelColore(app, immagine, ROSA), 'la password si legge nella foto').toBeLessThan(20);
 });
 
-// Lo Screenshot dal menu della scheda «Conto»: torna la foto che l'utente scarica.
+// #2116.5 — lo schermo intero, o quello che si sceglie nel selettore di Wayland: il contenitore non ha un sistema che
+// fotografi lo schermo, quindi la foto la compone la prova dalle schede vere, scoperte, nel punto in cui ogni finestra
+// di Filo sta. Le due finestre stanno affiancate, come nella segnalazione.
+async function schermoFinto(app, { wayland = false } = {}) {
+  await app.evaluate(({ nativeImage, screen, BrowserWindow }, { wl }) => {
+    const d = screen.getPrimaryDisplay().bounds;
+    const filo = BrowserWindow.getAllWindows().filter((w) => w._filoTabs && !w.isDestroyed());
+    filo.forEach((w, i) => w.setBounds({ x: d.x + Math.round((i * d.width) / filo.length), y: d.y, width: Math.floor(d.width / filo.length), height: d.height }));
+    globalThis.__schermo = { catture: 0, veli: 0, durante: null };
+    const componi = async () => {
+      // Quello che l'utente fa col selettore aperto, prima di scegliere.
+      if (globalThis.__schermo.durante) await globalThis.__schermo.durante();
+      const buf = Buffer.alloc(d.width * d.height * 4);
+      for (let i = 0; i < buf.length; i += 4) { buf[i] = 0x30; buf[i + 1] = 0x30; buf[i + 2] = 0x30; buf[i + 3] = 255; }
+      for (const w of BrowserWindow.getAllWindows().filter((x) => x._filoTabs && !x.isDestroyed())) {
+        const tm = w._filoTabs;
+        const tab = tm.tabs.find((t) => t.id === tm.activeId);
+        const c = w.getContentBounds();
+        const b = tab.view.getBounds();
+        const img = (await tab.view.webContents.capturePage()).resize({ width: b.width, height: b.height });
+        const src = img.toBitmap();
+        const { width: sw, height: sh } = img.getSize();
+        for (let y = 0; y < sh; y++) {
+          const ty = c.y + b.y + y - d.y;
+          if (ty < 0 || ty >= d.height) continue;
+          for (let x = 0; x < sw; x++) {
+            const tx = c.x + b.x + x - d.x;
+            if (tx < 0 || tx >= d.width) continue;
+            src.copy(buf, (ty * d.width + tx) * 4, (y * sw + x) * 4, (y * sw + x) * 4 + 4);
+          }
+        }
+        // I veli che Filo posa sopra la pagina li disegnerebbe il sistema: qui li disegna la prova.
+        for (const v of w.contentView.children.filter((x) => x._filoVelo)) {
+          globalThis.__schermo.veli += 1;
+          const r = v.getBounds();
+          for (let y = Math.max(0, c.y + r.y - d.y); y < Math.min(d.height, c.y + r.y + r.height - d.y); y++) {
+            for (let x = Math.max(0, c.x + r.x - d.x); x < Math.min(d.width, c.x + r.x + r.width - d.x); x++) {
+              const i = (y * d.width + x) * 4;
+              buf[i] = 0x80; buf[i + 1] = 0x80; buf[i + 2] = 0x80; buf[i + 3] = 255;
+            }
+          }
+        }
+      }
+      const foto = nativeImage.createFromBitmap(buf, { width: d.width, height: d.height });
+      globalThis.__schermo.grezza = foto.toDataURL();
+      return foto;
+    };
+    globalThis.SN_SCHERMO._perProve.usaSistema({
+      piattaforma: () => 'win32',
+      wayland: () => wl,
+      permessoMac: () => 'granted',
+      fonti: async ({ lato = 0 } = {}) => {
+        if (lato > 0) globalThis.__schermo.catture += 1;
+        if (wl) return lato > 0 ? [{ id: 'screen:77:0', nome: 'Schermo scelto nel selettore', tipo: 'schermo', displayId: '', immagine: await componi() }] : [];
+        return [{ id: 'screen:1:0', nome: 'Entire screen', tipo: 'schermo', displayId: String(screen.getPrimaryDisplay().id), immagine: lato > 0 ? await componi() : null }];
+      },
+    });
+  }, { wl: wayland });
+}
+
+async function cassaCompilata(app, openTab, testServer) {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Cassa del negozio</title></head><body style="margin:0">
+    <div style="height:120px;background:${tinta(VERDE)}"></div>
+    <form style="padding:20px"><input id="c" name="q" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0"></form>
+    </body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await page.locator('#c').blur();
+}
+
+// Il giro della chat fino all'OK sul popup.
+async function guardaDopoOk(app, chat, nome) {
+  await chatCheGuarda(app, nome);
+  await chiedi(chat, 'guarda lo schermo e dimmi cosa vedi');
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
+}
+
+const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
+
+test('#2116.5: guardando lo schermo intero, il numero della carta nella finestra di Filo accanto arriva coperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app);
+  await guardaDopoOk(app, chat, 'Schermo intero');
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  const grezza = await app.evaluate(() => globalThis.__schermo.grezza);
+  expect(await pixelDelColore(app, grezza, ROSA), 'lo schermo del sistema finto deve mostrare il numero scoperto').toBeGreaterThan(200);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare lo schermo con la cassa').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto dello schermo').toBeLessThan(20);
+});
+
+// Su Wayland il selettore può dare proprio la finestra di Filo, e non dice dove sta: finché è aperto le coperture
+// stanno dentro le finestre di Filo, e qualunque cosa si scelga le trova già coperte.
+test('#2116.5: Wayland, con una cassa compilata in una finestra di Filo quello scelto nel selettore arriva col numero coperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await app.evaluate(() => globalThis.__schermo.veli), 'col selettore aperto la cassa deve avere il suo velo').toBeGreaterThan(0);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare quello scelto nel selettore').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
+  const rimasti = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .reduce((n, w) => n + w.contentView.children.filter((v) => v._filoVelo).length, 0));
+  expect(rimasti, 'chiuso il selettore i veli se ne vanno').toBe(0);
+});
+
+// Col selettore aperto l'utente torna alla cassa e scrive un'altra carta fuori dai veli: quella foto non parte.
+test('#2116.5: Wayland, una carta scritta mentre il selettore è aperto ferma la foto e il modello sa perché', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await cassaCompilata(app, openTab, testServer);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await app.evaluate(({ BrowserWindow }, rosa) => {
+    globalThis.__schermo.durante = async () => {
+      // La cassa in vista: la seconda finestra può averne ripristinata una copia dietro la chat.
+      const tab = BrowserWindow.getAllWindows().filter((w) => w._filoTabs)
+        .map((w) => w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId)).find((t) => t && t.title === 'Cassa del negozio');
+      await tab.view.webContents.executeJavaScript(`(() => { const i = document.createElement('input'); i.name = 'q2';
+        i.style.cssText = 'position:absolute;left:20px;top:260px;width:420px;font:bold 34px monospace;color:${rosa};background:#fff;border:1px solid #999;caret-color:transparent;outline:0';
+        document.body.appendChild(i); i.focus(); })()`);
+      await tab.view.webContents.insertText('5555 5555 5555 4444');
+      await tab.view.webContents.executeJavaScript('document.activeElement.blur()');
+      await new Promise((r) => setTimeout(r, 150));
+    };
+  }, tinta(ROSA));
+  await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBe(2);
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto con la carta scoperta non deve partire').toBe(0);
+  expect(await app.evaluate(() => globalThis.__schermo.catture), 'il selettore si è aperto').toBe(1);
+  expect((await app.evaluate(() => globalThis.__chat[1])).slice(-800)).toContain('mentre sceglievi nel selettore');
+});
+
+test('#2116.5: Wayland, con le finestre di Filo senza niente da coprire quello scelto nel selettore arriva al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Ricette</title></head><body style="margin:0;background:${tinta(VERDE)}">
+    <p style="font:20px sans-serif">Pasta al forno</p></body></html>`);
+  await superaAvvisoSeCe(app);
+  const chat = await secondaFinestraConChat(app);
+  await schermoFinto(app, { wayland: true });
+  await guardaDopoOk(app, chat, SELETTORE);
+  await expect.poll(() => app.evaluate(() => globalThis.__occhio.length), { timeout: 30_000 }).toBe(1);
+  const [immagine] = await app.evaluate(() => globalThis.__occhio);
+  expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare quello scelto nel selettore').toBeGreaterThan(20_000);
+  expect(await app.evaluate(() => globalThis.__schermo.catture)).toBe(1);
+});
 async function scattaScreenshot(app, page) {
   let utente = null;
   await expect.poll(async () => {

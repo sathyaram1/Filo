@@ -33,7 +33,9 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    `touchUpdatedAt` in `src/shared/feedback.js`). I cammini che non passano da
    lì si contano a mano, una volta, per iscritto (anche negli script).
 2. **All'apertura si legge tutto**, a pagine e coi soli campi della lista; se
-   il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover).
+   il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover). Il main
+   tiene la lista, anche su disco: alla riapertura bastano i cambiati e il
+   conto, e un conto che non torna fa rileggere tutto (#2470).
 3. **La domanda incrementale.** Filtro `> ultimo visto` meno un margine per gli
    orologi scentrati, ordine (campo, nome), cursore oltre il tetto di pagina.
    «Ultimo visto» è l'ora del SERVER, e il margine si toglie anche a quella.
@@ -43,13 +45,16 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    sempre col margine. Un giro a vuoto costa una lettura. Una riga riletta coi soli
    campi della lista li sostituisce tutti: un campo della lista che manca è
    stato tolto sul server, non si tiene quello vecchio.
-4. **La riconciliazione rara** (mezz'ora): le versioni di tutto, confrontate in
-   pagina. Una lettura interrotta non fa uscire nessuno.
+4. **La riconciliazione rara** (sei ore): le versioni di tutto, confrontate in
+   pagina. Una lettura interrotta non fa uscire nessuno. Nel mezzo, ogni
+   mezz'ora, il controllo leggero: il conto contro le righe in mano e l'ultimo
+   cambiato contro la sua versione; un conto diverso fa riallineare.
 5. **Un giro solo, e solo con qualcuno che guarda.** Vive nel main senza un
    orologio suo: lo chiede la pagina in vista, e la porta ricontrolla la vista.
    L'esito va anche alle altre pagine iscritte.
 6. **I segni senza orologio coprono chi non firma**: l'ora di Firestore dei
-   feedback in mano alle routine (una lettura ciascuno), il contatore degli
+   feedback in mano alle routine (una lettura ciascuno, ogni cinque minuti; a
+   ogni giro quelli appena presi secondo il registro), il contatore degli
    invii CONTATO contro le righe arrivate, e il registro dei worker, che dice
    QUALE feedback è stato preso: quello si rilegge e si segue, il resto no.
 7. **Un tetto non taglia in silenzio.** I seguiti si leggono a pezzi con un

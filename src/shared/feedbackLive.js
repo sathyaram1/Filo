@@ -28,12 +28,21 @@
   // (patterns/un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md).
   const LISTA_IN_USO_MS = 1500;
 
-  // Il riallineamento completo, raro: è l'unica domanda che vede le
-  // cancellazioni e le scritture di chi non firma `updatedAt`.
-  const RECONCILE_MS = 30 * 60 * 1000;
+  // Il riallineamento completo, raro: è l'unica domanda che vede le scritture di chi non firma `updatedAt`.
+  // Ogni mezz'ora rileggeva tutti i feedback, ~50 mila letture al giorno (#2470).
+  const RECONCILE_MS = 6 * 60 * 60 * 1000;
 
-  // Margine sull'ora firmata da chi scrive: le macchine hanno orologi diversi.
-  const OVERLAP_MS = 2 * 60 * 1000;
+  // Il controllo leggero fra due riallineamenti: quanti sono (una lettura ogni mille) e l'ultimo cambiato. Un
+  // conto diverso da quelli in mano è una cancellazione o un arrivo perso, e fa riallineare.
+  const CONTROLLO_MS = 30 * 60 * 1000;
+
+  // Margine sull'ora della lettura PRECEDENTE del server: copre chi firma con un orologio un po' indietro.
+  // Due minuti facevano rileggere ogni cambio tre volte (#2470).
+  const OVERLAP_MS = 20 * 1000;
+
+  // I seguiti costano una lettura ciascuno: si guardano ogni cinque minuti, non a ogni giro (#2470). Chi parte
+  // adesso lo dice il registro dei worker, che si guarda a ogni giro.
+  const SEGUITI_MS = 5 * 60 * 1000;
 
   // Seguiti da vicino (una lettura ciascuno a giro): largo e letto a pezzi;
   // sopra, il giro lo dice e si riallinea (#676.2).
@@ -268,18 +277,22 @@
   //   submissionCount()           → intero | null
   //   avviiRoutine()              → [{ startedAt, num, role }]; lancia se illeggibile
   //   idDelNumero(num)            → id del feedback | null
+  //   controlloLeggero()          → { count: intero | null, ultimo: { _id, _updateTime } | null }
   function makeWatcher({
     listChangedSince, listVersions,
     seguiti = null, versionsOf = null, readRows = null, submissionCount = null,
-    avviiRoutine = null, idDelNumero = null,
-    now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
+    avviiRoutine = null, idDelNumero = null, controlloLeggero = null,
+    now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS, controlloMs = CONTROLLO_MS,
     overlapMs = OVERLAP_MS, seguitiTetto = SEGUITI_TETTO, registroSeguiMs = REGISTRO_SEGUI_MS,
-    onWarn = null,
+    seguitiMs = SEGUITI_MS, onWarn = null,
   } = {}) {
     let lastTickAt = 0;
     let lastReconcileAt = 0;
+    let lastControlloAt = 0;
+    let lastSeguitiAt = 0;
     let inFlight = null;
     let versioniSeguite = new Map();   // id → `_updateTime` visto
+    let noti = null;                   // id che esistono sul server, per il conto del controllo; null = non so
     let inviiVisti = null;
     let avviiVisti = null;             // chiavi del registro già viste; null = mai letto
     const daRegistro = new Map();      // id → quando il registro l'ha indicato
@@ -307,9 +320,10 @@
       for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r) - overlapMs);
     }
 
+    // Con l'ora del server in mano il PC non conta: indietro di minuti, faceva rileggere minuti di cambi a ogni giro.
     function since() {
       const locale = (lastTickAt || (now() - overlapMs)) - overlapMs;
-      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer) : locale)).toISOString();
+      return new Date(Math.max(0, oraServer || locale)).toISOString();
     }
 
     async function contaInvii(precedente) {
@@ -366,24 +380,25 @@
       return Array.isArray(rows) ? rows : [];
     }
 
-    // Seguiti: quelli delle pagine (in mano alle routine) più quelli indicati
-    // dal registro, finché la pagina non li segue da sé o non scadono. Sopra il
-    // tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
+    // Seguiti: quelli delle pagine (in mano alle routine) ogni `seguitiMs`, più quelli indicati dal registro
+    // (appena presi da un worker, pochi) a ogni giro finché non scadono: è lì che il server riscrive senza firmare.
+    // Sopra il tetto non si taglia in silenzio: si dice e ci si riallinea (#676.2).
     async function daiSeguiti() {
       if (typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
       const dallePagine = typeof seguiti === 'function' ? (seguiti() || []).map(String).filter(Boolean) : [];
-      const seguitiDallePagine = new Set(dallePagine);
       const ora = now();
       for (const [id, da] of daRegistro) {
-        if (seguitiDallePagine.has(id) || ora - da > registroSeguiMs) daRegistro.delete(id);
+        if (ora - da > registroSeguiMs) daRegistro.delete(id);
       }
-      const tutti = Array.from(new Set([...dallePagine, ...daRegistro.keys()]));
+      const tocca = ora - lastSeguitiAt >= seguitiMs;
+      const tutti = Array.from(new Set([...(tocca ? dallePagine : []), ...daRegistro.keys()]));
       const ids = tutti.slice(0, seguitiTetto);
       if (tutti.length > ids.length) {
         avvisa(`seguiti: ${tutti.length} sopra il tetto di ${seguitiTetto}, riallineamento completo al giro dopo`);
         lastReconcileAt = 0;
       }
       if (ids.length === 0) return [];
+      const inizio = tocca ? ora : lastSeguitiAt;
       const vers = await versionsOf(ids);
       const mossi = [];
       for (const v of Array.isArray(vers) ? vers : []) {
@@ -393,11 +408,34 @@
         if (!versioniSeguite.has(id)) versioniSeguite.set(id, t); // primo avvistamento: si prende nota
         else if (versioniSeguite.get(id) !== t) mossi.push([id, t]);
       }
-      if (mossi.length === 0) return [];
-      const rows = await readRows(mossi.map(([id]) => id));
+      const rows = mossi.length ? await readRows(mossi.map(([id]) => id)) : [];
       vedi(rows);
-      // Segnata dopo la rilettura: se fallisce, il giro dopo riprova.
+      // Segnati dopo la rilettura: se fallisce, il giro dopo riprova.
       for (const [id, t] of mossi) versioniSeguite.set(id, t);
+      lastSeguitiAt = inizio;
+      return Array.isArray(rows) ? rows : [];
+    }
+
+    // Il conto dei feedback contro quelli in mano, e l'ultimo cambiato contro la sua versione vista. Non riuscito:
+    // si riprova al giro dopo, e intanto vale quello che si sapeva.
+    async function controllo() {
+      if (typeof controlloLeggero !== 'function' || now() - lastControlloAt < controlloMs) return [];
+      const inizio = now();
+      let c;
+      try { c = await controlloLeggero(); } catch (e) {
+        avvisa(`controllo leggero non riuscito: ${motivo(e)}`);
+        return [];
+      }
+      lastControlloAt = inizio;
+      const n = c && c.count;
+      if (Number.isInteger(n) && (!noti || n !== noti.size)) lastReconcileAt = 0;
+      const u = c && c.ultimo;
+      if (!u || !u._id || !u._updateTime || typeof readRows !== 'function') return [];
+      const id = String(u._id);
+      if (versioniSeguite.get(id) === u._updateTime) return [];
+      const rows = await readRows([id]);
+      vedi(rows);
+      versioniSeguite.set(id, u._updateTime);
       return Array.isArray(rows) ? rows : [];
     }
 
@@ -408,10 +446,12 @@
       if (!versions) throw new Error('versioni non lette');
       if (out.complete === false) avvisa('riallineamento: lettura interrotta dal freno sulle pagine');
       versioniSeguite = new Map(versions.map((v) => [String(v._id), v._updateTime || null]));
+      noti = out.complete === false ? null : new Set(versions.map((v) => String(v._id)));
       vedi(versions, out.readTime);
       inviiVisti = await contaInvii(inviiVisti);
       await nuoviAvvii();
       lastReconcileAt = startedAt;
+      lastControlloAt = startedAt;
       lastTickAt = startedAt;
       return { kind: 'reconcile', versions, complete: out.complete !== false };
     }
@@ -439,12 +479,15 @@
       for (const r of tutte) {
         if (!r || !r._id) continue;
         const id = String(r._id);
+        if (noti) noti.add(id);
         if (r._updateTime && versioniSeguite.get(id) === r._updateTime) continue;
         versioniSeguite.set(id, r._updateTime || null);
         perId.set(id, r);
       }
-      for (const r of await dalRegistro()) if (r && r._id) perId.set(String(r._id), r);
-      for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
+      for (const r of [...await dalRegistro(), ...await daiSeguiti()]) {
+        if (r && r._id) { perId.set(String(r._id), r); if (noti) noti.add(String(r._id)); }
+      }
+      for (const r of await controllo()) if (r && r._id) perId.set(String(r._id), r);
       lastTickAt = startedAt;
       return { kind: 'changed', rows: Array.from(perId.values()) };
     }
@@ -468,9 +511,13 @@
       // però non torna avanti se c'era già: una Gestione nascosta da ore deve
       // ricevere al rientro quello che è cambiato mentre non guardava.
       // `righe` e `readTime` (della prima pagina): al primo allineamento danno l'ora del server e le versioni in mano.
-      allineato(at, righe, readTime) {
+      // `pienoAt`: una lista ricomposta dalla copia su disco più i cambiati vale come controllo, non come
+      // riallineamento: il prossimo completo si conta dall'ultima lettura intera.
+      allineato(at, righe, readTime, pienoAt) {
         const t = Number(at) || now();
-        lastReconcileAt = Math.max(lastReconcileAt, t);
+        lastReconcileAt = Math.max(lastReconcileAt, Number(pienoAt) || t);
+        lastControlloAt = Math.max(lastControlloAt, t);
+        if (Array.isArray(righe) && righe.length) noti = new Set(righe.filter((r) => r && r._id).map((r) => String(r._id)));
         if (lastTickAt) return;
         lastTickAt = t;
         vedi(righe, readTime);
@@ -480,13 +527,13 @@
       },
       forceReconcile() { lastReconcileAt = 0; },
       seguitiDalRegistro() { return Array.from(daRegistro.keys()); },
-      _state() { return { lastTickAt, lastReconcileAt, inviiVisti, oraServer }; },
+      _state() { return { lastTickAt, lastReconcileAt, lastControlloAt, inviiVisti, oraServer, noti: noti ? noti.size : null }; },
     };
   }
 
   global.SN_FEEDBACK_LIVE = {
     POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
-    RECONCILE_MS, OVERLAP_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
+    RECONCILE_MS, CONTROLLO_MS, OVERLAP_MS, SEGUITI_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
     diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato, fusioniDa, nellaFinestra,
     ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher,
   };

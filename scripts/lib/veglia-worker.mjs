@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
-import { leggiMeta, rigaSintetica } from '../session-report.mjs';
+import { attesaDichiarata, leggiMeta, rigaSintetica } from '../session-report.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
@@ -114,7 +114,7 @@ const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice
 
 /**
  * L'ultimo passo di un transcript, senza il testo del worker: lo strumento chiamato per ultimo (ora, risposta avuta),
- * di che tipo è l'ultima riga e il modello dell'ultimo turno. PURA.
+ * di che tipo è l'ultima riga, il modello dell'ultimo turno e l'attesa dichiarata che finisce più tardi. PURA.
  */
 export function ultimoPasso(righe) {
   const nomi = new Map();
@@ -122,12 +122,15 @@ export function ultimoPasso(righe) {
   let strumento = null;
   let passo = null;
   let modello = '';
+  let attesa = null;
   for (const r of righe) {
     let o;
     try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
     if (!o || typeof o !== 'object') continue;
     const ms = Date.parse(String(o.timestamp || ''));
     const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    const dichiarata = attesaDichiarata(o);
+    if (dichiarata && (!attesa || dichiarata.finoMs >= attesa.finoMs)) attesa = dichiarata;
     let cosa = '';
     if (o.type === 'assistant' && rigaSintetica(o.message)) {
       cosa = 'errore dell\'API o richiesta interrotta';
@@ -159,6 +162,7 @@ export function ultimoPasso(righe) {
     strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
     passo,
     modello,
+    attesa,
   };
 }
 
@@ -185,6 +189,11 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
     const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
     const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
     parti.push(`Ultimo passo per traccia: ${righe.join(', ')}${altre}${elenco.length === 1 ? '; nessun sotto-agente' : ''}.`);
+    const attesa = elenco.map((e) => e.attesa).filter(Boolean).reduce((a, b) => (!a || b.finoMs >= a.finoMs ? b : a), null);
+    if (attesa) {
+      const tentativo = attesa.tentativo ? `, tentativo ${attesa.tentativo}${attesa.di ? ` di ${attesa.di}` : ''}` : '';
+      parti.push(`Ultima attesa dichiarata dal fornitore: dalle ${ora(attesa.inizioMs)} alle ${ora(attesa.finoMs)}${tentativo}.`);
+    }
   }
   const cmd = Array.isArray(comandi) ? comandi : [];
   if (!processiLetti) parti.push('Processi nella cartella: non letti.');
@@ -265,7 +274,7 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN, fornitoreFinoMs: NaN, file: [] };
   const ultimoMs = Math.max(...file.map((f) => f.m));
   const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
   const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
@@ -274,7 +283,13 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   // Il worker è la traccia lanciata da chi guida il giro (senza lanciatore nel meta); i suoi figli ne hanno uno.
   const worker = lette.filter(({ f }) => { const m = leggiMeta(f.p); return !(m && typeof m.parentAgentId === 'string' && m.parentAgentId.trim()); })
     .reduce((a, b) => (!a || b.f.m >= a.f.m ? b : a), null);
-  return { viste: true, ultimoMs, attesa, elenco, chiusoMs: worker ? chiusuraDi(worker.righe) : NaN };
+  const fini = elenco.map((e) => (e.attesa ? e.attesa.finoMs : NaN)).filter(Number.isFinite);
+  return {
+    viste: true, ultimoMs, attesa, elenco,
+    chiusoMs: worker ? chiusuraDi(worker.righe) : NaN,
+    fornitoreFinoMs: fini.length ? Math.max(...fini) : NaN,
+    file: file.map((f) => f.p),
+  };
 }
 
 /**
@@ -352,12 +367,28 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
+  // Un'attesa dichiarata dal fornitore vale come un passo fino alla sua fine: il segno di vita sta nel futuro.
+  if (Number.isFinite(tracce.fornitoreFinoMs)) tempi.push(tracce.fornitoreFinoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
+  // Il tetto di costo della corsa di un compito (#2303), scritto da dispatch nel marcatore; `dalMs` è da quando contare.
+  const tetto = mio ? Number(m.tettoUsd) : NaN;
   return {
     mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce,
     chiusoMs: tracce.viste ? tracce.chiusoMs : NaN,
+    ...(Number.isFinite(tetto) && tetto > 0 ? { tettoUsd: tetto, dalMs: dopoMs } : {}),
   };
+}
+
+/**
+ * Il tetto superato, dai segni e dai dollari misurati: { usd, tettoUsd } da rilasciare, o null. PURA.
+ * Senza tetto, o senza una misura, non si ferma niente.
+ */
+export function oltreIlTetto(s, misura) {
+  const tetto = Number(s && s.tettoUsd);
+  const usd = Number(misura && misura.usd);
+  if (!(tetto > 0) || !Number.isFinite(usd)) return null;
+  return usd > tetto ? { usd: Math.round(usd * 100) / 100, tettoUsd: tetto } : null;
 }
 
 /**
@@ -371,7 +402,8 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   const tracce = s.tracce || {};
   if (!(s.processi > 0) && !tracce.viste) return {};
   const noti = (s.tempi || []).filter((t) => Number.isFinite(t));
-  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.max(...noti) : NaN);
+  // Un segno nel futuro (un'attesa dichiarata dal fornitore) vale «adesso».
+  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.min(adesso, Math.max(...noti)) : NaN);
   if (!Number.isFinite(attivitaMs)) return {};
   const out = { attivitaMs: Math.round(attivitaMs) };
   const a = tracce.attesa;
@@ -379,22 +411,43 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   return out;
 }
 
+export const FERMA_IL_WORKER = 'Il worker però è ancora acceso e spende: fermalo adesso con lo strumento TaskStop (se non lo vedi, caricalo con ToolSearch «select:TaskStop»), passandogli l’id che ti ha dato il suo lancio.';
+
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
 
 /**
  * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio, quadro)`
- * dichiara il guasto), altrimenti alla fine della fetta. I testi sono fissi: niente del worker arriva a chi guida il giro.
- * @returns {Promise<{ uscita: number, testo: string, guasto?: string }>}
+ * dichiara il guasto), altrimenti alla fine della fetta. Un compito col tetto di costo (#2303) si misura con `costo(s)`
+ * una volta per fetta, e oltre il tetto `rilasciaOltre(oltre, mio)` lo ferma. I testi sono fissi: niente del worker
+ * arriva a chi guida il giro.
+ * @returns {Promise<{ uscita: number, testo: string, guasto?: string, oltreTetto?: object }>}
  */
 export async function veglia({
-  leggi, rilascia, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+  leggi, rilascia, costo = null, rilasciaOltre = null, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
   fetta = FETTA_MS, passo = PASSO_MS, soglia = SOGLIA_FERMO_MS,
 } = {}) {
   const fine = adesso() + fetta;
+  let misurato = false;
   for (;;) {
-    const s = leggi();
+    const s = await leggi();
     const g = giudica({ ...s, adesso: adesso(), soglia });
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
+    if (!misurato && costo && rilasciaOltre && s && s.tettoUsd > 0) {
+      misurato = true;
+      const oltre = oltreIlTetto(s, await costo(s));
+      if (oltre) {
+        const r = await rilasciaOltre(oltre, s.mio);
+        const esito = r && r.ok
+          ? 'biglietto rilasciato, il compito non riparte'
+          : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+        return {
+          uscita: USCITA_FERMO,
+          oltreTetto: oltre,
+          // Un worker in sottofondo sopravvive al giro chiuso e spenderebbe ancora col biglietto già chiuso (#2303).
+          testo: `Compito oltre il tetto di costo della corsa (${oltre.usd} $ su ${oltre.tettoUsd} $): ${esito}. ${FERMA_IL_WORKER} Poi chiudi il giro: non chiedere biglietti e non lanciare altri worker.`,
+        };
+      }
+    }
     const minuti = Math.round(g.fermoMs / 60000);
     if (g.stato === 'fermo' || g.stato === 'chiuso') {
       const chiuso = g.stato === 'chiuso';

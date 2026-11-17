@@ -46,9 +46,9 @@ Per quello che trova questa lettura, in più:
 - copie che oggi coincidono, o un comportamento senza prova, non li incontra
   ancora nessuno: il livello è uno sotto quello del difetto che lascerebbero
   passare (una regressione dello scenario principale, che sarebbe un 2, vale
-  1), mai sotto 0. La sede è interna se la copia o il comportamento senza
-  prova li ha scritti il ramo; se la copia c'era già, vicina o esterna con le
-  regole qui sopra;
+  1), mai sotto 1. La sede è interna se la copia o il comportamento senza
+  prova li ha scritti il ramo; se la copia c'era già, è esterna, senza
+  livello;
 - niente `?`: una scelta che spetta all'owner la scrivi nella prima riga, e
   decide il verificatore.
 

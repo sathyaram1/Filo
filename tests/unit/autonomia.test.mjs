@@ -420,6 +420,7 @@ test('ogni tipo che urlExfil.contestoDaAzioni tratta come non fidato ha una font
     RIAPRI_SCHEDA: { _output: { riaperta: true, titolo: 'x', url: 'https://x.example/' } },
     BLUETOOTH: { _output: { ok: true, cosa: 'bluetooth', elenco: [{ nome: 'Cuffie' }] } },
     WIFI: { _output: { ok: false, cosa: 'wifi', errore: 'ambiguo', candidati: ['Casa', 'Casa 5G'] } },
+    ESPANDI_FILO: { _output: { espanso: true, righe: 1, testo: '- 20:24 pagina di x.example: «x»', esterno: true } },
   };
   for (const t of tipi) {
     assert.ok(esempi[t], `manca l'esempio di ${t} in questa sentinella`);
@@ -598,14 +599,14 @@ test('#530.3: un comando porta fuori il suo testo, e lo stesso segreto ha la ste
 
 test('#1312: il livello si cambia dalla chat, e nessun testo per il modello gli dice che non può', () => {
   for (const f of ['actionTools.js', 'onboarding.js', 'filoState.js']) require(join(ROOT, 'src', 'shared', f));
-  const imposta = globalThis.SN_ACTION_TOOLS.definitions({}).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  const imposta = globalThis.SN_ACTION_TOOLS.definitions({}).find((d) => d.function.name === 'impostazioni').function.description;
   const intervista = globalThis.SN_ONBOARDING.ITEMS.find((i) => i.id === 'autonomia').applica;
   const contesto = globalThis.SN_FILO_STATE.renderForPrompt({
     time: { humanNow: 'oggi' }, tabs: [], timers: [], notifications: [], autonomia: A.infoLivello('default'),
   });
-  assert.match(imposta, /• autonomia:/);
+  assert.match(imposta, /- imposta\(chiave, valore\):[^\n]*autonomia/);
   for (const [dove, t] of [['strumento', imposta], ['intervista', intervista], ['contesto', contesto]]) {
-    assert.match(t, /IMPOSTA_PREFERENZA|chiave autonomia/, dove);
+    assert.match(t, /impostazioni\(imposta\)|imposta\(chiave, valore\)|chiave autonomia/, dove);
     assert.doesNotMatch(t, /non è fra queste|lo cambia solo l.utente|non hai un.azione/i, dove);
   }
 });

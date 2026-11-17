@@ -1852,13 +1852,16 @@ function analizzaPer(sender) {
   return tm && typeof tm._sbAnalizza === 'function' ? (u, ctx) => tm._sbAnalizza(u, ctx) : null;
 }
 
+// Il modello conosce le azioni come strumento(azione), non per tipo.
+const chiamataPerModello = (type) => (globalThis.SN_ACTION_TOOLS ? globalThis.SN_ACTION_TOOLS.chiamata(type) : type);
+
 // Cosa sente il modello quando l'indirizzo che ha scritto non compare da nessuna parte (#553).
 function rifiutoNonCompare(type) {
   const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
-  return `Azione ${type} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
+  return `Azione ${chiamataPerModello(type)} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
     + 'nei risultati, nelle pagine lette o nei loro link, nelle schede, nella cronologia). Non l\'ho ' + verbo + '. Trovalo: '
-    + 'cercalo con CERCA_WEB o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
-    + 'usare la sua home o la sua ricerca (vedi la descrizione di LEGGI_PAGINA), oppure cerca_nel_sito con la home del sito '
+    + 'cercalo con web(cerca) o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
+    + 'usare la sua home o la sua ricerca, oppure cerca_nel_sito con la home del sito '
     + 'che l\'utente ha nominato. Se richiami lo stesso indirizzo, lo chiedo all\'utente. Se non lo trovi, diglielo: '
     + 'sotto la risposta resta il bottone per aprirlo lui, se vuole.';
 }
@@ -1892,9 +1895,9 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
         kept: false,
         rejected: true,
         senzaModulo: true,
-        error: `Azione ${type} NON fatta: cerca_nel_sito vale per i siti comuni e per i siti che l'utente ha nominato, e ${home} `
+        error: `Azione ${chiamataPerModello(type)} NON fatta: cerca_nel_sito vale per i siti comuni e per i siti che l'utente ha nominato, e ${home} `
           + 'non è fra questi. Se serve, scrivi tu l\'indirizzo della ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. '
-          + 'Oppure cerca la pagina con CERCA_WEB.',
+          + 'Oppure cerca la pagina con web(cerca).',
         output: { senzaModulo: true, url: home },
       };
     }
@@ -1906,8 +1909,8 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
       kept: false,
       rejected: true,
       senzaModulo: true,
-      error: `Azione ${type} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
-        + 'ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. Oppure cerca la pagina con CERCA_WEB.',
+      error: `Azione ${chiamataPerModello(type)} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
+        + 'ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. Oppure cerca la pagina con web(cerca).',
       output: { senzaModulo: true, url: home },
     };
   }
@@ -2957,6 +2960,13 @@ async function eseguiAzioneFilo(action, {
     rigaDaCorreggere = trovate.length === 1 ? trovate[0] : null;
   }
 
+  // «Metti Screenshot in cima alla barra»: l'icona detta col nome del menu diventa il suo id prima del registro, così
+  // popup, esito e diario dicono quella giusta.
+  if (type === 'SPOSTA_ICONA' && globalThis.SN_DISPOSIZIONE_ICONE) {
+    const id = globalThis.SN_DISPOSIZIONE_ICONE.risolvi(action.icona ?? action.id, action.contesto);
+    if (id) { action.icona = id; delete action.id; }
+  }
+
   // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
   // l'esito dicono quello che si salva o si toglie davvero.
   if (type === 'TIENI_APERTA' || type === 'NON_TENERE_APERTA') {
@@ -3676,6 +3686,13 @@ async function eseguiAzioneFilo(action, {
         const detail = Caps ? Caps.renderDetailForPrompt(ids, cancelliAperti()) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
+      case 'ESPANDI_FILO': {
+        // SPEC-CONTESTO § Tre livelli: sotto una riga del diario, il grezzo di quelle ore. Sola lettura.
+        const r = await espandiFilo(action.da, action.a);
+        return r.errore
+          ? { executed: false, kept: true, output: { espanso: true, error: r.errore } }
+          : { executed: true, kept: true, output: { espanso: true, ...r } };
+      }
       case 'CERCA_CHAT': {
         // #525 — l'archivio delle chat passate, per «riprendi la discussione
         // di ieri sulla coscienza». Due passi come LEGGI_FILE: prima l'elenco
@@ -4369,7 +4386,9 @@ async function eseguiAzioneFilo(action, {
         const target = D ? D.zonaDellAzione(action) : '';
         if (!D || !D.esiste(id) || !target) {
           const serveContesto = dove === 'fila' || dove === 'altro_fila';
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
+          // Gli id non stanno nello strumento (tetto degli strumenti, SPEC-CONTESTO): li dà l'esito di un id sbagliato.
+          const icone = D && !D.esiste(id) ? [...Object.keys(D.ICONE), ...Object.keys(D.AZIONI || {})].map((i) => `${i} (${D.nome(i)})`).join(', ') : null;
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(icone ? { icone } : {}), ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
         }
         if (!D.ammessa(id, target)) {
           return { executed: false, kept: false, output: { icona: 'invalid', id, dove, contesto: D.contestoDiZona(target), motivo: `«${D.nome(id)}» è un'azione ${D.CONTESTI[D.AZIONI[id].contesto].su}: resta nella sua fila o nel suo «Altro…»` } };
@@ -4796,7 +4815,7 @@ function impostazioniLetteForPrompt(actions) {
     const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
     const testa = !cerca ? 'tutte le voci'
       : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
-    blocchi.push(`[Impostazioni di Filo lette con LEGGI_IMPOSTAZIONI (${testa}): sono i valori veri di quel momento, `
+    blocchi.push(`[Impostazioni di Filo lette con impostazioni(leggi) (${testa}): sono i valori veri di quel momento, `
       + 'rispondi con questi; se nel frattempo ne hai cambiata una, rileggila. Per cambiarne una usa la chiave fra parentesi quadre.]\n'
       + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
   }
@@ -5156,6 +5175,35 @@ function rilettura(chat, { da = null, cap }) {
 // Esterno è tutto quello che viene dall'archivio: la trascrizione, il
 // frammento trovato dalla ricerca e anche il TITOLO, che lo scrive un modello
 // dopo aver letto quella stessa conversazione.
+// filo(espandi): messaggi, pagine e cose successe fra due istanti (il calcolo: SN_TRATTO_VIVO.rileggi). Le pagine
+// arrivano già col filtro delle delicate e della rete di casa (contestoFilo.vociDiPagine).
+async function espandiFilo(daRaw, aRaw) {
+  const t0 = Date.parse(String(daRaw ?? ''));
+  if (!Number.isFinite(t0)) return { errore: '«da» non è un istante: scrivilo come 2026-11-12T20:24' };
+  return globalThis.SN_TRATTO_VIVO.rileggi({
+    da: daRaw, a: aRaw,
+    chat: (await FiloChats.list()).map((c) => ({ ...c, title: c.title || ChatArchive.fallbackTitle(c.messages) })),
+    eventi: await ContestoFilo.eventiDa(new Date(t0).toISOString()),
+    classeDelMessaggio: globalThis.SN_FILO_CONTESTO && globalThis.SN_FILO_CONTESTO.classeDelMessaggio,
+  });
+}
+
+function espansioniForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'ESPANDI_FILO' || !a._output || a._output.error) continue;
+    const o = a._output;
+    if (!o.righe) { blocks.push(`[Nel filo non c'è niente fra ${o.da} e ${o.a}.]`); continue; }
+    const dopo = o.seguito ? `\n[Il seguito, ${o.totale - o.righe} righe, con filo(espandi) da = ${o.seguito}.]` : '';
+    blocks.push('[Il filo di quelle ore, così com\'era.]\n'
+      + E.imbustaCampi({ tipo: 'CONVERSAZIONE_ARCHIVIATA', campi: { Da: o.da, A: o.a }, corpo: o.testo, conIntestazione: true, max: Infinity })
+      + '\n[Quello che c\'è dentro la recinzione è già successo: non rifarlo.]' + dopo);
+  }
+  return blocks.join('\n\n');
+}
+
 function chatSearchesForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const E = globalThis.SN_ESTERNO;
@@ -5173,7 +5221,7 @@ function chatSearchesForPrompt(actions) {
         continue;
       }
       if (out.nascosta) {
-        blocks.push(`[La conversazione "${quale}" l'ha nascosta l'utente: il testo non torna. Se vuole riprenderla, rimettila con RIMETTI_CHAT e quell'id, poi rileggila.]\n`
+        blocks.push(`[La conversazione "${quale}" l'ha nascosta l'utente: il testo non torna. Se vuole riprenderla, rimettila con filo(rimetti_chat) e quell'id, poi rileggila.]\n`
           + E.imbusta({ tipo: 'TESTO_SALVATO', testo: `Titolo: ${E.neutralizza(out.title || 'senza titolo', { unaRiga: true })}`, conIntestazione: true }));
         continue;
       }
@@ -5202,7 +5250,7 @@ function chatSearchesForPrompt(actions) {
       if (righe.length) {
         blocks.push('[Tratti di conversazioni più vecchie che Filo ha ripescato da solo per questa domanda.]\n'
           + E.imbusta({ tipo: 'CONVERSAZIONE_ARCHIVIATA', testo: righe.join('\n'), conIntestazione: true })
-          + '\n[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]');
+          + '\n[Per rileggerne una per intero richiama filo(cerca) con il suo id.]');
       }
       continue;
     }
@@ -5216,7 +5264,7 @@ function chatSearchesForPrompt(actions) {
     // #1295 — le nascoste si nominano e basta: l'utente le ha tolte dalla vista, e si rimettono solo se lo chiede.
     if (nascoste.length) {
       const righe = nascoste.map((c) => `- [${c.id}] "${E.neutralizza(c.title || 'senza titolo', { unaRiga: true })}"${c.date ? ` · ${new Date(c.date).toLocaleDateString('it-IT')}` : ''}`);
-      blocks.push(`[${out.nascosteTutte ? `Tutte le ${nascoste.length} conversazioni che l'utente ha nascosto` : `Conversazioni che l'utente ha nascosto e che combaciano con "${cercato}"`}: non le leggi. Se è una di queste che cerca, diglielo e chiedigli se vuole rimetterla (RIMETTI_CHAT con l'id).]\n`
+      blocks.push(`[${out.nascosteTutte ? `Tutte le ${nascoste.length} conversazioni che l'utente ha nascosto` : `Conversazioni che l'utente ha nascosto e che combaciano con "${cercato}"`}: non le leggi. Se è una di queste che cerca, diglielo e chiedigli se vuole rimetterla (filo(rimetti_chat) con l'id).]\n`
         + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
     }
     // #868 — le pagine visitate: titoli, indirizzi e riassunti li scrivono i siti, quindi in busta.
@@ -5226,7 +5274,7 @@ function chatSearchesForPrompt(actions) {
         const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
         return `- ${pg.id ? `[${pg.id}] ` : ''}${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
       });
-      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Una scheda chiusa si riapre com'era con RIAPRI_SCHEDA e il suo id; una pagina visitata con NAVIGA e il suo indirizzo.]\n`
+      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Una scheda chiusa si riapre com'era con scheda(riapri) e il suo id; una pagina visitata con scheda(apri) e il suo indirizzo.]\n`
         + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
     }
     if (cambiTrovati.length) {
@@ -5234,7 +5282,7 @@ function chatSearchesForPrompt(actions) {
       const conMeno = Array.isArray(out.cambiCercatiCon) && out.cambiCercatiCon.length
         ? ` (nessuno con tutte le parole: trovati cercando "${E.perCanaleSistema(out.cambiCercatiCon.join(' '))}", controlla che siano quelli giusti)`
         : '';
-      blocks.push(`[I cambi del filo che combaciano con "${cercato}"${conMeno}: si rimettono com'erano con ANNULLA_CAMBIO e l'id.]\n`
+      blocks.push(`[I cambi del filo che combaciano con "${cercato}"${conMeno}: si rimettono com'erano con filo(annulla) e l'id.]\n`
         + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
     }
     // #868.1 — l'utente ha cancellato qualcosa che questa ricerca aveva trovato: non c'è più, e non è «niente trovato».
@@ -5280,7 +5328,7 @@ function chatSearchesForPrompt(actions) {
         testo: lines.join('\n'),
         conIntestazione: true,
       })
-      + '\n[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]',
+      + '\n[Per rileggerne una per intero richiama filo(cerca) con il suo id.]',
     );
   }
   return blocks.join('\n\n').trim();
@@ -5405,7 +5453,7 @@ function consiglioPaginaNonLetta(out) {
   const stato = Number(out.stato) || 0;
   switch (out.errore) {
     case 'rete-locale':
-      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando LEGGI_PAGINA con lo stesso indirizzo lo leggi da lì.';
+      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando web(leggi) con lo stesso indirizzo lo leggi da lì.';
     case 'pericoloso':
       return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
     case 'schema':
@@ -5416,7 +5464,7 @@ function consiglioPaginaNonLetta(out) {
     case 'http':
       if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
       if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
-        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con NAVIGA con background: true e poi rileggilo con LEGGI_PAGINA, che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
+        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con scheda(apri) con background: true e poi rileggilo con web(leggi), che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
       }
       return 'Prova un\'altra fonte, o riprova una volta. Non inventare il contenuto.';
     case 'tempo':
@@ -5530,7 +5578,7 @@ function pageReadsForPrompt(actions) {
         blocks.push(schedaMuta('la copia scaricata a parte è senza testo'));
       } else {
         blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
-          + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
+          + 'Se il dato serve, aprila con scheda(apri) con background: true e poi rileggila con web(leggi), che la legge dalla scheda; '
           + 'altrimenti prova un\'altra fonte. Non inventare il contenuto.]');
       }
       continue;
@@ -5542,7 +5590,7 @@ function pageReadsForPrompt(actions) {
       blocks.push('[Pagina web letta ma lasciata fuori: con le altre letture di questo turno non stava nella memoria del modello. '
         + 'Restano titolo e indirizzo, il testo non lo hai davanti: non inventarlo e rispondi con quello che hai. Non rileggerla in '
         + 'questo turno; sotto la tua risposta Filo dice all\'utente quali pagine ha lasciato fuori, e se lui lo chiede la rileggi con '
-        + `LEGGI_PAGINA e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
+        + `web(leggi) e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
         + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi, conIntestazione: true }));
       continue;
     }
@@ -5563,10 +5611,10 @@ function pageReadsForPrompt(actions) {
     if (parziale) {
       blocco += `\n[Letto fino al carattere ${finoQui} su ${totale}: il resto non stava nella memoria del modello insieme alle altre `
         + 'letture di questo turno. Rispondi con quello che hai e, se il dato manca, dillo; non rileggerla in questo turno: se '
-        + `l'utente lo chiede, il seguito si legge con LEGGI_PAGINA, lo stesso url e da: ${finoQui}.]`;
+        + `l'utente lo chiede, il seguito si legge con web(leggi), lo stesso url e da: ${finoQui}.]`;
     } else if (out.troncata) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
-        + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
+        + `richiama web(leggi) con lo stesso url e da: ${fino}.]`;
     }
     if (out.lettaInParte || out.scaricataInParte) blocco += `\n${avvisoLettaInParte(out)}`;
     if (out.schedaNonRisponde) {
@@ -5575,8 +5623,8 @@ function pageReadsForPrompt(actions) {
         + 'Se il dato non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
     }
     if (out.soloJavaScript) {
-      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
-        + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';
+      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con scheda(apri) con '
+        + 'background: true e poi rileggila con web(leggi), che la legge dalla scheda.]';
     }
     if (out.sospetto) {
       blocco += `\n[Il rilevatore di siti pericolosi considera questo sito sospetto (${E.perCanaleSistema(out.sospetto)}): usa i dati `
@@ -5625,7 +5673,7 @@ function vediSchermoPerModello(action, res) {
   const nome = E.perCanaleSistema(String(o.finestra || (action && action._finestra && action._finestra.nome) || action.finestra || ''));
   if (o.spenta) {
     return 'Non ho guardato niente: l\'impostazione «Filo può guardare lo schermo» è spenta, e da spenta Filo non cattura nessuna finestra. '
-      + 'Proponi all\'utente di accenderla chiamando adesso IMPOSTA_PREFERENZA con chiave guarda_schermo e valore true: il sistema gli mostra '
+      + 'Proponi all\'utente di accenderla chiamando adesso impostazioni(imposta) con chiave guarda_schermo e valore true: il sistema gli mostra '
       + 'il popup e gli basta un clic. Non riprovare a guardare finché non è accesa.';
   }
   if (res && res.needsConfirm) {
@@ -5644,11 +5692,11 @@ function vediSchermoPerModello(action, res) {
   }
   if (o.nessuna) {
     return `Nessuna finestra aperta si chiama «${E.perCanaleSistema(o.richiesta)}». Queste sono quelle che si possono guardare:\n${finestre(o.elenco)}${nota}\n`
-      + 'Se una è chiaramente quella che intende l\'utente, richiama VEDI_SCHERMO col suo nome esatto; se non si capisce, chiediglielo.';
+      + 'Se una è chiaramente quella che intende l\'utente, richiama computer(guarda) col suo nome esatto; se non si capisce, chiediglielo.';
   }
   if (Array.isArray(o.elenco)) {
     return `Finestre che si possono guardare adesso:\n${finestre(o.elenco)}${nota}\n`
-      + 'Richiama VEDI_SCHERMO con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
+      + 'Richiama computer(guarda) con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
       + 'chiediglielo elencando le candidate.';
   }
   if (o.errore) return `Non ho potuto guardare «${nome}»: ${E.perCanaleSistema(o.errore)}. Dillo all'utente in una riga, senza inventare cosa c'era.`;
@@ -5699,7 +5747,7 @@ function salvateTrovateForPrompt(actions) {
       ? ` Nessuna conteneva tutte le parole: queste arrivano cercando "${E.perCanaleSistema(o.cercatoCon.join(' '))}", controlla che siano quelle giuste.` : '';
     blocks.push(`[Le pagine di «Aperti per dopo» ${quali} (${o.trovate} su ${o.totale}).${oltre}${largo} `
       + 'Nella risposta nomina quelle giuste col titolo così com\'è: sotto la risposta diventano bottoni che le aprono. '
-      + 'Per aprirne una adesso usa APRI_SALVATA con l\'id.]\n'
+      + 'Per aprirne una adesso usa scheda(apri_salvata) con l\'id.]\n'
       + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
   }
   return blocks.join('\n\n').trim();
@@ -5750,7 +5798,7 @@ function schedeChiuseForPrompt(actions) {
       return `- [${p.id}] ${titolo} · ${quandoDetto(p.chiusa)} · ${perche}${extra}\n  ${p.url}${p.riassunto ? `\n  ${E.neutralizza(p.riassunto, { unaRiga: true })}` : ''}`;
     });
     const oltre = o.trovate > o.schede.length ? ` Ne combaciano ${o.trovate}: qui le prime ${o.schede.length}, per le altre restringi con parole, date o motivo.` : '';
-    blocks.push(`[Schede chiuse${filtro ? ` (${filtro})` : ''}: ${o.trovate} su ${o.totale}.${oltre} Per riaprirne una usa RIAPRI_SCHEDA con l'id, non NAVIGA.]\n`
+    blocks.push(`[Schede chiuse${filtro ? ` (${filtro})` : ''}: ${o.trovate} su ${o.totale}.${oltre} Per riaprirne una usa scheda(riapri) con l'id, non scheda(apri).]\n`
       + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
   }
   return blocks.join('\n\n').trim();
@@ -5770,7 +5818,7 @@ function observationsForPrompt(tutte) {
     schedeChiuseForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
+    chatSearchesForPrompt(actions), espansioniForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
   ].filter(Boolean).join('\n\n');
@@ -5865,7 +5913,7 @@ function esitoChiusuraPerModello(action, o) {
     return `Nessuna scheda chiusa: ${perche}.${coda}`;
   }
   const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
-    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con SCHEDE_CHIUSE e riaprila con RIAPRI_SCHEDA.';
+    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con scheda(chiuse) e riaprila con scheda(riapri).';
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
@@ -5883,10 +5931,10 @@ function dopoPulsante(o) {
   if (o.sistema) return ' La frase la legge adesso la pagina della chat con la voce di riserva del sistema, con velocità e tono salvati.';
   if (o.voce) {
     return ' La frase la legge adesso la pagina della chat; se la voce naturale non è disponibile si sente quella del '
-      + 'sistema e un avviso dice perché. Per sceglierla si usa IMPOSTA_PREFERENZA voce_modello.';
+      + 'sistema e un avviso dice perché. Per sceglierla si usa impostazioni(imposta) voce_modello.';
   }
-  if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con IMPOSTA_PREFERENZA.';
-  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (IMPOSTA_PREFERENZA suono_notifiche).';
+  if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con impostazioni(imposta).';
+  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (impostazioni(imposta) suono_notifiche).';
   return '';
 }
 
@@ -5911,18 +5959,19 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
   if (res && (res.nonCompare || res.senzaModulo)) return res.error;
-  if (res && res.no) return `Azione ${type} NON fatta: ${res.error}.`;
+  const nome = chiamataPerModello(type);
+  if (res && res.no) return `Azione ${nome} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
-    return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
+    return `Azione ${nome} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
   if (res.output && res.output.blocked === 'segreto' && res.output.guasto) {
-    return `Azione ${type} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
+    return `Azione ${nome} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
       + 'risposto, e senza di lui niente esce. Non riprovare con un\'altra azione che porta fuori le stesse cose. Di\' '
       + 'all\'utente in una riga che non l\'hai fatto e perché.';
   }
   if (res.output && res.output.blocked === 'segreto') {
-    return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
+    return `Azione ${nome} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
       + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
       + '(spezzato, codificato, in un altro campo o con un\'altra azione). Di\' all\'utente in una riga cosa hai '
       + 'fermato, senza ripetere il dato: se vuole mandarlo davvero, lo fa lui a mano.';
@@ -5931,7 +5980,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (obs) return obs;
   if (type === 'APRI_SALVATA' && res.output && !res.needsConfirm) {
     const o = res.output;
-    if (o.trovata === false) return 'Nessuna pagina con quell\'id in «Aperti per dopo»: forse è già stata aperta o tolta. Se serve rifai CERCA_SALVATE e usa un id preso da lì, mai inventato.';
+    if (o.trovata === false) return 'Nessuna pagina con quell\'id in «Aperti per dopo»: forse è già stata aperta o tolta. Se serve rifai scheda(salvate) e usa un id preso da lì, mai inventato.';
     if (o.blocked === 'site') return `Pagina NON aperta: ${o.host || 'quel sito'} è fra i siti bloccati, ed è rimasta in «Aperti per dopo». Diglielo in una riga.`;
     if (!o.aperta) return 'Pagina NON aperta, ed è rimasta in «Aperti per dopo». Diglielo in una riga.';
     const E = globalThis.SN_ESTERNO;
@@ -6004,7 +6053,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'RIPRENDI_AUDIO' && res.output && !res.needsConfirm) {
     const o = res.output;
     if (o.giaSuona) return conTitolo('Niente da far ripartire: c\'è già una scheda che suona. Chiedi all\'utente se intende un\'altra musica.', o.titolo);
-    if (o.nessuna) return 'Niente da far ripartire: nessuna scheda, aperta o chiusa, ha suonato. Chiedi all\'utente cosa vuole ascoltare, o cercalo con NAVIGA (background: true).';
+    if (o.nessuna) return 'Niente da far ripartire: nessuna scheda, aperta o chiusa, ha suonato. Chiedi all\'utente cosa vuole ascoltare, o cercalo con scheda(apri) (background: true).';
     if (o.error) return `Musica NON ripartita: ${o.error}.`;
     const dove = o.numero ? ` la scheda ${o.numero}` : ' la scheda';
     if (o.nonPartita) return conTitolo(`${o.riaperta ? 'Ho riaperto' : 'Ho trovato'}${dove}, ma l'audio non è ripartito da solo (la pagina non ha un lettore pronto o l'ha rifiutato). Di' all'utente in una riga di premere play lì.`, o.titolo);
@@ -6014,7 +6063,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const o = res.output;
     if (o.nessuna) return 'Niente messo in pausa: nessuna scheda sta suonando. Dillo all\'utente in una riga.';
     if (o.error) return `Niente messo in pausa: ${o.error}.`;
-    return conTitolo('Messa in pausa. Dillo in una riga; «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.', o.titolo);
+    return conTitolo('Messa in pausa. Dillo in una riga; «rimettimi la musica» la fa ripartire con scheda(riprendi_audio).', o.titolo);
   }
   if (type === 'MOSTRA_SCHEDA' && res.output && !res.needsConfirm) {
     const o = res.output;
@@ -6023,7 +6072,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   }
   if (type === 'RIAPRI_SCHEDA' && res.output && !res.needsConfirm && !res.output.nonRaggiungibile && !res.output.tagliato) {
     const o = res.output;
-    if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con SCHEDE_CHIUSE e usa l\'id che ti torna.';
+    if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con scheda(chiuse) e usa l\'id che ti torna.';
     if (!o.riaperta) return `Scheda NON riaperta${o.error ? `: ${o.error}` : ''}.`;
     return conTitolo('Scheda riaperta com\'era. Dillo in una riga.', o.titolo);
   }
@@ -6038,7 +6087,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (t) return t;
   }
   if (res.output && res.output.blocked === 'disabled') {
-    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
+    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (impostazioni(imposta) modalita_terminale true) e non riprovare finché non è attiva.';
   }
   if (res.needsConfirm) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
@@ -6058,16 +6107,16 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (res.output.rifiuto) return `Non corretta: ${res.output.error}`;
     return res.output.trovate > 1
       ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
-      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
+      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa memoria(impara).';
   }
   if ((type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') && res.output && !res.needsConfirm) {
     const o = res.output;
     if (o.giaInVista) return 'Quella conversazione non è nascosta: è già nel filo. Niente da rimettere.';
-    if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai CERCA_CHAT e usa un id preso da lì, mai inventato.';
+    if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai filo(cerca) e usa un id preso da lì, mai inventato.';
     const titolo = nomiSalvati([action._titolo || 'senza titolo']);
     if (o.cancellata) return `Cancellata per sempre: non c'è più nel filo né sul computer.\n${titolo}`;
-    if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (RIMETTI_CHAT).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
-    if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con CERCA_CHAT e l'id ${action.id}.\n${titolo}`;
+    if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (filo(rimetti_chat)).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
+    if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con filo(cerca) e l'id ${action.id}.\n${titolo}`;
     return 'Conversazione NON toccata.';
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
@@ -6188,7 +6237,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     }
     const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
     if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
-    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
+    return `Azione ${nome} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
@@ -6203,12 +6252,17 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // sempre per lo stesso motivo: non c'è una scheda web attiva.
   const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
   if (PAGE_ACTIONS.includes(type) && res.output && res.output.restyle === 'no-page') {
-    return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
+    return `Azione ${nome} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
   }
   if (PAGE_ACTIONS.includes(type) && !res.output) {
-    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
+    return `Azione ${nome} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
-  return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
+  // Un'icona che non riconosco: l'elenco è la strada per riprovare, non un motivo per fermarsi.
+  if (type === 'SPOSTA_ICONA' && res.output && res.output.icone) {
+    return `Icona NON spostata: «${globalThis.SN_ESTERNO.perCanaleSistema(String(res.output.id || ''))}» non è un'icona che conosco. Riprova adesso con l'id di quella che `
+      + `intende l'utente, da questo elenco (id e nome): ${res.output.icone}. Se nessuna gli somiglia, chiediglielo.`;
+  }
+  return `Azione ${nome} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
@@ -7977,7 +8031,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (tipo === 'aggiungi') return no('la carta è già nella home');
   if (tipo === 'togli') {
     if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
-      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+      return no('un timer o una sveglia si tolgono con promemoria(cancella)');
     }
     let avvisi = 0;
     for (const v of voci) {

@@ -93,12 +93,12 @@
   // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
   function sbloccoFermo(motivo, ramo) {
     const m = String(motivo || '').toLowerCase();
-    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito: lo porta avanti una sessione locale.';
+    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
     if (/ramo|registro/.test(m)) {
       const server = /server/.test(m);
       const nome = String(ramo || '').trim() || '<ramo>';
       return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
-        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, lo porta avanti una sessione locale.`;
+        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, «Dichiara fidato com’è» nel dettaglio, dopo averlo letto.`;
     }
     if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
@@ -2185,6 +2185,17 @@
   function segnoFiducia(x) {
     return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
+  // Lo stesso scudo su ogni nota della conversazione (#1919): chi la legge si sporca solo per quelle non fidate.
+  const SEGNI_FIDUCIA_NOTA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Nota fidata',
+      testo: 'Nota fidata: l’hai scritta tu, o un lavoro che non aveva letto niente di non fidato. Chi la legge resta pulito.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Nota non fidata',
+      testo: 'Nota non fidata: l’ha scritta, o registrata come tua risposta, chi aveva letto testo non fidato; oppure è di prima che il server segnasse la fiducia delle note. Chi la legge si sporca.' }),
+  });
+  /** Il segno della fiducia di una nota, da `fidata` di SN_FEEDBACK_THREAD.fiduciaDelleNote. PURA. */
+  function segnoFiduciaNota(fidata) {
+    return fidata === true ? SEGNI_FIDUCIA_NOTA.fidata : SEGNI_FIDUCIA_NOTA.nonfidata;
+  }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
    *  frase c'è già, che si legge intera nell'hover. Soli spazi = nessuna frase. PURA. */
@@ -2225,7 +2236,7 @@
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
-    filtraFiducia, contaNonFidate, segnoFiducia,
+    filtraFiducia, contaNonFidate, segnoFiducia, segnoFiduciaNota,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

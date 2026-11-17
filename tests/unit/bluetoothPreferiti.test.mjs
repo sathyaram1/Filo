@@ -54,8 +54,8 @@ test('un indirizzo scritto in un\'altra forma si salva in quella dell\'elenco de
   }
 });
 
-test('un dispositivo detto per nome non diventa un indirizzo: la risposta dice di usare BLUETOOTH', () => {
+test('un dispositivo detto per nome non diventa un indirizzo: la risposta dice di usare computer(bluetooth)', () => {
   const r = s.build('aggiungi le cuffie Sony');
-  assert.match(r.rifiuto, /BLUETOOTH/);
+  assert.match(r.rifiuto, /computer\(bluetooth\)/);
   assert.equal(r.partial, undefined);
 });

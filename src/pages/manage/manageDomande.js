@@ -651,11 +651,36 @@
     return s;
   }
 
+  // Chi l'ha superata: la domanda che l'ha assorbita (§3.6) o quella nata al suo posto.
+  function superataDa(d) {
+    const dentro = D.assorbitaIn(d);
+    if (dentro) return { id: dentro, assorbita: true };
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : {};
+    return D.numeroDi(e.superataDa) !== null ? { id: String(e.superataDa), assorbita: false } : null;
+  }
+
+  // Le domande che questa ha assorbito restano visibili dentro di lei (§3.6).
+  function assorbite(d) {
+    const ids = (Array.isArray(d.assorbite) ? d.assorbite : []).filter((id) => D.numeroDi(id) !== null);
+    if (!ids.length) return null;
+    const l = el('div', 'mg-dq-legami mg-dq-assorbite');
+    for (const id of ids) l.appendChild(legame('domanda', id));
+    return sezione('mg-dq-assorbite-sez', ids.length === 1 ? 'Assorbe la domanda' : `Assorbe ${ids.length} domande`, l);
+  }
+
   function esito(d) {
     const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
     let testo = '';
     let tipo = '';
-    if (d.stato === 'superata') testo = 'Superata da un’altra domanda.';
+    if (d.stato === 'superata') {
+      const da = superataDa(d);
+      if (!da) testo = 'Superata da un’altra domanda.';
+      else {
+        const p = el('p', 'mg-dq-esito');
+        p.append(da.assorbita ? 'Assorbita in ' : 'Superata da ', legame('domanda', da.id), '.');
+        return p;
+      }
+    }
     // Il compito «Gestisci la domanda» (§3.5) la tiene prima che arrivi a te: si dice cosa sta succedendo e com'è finita.
     else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.';
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
@@ -672,15 +697,23 @@
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
     else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
-    // Una ripresa che non ha spostato il lavoro lo dice (#1577): non serviva, o accodata al giro dopo.
-    else if (e && e.ok && d.stato === 'chiusa' && e.nonServiva) testo = 'Non serviva: il lavoro è già fuso con questa scelta.';
-    else if (e && e.ok && d.stato === 'chiusa' && e.accodata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: la prende il prossimo giro di lavoro.`;
-    else if (e && e.ok && d.stato === 'chiusa' && e.rimandata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: il lavoro torna in verifica con la tua risposta.`;
-    else if (e && e.ok && d.stato === 'chiusa' && e.lavoroArchiviato) testo = 'Il lavoro è archiviato: la risposta non lo riapre.';
     // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
-    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
+    else if (e && e.ok && d.stato === 'chiusa') testo = ripresaDetta(d) || `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
+  }
+
+  // Una ripresa che non ha spostato il lavoro lo dice (#1577), anche nella risposta automatica (#2149.1): '' se è
+  // ripartito come dice la scelta.
+  function ripresaDetta(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
+    if (!e || !e.ok || d.stato !== 'chiusa') return '';
+    const il = e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : '';
+    if (e.nonServiva) return 'Non serviva: il lavoro è già fuso con questa scelta.';
+    if (e.accodata) return `Fatto${il}: la prende il prossimo giro di lavoro.`;
+    if (e.rimandata) return `Fatto${il}: il lavoro torna in verifica con la ${e.automatica ? '' : 'tua '}risposta.`;
+    if (e.lavoroArchiviato) return 'Il lavoro è archiviato: la risposta non lo riapre.';
+    return '';
   }
 
   // Chiusa dalla revisione perché un lavoro fuso l'ha attuata (#2006): { id, num }, o null.
@@ -705,6 +738,8 @@
     const frase = el('p', 'mg-dq-esito');
     if (da) frase.append('Risposta automatica col principio di ', legame('domanda', da), '.');
     else frase.textContent = 'Risposta automatica.';
+    const ripresa = ripresaDetta(d);
+    if (ripresa) frase.append(' ', ripresa);
     if (!da) return frase;
     const fonte = trova(da);
     if (!fonte) chiediFonte(da);
@@ -859,11 +894,14 @@
   }
 
   // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6), una data dalla chiave
-  // owner-non-fidato (#2011) e una registrata da una sessione locale (#1924).
+  // owner-non-fidato (#2011), una registrata da una sessione locale (#1924) e una che la revisione ha assorbito (§3.6).
   function riapribile(d) {
+    if (D.assorbitaIn(d)) return true;
     return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
   function titoloRiapri(d) {
+    const dentro = D.assorbitaIn(d);
+    if (dentro) return `Rimettila fra quelle da rispondere: la revisione l’aveva assorbita in ${dentro}, che non la elenca più`;
     if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: quello che ha applicato si disfa dove si può, e un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
@@ -924,7 +962,7 @@
     // Su una chiusa da fidare le note stanno aperte sopra i tasti: si leggono prima di «Segna fidata» (#2078).
     const primaDeiTasti = !!note && fidabile(d);
     if (primaDeiTasti) note.open = true;
-    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d),
+    for (const parte of [assorbite(d), opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d),
       primaDeiTasti ? note : null, risposta(d), primaDeiTasti ? null : note]) if (parte) art.appendChild(parte);
     return art;
   }

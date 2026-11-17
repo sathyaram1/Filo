@@ -29,7 +29,7 @@
 //     si rilancia senza argomenti: riusa la richiesta registrata.
 //
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
-//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1v]` = vicino, `[1i?]` =
+//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[e]` = esterno (senza livello), `[1i?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
@@ -102,13 +102,13 @@ const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : 
 
 // Le regole del giro: le stesse del server e degli strumenti delle routine
 // (fonte unica). Lette dal progetto, accanto a questo file: in locale non c'è
-// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap0)
+// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap1)
 // invece non stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
 const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(__dirname, '..', 'src', 'shared', 'verifierRound.js'));
 const ROUND = globalThis.SN_VERIFIER_ROUND;
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 
 // ─── I bilanci del giro si leggono dal server ────────────────────────────────
 //
@@ -142,7 +142,7 @@ export function numeroFirestore(campo) {
 /**
  * I bilanci come stanno nel documento del server, uno per livello. Lancia con
  * un messaggio che dice cosa manca; mai un numero al posto di quello dell'owner.
- * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
+ * @returns {Promise<{cap3:number, cap2:number, cap1:number, fixInstructions:string, giroStretto:boolean}>}
  */
 export async function leggiBilanciDalServer({
   fetchImpl = fetch, env = process.env, trovaRefresh = null, copiaDir = null, now = Date.now(),
@@ -556,11 +556,17 @@ export function notaDelGiro(entry, { branch, sha }) {
   const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}${testoServer(entry && entry.requestedServer)}).`];
   const prima = rounds[rounds.length - 1];
   if (prima) {
-    const rilievi = ROUND.parseFindings(String(prima.critique || '')).findings;
-    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${rilievi.length === 1 ? '1 rilievo' : `${rilievi.length} rilievi`}.`);
-    for (const f of rilievi) {
-      righe.push(`· livello ${f.level}${f.sede === 'e' ? ', di un altro lavoro' : ''}: ${ROUND.primaFrase(f.text, 160)}`);
+    const letta = ROUND.parseFindings(String(prima.critique || ''));
+    // Una critica registrata con la scala a quattro livelli (#2339) non perde le sue righe: si riportano com'erano.
+    const vecchie = Array.isArray(letta.rifiutati) ? letta.rifiutati : [];
+    const n = letta.findings.length + vecchie.length;
+    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${n === 1 ? '1 rilievo' : `${n} rilievi`}.`);
+    for (const f of letta.findings) {
+      righe.push(f.sede === 'e'
+        ? `· di un altro lavoro, senza livello: ${ROUND.primaFrase(f.text, 160)}`
+        : `· livello ${f.level}: ${ROUND.primaFrase(f.text, 160)}`);
     }
+    for (const r of vecchie) righe.push(`· scritto con la scala vecchia: ${ROUND.primaFrase(r.replace(/\s*\([^)]*\)\s*$/, ''), 160)}`);
   }
   return righe.join('\n');
 }
@@ -628,7 +634,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const serverFermo = partenzaServer === String((server && server.sha) || '');
   if (sha && partenza && sha === partenza && serverFermo) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
-    // Fermano solo gli interni: un vicino non corretto esce coi rimasti, qualunque livello porti scritto.
+    // Fermano solo gli interni.
     const gravi = pending.filter((f) => ROUND.sedeDi(f.sede) === 'i' && Number(f.level) >= 2);
     const lievi = pending.filter((f) => !gravi.includes(f));
     if (gravi.length) {
@@ -771,7 +777,8 @@ export function derivatiText(list) {
     const dove = g.tipo === 'rimasti'
       ? `un solo feedback per ${g.findings.length === 1 ? 'questo rilievo' : `questi ${g.findings.length} rilievi`}`
       : 'feedback a parte';
-    return `${g.findings.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n')}\n  → ${dove}, priorità ${g.priority} (${ROUND.groupLabel(g)})`;
+    const priorita = g.priority == null ? 'senza livello' : `priorità ${g.priority}`;
+    return `${g.findings.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n')}\n  → ${dove}, ${priorita} (${ROUND.groupLabel(g)})`;
   }).join('\n');
 }
 
@@ -1214,19 +1221,16 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'con le barre normali, viene riconosciuto).',
     '',
     'QUANDO HAI FINITO registra la critica: una riga per rilievo, con livello E sede davanti',
-    'fra quadre, prima la cifra e poi la lettera (3 sicurezza/dati/Filo inutilizzabile · 2 la',
-    'cosa chiesta non si ottiene o cammino principale · 1 cosmetica/attrito fuori cammino ·',
-    '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro, `v` è un altro lavoro',
-    'ma sta in un file che questo ramo modifica già; `[1i?]` = chiede una decisione',
-    'dell’owner, e nel testo scrivi l’opzione che consigli; `[2i?!]` = una scelta difficile da',
-    'disfare: dati degli utenti, sicurezza, formati salvati su disco). Una riga col solo livello viene respinta. Le righe prima del',
+    'fra quadre, con la scala della ricetta qui sotto («Il livello e la sede di ogni rilievo»):',
+    '`[2i]` interno col livello, `[e]` esterno senza livello, `[1i?]` chiede una decisione',
+    'dell’owner, `[2i?!]` una scelta difficile da disfare. Una riga col solo livello viene respinta. Le righe prima del',
     'primo rilievo sono il riassunto di cosa funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
     '«[2i]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
     '  [2i] il pulsante non salva se il titolo è vuoto: passi …',
-    '  [0e] con la finestra sotto i 300 pixel il menu esce dallo schermo: c’era già su main"',
+    '  [e] con la finestra sotto i 300 pixel il menu esce dallo schermo: c’era già su main"',
     'Poi SEGUI la risposta stampata dal comando: dice cosa succede adesso.',
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',

@@ -382,8 +382,8 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
 
   // Spente le routine, bilanci, istruzioni e lavori server si preparano per la riaccensione.
   await expect(page.locator('#mgLavoriServer')).toBeEnabled();
-  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions',
-    '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgCap0Save', '#mgFixInstructionsSave']) {
+  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgFixInstructions',
+    '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgFixInstructionsSave']) {
     await expect(page.locator(id)).toBeEnabled();
   }
   await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
@@ -393,7 +393,7 @@ test('a routine spente un bilancio e le istruzioni si modificano e restano salva
   // Il caso dell'owner: apre Gestione con le routine GIÀ spente e vuole cambiare i numeri.
   const page = await apriAutomazioni(openTab);
   await stubAutomation(page, { routinesEnabled: false });
-  await stubCaps(page, { cap3: 2, cap2: 5, cap1: 1, cap0: 0, fixInstructions: 'VECCHIO' });
+  await stubCaps(page, { cap3: 2, cap2: 5, cap1: 1, fixInstructions: 'VECCHIO' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   await page.evaluate(() => window.__mgTest.loadCaps());
@@ -650,7 +650,7 @@ test('le scelte sulle sessioni restano manovrabili anche a routine spente', asyn
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
 // cambiamento ha effetto").
-async function stubCaps(page, initial = { cap3: 5, cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' }) {
+async function stubCaps(page, initial = { cap3: 5, cap2: 5, cap1: 2, fixInstructions: '' }) {
   await page.evaluate((init) => {
     window.__capsValue = { ...init };
     window.__capsSets = [];
@@ -666,7 +666,7 @@ async function stubCaps(page, initial = { cap3: 5, cap2: 5, cap1: 2, cap0: 0, fi
           window.__capsSets.push({ giroStretto: msg.giroStretto });
         }
         const clamp =(n) => Math.min(10, Math.max(0, Math.round(Number(n))));
-        for (const field of ['cap3', 'cap2', 'cap1', 'cap0']) {
+        for (const field of ['cap3', 'cap2', 'cap1']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
             window.__capsSets.push({ [field]: window.__capsValue[field] });
@@ -760,7 +760,7 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
 });
 
-test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
+test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -769,27 +769,29 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   const cap3 = page.locator('#mgCap3');
   const cap2 = page.locator('#mgCap2');
   const cap1 = page.locator('#mgCap1');
-  const cap0 = page.locator('#mgCap0');
   const fix = page.locator('#mgFixInstructions');
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeVisible();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeVisible();
+  // La scala è a tre livelli (#2339): il bilancio dello 0 non c'è più.
+  await expect(page.locator('#mgCap0, #mgCap0Save, #mgCap0Block')).toHaveCount(0);
 
   // Da non-admin i campi sono in sola lettura (stesso contratto dello switch).
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeDisabled();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeDisabled();
   await expect(page.locator('#mgCap3Save')).toBeDisabled();
   await expect(page.locator('#mgCap2Save')).toBeDisabled();
+  await expect(page.locator('#mgCap1Save')).toBeDisabled();
   await expect(page.locator('#mgFixInstructionsSave')).toBeDisabled();
 
-  // Simula l'owner: stub della config + abilita i controlli.
-  await stubCaps(page, { cap3: 2, cap2: 7, cap1: 1, cap0: 0, fixInstructions: 'TESTO OWNER' });
+  // Simula l'owner: stub della config + abilita i controlli. Un cap0 rimasto nel documento non si mostra.
+  await stubCaps(page, { cap3: 2, cap2: 7, cap1: 1, cap0: 4, fixInstructions: 'TESTO OWNER' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps()); // rilegge dalla config stubbata
-  for (const el of [cap3, cap2, cap1, cap0, fix]) await expect(el).toBeEnabled();
+  for (const el of [cap3, cap2, cap1, fix]) await expect(el).toBeEnabled();
   // I campi riflettono il valore della config, non un default locale.
   await expect(cap3).toHaveValue('2');
   await expect(cap2).toHaveValue('7');
   await expect(cap1).toHaveValue('1');
-  await expect(cap0).toHaveValue('0');
   await expect(fix).toHaveValue('TESTO OWNER');
+  await expect(page.locator('#mgCap0')).toHaveCount(0);
 
   // Cambia i valori e salva (ogni campo col suo bottone).
   await cap3.fill('4');
@@ -801,27 +803,24 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   await cap1.fill('3');
   await page.locator('#mgCap1Save').click();
   await expect(page.locator('#mgCap1Msg')).toHaveText('Salvato.');
-  await cap0.fill('1');
-  await page.locator('#mgCap0Save').click();
-  await expect(page.locator('#mgCap0Msg')).toHaveText('Salvato.');
   await fix.fill('');
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato: vale il testo del server.');
 
   // I valori sono stati SCRITTI nella config (l'IPC che il server della
   // critica legge): è qui che "hanno effetto", non solo in una cache locale.
-  // Ogni salvataggio tocca SOLO il suo campo.
+  // Ogni salvataggio tocca SOLO il suo campo, e nessuno scrive un cap0.
   await expect.poll(() => page.evaluate(() => window.__capsSets))
-    .toEqual([{ cap3: 4 }, { cap2: 5 }, { cap1: 3 }, { cap0: 1 }, { fixInstructions: '' }]);
-  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap3: 4, cap2: 5, cap1: 3, cap0: 1, fixInstructions: '' });
+    .toEqual([{ cap3: 4 }, { cap2: 5 }, { cap1: 3 }, { fixInstructions: '' }]);
+  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap3: 4, cap2: 5, cap1: 3, cap0: 4, fixInstructions: '' });
 
   // Sono anche specchiati nella cache locale (display istantaneo all'avvio).
   const cached = await page.evaluate(async () => {
     const K = window.SN_CONST.STORAGE_KEYS;
-    const d = await window.chrome.storage.local.get([K.AUTOMATION_CAP2, K.AUTOMATION_CAP1, K.AUTOMATION_CAP0]);
-    return [d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], d[K.AUTOMATION_CAP0]];
+    const d = await window.chrome.storage.local.get([K.AUTOMATION_CAP3, K.AUTOMATION_CAP2, K.AUTOMATION_CAP1]);
+    return [d[K.AUTOMATION_CAP3], d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], 'AUTOMATION_CAP0' in K];
   });
-  expect(cached).toEqual([5, 3, 1]);
+  expect(cached).toEqual([4, 5, 3, false]);
 });
 
 test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella config delle routine, e un guasto lo rimette dov\'era', async ({ openTab }) => {
@@ -839,7 +838,7 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await expect(giro).toBeDisabled();
 
   // Documento senza il campo: spento. Non dipende dalle routine accese.
-  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' });
+  await stubCaps(page, { cap2: 5, cap1: 2, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   await expect(giro).toBeEnabled();
@@ -2563,7 +2562,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
+  await stubCaps(page, { cap2: 5, cap1: 2, fixInstructions: 'PRIMA' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const fix = page.locator('#mgFixInstructions');
@@ -2586,7 +2585,7 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
+  await stubCaps(page, { cap2: 3, cap1: 2, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const cap2 = page.locator('#mgCap2');
@@ -2618,7 +2617,7 @@ test('giro stretto: se la config non si legge l’interruttore resta com’era e
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
+  await stubCaps(page, { cap2: 5, cap1: 1, fixInstructions: '', giroStretto: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const giro = page.locator('#mgGiroStretto');

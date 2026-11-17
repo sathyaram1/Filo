@@ -78,3 +78,9 @@ test('la tabella degli ambiti di SPEC-DOMANDE § 5.2 e questi dati nominano gli 
   const nomi = sezione.split('\n').map((r) => /^\| `([a-z_]+)` \|/.exec(r)).filter(Boolean).map((m) => m[1]).sort();
   assert.deepEqual(nomi, Object.keys(A.INIZIALI).sort());
 });
+
+test('feedback.metadati dice a chi la chiama come si chiede la pagina dopo (#2549)', () => {
+  const p = A.OPERAZIONI['feedback.metadati'].parametri;
+  for (const parola of ['tutti', 'limite', 'troncato', 'dopo', 'seguente', 'ids', 'mancanti', 'illeggibili']) assert.ok(p.includes(parola), parola);
+  assert.equal(A.OPERAZIONI['feedback.apri'].parametri, '', 'chi non ne ha non ne inventa');
+});

@@ -15,6 +15,7 @@ const GIOVEDI_9 = Date.UTC(2026, 9, 29, 8, 30);
 const REVISIONE = {
   id: 'rev-domande', nome: 'Revisione delle domande', testo: 'Leggi le domande <b>aperte</b>.\nRaggruppale.', giorni: [0, 1, 2, 3, 4, 5, 6],
   ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
+  tettoUsd: null, tetto: { usd: 124, da: 'corse', mediana: 61.7, corse: 3 },
   prossimaIl: LUNEDI_6, creatoIl: ORA - 3000 * MIN, modificatoIl: ORA - 600 * MIN, iniziale: true, attesa: 'aspetta l’ambiente dei riservati',
   istanza: { id: 'C-12', stato: 'fatto', esito: '3 domande raggruppate', creatoIl: ORA - 300 * MIN, nonPrimaDi: ORA - 300 * MIN, chiusoIl: ORA - 250 * MIN },
   rapporto: { testo: 'Raggruppate <img src=x onerror="window.__xss=1"> tre domande.\nRiparti da D-40.', fiducia: 'non_fidato', scrittoIl: LUNEDI_6 - 24 * 60 * MIN + 41 * MIN, compitoId: 'C-12' },
@@ -172,7 +173,7 @@ test('Modifica e Salva mandano i campi ripuliti, solo i toccati cambiano, e la r
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     id: 'rev-domande', nome: 'Revisione serale', testo: REVISIONE.testo, giorni: [1, 2, 3, 4, 5, 6], ora: '21:15', ambito: 'coda',
-    urgenza: 46, modello: 'sonnet', sforzo: 'xhigh', attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
+    urgenza: 46, modello: 'sonnet', sforzo: 'xhigh', tettoUsd: null, attivo: true, domandaFineTurno: 'Cosa ti è mancato?',
   });
   await expect(r.locator('.mg-cp-nome')).toHaveText('Revisione serale');
   await expect(r).toContainText('lunedì, martedì, mercoledì, giovedì, venerdì e sabato alle 21:15');
@@ -180,6 +181,38 @@ test('Modifica e Salva mandano i campi ripuliti, solo i toccati cambiano, e la r
   await expect(r).toContainText('sonnet · xhigh');
   await expect(r.locator('.mg-rc-esito')).toHaveText('Salvato.');
   await expect(r.getByRole('button', { name: 'Modifica' })).toBeFocused();
+});
+
+// #2303: il tetto di costo per corsa sta accanto a modello e sforzo, con la sua stima; vuoto è quello automatico.
+test('il tetto di costo per corsa: automatico dalla mediana, scritto dall\'owner, rifiutato col numero se storto', async ({ openTab }) => {
+  const page = await apri(openTab);
+  const r = riga(page, 'rev-domande');
+  await expect(r.locator('.mg-rc-tetto')).toHaveText('tetto 124 $ (automatico)');
+  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /Una corsa costa di solito 61,7 \$ \(mediana di 3\), circa 1\.872 \$ al mese\./);
+  await expect(riga(page, 'potatura').locator('.mg-rc-tetto')).toHaveText('senza tetto');
+  await r.getByRole('button', { name: 'Modifica' }).click();
+  const form = r.locator('form.mg-rc-form');
+  const tetto = form.locator('[data-campo="tettoUsd"]');
+  await expect(tetto).toHaveValue('');
+  await expect(tetto).toHaveAttribute('placeholder', 'automatico, 124 $');
+  await expect(form.locator('.mg-rc-tetto-stima')).toHaveText('di solito 61,7 $ a corsa, circa 1.872 $ al mese');
+  await tetto.fill('tanti');
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form.locator('.mg-rc-form-msg')).toHaveText('Il tetto di costo è un numero di dollari da 0,01 a 10000, o vuoto per quello automatico.');
+  expect(await inviati(page, 'ricorrente_salva')).toHaveLength(0);
+  await tetto.fill('90,5');
+  await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-tetto.png', fullPage: true });
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form).toHaveCount(0);
+  const [salva] = await inviati(page, 'ricorrente_salva');
+  expect(salva.ricorrente.tettoUsd).toBe(90.5);
+  // Riaperto, il tetto scritto c'è; svuotato, torna automatico.
+  await r.getByRole('button', { name: 'Modifica' }).click();
+  await expect(form.locator('[data-campo="tettoUsd"]')).toHaveValue('90.5');
+  await form.locator('[data-campo="tettoUsd"]').fill('');
+  await form.getByRole('button', { name: 'Salva' }).click();
+  await expect(form).toHaveCount(0);
+  expect((await inviati(page, 'ricorrente_salva')).pop().ricorrente.tettoUsd).toBeNull();
 });
 
 test('un rifiuto del server si legge accanto al modulo col suo dettaglio, e quello scritto resta', async ({ openTab }) => {
@@ -224,7 +257,7 @@ test('l\'interruttore accende e spegne mandando solo «attivo», anche con una b
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     id: 'potatura', nome: 'Potatura dei rami', testo: 'Pota i rami vecchi.', giorni: [1], ora: '01:00', ambito: 'rami', urgenza: 5,
-    modello: 'haiku', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    modello: 'haiku', sforzo: 'high', tettoUsd: null, attivo: true, domandaFineTurno: '',
   });
   await expect(p.locator('[data-campo="testo"]')).toHaveValue('Bozza da non mandare');
   await expect(p.locator('[data-campo="attivo"]'), 'una levetta sola per un ricorrente che c’è già').toHaveCount(0);
@@ -296,7 +329,7 @@ test('nuovo compito ricorrente: parte coi valori iniziali, rifiuta prima di mand
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     nome: 'Guarda i <b>log</b>', testo: 'Leggi i log della notte.', giorni: [0, 1, 2, 3, 4, 5, 6], ora: '06:00', ambito: 'lavoro',
-    urgenza: 45, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    urgenza: 45, modello: 'opus', sforzo: 'high', tettoUsd: null, attivo: true, domandaFineTurno: '',
   });
   const nuova = riga(page, 'nuovo-1');
   await expect(nuova.locator('.mg-cp-nome')).toHaveText('Guarda i <b>log</b>');

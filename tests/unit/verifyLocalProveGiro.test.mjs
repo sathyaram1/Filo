@@ -77,7 +77,7 @@ test('consegnare una correzione con file non salvati: il rifiuto elenca i file e
   const dopoCritica = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
     critique: 'provato tutto.\n[2i] rotto', sha: SHA,
     // I bilanci li passa chi chiama: nel codice non c'è un default (2026-09-16).
-    caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 },
+    caps: { cap3: 5, cap2: 5, cap1: 2 },
   });
   const rifiuto = withFixed(dopoCritica.state, 'r', {
     report: 'corretto', sha: ALTRO, dirtyFiles: ['tests/verifica/locale-r/giro1-prova.spec.mjs', 'avanzo.txt'],
@@ -138,7 +138,7 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   const buona = { ok: true, sha: PULIZIA, files: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'], cancellate: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'] };
   const critica = (derived) => {
     const s = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
-      critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 },
+      critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2 },
     }).state;
     s.r.pending.derived = derived;
     return s;
@@ -159,6 +159,6 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   assert.equal(f.outcome, 'fixed');
   assert.equal(f.state.r.chiusura.shaPrima, PULIZIA);
   // La risposta persa si ristampa anche dal commit della pulizia.
-  const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 } });
+  const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2 } });
   assert.equal(rimandata.replayed, true);
 });

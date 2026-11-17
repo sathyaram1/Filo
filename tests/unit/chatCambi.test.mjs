@@ -29,12 +29,15 @@ test('la chat riceve i cambi del giorno, nel contesto e non nelle istruzioni fis
   assert.ok(intero.indexOf('CAMBI:\n') > statico.length - 1);
 });
 
-test('la chat sa che le rupie sono INR e che il conto si ordina col marker', () => {
+// Che le rupie siano INR e quanto vale un miglio il modello lo sa da sé (SPEC-CONTESTO § La parte fissa): resta solo
+// quello che non deduce, il marker e i cambi del giorno.
+test('la chat sa che il conto si ordina col marker, senza tabelle scritte a mano', () => {
   const statico = PROMPTS.filoChatStatic({});
-  assert.ok(statico.includes('rupie = INR'));
+  assert.ok(!statico.includes('rupie = INR'), 'i nomi delle valute sono tornati nella parte fissa');
+  assert.ok(!statico.includes('1 mi = 1.609 km'), 'i fattori delle unità sono tornati nella parte fissa');
   assert.ok(statico.includes('[[calc: X/<tasso> | eur]]'), 'manca la regola da valuta a euro');
   assert.ok(statico.includes('| valuta]]'), 'manca la regola da euro (o da un\'altra valuta) a valuta');
-  assert.ok(/CERCA_WEB/.test(statico.slice(statico.indexOf('CONTI E CAMBI'))), 'una valuta fuori elenco non ha una strada');
+  assert.ok(/web\(cerca\)/.test(statico.slice(statico.indexOf('Conti:'))), 'una valuta fuori elenco non ha una strada');
 });
 
 test('senza cambi la chat non scrive un blocco CAMBI vuoto', () => {

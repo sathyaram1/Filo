@@ -47,7 +47,7 @@ async function stubAgents(app) {
       // Il correttore rilegge anche il campo della home: un testo incollato lo sveglia prima dell'invio.
       if (all.includes('TESTO DA RILEGGERE') || all.includes('<testo_nuovo>')) return '[][][][nessuno]';
       // La coda è solo della chat: il correttore rilegge la chat di casa (#1447) e una sua chiamata se la prendeva.
-      if (!JSON.stringify(messages?.[0] ?? '').includes('attraverso un campo di testo nella dashboard')) return 'NIENTE';
+      if (!JSON.stringify(messages?.[0] ?? '').includes('Sei Filo, l\'assistente dentro il browser Filo')) return 'NIENTE';
       globalThis.__chatPrompts.push(all);
       const next = globalThis.__chatReplies.shift();
       return next || JSON.stringify({ text: 'Dimmi pure.', actions: [] });

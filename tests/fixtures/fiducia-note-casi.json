@@ -1,0 +1,131 @@
+{
+  "casi": [
+    {
+      "notes": "Primo report, senza marcatore.",
+      "impronte": [
+        "8019e4fe4a114d423e6720601defdfe3a39a3870bd218fef580da3d3b81c8398"
+      ],
+      "fidate": [
+        false
+      ],
+      "motivo": "nota non fidata nella conversazione: 1"
+    },
+    {
+      "notes": "Report uno.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nReport due\ncon due righe.\n\n--- La tua risposta del 01/11/26, 10:00 ---\nVa bene così.",
+      "impronte": [
+        "93f4ee81388bf410ed5a2c6c8f7f57d1db1ae57541ee4490013ce45bcf84d6d8",
+        "da85ad1d9253c40b630ca0f74cb6f4b4cb71b8294e5c27b83ed269498a8881f2",
+        "7597fb52a34478f8065d2444569eb666dfdb8ccdbd9a9f3d051bd5bd439ee7b4"
+      ],
+      "fidate": [
+        false,
+        false,
+        true
+      ],
+      "motivo": "note non fidate nella conversazione: 1, 2"
+    },
+    {
+      "notes": "Report con allegato.\n@@filo-attachment {\"kind\":\"img\",\"url\":\"https://x.it/a.png\"}\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\n@@filo-attachment {\"kind\":\"file\",\"url\":\"https://x.it/b.pdf\",\"name\":\"b.pdf\"}",
+      "impronte": [
+        "8d5d01ca3f6f39fec7f607ea9e017d7767898ea32ce2e7bcd6341df2ddb3c917",
+        "2a0bae920a62e4334bc06cf065b26849180cbf5be5844b4cf9a5b69bdbd7f8be"
+      ],
+      "fidate": [
+        false,
+        false
+      ],
+      "motivo": "note non fidate nella conversazione: 1, 2"
+    },
+    {
+      "notes": "Righe con a capo di Windows.\r\nseconda riga\r\n\r\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\r\n  spazi ai bordi  \r\n",
+      "impronte": [
+        "ceafb70c3bdd4ceb27f7f7e5a6e0fed8e46425aa921458c6f35605af1f21ed73",
+        "a172b1b6fd10df79487936060eb14a0de972aad52edb597c99d444280a3646f1"
+      ],
+      "fidate": [
+        false,
+        false
+      ],
+      "motivo": "note non fidate nella conversazione: 1, 2"
+    },
+    {
+      "notes": "--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nDopo il taglio: è già 🎉 ok, «ç».",
+      "impronte": [
+        "8ce14786848b6c948bb93497a2c26f9a5c9991991550e9cc8ed901bffaf73737",
+        "858798a402c11e8fdd6709b0d105a3b7fd6f4653bcda0bcadf8307cb60d643de"
+      ],
+      "fidate": [
+        true,
+        false
+      ],
+      "motivo": "nota non fidata nella conversazione: 2"
+    },
+    {
+      "notes": "--- Riaperto il 02/11/26 ---\nRiaperta dall'owner.\n\n--- Filo ha risposto il 02/11/26 ---\nRisposta storica.",
+      "impronte": [
+        "d56df2f01c2f89678d679adf5e8cdd73e8d1798b391a5176b9067bc54b21f5a4",
+        "8141bda68a72d4f0c62d62c66c9dce1db9fcf9c4b618b583849517df8f7c57eb"
+      ],
+      "fidate": [
+        true,
+        false
+      ],
+      "motivo": "nota non fidata nella conversazione: 2"
+    },
+    {
+      "notes": "--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 1.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 2.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 3.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 4.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 5.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 6.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 7.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 8.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 9.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 10.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 11.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 12.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 13.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nNota 14.",
+      "impronte": [
+        "9ccff6695968a28f8e0a32adab633a56b6e41c28686a6980f56d461eba19897b",
+        "0d1fe6ef82b88c580cf84075557114ab929f696cda2406985b8b9ccd317f1360",
+        "c3f97f0436bf803726dcf03d99f3894a10d127005532419c719f9d65782eea20",
+        "4d2e70e018d13b17ad3d2ffc26531cf6305275628850c4df62fa2b873237a462",
+        "734698c27124d73686b2d03f70c57d1e1371d54d5d51f9cd974faa28638a9893",
+        "7af33efe19a499e1d4f4921cdbe1f525386d637836aaf3bb7abf487e5c880a53",
+        "771ef0596d990c1b68973690ccba41c9cd120da5901632c47b2e5c4aae1216ac",
+        "924a672ff4e591f030d31511acb48a65e916f650cd00c9e3e7f3c5e4db1204d7",
+        "4426e68470021c70728ece9f5f113f3c9d68eb55aeef0a76e2f5ae3acbbaee70",
+        "523fdcd72ff500fa14fc356dec8f92a154589ebd66b02fee73b9c3ece94f42cd",
+        "ca09a822325de0011a727e3b1e0b542b9460cd58a4bd40555fd210ad9687580e",
+        "3a33cdc71e3f4ab0090bd09ae703c13593df287a2b693907a345a15bd33da4ae",
+        "63a918721b358cebd93786f84c2f7ba433f135ceddae85bde52d2e5b7671949a",
+        "e2850d31e3d3953243aadc4eea65732979da05e18acc355cd068dbb981fa2eaa"
+      ],
+      "fidate": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "motivo": "note non fidate nella conversazione: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 e altre 2"
+    },
+    {
+      "notes": "Report uno.\n\n--- Aggiornamento dell'agente del 01/11/26, 09:00 ---\nReport due\ncon due righe.\n\n--- La tua risposta del 01/11/26, 10:00 ---\nVa bene così.",
+      "noteFidate": [
+        "93f4ee81388bf410ed5a2c6c8f7f57d1db1ae57541ee4490013ce45bcf84d6d8",
+        "da85ad1d9253c40b630ca0f74cb6f4b4cb71b8294e5c27b83ed269498a8881f2",
+        "!7597fb52a34478f8065d2444569eb666dfdb8ccdbd9a9f3d051bd5bd439ee7b4"
+      ],
+      "impronte": [
+        "93f4ee81388bf410ed5a2c6c8f7f57d1db1ae57541ee4490013ce45bcf84d6d8",
+        "da85ad1d9253c40b630ca0f74cb6f4b4cb71b8294e5c27b83ed269498a8881f2",
+        "7597fb52a34478f8065d2444569eb666dfdb8ccdbd9a9f3d051bd5bd439ee7b4"
+      ],
+      "fidate": [
+        true,
+        true,
+        false
+      ],
+      "motivo": "nota non fidata nella conversazione: 3"
+    }
+  ]
+}

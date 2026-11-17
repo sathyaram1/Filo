@@ -394,7 +394,7 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
   // L'azione è uno strumento nativo (actionTools.js) che c'è sempre ma vale solo durante l'intervista: il prompt
   // deve dirlo, altrimenti il modello non sa che può usarlo adesso.
-  assert.match(conOnb, /strumento ONBOARDING vale solo adesso/, 'senza l’azione non può spuntare niente');
+  assert.match(conOnb, /filo_su_di_se\(intervista\) vale solo adesso/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
   // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
   // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
@@ -463,7 +463,7 @@ test('l’autonomia è una voce da scoprire, e la si spunta dopo la scelta (#118
   assert.equal(voce.kind, 'scoprire');
   assert.match(voce.applica, /"autonomia": true/, 'il modello deve sapere come mostrare la scelta');
   assert.match(voce.applica, /il clic lo salva già/, 'che il clic non va rifatto');
-  assert.match(voce.applica, /IMPOSTA_PREFERENZA con chiave autonomia/, 'e che detto a parole lo cambia come in chat (#1312)');
+  assert.match(voce.applica, /impostazioni\(imposta\) con chiave autonomia/, 'e che detto a parole lo cambia come in chat (#1312)');
   assert.match(O.renderChecklistForPrompt(O.emptyState()), /\[ \] autonomia/);
 });
 
@@ -630,8 +630,8 @@ test('la voce dei contatori dice come applicare una risposta data a parole, con 
   const voce = O.ITEMS.find((i) => i.id === 'contatori');
   assert.match(voce.applica, /a parole/);
   assert.doesNotMatch(voce.applica, /non hai un.azione/i);
-  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
-  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  const m = /impostazioni\(imposta\), chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina impostazioni(imposta) e la sua chiave');
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });

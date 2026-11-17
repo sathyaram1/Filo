@@ -26,15 +26,16 @@
   const BOZZE_KEY = 'filo.gestione.ricorrenti.bozze';
   // La settimana dell'owner parte dal lunedì (ricorrenti.js): la domenica va in fondo.
   const SETTIMANA = [1, 2, 3, 4, 5, 6, 0];
-  const CAMPI = ['nome', 'testo', 'giorni', 'ora', 'ambito', 'urgenza', 'modello', 'sforzo', 'attivo', 'domandaFineTurno'];
+  const CAMPI = ['nome', 'testo', 'giorni', 'ora', 'ambito', 'urgenza', 'modello', 'sforzo', 'tettoUsd', 'attivo', 'domandaFineTurno'];
   // Come i ricorrenti iniziali (§4.1): Opus a sforzo high, perché nessun ricorrente costruisce codice da zero.
+  // Il tetto vuoto è quello automatico (#2303): il doppio della mediana delle ultime corse.
   const PREDEFINITO = Object.freeze({
     nome: '', testo: '', giorni: [0, 1, 2, 3, 4, 5, 6], ora: '06:00', ambito: 'lavoro', urgenza: K.URGENZA.nuovo,
-    modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    modello: 'opus', sforzo: 'high', tettoUsd: '', attivo: true, domandaFineTurno: '',
   });
   // Un campo che il server non ha mandato resta vuoto: un default lì cambierebbe il ricorrente senza che l'owner lo veda.
   const VUOTO = Object.freeze({
-    nome: '', testo: '', giorni: [], ora: '', ambito: '', urgenza: '', modello: '', sforzo: '', attivo: true, domandaFineTurno: '',
+    nome: '', testo: '', giorni: [], ora: '', ambito: '', urgenza: '', modello: '', sforzo: '', tettoUsd: '', attivo: true, domandaFineTurno: '',
   });
 
   const el = {
@@ -248,7 +249,7 @@
     const occ = stato.occupato.get(r.id);
     const e = stato.esito.get(r.id);
     // Quando cambia una di queste il contenitore vivo si rifà (dalla bozza, se c'è); altrimenti resta, modulo compreso.
-    li.dataset.state = [r.attivo === false ? 0 : 1, r.modificatoIl || 0, (r.rapporto && r.rapporto.scrittoIl) || 0,
+    li.dataset.state = [r.attivo === false ? 0 : 1, r.modificatoIl || 0, (r.rapporto && r.rapporto.scrittoIl) || 0, tettoTesto(r.tetto),
       occ ? `${occ.azione}${occ.valore}` : '', e ? e.testo : '', stato.msgModulo.has(r.id) ? stato.msgModulo.get(r.id).testo : ''].join('|');
 
     const testa = nodo('div', 'mg-rc-testa');
@@ -261,6 +262,7 @@
       nodo('span', '', `ambito ${r.ambito || '?'}`, ambitoTitolo(a)),
       nodo('span', '', `urgenza ${r.urgenza}`, 'Più alta passa prima'),
       nodo('span', '', K.modelloTesto(r.modello, r.sforzo), 'Modello e sforzo di ogni istanza'),
+      nodo('span', 'mg-rc-tetto', tettoTesto(r.tetto), stimaTesto(r.tetto, r.giorni)),
     );
     const sotto2 = nodo('div', 'mg-cp-sotto mg-rc-quando');
     if (r.attivo === false) sotto2.append(nodo('span', '', 'spento: non parte'));
@@ -282,6 +284,24 @@
     if (sotto2.children.length) li.append(sotto2);
     li.append(vivo);
     return li;
+  }
+
+  // ── Il tetto di costo della corsa (#2303) ────────────────────────────────
+
+  const dollari = (n) => `${(Math.round(Number(n) * 100) / 100).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
+
+  function tettoTesto(t) {
+    if (!t || !(Number(t.usd) > 0)) return 'senza tetto';
+    return `tetto ${dollari(t.usd)}${t.da === 'corse' ? ' (automatico)' : ''}`;
+  }
+
+  const alMese = (t, giorni) => Number(t.mediana) * (Array.isArray(giorni) ? giorni.length : 0) * 52 / 12;
+
+  /** La stima accanto al tetto: quanto costa di solito una corsa, e al mese con la cadenza scelta. */
+  function stimaTesto(t, giorni) {
+    const regola = 'Oltre il tetto la corsa si ferma e non riparte. Vuoto: il doppio della mediana delle ultime corse.';
+    if (!t || !(Number(t.corse) > 0)) return `${regola} Nessuna corsa finita ancora: finché non ne finisce una, il tetto automatico non c’è.`;
+    return `${regola} Una corsa costa di solito ${dollari(t.mediana)} (mediana di ${t.corse}), circa ${dollari(Math.round(alMese(t, giorni)))} al mese.`;
   }
 
   // ── Il modulo ────────────────────────────────────────────────────────────
@@ -373,10 +393,20 @@
     sforzo.append(new Option('dell’agente', ''));
     for (const s of K.SFORZI) sforzo.append(new Option(s, s));
     sforzo.value = String(v.sforzo || '');
+    const cur = id === NUOVO ? null : trova(id);
+    const auto = cur && cur.tetto && cur.tetto.da !== 'owner' ? Number(cur.tetto.usd) : NaN;
+    const tetto = campo('input', 'tettoUsd', {
+      type: 'text', inputMode: 'decimal', value: v.tettoUsd === null || v.tettoUsd === undefined ? '' : String(v.tettoUsd),
+      placeholder: auto > 0 ? `automatico, ${dollari(auto)}` : 'automatico',
+    });
+    tetto.className = 'mg-auto-number mg-rc-tetto-campo';
+    const stima = nodo('span', 'mg-rc-tetto-stima', cur && cur.tetto && cur.tetto.corse > 0
+      ? `di solito ${dollari(cur.tetto.mediana)} a corsa, circa ${dollari(Math.round(alMese(cur.tetto, v.giorni)))} al mese` : 'nessuna corsa finita ancora');
     scelte.append(
       scelta('Ambito', ambito, 'Cosa può fare l’agente: l’elenco degli ambiti è in fondo alla scheda'),
       scelta('Urgenza', urgenza, 'Più alta passa prima. I feedback a priorità 3 stanno da 50 in su, «Gestisci la risposta» a 47.'),
       scelta('Modello', modello), scelta('Sforzo', sforzo),
+      scelta('Tetto a corsa ($)', tetto, stimaTesto(cur && cur.tetto, v.giorni)), stima,
     );
     // Uno che c'è già si accende e si spegne dalla sua levetta, subito: una seconda nel modulo varrebbe solo al salvataggio.
     if (id === NUOVO) {

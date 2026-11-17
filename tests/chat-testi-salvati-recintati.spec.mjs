@@ -53,7 +53,7 @@ async function conta(app, testo, ago) {
 }
 
 // Dopo ogni turno partono anche le lezioni e la home: si riconoscono dall'inizio.
-const APRE_CHAT = 'Sei Filo, un assistente personale. L\'utente interagisce';
+const APRE_CHAT = 'Sei Filo, l\'assistente dentro il browser Filo';
 const APRE_HOME = 'Sei Filo, un assistente personale. Il tuo compito è preparare la dashboard';
 
 test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva recintato', async ({ app, shell }) => {

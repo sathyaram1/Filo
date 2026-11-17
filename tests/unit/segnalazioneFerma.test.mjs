@@ -22,18 +22,18 @@ require(join(SHARED, 'manageReview.js'));
 
 const V = globalThis.SN_VERIFIER_ROUND;
 const MR = globalThis.SN_MANAGE_REVIEW;
-const CAPS = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
+const CAPS = { cap3: 10, cap2: 10, cap1: 1 };
 const F = (s) => V.parseFindings(s).findings;
 const decide = (s, counts = {}) => V.decideRound({ findings: F(s), caps: CAPS, counts });
 
 test('allo stop gli altri interni della critica sono «sospesi»: restano con quello che ha fermato, senza pagare niente', () => {
-  const d = decide('[2i?!] a\n[1i] b\n[0i] c\n[1e] d');
+  const d = decide('[2i?!] a\n[1i] b\n[2i] c\n[e] d');
   assert.equal(d.stop, true);
   assert.deepEqual(d.blocking.map((f) => f.text), ['a']);
   assert.deepEqual(d.sospesi.map((f) => f.text), ['b', 'c']);
   assert.deepEqual(d.external.map((f) => f.text), ['d']);
   assert.equal(d.consume, null);
-  assert.deepEqual(d.counts, { count3: 0, count2: 0, count1: 0, count0: 0 });
+  assert.deepEqual(d.counts, { count3: 0, count2: 0, count1: 0 });
   // A bilanci esauriti dal 3 in giù, uguale (il 2 a bilanci finiti non ferma: esce a parte).
   const d2 = decide('[3i] a\n[1i] b', { count3: 10, count2: 10, count1: 1 });
   assert.deepEqual(d2.sospesi.map((f) => f.text), ['b']);
@@ -58,19 +58,22 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
 
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {
   const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [], scope: 'pieno', perimetro: [] });
-  const esempi = brief.split('\n').filter((l) => /^\s*\[\d/.test(l));
+  const esempi = brief.split('\n').filter((l) => /^\s*\[(\d|e\b)/.test(l));
   assert.ok(esempi.length >= 2, 'il compito porta righe d\'esempio');
   for (const riga of esempi) {
     assert.deepEqual(V.unparsedLevelLines(riga), [], riga);
     assert.equal(V.parseFindings(riga).findings.length, 1, riga);
   }
+  assert.ok(esempi.some((riga) => V.parseFindings(riga).findings[0].sede === 'e'), 'un esempio d\'esterno, senza livello');
   assert.doesNotMatch(brief, /`\[1\?\]`/);
+  // La scala vecchia non s'insegna più (#2339): niente 0, niente vicino, niente esterno col livello.
+  assert.doesNotMatch(brief, /\[0[iev]|\[\d[ev]\]|`v`/);
   assert.match(brief, /sede/);
 });
 
 test('il perimetro del giro stretto scrive i rilievi con la sede, nella forma di ripiego', () => {
   const nota = perimetroNote('chiusura', { rilievi: [{ level: 2, sede: 'e', text: 'x', decision: true }, { level: 1, text: 'y' }] });
-  assert.match(nota, /- \[2e\?\] x/);
+  assert.match(nota, /- \[e\?\] x/, 'un esterno non porta livello, nemmeno se lo stato vecchio ne ha uno');
   assert.match(nota, /- \[1i\] y/);
 });
 

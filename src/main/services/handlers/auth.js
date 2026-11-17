@@ -358,6 +358,8 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
+      // La copia dei feedback non resta sul disco di chi è uscito.
+      listaInMano.dimentica();
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
       giudiciFermi?.colpo('accesso');
       return { ok: true };
@@ -477,10 +479,10 @@ module.exports = function register(on, ctx) {
       } else {
         await FB.updateStatus(id, campi, { idToken });
       }
-      // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
-      // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
+      // Il triage cambia la scheda di QUESTO id, e la si scrive subito. Il giro intero forzato a ogni triage
+      // costava ~2.300 letture ad azione (#2470): parte solo se non gira da mezz'ora.
       await syncOneCard(id, idToken);
-      scheduleViewSync({ delayMs: 1500, force: true });
+      scheduleViewSync({ delayMs: 1500 });
       if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
@@ -681,7 +683,7 @@ module.exports = function register(on, ctx) {
   // (config/routines, campi in VERIFIER_CAP_KEYS più `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
-  const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+  const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
   const capsReply = (caps) => {
     const out = { ok: true, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true };
     for (const k of CAP_KEYS) out[k] = caps[k];
@@ -908,8 +910,27 @@ module.exports = function register(on, ctx) {
     };
   }
 
-  async function listMergeApprovals() {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list' });
+  // Le richieste di fusione lette da poco valgono per tutte le pagine: la Gestione le chiedeva a ogni cambio di
+  // scheda e di stato, ~400 volte al giorno (#2470). Dopo una decisione, e dal campanello, si rileggono.
+  const FUSIONI_FRESCHE_MS = 90 * 1000;
+  let fusioniInMano = null;   // { at, chi, r }
+  function fusioniCambiate() { fusioniInMano = null; }
+
+  async function listMergeApprovals({ fresco = false } = {}) {
+    const chi = emailOwner();
+    const eta = fusioniInMano && fusioniInMano.chi === chi ? Date.now() - fusioniInMano.at : Infinity;
+    if (!fresco && eta < FUSIONI_FRESCHE_MS) {
+      return { ...fusioniInMano.r, daCopia: true, scadeTraMs: FUSIONI_FRESCHE_MS - eta };
+    }
+    const at = Date.now();
+    const r = await leggiMergeApprovals();
+    fusioniInMano = { at, chi, r };
+    return r;
+  }
+
+  async function leggiMergeApprovals() {
+    // La Gestione mostra anche decisioni passate e fusioni senza chiedere: il server le dà solo a richiesta (#2468).
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list', parti: ['recent', 'preapproved'] });
     return {
       ok: true,
       pending: (r && r.pending) || [],
@@ -924,7 +945,7 @@ module.exports = function register(on, ctx) {
     };
   }
 
-  on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
+  on(MSG.MERGE_APPROVALS_GET, ownerOnly((msg) => listMergeApprovals({ fresco: !!(msg && msg.fresco === true) })));
 
   // La collezione `feedback` non si legge senza credenziali e in una pagina filo:// l'ID token
   // non deve arrivare: si legge qui, col token e con gli stessi due cancelli (#583).
@@ -933,21 +954,41 @@ module.exports = function register(on, ctx) {
 
   // Voti e riaperture stanno sulla SCHEDA pubblica, l'unico documento che chi vota può aprire:
   // si riuniscono qui, e la scheda vince solo dove ha qualcosa da dire.
-  let cardsCache = { at: 0, rows: [] };
-  const CARDS_TTL_MS = 30_000;
+  // TUTTE le schede: una finestra sui più recenti lascerebbe in bacheca come risolti i fix vecchi tornati in
+  // lavorazione. Tutte una volta, poi le cambiate dal segnalibro (#2470: ogni apertura le rileggeva tutte).
+  const ListaGestione = require('../listaGestione');
+  const fileGestione = (nome) => {
+    try { return require('node:path').join(require('electron').app.getPath('userData'), nome); } catch (_) { return ''; }
+  };
+  const discoDi = (nome) => ({
+    leggiFile: () => { const f = fileGestione(nome); return f ? require('../scritturaAtomica').leggiSync(f) : null; },
+    scriviFile: (testo) => { const f = fileGestione(nome); return f ? require('../scritturaAtomica').scrivi(f, testo, { mode: 0o600 }) : null; },
+    togliFile: () => { const f = fileGestione(nome); if (f) require('node:fs').rmSync(f, { force: true }); },
+  });
+  const schedeInMano = ListaGestione.creaSchede({
+    leggiTutte: async () => {
+      const FB = FEEDBACK();
+      return FB.listAllPublic
+        ? FB.listAllPublic({ timeoutMs: 20000, fresh: true })
+        : FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+    },
+    leggiCambiate: async ({ since }) => FEEDBACK().listPublicChangedSince({ since, pageSize: FEEDBACK().LIST_PAGE_SIZE, timeoutMs: 20000 }),
+    ...discoDi('gestione-schede.json'),
+  });
 
   async function publicCards({ fresh = false } = {}) {
-    const FB = FEEDBACK();
-    if (!FB) return [];
-    if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
-    // TUTTE le schede, paginate: una finestra sui più recenti lascerebbe in bacheca come risolti
-    // i fix vecchi tornati in lavorazione, votabili e riapribili a pagamento.
-    const rows = FB.listAllPublic
-      ? await FB.listAllPublic({ timeoutMs: 20000, fresh })
-      : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
-    cardsCache = { at: Date.now(), rows };
-    return rows;
+    if (!FEEDBACK()) return [];
+    return schedeInMano.tutte({ fresh });
   }
+
+  // La lista della Gestione fra un'apertura e l'altra: la copia di quell'account, i cambiati e il conto (#2470).
+  const emailOwner = () => { try { return String(auth.getTokenClaims()?.email || ''); } catch (_) { return ''; } };
+  const listaInMano = ListaGestione.creaLista({
+    leggiTutti: async ({ fields }) => FEEDBACK().listAllPaged({ idToken: await liveToken(), fields }),
+    leggiCambiati: async ({ since, fields }) => FEEDBACK().listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields }),
+    conta: async () => FEEDBACK().countAll({ timeoutMs: 20000, idToken: await liveToken() }),
+    ...discoDi('gestione-lista.json'),
+  });
 
   // Per pochi feedback si chiedono le loro sole schede: il giro della Gestione
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
@@ -1003,14 +1044,17 @@ module.exports = function register(on, ctx) {
     // freno sulle pagine è scattato, chi guarda deve poterlo dire.
     if (op === 'listAll') {
       const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      if (msg.lista !== true) {
+        const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
+        return { ok: true, rows, complete, readTime };
+      }
+      // `lista`: è il caricamento della Gestione (#676). Tutti i feedback, ricomposti dalla copia in mano più i
+      // cambiati quando il conto torna (#2470): le schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
       const startedAt = Date.now();
-      const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
-      // `lista`: è il caricamento della Gestione (#676), che ora legge tutto: le
-      // schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
-      if (msg.lista !== true) return { ok: true, rows, complete, readTime };
+      const { rows, complete, readTime, pienoAt } = await listaInMano.carica({ chi: emailOwner(), campi: fields });
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
-      if (w && complete) w.allineato(startedAt, rows, readTime);
+      if (w && complete) w.allineato(startedAt, rows, readTime, pienoAt);
       return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
@@ -1057,6 +1101,8 @@ module.exports = function register(on, ctx) {
       // Letti dal modulo, non dalle sue costanti: gli spec accorciano i tempi.
       pollMs: LIVE.POLL_MS,
       reconcileMs: LIVE.RECONCILE_MS,
+      controlloMs: LIVE.CONTROLLO_MS,
+      seguitiMs: LIVE.SEGUITI_MS,
       onWarn: (m) => console.warn('[feedback] giro:', m),
       seguiti: () => {
         const out = new Set();
@@ -1069,6 +1115,7 @@ module.exports = function register(on, ctx) {
         return mergeCardFields(rows, { mirate: true });
       },
       submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await liveToken() }),
+      controlloLeggero: async () => FB.controlloLeggero({ timeoutMs: 20000, idToken: await liveToken() }),
       avviiRoutine: async () => Defaults.getWorkerLog(await liveToken(), { severo: true }),
       idDelNumero: async (num) => FB.idDelNumero(num, { timeoutMs: 20000, idToken: await liveToken() }),
       listVersions: async () => {
@@ -1164,7 +1211,8 @@ module.exports = function register(on, ctx) {
   let syncTimer = null;
   let syncing = false;
   let lastSyncAt = 0;
-  const SYNC_MIN_GAP_MS = 60_000;
+  // Il giro intero non forzato: la scheda toccata dal triage la scrive syncOneCard, il resto può aspettare (#2470).
+  const SYNC_MIN_GAP_MS = 30 * 60 * 1000;
 
   // ── Da quando ricontrollare le chiusure ──────────────────────────────────
   //
@@ -1234,19 +1282,23 @@ module.exports = function register(on, ctx) {
       if (!row) return; // cancellato nel frattempo: se ne occupa il giro generale
       const fb = await decryptFeedbackObject(row, priv);
       const card = V.cardFor(fb);
+      // La scheda in mano si aggiorna qui: buttarle via tutte faceva rileggere la bacheca intera a ogni triage (#2470).
       if (!card) {
         await FB.unpublishPublicCard(key, { idToken });
+        schedeInMano.tolta(key);
       } else {
         // Voti e riaperture stanno sulla scheda: la maschera non li tocca, ma quelli rimasti sul
         // documento vanno portati dentro come fa il giro generale.
         let before = null;
         try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
         const carry = V.carryUserFields(fb, before);
-        await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
+        const scritta = Object.keys(carry).length ? { ...card, ...carry } : card;
+        await FB.publishPublicCard(key, scritta, { idToken });
+        schedeInMano.scritta(key, { ...(before || {}), ...scritta });
       }
-      cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
       if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
     } catch (e) {
+      schedeInMano.dimentica();
       console.warn('[feedback] scheda singola non aggiornata:', e?.message || e);
     }
   }
@@ -1397,8 +1449,8 @@ module.exports = function register(on, ctx) {
       const scartate = decifrati.length !== feedbacks.length;
       const complete = !scartate && (schedeCoperte || base.length < FB.LIST_PAGE_SIZE);
       const plan = V.planSync(published, feedbacks, { complete });
-      for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
-      for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
+      for (const { id, card } of plan.upsert) { await FB.publishPublicCard(id, card, { idToken }); schedeInMano.scritta(id, card); }
+      for (const id of plan.remove) { await FB.unpublishPublicCard(id, { idToken }); schedeInMano.tolta(id); }
 
       // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
       // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
@@ -1417,7 +1469,6 @@ module.exports = function register(on, ctx) {
       // per sempre proprio quelle che non ha guardato.
       if (chiusiLetti) await segnaSincroRiuscita();
       if (plan.upsert.length || plan.remove.length) {
-        cardsCache = { at: 0, rows: [] };
         // Le schede sono appena cambiate: anche la cache della lettura completa non vale più.
         if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
         console.log('[feedback] vista pubblica aggiornata:',
@@ -1425,6 +1476,7 @@ module.exports = function register(on, ctx) {
       }
       return { ok: true, published: plan.upsert.length, removed: plan.remove.length };
     } catch (e) {
+      schedeInMano.dimentica();
       console.warn('[feedback] sincronizzazione della vista pubblica non riuscita:', e?.message || e);
       return { ok: false, error: e?.message || String(e) };
     } finally {
@@ -1437,7 +1489,7 @@ module.exports = function register(on, ctx) {
   try {
     require('../mergeApprovalSignal').start({
       isAdmin: () => auth.isAdmin(),
-      read: listMergeApprovals,
+      read: () => listMergeApprovals({ fresco: true }),
       broadcast: (m) => ctx.broadcastToFiloPages(m),
       type: MSG.MERGE_APPROVALS_CHANGED,
     });
@@ -1463,7 +1515,8 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
+    fusioniCambiate();
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') }).finally(fusioniCambiate);
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
     // Alla pagina arriva tutto l'esito, non solo esito e sha: senza riallineamento e motivo
     // diceva «la richiesta decade» a un riallineamento riuscito.
@@ -1645,6 +1698,47 @@ module.exports = function register(on, ctx) {
     return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
   }));
 
+  // Ramo e note di un lavoro dichiarati fidati com'erano (#2258): il main passa solo la forma; cosa e se lo decide il server.
+  const SHA_RE = /^[0-9a-f]{40}$/;
+  function vistoDi(v) {
+    if (!v || typeof v !== 'object' || !Number.isInteger(v.stato) || v.stato < 0) return null;
+    const out = { stato: v.stato };
+    for (const repo of ['app', 'server']) {
+      if (v[repo] === undefined) continue;
+      if (!SHA_RE.test(String(v[repo]))) return null;
+      out[repo] = String(v[repo]);
+    }
+    return out;
+  }
+  on(MSG.FIDUCIA_DICHIARA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback da dichiarare fidato.' };
+    const prova = msg?.prova === true;
+    const visto = prova ? null : vistoDi(msg?.visto);
+    if (!prova && !visto) return { ok: false, error: 'Manca quello che hai guardato: riapri il controllo e riprova.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerFiducia', prova ? { op: 'dichiara', feedbackId, prova: true } : { op: 'dichiara', feedbackId, visto });
+    } catch (e) {
+      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione della fiducia non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può farlo: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+    if (r && r.ok === false && r.reason === 'op_sconosciuta') return { ok: false, error: 'Il server non sa ancora farlo: arriva col prossimo aggiornamento del server.' };
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non l’ha dichiarato fidato.' };
+    if (r.niente === true) return { ok: true, niente: true };
+    const rami = (Array.isArray(r.rami) ? r.rami : []).filter((x) => x && (x.repo === 'app' || x.repo === 'server') && SHA_RE.test(String(x.punta)))
+      .map((x) => ({ repo: x.repo, punta: String(x.punta), motivo: String(x.motivo || '').slice(0, 400) }));
+    const out = { ok: true, rami, stato: Number.isInteger(r.stato) ? r.stato : 0 };
+    if (prova) {
+      out.visto = vistoDi(r.visto);
+      out.scritti = (Array.isArray(r.scritti) ? r.scritti : []).filter((x) => x && Number(x.at) > 0)
+        .map((x) => ({ at: Number(x.at), ruolo: String(x.ruolo || '').slice(0, 40) }));
+    }
+    return out;
+  }));
+
   // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
   // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
   async function chiamaCompiti(data, nonAncora) {
@@ -1658,15 +1752,47 @@ module.exports = function register(on, ctx) {
     if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
     return r;
   }
+  // La scheda Compiti si rilegge ogni minuto (#2468): dopo una lettura intera il main chiede al server solo i compiti
+  // cambiati e li fonde nella sua copia, così la pagina riceve sempre l'elenco intero. Ogni tanto si rilegge tutto:
+  // gli ambienti dei riservati cambiano il segno anche dei compiti non toccati.
+  const COMPITI_RILETTURA_MS = 10 * 60 * 1000;
+  let compitiInMano = null;   // { chi, storico, intera, adesso, aperti: Map, chiusi, nChiusi, altri, ambiti }
+  const perUrgenza = (a, b) => (Number(b.urgenza) - Number(a.urgenza)) || ((Number(a.creatoIl) || 0) - (Number(b.creatoIl) || 0))
+    || ((Number(a.numero) || 0) - (Number(b.numero) || 0));
+  function rispostaCompiti(m) {
+    return { ok: true, aperti: [...m.aperti.values()], storico: m.chiusi.slice(), altri: m.altri, adesso: m.adesso, ambiti: m.ambiti.slice() };
+  }
+  function fondiCompiti(m, r, n) {
+    for (const c of (Array.isArray(r.aperti) ? r.aperti : [])) if (c && c.id) m.aperti.set(String(c.id), c);
+    for (const c of (Array.isArray(r.storico) ? r.storico : [])) {
+      if (!c || !c.id) continue;
+      m.aperti.delete(String(c.id));
+      m.chiusi = [c].concat(m.chiusi.filter((x) => x.id !== c.id));
+    }
+    m.aperti = new Map([...m.aperti].sort(([, a], [, b]) => perUrgenza(a, b)));
+    m.chiusi.sort((a, b) => (Number(b.chiusoIl) || 0) - (Number(a.chiusoIl) || 0));
+    if (m.chiusi.length > n) { m.chiusi = m.chiusi.slice(0, n); m.altri = true; }
+    m.adesso = Number(r.adesso) || m.adesso;
+    if (Array.isArray(r.ambiti)) m.ambiti = r.ambiti;
+  }
   on(MSG.COMPITI_ELENCO, ownerOnly(async (msg) => {
     const data = { op: 'elenco' };
     if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
     if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
     // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
     if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
+    const chi = emailOwner();
+    const m = compitiInMano;
+    const aDelta = !data.prima && m && m.chi === chi && m.storico === (data.storico || 0) && m.adesso > 0
+      && Date.now() - m.intera < COMPITI_RILETTURA_MS;
+    if (aDelta) data.dopo = m.adesso;
     const r = await chiamaCompiti(data);
     if (!r.ok) return r;
-    return {
+    if (aDelta && r.delta === true) {
+      fondiCompiti(m, r, Number(data.storico) || m.nChiusi);
+      return rispostaCompiti(m);
+    }
+    const out = {
       ok: true,
       aperti: Array.isArray(r.aperti) ? r.aperti : [],
       storico: Array.isArray(r.storico) ? r.storico : [],
@@ -1675,6 +1801,14 @@ module.exports = function register(on, ctx) {
       adesso: Number(r.adesso) || 0,
       ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
     };
+    // Solo la prima pagina fa da copia: quelle dei più vecchi (`prima`) sono un'altra vista.
+    if (!data.prima) {
+      compitiInMano = {
+        chi, storico: data.storico || 0, intera: Date.now(), adesso: out.adesso,
+        aperti: new Map(out.aperti.filter((c) => c && c.id).map((c) => [String(c.id), c])), chiusi: out.storico.slice(), nChiusi: out.storico.length, altri: out.altri, ambiti: out.ambiti,
+      };
+    }
+    return out;
   }));
   on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
     const v = globalThis.SN_COMPITI.validaNuovo(msg?.compito);
@@ -1748,7 +1882,8 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
-    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
+    fusioniCambiate();
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') }).finally(fusioniCambiate);
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
     return { ok: true, result: 'discarded' };
   }));
@@ -1758,7 +1893,8 @@ module.exports = function register(on, ctx) {
     if (!feedbackId) return { ok: false, error: 'Manca la pratica di cui chiedere la fusione.' };
     let r;
     try {
-      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId });
+      fusioniCambiate();
+      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId }).finally(fusioniCambiate);
     } catch (e) {
       if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
       return { ok: false, error: e?.detail || e?.message || 'Il server non ha riaperto la richiesta.' };

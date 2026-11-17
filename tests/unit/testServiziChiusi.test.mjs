@@ -26,6 +26,36 @@ test('il servizio delle schede è chiuso, i suoi sosia no', () => {
   }
 });
 
+// #2470: ogni lancio di prova creava un utente anonimo vero e chiamava le funzioni del server.
+test('funzioni, identità anonima e rinnovo dell\'accesso sono chiusi come le schede', () => {
+  for (const u of [
+    'https://europe-west1-filo-8b9cb.cloudfunctions.net/walletState',
+    'https://europe-west1-filo-8b9cb.cloudfunctions.net/walletPendingInvite',
+    'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=k',
+    'https://securetoken.googleapis.com/v1/token?key=k',
+    'https://firebasestorage.googleapis.com/v0/b/x/o',
+  ]) assert.equal(S.hostChiuso(u), true, u);
+  // Il server finto delle prove resta raggiungibile, e così i servizi che non sono di Filo.
+  for (const u of ['http://127.0.0.1:4100/walletState', 'https://oauth2.googleapis.com/token', 'https://openrouter.ai/api/v1/models']) {
+    assert.equal(S.hostChiuso(u), false, u);
+  }
+});
+
+test('ogni indirizzo delle funzioni o dell\'identità scritto in src/ è chiuso nei test', () => {
+  const trovati = new Set();
+  const giro = (dir) => {
+    for (const nome of readdirSync(dir)) {
+      const p = join(dir, nome);
+      if (statSync(p).isDirectory()) { if (nome !== 'vendor') giro(p); continue; }
+      if (!/\.m?js$/.test(nome)) continue;
+      for (const m of readFileSync(p, 'utf8').matchAll(/https:\/\/([a-z0-9.-]+\.cloudfunctions\.net|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|firestore\.googleapis\.com)/g)) trovati.add(m[1]);
+    }
+  };
+  giro(join(ROOT, 'src'));
+  assert.ok(trovati.size >= 4, `indirizzi trovati: ${[...trovati]}`);
+  for (const host of trovati) assert.equal(S.hostChiuso(`https://${host}/x`), true, `${host} non è chiuso nelle prove`);
+});
+
 test('il fetch del main verso le schede fallisce come senza rete, il resto passa', async () => {
   const chiamate = [];
   const target = { fetch: async (input) => { chiamate.push(String(input.url || input)); return 'ok'; } };
@@ -100,7 +130,10 @@ test('il main chiude i servizi fuori da ogni condizione: decide il modulo, anche
 test('le prove chiudono i servizi in modalità test o su richiesta del pilota, il resto no', () => {
   assert.equal(S.serviziChiusiRichiesti({ NODE_ENV: 'test' }), true);
   assert.equal(S.serviziChiusiRichiesti({ FILO_SERVIZI_CHIUSI: '1' }), true);
-  for (const env of [{}, { NODE_ENV: 'production' }, { FILO_SERVIZI_CHIUSI: '0' }, { FILO_SERVIZI_CHIUSI: '' }, null]) {
+  // #2067: verifica-linux apre il pacchetto vero senza NODE_ENV=test, e ogni corsa creava un utente anonimo vero.
+  assert.equal(S.serviziChiusiRichiesti({ GITHUB_ACTIONS: 'true', CI: 'true' }), true);
+  for (const env of [{}, { NODE_ENV: 'production' }, { FILO_SERVIZI_CHIUSI: '0' }, { FILO_SERVIZI_CHIUSI: '' },
+    { GITHUB_ACTIONS: 'false' }, { CI: 'true' }, null]) {
     assert.equal(S.serviziChiusiRichiesti(env), false, JSON.stringify(env));
   }
 });

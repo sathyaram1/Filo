@@ -4,6 +4,7 @@
 'use strict';
 
 const Foto = require('./fotoDellaPagina');
+const { interseca } = require('./campiNeiRiquadri');
 
 // Il lato lungo chiesto al sistema e quello che va al modello: un 4K resta leggibile, una PNG da decine di MB no.
 const LATO_CATTURA = 2560;
@@ -94,18 +95,91 @@ function tuttaNera(img) {
   return true;
 }
 
-function immagineDa(img) {
+function senzaImmagine(img) {
   if (!img || (typeof img.isEmpty === 'function' && img.isEmpty())) {
     return { errore: 'il sistema non mi ha dato l\'immagine: forse la finestra è ridotta a icona' };
   }
   const { width, height } = img.getSize();
   if (!width || !height) return { errore: 'il sistema non mi ha dato l\'immagine: forse la finestra è ridotta a icona' };
   if (tuttaNera(img)) return { errore: 'il sistema mi ha dato un\'immagine tutta nera', nera: true };
+  return null;
+}
+
+function immagineDa(img) {
+  const no = senzaImmagine(img);
+  if (no) return no;
+  const { width, height } = img.getSize();
   const vista = Math.max(width, height) > LATO_MODELLO
     ? img.resize(width >= height ? { width: LATO_MODELLO, quality: 'best' } : { height: LATO_MODELLO, quality: 'best' })
     : img;
   return { dataUrl: `data:image/jpeg;base64,${vista.toJPEG(QUALITA).toString('base64')}` };
 }
+
+// ─── Le finestre di Filo dentro la foto dello schermo (#2116.5) ──────────────────────────────────────────────────────
+// Passano dalle stesse coperture della finestra guardata da sola; una che non si misura si copre per intero, così le
+// altre app restano visibili. Contano anche le finestrelle di accesso, che sono di Filo ma non hanno schede.
+
+// Corta: con il nome della finestra sta nel motivo della riga d'esito, che si taglia a 200 caratteri.
+const FRASE_SELETTORE = 'mentre sceglievi nel selettore una finestra di Filo ha cambiato quello che mostra e poteva restare scoperta: riprova';
+// Grigio dei veli: lo stesso delle coperture dipinte sulla foto.
+const TINTA_VELO = `#${Foto.GRIGIO.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+
+/** Il rettangolo del desktop (coordinate dello schermo) che la foto di `displayId` ritrae: quel monitor, o l'insieme dei
+ *  monitor quando il sistema ne fa una foto sola (X11), scelto dalle proporzioni della foto. Null se non si sa. PURA. */
+function areaDelloSchermo(rettangoli, displayId, rapporto) {
+  const r = (rettangoli || []).filter((x) => x && x.width > 0 && x.height > 0);
+  if (!r.length) return null;
+  const left = Math.min(...r.map((x) => x.left)), top = Math.min(...r.map((x) => x.top));
+  const insieme = {
+    left, top,
+    width: Math.max(...r.map((x) => x.left + x.width)) - left,
+    height: Math.max(...r.map((x) => x.top + x.height)) - top,
+  };
+  const quello = r.find((x) => String(x.id) === String(displayId));
+  if (!quello || !(rapporto > 0)) return quello || insieme;
+  const scarto = (a) => Math.abs(Math.log((a.width / a.height) / rapporto));
+  return scarto(insieme) < scarto(quello) ? insieme : quello;
+}
+
+/** Le coperture delle finestre di Filo in una foto dello schermo `larghezza`×`altezza` che ritrae `area`: `prima` e `dopo`
+ *  sono le finestre in vista ai due lati dello scatto (`{ wc, vista }`), `misure[i]` le coperture di `prima[i]`.
+ *  `{ lista }` in pixel della foto, o `{ no }` quando non si sa dove la foto mette le finestre. Una finestra che non si
+ *  misura, o arrivata durante lo scatto senza la misura di prima, si copre per intero. PURA. */
+function copertureDelloSchermo({ prima, dopo, misure, area, larghezza, altezza }) {
+  if (!prima.length && !dopo.length) return { lista: [] };
+  if (!area) return { no: 'misura' };
+  const kx = larghezza / area.width, ky = altezza / area.height;
+  const sulla = (v) => !!(v && interseca(v, area));
+  const nellaFoto = (v) => ({ left: (v.left - area.left) * kx, top: (v.top - area.top) * ky, width: v.width * kx, height: v.height * ky });
+  const intera = (v) => ({ ...nellaFoto(v), colore: Foto.GRIGIO });
+  const lista = [];
+  for (const w of dopo) if (sulla(w.vista) && !prima.some((p) => p.wc === w.wc)) lista.push(intera(w.vista));
+  for (let i = 0; i < prima.length; i++) {
+    const posti = [prima[i].vista, ...dopo.filter((w) => w.wc === prima[i].wc).map((w) => w.vista)].filter(sulla);
+    for (const v of posti) lista.push(...(misure[i].no ? [intera(v)] : Foto.copertureNellaFoto(misure[i], nellaFoto(v), 2)));
+  }
+  return { lista };
+}
+
+/** I veli da posare dentro una finestra di Filo, in punti della finestra: `dentro` è dove la pagina sta nella finestra,
+ *  `misura` la sua da copertureIntorno. Una pagina che non si misura si vela intera. PURA. */
+function veliDellaFinestra(misura, dentro) {
+  const tutta = { left: dentro.x, top: dentro.y, width: dentro.width, height: dentro.height };
+  if (!misura || misura.no) return [tutta];
+  return Foto.copertureNellaFoto(misura, tutta, 2);
+}
+
+/** Vero se ogni copertura di `dopo` sta sotto un velo posato per `prima` sulla stessa pagina, alla stessa grandezza. PURA. */
+function velataGia(prima, dopo) {
+  if (!prima || prima.no) return true;
+  if (!dopo || dopo.no) return false;
+  if (!prima.vista || !dopo.vista || prima.vista.w !== dopo.vista.w || prima.vista.h !== dopo.vista.h) return false;
+  const dentro = (r, v) => r.left >= v.left - 1 && r.top >= v.top - 1
+    && r.left + r.width <= v.left + v.width + 1 && r.top + r.height <= v.top + v.height + 1;
+  return (dopo.lista || []).every((r) => (prima.lista || []).some((v) => dentro(r, v)));
+}
+
+const stessoPosto = (a, b) => !!(a && b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
 
 function sistemaVero() {
   const electron = require('electron');
@@ -138,16 +212,55 @@ function sistemaVero() {
       }));
     },
     // Le finestre di Filo si fotografano dalla loro scheda in vista: niente permessi del sistema, su ogni piattaforma.
+    // `vista`: dove la scheda si disegna sul desktop, se la finestra si vede.
     finestreFilo: () => finestre().filter((w) => w._filoTabs).map((w) => {
       const tm = w._filoTabs;
       const tab = (tm.tabs || []).find((t) => t.id === tm.activeId);
+      let vista = null;
+      try {
+        if (tab && tab.view && w.isVisible() && !w.isMinimized()) {
+          const c = w.getContentBounds();
+          const b = tab.view.getBounds();
+          if (b.width > 0 && b.height > 0) vista = { left: c.x + b.x, top: c.y + b.y, width: b.width, height: b.height };
+        }
+      } catch (_) { vista = null; }
       return {
         id: `filo:${w.id}`, tipo: 'finestra', filo: true,
         nome: `Filo: ${String((tab && tab.title) || 'scheda vuota')}`,
         url: String((tab && tab.url) || ''),
         wc: tab && tab.view ? tab.view.webContents : null,
+        vista,
       };
     }),
+    // Tutto quello di Filo che lo schermo può mostrare: la scheda in vista di ogni finestra e le finestrelle di accesso.
+    // `dentro`: dove la pagina sta nella sua finestra; `vista`: dove sta sul desktop.
+    sulloSchermo: () => finestre().filter((w) => w.isVisible() && !w.isMinimized()).map((w) => {
+      try {
+        const c = w.getContentBounds();
+        let wc = null;
+        let dentro = null;
+        if (w._filoTabs) {
+          const tm = w._filoTabs;
+          const tab = (tm.tabs || []).find((t) => t.id === tm.activeId);
+          if (tab && tab.view) { wc = tab.view.webContents; dentro = tab.view.getBounds(); }
+        } else if (w.webContents && w.webContents._filoFinestrella) {
+          wc = w.webContents;
+          dentro = { x: 0, y: 0, width: c.width, height: c.height };
+        }
+        if (!wc || !dentro || !(dentro.width > 0) || !(dentro.height > 0)) return null;
+        return { win: w, wc, dentro, vista: { left: c.x + dentro.x, top: c.y + dentro.y, width: dentro.width, height: dentro.height } };
+      } catch (_) { return null; }
+    }).filter(Boolean),
+    // Un velo è una vista piena posata sopra la pagina: qualunque foto del sistema la trova già coperta.
+    posaVelo: (win, r) => {
+      const { View } = electron;
+      const v = new View();
+      v.setBackgroundColor(TINTA_VELO);
+      v.setBounds({ x: Math.floor(r.left), y: Math.floor(r.top), width: Math.ceil(r.width) + 1, height: Math.ceil(r.height) + 1 });
+      v._filoVelo = true;
+      win.contentView.addChildView(v);
+      return () => { try { if (!win.isDestroyed()) win.contentView.removeChildView(v); } catch (_) {} };
+    },
     maniglieFilo: () => finestre().map((w) => {
       try { return maniglia(w.getMediaSourceId()); } catch (_) { return ''; }
     }).filter(Boolean),
@@ -159,7 +272,8 @@ function sistemaVero() {
       let conFilo = '';
       try { if (w) conFilo = String(screen.getDisplayMatching(w.getBounds()).id); } catch (_) {}
       const lato = Math.max(...tutti.map((d) => Math.max(d.size.width, d.size.height) * (d.scaleFactor || 1)), 0);
-      return { primario: String(primario.id), conFilo, lato: Math.round(lato) };
+      const rettangoli = tutti.map((d) => ({ id: String(d.id), left: d.bounds.x, top: d.bounds.y, width: d.bounds.width, height: d.bounds.height }));
+      return { primario: String(primario.id), conFilo, lato: Math.round(lato), rettangoli };
     },
     delicata: async (url) => {
       if (!/^https?:/i.test(String(url || ''))) return '';
@@ -294,16 +408,85 @@ function crea({ sistema = null } = {}) {
       if (!r.ok && r.code !== 'vuota') return { errore: `la foto non è partita: ${Foto.perche(r.code)}` };
       return immagineDa(r.ok ? r.img : null);
     }
-    if (f.tipo === SELETTORE) {
-      const scelte = await s.fonti({ tipi: ['window', 'screen'], lato: latoCattura() });
-      const sc = scelte.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()));
-      if (!sc) return { errore: 'nel selettore del sistema non è stato scelto niente' };
-      return { ...immagineDa(sc.immagine), nome: sc.nome };
-    }
-    const fonti = await s.fonti({ tipi: [f.tipo === 'schermo' ? 'screen' : 'window'], lato: latoCattura() });
+    if (f.tipo === SELETTORE || f.tipo === 'schermo') return catturaConFilo(f);
+    const fonti = await s.fonti({ tipi: ['window'], lato: latoCattura() });
     const trovata = fonti.find((x) => x.id === f.id);
     if (!trovata) return { errore: 'non è più aperta' };
     return immagineDa(trovata.immagine);
+  }
+
+  function sulloSchermo() {
+    const s = S();
+    if (typeof s.sulloSchermo === 'function') return s.sulloSchermo();
+    return s.finestreFilo().filter((w) => w.wc && w.vista);
+  }
+
+  // Nel selettore di Wayland non si sa dove finiscono le finestre di Filo, né se l'utente ne sceglie una: le coperture
+  // si posano DENTRO le finestre finché il selettore è aperto. Se intanto qualcosa esce dai veli, la foto non parte.
+  async function catturaColSelettore() {
+    const s = S();
+    const prima = sulloSchermo();
+    const wcs = prima.map((w) => w.wc);
+    const misurate = prima.length ? (await Foto.copertureIntorno(wcs, async () => true)).pagine : [];
+    const togli = [];
+    try {
+      for (let i = 0; i < prima.length; i++) {
+        if (!Foto.daCoprire(misurate[i])) continue;
+        for (const r of veliDellaFinestra(misurate[i], prima[i].dentro)) togli.push(s.posaVelo(prima[i].win, r));
+      }
+      // I veli devono essere disegnati prima che il sistema prenda il fotogramma.
+      if (togli.length) await new Promise((r) => setTimeout(r, 120));
+      let sc = null;
+      const { img, pagine } = await Foto.copertureIntorno(wcs, async () => {
+        const fonti = await s.fonti({ tipi: ['window', 'screen'], lato: latoCattura() });
+        sc = fonti.find((x) => x.immagine && !(typeof x.immagine.isEmpty === 'function' && x.immagine.isEmpty()));
+        return sc ? sc.immagine : null;
+      });
+      if (!sc) return { errore: 'nel selettore del sistema non è stato scelto niente' };
+      const nome = { nome: sc.nome };
+      const no = senzaImmagine(img);
+      if (no) return { ...no, ...nome };
+      const dopo = sulloSchermo();
+      const cambiata = dopo.some((w) => {
+        const i = prima.findIndex((p) => p.wc === w.wc);
+        return i < 0 || (Foto.daCoprire(misurate[i]) && !stessoPosto(prima[i].dentro, w.dentro));
+      });
+      if (cambiata || prima.some((_, i) => Foto.daCoprire(pagine[i]) && !velataGia(misurate[i], pagine[i]))) {
+        return { errore: FRASE_SELETTORE, ...nome };
+      }
+      return { ...immagineDa(img), ...nome };
+    } finally {
+      for (const t of togli) t();
+    }
+  }
+
+  // Lo schermo, o quello che si sceglie nel selettore: dentro possono esserci finestre di Filo (#2116.5). Le finestre
+  // delle altre app no, perché le finestre di Filo non stanno nel loro elenco.
+  async function catturaConFilo(f) {
+    if (f.tipo === SELETTORE) return catturaColSelettore();
+    const s = S();
+    const prima = sulloSchermo();
+    let sc = null;
+    const { img, pagine } = await Foto.copertureIntorno(prima.map((w) => w.wc), async () => {
+      const fonti = await s.fonti({ tipi: ['screen'], lato: latoCattura() });
+      sc = fonti.find((x) => x.id === f.id);
+      return sc ? sc.immagine : null;
+    });
+    if (!sc) return { errore: 'non è più aperta' };
+    const no = senzaImmagine(img);
+    if (no) return no;
+    const dopo = sulloSchermo();
+    const { width, height } = img.getSize();
+    let info = {};
+    try { info = s.schermi() || {}; } catch (_) {}
+    const c = copertureDelloSchermo({
+      prima, dopo, misure: pagine, area: areaDelloSchermo(info.rettangoli, sc.displayId, width / height), larghezza: width, altezza: height,
+    });
+    if (c.no) return { errore: `la foto dello schermo non è partita: in una finestra di Filo ${Foto.perche(c.no)}` };
+    if (!c.lista.length) return immagineDa(img);
+    const coperta = Foto.dipintaSu(img, c.lista, { x: 1, y: 1 });
+    if (!coperta) return { errore: `la foto dello schermo non è partita: in una finestra di Filo ${Foto.perche('misura')}` };
+    return immagineDa(coperta);
   }
 
   // Dopo il gate: l'OK (o la finestra già guardata in questa richiesta) c'è. Torna solo testo.
@@ -344,5 +527,6 @@ function crea({ sistema = null } = {}) {
 
 module.exports = {
   crea, acceso, scegli, normalizza, nomiUnici, nomiSchermi, sessioneWayland, maniglia, tuttaNera,
-  LATO_CATTURA, LATO_MODELLO, SELETTORE, PANNELLO_MAC, FRASE_MAC,
+  areaDelloSchermo, copertureDelloSchermo, veliDellaFinestra, velataGia,
+  LATO_CATTURA, LATO_MODELLO, SELETTORE, PANNELLO_MAC, FRASE_MAC, FRASE_SELETTORE,
 };
