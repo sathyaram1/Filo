@@ -37,8 +37,7 @@ export const ESITI_CHE_PROSEGUONO = Object.freeze(['verde', 'rosso_anche_su_main
 export const unitProseguono = (p) => !!p && !p.errore && !p.saltata && ESITI_CHE_PROSEGUONO.includes(p.esito);
 export const TETTO_ROSSI = 40;
 const MAIN = 'main';
-// Esplicito: in un clone a ramo singolo `fetch origin main` muove solo FETCH_HEAD, e origin/main resta vecchio (#2237.3).
-export const refspecMain = (main = MAIN) => `+refs/heads/${main}:refs/remotes/origin/${main}`;
+export { gitIn, refspecMain };
 const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-fusione@filo.invalid', '-c', 'commit.gpgsign=false'];
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
