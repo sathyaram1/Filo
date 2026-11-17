@@ -3516,7 +3516,15 @@ async function eseguiAzioneFilo(action, {
             ? segnalazioneConfermataPulita(sender, action)
             : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
           const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
-          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          let payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          // #1668 — gli allegati li prende il main dalla conversazione, di nuovo qui: dal riquadro tornano solo gli id scelti.
+          if (globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action)) {
+            const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
+            const { voci } = await require('./allegatiDellaChat').voci(action, chatDellAzione);
+            const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
+            if (p.errore) return { executed: false, kept: false, output: { error: p.errore } };
+            payload = p.payload;
+          }
           const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
           // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
           if (r && r.queued) {
