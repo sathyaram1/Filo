@@ -109,6 +109,7 @@
     visibili = nuove;
     impostazioniLette = true;
     disegna();
+    precaricaElenchi();
     if (prima === segue()) return;
     if (segue()) chiedi({ subito: true });
     else send({ type: MSG.SISTEMA_STATO, segue: false }).catch(() => {});
