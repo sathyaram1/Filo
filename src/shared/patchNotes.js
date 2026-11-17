@@ -122,6 +122,9 @@
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
       ],
+      fixes: [
+        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
+      ],
     },
     {
       version: '0.2.290', date: '2026-11-17',
@@ -142,7 +145,6 @@
       ],
       fixes: [
         { testo: 'Se fai a Filo una domanda come «è possibile…?», «c\'è un modo per…?» o «sai…?», non ti propone più di mandare una segnalazione.', segnalazione: 474 },
-        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
