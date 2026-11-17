@@ -1741,9 +1741,14 @@ function nelFilo(richiesta, r) {
   return r;
 }
 
+// #2394 — dove la home legge gli abbinati prima del clic: solo dove leggerli non chiede un permesso (su Mac blueutil
+// passa dal permesso del Bluetooth, che si chiede solo a un gesto dell'utente).
+const PRECARICABILE = { bluetooth: ['win32', 'linux'] };
+
 function comanda(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore) return Promise.resolve(nelFilo(richiesta, { ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore }));
+  if (q.precarica && !(PRECARICABILE[q.cosa] || []).includes(process.platform)) return Promise.resolve({ ok: false, cosa: q.cosa, saltato: true });
   const esegui = async () => {
     try {
       // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
