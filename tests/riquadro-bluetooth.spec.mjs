@@ -141,6 +141,11 @@ test('un elenco che il sistema non finisce in tempo dice cosa è successo; uno a
   await expect(errore).toContainText('Il sistema non ha finito di leggere i dispositivi abbinati in tempo.', { timeout: 8_000 });
   await expect(errore).not.toContainText('Il sistema non ha eseguito il comando.');
   await riquadro(page).screenshot({ path: 'tests/.shots/2394-bluetooth-errore.png' }).catch(() => {});
+  // Riprovare è a un clic, nel riquadro.
+  const letture = async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
+  const fatte = await letture();
+  await opzione(page, 'Rileggi l\'elenco').click();
+  await expect.poll(letture).toBe(fatte + 1);
   await page.keyboard.press('Escape');
 
   await computerFinto(app, { elenco: { ok: true, acceso: true, parziale: true, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] } });
