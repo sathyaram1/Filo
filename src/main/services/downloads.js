@@ -594,7 +594,7 @@ function contaProgramma(rec, evento) {
 function avvisaNonRiuscito(rec) {
   const riprova = /^https?:/i.test(String(rec.url || '')) ? [{ label: 'Riprova', riprovaDownloadId: rec.id }] : [];
   shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, {
-    ...chiaveAvviso(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
+    ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
   }, scopeOf(rec));
 }
 
