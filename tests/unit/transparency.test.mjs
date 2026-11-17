@@ -204,7 +204,7 @@ test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente'
 // #1407: la sezione diceva solo dove gira il codice, e chi leggeva credeva in Europa anche i dati.
 test('la privacy dice dove sta ogni parte del server', () => {
   const { T } = loadModules();
-  const t = T.get('privacy').text;
+  const t = T.get('privacy-completa').text;
   const sezione = t.slice(t.indexOf('\nIl server di Filo\n'), t.indexOf('\nI feedback\n'));
   const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Gli allegati dei feedback': /Stati Uniti.*Carolina del Sud.*us-east1/, 'Le identità': /Stati Uniti/ };
   for (const [parte, posto] of Object.entries(dove)) {
