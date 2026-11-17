@@ -744,6 +744,7 @@ export function righeStato(st) {
     `Account: primo ${acc.primo || 'alternanza'}; spenti da te ${spenti.join(', ') || 'nessuno'}; esclusi dall'owner ${esclusi.join(', ') || 'nessuno'}.`,
     `Sveglia chiesta: ${s.sveglia && s.sveglia.ms ? new Date(s.sveglia.ms).toISOString() : 'nessuna'}. Mattino: ${unaRiga(JSON.stringify(s.mattino ?? null))}.`,
     `Ultimo guasto: ${s.ultimoGuasto ? `${new Date(s.ultimoGuasto.ms).toISOString()}${s.ultimoGuasto.testo ? ` ${unaRiga(s.ultimoGuasto.testo).slice(0, 300)}` : ''}` : 'nessuno'}.`,
+    ...righePause(s.pause, s.voci),
     `Segnali non letti (${segnali.length}):`,
     ...segnali.map((x) => `- ${unaRiga(x.id)} ${unaRiga(x.tipo)} ${x.atMs ? new Date(x.atMs).toISOString() : ''}${x.dettaglio ? ` ${unaRiga(JSON.stringify(x.dettaglio)).slice(0, 400)}` : ''}`),
     ...righeCorseFerme(s.corseFerme),
