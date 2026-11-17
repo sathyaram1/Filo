@@ -161,6 +161,7 @@ test('l\'elenco si legge quando la home si apre: al clic sul riquadro i disposit
   expect(dalClic).toBeLessThan(RITARDO);
   // Mostrato quello di prima, il riquadro dice che sta aggiornando e poi lo toglie.
   await expect(riquadro(page).locator('.dash-sis-aggiorno')).toBeVisible();
+  await riquadro(page).screenshot({ path: 'tests/.shots/2394-bluetooth-aggiorno.png' }).catch(() => {});
   await expect(riquadro(page).locator('.dash-sis-aggiorno')).toBeHidden({ timeout: RITARDO + 5_000 });
   await page.screenshot({ path: 'tests/.shots/2394-bluetooth-elenco.png' }).catch(() => {});
 });
