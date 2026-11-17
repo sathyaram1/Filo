@@ -1485,6 +1485,7 @@
   async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
     sending = true;
     scrittoQui = true;
+    BarraSiti.perInvio();
     Comandi.lasciaNonRisolto();
     Coda.fineRisali();
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
