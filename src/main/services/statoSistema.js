@@ -603,6 +603,19 @@ function datiDaWindows(riga) {
   return { batteria: j.batteria || null, rete, bluetooth, volume: j.volume || null, wifi: j.wifi || null };
 }
 
+// Una riga del lettore che risponde a una richiesta d'elenco (bluetooth, wifi): non è una lettura dello stato.
+function elencoDaRiga(riga) {
+  let j;
+  try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
+  const e = j && typeof j === 'object' && !Array.isArray(j) ? j.elenco : null;
+  return e && typeof e === 'object' && (e.cosa === 'bluetooth' || e.cosa === 'wifi') ? e : null;
+}
+
+// Il tempo per la risposta a un elenco: col PowerShell già acceso bastano le attese dello script (8 s per la ricerca,
+// 3 s per un nome), mentre uno che parte su un PC lento ci mette da solo decine di secondi (#2394).
+const ELENCO_ACCESO_MS = 20 * 1000;
+const ELENCO_A_FREDDO_MS = 60 * 1000;
+
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
   let figlio = null;
   let ultimo = null;
@@ -612,13 +625,25 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   let guasti = 0;
   let attese = [];
   const sveglia = () => { const a = attese; attese = []; for (const r of a) r(); };
+  // Le richieste d'elenco in volo, per cosa: due uguali sono una. Un PowerShell vivo che non risponde a stdin non
+  // risponderà mai: da lì gli elenchi tornano allo script (`muti`).
+  const richieste = new Map();
+  let muti = false;
+  const consegna = (cosa, valore) => {
+    const r = richieste.get(cosa);
+    if (!r) return;
+    richieste.delete(cosa);
+    clearTimeout(r.timer);
+    r.risolvi(valore);
+  };
+  const consegnaTutte = () => { for (const cosa of [...richieste.keys()]) consegna(cosa, null); };
 
   function assicura() {
     if (figlio || guasti >= 3) return;
     let buffer = '';
     try {
       figlio = avvia('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', scriptWindows(pid)],
-        { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+        { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
     } catch (_) {
       figlio = null;
       guasti = 3;
@@ -626,6 +651,7 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       return;
     }
     const questo = figlio;
+    if (questo.stdin) questo.stdin.on('error', () => {});
     questo.stdout.setEncoding('utf8');
     questo.stdout.on('data', (pezzo) => {
       if (figlio !== questo) return;
@@ -633,15 +659,18 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       if (buffer.length > 1024 * 1024) buffer = '';
       let a;
       while ((a = buffer.indexOf('\n')) >= 0) {
-        const d = datiDaWindows(buffer.slice(0, a));
+        const riga = buffer.slice(0, a);
         buffer = buffer.slice(a + 1);
+        const e = elencoDaRiga(riga);
+        if (e) { consegna(e.cosa, e); continue; }
+        const d = datiDaWindows(riga);
         if (d) { ultimo = d; quando = Date.now(); fresco = true; guasti = 0; sveglia(); quandoCambia(); }
       }
     });
     // Un'uscita che non abbiamo chiesto è un guasto: dopo tre di fila il lettore si arrende, senza ripartire in loop.
     const finito = () => {
       // Un processo vecchio che esce dopo la ripartenza non sveglia chi aspetta quello nuovo.
-      if (figlio === questo) { figlio = null; fresco = false; sveglia(); }
+      if (figlio === questo) { figlio = null; fresco = false; sveglia(); consegnaTutte(); }
       if (!questo.fermatoDaNoi && !questo.contato) { questo.contato = true; guasti += 1; }
     };
     questo.on('error', finito);
