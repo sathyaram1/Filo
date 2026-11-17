@@ -312,27 +312,131 @@ for (const voce of ['Indietro', 'Ingrandisci']) {
   });
 }
 
-// Con la finestrella di accesso davanti le voci della scheda agiscono su di lei: il sito dietro aspetta l'accesso.
-test('su Mac, con la finestrella di accesso davanti, «Chiudi scheda» chiude lei e non il sito che aspetta', async ({ app, openTab, testServer }) => {
-  const { accesso, negozio: html } = negozioConAccesso(testServer);
+// Con la finestrella di accesso davanti le voci della scheda agiscono su di lei, con la principale aperta o chiusa: chi
+// sta nella finestrella è nella stessa situazione (#2031.2). Il sito dietro, che aspetta l'accesso, non si tocca: ha
+// una pagina prima e un segno che una ricarica porterebbe via, così una voce finita su di lui si vede.
+const segnaPagina = (hash) => `location.hash = ${JSON.stringify(hash)}; window.__segno2031 = 1; true`;
+const leggiPagina = '({ hash: location.hash, segno: window.__segno2031 === 1 })';
+
+const laFinestrella = (app, base) => app.evaluate(async ({ BrowserWindow }, b) => {
+  const f = BrowserWindow.getAllWindows().find((w) => { try { return !w.isDestroyed() && !w._filoTabs && w.webContents.getURL().startsWith(b); } catch (_) { return false; } });
+  if (!f) return null;
+  const pagina = await f.webContents.executeJavaScript('({ hash: location.hash, segno: window.__segno2031 === 1 })', false).catch(() => ({}));
+  return { ...pagina, zoom: f.webContents.getZoomLevel(), schermoPieno: f.isFullScreen() };
+}, base);
+
+const ilSitoDietro = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+  const t = w && w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
+  if (!t) return null;
+  const pagina = await t.view.webContents.executeJavaScript('({ hash: location.hash, segno: window.__segno2031 === 1 })', false).catch(() => ({}));
+  return { ...pagina, zoom: t.view.webContents.getZoomLevel(), schermoPieno: !!w._filoTabs.contentFullscreen };
+});
+
+const finestrellaDavanti = (app, base) => expect.poll(() => app.evaluate(({ BrowserWindow }, b) => {
+  const f = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && !w._filoTabs && w.webContents.getURL().startsWith(b));
+  f.show(); f.focus();
+  return BrowserWindow.getFocusedWindow() === f;
+}, base), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
+
+for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 'Chiudi scheda']]) {
+  test(`su Mac, con la finestrella di accesso davanti e la principale ${principale}, le voci della scheda agiscono su di lei`, async ({ app, shell, openTab, testServer }) => {
+    const { accesso, negozio: html } = negozioConAccesso(testServer);
+    await sentinella(app);
+    const page = await testServer.openReady(openTab, html);
+    await page.evaluate(segnaPagina('uno'));
+    await page.click('#b');
+    await expect.poll(async () => (await stato(app, accesso)).accesso, { message: 'la finestrella di accesso non si è aperta', timeout: 10000 }).toBe(1);
+    await app.evaluate(async ({ BrowserWindow }, [b, js]) => {
+      const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && w.webContents.getURL().startsWith(b));
+      await f.webContents.executeJavaScript(js, false);
+    }, [accesso, segnaPagina('due')]);
+    if (principale === 'chiusa') {
+      await expect.poll(async () => (await sessioneSalvata(app)).some((u) => u.startsWith(page.url().split('#')[0])), { timeout: 10000 }).toBe(true);
+      await shell.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
+      await expect.poll(async () => (await stato(app, accesso)).normale, { message: 'la finestra principale non si è chiusa', timeout: 10000 }).toBeNull();
+    }
+    const normali = (await stato(app, accesso)).normali;
+    const voce = async (v) => { await finestrellaDavanti(app, accesso); await voceDellaBarra(app, v); };
+
+    await voce('Ricarica');
+    await expect.poll(async () => (await laFinestrella(app, accesso))?.segno, { message: 'Ricarica non ha ricaricato la finestrella', timeout: 10000 }).toBe(false);
+    await voce('Indietro');
+    await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Indietro non ha portato indietro la finestrella', timeout: 10000 }).toBe('');
+    await voce('Avanti');
+    await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Avanti non ha portato avanti la finestrella', timeout: 10000 }).toBe('#due');
+    await voce('Ingrandisci');
+    await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Ingrandisci non ha ingrandito la finestrella', timeout: 10000 }).toBeGreaterThan(0);
+    await voce('Dimensione reale');
+    await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Dimensione reale non ha rimesso la finestrella com\'era', timeout: 10000 }).toBe(0);
+    await voce('Annulla');
+    await voce('Schermo intero');
+    await new Promise((r) => setTimeout(r, 800));
+    const f = await laFinestrella(app, accesso);
+    expect(f.hash, 'Annulla fuori da un campo ha portato indietro la finestrella: Indietro su di lei è un\'altra voce').toBe('#due');
+    expect(f.schermoPieno, 'a schermo intero la finestrella perde la barra col sito').toBe(false);
+    expect((await stato(app, accesso)).normali, 'una voce ha rifatto o chiuso la finestra principale').toBe(normali);
+    if (principale === 'aperta') {
+      expect(await ilSitoDietro(app), 'una voce è finita sul sito che aspetta l\'accesso').toEqual({ hash: '#uno', segno: true, zoom: 0, schermoPieno: false });
+    }
+
+    await voce(chiusura);
+    await expect.poll(async () => (await stato(app, accesso)).accesso, { message: `«${chiusura}» non ha chiuso la finestrella davanti`, timeout: 10000 }).toBe(0);
+    await new Promise((r) => setTimeout(r, 500));
+    const dopo = await stato(app, accesso);
+    expect(dopo.normali, `«${chiusura}» ha toccato la finestra principale`).toBe(normali);
+    if (principale === 'aperta') expect(dopo.normale.schede.some((u) => u.startsWith(page.url().split('#')[0])), `«${chiusura}» ha chiuso il sito dietro la finestrella`).toBe(true);
+    expect(dopo.errori).toEqual([]);
+  });
+}
+
+// Su Mac, con la finestra ridotta a icona e Filo attivo, le voci che chiudono non tolgono niente che l'utente non vede:
+// la riportano davanti e basta. Le altre, Annulla compreso, la riportano davanti e agiscono (#2031.2). Qui una finestra
+// non si riduce davvero: la riduzione si simula.
+const riduci = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  w.__ripristini = w.__ripristini || 0;
+  w.__ridotta = true;
+  w.isMinimized = () => w.__ridotta;
+  w.restore = () => { w.__ridotta = false; w.__ripristini++; };
+});
+const ridotta = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  if (!w || w.isDestroyed()) return null;
+  const t = w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
+  const hash = await t.view.webContents.executeJavaScript('location.hash', false).catch(() => null);
+  return { ridotta: w.__ridotta, ripristini: w.__ripristini, schede: w._filoTabs.tabs.length, hash };
+});
+
+test('su Mac, con la finestra ridotta a icona, Chiudi scheda e Chiudi finestra la riportano davanti senza chiudere niente', async ({ app, openTab, testServer }) => {
   await sentinella(app);
-  const page = await testServer.openReady(openTab, html);
-  const negozio = page.url();
-  await page.click('#b');
-  await expect.poll(async () => (await stato(app, accesso)).accesso, { timeout: 10000 }).toBe(1);
-  const davanti = (a) => app.evaluate(({ BrowserWindow }, b) => {
-    const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && w.webContents.getURL().startsWith(b));
-    f.show(); f.focus();
-    return BrowserWindow.getFocusedWindow() === f;
-  }, a);
-  await expect.poll(() => davanti(accesso), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
-  for (const voce of ['Ricarica', 'Indietro', 'Annulla']) await voceDellaBarra(app, voce);
-  await new Promise((r) => setTimeout(r, 800));
-  expect((await stato(app, accesso)).normale.schede, 'una voce ha toccato il sito dietro la finestrella').toContain(negozio);
+  const page = await testServer.openReady(openTab, '<title>Ridotta</title><h1>ridotta</h1>');
+  await page.evaluate(() => { location.hash = 'due'; });
+  const { schede } = await ridotta(app);
+
+  let ripristini = 0;
+  for (const voce of ['Chiudi scheda', 'Chiudi finestra']) {
+    await riduci(app);
+    await voceDellaBarra(app, voce);
+    await new Promise((r) => setTimeout(r, 500));
+    const s = await ridotta(app);
+    expect(s, `«${voce}» ha chiuso la finestra ridotta a icona`).not.toBeNull();
+    expect(s.ripristini, `«${voce}» non ha riportato davanti la finestra`).toBe(++ripristini);
+    expect(s.schede, `«${voce}» ha chiuso una scheda che l'utente non vedeva`).toBe(schede);
+  }
+
+  // Annulla fuori da un campo è un Indietro: come lui riporta davanti la finestra e poi torna alla pagina prima.
+  for (const [voce, hash] of [['Annulla', ''], ['Avanti', '#due']]) {
+    await riduci(app);
+    await voceDellaBarra(app, voce);
+    await expect.poll(async () => (await ridotta(app)).hash, { message: `«${voce}» non ha agito sulla pagina`, timeout: 10000 }).toBe(hash);
+    expect((await ridotta(app)).ripristini, `«${voce}» ha agito sulla finestra ridotta senza riportarla davanti`).toBe(++ripristini);
+  }
+
+  // Davanti, Chiudi scheda chiude.
   await voceDellaBarra(app, 'Chiudi scheda');
-  await expect.poll(async () => (await stato(app, accesso)).accesso, { message: 'Cmd+W non ha chiuso la finestrella davanti', timeout: 10000 }).toBe(0);
-  expect((await stato(app, accesso)).normale.schede, 'Cmd+W ha chiuso il sito dietro la finestrella').toContain(negozio);
-  expect((await stato(app, accesso)).errori).toEqual([]);
+  await expect.poll(async () => (await ridotta(app)).schede, { message: 'con la finestra davanti Chiudi scheda non chiude', timeout: 10000 }).toBe(schede - 1);
+  expect((await stato(app)).errori).toEqual([]);
 });
 
 // La finestra ora c'è mentre gli init lavorano: chi la chiude subito non deve trovare la sessione svuotata.
