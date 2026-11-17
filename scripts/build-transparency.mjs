@@ -331,17 +331,18 @@ function buildDocs() {
   for (const [k, v] of Object.entries(glossaryRaw)) if (k.charAt(0) !== '_') glossary[k] = v;
 
   const files = readdirSync(SRC_DIR).filter((f) => f.endsWith('.md')).sort();
-  const docs = files.map((file) => {
-    // Fine riga normalizzati SUBITO: su Windows git riscrive i .md in CRLF, e
-    // il testo generato veniva diverso a seconda di come il file era stato
-    // estratto dal repo (la riga `---` sopravviveva alla ripulitura perché
-    // `$` non passa il `\r`). Risultato: il controllo di allineamento diventava
-    // rosso dopo un rebase senza che nessuno avesse toccato il documento.
-    const raw = readFileSync(join(SRC_DIR, file), 'utf8').replace(/\r\n/g, '\n');
-    const { meta, body } = parseFrontMatter(raw);
+  // Fine riga normalizzati SUBITO: su Windows git riscrive i .md in CRLF, e
+  // il testo generato veniva diverso a seconda di come il file era stato
+  // estratto dal repo (la riga `---` sopravviveva alla ripulitura perché
+  // `$` non passa il `\r`). Risultato: il controllo di allineamento diventava
+  // rosso dopo un rebase senza che nessuno avesse toccato il documento.
+  const letti = files.map((file) => ({ file, ...parseFrontMatter(readFileSync(join(SRC_DIR, file), 'utf8').replace(/\r\n/g, '\n')) }));
+  // Un link può portare a ogni documento scritto e a ogni area annunciata, che ha già la sua pagina.
+  const docIds = new Set([...letti.map(({ file, meta }) => meta.id || file.replace(/\.md$/, '')), ...AREE_ANNUNCIATE.map((a) => a.id)]);
+  const docs = letti.map(({ file, meta, body }) => {
     const sources = [];
-    const { html, sections } = renderBody(body, sources);
-    const plain = renderPlain(body, sources);
+    const { html, sections } = renderBody(body, sources, docIds);
+    const plain = renderPlain(body, sources, docIds);
     return {
       id: meta.id || file.replace(/\.md$/, ''),
       title: meta.title || file,
