@@ -950,7 +950,7 @@
         return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
-    // #1803 — la barra dei siti nella nuova scheda, e la chat ripiegata che le lascia il centro.
+    // #1803 — la barra dei siti nella nuova scheda. La chat ripiegata la scrive l'azione BARRA_SITI, come la freccia.
     {
       scrive: ['barraSiti.visibile'],
       aiuto: 'true | false (la barra dei siti e dei programmi nella nuova scheda)',
