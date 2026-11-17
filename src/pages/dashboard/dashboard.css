@@ -20,6 +20,9 @@
   --dash-filo-nodo: 450ms;
   --dash-filo-gomitolo: 850ms;
   --dash-trama-opacity: 0.5;
+  /* La barra dei siti (#1803): fondo delle sue voci e misura delle icone, token barraSiti.*. */
+  --dash-barra-fondo: #f7f2e8;
+  --dash-barra-icona: 20px;
 }
 
 [data-sn-theme="dark"] {
