@@ -796,7 +796,7 @@ test('il redattore: una riga tiene la segnalazione delle righe lette, e la conse
 });
 
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
-  const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z-]+)/g)].map((m) => m[1]);
+  const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z0-9-]+)/g)].map((m) => m[1]);
   const fuori = nominati.filter((c) => !M.SOTTOCOMANDI.includes(c));
   assert.deepEqual([...new Set(fuori)], [], 'sottocomandi nel ruolo che lo script non conosce');
   const strumenti = RUOLO.slice(RUOLO.indexOf('## Gli strumenti'));
