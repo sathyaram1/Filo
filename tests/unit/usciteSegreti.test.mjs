@@ -931,7 +931,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const porta = esegui.indexOf('controllaUscita(');
     assert.ok(porta > 0, 'executeFiloAction non passa dalla porta delle uscite');
     assert.ok(porta < esegui.indexOf('Levels.ingressi(action'), 'la porta deve venire prima del gate dell\'autonomia');
-    assert.ok(porta < esegui.indexOf('switch (type)'), 'la porta deve venire prima di ogni esecuzione');
+    assert.ok(porta < esegui.indexOf('AZIONI[type]'), 'la porta deve venire prima di ogni esecuzione');
   });
 
   // Quello che porta testo fuori dal computer: aprire un indirizzo, cercare, lanciare un
