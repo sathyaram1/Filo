@@ -295,6 +295,7 @@
     if (!corrente || !corrente.el.isConnected) { nascondi(); return; }
     const testo = testoProprio(corrente.el);
     if (!testo) { nascondi(); return; }
+    if (tipEl) tipEl.scrollTop = 0;
     disegna(testo);
     // Chi conta le etichette lette (le icone del menu) lo sa dal pezzo stesso, anche dentro uno shadow chiuso.
     try { corrente.el.dispatchEvent(new CustomEvent('sn-fumetto-mostrato')); } catch (_) {}
