@@ -459,9 +459,9 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     { re: /barra\s+(degli\s+)?indirizzi/i, why: 'la barra degli indirizzi è sempre nascosta' },
     // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
     // esiste), la barra in basso (chat del deck builder) o quella delle
-    // applicazioni del sistema (l'avanzamento dei download, #941): intercetta
+    // applicazioni del sistema (l'avanzamento dei download, #941) o la barra dei siti della home (#1803): intercetta
     // formule come "Pulsante Home nella barra" che rimandano alla barra sparita.
-    { re: /nella barra(?!\s+(delle schede|in basso|laterale|delle applicazioni))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
+    { re: /nella barra(?!\s+(delle schede|in basso|laterale|delle applicazioni|dei siti))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
