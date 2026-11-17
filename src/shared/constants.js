@@ -160,6 +160,7 @@
     AUTOMATION_CAP3: 'filo_automation_cap3', // giri per i rilievi di livello 3
     AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 2
     AUTOMATION_CAP1: 'filo_automation_cap1', // giri per i rilievi di livello 1
+    AUTOMATION_TETTO_VERIFICHE: 'filo_automation_tetto_verifiche', // verifiche in tutto prima che si decida (#2338)
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
