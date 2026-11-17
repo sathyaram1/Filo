@@ -1581,7 +1581,7 @@ function normalizzaRichiesta(r) {
   }
   if (cosa === 'bluetooth' || cosa === 'wifi') {
     const out = { cosa };
-    if (vero(q.elenca)) { out.elenca = true; return out; }
+    if (vero(q.elenca)) { out.elenca = true; if (q.precarica === true) out.precarica = true; return out; }
     const nome = testo(cosa === 'wifi' ? (q.rete ?? q.nome ?? q.ssid) : (q.dispositivo ?? q.nome));
     // Riquadro e tasto destro passano anche l'indirizzo: trova il dispositivo anche senza nome, e fra due nomi uguali.
     const indirizzo = cosa === 'bluetooth' && normalizzaIndirizzo(q.indirizzo, 'win32') ? String(q.indirizzo).trim() : null;
