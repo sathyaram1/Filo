@@ -190,8 +190,9 @@ for (const tema of ['light', 'dark']) {
     await testServer.openReady(openTab, '<h1>Un sito</h1><p>Una pagina qualunque.</p>');
     await shell.evaluate(() => window.filoNotify('Scaricato: relazione.pdf', { durationSec: 0, carta: 'download:abc', actions: [{ label: 'Apri file', onClick() {} }] }));
     const vista = await avvisi();
+    await vista.emulateMedia({ colorScheme: tema });
     await expect(vista.locator('.shell-notif.show .shell-notif-ico svg')).toHaveCount(1);
-    await vista.waitForTimeout(400);
+    await vista.waitForTimeout(1200);
     await vista.screenshot({ path: `tests/.shots/2390-angolo-${tema}.png` });
   });
 }
