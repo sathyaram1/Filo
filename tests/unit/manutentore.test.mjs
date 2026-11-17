@@ -714,7 +714,7 @@ test('#2338: l5, l4, bilanci e passa chiamano le operazioni del server coi campi
   assert.equal(await M.main(['bilanci', '--cap3', '4', '--tetto', '8'], CHIAVE), 0);
   assert.equal(await M.main(['passa', '902', 'resta', 'un', 'caso', 'raro'], CHIAVE), 0);
   assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
-    ['l5.elenco', undefined], ['l5.approva', { id: 'r1' }], ['l4.elenco', undefined], ['l4.salta', { numero: '901', sha: 'b'.repeat(40) }],
+    ['l5.elenco', {}], ['l5.approva', { id: 'r1' }], ['l4.elenco', {}], ['l4.salta', { numero: '901', sha: 'b'.repeat(40) }],
     ['bilanci', {}], ['bilanci', { cap3: 4, tettoVerifiche: 8 }], ['passa', { numero: '902', testo: 'resta un caso raro' }],
   ]);
   const out = s.out.join('\n');
