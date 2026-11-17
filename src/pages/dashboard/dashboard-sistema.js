@@ -701,10 +701,11 @@
     righeInfo(info, x);
     info.dataset.testo = x.dettaglio.join('\n');
     el.appendChild(info);
-    const questo = { el, info, voce: v, ancora, punto, copia: x.copia };
+    const questo = { el, info, voce: v, ancora, punto };
     const comandi = creaComandi(questo, x);
     if (comandi) { el.appendChild(comandi); questo.comandi = comandi; }
-    const azioni = [['Copia', (opt) => copia(opt)], [`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
+    // #2394 — niente «Copia» del riquadro: la frase la porta chi trascina la voce in chat, il nome lo copia il tasto destro.
+    const azioni = [[`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
     for (const altra of ORDINE) {
       if (altra !== v && visibili[altra] === false && d[altra]) {
         azioni.push([`Mostra ${NOMI[altra]}`, () => { chiudiBox(); imposta(altra, true); }]);
