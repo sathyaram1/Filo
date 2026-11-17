@@ -157,6 +157,13 @@
     return errore(voci, 'mossa sconosciuta');
   }
 
+  // L'operazione che la chat chiede, coi sinonimi che il modello usa; '' se non è una della barra.
+  const OPERAZIONI = { aggiungi: 'aggiungi', metti: 'aggiungi', togli: 'togli', rimuovi: 'togli', rinomina: 'rinomina', sposta: 'sposta', elenca: 'elenca', leggi: 'elenca' };
+  function operazione(a) {
+    const op = String((a && typeof a === 'object' ? (a.operazione ?? a.op) : a) || '').trim().toLowerCase();
+    return OPERAZIONI[op] || '';
+  }
+
   // Quello che la chat legge della barra: nome e indirizzo, mai le icone.
   function descrivi(voci) {
     return normalizza(voci).map((v) => (v.tipo === 'app' ? { nome: v.nome, programma: v.percorso } : { nome: v.nome, indirizzo: v.url }));
