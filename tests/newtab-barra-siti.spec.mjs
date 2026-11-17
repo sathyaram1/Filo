@@ -180,10 +180,10 @@ test('#1662 la freccia ripiega la chat: resta il campo, al centro la barra; rest
   await expect(p.locator('#barraSiti .dash-barra-voce[aria-label="YouTube"]')).toBeVisible();
 
   // Tema scuro, ripiegata.
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await imposta(p, { theme: 'dark' });
   await expect(p.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
   await scatta(p, 'ripiegata-scura');
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'light' }));
+  await imposta(p, { theme: 'light' });
 
   // (7) Clic di nuovo: la conversazione torna.
   await p.locator('#ripiegaChat').click();
