@@ -2231,6 +2231,11 @@
               }).catch(() => {}),
             };
           }
+          // #2390 — «Ferma» sull'avviso del timer scaduto: quello che fa il pulsante della suoneria nella fila di schede.
+          if (a && typeof a.fermaTimer === 'string' && !a.onClick && MSG_FILO.FILO_STOP_TIMER_ALARM) {
+            const id = a.fermaTimer;
+            return { label: a.label, onClick: () => api.message({ type: MSG_FILO.FILO_STOP_TIMER_ALARM, id }).catch(() => {}).then(refreshRinging) };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
