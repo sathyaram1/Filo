@@ -19,6 +19,7 @@ import { fileBlocco } from '../../scripts/lib/pacchetti.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
 import { carattereSicuro } from '../../scripts/lib/carattere-commento.mjs';
+import { COMANDO as COMANDO_DRIVER, NOME as NOME_DRIVER } from '../../scripts/lib/driver-novita.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
