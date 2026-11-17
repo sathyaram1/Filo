@@ -231,6 +231,42 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
   await expect(page.locator('#ripiegaChat')).toBeVisible();
 });
 
+test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo scrive l\'indirizzo; il tasto destro nasconde la barra', async ({ app }) => {
+  test.setTimeout(60_000);
+  let page = await home(app);
+  await app.evaluate(async () => {
+    const voci = Array.from({ length: 40 }, (_, i) => ({ id: `v${i}`, tipo: 'sito', url: `https://sito${i}.example.org/`, nome: `Sito ${i}`, icona: '' }));
+    await chrome.storage.local.set({ filo_barra_siti: voci });
+  });
+  await page.reload();
+  page = await home(app);
+  const barra = page.locator('#barraSiti');
+  await expect(barra.locator('.dash-barra-voce[data-tipo]')).toHaveCount(40);
+  // La rotella porta la fila di lato fino all'ultima voce.
+  await barra.hover();
+  for (let i = 0; i < 30; i++) await page.mouse.wheel(0, 400);
+  await expect.poll(() => barra.evaluate((b) => b.scrollLeft)).toBeGreaterThan(0);
+  await expect(barra.locator('.dash-barra-voce[aria-label="Sito 39"]')).toBeInViewport();
+
+  // Canc sulla voce col fuoco la toglie.
+  await barra.locator('.dash-barra-voce[aria-label="Sito 39"]').focus();
+  await page.keyboard.press('Delete');
+  await expect(barra.locator('.dash-barra-voce[aria-label="Sito 39"]')).toHaveCount(0);
+  await expect.poll(async () => (await salvate(app)).length).toBe(39);
+
+  // Trascinata nel campo di scrittura: ci scrive l'indirizzo, e resta nella barra.
+  await barra.locator('.dash-barra-voce[aria-label="Sito 0"]').scrollIntoViewIfNeeded();
+  await barra.locator('.dash-barra-voce[aria-label="Sito 0"]').dragTo(page.locator('#input'));
+  await expect(page.locator('#input')).toHaveValue(/https:\/\/sito0\.example\.org\//);
+  await expect(barra.locator('.dash-barra-voce[aria-label="Sito 0"]')).toHaveCount(1);
+
+  // Tasto destro sulla barra: «Nascondi la barra» la toglie dalla home e dalle Preferenze.
+  await page.locator('#barraSiti .dash-barra-piu').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Nascondi la barra' }).click();
+  await expect(barra).toBeHidden();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).barraSiti.visibile)).toBe(false);
+});
+
 test('#1657 un programma del computer nella barra parte al clic', async ({ app }) => {
   test.skip(process.platform === 'win32', 'il programma di prova è uno script di shell');
   test.setTimeout(60_000);
