@@ -537,7 +537,9 @@
       uscita: (a) => [a.titolo ?? a.title ?? '', a.testo ?? a.text ?? a.messaggio ?? ''].join('\n'),
       // Il prompt fa proporre a Filo la segnalazione quando ammette una mancanza: se l'utente non ha chiesto
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
-      perimetro: (a, ctx) => CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
+      // Con degli allegati chiede sempre: le miniature di quello che parte stanno nel riquadro (#1668).
+      perimetro: (a, ctx) => !segnalazioneConAllegati(a) && CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
+      perchePerimetro: (a) => (segnalazioneConAllegati(a) ? 'Con degli allegati Filo chiede sempre: guarda cosa parte.' : ''),
       describe: (a) => {
         // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
         // che parte a nome dell'utente, e un consenso su un testo che non si
