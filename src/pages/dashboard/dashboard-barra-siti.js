@@ -353,6 +353,12 @@
     d.rimetti.type = 'button';
     d.rimetti.addEventListener('click', rimetti);
     d.freccia.addEventListener('click', () => ripiega(!ripiegata));
+    // A chat aperta la fila scorre di lato: la rotella la porta, così ogni voce si raggiunge anche senza touchpad.
+    d.barra.addEventListener('wheel', (e) => {
+      if (ripiegata || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || d.barra.scrollWidth <= d.barra.clientWidth) return;
+      d.barra.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
     d.barra.addEventListener('contextmenu', (e) => { if (e.target === d.barra || e.target.closest('.dash-barra-piu')) { e.preventDefault(); menuBarra(e); } });
     d.riga.addEventListener('dragover', sopraBarra);
     d.riga.addEventListener('dragleave', (e) => { if (!d.riga.contains(e.relatedTarget)) { d.riga.classList.remove('dash-barra-bersaglio'); segnaPunto(null); } });
