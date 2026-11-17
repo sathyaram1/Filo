@@ -28,7 +28,7 @@
   }
 
   // L'icona di un avviso: quella che chiede chi lo manda, se no dalla cosa che racconta.
-  const ICONE = ['bell', 'warning', 'timer', 'alarm', 'download', 'globe', 'refresh', 'shield'];
+  const ICONE = ['bell', 'warning', 'timer', 'alarm', 'download', 'globe', 'reload', 'blocked', 'check', 'sparkles'];
   function icona({ icona: chiesta = '', carta = '', errore = false } = {}) {
     if (ICONE.includes(chiesta)) return chiesta;
     if (errore) return 'warning';
