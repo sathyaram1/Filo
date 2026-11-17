@@ -84,6 +84,70 @@
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 22%, transparent);
 }
+/* Gli allegati che partirebbero (#1668): foglietti piccoli, un clic li toglie e li rimette. */
+.sn-confirm-allegati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 12px;
+}
+.sn-confirm-allegato {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--sn-fg, #1a1918) 5%, transparent);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  transition: opacity 0.15s, border-color 0.15s, transform 0.15s;
+}
+.sn-confirm-allegato:hover { border-color: var(--sn-accent, #c45a3b); transform: translateY(-1px); }
+.sn-confirm-allegato:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-offset: 1px; }
+.sn-confirm-allegato img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sn-confirm-allegato-nome {
+  padding: 4px;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--sn-fg, #1a1918);
+}
+.sn-confirm-allegato-segno {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  color: var(--sn-bg, #fff);
+  background: color-mix(in srgb, var(--sn-fg, #1a1918) 70%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sn-confirm-allegato:hover .sn-confirm-allegato-segno,
+.sn-confirm-allegato:focus-visible .sn-confirm-allegato-segno,
+.sn-confirm-allegato.sn-tolto .sn-confirm-allegato-segno { opacity: 1; }
+.sn-confirm-allegato.sn-tolto > img,
+.sn-confirm-allegato.sn-tolto > .sn-confirm-allegato-nome { opacity: 0.35; }
+.sn-confirm-allegato[aria-disabled="true"] { cursor: not-allowed; transform: none; }
+.sn-confirm-allegati-nota {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--sn-fg, #1a1918) 70%, transparent);
+}
+.sn-confirm-allegati-nota.sn-oltre { color: var(--sn-error, #b91c1c); }
 .sn-confirm-input {
   display: block;
   width: 100%;
