@@ -1131,6 +1131,7 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    if (vuole('barraSiti.visibile')) $('barraSitiVisibile').checked = !(settings.barraSiti && settings.barraSiti.visibile === false);
     const sis = settings.homeSistema || {};
     if (vuole('homeSistema.ora')) $('homeSisOra').checked = sis.ora !== false;
     if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
