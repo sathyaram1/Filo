@@ -82,6 +82,7 @@ function ElencoBt {
     }
   }
   $lista = New-Object System.Collections.ArrayList
+  $cercati = 0
   foreach ($d in @($trovati)) {
     $ind = ''
     try { $ind = ([string]$d.Properties['System.Devices.Aep.DeviceAddress']) -replace '[^0-9A-Fa-f]', '' } catch {}
