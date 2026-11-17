@@ -123,7 +123,10 @@ async function avvia(id, { lanciatore = lancia } = {}) {
   const c = controllaProgramma(voce.percorso);
   if (c.errore) return { ok: false, error: c.errore };
   const e = await lanciatore(voce.percorso);
-  return e ? { ok: false, error: `${voce.nome} non è partito: ${e}` } : { ok: true, nome: voce.nome };
+  const r = e ? { ok: false, error: `${voce.nome} non è partito: ${e}` } : { ok: true, nome: voce.nome };
+  // Come ogni file aperto col sistema, l'avvio entra nel filo (#1561).
+  try { require('./accaduti').fileAperto({ percorso: voce.percorso }, r, { incognito: require('../shim/storage').inIncognito() }); } catch (_) {}
+  return r;
 }
 
 module.exports = { leggi, modifica, daChat, avvia, controllaProgramma };
