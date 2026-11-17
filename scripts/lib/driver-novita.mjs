@@ -16,9 +16,12 @@ const novitaFusione = () => {
 
 export const NOME = 'novita';
 export const SCRIPT = 'scripts/novita-driver.mjs';
-// Git lancia il driver dalla radice dell'albero. Un albero a metà rebase senza lo script fa la fusione di testo coi
-// marcatori: un driver che manca non deve mai lasciare il lato «ours» muto, come se fosse risolto.
-export const COMANDO = `if [ -f ${SCRIPT} ]; then node ${SCRIPT} %O %A %B %L; else git merge-file --marker-size=%L %A %O %B; fi`;
+// L'uscita del driver per «conflitto, marcatori già scritti»: ogni altra (node che non parte, script rotto) è un driver
+// che non ha scritto niente.
+export const CONFLITTO = 37;
+// Git lancia il driver dalla radice dell'albero. Uno script che manca o non arriva in fondo lascia la fusione di testo coi
+// marcatori: il lato «ours» non deve mai restare muto, come se fosse risolto.
+export const COMANDO = `if [ -f ${SCRIPT} ]; then node ${SCRIPT} %O %A %B %L; r=$?; if [ $r -eq 0 ]; then exit 0; fi; if [ $r -eq ${CONFLITTO} ]; then exit 1; fi; fi; git merge-file --marker-size=%L %A %O %B`;
 const VOCI = Object.freeze({ [`merge.${NOME}.name`]: 'registro delle novità: le righe dei due lati (#2224)', [`merge.${NOME}.driver`]: COMANDO });
 
 function gitIn(cwd, args) {
