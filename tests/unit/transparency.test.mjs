@@ -187,7 +187,7 @@ test('nessuna voce della barra è un vicolo cieco: anche le aree non scritte han
 // #951 — Privacy e Sicurezza sono scritte: la loro pagina pubblica ha il documento, non il segnaposto.
 test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente', () => {
   const { T } = loadModules();
-  for (const [id, titolo] of [['privacy', 'Privacy'], ['security', 'Sicurezza']]) {
+  for (const [id, titolo] of [['privacy', 'Privacy'], ['privacy-completa', 'Privacy, tutti i dettagli'], ['security', 'Sicurezza']]) {
     const doc = T.get(id);
     assert.ok(doc, `il documento "${id}" non esiste`);
     assert.equal(doc.title, titolo);
