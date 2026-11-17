@@ -831,7 +831,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   box-shadow: inset 0 0 0 1px var(--dash-line);
 }
 .dash[data-chat-ripiegata="1"] .dash-barra-icona img { width: calc(var(--dash-barra-icona) * 1.2); height: calc(var(--dash-barra-icona) * 1.2); }
-.dash[data-chat-ripiegata="1"] .dash-barra-lettera { width: 60%; height: 60%; }
+.dash[data-chat-ripiegata="1"] .dash-barra-lettera { background: none; font-size: calc(var(--dash-barra-icona) * 0.95); }
 .dash[data-chat-ripiegata="1"] .dash-barra-voce:hover,
 .dash[data-chat-ripiegata="1"] .dash-barra-voce:focus-visible { background: var(--dash-line); box-shadow: none; }
 .dash[data-chat-ripiegata="1"] .dash-barra-nome {
