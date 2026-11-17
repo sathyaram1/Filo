@@ -111,8 +111,9 @@ scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se
 - al **battito**, ogni 2 ore al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
   accensione nata morta di qualunque voce (la voce nel dettaglio: A, B, serverA, reteAperta, riservatiB…), domanda di
-  processo di un worker, richiesta dell'owner dalla chat. `stato` dice quale voce è in pausa fino a quando e perché
-  ogni voce non ha acceso all'ultimo giro (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
+  processo di un worker, richiesta dell'owner dalla chat, richiesta L5 o controllo bocciato su un lavoro fidato
+  (`approvazione`). `stato` dice quale voce è in pausa fino a quando e perché ogni voce non ha acceso all'ultimo giro
+  (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
