@@ -12,6 +12,10 @@
       version: '0.2.289', date: '2026-11-17',
       features: [
         { testo: 'La Privacy, in Trasparenza, ora ha una pagina breve da leggere in due minuti: cosa esce dal tuo computer e chi lo vede, con le parole difficili spiegate al passaggio del mouse. Ogni dettaglio, funzione per funzione, sta nella pagina «Privacy, tutti i dettagli», a un clic.', segnalazione: 1483 },
+        { testo: 'Quando chiedi a Filo in chat di mandare un feedback, può allegarci le immagini e i file della conversazione e la finestra che ha guardato per te. Prima dell\'invio li vedi in miniatura, e con un clic togli quelli che non vuoi mandare.', segnalazione: 1668 },
+      ],
+      fixes: [
+        { testo: 'Se fai a Filo una domanda come «è possibile…?», «c\'è un modo per…?» o «sai…?», non ti propone più di mandare una segnalazione.', segnalazione: 474 },
       ],
     },
     {
