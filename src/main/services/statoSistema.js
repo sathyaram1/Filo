@@ -376,7 +376,7 @@ function Scrivi($oggetto) {
   return $j
 }
 __ELENCO_BT__
-$global:wlanPronta = $false
+$global:retiPronte = $false
 function Rispondi([string]$cosa) {
   if ($cosa -eq 'bluetooth') {
     try { $e = ElencoBt } catch { $e = [ordered]@{ errore = 'eccezione' } }
@@ -384,14 +384,14 @@ function Rispondi([string]$cosa) {
   } elseif ($cosa -eq 'wifi') {
     $r = [ordered]@{ cosa = 'wifi' }
     try {
-      if (-not $global:wlanPronta) {
+      if (-not $global:retiPronte) {
         Add-Type -TypeDefinition @'
 __WLAN__'@
-        $global:wlanPronta = $true
+        $global:retiPronte = $true
       }
       $w = [FiloWlan.Wlan]::Elenco()
       $r.codice = $w.Codice; $r.interfacce = $w.Interfacce; $r.reti = @($w.Reti); $r.attuale = $w.Attuale
-    } catch { if ($global:wlanPronta) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
+    } catch { if ($global:retiPronte) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
     $null = Scrivi ([ordered]@{ elenco = $r })
   }
 }
