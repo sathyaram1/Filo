@@ -704,7 +704,7 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const patch = { fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto };
+      const patch = { fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto, tettoVerifiche: msg.tettoVerifiche };
       for (const k of CAP_KEYS) patch[k] = msg[k];
       return capsReply(await Defaults.setRoutineCaps(patch, idToken));
     } catch (e) {
