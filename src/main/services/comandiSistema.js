@@ -41,6 +41,75 @@ $null = [Windows.Devices.Radios.RadioState,Windows.System.Devices,ContentType=Wi
 $null = [Windows.Devices.Radios.RadioAccessStatus,Windows.System.Devices,ContentType=WindowsRuntime]
 `;
 
+// I dispositivi abbinati in una ricerca sola, con indirizzo, collegamento e contenitore chiesti insieme (niente
+// FromIdAsync, che costava un'attesa per dispositivo): lo usano lo script dell'elenco e il lettore della home
+// (statoSistema.js), che lo tiene già caricato. Vuole `$asTask`. «Unknown» della radio resta null: non è spento.
+const PS_ELENCO_BT = String.raw`try {
+  $null = [Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceInformationKind,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+} catch {}
+function AttendiElenco($op, [Type]$tipo, [int]$ms) {
+  $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($op))
+  if ($t.Wait($ms)) { $t.Result } else { $null }
+}
+function ElencoBt {
+  $esito = [ordered]@{ acceso = $null; dispositivi = $null; errore = $null }
+  $tutte = AttendiElenco ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]]) 5000
+  if ($null -eq $tutte) { $esito.errore = 'tempo-comando'; return $esito }
+  $bt = @($tutte | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
+  if ($bt.Count -eq 0) { $esito.errore = 'nessuna-radio'; return $esito }
+  if (@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $esito.acceso = $true }
+  elseif (@($bt | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $esito.acceso = $false }
+  $classico = 'e0cbf06c-cd8b-4647-bb8a-263b43f0f974'
+  $basso = 'bb7bb05e-5972-42b5-94fc-76eaa7084d49'
+  $proprieta = [string[]]@('System.Devices.Aep.DeviceAddress', 'System.Devices.Aep.IsConnected', 'System.Devices.Aep.ContainerId', 'System.Devices.Aep.ProtocolId')
+  $tipo = [Windows.Devices.Enumeration.DeviceInformationKind]::AssociationEndpoint
+  $abbinati = 'System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True'
+  $insieme = [Windows.Devices.Enumeration.DeviceInformationCollection]
+  $trovati = $null
+  try {
+    $trovati = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync("(System.Devices.Aep.ProtocolId:=""{$classico}"" OR System.Devices.Aep.ProtocolId:=""{$basso}"") AND $abbinati", $proprieta, $tipo)) $insieme 8000
+    if ($null -eq $trovati) { $esito.errore = 'tempo-comando'; return $esito }
+  } catch {
+    # Una ricerca per protocollo, se Windows non accetta l'OR.
+    $trovati = @()
+    foreach ($p in @($classico, $basso)) {
+      $parte = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync("System.Devices.Aep.ProtocolId:=""{$p}"" AND $abbinati", $proprieta, $tipo)) $insieme 8000
+      if ($null -eq $parte) { $esito.errore = 'tempo-comando'; return $esito }
+      $trovati += @($parte)
+    }
+  }
+  $lista = New-Object System.Collections.ArrayList
+  foreach ($d in @($trovati)) {
+    $ind = ''
+    try { $ind = ([string]$d.Properties['System.Devices.Aep.DeviceAddress']) -replace '[^0-9A-Fa-f]', '' } catch {}
+    if ($ind.Length -ne 12) {
+      $m = [regex]::Match([string]$d.Id, '([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$')
+      if ($m.Success) { $ind = $m.Value -replace '[:-]', '' }
+    }
+    if ($ind.Length -ne 12) { continue }
+    $le = ([string]$d.Id) -like 'BluetoothLE#*'
+    try { if (([string]$d.Properties['System.Devices.Aep.ProtocolId']).Trim('{}').ToLower() -eq $basso) { $le = $true } } catch {}
+    $collegato = $null
+    try { $c = $d.Properties['System.Devices.Aep.IsConnected']; if ($null -ne $c) { $collegato = [bool]$c } } catch {}
+    $contenitore = ''
+    try { $contenitore = ([string]$d.Properties['System.Devices.Aep.ContainerId']).Trim('{}').ToLower() } catch {}
+    $nome = [string]$d.Name
+    if ((-not $nome.Trim()) -and $le) {
+      try {
+        $dev = AttendiElenco ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) 3000
+        if ($null -ne $dev) { $nome = [string]$dev.Name }
+      } catch {}
+    }
+    $null = $lista.Add([ordered]@{ indirizzo = $ind.ToLower(); nome = $nome; collegato = $collegato; le = $le; contenitore = $contenitore })
+  }
+  $esito.dispositivi = @($lista)
+  return $esito
+}
+`;
+
 // Core Audio dell'uscita predefinita (C# 5: lo compila il PowerShell 5.1 di Windows). Lo legge anche statoSistema.js.
 const CS_VOLUME = String.raw`using System;
 using System.Runtime.InteropServices;
