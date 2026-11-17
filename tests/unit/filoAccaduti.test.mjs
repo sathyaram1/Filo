@@ -336,7 +336,7 @@ test('ogni accaduto ha un punto solo da cui nasce', () => {
   const tutti = sorgenti();
   const chi = (re) => tutti.filter((s) => re.test(s.testo)).map((s) => s.p).sort();
   const PORTE = {
-    azione: [/accaduti'\)\.azione\(/, ['src/main/services/handlers.js']],
+    azione: [/accaduti'\)\.azione\(/, ['src/main/services/autonomiaFonti.js']],
     // Volume, Wi-Fi e Bluetooth: dalla porta che chat e tasti della home condividono.
     comandoSistema: [/accaduti'\)\.comandoSistema\(/, ['src/main/services/comandiSistema.js']],
     ricerca: [/SN_ACCADUTI\?\.ricerca\(|accaduti'\)\.ricerca\(/, ['src/main/services/webSearch.js']],
