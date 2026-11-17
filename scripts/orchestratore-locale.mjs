@@ -667,6 +667,7 @@ async function main(argv) {
         log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
       }
       // Le worktree dei lavori nascono qui sotto e leggono la config del principale.
+      ensureDriverNovita(P.radice);
       for (const radice of [P.radice, P.serverRadice].filter(Boolean)) ensureCommentChar(radice);
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
