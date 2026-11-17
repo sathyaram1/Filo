@@ -212,17 +212,6 @@ export function testoProva(prova) {
   }
 }
 
-/** Esecutore git con un tetto sul tempo, come quello del cancello. */
-export function gitIn(root, ms = 120000) {
-  return function git(args) {
-    try {
-      return { ok: true, out: String(execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: ms }) || '').trim() };
-    } catch (e) {
-      return { ok: false, out: `${(e && e.stdout) || ''}${(e && e.stderr) || ''}`.trim() || String((e && e.message) || e) };
-    }
-  };
-}
-
 /**
  * Toglie il collegamento a node_modules senza attraversarlo. Su Windows `rmdir` senza /s: su una junction toglie
  * la junction, su una cartella vera piena fallisce, che è il lato sicuro. Mai una rimozione ricorsiva qui.
