@@ -274,12 +274,28 @@ test('il repo dichiara il driver sul registro, e lo imposta ovunque nasce una co
   const attributi = readFileSync(join(REPO, '.gitattributes'), 'utf8');
   assert.match(attributi, new RegExp(`^${NOVITA.replace(/[.]/g, '\\.')} merge=${NOME}$`, 'm'));
   const chiamate = {
-    'scripts/lib/clone-worker.mjs': /ensureCommentChar\(dir\);\s*\n\s*ensureDriverNovita\(dir\);/,
-    'scripts/lib/branch-integrity.mjs': /ensureCommentChar\(root\);\s*\n\s*ensureDriverNovita\(root\);/,
-    'scripts/orchestratore-locale.mjs': /ensureDriverNovita\(P\.radice\);/,
-    '.claude/hooks/session-start.sh': /node scripts\/novita-driver\.mjs --imposta/,
+    'scripts/lib/clone-worker.mjs': /preparaCopia\(dir\);/,
+    'scripts/lib/branch-integrity.mjs': /preparaCopia\(root\);/,
+    'scripts/orchestratore-locale.mjs': /\[P\.radice, P\.serverRadice\]\.filter\(Boolean\)\) preparaCopia\(radice\);/,
+    '.claude/hooks/session-start.sh': /node scripts\/prepara-copia\.mjs/,
   };
   for (const [f, re] of Object.entries(chiamate)) assert.match(readFileSync(join(REPO, f), 'utf8'), re, f);
+});
+
+// Una strada nuova che preparasse una copia col solo carattere di commento lascerebbe il rebase senza driver.
+test('i due pezzi della config della copia li chiama solo il passo unico', () => {
+  const ammessi = new Set(['scripts/lib/prepara-copia.mjs', 'scripts/lib/carattere-commento.mjs', 'scripts/lib/driver-novita.mjs']);
+  const visti = [];
+  const giro = (dir) => {
+    for (const e of readdirSync(join(REPO, dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) { if (e.name !== 'node_modules') giro(p); continue; }
+      if (!/\.(mjs|js|cjs|sh)$/.test(e.name) || ammessi.has(p)) continue;
+      if (/\b(ensureCommentChar|ensureDriverNovita)\b/.test(readFileSync(join(REPO, p), 'utf8'))) visti.push(p);
+    }
+  };
+  for (const d of ['scripts', '.claude/hooks', 'routines']) giro(d);
+  assert.deepEqual(visti, []);
 });
 
 test('l’unione nel rebase: «ours» è la base nuova, «theirs» il commit del ramo', () => {
