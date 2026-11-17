@@ -145,6 +145,47 @@ test('un ramo già riallineato col commit che ha portato la sua riga in cima: il
   assert.deepEqual(blocchi(leggi(s.work)).map((b) => [b[0], b[1]]), [['0.2.12', ['di main', 'altra', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
 });
 
+// Dove la regola del cancello si rifiuta (qui un blocco aperto prima di alzare il manifesto), lo spostamento passa lo stesso.
+test('lo spostamento della riga del ramo si rifà su main anche dove la regola del cancello non si applica', () => {
+  const s = scena();
+  s.suMain((d) => scrivi(d, NOVITA, sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }])));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  git(s.work, ['checkout', '-qb', 'worker/sposta', 'origin/main']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'il lavoro');
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main', 'del ramo'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'novità: una riga del ramo da versioni uscite al blocco 0.2.12');
+  s.suMain((d) => scrivi(d, NOVITA, sorgente([{ v: '0.2.12', features: ['di main', 'altra'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }])));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(blocchi(leggi(s.work)).map((b) => [b[0], b[1]]), [['0.2.12', ['di main', 'altra', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
+});
+
+test('la mossa su «ours»: ritocco al suo posto, spostamento in fondo all’elenco, e niente se la riga non c’è una volta sola', () => {
+  const ours = sorgente([{ v: '0.2.12', features: ['x', 'y'] }, { v: '0.2.11', features: ['a', 'b'] }]);
+  const base = sorgente([{ v: '0.2.12', features: ['x'] }, { v: '0.2.11', features: ['a', 'b'] }]);
+  const hunks = (theirs) => {
+    const casa = cartellaTemporanea('driver-novita-mossa-');
+    fatte.push(casa);
+    writeFileSync(join(casa, 'b'), base);
+    writeFileSync(join(casa, 't'), theirs);
+    return hunkDa(git(casa, ['diff', '--no-index', '-U0', 'b', 't'], { ok: false }).out);
+  };
+  const sposta = sorgente([{ v: '0.2.12', features: ['x', 'b'] }, { v: '0.2.11', features: ['a'] }]);
+  const r = mossaSuOurs({ ours, theirs: sposta, hunks: hunks(sposta) });
+  assert.equal(r.ok, true);
+  assert.deepEqual(blocchi(r.src), [['0.2.12', ['x', 'y', 'b'], []], ['0.2.11', ['a'], []]]);
+  const ritocca = sorgente([{ v: '0.2.12', features: ['x'] }, { v: '0.2.11', features: ['a', 'b bis'] }]);
+  const q = mossaSuOurs({ ours, theirs: ritocca, hunks: hunks(ritocca) });
+  assert.deepEqual(blocchi(q.src), [['0.2.12', ['x', 'y'], []], ['0.2.11', ['a', 'b bis'], []]]);
+  const nuova = sorgente([{ v: '0.2.12', features: ['x', 'nuova'] }, { v: '0.2.11', features: ['a', 'b'] }]);
+  assert.equal(mossaSuOurs({ ours, theirs: nuova, hunks: hunks(nuova) }).ok, false, 'una riga nuova la unisce la regola del cancello, non la mossa');
+  const altrove = sorgente([{ v: '0.2.12', features: ['x'] }, { v: '0.2.11', features: ['a', 'b bis'] }]);
+  assert.equal(mossaSuOurs({ ours: sorgente([{ v: '0.2.12', features: ['x'] }, { v: '0.2.11', features: ['a', 'b di main'] }]), theirs: altrove, hunks: hunks(altrove) }).ok, false,
+    'una riga riscritta anche da main resta un conflitto');
+});
+
 test('main intanto ha pubblicato il blocco del ramo: nel rebase la riga va nel blocco della prossima versione', () => {
   const s = scena();
   git(s.work, ['checkout', '-qb', 'worker/tardi']);
