@@ -58,7 +58,7 @@ test('un\'immagine uscita dalla memoria conserva il numero delle altre e non si 
 test('gli allegati arrivano dalla conversazione; un identificatore inesistente si scarta', () => {
   const inv = AS.inventario(messaggi, fotoDi);
   const sch = { dataUrl: JPG, nome: 'Calcolatrice' };
-  const { voci, scartati } = AS.scegli({ immagini: [2, 9], file: ['/home/u/note.txt', '/etc/passwd', '/home/u/finto.txt'], schermata: true }, inv, sch);
+  const { voci, scartati } = AS.scegli({ allegati: ['2', '9', '/home/u/note.txt', '/etc/passwd', '/home/u/finto.txt', 'schermata'] }, inv, sch);
   assert.deepEqual(voci.map((v) => v.id), ['immagine:2', 'file:/home/u/note.txt', 'schermata']);
   assert.equal(voci[0].dataUrl, JPG);
   assert.equal(voci[2].dataUrl, JPG);
