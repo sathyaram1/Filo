@@ -225,8 +225,9 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
     expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).chatRipiegata)).toBe(true);
   } finally { await ripristina(app); }
   // Nascondere la barra dalle Preferenze la toglie dalla home.
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ barraSiti: { visibile: false }, chatRipiegata: false }));
+  await imposta(page, { barraSiti: { visibile: false }, chatRipiegata: false });
   await expect(page.locator('#barraSiti')).toBeHidden();
+  await expect(page.locator('#threadView')).toBeVisible();
   await expect(page.locator('#ripiegaChat')).toBeVisible();
 });
 
