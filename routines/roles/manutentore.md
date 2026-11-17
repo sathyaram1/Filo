@@ -312,7 +312,7 @@ dice il perché: non si aggira.
 
 ```bash
 npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo intero (non per differenze)
-npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
+npm run manutentore -- stato | schede              # stato, segnali, N, pause e perché delle voci; tutte le schede in una riga
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]
 npm run manutentore -- rapporti --giorni 7 --cache  # per ruolo: cache scritta, rewarm, attese oltre 5 min, saldo dell'ora
