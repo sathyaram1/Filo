@@ -481,7 +481,7 @@
     }
     // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
     const collegato = v.collegato === true && !(questo.ultimo && questo.ultimo.spento);
-    const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
+    const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, indirizzo: v.indirizzo, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
     if (preferito(v)) opt.classList.add('dash-sis-preferito');
