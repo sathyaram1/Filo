@@ -645,6 +645,7 @@
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
       const perche = String(avviso || '').trim() || (opts && opts.reversibile ? '' : 'Questa azione non è reversibile.');
       header(box, { title, parti: [...partiDi(text, parti), `\n\n${perche ? `${perche} ` : ''}Scrivi “${word}” per procedere.`] });
+      const allegati = allegatiIn(box, opts || {}, () => { allegati.aggiornaNota(); aggiorna(); });
 
       const input = doc.createElement('input');
       input.type = 'text';
