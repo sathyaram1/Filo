@@ -57,18 +57,19 @@ export function inRebase(cwd) {
 }
 
 /** Il nome del commit in corso nel rebase, come lo scrive git nei marcatori («abc1234 (titolo)»). PURA. */
-export function etichettaDaFatti(fatti) {
+export function etichettaDaFatti(fatti, corto = (sha) => sha) {
   const righe = String(fatti || '').split(/\r?\n/).filter((r) => /^\s*(p|pick|r|reword|e|edit|s|squash|f|fixup)\s+[0-9a-f]{4,}/.test(r));
   const m = righe.length ? /^\s*\S+\s+([0-9a-f]+)\s*(?:#\s*)?(.*)$/.exec(righe[righe.length - 1]) : null;
   if (!m) return 'theirs';
-  return m[2] ? `${m[1]} (${m[2].trim()})` : m[1];
+  return m[2] ? `${corto(m[1])} (${m[2].trim()})` : corto(m[1]);
 }
 
 // Git 2.43 non passa i nomi dei lati al driver (%X e %Y restano letterali): li ricostruisce chi fa la fusione di testo.
 function etichette(cwd) {
   let fatti = '';
   try { fatti = readFileSync(join(percorsoGit(cwd, 'rebase-merge'), 'done'), 'utf8'); } catch (_) { /* fusione, o rebase senza elenco */ }
-  return ['HEAD', 'base', etichettaDaFatti(fatti)];
+  const corto = (sha) => { const r = gitIn(cwd, ['rev-parse', '--short', sha]); return r.ok ? r.out.trim() : sha; };
+  return ['HEAD', 'base', etichettaDaFatti(fatti, corto)];
 }
 
 /**
