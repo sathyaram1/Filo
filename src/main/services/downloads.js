@@ -1151,7 +1151,7 @@ function annunciaStreaming(rec, state) {
   } else if (state === 'interrupted') {
     // «Riprova» solo dove riprovare può servire: un limite d'età non cambia ripetendo.
     shellToast(rec.nota || `Video non salvato: ${shortName(rec.filename)}`, {
-      durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
+      ...cartaDi(rec), durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
       ...(rec._riprovabile ? { actions: [{ label: 'Riprova', riprovaDownloadId: rec.id }] } : {}),
     }, scopeOf(rec));
   }
