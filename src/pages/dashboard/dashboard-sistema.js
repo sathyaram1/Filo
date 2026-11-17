@@ -371,44 +371,99 @@
     return null;
   }
 
-  // L'elenco è una foto della radio: accesa o spenta da qui, dalla chat o dal sistema, si rilegge.
-  const firmaRadio = (voce, x) => (voce === 'bluetooth' ? String(!!(x && x.spento)) : String(x ? x.wifi : null));
+  // L'elenco è una foto della radio: accesa o spenta da qui, dalla chat o dal sistema, si rilegge. Una radio di cui
+  // il main non sa ancora lo stato (`ignoto`) non cambia la foto: la lettura dell'elenco è proprio quella che lo dice.
+  const firmaRadio = (voce, x) => (voce === 'bluetooth' ? (x && x.ignoto ? null : String(!!(x && x.spento))) : String(x ? x.wifi : null));
   const elencoDaLeggere = (voce, x) => voce === 'bluetooth' || !!etichettaRadioWifi(x);
 
-  // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
-  async function caricaElenco(questo) {
-    const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
-    questo.firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
-    // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
-    const giro = (questo.letture = (questo.letture || 0) + 1);
-    const lista = questo.elenco;
-    lista.replaceChildren();
+  // #2394 — l'ultimo elenco letto, per cosa: si mostra subito all'apertura del riquadro mentre arriva quello nuovo, e
+  // si legge già quando la home si apre, prima del clic.
+  const ultimiElenchi = { bluetooth: null, wifi: null };
+  const ELENCO_FRESCO_MS = 60 * 1000;
+  function leggiElenco(cosa) {
+    const p = comanda({ cosa, elenca: true });
+    p.then((r) => { if (r && r.ok && Array.isArray(r.elenco)) ultimiElenchi[cosa] = { r, quando: Date.now() }; });
+    return p;
+  }
+  function precaricaElenchi() {
+    if (document.visibilityState === 'hidden') return;
+    const voci = { bluetooth: 'bluetooth', wifi: 'rete' };
+    for (const cosa of Object.keys(voci)) {
+      if (visibili[voci[cosa]] === false) continue;
+      const u = ultimiElenchi[cosa];
+      if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco(cosa).catch(() => {});
+    }
+  }
+
+  function rigaAttesa(testo) {
     const attesa = document.createElement('div');
     attesa.className = 'dash-sis-attesa';
     const rot = document.createElement('span');
     rot.className = 'dash-sis-rotella';
     rot.setAttribute('aria-hidden', 'true');
-    attesa.append(rot, document.createTextNode(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
-    lista.appendChild(attesa);
-    const r = await comanda({ cosa, elenca: true });
+    attesa.append(rot, document.createTextNode(testo));
+    return attesa;
+  }
+
+  // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
+  async function caricaElenco(questo) {
+    const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
+    const firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
+    if (firma !== null) questo.firma = firma;
+    // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
+    const giro = (questo.letture = (questo.letture || 0) + 1);
+    const lista = questo.elenco;
+    const prima = ultimiElenchi[cosa];
+    if (prima && !questo.elencoMostrato) disegnaElenco(questo, cosa, prima.r, { aggiorno: true });
+    else if (!questo.elencoMostrato) lista.replaceChildren(rigaAttesa(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
+    else {
+      const segno = lista.querySelector('.dash-sis-aggiorno');
+      if (segno) segno.hidden = false;
+    }
+    const r = await leggiElenco(cosa);
     if (box !== questo || questo.letture !== giro) return;
-    if (r.ok && cosa === 'bluetooth' && Array.isArray(r.elenco)) r.elenco = inCimaIPreferiti(r.elenco);
-    lista.replaceChildren();
     if (!r.ok) {
+      questo.elencoMostrato = false;
+      lista.replaceChildren();
       const err = document.createElement('div');
       err.className = 'dash-sis-errore';
       lista.appendChild(err);
       mostraErrore(err, r);
       return;
     }
-    const voci = Array.isArray(r.elenco) ? r.elenco : [];
+    disegnaElenco(questo, cosa, r);
+  }
+
+  // `aggiorno`: è l'elenco di prima, mostrato mentre arriva quello nuovo.
+  function disegnaElenco(questo, cosa, r, { aggiorno = false } = {}) {
+    const lista = questo.elenco;
+    let voci = Array.isArray(r.elenco) ? r.elenco : [];
+    if (cosa === 'bluetooth') voci = inCimaIPreferiti(voci);
+    lista.replaceChildren();
     const titolo = document.createElement('div');
     titolo.className = 'dash-sis-titolo';
     titolo.textContent = voci.length
       ? (cosa === 'wifi' ? 'Reti conosciute' : 'Dispositivi abbinati')
       : (cosa === 'wifi' ? 'Il computer non conosce nessuna rete Wi-Fi' : 'Nessun dispositivo abbinato');
+    const segno = document.createElement('span');
+    segno.className = 'dash-sis-rotella dash-sis-aggiorno';
+    segno.setAttribute('aria-hidden', 'true');
+    segno.title = 'Aggiorno';
+    segno.hidden = !aggiorno;
+    titolo.appendChild(segno);
     lista.appendChild(titolo);
     for (const v of voci) lista.appendChild(voceElenco(questo, cosa, v));
+    // Il sistema ha smesso di rispondere a metà: quello che c'è è vero, ma può mancare qualcosa.
+    if (r.parziale && !aggiorno) {
+      const nota = document.createElement('div');
+      nota.className = 'dash-sis-errore dash-sis-parziale';
+      nota.textContent = cosa === 'wifi'
+        ? 'Il sistema non ha finito di leggere le reti in tempo: ne può mancare qualcuna.'
+        : 'Il sistema non ha finito di leggere i dispositivi in tempo: ne può mancare qualcuno.';
+      lista.appendChild(nota);
+      lista.appendChild(creaOpzione('Rileggi l\'elenco', () => caricaElenco(questo)));
+    }
+    questo.elencoMostrato = true;
   }
 
   function voceElenco(questo, cosa, v) {
