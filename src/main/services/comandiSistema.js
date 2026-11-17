@@ -1081,7 +1081,11 @@ function rifinisciDispositivi(lista) {
     if (c) perContenitore.set(c, out.length);
     out.push({ ...d });
   }
-  return out.map(({ contenitore, ...d }) => ({ ...d, nome: typeof d.nome === 'string' && d.nome.trim() ? d.nome : nomeDiRiserva(d) }));
+  return out.map((d) => {
+    const x = { ...d, nome: typeof d.nome === 'string' && d.nome.trim() ? d.nome : nomeDiRiserva(d) };
+    delete x.contenitore;
+    return x;
+  });
 }
 
 function interpretaBtCollega(u, piattaforma, collega) {
