@@ -19,8 +19,8 @@ test('breve: link, glossario e voci della barra', async ({ openTab }) => {
   const alpha = page.locator('#doc-body .sn-gloss', { hasText: /^alpha$/ });
   await alpha.scrollIntoViewIfNeeded();
   await alpha.hover();
-  const pop = page.locator('.sn-gloss-pop, #gloss-pop, [class*="gloss"][hidden], [class*="pop"]').filter({ hasText: 'prima fase di prova' });
-  await expect(pop.first()).toBeVisible();
+  await expect(page.locator('#gloss-pop')).toBeVisible();
+  await expect(page.locator('#gloss-pop')).toContainText('prima fase di prova');
   await page.screenshot({ path: 'tests/.shots/1483-alpha.png' });
 
   await page.locator('#doc-body a', { hasText: 'Tutti i dettagli' }).click();
