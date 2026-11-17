@@ -826,7 +826,9 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   }
   // Il dispatch: una sola sospensione, dopo la risposta del modulo.
   const h = sorgenteHandlers();
-  const corpo = h.slice(h.indexOf('async function executeFiloAction('), h.indexOf("    switch (type) {\n      case 'NAVIGA'"));
+  const tratto = (da, a) => h.slice(h.indexOf(da), h.indexOf(a, h.indexOf(da)));
+  const corpo = tratto('async function executeFiloAction(', '\n}\n')
+    + tratto('async function eseguiAzioneFilo(', '    const esegui = Object.hasOwn(AZIONI, type)');
   assert.equal((h.match(/\bneedsConfirm:/g) || []).length, 1, 'needsConfirm si decide in un posto solo');
   assert.ok(corpo.indexOf('decisioneAutonomia(') > 0 && corpo.indexOf('decisioneAutonomia(') < corpo.indexOf('needsConfirm:'),
     'la sospensione viene dalla risposta di SN_AUTONOMIA');
