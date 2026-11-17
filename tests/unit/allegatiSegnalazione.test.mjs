@@ -64,7 +64,7 @@ test('gli allegati arrivano dalla conversazione; un identificatore inesistente s
   assert.equal(voci[2].dataUrl, JPG);
   assert.deepEqual(scartati, ['immagine 9', 'passwd', 'finto.txt']);
   // La schermata che non c'è non parte.
-  assert.deepEqual(AS.scegli({ schermata: true }, inv, null).scartati, ['schermata']);
+  assert.deepEqual(AS.scegli({ allegati: ['schermata'] }, inv, null).scartati, ['schermata']);
 });
 
 test('il payload porta images e files nella forma di SN_FEEDBACK.submit', () => {
