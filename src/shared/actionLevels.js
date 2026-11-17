@@ -279,18 +279,29 @@
   }
 
   // L'operazione la riconosce src/shared/barraSiti.js; dove non è caricato (una pagina) resta la parola detta.
-  function opBarraSiti(a) {
+  function barraSiti() {
     if (!global.SN_BARRA_SITI && typeof require === 'function') { try { require('./barraSiti.js'); } catch (_) {} }
-    const B = global.SN_BARRA_SITI;
+    return global.SN_BARRA_SITI || null;
+  }
+  function opBarraSiti(a) {
+    const B = barraSiti();
     return B ? B.operazione(a) : String((a && (a.operazione ?? a.op)) || '').trim().toLowerCase();
+  }
+  // Il percorso del programma che la mossa metterebbe nella barra, o ''. Senza il modulo vale il solo `percorso`.
+  function programmaDellaBarra(a) {
+    const B = barraSiti();
+    if (!B) return String((a && a.percorso) || '').trim();
+    const m = B.mossaDaChat(a);
+    return m.tipo === 'aggiungi' && m.percorso ? m.percorso : '';
   }
   // Il programma si mostra col percorso intero: è quello che partirà al clic.
   function descriviBarraSiti(a, fatto) {
     const op = opBarraSiti(a);
     const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 80 ? `${x.slice(0, 79)}…` : x; };
-    const percorso = String((a && a.percorso) || '').trim();
-    const sito = corto(a && (a.indirizzo ?? a.url));
-    const voce = corto(a && a.voce);
+    const percorso = programmaDellaBarra(a);
+    const detto = a && (a.elemento ?? a.voce);
+    const sito = corto(a && (a.indirizzo ?? a.url ?? detto));
+    const voce = corto(detto ?? (a && a.indirizzo));
     const frase = (parti) => (fatto ? piatto(parti) : parti);
     if (op === 'elenca') return fatto ? 'Letta la barra dei siti' : 'Leggere la barra dei siti';
     if (op === 'ripiega') return fatto ? 'Chat della home ripiegata' : 'Ripiegare la chat della home';
