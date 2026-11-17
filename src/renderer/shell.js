@@ -1630,6 +1630,8 @@
     reloadBtn.disabled = !a;
 
     applyChrome(isHomeUrl(a ? a.url : null));
+    // #2390 — nella home e fuori gli avvisi dell'angolo hanno tempi diversi. Al primo disegno NOTIFS può non esserci ancora.
+    try { NOTIFS.cambiaLuogo(); } catch (_) {}
   }
 
   // Gli eventi delle schede stanno sulla striscia: valgono per ogni nodo, anche nato dopo, e leggono la
