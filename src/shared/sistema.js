@@ -249,6 +249,7 @@
     else righe.push('Rete: collegato.');
     const bt = s.bluetooth;
     if (!bt) righe.push('Bluetooth: nessun adattatore (o il sistema non lo dice).');
+    else if (bt.acceso === null) righe.push('Bluetooth: c\'è, ma il sistema non dice se è acceso.');
     else if (!bt.acceso) righe.push('Bluetooth: spento.');
     else if (bt.dispositivi === null) righe.push('Bluetooth: acceso (quali dispositivi sono collegati il sistema non lo dice).');
     else if (!bt.dispositivi.length) righe.push('Bluetooth: acceso, nessun dispositivo collegato.');
