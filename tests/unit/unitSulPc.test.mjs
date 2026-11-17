@@ -207,7 +207,7 @@ test('#1737: il lanciatore degli unit e ciò che importa non nominano il registr
     visti.add(rel);
     const src = readFileSync(join(ROOT, rel), 'utf8');
     assert.doesNotMatch(src, /patchNotes\.js/, `${rel} nomina il registro delle novità`);
-    for (const m of src.matchAll(/\bfrom\s*['"](\.{1,2}\/[^'"]+)['"]/g)) coda.push(join(dirname(rel), m[1]).split('\\').join('/'));
+    for (const m of src.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g)) coda.push(join(dirname(rel), m[1]).split('\\').join('/'));
   }
   assert.ok(visti.has('scripts/lib/unit-sul-pc.mjs'), [...visti].join(', '));
 });
