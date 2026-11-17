@@ -48,6 +48,9 @@ async function lasciaSullaBarra(app, shell, page, idScheda) {
   await shell.mouse.move(verso.x, verso.y, { steps: 8 });
   await shell.mouse.up();
 }
+// Come le Preferenze: dalla porta delle impostazioni, che le annuncia alle pagine aperte.
+const imposta = (page, settings) => page.evaluate((s) => new Promise((ok) => chrome.runtime.sendMessage(
+  { type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: s }, ok)), settings);
 const salvate = (app) => app.evaluate(async () => (await chrome.storage.local.get('filo_barra_siti')).filo_barra_siti || []);
 
 async function homeConScheda(app, shell, openTab, testServer, titolo) {
