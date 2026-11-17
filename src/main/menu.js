@@ -18,25 +18,31 @@ function finestra() {
   return BrowserWindow.getAllWindows().find((w) => w._filoTabs) || null;
 }
 
-// Davanti c'è una finestra senza schede (la finestrella di accesso) e dietro una con: le voci della scheda agiscono su
-// di lei o non fanno niente, mai su quella dietro (#2031: Cmd+W chiudeva il sito che aspettava l'accesso). Senza
-// finestre con schede la voce ridà la finestra, come chiede la segnalazione.
+// Davanti c'è una finestra senza schede (la finestrella di accesso): le voci della scheda agiscono su di lei o non fanno
+// niente, mai su quella dietro (#2031: Cmd+W chiudeva il sito che aspettava l'accesso), che la principale ci sia o no.
 function finestrellaDavanti() {
   const { BrowserWindow } = require('electron');
   const messa = BrowserWindow.getFocusedWindow();
-  return messa && !messa.isDestroyed() && !messa._filoTabs && finestra() ? messa : null;
+  return messa && !messa.isDestroyed() && !messa._filoTabs ? messa : null;
+}
+
+// La finestra su cui agisce una voce, ridotta a icona o dietro, torna davanti prima: chi preme vede cosa cambia (#2031).
+function portalaDavanti(c) {
+  if (c && c !== require('electron').BrowserWindow.getFocusedWindow()) require('./window').portaDavanti(c);
+}
+
+// Ridotta a icona l'utente non la vede: chiudere lì gli toglierebbe una scheda o la finestra a sua insaputa (#2031.2).
+function nonVista(win) {
+  try { return win.isMinimized() || !win.isVisible(); } catch (_) { return false; }
 }
 
 // Su Mac Filo resta acceso senza finestre con schede (finestrella di accesso aperta, o nessuna): le voci la ridanno come
-// Dock e seconda apertura, e agiscono a schede riaperte; ridotta o dietro, torna davanti (#2031). `nascita`: solo se
-// l'ha fatta nascere questa voce, con `ripristinata` se ha ridato le schede salvate.
+// Dock e seconda apertura, e agiscono a schede riaperte. `nascita`: solo se l'ha fatta nascere questa voce, con
+// `ripristinata` se ha ridato le schede salvate.
 async function finestraPerAgire() {
   const W = require('./window');
   const c = finestra();
-  if (c && c !== require('electron').BrowserWindow.getFocusedWindow()) {
-    try { if (c.isMinimized()) c.restore(); } catch (_) {}
-    W.revealWindow(c);
-  }
+  portalaDavanti(c);
   const win = c || W.ridaiFinestraNormale();
   if (!win) return {};
   const esito = await W.quandoPronta(win);
