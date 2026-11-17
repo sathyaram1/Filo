@@ -649,7 +649,7 @@ test('#1072.1 — un download scritto con `^` o con le virgolette resta testo de
 test('#1072.1 — il comando dell\'assistente si giudica con la shell delle Preferenze, e parte con quella stessa', () => {
   const src = sorgenteHandlers();
   assert.match(src, /if \(type === 'ESEGUI_COMANDO'\) action\._perimetro\.shell = await shellDeiComandi\(\);/);
-  const esegui = src.slice(src.indexOf("case 'ESEGUI_COMANDO': {")).slice(0, 1500);
+  const esegui = src.slice(src.indexOf('async function azioneEseguiComando(')).slice(0, 1500);
   assert.match(esegui, /const shell = \(action\._perimetro && action\._perimetro\.shell\) \|\| await shellDeiComandi\(\);/);
   assert.match(esegui, /runCommand\(cmd, \{ shell,/);
 });
