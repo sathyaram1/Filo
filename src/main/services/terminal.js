@@ -494,7 +494,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
     // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
     // accenti e trattini lunghi tornano storpiati.
     const mark = trackCwd ? nuovoMarcatore() : '';
-    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
+    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark, preludio });
     let stdout = '';
     let codaOut = ''; // ultimi caratteri dello stdout, anche oltre il tetto
     let stderr = '';
