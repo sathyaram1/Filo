@@ -411,7 +411,8 @@ const ridotta = (app) => app.evaluate(async ({ BrowserWindow }) => {
 test('su Mac, con la finestra ridotta a icona, Chiudi scheda e Chiudi finestra la riportano davanti senza chiudere niente', async ({ app, openTab, testServer }) => {
   await sentinella(app);
   const page = await testServer.openReady(openTab, '<title>Ridotta</title><h1>ridotta</h1>');
-  await page.evaluate(() => { location.hash = 'due'; });
+  expect(page.url()).toContain('Ridotta'.length ? '' : '');
+  await segnaPagina(app, '', 'due');
   const { schede } = await ridotta(app);
 
   let ripristini = 0;
