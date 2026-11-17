@@ -16,8 +16,10 @@ Nel payload:
 - `vive`: le altre domande vive (in smistamento, aperte, in lavorazione) su
   quel feedback, provvisorie comprese, ognuna con stato, titolo, problema,
   opzioni, consiglio, `blocca` e `provvisoria`, senza le note per gli agenti;
-  `viveAltre` quante ne restano fuori se sono troppe. Senza il campo il server
-  non te le ha mandate: non vuol dire che non ce ne siano;
+  `viveAltre` quante ne restano fuori se sono troppe. Di una riservata, fuori
+  dall'ambiente dei riservati, arrivano solo id, stato, `blocca` e
+  `provvisoria`, col segno `riservata`: non sai che scelta chiede. Senza il
+  campo il server non te le ha mandate: non vuol dire che non ce ne siano;
 - `riferimenti`: numero, stato e priorità dei feedback che la domanda nomina,
   per id;
 - `registro`: i principi delle domande chiuse (con `assente` non ti arriva, e
