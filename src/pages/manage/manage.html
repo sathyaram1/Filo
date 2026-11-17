@@ -2871,6 +2871,21 @@
                 </div>
               </section>
 
+              <section class="mg-auto-block" id="mgTettoVerificheBlock">
+                <label class="mg-auto-field-label" for="mgTettoVerifiche">Verifiche in tutto per un lavoro</label>
+                <p class="mg-auto-block-desc">
+                  Contano tutte: quelle passate, quelle dopo un riallineamento e i
+                  verificatori morti. Superato il tetto, il lavoro si ferma come coi
+                  bilanci finiti. Lo cambia anche il manutentore, e lo scrive nel recap.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgTettoVerifiche" class="mg-auto-number"
+                    min="1" max="50" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgTettoVerificheSave">Salva</button>
+                  <span class="mg-action-msg" id="mgTettoVerificheMsg" role="status"></span>
+                </div>
+              </section>
+
               <section class="mg-auto-block" id="mgGiroStrettoBlock">
                 <label class="mg-switch" id="mgGiroStrettoSwitch" title="Acceso: dopo una correzione la verifica seguente controlla solo i rilievi corretti e il codice cambiato, invece di rifare tutta la ricerca. Costa meno giri; un difetto nato altrove può sfuggire.">
                   <span class="mg-switch-text">Giro stretto dopo una correzione</span>
