@@ -549,6 +549,13 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.equal(senzaCorse.suite, 'assente');
   assert.match(messageForServerMerge(senzaCorse, 'worker/x'), /non è mai partita: avviala da Actions di filo-security .*Run workflow sul ramo worker\/x/);
   assert.match(messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'in_corso' })), /non è ancora verde/);
+  // #2540: una corsa che GitHub non ha avviato (pagamenti, limite di spesa) non è un rosso da correggere.
+  const nonPartita = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'non_partita', url: 'https://github.com/x/actions/runs/43709496611' });
+  assert.equal(nonPartita.suite, 'non_partita');
+  const riga = messageForServerMerge(nonPartita, 'worker/x');
+  assert.match(riga, /senza avviarla \(https:\/\/github\.com\/x\/actions\/runs\/43709496611\): non è un rosso del ramo/);
+  assert.match(riga, /limite di spesa di Actions.*Run workflow sul ramo worker\/x/);
+  assert.doesNotMatch(riga, /correggi/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
   // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
