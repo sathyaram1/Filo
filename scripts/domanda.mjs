@@ -434,6 +434,11 @@ export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
     }
     const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
     if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
+    // Il suo testo arriva solo nell'ambiente dei riservati (#1928.2): come la illeggibile, non è «senza titolo».
+    if (d.riservata) {
+      righe.push(`  ${visibile(d.id || '?')} [${segni.join(' · ')} · riservata: il testo arriva solo a chi gira nei riservati, non sai che scelta chiede]`);
+      continue;
+    }
     righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
     if (d.contesto) righe.push(rientro(`Contesto: ${d.contesto}`, '    '));
     if (d.problema) righe.push(rientro(`Problema: ${d.problema}`, '    '));
