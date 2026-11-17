@@ -73,7 +73,7 @@ function mostra(win, { uid = '', testo = '', titolo = '', chiave = '' } = {}) {
   const body = String(testo || '').slice(0, 2000);
   if (!body || davanti()) return false;
   if (win && win._filoIncognito) return false;
-  const { Notification } = electron();
+  const Notification = IN_PROVA ? NotificaDiProva : electron().Notification;
   try { if (!Notification.isSupported()) return false; } catch (_) { return false; }
   const adesso = Date.now();
   vecchie(adesso);
