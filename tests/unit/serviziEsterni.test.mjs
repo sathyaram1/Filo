@@ -56,6 +56,7 @@ const COMPOSTI = [
   { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
+  { file: 'src/shared/barraSiti.js', testo: 's = `https://${s}`', perche: 'il sito scritto per la barra dei siti senza schema: si salva, e si apre in una scheda al clic dell’utente' },
   { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`http://${s}`)', perche: 'l’indirizzo che un comando contatta, per giudicarlo prima che parta (#2293)' },
   { file: 'src/shared/urlExfil.js', testo: '`http://${u.slice(s[0].length)}`', perche: 'la forma web di un indirizzo con un altro schema, per giudicarlo prima che parta (#2293)' },
