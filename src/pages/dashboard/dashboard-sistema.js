@@ -314,7 +314,7 @@
     if (!r) return;
     try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'comando_sistema_non_riuscito' })).catch(() => {}); } catch (_) {}
     const frase = document.createElement('div');
-    frase.textContent = r.frase || 'Il sistema non ha eseguito il comando.';
+    frase.textContent = r.frase || NON_RISPOSTO;
     dove.appendChild(frase);
     if (r.dove) {
       const come = document.createElement('div');
