@@ -58,13 +58,14 @@ test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', asy
 
 // #951 — Privacy e Sicurezza erano «non ancora scritte»: dalla barra si arriva al documento vero, con le sue sezioni.
 for (const { id, voce, sezione, frase } of [
-  { id: 'privacy', voce: 'Privacy', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
+  { id: 'privacy', voce: 'Privacy', sezione: 'Ai fornitori dei modelli', frase: 'hello@filo.red' },
+  { id: 'privacy-completa', voce: 'Privacy, tutti i dettagli', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
   { id: 'security', voce: 'Sicurezza', sezione: 'Da dove viene il file che hai scaricato', frase: 'SHA-256' },
 ]) {
   test(`la voce ${voce} della barra apre il suo documento, non il segnaposto`, async ({ openTab }) => {
     const page = await openTab(URL);
     await expect(page.locator('#title')).toHaveText('Politica sui modelli');
-    const link = page.locator(`#nav a[href*="doc=${id}"]`);
+    const link = page.locator(`#nav a[href="?doc=${id}"]`);
     await expect(link).not.toHaveClass(/is-soon/);
     await link.click();
 
