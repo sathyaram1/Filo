@@ -1514,6 +1514,20 @@ const computer = () => computerFinto || COMPUTER;
 
 const sistemaMain = () => globalThis.SN_SISTEMA_MAIN || null;
 
+// Su Windows gli elenchi li legge il PowerShell del lettore della home, già acceso e con WinRT caricato: un PowerShell
+// nuovo costa da solo secondi (#2394). null: il lettore non può, e si passa allo script.
+async function dalLettore(cosa) {
+  const M = sistemaMain();
+  if (process.platform !== 'win32' || !M || typeof M.elencoDalLettore !== 'function') return null;
+  try { return await M.elencoDalLettore(cosa); } catch (_) { return null; }
+}
+
+// L'acceso letto con l'elenco è una lettura vera della radio: il lettore della home la usa (#2394).
+function radioLetta(voce, acceso) {
+  const M = sistemaMain();
+  try { if (M && typeof M.radioLetta === 'function') M.radioLetta(voce, acceso); } catch (_) {}
+}
+
 // Quello che il comando ha appena cambiato si vede subito nella home, senza aspettare il giro del lettore.
 function annunciaCambio(parziale) {
   const M = sistemaMain();
