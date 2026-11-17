@@ -10,33 +10,27 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
-require(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'patchNotes.js'));
+const SHARED = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared');
+require(join(SHARED, 'patchNotes.js'));
+require(join(SHARED, 'novitaFusione.js'));
 const { cmpVersion, testo } = globalThis.SN_PATCH_NOTES;
+// Lettura del sorgente e prossima versione stanno nel modulo che il server incorpora: una regola sola (#2543).
+const {
+  FILE, CAMPO: CAMPO_MANIFESTO, prossimaVersione: prossimaDelModulo, chiaviDoppie: doppieDelModulo,
+  testoChiaviDoppie: testoDoppie, mappaSorgente, tagliaElemento, applica, modificheInCima, CHIAVI,
+  aggiunteSottoUscite: aggiunteDelModulo,
+} = globalThis.SN_NOVITA_FUSIONE;
 
-export const FILE_NOVITA = 'src/shared/patchNotes.js';
-export const CAMPO = 'prossimaVersione';
+export const FILE_NOVITA = FILE;
+export const CAMPO = CAMPO_MANIFESTO;
 const A_B_C = /^\d+\.\d+\.\d+$/;
-const CHIAVI = ['features', 'fixes'];
 
 /** La prossima versione con la regola del server che la pubblica: `prossimaVersione` di primo livello, o patch+1. `{ versione, dichiarata }` | `{ errore }`. PURA. */
-export function prossimaVersione(manifesto) {
-  const attuale = String((manifesto && manifesto.version) || '');
-  if (!A_B_C.test(attuale)) return { errore: `la versione del manifesto «${attuale}» non è nella forma a.b.c` };
-  if (!Object.hasOwn(manifesto, CAMPO)) {
-    const [a, b, c] = attuale.split('.').map(Number);
-    return { versione: `${a}.${b}.${c + 1}`, dichiarata: false };
-  }
-  const dichiarata = manifesto[CAMPO];
-  if (typeof dichiarata !== 'string' || !A_B_C.test(dichiarata)) {
-    return { errore: `«${CAMPO}» nel manifesto vale ${JSON.stringify(dichiarata)}: serve un numero a.b.c, come "0.3.0". `
-      + 'Il server rifiuterebbe la pubblicazione: correggilo o toglilo.' };
-  }
-  if (cmpVersion(dichiarata, attuale) <= 0) {
-    return { errore: `«${CAMPO}» nel manifesto è ${dichiarata}, non più alta della versione ${attuale}. `
-      + 'Il server rifiuterebbe la pubblicazione: alzalo o toglilo.' };
-  }
-  return { versione: dichiarata, dichiarata: true };
-}
+export const prossimaVersione = prossimaDelModulo;
+/** Le proprietà scritte due volte nello stesso blocco (#2320). `[{ version, chiave }]`; lancia se il testo non si legge. PURA. */
+export const chiaviDoppie = doppieDelModulo;
+/** Il motivo da stampare per le chiavi doppie di chiaviDoppie. PURA. */
+export const testoChiaviDoppie = testoDoppie;
 
 /** I blocchi del registro scritto in `src`, eseguito a parte. Lancia se il testo non è un registro. */
 export function registroDa(src) {
@@ -49,23 +43,8 @@ export function registroDa(src) {
 
 const righe = (n) => CHIAVI.flatMap((chiave) => (n[chiave] || []).map((r, indice) => ({ chiave, indice, riga: testo(r) })));
 
-/**
- * Le righe che `dopo` aggiunge rispetto a `prima` sotto le versioni fino a `uscita` compresa, ognuna con blocco,
- * elenco e posto. Si contano le righe per blocco: riscrivere una riga già uscita, o spostarla nel blocco della
- * prossima versione, resta lecito. PURA.
- */
-export function aggiunteSottoUscite(prima, dopo, uscita) {
-  const vecchie = new Map(prima.map((n) => [n.version, righe(n).map((r) => r.riga)]));
-  const out = [];
-  for (const n of dopo) {
-    if (cmpVersion(n.version, uscita) > 0) continue;
-    const prec = vecchie.get(n.version) || [];
-    const ora = righe(n);
-    if (ora.length <= prec.length) continue;
-    for (const r of ora) if (!prec.includes(r.riga)) out.push({ version: n.version, ...r });
-  }
-  return out;
-}
+/** Le righe che `dopo` aggiunge a `prima` sotto le versioni fino a `uscita`: la regola del modulo condiviso, che usa anche la prova sulla fusione. PURA. */
+export const aggiunteSottoUscite = (prima, dopo, uscita) => aggiunteDelModulo(prima, dopo, uscita, testo);
 
 /**
  * Le righe che il ramo ha scritto sotto versioni uscite su main DOPO la sua partenza (#2130): sul ramo la sentinella è
@@ -76,161 +55,6 @@ export function sottoUsciteSuMain(prima, dopo, manifesto, versioneMain) {
   const suMain = String(versioneMain || '');
   if (!A_B_C.test(delRamo) || !A_B_C.test(suMain) || cmpVersion(suMain, delRamo) <= 0) return [];
   return aggiunteSottoUscite(prima, dopo, suMain).map(({ version, riga }) => ({ version, riga }));
-}
-
-// ── Lettura del sorgente: dove comincia e finisce ogni elemento, senza un parser fuori dal repo ──
-
-function dopoStringa(src, i) {
-  const q = src[i];
-  for (let j = i + 1; j < src.length; j++) {
-    if (src[j] === '\\') { j++; continue; }
-    if (q === '`' && src[j] === '$' && src[j + 1] === '{') { j = elementi(src, j + 1).chiude; continue; }
-    if (src[j] === q) return j + 1;
-    if (q !== '`' && src[j] === '\n') break;
-  }
-  throw new Error(`stringa non chiusa al carattere ${i}`);
-}
-
-function dopoCommento(src, i) {
-  if (src[i] !== '/') return i;
-  if (src[i + 1] === '/') { const a = src.indexOf('\n', i); return a < 0 ? src.length : a; }
-  if (src[i + 1] === '*') { const a = src.indexOf('*/', i + 2); if (a < 0) throw new Error('commento non chiuso'); return a + 2; }
-  return i;
-}
-
-const APRE = { '[': ']', '{': '}', '(': ')' };
-
-/** `src[apre]` è [ { o (: dove si chiude e i suoi elementi di primo livello, `{ inizio, fine }` senza spazi né commenti attorno. */
-function elementi(src, apre) {
-  const pila = [APRE[src[apre]]];
-  const out = [];
-  let inizio = -1;
-  let fine = -1;
-  let i = apre + 1;
-  while (i < src.length) {
-    const c = src[i];
-    if (/\s/.test(c)) { i++; continue; }
-    const dc = dopoCommento(src, i);
-    if (dc !== i) { i = dc; continue; }
-    if (pila.length === 1 && (c === ',' || c === pila[0])) {
-      if (inizio >= 0) out.push({ inizio, fine });
-      inizio = -1;
-      if (c === pila[0]) return { chiude: i, elementi: out };
-      i++;
-      continue;
-    }
-    if (inizio < 0) inizio = i;
-    if (c === '\'' || c === '"' || c === '`') { i = dopoStringa(src, i); fine = i; continue; }
-    if (APRE[c]) pila.push(APRE[c]);
-    else if (c === pila[pila.length - 1]) pila.pop();
-    else if (c === ']' || c === '}' || c === ')') throw new Error(`«${c}» inatteso al carattere ${i}`);
-    i++;
-    fine = i;
-  }
-  throw new Error('parentesi non chiusa');
-}
-
-const inizioRiga = (src, i) => src.lastIndexOf('\n', i - 1) + 1;
-const rientro = (src, i) => { const p = src.slice(inizioRiga(src, i), i); return /^[ \t]*$/.test(p) ? p : null; };
-
-/** Le proprietà di un oggetto letterale: nome, dove sta tutta e dove comincia il valore. */
-function proprieta(src, apre) {
-  const { chiude, elementi: el } = elementi(src, apre);
-  const props = el.map((e) => {
-    const m = /^['"]?([A-Za-z_$][\w$]*)['"]?\s*:\s*/.exec(src.slice(e.inizio, e.fine));
-    return m ? { nome: m[1], ...e, valore: e.inizio + m[0].length } : { nome: '', ...e, valore: -1 };
-  });
-  return { chiude, props };
-}
-
-/** I blocchi del registro nel sorgente, ognuno coi suoi limiti e le sue proprietà. */
-function blocchiSorgente(src) {
-  const m = /\bconst\s+NOTES\s*=\s*\[/.exec(src);
-  if (!m) throw new Error('non trovo «const NOTES = [»');
-  const apre = m.index + m[0].length - 1;
-  const { chiude, elementi: blocchi } = elementi(src, apre);
-  return {
-    apre, chiude,
-    blocchi: blocchi.map((b) => {
-      if (src[b.inizio] !== '{') throw new Error(`un blocco del registro non è un oggetto (carattere ${b.inizio})`);
-      const { chiude: fineOggetto, props } = proprieta(src, b.inizio);
-      return { ...b, chiudeOggetto: fineOggetto, props };
-    }),
-  };
-}
-
-/**
- * Le proprietà scritte due volte nello stesso blocco: eseguito, l'oggetto tiene solo l'ultima e le righe dell'altra
- * spariscono senza errore, anche al confronto (#2320). `[{ version, chiave }]`; lancia se il testo non si legge. PURA.
- */
-export function chiaviDoppie(src) {
-  const out = [];
-  blocchiSorgente(src).blocchi.forEach((b, k) => {
-    const v = b.props.find((p) => p.nome === 'version');
-    const scritta = v && /^(['"`])([^'"`\\]*)\1/.exec(src.slice(v.valore, v.fine));
-    const version = scritta ? scritta[2] : `n. ${k + 1}`;
-    const nomi = b.props.map((p) => p.nome).filter(Boolean);
-    for (const chiave of new Set(nomi.filter((n, i) => nomi.indexOf(n) !== i))) out.push({ version, chiave });
-  });
-  return out;
-}
-
-/** Il motivo da stampare per le chiavi doppie di chiaviDoppie. PURA. */
-export function testoChiaviDoppie(doppie) {
-  const dove = doppie.map((d) => `nel blocco ${d.version} «${d.chiave}»`).join(', ');
-  return `${dove} ${doppie.length === 1 ? 'è scritto' : 'sono scritti'} due volte: vale solo l'ultimo, e le righe dell'altro spariscono dal registro. `
-    + 'Uniscili in uno solo, poi rilancia';
-}
-
-/** La mappa del registro nel sorgente: per ogni blocco i suoi limiti e, per features e fixes, l'elenco e i suoi elementi. */
-function mappaSorgente(src) {
-  const { apre, chiude, blocchi } = blocchiSorgente(src);
-  return {
-    apre, chiude,
-    blocchi: blocchi.map((b) => {
-      const elenchi = {};
-      for (const p of b.props) {
-        if (!CHIAVI.includes(p.nome)) continue;
-        if (src[p.valore] !== '[') throw new Error(`«${p.nome}» non è un elenco scritto per esteso (carattere ${p.valore})`);
-        const e = elementi(src, p.valore);
-        elenchi[p.nome] = { prop: p, apre: p.valore, chiude: e.chiude, elementi: e.elementi };
-      }
-      return { ...b, elenchi };
-    }),
-  };
-}
-
-/** Il tratto da togliere per far sparire l'elemento `el` (di `tutti`): la sua riga intera se ce l'ha da solo. */
-function tagliaElemento(src, el, tutti) {
-  const dopo = /^[ \t]*,?[ \t]*(\/\/[^\n]*)?\r?\n/.exec(src.slice(el.fine));
-  if (rientro(src, el.inizio) !== null && dopo) return { da: inizioRiga(src, el.inizio), a: el.fine + dopo[0].length, testo: '' };
-  const virgola = /^\s*,[ \t]*/.exec(src.slice(el.fine));
-  if (virgola) return { da: el.inizio, a: el.fine + virgola[0].length, testo: '' };
-  const k = tutti.indexOf(el);
-  return { da: k > 0 ? tutti[k - 1].fine : el.inizio, a: el.fine, testo: '' };
-}
-
-/** Manca la virgola fra l'ultimo elemento (o proprietà) e la chiusura? Allora la si aggiunge. */
-function virgolaDopo(src, ultimo, chiude) {
-  if (!ultimo) return null;
-  let i = ultimo.fine;
-  while (i < chiude) {
-    const dc = dopoCommento(src, i);
-    if (dc !== i) { i = dc; continue; }
-    if (src[i] === ',') return null;
-    i++;
-  }
-  return { da: ultimo.fine, a: ultimo.fine, testo: ',' };
-}
-
-function applica(src, modifiche) {
-  const ord = [...modifiche].sort((x, y) => y.da - x.da || y.a - x.a);
-  for (let k = 1; k < ord.length; k++) {
-    if (ord[k].a > ord[k - 1].da) throw new Error('due modifiche si sovrappongono: il registro va sistemato a mano');
-  }
-  let out = src;
-  for (const m of ord) out = out.slice(0, m.da) + m.testo + out.slice(m.a);
-  return out;
 }
 
 const json = (x) => JSON.stringify(x);
@@ -311,60 +135,25 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
   const testoDi = (r) => JSON.parse(json(r));
   const portate = (chiave) => sposta.filter((s) => s.chiave === chiave).map((s) => testoDi(dopo.find((n) => n.version === s.version)[chiave][s.indice]));
   const cima = sopra[0] ? mappa.blocchi[0] : null;
+  const primo = mappa.blocchi.find((_, b) => attesi[b] !== null) || mappa.blocchi[0];
+  const inCima = modificheInCima(src, { cima, primo, versione: p.versione, oggi, daPortare });
+  if (!inCima.ok) return { ok: false, motivo: inCima.motivo };
+  modifiche.push(...inCima.modifiche);
   if (cima) {
-    const rProp = rientro(src, cima.props[0].inizio);
-    const rChiude = rientro(src, cima.chiudeOggetto);
-    if (rProp === null || rChiude === null) return { ok: false, motivo: `il blocco ${p.versione} non è scritto una proprietà per riga: aggiungi le righe a mano` };
     for (const chiave of CHIAVI) {
       if (!daPortare[chiave].length) continue;
-      const e = cima.elenchi[chiave];
+      const nuovo = !cima.elenchi[chiave];
       attesi[0][chiave] = [...(attesi[0][chiave] || []), ...portate(chiave)];
-      if (!e) {
-        const corpo = daPortare[chiave].map((t) => `${rProp}  ${t},\n`).join('');
-        // Al posto dove main scrive lo stesso elenco: un suo `features` nello stesso blocco diventa un conflitto del
-        // rebase, non una chiave doppia che ne cancella le righe in silenzio (#2320).
-        const correzioni = chiave === 'features' && cima.elenchi.fixes && cima.elenchi.fixes.prop;
-        if (correzioni && rientro(src, correzioni.inizio) !== null) {
-          const voci = Object.entries(attesi[0]).filter(([k]) => k !== chiave);
-          voci.splice(voci.findIndex(([k]) => k === 'fixes'), 0, [chiave, attesi[0][chiave]]);
-          attesi[0] = Object.fromEntries(voci);
-          const da = inizioRiga(src, correzioni.inizio);
-          modifiche.push({ da, a: da, testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
-          continue;
-        }
-        const ultima = cima.props[cima.props.length - 1];
-        const v = virgolaDopo(src, ultima, cima.chiudeOggetto);
-        if (v) modifiche.push(v);
-        modifiche.push({ da: inizioRiga(src, cima.chiudeOggetto), a: inizioRiga(src, cima.chiudeOggetto), testo: `${rProp}${chiave}: [\n${corpo}${rProp}],\n` });
-        continue;
-      }
-      const rChiusa = rientro(src, e.chiude);
-      if (rChiusa !== null && e.elementi.length) {
-        const rEl = rientro(src, e.elementi[0].inizio) ?? `${rChiusa}  `;
-        const v = virgolaDopo(src, e.elementi[e.elementi.length - 1], e.chiude);
-        if (v) modifiche.push(v);
-        modifiche.push({ da: inizioRiga(src, e.chiude), a: inizioRiga(src, e.chiude), testo: daPortare[chiave].map((t) => `${rEl}${t},\n`).join('') });
-      } else {
-        const rKey = rientro(src, e.prop.inizio) ?? rProp;
-        const tutti = [...e.elementi.map((x) => src.slice(x.inizio, x.fine)), ...daPortare[chiave]];
-        modifiche.push({ da: e.apre, a: e.chiude + 1, testo: `[\n${tutti.map((t) => `${rKey}  ${t},\n`).join('')}${rKey}]` });
+      if (nuovo && chiave === 'features' && inCima.featuresPrimaDiFixes) {
+        const voci = Object.entries(attesi[0]).filter(([k]) => k !== chiave);
+        voci.splice(voci.findIndex(([k]) => k === 'fixes'), 0, [chiave, attesi[0][chiave]]);
+        attesi[0] = Object.fromEntries(voci);
       }
     }
   } else {
-    const primo = mappa.blocchi.find((_, b) => attesi[b] !== null) || mappa.blocchi[0];
-    const r0 = primo ? rientro(src, primo.inizio) : null;
-    if (r0 === null) return { ok: false, motivo: 'il primo blocco del registro non comincia una riga: apri il blocco a mano' };
     const nuovo = { version: p.versione, date: oggi };
-    let t = `${r0}{\n${r0}  version: '${p.versione}', date: '${oggi}',\n`;
-    for (const chiave of CHIAVI) {
-      if (!daPortare[chiave].length) continue;
-      nuovo[chiave] = portate(chiave);
-      t += `${r0}  ${chiave}: [\n${daPortare[chiave].map((x) => `${r0}    ${x},\n`).join('')}${r0}  ],\n`;
-    }
-    t += `${r0}},\n`;
+    for (const chiave of CHIAVI) if (daPortare[chiave].length) nuovo[chiave] = portate(chiave);
     attesi.unshift(nuovo);
-    const da = inizioRiga(src, mappa.blocchi[0].inizio);
-    modifiche.push({ da, a: da, testo: t });
   }
 
   let nuovoSrc;
@@ -435,7 +224,7 @@ export function testoRiportaInCima(r) {
   const attesa = Array.isArray(r.inAttesa) ? r.inAttesa : [];
   const dopo = attesa.length ? [
     `Novità: ${attesa.length === 1 ? 'una riga del ramo sta' : `${attesa.length} righe del ramo stanno`} sotto la ${r.uscitaSuMain}, uscita su main dopo la partenza del ramo. `
-      + `Dopo il rebase su main le sposta questo strumento, e in routine lo fa da sé il riallineamento che precede la fusione: sul ramo com'è non c'è niente da correggere.`,
+      + `Le sposta da sé la fusione con main, al cancello come in \`npm run finish\`: sul ramo com'è non c'è niente da correggere.`,
     ...attesa.map((s) => `  in ${s.version}: ${s.riga.slice(0, 100)}`),
   ] : [];
   if (!r.spostate.length) return dopo.length ? dopo : [`Novità: nessuna riga del ramo sotto una versione già uscita.`];

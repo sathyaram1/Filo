@@ -116,7 +116,14 @@ export function unisciParti({ ramo, main, parti = [] } = {}) {
     return { ...base, esito: 'non_provata', motivo: (mancate.join('; ') || 'nessuna parte provata').slice(0, 300), ...conStoria };
   }
   const esito = lette.map((l) => l.c.esito).reduce((a, b) => (PESO_SI_FONDE.indexOf(b) > PESO_SI_FONDE.indexOf(a) ? b : a));
-  return { ...base, esito, mainSha, ...conStoria };
+  // Il registro delle novità unito (#2543) lo scrive il server com'è qui: le parti che hanno fuso devono averlo uguale.
+  const fuse = lette.filter((l) => l.c.esito !== 'main_contenuto');
+  const impronta = (l) => (l.c.novita && typeof l.c.novita.sha === 'string' ? l.c.novita.sha : '');
+  if (new Set(fuse.map(impronta)).size > 1) {
+    return { ...base, esito: 'non_provata', motivo: `le parti non hanno unito le novità allo stesso modo (${fuse.map((l) => `${l.nome}: ${impronta(l) || 'nessuna'}`).join(', ')})`.slice(0, 300), ...conStoria };
+  }
+  const conNovita = fuse.find(impronta);
+  return { ...base, esito, mainSha, ...conStoria, ...(conNovita ? { novita: conNovita.c.novita } : {}) };
 }
 
 /** Le parti dall'ambiente del lavoro che unisce: CAMPO_<NOME> e RISULTATO_<NOME>, scritti dal workflow. PURA. */
