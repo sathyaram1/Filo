@@ -8,8 +8,11 @@ import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
-const { uniscaNovita } = globalThis.SN_NOVITA_FUSIONE;
+// Solo quando git lancia il driver: chi imposta la config (preparazione del clone, hook) non lo carica.
+const novitaFusione = () => {
+  if (!globalThis.SN_NOVITA_FUSIONE) createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
+  return globalThis.SN_NOVITA_FUSIONE;
+};
 
 export const NOME = 'novita';
 export const SCRIPT = 'scripts/novita-driver.mjs';
