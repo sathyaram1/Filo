@@ -15,6 +15,7 @@
       ],
       fixes: [
         { testo: 'Nella home il campo per scrivere non si stringe più quando arriva un avviso.', segnalazione: 2390 },
+        { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
       ],
     },
     {
