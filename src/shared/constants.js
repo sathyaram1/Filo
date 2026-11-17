@@ -2657,6 +2657,10 @@
     textScale: 1,
     // Il commento proattivo al centro della home, per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // La barra dei siti della nuova scheda (#1803): si nasconde da Preferenze → Avanzate o dalla chat. `chatRipiegata`:
+    // la freccia ha nascosto la conversazione al centro e la barra ne ha preso il posto; resta al riavvio.
+    barraSiti: { visibile: true },
+    chatRipiegata: false,
     // Una pagina può far partire un download al secondo mentre l'utente non c'è (#2294): Filo ne scrive al più ogni
     // `downloadOgniMin` minuti (valori in FILO_PARLA_DOWNLOAD_MIN). Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     filoParla: { downloadOgniMin: 10 },
