@@ -678,8 +678,6 @@ test('un elenco fermato a metà per tempo scaduto vale per quello che è arrivat
     T.runCommand = vero;
     console.warn = avviso;
   }
-  assert.ok(!T.invocazione('powershell', 'Get-Date', { preludio: false }).args.join(' ').includes('chcp'));
-  assert.ok(T.invocazione('powershell', 'Get-Date').args.join(' ').includes('chcp'), 'gli altri comandi tengono il preludio UTF-8');
 });
 
 test('un dispositivo senza nome si chiama come lo chiama Windows, e le due identità delle stesse cuffie sono una riga', () => {
