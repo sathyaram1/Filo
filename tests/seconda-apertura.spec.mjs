@@ -231,14 +231,48 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà co
   expect((await stato(app, accesso)).normali).toBe(1);
 });
 
-// Senza finestre con schede, anche con la finestrella davanti, ogni voce che agisce su una scheda o sulla finestra la ridà.
-const voci = [['Cronologia AI', /^filo:\/\/history\//], ['Barra laterale', null], ['Assistente laterale', null], ['Ricarica', null], ['Schermo intero', null]];
-for (const [voce, davanti] of voci) {
-  test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede`, async ({ app, shell, openTab, testServer }) => {
+// Senza finestre con schede, con la finestrella dietro, ogni voce che agisce su una scheda o sulla finestra la ridà, e poi
+// fa la sua cosa lì (#2031.2). Avanti e il pannello degli strumenti su un sito non cambiano niente da guardare: si
+// guarda che la richiesta sia arrivata alla finestra rifatta.
+const rifatta = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+  if (!w) return null;
+  const t = w._filoTabs;
+  const a = t.tabs.find((s) => s.id === t.activeId);
+  return {
+    barra: !!t.barra.aperta, bloccata: !!t.barra.opzioni.bloccata, schermoPieno: !!t.contentFullscreen,
+    aiuto: (a && a.aiuto && a.aiuto.pannello) || 'chiuso', richieste: globalThis.__richieste2031 || [],
+  };
+});
+
+const spiaRichieste = (app) => app.evaluate(({ BrowserWindow }) => {
+  globalThis.__richieste2031 = [];
+  const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+  for (const [o, nome] of [[Object.getPrototypeOf(t), 'navigaCronologia'], [Object.getPrototypeOf(t.barra.destro), 'comandaDavanti']]) {
+    const prima = o[nome];
+    o[nome] = function (...a) { globalThis.__richieste2031.push(`${nome}:${a[0]}`); return prima.apply(this, a); };
+  }
+  return { bloccata: !!t.barra.opzioni.bloccata };
+});
+
+const voci = [
+  ['Cronologia AI', null],
+  ['Barra laterale', (r) => expect(r.barra, 'la barra laterale non si è aperta').toBe(true)],
+  ['Assistente laterale', (r) => expect(r.aiuto, 'l\'Aiuto non si è aperto').toBe('aperto')],
+  ['Ricarica', null],
+  ['Schermo intero', (r) => expect(r.schermoPieno, 'la finestra non è andata a schermo intero').toBe(true)],
+  ['Avanti', (r) => expect(r.richieste, 'Avanti non è arrivato alla scheda davanti').toContain('navigaCronologia:avanti')],
+  ['Pannello degli strumenti', (r) => expect(r.richieste, 'il pannello non è stato chiesto alla scheda davanti').toContain('comandaDavanti:commuta')],
+  ['Tieni aperta o sblocca la barra laterale', (r, prima) => expect(r.bloccata, 'il lucchetto della barra non è cambiato').toBe(!prima.bloccata)],
+];
+for (const [voce, fatta] of voci) {
+  test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede e fa la sua cosa`, async ({ app, shell, openTab, testServer }) => {
+    const prima = await spiaRichieste(app);
     const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
     await voceDellaBarra(app, voce);
     await tornaLaFinestra(app, accesso, negozio, `«${voce}» senza finestra non ha ridato Filo con le sue schede`);
-    if (davanti) await expect.poll(() => attiva(app), { message: `quello che apre «${voce}» non è davanti`, timeout: 10000 }).toMatch(davanti);
+    if (voce === 'Cronologia AI') await expect.poll(() => attiva(app), { message: 'la Cronologia AI non è davanti', timeout: 10000 }).toMatch(/^filo:\/\/history\//);
+    if (fatta) await expect(async () => fatta(await rifatta(app), prima)).toPass({ timeout: 10000 });
     expect((await stato(app, accesso)).normali).toBe(1);
   });
 }
