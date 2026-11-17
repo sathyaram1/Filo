@@ -134,6 +134,28 @@ html, body {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
 }
+/* #2390 — l'avviso di una cosa che ha già la sua carta: la carta stessa si fa notare, un piccolo sobbalzo e un alone. */
+.dash-carta.dash-notare {
+  border-color: var(--dash-accent);
+  animation: dash-notare calc(0.6s * var(--sn-motion, 1)) ease-in-out 3;
+}
+@keyframes dash-notare {
+  0%, 100% { transform: none; box-shadow: 0 0 0 0 transparent; }
+  40% { transform: scale(1.025); box-shadow: 0 0 0 5px color-mix(in srgb, var(--dash-accent) 35%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-carta.dash-notare { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 35%, transparent); }
+}
+/* La copia che vola dall'angolo alla colonna (#2390): sopra tutto, senza prendere il puntatore. */
+.dash-carta-in-volo {
+  position: fixed;
+  margin: 0;
+  z-index: 50;
+  pointer-events: none;
+  transform-origin: top left;
+  box-sizing: border-box;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
+}
 
 .dash-carta-testa {
   display: flex;
