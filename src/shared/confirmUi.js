@@ -106,7 +106,7 @@
   background: color-mix(in srgb, var(--sn-fg, #1a1918) 5%, transparent);
   border: 1px solid var(--sn-border, #e0dcd4);
   border-radius: var(--sn-radius, 6px);
-  transition: opacity 0.15s, border-color 0.15s, transform 0.15s;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1)), transform calc(0.15s * var(--sn-motion, 1));
 }
 .sn-confirm-allegato:hover { border-color: var(--sn-accent, #c45a3b); transform: translateY(-1px); }
 .sn-confirm-allegato:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-offset: 1px; }
