@@ -560,3 +560,34 @@ test('lo strumento dice al modello di cosa parlano i documenti, e di leggerli pr
   assert.match(fn.description, /security «Sicurezza»/);
   assert.match(fn.description, /leggilo prima di rispondere/);
 });
+
+// #1483 — Un link fra documenti si scrive col solo id: dentro Filo cambia la query, sul sito il file, per
+// l'agente dice quale documento leggere. Non è una fonte numerata.
+test('i link della Privacy breve portano alla politica sui modelli e alla pagina completa, in app, sul sito e per l\'agente', () => {
+  const { T } = loadModules();
+  const breve = T.get('privacy');
+  assert.match(breve.html, /<a class="sn-doc-link" href="\?doc=models">politica sui modelli<\/a>/);
+  assert.match(breve.html, /<a class="sn-doc-link" href="\?doc=privacy-completa">Tutti i dettagli<\/a>/);
+  assert.ok(!breve.sources.some((s) => /^(models|privacy-completa)$/.test(s.url)), 'un link interno è finito fra le fonti');
+  assert.match(breve.text, /politica sui modelli \(documento «models»\)/);
+  assert.match(breve.text, /Tutti i dettagli \(documento «privacy-completa»\)/);
+  const sito = readFileSync(join(ROOT, 'site', 'transparency', 'privacy.html'), 'utf8');
+  assert.match(sito, /href="\.\/models\.html">politica sui modelli</);
+  assert.match(sito, /href="\.\/privacy-completa\.html">Tutti i dettagli</);
+  assert.doesNotMatch(sito, /href="\?doc=/, 'sul sito un link resta nella forma della pagina interna');
+  assert.ok(existsSync(join(ROOT, 'site', 'transparency', 'privacy-completa.html')));
+  assert.equal(T.get('privacy-completa').title, 'Privacy, tutti i dettagli');
+  assert.deepEqual(T.NAV.slice(1, 3).map((n) => n.label), ['Privacy', 'Privacy, tutti i dettagli']);
+});
+
+test('un link a un documento che non esiste ferma la generazione, un\'ancora resta attaccata al link', () => {
+  const { tmp, leggi } = generaCopia({
+    'zz-link.md': ['---', 'id: zz-link', 'title: Link', 'order: 50', '---', '', 'Vedi [i punti deboli](privacy-completa#i-punti-deboli).', ''],
+  });
+  assert.match(leggi('site', 'transparency', 'zz-link.html'), /href="\.\/privacy-completa\.html#i-punti-deboli"/);
+  assert.match(leggi('src', 'shared', 'transparency.js'), /href=\\"\?doc=privacy-completa#i-punti-deboli\\"/);
+  writeFileSync(join(tmp, 'transparency', 'zz-link.md'), ['---', 'id: zz-link', 'title: Link', '---', '', 'Vedi [qui](nessuno).', ''].join('\n'));
+  assert.throws(() => execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8', stdio: 'pipe' }),
+    /documento che non esiste: «nessuno»/);
+  togliCartella(tmp);
+});
