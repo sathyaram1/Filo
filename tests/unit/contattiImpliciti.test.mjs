@@ -12,7 +12,7 @@ import { dirname, resolve, join, relative } from 'node:path';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
-const privacy = leggi('transparency', 'privacy.md').replace(/\s+/g, ' ');
+const privacy = leggi('transparency', 'privacy-completa.md').replace(/\s+/g, ' ');
 
 function sorgenti(dir) {
   const out = [];

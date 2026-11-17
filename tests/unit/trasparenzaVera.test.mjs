@@ -14,7 +14,7 @@ import * as Letture from '../../scripts/lib/letture-esterne.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const unaRiga = (s) => s.replace(/\s+/g, ' ');
-const privacy = unaRiga(leggi('transparency', 'privacy.md'));
+const privacy = unaRiga(leggi('transparency', 'privacy-completa.md'));
 const sicurezza = unaRiga(leggi('transparency', 'security.md'));
 
 // Il codice dice `vero`: il documento deve contenere la frase. Il codice dice altro: la frase deve sparire.

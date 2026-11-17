@@ -90,7 +90,22 @@ function parseFrontMatter(raw) {
 // Inline: link → nota numerata, poi grassetto. L'ordine conta: si escapa PRIMA
 // (così il testo del documento non può iniettare HTML), poi si applicano i
 // pattern, che sopravvivono all'escape perché usano solo [ ] ( ) e *.
-function renderInline(text, sources) {
+// Un link fra documenti si scrive col solo id del documento, `[testo](models)` o `[testo](privacy#sezione)`:
+// diventa un link alla pagina, non una fonte numerata. Un id che non esiste ferma la generazione.
+const LINK_INTERNO = /^([a-z0-9][a-z0-9-]*)(#[a-z0-9-]+)?$/;
+function linkInterno(url, docIds) {
+  const m = LINK_INTERNO.exec(url);
+  if (!m) return null;
+  if (!docIds.has(m[1])) throw new Error(`link a un documento che non esiste: «${url}» (documenti: ${[...docIds].join(', ')})`);
+  return { id: m[1], ancora: m[2] || '' };
+}
+
+// La pagina dentro Filo sceglie il documento con la query, il sito con un file per documento.
+function htmlPerSito(html) {
+  return html.replace(/ href="\?doc=([a-z0-9-]+)(#[a-z0-9-]+)?"/g, (_a, id, ancora) => ` href="./${id}.html${ancora || ''}"`);
+}
+
+function renderInline(text, sources, docIds) {
   let out = escapeHtml(text);
 
   // Un comando da copiare (`…`) si mette da parte prima di link e grassetto: dentro non vale nessun altro segno.
@@ -98,6 +113,10 @@ function renderInline(text, sources) {
   out = out.replace(/`([^`]+)`/g, (_all, c) => `${codici.push(c) - 1}`);
 
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_all, label, url) => {
+    const interno = linkInterno(url, docIds);
+    if (interno) {
+      return `<a class="sn-doc-link" href="?doc=${interno.id}${interno.ancora}">${label}</a>`;
+    }
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
     if (idx === -1) {
@@ -115,7 +134,7 @@ function renderInline(text, sources) {
   return out.replace(/(\d+)/g, (_all, i) => `<code>${codici[Number(i)]}</code>`);
 }
 
-function renderBody(body, sources) {
+function renderBody(body, sources, docIds) {
   const lines = body.split(/\r?\n/);
   const html = [];
   const sections = [];
@@ -124,7 +143,7 @@ function renderBody(body, sources) {
 
   const flushPara = () => {
     if (!para.length) return;
-    html.push(`<p>${renderInline(para.join(' '), sources)}</p>`);
+    html.push(`<p>${renderInline(para.join(' '), sources, docIds)}</p>`);
     para = [];
   };
   const flushList = () => {
@@ -146,7 +165,7 @@ function renderBody(body, sources) {
       const title = h2[1].trim();
       const id = slugify(title);
       sections.push({ id, title });
-      html.push(`<h2 id="${id}">${renderInline(title, sources)}</h2>`);
+      html.push(`<h2 id="${id}">${renderInline(title, sources, docIds)}</h2>`);
       continue;
     }
 
@@ -154,7 +173,7 @@ function renderBody(body, sources) {
     if (ol) {
       flushPara();
       if (list !== 'ol') { flushList(); html.push('<ol>'); list = 'ol'; }
-      html.push(`<li>${renderInline(ol[2], sources)}</li>`);
+      html.push(`<li>${renderInline(ol[2], sources, docIds)}</li>`);
       continue;
     }
 
@@ -162,7 +181,7 @@ function renderBody(body, sources) {
     if (ul) {
       flushPara();
       if (list !== 'ul') { flushList(); html.push('<ul>'); list = 'ul'; }
-      html.push(`<li>${renderInline(ul[1], sources)}</li>`);
+      html.push(`<li>${renderInline(ul[1], sources, docIds)}</li>`);
       continue;
     }
 
@@ -176,10 +195,12 @@ function renderBody(body, sources) {
 
 // Testo piano per l'agente: niente marcatori, i numeri delle fonti restano come
 // [1] così se Filo cita un passaggio può dire anche da dove viene.
-function renderPlain(body, sources) {
+function renderPlain(body, sources, docIds) {
   const seen = [];
   let out = body
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_a, label, url) => {
+      const interno = linkInterno(url, docIds);
+      if (interno) return `${label} (documento «${interno.id}»)`;
       let idx = seen.indexOf(url);
       if (idx === -1) { seen.push(url); idx = seen.length - 1; }
       return `${label} [${idx + 1}]`;
@@ -241,14 +262,30 @@ const UI_RUNTIME = `
     var node;
     while ((node = walker.nextNode())) pending.push(node);
 
+    // Si glossa la prima occorrenza nell'ordine di lettura; a pari posto vince la chiave più lunga, così
+    // «crediti di Filo» non lo copre una chiave «crediti». Solo parole intere: «server» non glossa «serverless».
+    var LETTERA = /[a-z0-9à-öø-ÿ]/;
+    function trova(testo, parola) {
+      for (var da = 0; ;) {
+        var pos = testo.indexOf(parola, da);
+        if (pos === -1) return -1;
+        if (!LETTERA.test(testo.charAt(pos - 1)) && !LETTERA.test(testo.charAt(pos + parola.length))) return pos;
+        da = pos + 1;
+      }
+    }
     for (var i = 0; i < pending.length; i++) {
       var textNode = pending[i];
-      for (var t = 0; t < terms.length; t++) {
-        var term = terms[t];
-        if (done[term]) continue;
+      while (textNode) {
         var value = textNode.nodeValue;
-        var at = value.toLowerCase().indexOf(term.toLowerCase());
-        if (at === -1) continue;
+        var lower = value.toLowerCase();
+        var at = -1;
+        var term = null;
+        for (var t = 0; t < terms.length; t++) {
+          if (done[terms[t]]) continue;
+          var pos = trova(lower, terms[t].toLowerCase());
+          if (pos !== -1 && (at === -1 || pos < at)) { at = pos; term = terms[t]; }
+        }
+        if (!term) break;
         var before = value.slice(0, at);
         var match = value.slice(at, at + term.length);
         var after = value.slice(at + term.length);
@@ -265,7 +302,7 @@ const UI_RUNTIME = `
         if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
         textNode.parentNode.replaceChild(frag, textNode);
         done[term] = true;
-        if (tail) { textNode = tail; } else { break; }
+        textNode = tail;
       }
     }
   }
@@ -310,17 +347,18 @@ function buildDocs() {
   for (const [k, v] of Object.entries(glossaryRaw)) if (k.charAt(0) !== '_') glossary[k] = v;
 
   const files = readdirSync(SRC_DIR).filter((f) => f.endsWith('.md')).sort();
-  const docs = files.map((file) => {
-    // Fine riga normalizzati SUBITO: su Windows git riscrive i .md in CRLF, e
-    // il testo generato veniva diverso a seconda di come il file era stato
-    // estratto dal repo (la riga `---` sopravviveva alla ripulitura perché
-    // `$` non passa il `\r`). Risultato: il controllo di allineamento diventava
-    // rosso dopo un rebase senza che nessuno avesse toccato il documento.
-    const raw = readFileSync(join(SRC_DIR, file), 'utf8').replace(/\r\n/g, '\n');
-    const { meta, body } = parseFrontMatter(raw);
+  // Fine riga normalizzati SUBITO: su Windows git riscrive i .md in CRLF, e
+  // il testo generato veniva diverso a seconda di come il file era stato
+  // estratto dal repo (la riga `---` sopravviveva alla ripulitura perché
+  // `$` non passa il `\r`). Risultato: il controllo di allineamento diventava
+  // rosso dopo un rebase senza che nessuno avesse toccato il documento.
+  const letti = files.map((file) => ({ file, ...parseFrontMatter(readFileSync(join(SRC_DIR, file), 'utf8').replace(/\r\n/g, '\n')) }));
+  // Un link può portare a ogni documento scritto e a ogni area annunciata, che ha già la sua pagina.
+  const docIds = new Set([...letti.map(({ file, meta }) => meta.id || file.replace(/\.md$/, '')), ...AREE_ANNUNCIATE.map((a) => a.id)]);
+  const docs = letti.map(({ file, meta, body }) => {
     const sources = [];
-    const { html, sections } = renderBody(body, sources);
-    const plain = renderPlain(body, sources);
+    const { html, sections } = renderBody(body, sources, docIds);
+    const plain = renderPlain(body, sources, docIds);
     return {
       id: meta.id || file.replace(/\.md$/, ''),
       title: meta.title || file,
@@ -512,7 +550,7 @@ ${css}
   <p class="sn-doc-sub">${escapeHtml(doc.subtitle)}</p>
   <p class="sn-doc-meta">Ultima revisione: ${escapeHtml(doc.updated)}</p>
   <article id="doc-body">
-${doc.html}
+${htmlPerSito(doc.html)}
   </article>
 </main>
 <div class="sn-gloss-pop" id="gloss-pop" hidden></div>

@@ -58,13 +58,14 @@ test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', asy
 
 // #951 — Privacy e Sicurezza erano «non ancora scritte»: dalla barra si arriva al documento vero, con le sue sezioni.
 for (const { id, voce, sezione, frase } of [
-  { id: 'privacy', voce: 'Privacy', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
+  { id: 'privacy', voce: 'Privacy', sezione: 'Ai fornitori dei modelli', frase: 'hello@filo.red' },
+  { id: 'privacy-completa', voce: 'Privacy, tutti i dettagli', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
   { id: 'security', voce: 'Sicurezza', sezione: 'Da dove viene il file che hai scaricato', frase: 'SHA-256' },
 ]) {
   test(`la voce ${voce} della barra apre il suo documento, non il segnaposto`, async ({ openTab }) => {
     const page = await openTab(URL);
     await expect(page.locator('#title')).toHaveText('Politica sui modelli');
-    const link = page.locator(`#nav a[href*="doc=${id}"]`);
+    const link = page.locator(`#nav a[href="?doc=${id}"]`);
     await expect(link).not.toHaveClass(/is-soon/);
     await link.click();
 
@@ -74,10 +75,51 @@ for (const { id, voce, sezione, frase } of [
     await expect(page.locator('#doc-body h2', { hasText: sezione })).toHaveCount(1);
     await expect(page.locator('#doc-body h2', { hasText: 'I punti deboli' })).toHaveCount(1);
     await expect(page.locator('#doc-body')).toContainText(frase);
-    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(5);
+    // La Privacy breve è prosa: l'unico elenco è quello delle fonti.
+    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(id === 'privacy' ? 0 : 5);
     await page.screenshot({ path: `tests/.shots/trasparenza-${id}.png`, fullPage: false });
   });
 }
+
+// #1483 — La Privacy breve rimanda alla completa e alla politica sui modelli con link fra documenti.
+test('i link della Privacy breve aprono la pagina completa e la politica sui modelli', async ({ openTab }) => {
+  const page = await openTab(URL + '?doc=privacy');
+  await expect(page.locator('#title')).toHaveText('Privacy');
+  await expect(page.locator('#nav a')).toContainText(['Privacy', 'Privacy, tutti i dettagli']);
+
+  await page.locator('#doc-body a', { hasText: 'Tutti i dettagli' }).click();
+  await expect(page.locator('#title')).toHaveText('Privacy, tutti i dettagli');
+  await expect(page.locator('#subtitle')).toHaveText('Ogni funzione, cosa manda, quando e a chi.');
+  await expect(page.locator('.sn-nav-item.is-active')).toHaveText('Privacy, tutti i dettagli');
+  await expect(page.locator('#doc-body h2', { hasText: 'Quanto parte da solo' })).toHaveCount(1);
+  expect(new globalThis.URL(page.url()).searchParams.get('doc')).toBe('privacy-completa');
+
+  await page.goBack();
+  await expect(page.locator('#title')).toHaveText('Privacy');
+  await page.locator('#doc-body a', { hasText: 'politica sui modelli' }).click();
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  await expect(page.locator('.sn-nav-item.is-active')).toHaveText('Modelli');
+});
+
+test('nella Privacy breve le parole difficili hanno la loro glossa, alla prima volta che compaiono', async ({ openTab }) => {
+  const page = await openTab(URL + '?doc=privacy');
+  const alpha = page.locator('#doc-body .sn-gloss', { hasText: 'alpha' });
+  await expect(alpha).toHaveCount(1);
+  await alpha.hover();
+  await expect(page.locator('#gloss-pop')).toBeVisible();
+  await expect(page.locator('#gloss-pop')).toContainText('La prima fase di prova');
+
+  const glosse = await page.locator('#doc-body .sn-gloss').evaluateAll((els) => els.map((e) => ({
+    parola: e.textContent, prima: (e.previousSibling && e.previousSibling.textContent || '').slice(-30),
+  })));
+  const di = (parola) => glosse.find((g) => g.parola.toLowerCase() === parola.toLowerCase());
+  for (const parola of ['modelli di intelligenza artificiale', 'fornitori dei modelli', 'crediti di Filo', 'server', 'Aiuto', 'memorie', 'incognito', 'Tavily', 'link accorciato', 'OpenRouter']) {
+    expect(di(parola), `manca la glossa di «${parola}»`).toBeTruthy();
+  }
+  // La prima occorrenza nell'ordine di lettura, anche quando nello stesso paragrafo c'è una chiave più lunga.
+  expect(di('server').prima).toMatch(/Il primo è il $/);
+  await page.screenshot({ path: 'tests/.shots/trasparenza-privacy-glossa.png', fullPage: false });
+});
 
 for (const tema of ['light', 'dark']) {
   test(`i comandi per controllare il file scaricato si leggono come codice sul tema ${tema}`, async ({ openTab }) => {
