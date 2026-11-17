@@ -195,3 +195,19 @@ test('npm run test:unit sul PC dell\'owner senza main da origin: rosso e nessuna
     togliCartella(r.casa);
   }
 });
+
+// La sentinella L5 del server ammette il registro delle novità solo come dato dello script delle novità del rilascio:
+// il lanciatore degli unit, che il rilascio esegue coi segreti, non deve arrivarci per import (#1737).
+test('#1737: il lanciatore degli unit e ciò che importa non nominano il registro delle novità', () => {
+  const visti = new Set();
+  const coda = ['scripts/run-unit-tests.mjs'];
+  while (coda.length) {
+    const rel = coda.shift();
+    if (visti.has(rel)) continue;
+    visti.add(rel);
+    const src = readFileSync(join(ROOT, rel), 'utf8');
+    assert.doesNotMatch(src, /patchNotes\.js/, `${rel} nomina il registro delle novità`);
+    for (const m of src.matchAll(/\bfrom\s*['"](\.{1,2}\/[^'"]+)['"]/g)) coda.push(join(dirname(rel), m[1]).split('\\').join('/'));
+  }
+  assert.ok(visti.has('scripts/lib/unit-sul-pc.mjs'), [...visti].join(', '));
+});
