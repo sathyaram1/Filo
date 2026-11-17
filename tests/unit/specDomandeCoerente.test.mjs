@@ -270,3 +270,12 @@ test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
   assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`: l'owner\. Le domande di guasto non arrivano a nessuno/);
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /dal #1790 non ne nascono più: § 3\.8/);
 });
+
+// D-263 (#1924.1): il biglietto locale pulito lo dichiara la sessione; l'owner l'ha tenuto come limite, e un limite non
+// scritto lo si crede chiuso.
+test('il biglietto locale che nasce pulito per parola della sessione è un limite scritto fra quelli dichiarati', () => {
+  assert.match(sezione('### 1.2').replace(/\s+/g, ' '), /Se il biglietto nasce pulito lo decide la sessione.{0,120}\(D-263\), scritto in ROUTINE-AUTH-SPEC\.md § 7/);
+  const auth = readFileSync(join(ROOT, 'ROUTINE-AUTH-SPEC.md'), 'utf8').replace(/\r\n/g, '\n');
+  const s7 = auth.slice(auth.indexOf('\n## 7. '), auth.indexOf('\n## 8. ')).replace(/\s+/g, ' ');
+  assert.match(s7, /Una sessione locale decide da sola se il suo biglietto nasce pulito\*\* \(#1924\.1, limite accettato dall'owner con D-263\)/);
+});
