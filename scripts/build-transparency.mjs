@@ -534,7 +534,7 @@ ${css}
   <p class="sn-doc-sub">${escapeHtml(doc.subtitle)}</p>
   <p class="sn-doc-meta">Ultima revisione: ${escapeHtml(doc.updated)}</p>
   <article id="doc-body">
-${doc.html}
+${htmlPerSito(doc.html)}
   </article>
 </main>
 <div class="sn-gloss-pop" id="gloss-pop" hidden></div>
