@@ -214,8 +214,8 @@
     },
     BARRA_SITI: {
       via: ['home', 'barra_siti'],
-      description: 'la barra dei siti e dei programmi della nuova scheda: operazione elenca, aggiungi (indirizzo di un sito, o percorso intero di un programma del computer; nome facoltativo), togli, rinomina (nome), sposta (verso cima|fondo|sinistra|destra, o prima_di); ripiega nasconde la chat della home lasciando campo e barra al centro, riapri la rimette. La voce si dice col nome o l\'indirizzo.',
-      properties: { operazione: S({ enum: ['elenca', 'aggiungi', 'togli', 'rinomina', 'sposta', 'ripiega', 'riapri'] }), indirizzo: S(), percorso: S(), nome: S(), voce: S(), verso: S(), prima_di: S() },
+      description: 'barra dei siti della home: operazione elenca|aggiungi (voce: sito o percorso intero di un programma)|togli|rinomina (nome)|sposta (verso o prima_di)|ripiega|riapri (la chat). voce: nome o indirizzo.',
+      properties: { operazione: S(), voce: S(), nome: S(), verso: S(), prima_di: S() },
       required: ['operazione'],
       risultato: true,
     },
