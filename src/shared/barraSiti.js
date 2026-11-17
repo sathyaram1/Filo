@@ -164,6 +164,21 @@
     return OPERAZIONI[op] || '';
   }
 
+  // La mossa che chiede la chat (azione BARRA_SITI): `elemento` è la voce, o per aggiungi il sito o il percorso del
+  // programma; un percorso intero è un programma. `indirizzo`, `percorso` e `voce` valgono come sinonimi.
+  function mossaDaChat(a) {
+    const x = a && typeof a === 'object' ? a : {};
+    const dato = (k) => (x[k] == null ? '' : String(x[k]).trim());
+    const tipo = operazione(x);
+    const cosa = dato('elemento') || dato('voce');
+    const prima = dato('prima_di') ? { prima: dato('prima_di') } : {};
+    if (tipo === 'aggiungi') {
+      const percorso = dato('percorso') || (assoluto(cosa) ? cosa : '');
+      return { tipo, ...(percorso ? { percorso } : { url: dato('indirizzo') || dato('url') || cosa }), nome: dato('nome'), ...prima };
+    }
+    return { tipo, voce: cosa || dato('indirizzo') || (tipo === 'rinomina' ? '' : dato('nome')), nome: dato('nome'), verso: dato('verso'), ...prima };
+  }
+
   // Quello che la chat legge della barra: nome e indirizzo, mai le icone.
   function descrivi(voci) {
     return normalizza(voci).map((v) => (v.tipo === 'app' ? { nome: v.nome, programma: v.percorso } : { nome: v.nome, indirizzo: v.url }));
