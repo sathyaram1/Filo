@@ -60,6 +60,35 @@ async function modifica(mossa) {
   return giro;
 }
 
+// L'azione BARRA_SITI della chat: la stessa mossa dei gesti, dallo stesso `modifica`. Torna l'esito per il dispatch
+// e, se la barra è cambiata, le voci da annunciare.
+async function daChat(action) {
+  const B = Barra();
+  const a = action && typeof action === 'object' ? action : {};
+  const tipo = B.operazione(a);
+  if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+  if (tipo === 'elenca') return { executed: true, kept: false, output: { voci: B.descrivi(await leggi()) } };
+  const chi = tipo === 'rinomina' ? (a.voce ?? a.indirizzo) : (a.voce ?? a.indirizzo ?? a.nome);
+  const mossa = {
+    tipo,
+    url: a.indirizzo ?? a.url ?? '',
+    percorso: tipo === 'aggiungi' ? String(a.percorso ?? '').trim() : '',
+    nome: a.nome ?? '',
+    voce: chi ?? '',
+    verso: a.verso,
+    ...(a.prima_di != null && a.prima_di !== '' ? { prima: a.prima_di } : {}),
+  };
+  const esito = await modifica(mossa);
+  const voci = B.descrivi(esito.voci);
+  if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, voci } };
+  return {
+    executed: true,
+    kept: true,
+    output: { voci, ...(esito.voce ? { voce: esito.voce.nome } : {}), ...(esito.gia ? { gia: true } : {}) },
+    ...(esito.cambiato ? { cambiate: esito.voci } : {}),
+  };
+}
+
 function lancia(percorso, piattaforma = process.platform) {
   const { shell } = require('electron');
   const { spawn, execFile } = require('child_process');
