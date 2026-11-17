@@ -3518,7 +3518,11 @@ async function eseguiAzioneFilo(action, {
           const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
           let payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
           // #1668 — gli allegati li prende il main dalla conversazione, di nuovo qui: dal riquadro tornano solo gli id scelti.
-          if (globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action)) {
+          // Le miniature le mostra solo il riquadro delle pagine di Filo: da un sito si conferma il testo, e parte quello.
+          const conAllegati = globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action);
+          const daSito = !!sender && !/^filo:/i.test(String(sender?.tab?.url || sender?.url || ''));
+          if (conAllegati && daSito) avvisoAllegati = 'da una pagina web gli allegati non partono: la segnalazione è partita col solo testo';
+          if (conAllegati && !daSito) {
             const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
             const { voci } = await require('./allegatiDellaChat').voci(action, chatDellAzione);
             const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
