@@ -181,15 +181,12 @@
     const r = n.getBoundingClientRect();
     const x = e && e.clientX ? e.clientX : r.left;
     const y = e && e.clientY ? e.clientY : r.bottom;
-    const lista = [
-      { etichetta: v.tipo === 'app' ? `Avvia ${v.nome}` : `Apri ${v.nome}`, fai: () => apri(v) },
-      { etichetta: 'Rinomina…', fai: () => rinomina(v, n) },
-      i > 0 ? { etichetta: 'Sposta a sinistra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'su' }) } : null,
-      i < voci.length - 1 ? { etichetta: 'Sposta a destra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'giu' }) } : null,
-      v.tipo === 'sito' ? { etichetta: 'Copia l\'indirizzo', fai: () => copia(v.url) } : null,
-      null,
-      { etichetta: 'Togli dalla barra', fai: () => togli(v) },
-    ].filter((x, k, a) => x || (k > 0 && a[k - 1]));
+    const lista = [{ etichetta: v.tipo === 'app' ? `Avvia ${v.nome}` : `Apri ${v.nome}`, fai: () => apri(v) }];
+    lista.push({ etichetta: 'Rinomina…', fai: () => rinomina(v, n) });
+    if (i > 0) lista.push({ etichetta: 'Sposta a sinistra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'su' }) });
+    if (i < voci.length - 1) lista.push({ etichetta: 'Sposta a destra', fai: () => muovi({ tipo: 'sposta', id: v.id, verso: 'giu' }) });
+    if (v.tipo === 'sito') lista.push({ etichetta: 'Copia l\'indirizzo', fai: () => copia(v.url) });
+    lista.push(null, { etichetta: 'Togli dalla barra', fai: () => togli(v) });
     global.SN_DASH_CARTE.apriMenu(x, y, lista);
   }
   function menuBarra(e) {
