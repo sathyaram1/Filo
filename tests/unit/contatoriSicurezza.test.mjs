@@ -161,7 +161,7 @@ test('scelte, categorie, lavori, tipi, regole, verbi e tetti sono quelli del cod
   assert.deepEqual(S.TETTI_CODICE.filter((t) => t.startsWith('automatiche_')).sort(), automatiche.sort());
   const sorgenti = ['src/main/services/handlers/ai.js', 'src/main/services/riquadriRotti.js', 'src/main/services/geoBlockClassifier.js',
     'src/main/services/safebrowse/index.js', 'src/main/services/segretiLetti.js', 'src/shared/contatoriGiornalieri.js',
-    'src/main/services/schermo.js', 'src/main/tabs.js', 'src/main/services/handlers.js'].map(leggi).join('\n');
+    'src/main/services/schermo.js', 'src/main/tabs.js', ...percorsiDiHandlers()].map(leggi).join('\n');
   assert.match(sorgenti, /misura\('tetto', `automatiche_\$\{fermo\.gruppo\}`\)/);
   for (const t of S.TETTI_CODICE.filter((x) => !x.startsWith('automatiche_'))) assert.ok(sorgenti.includes(`'${t}'`), `nessuno conta il tetto ${t}`);
   for (const l of S.LAVORI) assert.ok(sorgenti.includes(`'${l}'`), `nessuno conta il lavoro ${l}`);
