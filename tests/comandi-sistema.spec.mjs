@@ -93,7 +93,8 @@ test('«alza il volume al 40%» in chat: il volume del computer è al 40% e la v
   await expect.poll(async () => (await computer(app)).volume.livello).toBe(40);
   await expect(voce(page, 'volume')).toHaveText('40%', { timeout: 5_000 });
   await expect(page.locator('.dash-activity-row', { hasText: 'Volume al 40%' }).first()).toBeAttached();
-  expect(await chiamate(app)).toEqual([['volume', { livello: 40 }]]);
+  // Le letture degli elenchi (quella dei dispositivi parte all'apertura della home, #2394) non cambiano niente.
+  expect((await chiamate(app)).filter((c) => !/Elenco$/.test(c[0]))).toEqual([['volume', { livello: 40 }]]);
 });
 
 test('«spegni il Bluetooth» in chat e il tasto nel riquadro della home fanno la stessa cosa allo stesso computer', async ({ app }) => {
