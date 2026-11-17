@@ -64,7 +64,18 @@ function pulisci(stato) {
       if (NOME_VAR.test(k) && typeof v === 'string') vars[k] = v;
     }
   }
-  return { carte, altre, aperta, tema: { vars } };
+  return { carte, altre, aperta, tema: { vars }, colonna };
+}
+
+// Le home di questa finestra (anche quella tenuta pronta per la prossima scheda nuova).
+function homeDi(win) {
+  const tm = win && !win.isDestroyed?.() ? win._filoTabs : null;
+  if (!tm) return [];
+  let viste = [];
+  try { viste = require('./tabs/riservaNuovaScheda').vistePerAnnunci(tm); } catch (_) { viste = []; }
+  return viste.filter(({ wc }) => {
+    try { return wc && !wc.isDestroyed() && /^filo:\/\/newtab\//i.test(wc.getURL() || ''); } catch (_) { return false; }
+  });
 }
 
 class AvvisiSopraPagina {
