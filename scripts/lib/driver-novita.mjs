@@ -65,7 +65,7 @@ export function etichettaDaFatti(fatti) {
 function etichette(cwd) {
   let fatti = '';
   try { fatti = readFileSync(join(percorsoGit(cwd, 'rebase-merge'), 'done'), 'utf8'); } catch (_) { /* fusione, o rebase senza elenco */ }
-  return ['HEAD', 'base', fatti ? etichettaDaFatti(fatti) : (existsSync(percorsoGit(cwd, 'MERGE_HEAD')) ? 'MERGE_HEAD' : 'theirs')];
+  return ['HEAD', 'base', etichettaDaFatti(fatti)];
 }
 
 /**
