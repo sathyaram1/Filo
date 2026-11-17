@@ -64,6 +64,11 @@
 
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
+  // La regola sta in src/shared/allegatiSegnalazione.js; senza il modulo, un campo d'allegato presente basta a chiedere.
+  const segnalazioneConAllegati = (a) => {
+    const A = global.SN_ALLEGATI_SEGNALAZIONE;
+    return A ? A.haAllegati(a) : !!(a && (a.immagini || a.file || a.schermata));
+  };
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
   // Decide urlExfil, la stessa regola del controllo delle uscite (#2293); caricato senza, un indirizzo o l'elenco dei
