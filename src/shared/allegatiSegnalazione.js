@@ -111,8 +111,9 @@
     return Math.max(0, Math.floor((corpo.length * 3) / 4) - pad);
   }
 
+  // Per eccesso: un file appena sopra il tetto non deve leggersi uguale al tetto.
   function mb(byte) {
-    return `${(byte / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+    return `${(Math.ceil((byte / (1024 * 1024)) * 10) / 10).toFixed(1).replace('.', ',')} MB`;
   }
 
   // Il problema di una voce pronta ({ tipo, nome, dataUrl, byte?, problema? }) che le impedisce di partire, o ''.
