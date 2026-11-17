@@ -1751,6 +1751,16 @@
     let seq = 0;
     // Il puntatore sopra la pila: le carte in vista in quel momento sono lette (#1470).
     let sopraOra = false;
+    // #2390 — dove va un avviso lo dice SN_FORMA_AVVISO: `data-luogo` è angolo (in basso a destra), colonna (una carta
+    // della colonna sinistra della home) o fuori (è diventato una notifica del sistema e aspetta il suo clic).
+    const FORMA = window.SN_FORMA_AVVISO;
+    let davanti = true;
+    let eraHome = null;
+    const inHome = () => { const a = activeTab(); return isHomeUrl(a ? a.url : null); };
+    const riduci = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+    const luogo = (c) => c.dataset.luogo || 'angolo';
+    // Le parcheggiate per il sistema senza durata aspettano il ritorno; oltre questo numero le più vecchie restano solo lì.
+    const FUORI_MAX = 30;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
