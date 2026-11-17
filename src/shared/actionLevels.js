@@ -293,6 +293,8 @@
     const voce = corto(a && a.voce);
     const frase = (parti) => (fatto ? piatto(parti) : parti);
     if (op === 'elenca') return fatto ? 'Letta la barra dei siti' : 'Leggere la barra dei siti';
+    if (op === 'ripiega') return fatto ? 'Chat della home ripiegata' : 'Ripiegare la chat della home';
+    if (op === 'riapri') return fatto ? 'Chat della home riaperta' : 'Riaprire la chat della home';
     if (op === 'aggiungi' && percorso) return frase([fatto ? 'Messo nella barra dei siti il programma ' : 'Mettere nella barra dei siti il programma ', cit(percorso, true)]);
     if (op === 'aggiungi') return frase([fatto ? 'Messo nella barra dei siti ' : 'Mettere nella barra dei siti ', ...(sito ? [cit(sito)] : ['un sito'])]);
     const chi = voce ? [cit(voce)] : ['una voce'];
