@@ -183,6 +183,9 @@ for (const tema of ['light', 'dark']) {
     await shell.evaluate(() => window.filoNotify('Non sono riuscito ad aprire il file: forse è stato spostato', {
       durationSec: 1, errore: true, actions: [{ label: 'Apri cartella', onClick() {} }],
     }));
+    await home.locator('.dash-carta-in-volo').waitFor({ timeout: 6_000 });
+    await home.waitForTimeout(150);
+    await home.screenshot({ path: `tests/.shots/2390-home-volo-${tema}.png` });
     await expect(home.locator('#accade > .dash-carta[data-tipo="cornice"]')).toHaveCount(1, { timeout: 6_000 });
     await expect(home.locator('.dash-carta-in-volo')).toHaveCount(0, { timeout: 3_000 });
     await home.screenshot({ path: `tests/.shots/2390-home-carta-${tema}.png` });
