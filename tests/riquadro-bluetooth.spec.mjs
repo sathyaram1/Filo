@@ -101,9 +101,8 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   await page.waitForTimeout(500);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('aria-label', /^Bluetooth acceso/);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', '');
-  const visti = await page.evaluate(() => window.__visti);
-  expect(visti).toContain('leggendo');
-  expect(visti).not.toContain('spento');
+  // Da «leggo» si passa ad acceso, senza un «spento» in mezzo.
+  expect(await page.evaluate(() => window.__visti)).toEqual(['']);
 });
 
 test('un dispositivo che Windows lascia senza nome ha il nome di Windows, si collega dal riquadro e dal tasto destro', async ({ app }) => {
