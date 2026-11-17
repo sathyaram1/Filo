@@ -460,6 +460,7 @@ while ($true) {
             } catch { $nomi = $null }
           }
           if ($acceso) { $nomiPrima = $nomi } else { $nomiPrima = $null }
+          if ($null -eq $acceso) { $nomi = $null }
           $o.bluetooth = [ordered]@{ acceso = $acceso; dispositivi = $nomi }
         }
       }
