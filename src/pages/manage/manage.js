@@ -50,6 +50,10 @@
   const mgCap1     = document.getElementById('mgCap1');
   const mgCap1Save = document.getElementById('mgCap1Save');
   const mgCap1Msg  = document.getElementById('mgCap1Msg');
+  // Il tetto totale delle verifiche di un lavoro (#2338): superato, decide il manutentore come coi bilanci finiti.
+  const mgTettoVerifiche     = document.getElementById('mgTettoVerifiche');
+  const mgTettoVerificheSave = document.getElementById('mgTettoVerificheSave');
+  const mgTettoVerificheMsg  = document.getElementById('mgTettoVerificheMsg');
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
