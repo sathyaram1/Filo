@@ -82,11 +82,6 @@ test('menu del tasto destro sull\'avviso nell\'angolo: azioni, chiudi, apri', as
   const vista = await avvisi();
   const carta = vista.locator('.shell-notif.show', { hasText: 'Timer «Menu» scaduto' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
-  const voci = await app.evaluate(() => new Promise((ok) => {
-    const pm = require('./popup-menu');
-    ok(typeof pm.showPopupMenu);
-  })).catch((e) => String(e));
-  console.log('popup', voci);
   await carta.click({ button: 'right' });
   await vista.waitForTimeout(800);
   const finestre = app.windows().map((w) => { try { return w.url(); } catch (_) { return ''; } });
