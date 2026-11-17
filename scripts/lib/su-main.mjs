@@ -159,7 +159,7 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
  * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge. `numeri` ({ N: id }) come
  * in fusioniSuMain.
  */
-export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = {} } = {}) {
+export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = null } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
@@ -171,7 +171,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
   const linea = lineaPrincipale(root, base);
   const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })),
-    { fusioni: fusioniSuMain(root, { ref: base, numeri }) });
+    { fusioni: fusioniSuMain(root, { ref: base, numeri: numeri || {} }) });
   const perId = new Map();
   for (const t of tutti) {
     const l = leggiTentativo(t.ramo);
@@ -180,30 +180,44 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const contiene = (a, b) => { try { git(root, ['merge-base', '--is-ancestor', a.head, b.head]); return true; } catch (_) { return false; } };
   const inCima = new Set([...perId.values()].map((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene)[0] : vivi[0]).ramo));
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
-  const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
+  const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)%09%(objectname)', 'refs/remotes/origin']).split('\n');
+  // Nomi di rami e di file li sceglie chi lavora, anche su un feedback non fidato (#2337): escono solo i nomi che il
+  // server ha scritto (il tentativo di un feedback dell'indice) e i file che su main ci sono già; il resto si conta.
+  // Senza l'indice (chi chiama non passa `numeri`) vale la forma stretta del tentativo: un id corto di sole lettere e cifre.
+  const idNoti = numeri ? new Set(Object.values(numeri).map(String)) : null;
+  const idValido = (id) => (idNoti ? idNoti.has(id) : /^[A-Za-z0-9]{1,24}$/.test(id));
+  const suMain = new Set(git(root, ['ls-tree', '-r', '--name-only', base]).split('\n').filter(Boolean));
+  const nome = (ramo, head) => {
+    const corto = ramo.replace(/^origin\//, '');
+    const l = leggiTentativo(corto);
+    if (l && idValido(l.id)) return corto;
+    const radice = corto.split('/')[0];
+    return `${['worker', 'claude'].includes(radice) ? radice : 'altro'}/(nome non mostrato) @${String(head || '').slice(0, 7)}`;
+  };
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
-    const [ramo, data] = riga.split('\t');
+    const [ramo, data, head] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
     const tentativo = leggiTentativo(ramo);
     if (tentativo && !inCima.has(ramo)) continue;
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
-    if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
+    if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(nome(ramo, head)); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
     // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
     const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
     const file = new Set();
+    const nuovi = new Set();
     const conta = new Map();
     let avanti = 0;
     for (const r of log.split('\n')) {
       if (r.startsWith('\u0001')) {
         avanti += 1;
         for (const m of r.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
-      } else if (r.trim()) file.add(r.trim());
+      } else if (r.trim()) (suMain.has(r.trim()) ? file : nuovi).add(r.trim());
     }
     if (!avanti) continue;
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), feedback });
+    rami.push({ ramo: nome(ramo, head), data, avanti, file: [...file].sort(), ...(nuovi.size ? { fileNuovi: [...nuovi].sort() } : {}), feedback });
   }
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
@@ -229,8 +243,12 @@ export function incroci(rami, file) {
   const delServer = voci.map((v) => v.replace(PREFISSO_SERVER, ''));
   const tocca = (elenco) => (f) => elenco.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
   return (Array.isArray(rami) ? rami : [])
-    .map((r) => ({ ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
-      comuni: (r.file || []).filter(tocca(r.repo === 'server' ? delServer : nude)) }))
+    // Un file nuovo del ramo ha il nome di chi lavora (#2337): conta solo uguale a uno della scheda, che lo ripete lei.
+    .map((r) => {
+      const elenco = r.repo === 'server' ? delServer : nude;
+      return { ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
+        comuni: [...(r.file || []).filter(tocca(elenco)), ...(r.fileNuovi || []).filter((f) => elenco.includes(f))] };
+    })
     .filter((r) => r.comuni.length);
 }
 

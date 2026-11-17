@@ -71,7 +71,15 @@ poi il ramo del server su main di filo-security.
    - un file in `diffBinari` vale **fail** da solo: un sorgente con un NUL è
      un binario fuori dagli asset, e nei diff di serie sparisce;
    - chiavi o segreti in chiaro; `eval`/`require` dinamico su input non fidato;
-   - bypass di controlli di auth; XSS; SSRF; path traversal.
+   - bypass di controlli di auth; XSS; SSRF; path traversal;
+   - **ciò che il manutentore legge si allarga** (#2337): un'operazione nuova
+     del suo endpoint che restituisce dati, un campo in più fra quelli che gli
+     arrivano di un feedback non fidato, testo scritto da altri (note, rapporti,
+     segnali, domande, perizia) che gli arriva senza passare dal filtro di
+     fiducia, un ambiente o uno strumento web che il suo ruolo gli apre, la prova
+     di tenuta del server indebolita o saltata. Vale **fail** anche se il resto è
+     pulito, con la nota che dice cosa si allarga e da dove: il manutentore è
+     fidato perché non riceve mai testo non fidato, e allargarlo lo decide l'owner.
 3. Valuta la **coerenza interna del diff**. Non conosci l'obiettivo del lavoro
    (è voluto: altrimenti leggeresti lo stesso testo che lo ha prodotto),
    quindi la domanda non è "fa ciò che era chiesto?" ma: **le parti del diff

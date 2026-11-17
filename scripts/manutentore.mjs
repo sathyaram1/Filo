@@ -136,7 +136,9 @@ export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
   const dove = r.repo === 'server' ? ' sul server' : '';
-  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ') || '(nessun file)'}`;
+  const n = Array.isArray(r.fileNuovi) ? r.fileNuovi.length : 0;
+  const nuovi = n ? `${r.file.length ? ', ' : ''}${n} file che su main non ci sono (non si mostrano)` : '';
+  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ')}${nuovi}${r.file.length || nuovi ? '' : '(nessun file)'}`;
 }
 
 /**

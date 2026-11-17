@@ -1526,7 +1526,23 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   return r && r.num ? ok : 'OK: consegnato.';
 }
 
-export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano'];
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano', 'perizia'];
+
+export const CAMPI_PERIZIA = Object.freeze(['classe', 'area', 'unioni', 'file']);
+
+/**
+ * `deliver perizia --classe N [--area A] [--unioni 812,813] [--file a,b]` nei tipi che il server vuole (#2337): un campo
+ * in più si ferma qui, ma la regola che rifiuta il testo libero sta sul server (routine/perizia.js). PURA.
+ */
+export function datiPerizia(data) {
+  const d = data && typeof data === 'object' ? data : {};
+  const estranei = Object.keys(d).filter((k) => !CAMPI_PERIZIA.includes(k));
+  if (estranei.length) return { errore: `la perizia porta solo --classe, --area, --unioni e --file (non --${estranei[0]})` };
+  if (!/^\d{1,2}$/.test(String(d.classe ?? ''))) return { errore: '--classe è un intero da 1 a 10' };
+  if (d.area !== undefined && typeof d.area !== 'string') return { errore: '--area vuole una delle aree delle schede' };
+  const lista = (v) => (typeof v === 'string' ? v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean) : []);
+  return { dati: { classe: Number(d.classe), ...(d.area !== undefined ? { area: d.area.trim() } : {}), unioni: lista(d.unioni), file: lista(d.file) } };
+}
 
 /**
  * Una fermata (`--status design`) senza la domanda scritta da chi si ferma non parte (#1790): il server non ne compone
@@ -1628,6 +1644,17 @@ export function parolaInPiu(cmd, args) {
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
+// I nomi di campo che la riga di comando conosce: uno fuori elenco si ferma prima del server (#565). Quelli della perizia
+// li vuole datiPerizia (#2337).
+export const CAMPI_DELLA_RIGA = Object.freeze([
+  'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
+  'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
+  'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
+  'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
+  'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
+  ...CAMPI_PERIZIA,
+]);
+
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   // I comandi nei testi stampati, i nostri e quelli del server, portano alla copia fissata (#763).
@@ -1641,13 +1668,7 @@ if (isMain) {
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
   // I nomi di campo che questo strumento conosce.
-  const CAMPI = new Set([
-    'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
-    'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
-    'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
-  ]);
+  const CAMPI = new Set(CAMPI_DELLA_RIGA);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
   // resta è uno dei nostri campi. La conchiglia di Git trasforma `/guasto` in
@@ -1672,7 +1693,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -2217,6 +2238,12 @@ if (isMain) {
     if (!INTENTI.includes(intento)) {
       console.error(testoIntentoNonCapito(intento));
       process.exit(1);
+    }
+    if (intento === 'perizia') {
+      const p = datiPerizia(data);
+      if (p.errore) { console.error(`${p.errore}: non ho consegnato niente.`); process.exit(1); }
+      for (const k of Object.keys(data)) delete data[k];
+      Object.assign(data, p.dati);
     }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
     // in costruzione, nel manifesto del progetto). Va timbrata da sola: è ciò

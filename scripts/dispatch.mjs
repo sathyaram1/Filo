@@ -727,6 +727,8 @@ const ROLE_FILE = {
   compito: 'compito.md',
   // Il manutentore acceso dal pacemaker (SPEC-MANUTENTORE § 4): niente feedback, il contesto piccolo dal server.
   manutentore: 'manutentore.md',
+  // La perizia di un feedback non fidato (#2337): classe, unioni e file, e nient'altro.
+  perizia: 'perizia.md',
 };
 // Un halt che non è un guasto ha il suo testo: un `--guasto` qualunque fermerebbe il lavoro per niente, fino allo sblocco del manutentore (#1796).
 const HALT_KIND_FILE = {
@@ -1184,6 +1186,8 @@ export function buildPayload(bucket, ctx = {}) {
       if (bucket.ripartenzaPersa) out.ripartenzaPersa = { ...bucket.ripartenzaPersa, nota: testoRipartenzaPersa(bucket.ripartenzaPersa) };
       return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
+    case 'perizia':
+      return { case: 'perizia', id: bucket.id, num: bucket.num, ...conBusta(ctx), feedback: ctx.feedback || null, ...conImmagini(ctx) };
     case 'risposta': {
       const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
       return { ...resto, case: 'risposta', num: bucket.num || '' };
@@ -2514,7 +2518,7 @@ function positionOnBranch(bucket) {
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
-const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito', 'manutentore'];
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito', 'manutentore', 'perizia'];
 // Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
 const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 
@@ -2524,7 +2528,14 @@ const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
  */
 // Chi ha bisogno di leggere il feedback per poter lavorare: senza, il compito
 // è vuoto anche se la busta è formalmente in ordine.
-const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
+const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work', 'perizia'];
+// La perizia (#2337) legge il feedback e consegna dati: un ramo aperto per lei sarebbe spinto vuoto.
+const RUOLI_SENZA_RAMO = Object.freeze(['perizia']);
+
+/** Il lavoro del biglietto si fa su un ramo del feedback, che dispatch apre prima di consegnare? PURA. */
+export function apreUnRamo(bucket) {
+  return !!(bucket && bucket.id) && !RUOLI_SENZA_RAMO.includes(bucket.role);
+}
 
 // Quello che il server ha messo DENTRO la busta (codice in `payload.codiceBusta`, #1514) o, da un server che
 // non la manda, dentro la cornice con la quadra: è quello che dice se il compito ha un contenuto. Senza l'una e
@@ -2613,6 +2624,10 @@ export function serverCtx(bucket, fromServer, diff = '') {
       rapportoPrecedente: payload && payload.rapportoPrecedente && typeof payload.rapportoPrecedente === 'object' ? payload.rapportoPrecedente : null,
     };
   }
+  // La perizia (#2337): il feedback e le sue immagini, nient'altro.
+  if (role === 'perizia') {
+    return { ...conBusta(payload), feedback: (payload && payload.feedback) || null, immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [] };
+  }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
@@ -2676,7 +2691,7 @@ async function finalizeBucket(bucket, fromServer) {
   // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
   // fallisce, il feedback resta in coda invece di restare marchiato "in
   // lavorazione" da nessuno.
-  if (bucket.id) {
+  if (apreUnRamo(bucket)) {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
       if (pos.kind === 'permanent') {
