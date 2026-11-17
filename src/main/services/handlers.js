@@ -3529,10 +3529,16 @@ async function eseguiAzioneFilo(action, {
             payload = p.payload;
           }
           const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          const allegati = (payload.images || []).length + (payload.files || []).length;
+          const nonSaliti = r && Array.isArray(r.failed) ? r.failed.map((f) => f && f.name).filter(Boolean) : [];
+          const esitoAllegati = conAllegati
+            ? { output: daSito ? { allegati: 0, allegatiNonPartiti: 'da una pagina web parte solo il testo: gli allegati si mandano dalla chat di Filo' }
+              : { allegati, ...(nonSaliti.length ? { allegatiNonSaliti: nonSaliti } : {}) } }
+            : {};
           // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
           if (r && r.queued) {
             try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
-            return { executed: true, kept: false };
+            return { executed: true, kept: false, ...esitoAllegati };
           }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
