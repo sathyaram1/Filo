@@ -76,18 +76,16 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
     globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__libera = () => r(globalThis.__pc); }));
     globalThis.SN_SISTEMA_MAIN._perProve.invecchia(5 * 60 * 1000);
   });
-  // La home si riapre: ogni stato che la voce del Bluetooth mostra, dal primo disegno.
-  await page.addInitScript(() => {
-    window.__visti = [];
-    new MutationObserver((cambi) => {
-      for (const c of cambi) {
-        const el = c.target;
-        if (el.dataset && el.dataset.voce === 'bluetooth' && !el.hidden && window.__visti[window.__visti.length - 1] !== el.dataset.stato) window.__visti.push(el.dataset.stato);
-      }
-    }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['data-stato', 'hidden'] });
-  });
+  // La home si riapre: il main ha solo lo stato di prima della pausa, e la voce non lo dà per vero.
   await page.reload();
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', 'leggendo', { timeout: 5_000 });
+  await page.evaluate(() => {
+    window.__visti = [];
+    const el = document.querySelector('#sistema .dash-sis-voce[data-voce="bluetooth"]');
+    let ultimo = el.dataset.stato;
+    new MutationObserver(() => { if (el.dataset.stato !== ultimo) window.__visti.push((ultimo = el.dataset.stato)); })
+      .observe(el, { attributes: true, attributeFilter: ['data-stato'] });
+  });
   await voce(page, 'bluetooth').click();
   await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Leggo lo stato del Bluetooth…');
   // Finché non si sa, nessun interruttore che direbbe il contrario del vero.
