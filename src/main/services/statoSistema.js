@@ -443,7 +443,9 @@ while ($true) {
         if ($wf.Count -gt 0) { $o.wifi = [ordered]@{ acceso = (@($wf | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) } }
         $bt = @($radios | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
         if ($bt.Count -gt 0) {
-          $acceso = @($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0
+          $acceso = $null
+          if (@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $acceso = $true }
+          elseif (@($bt | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $acceso = $false }
           $nomi = @()
           if ($acceso -and ($null -ne $nomiPrima) -and (($giri % 3) -ne 0)) {
             $nomi = $nomiPrima
