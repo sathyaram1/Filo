@@ -134,7 +134,7 @@ test('due mosse quasi insieme non si cancellano: il main le mette in fila', asyn
   await Promise.all([
     S.modifica({ tipo: 'aggiungi', url: 'a.it' }),
     S.modifica({ tipo: 'aggiungi', url: 'b.it' }),
-    S.daChat({ operazione: 'aggiungi', indirizzo: 'c.it' }),
+    S.daChat({ operazione: 'aggiungi', elemento: 'c.it' }),
   ]);
   assert.equal(nomi(await S.leggi()), 'a.it,b.it,c.it');
 });
