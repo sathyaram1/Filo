@@ -268,12 +268,6 @@ async function chiudiAncheLaFinestrella(app) {
     .filter((w) => { try { return !w.isDestroyed() && !w._filoTabs; } catch (_) { return false; } }).length), { timeout: 10000 }).toBe(0);
 }
 
-const ingrandita = (app) => app.evaluate(({ BrowserWindow }) => {
-  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
-  const t = w && w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
-  return t ? t.view.webContents.getZoomLevel() : null;
-});
-
 // [voce, cosa deve aver fatto, chiusa anche la finestrella]
 const voci = [
   ['Cronologia AI', null, false],
