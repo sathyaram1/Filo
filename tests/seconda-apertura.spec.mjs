@@ -85,11 +85,11 @@ async function chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServ
   return { negozio, accesso };
 }
 
-async function tornaLaFinestra(app, accesso, negozio, perche) {
+async function tornaLaFinestra(app, accesso, negozio, perche, finestrelle = 1) {
   await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: perche, timeout: 15000 }).toContain(negozio);
   const s = await stato(app, accesso);
   expect(s.normale.visibile, 'la finestra rifatta deve vedersi').toBe(true);
-  expect(s.accesso, 'la finestrella di accesso non si chiude per questo').toBe(1);
+  expect(s.accesso, 'la finestrella di accesso non si chiude per questo').toBe(finestrelle);
   expect(s.errori, 'errori nel main').toEqual([]);
 }
 
