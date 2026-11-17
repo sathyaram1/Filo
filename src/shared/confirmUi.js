@@ -134,7 +134,7 @@
   color: var(--sn-bg, #fff);
   background: color-mix(in srgb, var(--sn-fg, #1a1918) 70%, transparent);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity calc(0.15s * var(--sn-motion, 1));
 }
 .sn-confirm-allegato:hover .sn-confirm-allegato-segno,
 .sn-confirm-allegato:focus-visible .sn-confirm-allegato-segno,
