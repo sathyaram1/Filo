@@ -1247,11 +1247,27 @@ function pannelliImpostazioni(piattaforma = piattaformaPannelli || process.platf
   return { ...(PANNELLI[piattaforma] || {}) };
 }
 
-function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
+// Ogni codice d'errore ha la sua frase (cosa è successo, cosa può fare l'utente): la sentinella è in
+// tests/unit/comandiSistema.test.mjs. Il dettaglio tecnico va nel log (eseguiScript), non qui.
+function spiega(errore, { cosa, piattaforma = process.platform, nome = '', elenca = false } = {}) {
   const radio = cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth';
   const Radio = cosa === 'wifi' ? 'Il Wi-Fi' : 'Il Bluetooth';
+  const oggetto = cosa === 'volume' ? 'il volume' : radio;
   const chi = nome ? `«${nome}»` : 'il dispositivo';
+  const elenco = cosa === 'wifi' ? 'le reti conosciute' : 'i dispositivi abbinati';
+  const pannello = (PANNELLI[piattaforma] || {})[cosa === 'volume' ? 'audio' : cosa === 'wifi' ? 'wifi' : 'bluetooth'];
+  const dalSistema = pannello ? 'Riprova; se non va ancora, si fa dalle impostazioni del sistema.' : 'Riprova fra qualche secondo.';
   const T = {
+    'tempo-comando': elenca
+      ? { frase: `Il sistema non ha finito di leggere ${elenco} in tempo.`, dove: 'Di solito alla seconda prova risponde: riprova fra qualche secondo.' }
+      : { frase: `Il sistema non ha finito di cambiare ${oggetto} in tempo: può essere ancora occupato.`, dove: dalSistema, apri: pannello },
+    winrt: { frase: `Windows non ha dato a Filo i suoi strumenti per ${elenca ? `leggere ${elenco}` : `comandare ${oggetto}`}.`, dove: dalSistema, apri: pannello },
+    eccezione: { frase: `Windows ha interrotto ${elenca ? `la lettura di ${elenco}` : `il comando per ${oggetto}`} con un errore.`, dove: dalSistema, apri: pannello },
+    compilazione: { frase: `Windows non ha accettato il comando che Filo prepara per ${oggetto}.`, dove: dalSistema, apri: pannello },
+    sconosciuto: { frase: `Il sistema ha risposto in un modo che Filo non sa leggere${elenca ? `, e ${elenco} non sono arrivati` : ''}.`, dove: dalSistema, apri: pannello },
+    indirizzo: { frase: `Filo non ha capito l'indirizzo Bluetooth di ${chi}.`, dove: 'Si collega dalle impostazioni Bluetooth del sistema.', apri: pannello },
+    comando: { frase: 'Il sistema ha rifiutato il cambio del volume.', dove: 'Si cambia dal menu audio del desktop.' },
+    'elenco-parziale': { frase: `Il sistema non ha finito di leggere ${elenco}, e ${nome ? `«${nome}»` : 'quello chiesto'} non era fra quelli arrivati.`, dove: 'Riprova fra qualche secondo.' },
     'accesso-DeniedByUser': {
       frase: 'Windows non lascia a Filo accendere e spegnere le radio.',
       dove: 'Si concede in Impostazioni → Privacy e sicurezza → Radio, con «Consenti alle app di controllare le radio del dispositivo».',
