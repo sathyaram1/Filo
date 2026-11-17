@@ -1689,12 +1689,13 @@ async function bluetooth(q) {
 async function wifi(q) {
   if (q.acceso != null) return radio(q);
   const elenco = await computer().wifiElenco();
-  if (!elenco.ok) return fallito(elenco.errore, q);
-  if (q.elenca) return { ok: true, cosa: 'wifi', elenco: elenco.reti, acceso: elenco.acceso, attuale: elenco.attuale };
+  if (!elenco.ok) return fallito(elenco.errore, { ...q, elenca: true });
+  radioLetta('wifi', elenco.acceso);
+  if (q.elenca) return { ok: true, cosa: 'wifi', elenco: elenco.reti, acceso: elenco.acceso, attuale: elenco.attuale, ...(elenco.parziale ? { parziale: true } : {}) };
   const nomi = elenco.reti.map((x) => x.nome);
   const s = scegliNome(q.nome, nomi);
   if (!s.scelto) {
-    const f = fallito(s.candidati ? 'ambiguo' : 'nessuna-rete', q);
+    const f = fallito(s.candidati ? 'ambiguo' : elenco.parziale ? 'elenco-parziale' : 'nessuna-rete', q);
     return { ...f, candidati: s.candidati || nomi };
   }
   const rete = elenco.reti.find((x) => x.nome === s.scelto);
