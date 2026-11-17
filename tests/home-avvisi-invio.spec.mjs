@@ -35,7 +35,7 @@ for (const [W, H] of [[1280, 840], [900, 700], [720, 640]]) {
     await expect(page.locator('#accade > .dash-carta[data-tipo="cornice"]')).toHaveCount(3, { timeout: 10_000 });
     await expect(vista.locator('.shell-notif.show')).toHaveCount(0);
     await page.waitForTimeout(800);
-    const larghezze = await page.evaluate(() => { cancelAnimationFrame(window.__giro); return [...window.__larghezze]; });
+    const larghezze = await page.evaluate(() => { clearInterval(window.__giro); return [...window.__larghezze]; });
     expect(larghezze).toHaveLength(1);
     // Il testo lungo resta tutto visibile: niente righe nascoste sotto lo scorrimento.
     expect(await page.locator('#input').evaluate((t) => t.scrollHeight - t.clientHeight)).toBeLessThanOrEqual(1);
