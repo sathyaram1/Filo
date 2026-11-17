@@ -310,6 +310,56 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   for (const x of ['Alphabet', 'p/e', 'borsa']) expect(disco, 'la domanda, il valore e la fonte non escono').not.toContain(x);
 });
 
+// #1642 — il passaggio del mouse sul valore dice nel fumetto di Filo quello che dice il tasto destro: mentre cerca
+// «Cerco il dato…», poi il valore col perché e la fonte. Niente title: il rettangolo del sistema non c'è più.
+test('il passaggio del mouse sul valore mostra nel fumetto di Filo la spiegazione del tasto destro', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: { 'p/e di soli xx': ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] },
+    fontiWeb: [{ titolo: 'Alphabet PE ratio', sito: 'borsa.example', url: 'https://borsa.example/goog', data: '', testo: 'Alphabet (GOOG) P/E ratio: 27.1 as of October 20, 2026' }],
+    estrai: '[27][Rapporto prezzo/utili di Alphabet][1][20 ottobre 2026]',
+  });
+  await app.evaluate(() => { globalThis.__trattieniWeb = true; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
+  const cercando = segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando');
+  await expect(cercando).toBeVisible({ timeout: 8000 });
+  const tip = page.locator('[data-sn-fumetto] .tip');
+  const sopra = async (loc) => {
+    const b = await riquadroDelSegno(loc);
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
+    return b;
+  };
+  await sopra(cercando);
+  await expect(tip).toBeVisible({ timeout: 3000 });
+  await expect(tip).toContainText('Cerco il dato…');
+  // La ricerca risponde col puntatore ancora sopra: il fumetto aperto passa al valore.
+  await app.evaluate(() => globalThis.__rilasciaWeb());
+  await expect(tip).toContainText('Metti 27', { timeout: 5000 });
+  await expect(tip).toContainText('Rapporto prezzo/utili di Alphabet');
+  await expect(tip).toContainText('Fonte: borsa.example, 20 ottobre 2026');
+  const v = valore(page, '27');
+  const b = await riquadroDelSegno(v);
+  const t = await tip.boundingBox();
+  expect(t.y >= b.y + b.height || t.y + t.height <= b.y, 'il fumetto non copre il valore').toBe(true);
+  await page.screenshot({ path: 'tests/.shots/correttore-segnaposto-fumetto.png' });
+
+  await page.mouse.move(5, 5);
+  await expect(tip).toBeHidden({ timeout: 3000 });
+  expect(await v.evaluate((el) => el.hasAttribute('title')), 'niente suggerimento del sistema sul valore').toBe(false);
+
+  // Lo stesso testo del tasto destro, riga per riga.
+  const menu = await tastoDestroSu(page, v);
+  const righe = await menu.locator('.sn-menu-segno > div').allTextContents();
+  expect(righe).toEqual(['Rapporto prezzo/utili di Alphabet', 'Fonte: borsa.example, 20 ottobre 2026']);
+  await page.keyboard.press('Escape');
+  await sopra(v);
+  await expect(tip).toBeVisible({ timeout: 3000 });
+  expect(await tip.evaluate((el) => el.textContent)).toBe(['Metti 27', ...righe].join('\n'));
+  // Il clic sul valore continua a metterlo.
+  await v.click();
+  await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, davvero basso. ');
+});
+
 test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e il suo valore', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {
     ragionato: { 'Nasdaq aveva': ['[di soli xx][][Alphabet P/E ratio][cerca][web]', '[media un p/e di xx][][Nasdaq dot-com average P/E][cerca][web]'] },
