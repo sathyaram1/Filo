@@ -56,7 +56,10 @@ che lo leggono nominano. Se lo strumento non lo trovi, consegna con `--motivo
    In ogni conflitto tieni **tutte e due le intenzioni**: quella del lavoro e
    quella arrivata su `main`. Per capire la seconda leggi il commit di `main`
    che ha toccato quel punto, non indovinarla. Risolto un file, `git add
-   <file>`; risolti tutti, `git rebase --continue`. Il push forzato non tocca a
+   <file>`; risolti tutti, `git rebase --continue`. Il registro delle novità
+   in conflitto da solo non ti ferma: lo risolve git tenendo le righe dei due
+   lati. Se lo trovi fra i conflitti, il ramo lì ha riscritto righe che
+   c'erano, e si unisce a mano. Il push forzato non tocca a
    te: lo fa la consegna, che registra il riallineamento solo se su origin il
    ramo è alla tua punta e contiene `main` com'era quando hai preso il lavoro:
    se intanto è andata avanti, il resto lo riallinea il cancello. Se rifiuta,
