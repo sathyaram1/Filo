@@ -155,6 +155,16 @@ test('con la riduzione del movimento la carta compare subito nella colonna, senz
   await expect(shell.locator('.shell-notif').first()).toHaveAttribute('data-luogo', 'colonna');
   await expect(home.locator('#accade > .dash-carta[data-tipo="cornice"]')).toContainText('Diretto nella colonna', { timeout: 2_000 });
   await expect(home.locator('.dash-carta-in-volo')).toHaveCount(0);
+
+  // Più avvisi nella colonna si tolgono anche tutti insieme, dal tasto destro di uno.
+  await shell.evaluate(() => window.filoNotify('Secondo nella colonna'));
+  const carte = home.locator('#accade > .dash-carta[data-tipo="cornice"]');
+  await expect(carte).toHaveCount(2);
+  await expect(carte.first()).toContainText('Secondo nella colonna');
+  await carte.first().click({ button: 'right' });
+  await home.locator('.dash-menu .dash-menu-voce', { hasText: 'Chiudi tutti gli avvisi' }).click();
+  await expect(carte).toHaveCount(0, { timeout: 5_000 });
+  await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(0);
 });
 
 test('su un sito l\'avviso resta nell\'angolo e se ne va: non diventa una carta; tornando alla home non resta nell\'angolo', async ({ app, shell, avvisi, openTab, testServer }) => {
