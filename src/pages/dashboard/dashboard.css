@@ -1744,12 +1744,11 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
   box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
-  /* Centrato fino a 720px; a destra lascia libera la pila degli avvisi della barra, che il main misura in
-     --filo-avvisi-barra-larga dal bordo della scheda: senza, una carta lunga copre l'invio (#1551). */
+  /* Centrato fino a 720px. Non si stringe per gli avvisi della barra (D-276, #2390): nella home un avviso sta
+     nell'angolo il tempo di leggerlo e poi vola nella colonna di sinistra. */
   --dash-centro: max(0px, (100% - 720px) / 2);
-  margin: var(--dash-gap) max(var(--dash-centro), var(--filo-avvisi-barra-larga, 0px) / var(--sn-zoom, 1) - var(--dash-lato) - var(--dash-colonna) - var(--dash-gap)) 0 var(--dash-centro);
+  margin: var(--dash-gap) var(--dash-centro) 0 var(--dash-centro);
   max-width: 720px;
-  /* Senza, il minimo del suo contenuto (la textarea) vince sul margine e sotto gli 840px l'invio torna coperto. */
   min-width: 0;
   box-sizing: border-box;
 }
