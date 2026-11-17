@@ -184,5 +184,5 @@
     return normalizza(voci).map((v) => (v.tipo === 'app' ? { nome: v.nome, programma: v.percorso } : { nome: v.nome, indirizzo: v.url }));
   }
 
-  global.SN_BARRA_SITI = { MAX_VOCI, MAX_NOME, ESTENSIONI_APP, estensione, nomeDelProgramma, normalizzaIndirizzo, normalizza, trova, applica, operazione, descrivi };
+  global.SN_BARRA_SITI = { MAX_VOCI, MAX_NOME, ESTENSIONI_APP, estensione, nomeDelProgramma, normalizzaIndirizzo, normalizza, trova, applica, operazione, mossaDaChat, descrivi };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
