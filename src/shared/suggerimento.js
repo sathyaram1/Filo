@@ -49,7 +49,7 @@
     return Number.isFinite(n) ? n : predefinito;
   }
 
-  const api = { posiziona, senzaParole, installa: () => {}, aperto: () => null };
+  const api = { posiziona, altezzaMassima, senzaParole, installa: () => {}, aperto: () => null };
   global.SN_SUGGERIMENTO = global.SN_SUGGERIMENTO || api;
   if (global.SN_SUGGERIMENTO !== api) return;
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
