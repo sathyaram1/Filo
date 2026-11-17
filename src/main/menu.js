@@ -175,6 +175,7 @@ const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
   const f = finestrellaDavanti();
   if (f) { try { f.close(); } catch (_) {} return; }
   const c = schedaAttiva();
+  if (c && nonVista(c.win)) { require('./window').portaDavanti(c.win); return; }
   try { c && c.tabs.closeTab(c.tab.id, { via: ev && ev.triggeredByAccelerator ? 'ctrl_w' : 'altro', strada: viaMenu(ev) }); } catch (_) {}
 });
 
