@@ -1168,6 +1168,18 @@ function interpretaWifiElenco(u, piattaforma) {
   return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null };
 }
 
+// Wlan.Elenco() di CS_WLAN, dallo script o dal lettore della home (statoSistema.js).
+function elencoWifiWindows(o) {
+  if (!o || typeof o !== 'object') return { ok: false, errore: 'sconosciuto' };
+  if (o.errore) return { ok: false, errore: String(o.errore) };
+  const codice = Number(o.codice) || 0;
+  if (codice) return { ok: false, errore: erroreWlan(codice) };
+  if (Number(o.interfacce) === 0) return { ok: false, errore: 'nessuna-radio' };
+  const attuale = typeof o.attuale === 'string' && o.attuale ? o.attuale : null;
+  const nomi = (elencoPs(o.reti) || []).filter((n) => typeof n === 'string' && n);
+  return { ok: true, acceso: null, reti: [...new Set(nomi)].map((nome) => ({ nome, attiva: nome === attuale })), attuale };
+}
+
 // I codici di wlanapi che l'utente può fare qualcosa per togliere.
 function erroreWlan(codice) {
   if (codice === 5) return 'posizione';
