@@ -67,7 +67,7 @@
   // La regola sta in src/shared/allegatiSegnalazione.js; senza il modulo, un campo d'allegato presente basta a chiedere.
   const segnalazioneConAllegati = (a) => {
     const A = global.SN_ALLEGATI_SEGNALAZIONE;
-    return A ? A.haAllegati(a) : !!(a && (a.immagini || a.file || a.schermata));
+    return A ? A.haAllegati(a) : !!(a && a.allegati && [].concat(a.allegati).length);
   };
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
