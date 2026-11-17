@@ -315,8 +315,7 @@ for (const voce of ['Indietro', 'Ingrandisci']) {
 // Con la finestrella di accesso davanti le voci della scheda agiscono su di lei, con la principale aperta o chiusa: chi
 // sta nella finestrella è nella stessa situazione (#2031.2). Il sito dietro, che aspetta l'accesso, non si tocca: ha
 // una pagina prima e un segno che una ricarica porterebbe via, così una voce finita su di lui si vede.
-const segnaPagina = (hash) => `location.hash = ${JSON.stringify(hash)}; window.__segno2031 = 1; true`;
-const leggiPagina = '({ hash: location.hash, segno: window.__segno2031 === 1 })';
+const segnaPagina = (hash) => `(() => { location.hash = ${JSON.stringify(hash)}; window.__segno2031 = 1; return true; })()`;
 
 const laFinestrella = (app, base) => app.evaluate(async ({ BrowserWindow }, b) => {
   const f = BrowserWindow.getAllWindows().find((w) => { try { return !w.isDestroyed() && !w._filoTabs && w.webContents.getURL().startsWith(b); } catch (_) { return false; } });
