@@ -4216,17 +4216,25 @@ async function eseguiAzioneFilo(action, {
       }
       case 'VEDI_SCHERMO': {
         // L'immagine va solo al modello di «Descrivi immagine», senza cronologia né cache: al giro torna testo (#778).
+        // In memoria resta l'ultima della chat, che l'utente può allegare a una segnalazione (#1668).
         const CE = globalThis.SN_CHAT_ERRORS;
-        return await Schermo.guarda(action, {
+        let foto = null;
+        const visto = await Schermo.guarda(action, {
           chiave: chiaveSchermo(sender),
           domanda,
-          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => Gate.text({
-            action: ACTIONS.DESCRIBE_IMAGE,
-            messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
-            ...(segnale ? { signal: segnale } : {}),
-          }),
+          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => {
+            foto = { dataUrl, nome: finestra };
+            return Gate.text({
+              action: ACTIONS.DESCRIBE_IMAGE,
+              messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
+              ...(segnale ? { signal: segnale } : {}),
+            });
+          },
           fraseErrore: (e) => String((e && e.userMessage) || (CE && CE.friendly(e)) || ''),
         });
+        const chatDellaFoto = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
+        if (visto && visto.executed && foto && chatDellaFoto) ContestoFilo.ricordaSchermata(chatDellaFoto, foto);
+        return visto;
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
       // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente
