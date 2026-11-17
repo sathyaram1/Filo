@@ -258,12 +258,11 @@ const spiaRichieste = (app) => app.evaluate(({ BrowserWindow }) => {
 });
 
 // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.
+const comeSuMac = (app) => app.evaluate(({ app: a }) => { a.removeAllListeners('window-all-closed'); a.on('window-all-closed', () => {}); });
+
 async function chiudiAncheLaFinestrella(app) {
-  await app.evaluate(({ app: a, BrowserWindow }) => {
-    a.removeAllListeners('window-all-closed');
-    a.on('window-all-closed', () => {});
-    for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs) w.close();
-  });
+  await comeSuMac(app);
+  await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs) w.close(); });
   // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: qui si contano solo le vive.
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
     .filter((w) => { try { return !w.isDestroyed() && !w._filoTabs; } catch (_) { return false; } }).length), { timeout: 10000 }).toBe(0);
