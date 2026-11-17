@@ -1831,8 +1831,20 @@
       });
       if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
+      if (api.avvisi.davanti) Promise.resolve(api.avvisi.davanti()).then((v) => cambiaDavanti(v !== false)).catch(() => {});
+      if (api.avvisi.onDavanti) api.avvisi.onDavanti((dati) => cambiaDavanti(!(dati && dati.davanti === false)));
+      // Il clic sulla notifica del sistema: Filo è tornato davanti, e l'avviso prende la forma di qui.
+      if (api.avvisi.onRichiama) {
+        api.avvisi.onRichiama((dati) => {
+          const uid = String((dati && dati.uid) || '');
+          const card = uid && Array.from(hostEl().children).find((c) => c.dataset.uid === uid && c.dataset.closing !== '1');
+          if (card && luogo(card) === 'fuori') { colloca(card, true); disponi(); }
+        });
+      }
     }
-    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Le vive dell'angolo: la colonna e le parcheggiate per il sistema non contano nel tetto della pila.
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1' && luogo(c) === 'angolo');
+    const tutteVive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
     // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
     function disponi() {
       const live = vive();
