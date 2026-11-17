@@ -74,7 +74,7 @@ test('un\'immagine che la chat non ha non si inventa, e una tolta nel riquadro n
   test.setTimeout(90_000);
   const page = await home(app);
   await depositoFinto(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ["1", "7"] })] }, { text: 'Inviata.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ['1', '7'] })] }, { text: 'Inviata.' }]);
   await incolla(page, ['#3b7ac4']);
   await chiedi(page, 'segnala questo bug con l\'immagine');
 
