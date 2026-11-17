@@ -44,7 +44,8 @@ async function passata(incognito) {
   // "notificato" per sempre). Si dimentica appena smette di suonare — la volta
   // dopo è una scadenza nuova a tutti gli effetti.
   const ringingNow = new Set((list || []).filter((t) => t.ringing).map((t) => t.id));
-  for (const id of visti) if (!ringingNow.has(id)) visti.delete(id);
+  // Smesso di suonare (Ferma da qualunque parte): via anche l'avviso, nella finestra e nel sistema.
+  for (const id of visti) if (!ringingNow.has(id)) { visti.delete(id); ritiraAvviso(chiaveAvviso(id)); }
   // Vale finché QUALCOSA suona, non solo all'istante della scadenza: un tutto
   // schermo che arriva DOPO ricoprirebbe il pulsante e rimetterebbe il rumore
   // senza interruttore.
