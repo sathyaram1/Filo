@@ -6,6 +6,7 @@
 //     `parti` (facoltativo, vince su `text`): stringhe di Filo e riquadri
 //     { citazione } / { elenco } col testo che non è suo (#592.7).
 //     `altroLabel`: un secondo sì, diverso da OK, che risolve 'altro'; solo nelle pagine di Filo.
+//     `allegati`/`scartati`/`limiti`: le miniature di quello che parte (#1668); il `tieni` di ogni voce dice cosa resta.
 //
 //   SN_CONFIRM_UI.confirmTyped({ title, text, word, avviso }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
