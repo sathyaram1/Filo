@@ -76,3 +76,23 @@ test('r1 la riga del ramo scritta e poi ritoccata in un secondo commit: il rebas
     ['0.2.10', ['vecchia'], []],
   ]);
 });
+
+test('r1 un ramo già riallineato col commit che ha portato la sua riga in cima: il rebase seguente va liscio', () => {
+  const s = scena();
+  s.suMain(sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  git(s.work, ['checkout', '-qb', 'worker/riallineato', 'origin/main']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'il lavoro, riallineato con la riga rimasta sotto la versione uscita');
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main', 'del ramo'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'novità: una riga del ramo da versioni uscite al blocco 0.2.12');
+  s.suMain(sorgente([{ v: '0.2.12', features: ['di main', 'altra'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  expect(r.status, r.out).toBe(0);
+  expect(blocchi(readFileSync(join(s.work, NOVITA), 'utf8'))).toEqual([
+    ['0.2.12', ['di main', 'altra', 'del ramo'], []],
+    ['0.2.11', ['a'], []],
+    ['0.2.10', ['vecchia'], []],
+  ]);
+});
