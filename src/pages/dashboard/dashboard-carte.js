@@ -1220,6 +1220,7 @@
       if (msg.type === MSG.CARTE_HOME_CAMBIATE && msg.layout) { layout = C.normalizza(msg.layout); disegna(); }
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
+      else if (msg.type === MSG.AVVISI_COLONNA && Array.isArray(msg.carte)) riceviCornice(msg.carte);
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
       else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
       else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
