@@ -97,7 +97,7 @@ test('oltre le 5 immagini il riquadro dice quante togliere e l\'OK aspetta la sc
   test.setTimeout(90_000);
   const page = await home(app);
   await depositoFinto(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ["1", "2", "3", "4", "5", "6"] })] }, { text: 'Inviata.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ['1', '2', '3', '4', '5', '6'] })] }, { text: 'Inviata.' }]);
   await incolla(page, ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666']);
   await chiedi(page, 'manda un feedback con tutte queste');
 
