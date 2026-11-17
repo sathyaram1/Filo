@@ -2067,8 +2067,10 @@
       close.addEventListener('click', () => dismiss(card, 'chiusa_x'));
       card.appendChild(close);
       azioni(card, opts.actions);
+      segni(card, opts);
 
       hostEl().appendChild(card);
+      const forma = colloca(card);
       disponi();
       if (sopraOra && card.dataset.attesa !== '1') card._letta = true;
       // forza reflow così la transizione di entrata parte
@@ -2076,7 +2078,8 @@
       card.offsetHeight;
       card.classList.add('show');
 
-      const wantSound = opts.sound !== undefined
+      // Fuori da Filo suona la notifica del sistema, con la sua voce.
+      const wantSound = forma === 'sistema' ? false : opts.sound !== undefined
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
@@ -2085,9 +2088,17 @@
           window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
         } catch (_) {}
       }
-
-      avviaTempo(card, durata);
       return card;
+    }
+    // `carta`: la carta della home che racconta già la stessa cosa (timer:<id>, download:<id>); `icona` e `titolo`
+    // per la carta e la notifica del sistema; `uid`: lo stesso avviso mandato dal main a più finestre.
+    function segni(card, opts) {
+      const carta = typeof opts.carta === 'string' && /^(timer|download):[A-Za-z0-9_-]{1,80}$/.test(opts.carta) ? opts.carta : '';
+      if (carta) card.dataset.carta = carta; else delete card.dataset.carta;
+      card.dataset.icona = FORMA.icona({ icona: opts.icona, carta, errore: !!opts.errore });
+      if (typeof opts.titolo === 'string' && opts.titolo.trim()) card.dataset.titolo = opts.titolo.trim().slice(0, 80);
+      else delete card.dataset.titolo;
+      if (typeof opts.uid === 'string' && opts.uid) card.dataset.uid = opts.uid.slice(0, 80);
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
     function dismissKey(key, esito = 'ritirata') {
