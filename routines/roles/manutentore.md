@@ -367,6 +367,10 @@ npm run manutentore -- domanda <file.json>         # una domanda all'owner, coi 
 npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin
 npm run manutentore -- registro <parole>           # i principi delle domande chiuse, prima di chiedere
 npm run manutentore -- spesa                       # la spesa della settimana per account
+npm run manutentore -- l5 | l5 approva <id>        # le richieste L5 dei lavori fidati; il tuo sì a una
+npm run manutentore -- l4 | l4 salta <N> <sha>     # i controlli di sicurezza bocciati dei lavori fidati; il salto
+npm run manutentore -- bilanci [--cap3 N] [--cap2 N] [--cap1 N] [--tetto N]   # li legge, o li scrive (nel recap)
+npm run manutentore -- passa <N> [perché]          # giri finiti: passa, e ciò che resta va in un figlio
 npm run manutentore -- transizione [--applica]     # solo l'owner, una volta: le 2 di prima scendono a 1
 ```
 
