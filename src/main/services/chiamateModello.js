@@ -2,12 +2,12 @@
 // Libreria nata da handlers.js: niente registrazioni di messaggi qui.
 
 const Defaults = require('./defaultsStore');
-const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
+const { settingsForOwnerAction } = require('./resolveSupportModel');
 const ContatoriServizio = require('./contatoriServizio');
 const ContestoFilo = require('./contestoFilo');
 const Compattazione = require('./compattazioneFilo');
 const Foto = require('./fotoDellaPagina');
-const { SN_CONST, SN_MSG } = globalThis;
+const { SN_CONST } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const Storage = globalThis.SN_STORAGE;
 const History = globalThis.SN_HISTORY;

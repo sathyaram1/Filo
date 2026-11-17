@@ -4,9 +4,9 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
-const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
-const { daFilo, origineDi } = require('./handlers/origine');
+const { fillMovedSlots } = require('./resolveSupportModel');
+const { azioneAmmessaDa } = require('./impostazioniPerOrigine');
+const { origineDi } = require('./handlers/origine');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
 const Compattazione = require('./compattazioneFilo');
@@ -15,7 +15,7 @@ const FiloParla = require('./filoParla');
 const SempreAperte = require('./sempreAperte');
 const ChiudiSchede = require('./chiudiSchede');
 const { SN_CONST, SN_MSG } = globalThis;
-const { ACTIONS, PROMPTS } = SN_CONST;
+const { ACTIONS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const Costs = globalThis.SN_COSTS;

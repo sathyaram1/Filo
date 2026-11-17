@@ -2,7 +2,7 @@
 // Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const Registro = require('../registroCambi');
-const { SN_CONST, SN_MSG } = globalThis;
+const { SN_MSG } = globalThis;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const FiloMem = globalThis.SN_FILO_MEMORY;

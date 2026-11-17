@@ -4,7 +4,7 @@
 const PageRead = require('../pageRead');
 const Registro = require('../registroCambi');
 const ContestoFilo = require('../contestoFilo');
-const { SN_CONST, SN_MSG } = globalThis;
+const { SN_CONST } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const { Schermo, winOf } = require('../handlersComuni');
 const { Gate } = require('../impostazioniEffettive');

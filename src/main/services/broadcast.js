@@ -2,9 +2,9 @@
 // Libreria nata da handlers.js: niente registrazioni di messaggi qui.
 
 const { BrowserWindow } = require('electron');
-const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { isFilo, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
-const { SN_CONST, SN_MSG } = globalThis;
+const { SN_MSG } = globalThis;
 const { MSG } = SN_MSG;
 
 // Le capacità che l'agente conosce dipendono da chi usa Filo: Red Team (#896), Bacheca e Mazzi (#1592) in pausa

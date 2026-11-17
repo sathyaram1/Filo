@@ -3,13 +3,13 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
+const { ownerSlotFor } = require('./resolveSupportModel');
 const SegretiLetti = require('./segretiLetti');
 const ContatoriSicurezza = require('./contatoriSicurezza');
 const ContatoriServizio = require('./contatoriServizio');
 const FiloParla = require('./filoParla');
 const { SN_CONST, SN_MSG } = globalThis;
-const { ACTIONS, PROMPTS } = SN_CONST;
+const { ACTIONS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const Costs = globalThis.SN_COSTS;

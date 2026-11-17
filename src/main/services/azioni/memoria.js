@@ -2,8 +2,8 @@
 // Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const Defaults = require('../defaultsStore');
-const { SN_CONST, SN_MSG } = globalThis;
-const { ACTIONS, PROMPTS } = SN_CONST;
+const { SN_CONST } = globalThis;
+const { ACTIONS } = SN_CONST;
 const FiloChats = globalThis.SN_FILO_CHATS;       // #525 — archivio delle chat con Filo
 const ChatArchive = globalThis.SN_CHAT_ARCHIVE;   // #525 — titoli, tipi, ricerca (logica pura)
 const FiloMem = globalThis.SN_FILO_MEMORY;
