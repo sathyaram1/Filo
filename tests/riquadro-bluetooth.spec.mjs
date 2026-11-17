@@ -65,10 +65,11 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', 'spento', { timeout: 8_000 });
   // Il lettore dorme da minuti; intanto il Bluetooth si accende dal sistema. La lettura che riparte tarda (PC lento).
-  await app.evaluate(async () => {
+  await app.evaluate(() => {
     globalThis.__pc.bluetooth = { acceso: true, dispositivi: [] };
     globalThis.__libera = null;
-    await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__libera = () => r(globalThis.__pc); }));
+    // Non si aspetta: la lettura resta in volo finché la prova non la libera.
+    globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__libera = () => r(globalThis.__pc); }));
     globalThis.SN_SISTEMA_MAIN._perProve.invecchia(5 * 60 * 1000);
   });
   await page.evaluate(() => {
