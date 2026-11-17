@@ -424,7 +424,7 @@
     },
     INVIA_FEEDBACK: {
       via: ['filo_su_di_se', 'feedback'],
-      // Le regole degli allegati stanno nella parte fissa del prompt: qui il tetto dei token degli strumenti è stretto.
+      // Cosa va in allegati lo dice solo la parte fissa del prompt: qui il tetto dei token degli strumenti è stretto.
       description: 'segnalazione a chi sviluppa Filo (titolo 2-6 parole), anche se Filo non sa fare una cosa.',
       properties: { testo: S(), titolo: S(), allegati: LISTA() }, required: ['testo', 'titolo'],
     },
