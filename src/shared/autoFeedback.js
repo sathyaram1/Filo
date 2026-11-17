@@ -147,8 +147,16 @@
     'anche', 'tutto', 'tutte', 'sono', 'essere', 'fare', 'cosa', 'filo',
   ]);
 
+  // Apostrofi e virgolette tipografici valgono quelli dritti: sulla tastiera del Mac e del
+  // telefono «c’è» arriva col tipografico.
   function normalize(s) {
-    return String(s || '').toLowerCase().replace(/['''"""]/g, "'");
+    return String(s || '').toLowerCase().replace(/[‘’‚‛ʼ`´“”„"]/g, "'");
+  }
+
+  // Per riconoscere una domanda: «è», «e'», «é» ed «e» sono la stessa lettera.
+  function normalizzaDomanda(s) {
+    return normalize(s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/([aeiou])'(?![a-z0-9])/g, '$1');
   }
 
   // Match puro coi titoli e le descrizioni del manifesto: l'id stabile della voce, o null.
