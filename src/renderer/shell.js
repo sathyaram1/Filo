@@ -1782,21 +1782,35 @@
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const figli = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const tutte = figli.filter((c) => luogo(c) === 'angolo');
+      const testoDi = (c) => c.querySelector('.shell-notif-msg')?.textContent || '';
+      const azioniDi = (c) => Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || '');
       const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
-        testo: c.querySelector('.shell-notif-msg')?.textContent || '',
-        azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
+        testo: testoDi(c),
+        azioni: azioniDi(c),
         chiusa: c.dataset.closing === '1',
         indirizzo: c.dataset.indirizzo || '',
         // #588.8 — lo scaricamento che la carta porta con sé quando la si trascina.
         trascina: c.dataset.trascina || '',
+        icona: c.dataset.icona || '',
+      }));
+      // Le carte della colonna della home, le più recenti in cima: le disegna la home, il modello resta qui.
+      const colonna = figli.filter((c) => luogo(c) === 'colonna' && c.dataset.closing !== '1').reverse().map((c) => ({
+        id: c.dataset.nid || '',
+        testo: testoDi(c),
+        azioni: azioniDi(c),
+        icona: c.dataset.icona || '',
+        titolo: c.dataset.titolo || '',
+        carta: c.dataset.carta || '',
+        vola: Number(c.dataset.vola) || 0,
       }));
       const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars }, colonna }); } catch (_) {}
     }
     if (api.avvisi) {
       if (api.avvisi.onSopra) {
