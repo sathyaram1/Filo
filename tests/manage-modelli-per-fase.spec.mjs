@@ -3,6 +3,10 @@
 // la scelta arriva in config/routines.roleModels, si ritrova riaprendo la pagina, si toglie, e mai un valore non letto.
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import '../src/shared/routineModelli.js';
+
+// L'elenco delle fasi lo tiene tests/unit/routineModelli.test.mjs: qui la pagina deve mostrarle tutte (#2561).
+const RUOLI = globalThis.SN_ROUTINE_MODELLI.RUOLI;
 
 const URL = 'filo://manage/manage.html';
 
@@ -133,8 +137,8 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   let page = await apri(openTab);
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
-  await expect(page.locator('#mgRoleModels select')).toHaveCount(12);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Verifica dopo un riallineamento', 'Correzione', 'Controllo cieco', 'Manutentore']);
+  await expect(page.locator('#mgRoleModels select')).toHaveCount(RUOLI.length * globalThis.SN_ROUTINE_MODELLI.CAMPI.length);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(RUOLI.map((r) => r.nome));
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
   // La verifica dopo un riallineamento dice cosa vale senza una scelta: la sua partenza, o quella della Verifica (#2344).
