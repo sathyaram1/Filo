@@ -192,6 +192,14 @@ test('smista mostra: una viva riservata senza testo dice perché, non «senza ti
   assert.ok(!testo.includes('non ferma il lavoro'));
 });
 
+// #1928.5: fuori dai riservati il feedback d'origine riservato arriva senza testo, e chi smista deve saperlo.
+test('smista mostra: il feedback d\'origine riservato dice che il testo non è arrivato', () => {
+  const fascicolo = { domanda: { id: 'D-9', opzioni: [] }, feedback: { num: '#1928', stato: 'todo', riservato: true, nome: '', testo: '', note: '' }, registro: { voci: [] } };
+  const testo = formattaFascicoloSmistamento(fascicolo);
+  assert.match(testo, /Feedback d'origine: #1928 · todo\n {2}Riservato: testo e note arrivano solo a chi gira nei riservati/);
+  assert.doesNotMatch(formattaFascicoloSmistamento({ ...fascicolo, feedback: { num: '#1928', stato: 'todo', testo: 'Testo.' } }), /Riservato/);
+});
+
 test('registro: col biglietto passa dal canale, da una sessione da ownerDomande e chi stampa un principio non fidato si sporca', async () => {
   assert.deepEqual(leggiArgomenti(['registro', 'crediti', 'dichiarati']), { cmd: 'registro', parole: 'crediti dichiarati' });
   assert.match(leggiArgomenti(['registro']).errore, /le parole da cercare/);
