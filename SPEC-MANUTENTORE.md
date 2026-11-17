@@ -155,7 +155,8 @@ giorno. Si accende:
   deploy, suite, domande di processo;
 - a una **sveglia del server** al segnale, senza aspettare il battito: guasto
   dichiarato, deploy del server rosso, suite rossa su main, accensione nata
-  morta, domanda di processo di un worker, richiesta dell'owner dalla chat;
+  morta, domanda di processo di un worker, richiesta dell'owner dalla chat,
+  richiesta L5 o controllo bocciato su un lavoro fidato a catena pulita;
 - **quando segue un problema**, più spesso: chiede lui al server la prossima
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
