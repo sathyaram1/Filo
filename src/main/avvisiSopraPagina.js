@@ -277,6 +277,12 @@ class AvvisiSopraPagina {
         : { label: 'Mostra tutti', action: 'avvisi:apri' });
     } else {
       voci.push(...carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label));
+      // #2390 — «apri»: il sito da cui l'avviso è nato, in una scheda.
+      if (carta.indirizzo) {
+        let host = '';
+        try { host = new URL(carta.indirizzo).hostname.replace(/^www\./, ''); } catch (_) { host = ''; }
+        if (host) voci.push({ label: `Apri ${host}`, icon: 'openTab', action: 'avviso:apri' });
+      }
       if (voci.length) voci.push({ type: 'separator' });
       voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
     }
