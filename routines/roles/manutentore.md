@@ -104,7 +104,8 @@ scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se
 
 - al **battito**, ogni 2 ore al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
-  accensione nata morta, domanda di processo di un worker, richiesta dell'owner dalla chat;
+  accensione nata morta, domanda di processo di un worker, richiesta dell'owner dalla chat, richiesta L5 o controllo
+  bocciato su un lavoro fidato (`approvazione`);
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
