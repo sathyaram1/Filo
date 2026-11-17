@@ -406,10 +406,12 @@
   }
 
   // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
-  async function caricaElenco(questo) {
+  // `daCapo`: la radio è cambiata, l'elenco mostrato non vale più (un «Scollega» con la radio spenta).
+  async function caricaElenco(questo, { daCapo = false } = {}) {
     const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
     const firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
     if (firma !== null) questo.firma = firma;
+    if (daCapo) { questo.elencoMostrato = false; ultimiElenchi[cosa] = null; }
     // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
     const giro = (questo.letture = (questo.letture || 0) + 1);
     const lista = questo.elenco;
