@@ -1163,8 +1163,57 @@ export const SOTTOCOMANDI = Object.freeze([
   'contesto', 'sveglia', 'stato', 'schede', 'leggi', 'rapporti', 'rami', 'incroci', 'ordine', 'accendi', 'parallelo',
   'priorita', 'attesa', 'pacchetto', 'nota', 'sblocca', 'archivia', 'taccuino', 'indicazione', 'sveglia-tra',
   'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat', 'transizione',
-  'feedback', 'compito', 'domanda', 'domanda-fine', 'registro', 'spesa',
+  'feedback', 'compito', 'domanda', 'domanda-fine', 'registro', 'spesa', 'l5', 'l4', 'bilanci', 'passa',
 ]);
+
+const CAMPI_BILANCI = Object.freeze({ '--cap3': 'cap3', '--cap2': 'cap2', '--cap1': 'cap1', '--tetto': 'tettoVerifiche' });
+
+/** I bilanci da scrivere dalla riga di comando: { dati } (vuoto = lettura) o { errore }. PURA. */
+export function datiBilanci(argv) {
+  const dati = {};
+  for (const [flag, campo] of Object.entries(CAMPI_BILANCI)) {
+    const v = opzione(argv, flag);
+    if (v === undefined) continue;
+    if (!/^\d+$/.test(String(v))) return { errore: `${flag} vuole un numero intero, non «${v}»` };
+    dati[campo] = Number(v);
+  }
+  return { dati };
+}
+
+/** Bilanci e tetto in una riga, con quello che è cambiato. PURA. */
+export function rigaBilanci(x) {
+  const b = (x && x.bilanci) || {};
+  const v = (k) => (b[k] === null || b[k] === undefined ? 'non scritto' : b[k]);
+  const riga = `Bilanci: 3 → ${v('cap3')}, 2 → ${v('cap2')}, 1 → ${v('cap1')}; tetto totale delle verifiche ${v('tettoVerifiche')}.`;
+  if (!Array.isArray(x && x.cambi)) return riga;
+  return x.cambi.length ? `${riga} Cambiati: ${x.cambi.join(', ')} (scritto nel recap).` : `${riga} Niente da cambiare.`;
+}
+
+/** Le richieste L5 dei lavori fidati, una per riga coi file; quelle che restano all'owner lo dicono. PURA. */
+export function righeL5(x) {
+  const righe = [];
+  for (const r of (x && x.richieste) || []) {
+    righe.push(`${r.id}  #${String(r.numero || '').replace(/^#/, '')} (${r.repo}) ${String(r.sha || '').slice(0, 12)} ${r.ramo}: ${(r.controlli || []).join(', ')}`);
+    for (const f of r.file || []) righe.push(`    ${f}`);
+    if (r.fileOltre) righe.push(`    … e altri ${r.fileOltre}`);
+    if (r.allOwner) righe.push(`    resta all'owner: ${r.allOwner.join('; ')}`);
+  }
+  if (!righe.length) righe.push('Nessuna richiesta L5 su lavori fidati a catena pulita.');
+  if (x && x.nonFidate) righe.push(`(${x.nonFidate} su lavori non fidati o a catena sporca: restano all'owner)`);
+  return righe;
+}
+
+/** I controlli di sicurezza bocciati sui lavori fidati, col perché. PURA. */
+export function righeL4(x) {
+  const righe = [];
+  for (const b of (x && x.bocciature) || []) {
+    righe.push(`#${String(b.num || '').replace(/^#/, '')} ${String(b.sha || '(senza commit)').slice(0, 40)} «${b.titolo || ''}»`);
+    if (b.motivo) righe.push(...String(b.motivo).split('\n').map((l) => `    ${l}`));
+  }
+  if (!righe.length) righe.push('Nessun controllo bocciato su lavori fidati a catena pulita.');
+  if (x && x.nonFidate) righe.push(`(${x.nonFidate} su lavori non fidati o a catena sporca: restano all'owner)`);
+  return righe;
+}
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   contesto | sveglia | stato | schede | leggi <N>
