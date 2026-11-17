@@ -533,7 +533,7 @@
     const { cosa, v, collegato } = opt._riga;
     const out = [];
     if (cosa === 'bluetooth') {
-      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, collega: !collegato })));
       const fra = preferito(v);
       out.push(voceMenu(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
         () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
