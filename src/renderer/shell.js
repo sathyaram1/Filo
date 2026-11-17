@@ -1894,7 +1894,7 @@
       card._tempo = tempi.avvia(t, () => scaduta(card));
     }
     function scaduta(card) {
-      if (luogo(card) === 'angolo' && davanti && FORMA.allaScadenza({ home: inHome() }) === 'vola') vola(card);
+      if (luogo(card) === 'angolo' && FORMA.allaScadenza({ home: inHome() }) === 'vola') vola(card);
       else dismiss(card, 'scaduta');
     }
     // Il volo lo disegna la home (dall'angolo alla cima della colonna): qui l'avviso cambia solo posto.
