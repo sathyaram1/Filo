@@ -150,7 +150,7 @@ test('la pagina pubblica è autonoma: niente richieste a domini esterni per rend
 test('la navigazione elenca tutte e quattro le aree, anche quelle non ancora scritte', () => {
   const { T } = loadModules();
   const ids = T.NAV.map((n) => n.id);
-  assert.deepEqual(ids, ['models', 'privacy', 'security', 'business']);
+  assert.deepEqual(ids, ['models', 'privacy', 'privacy-completa', 'security', 'business']);
   // Nascondere le aree mancanti darebbe l'impressione che Filo non abbia niente
   // da dire su privacy o sicurezza: restano visibili e spente finché non ci sono.
   const html = readFileSync(join(ROOT, 'site', 'transparency', 'models.html'), 'utf8');
