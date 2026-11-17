@@ -693,12 +693,33 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
     figlio = null;
     fresco = false;
     sveglia();
+    consegnaTutte();
+  }
+
+  // L'elenco (bluetooth o wifi) dal PowerShell acceso: l'oggetto della sua risposta; { tempo: true } se non arriva in
+  // tempo; null se il lettore non può (spento, arreso, muto) e chi chiede passa allo script.
+  function chiedi(cosa, ms) {
+    if (!figlio || muti || !figlio.stdin || (cosa !== 'bluetooth' && cosa !== 'wifi')) return Promise.resolve(null);
+    const c = richieste.get(cosa);
+    if (c) return c.p;
+    const acceso = fresco;
+    const voce = {};
+    voce.p = new Promise((risolvi) => {
+      voce.risolvi = risolvi;
+      voce.timer = setTimeout(() => {
+        if (acceso && figlio) muti = true;
+        consegna(cosa, acceso ? null : { tempo: true });
+      }, ms != null ? ms : (acceso ? ELENCO_ACCESO_MS : ELENCO_A_FREDDO_MS));
+    });
+    richieste.set(cosa, voce);
+    try { figlio.stdin.write(`${cosa}\n`); } catch (_) { consegna(cosa, null); }
+    return voce.p;
   }
 
   // `ultimo` è solo la riga del processo vivo; `ultimaRiga` resta a chi disegna mentre il lettore riparte.
   // Un lettore che si è arreso non ha più niente di vero da dire: meglio una voce che sparisce che una che mente.
   return {
-    assicura, pronto, ferma,
+    assicura, pronto, ferma, chiedi,
     ultimo: () => (fresco ? ultimo : null),
     ultimaRiga: () => (figlio ? ultimo : null),
     inAttesa: () => !!figlio && !fresco,
