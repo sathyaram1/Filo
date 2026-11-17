@@ -18,23 +18,20 @@ La forma, che la validazione comune controlla e rifiuta dicendo il campo:
 - un resoconto senza niente da decidere non è una domanda: va nel report o
   nelle note del feedback.
 
-**Un passo che solo l'owner può fare è un «da fare»**, non una frase nel testo
-o nelle note e non una domanda con una scelta finta: un segreto, un'impostazione
-di GitHub o di Firebase, una prova o una modifica dal suo PC. Lo apri quando lo
-scopri, chiunque tu sia (worker, manutentore, chi scrive una spec), con la
-stessa strada delle domande e `"tipo": "da_fare"`:
+**Un passo che solo l'owner può fare è un «da fare»** (un segreto,
+un'impostazione di GitHub o di Firebase, una prova dal suo PC), non una frase
+nel testo o nelle note né una domanda con una scelta finta. Chi lo scopre lo
+apre con la strada delle domande e `"tipo": "da_fare"`:
 
-- `problema` sono i passi concreti, e dove si fanno; `contesto` è perché serve;
-  `collegamenti` il lavoro che lo aspetta;
-- una sola opzione, il pulsante «Fatto»: la sua azione riprende il lavoro che
-  aspetta (`riprendi` sul feedback, `blocca: true`), o `{ "tipo": "nessuna" }`
-  se non ne aspetta nessuno. Facoltativa una seconda, «Non lo faccio», con la
-  sua azione (di solito `archivia`). I nomi dei pulsanti li mette Filo: il
-  `testo` dell'opzione dice solo cosa è stato fatto;
-- pro, contro e consiglio no: non c'è niente da scegliere, e un consiglio
-  applicato in blocco lo segnerebbe fatto senza di lui;
-- il feedback si può nominare per numero (`"feedbackId": "#1736"`): il server
-  lo traduce nell'id, e un numero che non esiste lo rifiuta.
+- `problema` i passi concreti e dove; `contesto` perché serve; `collegamenti`
+  il lavoro che aspetta;
+- un'opzione sola, «Fatto»: `riprendi` sul feedback che aspetta (`blocca:
+  true`) o `{ "tipo": "nessuna" }`; facoltativa «Non lo faccio» (di solito
+  `archivia`). I pulsanti li nomina Filo: il `testo` dice cosa è stato fatto;
+- niente pro, contro e consiglio: un consiglio applicato in blocco lo
+  segnerebbe fatto senza di lui;
+- il feedback si nomina anche per numero (`"feedbackId": "#1736"`): il server
+  lo traduce, o rifiuta un numero che non c'è.
 
 Un dubbio di processo (quale strumento, quale ordine, cosa fare di un rilievo)
 non è una domanda per l'owner: va al manutentore, nel rilascio con
