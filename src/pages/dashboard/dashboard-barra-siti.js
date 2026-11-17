@@ -171,7 +171,7 @@
   }
   async function rinomina(v, ancora) {
     const nome = await chiediTesto({ ancora, valore: v.nome, etichetta: `Nome nuovo per ${v.nome}` });
-    if (nome && nome !== v.nome) muovi({ tipo: 'rinomina', id: v.id, nome });
+    if (nome && nome !== v.nome) muovi({ tipo: 'rinomina', id: v.id, nome, cosa: v.nome });
   }
 
   function menuVoce(n, e) {
