@@ -1762,7 +1762,7 @@ async function risolviNome(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore || !q.nome || (q.cosa !== 'wifi' && q.cosa !== 'bluetooth')) return {};
   const r = await comanda({ cosa: q.cosa, elenca: true });
-  if (!r.ok || !Array.isArray(r.elenco)) return {};
+  if (!r.ok || !Array.isArray(r.elenco) || r.parziale) return {};
   const nomi = r.elenco.map((x) => x.nome);
   const s = scegliNome(q.nome, nomi);
   if (s.scelto) {
