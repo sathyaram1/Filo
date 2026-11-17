@@ -288,6 +288,8 @@ async function assistenteLaterale() {
 // Ctrl/Cmd+Z: nel campo di testo annulla, fuori torna indietro. Stessa regola di
 // src/content/content.js, che vale quando il tasto arriva alla pagina.
 async function annulla() {
+  // Fuori da un campo è un Indietro, e come lui agisce su una finestra che si vede.
+  if (!finestrellaDavanti()) portalaDavanti(finestra());
   const wc = contenutoAFuoco();
   if (!wc) return;
   const win = finestra();
