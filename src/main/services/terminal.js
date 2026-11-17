@@ -222,7 +222,7 @@ function invocazione(shell, command, { trackCwd = false, mark = '', preludio = t
       stdin: PREPARA_STDIN_POWERSHELL + PRELUDI_CODIFICA.powershell + withCwdProbe(shell, command, mark),
     };
   }
-  const testo = encodingPrelude(shell) + (trackCwd ? withCwdProbe(shell, command, mark) : command);
+  const testo = (preludio || trackCwd ? encodingPrelude(shell) : '') + (trackCwd ? withCwdProbe(shell, command, mark) : command);
   return { ...shellInvocation(shell, testo), stdin: null };
 }
 
