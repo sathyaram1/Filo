@@ -125,7 +125,7 @@ test('il motivo del silenzio distingue la chiave, l’interruttore e i modelli',
 test('nessun controllo di prontezza legge apiKeys[settings.provider]', async () => {
   const { readFileSync } = await import('node:fs');
   const files = [
-    join(ROOT, 'src', 'main', 'services', 'handlers.js'),
+    ...fileDiHandlers(),
     join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'),
     join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'),
   ];
