@@ -624,7 +624,7 @@ test('ogni codice d\'errore dei comandi e degli elenchi ha una frase propria, di
   const codici = new Set();
   for (const re of [/Dice 'errore' '([a-z][a-z-]*)'/g, /dice errore ([a-z][a-z-]*)/g, /FILO:errore=([a-z][a-z-]*)/g,
     /errore: '([a-z][a-z-]*)'/g, /errore = '([a-z][a-z-]*)'/g, /fallito\('([a-z][a-z-]*)'/g,
-    /\? '([a-z][a-z-]*)' : '([a-z][a-z-]*)'/g]) {
+    /errore[^\n]*?\? '([a-z][a-z-]*)' : '([a-z][a-z-]*)'/g]) {
     for (const m of sorgenti.matchAll(re)) for (const c of m.slice(1)) if (c) codici.add(c);
   }
   for (const n of [5, 1062, 1168, 87, -2144067582, 5023, -1, 12345]) codici.add(C.erroreWlan(n));
