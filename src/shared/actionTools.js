@@ -214,7 +214,7 @@
     },
     BARRA_SITI: {
       via: ['home', 'barra_siti'],
-      description: 'barra dei siti: elenca|aggiungi (sito o programma)|togli|rinomina|sposta (verso|prima_di)|ripiega|riapri la chat',
+      description: 'elenca|aggiungi (sito|programma)|togli|rinomina|sposta (verso|prima_di)|ripiega|riapri la chat',
       properties: { operazione: S(), elemento: S(), nome: S() },
       required: ['operazione'],
       risultato: true,
