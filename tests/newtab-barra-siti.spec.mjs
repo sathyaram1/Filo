@@ -203,7 +203,7 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
   test.setTimeout(60_000);
   const page = await home(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'b1', name: 'BARRA_SITI', arguments: JSON.stringify({ operazione: 'aggiungi', indirizzo: 'youtube.com', nome: 'YouTube' }) }] },
+    { toolCalls: [{ id: 'b1', name: 'BARRA_SITI', arguments: JSON.stringify({ operazione: 'aggiungi', elemento: 'youtube.com', nome: 'YouTube' }) }] },
     { text: 'Fatto, YouTube è nella barra.' },
     { toolCalls: [{ id: 'b2', name: 'BARRA_SITI', arguments: JSON.stringify({ operazione: 'ripiega' }) }] },
     { text: 'Ripiegata.' },
