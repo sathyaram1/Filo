@@ -24,11 +24,10 @@ regola**.
 
 - **Serve un passo che solo l'owner può fare** (un segreto, un'automazione
   GitHub, una prova sulla sua macchina). È un «da fare» (`"tipo": "da_fare"`,
-  sezione «Una domanda per l'owner si scrive per lui»): i passi da fare, perché
-  servono, e il pulsante «Fatto» che riprende questo lavoro. Consegnalo con lo
-  stesso comando, aggiungendo `--domanda <file.json>`: il lavoro aspetta che lo
-  segni fatto e poi riparte dal ramo. Mai una frase nel testo o nelle note: lì
-  nessuno la vede finché un worker non ci arriva.
+  sezione «Una domanda per l'owner si scrive per lui»), col pulsante «Fatto»
+  che riprende questo lavoro. Consegnalo con lo stesso comando, aggiungendo
+  `--domanda <file.json>`: il lavoro aspetta che lo segni fatto e poi riparte
+  dal ramo.
 
 Se invece si farebbe da qui ma qualcosa è rotto (un clone, una credenziale, la
 rete, uno strumento, i permessi della sessione), non è per regola: è un
