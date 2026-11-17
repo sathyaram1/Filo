@@ -600,9 +600,19 @@ async function setLavoriServer(on, idToken) {
 const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
-  const out = { fixInstructions: '', giroStretto: false };
+  const out = { fixInstructions: '', giroStretto: false, tettoVerifiche: null };
   for (const k of CAP_KEYS) out[k] = null;
   return out;
+}
+
+/** Il tetto totale delle verifiche nel suo intervallo, o null se non è un numero (#2338). */
+function clampTetto(n) {
+  const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
+  const min = Number.isFinite(A.TETTO_VERIFICHE_MIN) ? A.TETTO_VERIFICHE_MIN : 1;
+  const max = Number.isFinite(A.TETTO_VERIFICHE_MAX) ? A.TETTO_VERIFICHE_MAX : 50;
+  const v = Math.round(Number(n));
+  if (n === '' || n === null || n === undefined || !Number.isFinite(v)) return null;
+  return Math.min(max, Math.max(min, v));
 }
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
