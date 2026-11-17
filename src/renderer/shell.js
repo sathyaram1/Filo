@@ -2106,7 +2106,7 @@
         if (c.dataset.key === String(key)) dismiss(c, esito);
       }
     }
-    return { show, dismiss, dismissKey, rispecchia };
+    return { show, dismiss, dismissKey, rispecchia, cambiaLuogo };
   })();
 
   // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
