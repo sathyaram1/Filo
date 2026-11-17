@@ -663,6 +663,12 @@ async function setRoutineCaps(patch, idToken) {
     fields[k] = toFsValue(v);
     mask.push(k);
   }
+  if (p.tettoVerifiche != null) {
+    const v = clampTetto(p.tettoVerifiche);
+    if (v === null) throw new Error(`tettoVerifiche: serve un numero, non «${String(p.tettoVerifiche)}».`);
+    fields.tettoVerifiche = toFsValue(v);
+    mask.push('tettoVerifiche');
+  }
   if (typeof p.fixInstructions === 'string') {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
