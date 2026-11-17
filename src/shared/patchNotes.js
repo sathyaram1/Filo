@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.288', date: '2026-11-17',
+      features: [
+        { testo: 'La Privacy, in Trasparenza, ora ha una pagina breve da leggere in due minuti: cosa esce dal tuo computer e chi lo vede, con le parole difficili spiegate al passaggio del mouse. Ogni dettaglio, funzione per funzione, sta nella pagina «Privacy, tutti i dettagli», a un clic.', segnalazione: 1483 },
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.285', date: '2026-11-15',
       features: [],
       fixes: [
