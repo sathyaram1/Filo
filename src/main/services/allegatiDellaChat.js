@@ -35,6 +35,7 @@ async function leggiFile(v) {
   const ext = path.extname(v.nome).slice(1).toLowerCase();
   const type = MIME[ext] || 'application/octet-stream';
   const tipo = genere === 'image' ? 'immagine' : 'file';
+  if (!path.isAbsolute(v.percorso)) return { ...v, tipo, type, problema: 'non si trova più sul computer' };
   let st;
   try { st = await fs.promises.stat(v.percorso); } catch (_) { return { ...v, tipo, type, problema: 'non si trova più sul computer' }; }
   if (!st.isFile()) return { ...v, tipo, type, problema: 'non è un file' };
