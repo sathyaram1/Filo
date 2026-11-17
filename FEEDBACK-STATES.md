@@ -256,7 +256,7 @@ dirette verso `done`, strette: `todo → done` della pipeline per una segnalazio
 un pacchetto fuso (o un derivato in correzione fuso col suo lavoro, `statusReason: in_correzione`,
 §4c), e `working → done` della routine per un feedback già risolto su main.
 Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
-lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
+lavoro, o dalla sua ripresa su un ramo che non porta niente rispetto a main (#2427), con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
 altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
 illegale.
 
