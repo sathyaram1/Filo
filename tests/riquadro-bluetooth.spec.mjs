@@ -89,13 +89,15 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   await expect(riquadro(page).locator('.dash-sis-comandi > .sn-select-option')).toBeHidden();
   await page.screenshot({ path: 'tests/.shots/2394-bluetooth-leggo.png' }).catch(() => {});
   // L'elenco dei dispositivi legge anche la radio: basta lui, senza aspettare il lettore che tarda.
-  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  // (Il title lo toglie il fumetto di Filo al passaggio del mouse: lo stato si legge da aria-label.)
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('aria-label', /^Bluetooth acceso/, { timeout: 8_000 });
   await expect(opzione(page, 'Spegni il Bluetooth')).toBeVisible();
   await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Bluetooth acceso');
   await page.keyboard.press('Escape');
   await app.evaluate(() => globalThis.__libera());
   await page.waitForTimeout(500);
-  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso');
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('aria-label', /^Bluetooth acceso/);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', '');
   expect(await page.evaluate(() => window.__visti)).not.toContain('spento');
 });
 
