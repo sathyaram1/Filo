@@ -73,17 +73,7 @@ async function daChat(action) {
     const ripiegata = tipo === 'ripiega';
     return { executed: true, kept: false, output: { chat: ripiegata ? 'ripiegata' : 'aperta' }, impostazioni: { chatRipiegata: ripiegata } };
   }
-  const chi = tipo === 'rinomina' ? (a.voce ?? a.indirizzo) : (a.voce ?? a.indirizzo ?? a.nome);
-  const mossa = {
-    tipo,
-    url: a.indirizzo ?? a.url ?? '',
-    percorso: tipo === 'aggiungi' ? String(a.percorso ?? '').trim() : '',
-    nome: a.nome ?? '',
-    voce: chi ?? '',
-    verso: a.verso,
-    ...(a.prima_di != null && a.prima_di !== '' ? { prima: a.prima_di } : {}),
-  };
-  const esito = await modifica(mossa);
+  const esito = await modifica(B.mossaDaChat(a));
   const voci = B.descrivi(esito.voci);
   if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, voci } };
   return {
