@@ -288,7 +288,7 @@ for (const [voce, fatta, nessuna] of voci) {
     const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
     if (nessuna) await chiudiAncheLaFinestrella(app);
     await voceDellaBarra(app, voce);
-    await tornaLaFinestra(app, accesso, negozio, `«${voce}» senza finestra non ha ridato Filo con le sue schede`);
+    await tornaLaFinestra(app, accesso, negozio, `«${voce}» senza finestra non ha ridato Filo con le sue schede`, nessuna ? 0 : 1);
     if (voce === 'Cronologia AI') await expect.poll(() => attiva(app), { message: 'la Cronologia AI non è davanti', timeout: 10000 }).toMatch(/^filo:\/\/history\//);
     if (fatta) await expect(async () => fatta(await rifatta(app), prima)).toPass({ timeout: 10000 });
     expect((await stato(app, accesso)).normali).toBe(1);
