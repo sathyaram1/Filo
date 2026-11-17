@@ -511,7 +511,7 @@ test('un documento scritto in un\'area annunciata porta nella barra il suo nome 
   });
   const modulo = leggi('src', 'shared', 'transparency.js');
   const nav = JSON.parse(/const NAV = (\[[\s\S]*?\]);/.exec(modulo)[1]);
-  assert.deepEqual(nav.map((n) => n.label), ['Modelli', 'Sicurezza', 'Come si sostiene', 'I tuoi dati'],
+  assert.deepEqual(nav.map((n) => n.label), ['Modelli', 'Privacy, tutti i dettagli', 'Sicurezza', 'Come si sostiene', 'I tuoi dati'],
     'la barra non usa il nome corto e l\'ordine che il documento si dà');
   const barra = leggi('site', 'transparency', 'models.html').split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('>I tuoi dati<'), 'sul sito la barra tiene il nome dell\'area invece di quello del documento');
