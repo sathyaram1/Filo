@@ -247,6 +247,7 @@
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
     'zoom:propria': 'una pagina che scala da sé il suo contenuto (l\'editor) tiene lei il suo zoom',
+    chatRipiegata: 'ripiegare la chat della home è il gesto della sua freccia, che la riapre: una riga nel filo a ogni clic sarebbe rumore',
     'autonomia.*': 'quanto Filo fa da solo si alza solo con la parola «conferma» (#1312): un «annulla» lo rialzerebbe con un clic',
   };
 
