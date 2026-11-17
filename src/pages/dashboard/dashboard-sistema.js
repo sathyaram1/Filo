@@ -202,7 +202,7 @@
       voce.testo.hidden = !x.testo;
       voce.el.title = x.hover;
       voce.el.setAttribute('aria-label', x.dettaglio.join(', '));
-      voce.el.dataset.stato = x.offline ? 'offline' : x.bassa ? 'bassa' : x.spento ? 'spento' : '';
+      voce.el.dataset.stato = x.offline ? 'offline' : x.bassa ? 'bassa' : x.spento ? 'spento' : x.leggendo ? 'leggendo' : '';
     }
     host.hidden = !qualcuna;
     riga.hidden = !icone;
