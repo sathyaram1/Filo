@@ -2619,6 +2619,25 @@
     };
   }
 
+  // Il perché di un segno, riga per riga: il menu del tasto destro e il fumetto del valore lo leggono da qui (#1642).
+  function righeDelPerche(s) {
+    if (!s) return [];
+    const ripiego = s.cercando ? 'spell_segnaposto_cerco' : s.segno !== 'errore' ? 'spell_ocra_controlla'
+      : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+    const righe = [{ testo: s.motivo || t(ripiego) }];
+    if (s.fonteDato && s.fonteDato.nome) {
+      righe.push({ testo: t('spell_segnaposto_fonte', [s.fonteDato.nome, s.fonteDato.data].filter(Boolean).join(', ')), citazione: true });
+    }
+    if (s.citazione) righe.push({ testo: t('spell_ocra_prima', s.citazione), citazione: true });
+    return righe;
+  }
+
+  // Il fumetto del valore: cosa fa il clic, poi lo stesso perché del tasto destro.
+  function spiegazioneDelValore(s) {
+    const azione = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
+    return [azione, ...righeDelPerche(s).map((r) => r.testo).filter((x) => x && x !== azione)].join('\n');
+  }
+
   // Col clic di chi scrive: è una richiesta, quindi parte anche da una pagina delicata.
   function cercaDiNuovo(el, segno) {
     const state = el && monitored.get(el);
