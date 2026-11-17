@@ -3136,10 +3136,10 @@
     if (reopenId) await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
     if (eventoId) await vaiAlEvento(eventoId).catch((e) => { console.warn('[Filo] salto al punto del filo', e); return false; });
     if (onbState) await Accoglienza.openOnboarding(onbState);
-    BarraSiti.pronta();
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
+    BarraSiti.pronta();
     richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
     riprendiSeguitiOrfani().catch((e) => console.warn('[Filo] seguiti della pagina di prima', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
