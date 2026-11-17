@@ -11,9 +11,25 @@ const AZIONE = /^(chiudi|\d{1,2})$/;
 const PILA = /^(apri|riduci|chiudi-tutti)$/;
 const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
+const ICONA = /^[a-z][A-Za-z]{0,30}$/;
+const CARTA = /^(timer|download):[A-Za-z0-9_-]{1,80}$/;
+// L'azione dalla home su una carta della colonna (#2390): quelle della vista, più «assorbi» (la home ha già la carta).
+const AZIONE_HOME = /^(chiudi|assorbi|\d{1,2})$/;
+
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
 const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
+const icona = (v) => (ICONA.test(testo(v)) ? testo(v) : '');
+
+// L'SVG dell'icona lo scrive il main dalla libreria: la vista non carica script d'altre origini.
+function svgIcona(nome) {
+  if (!nome) return '';
+  try {
+    if (!globalThis.SN_ICONS) require('../shared/icons.js');
+    const f = globalThis.SN_ICONS && globalThis.SN_ICONS[nome];
+    return typeof f === 'function' ? f(16) : '';
+  } catch (_) { return ''; }
+}
 
 // Lo stato arriva dalla shell: se ne tengono solo le forme attese, senza tagliare i testi.
 function pulisci(stato) {
@@ -26,6 +42,18 @@ function pulisci(stato) {
       chiusa: c.chiusa === true,
       indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
       trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
+      icona: icona(c.icona),
+    }));
+  const colonna = (Array.isArray(stato && stato.colonna) ? stato.colonna : [])
+    .filter((c) => c && typeof c === 'object' && c.id)
+    .map((c) => ({
+      id: testo(c.id),
+      testo: testo(c.testo),
+      azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
+      icona: icona(c.icona),
+      titolo: testo(c.titolo).slice(0, 80),
+      carta: CARTA.test(testo(c.carta)) ? testo(c.carta) : '',
+      vola: Math.max(0, Math.round(Number(c.vola) || 0)),
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
   const aperta = !!(stato && stato.aperta === true);
