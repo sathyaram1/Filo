@@ -485,43 +485,14 @@ try {
   Dice 'acceso' ([int](@($dopo | Where-Object { $_ -eq 'On' }).Count -gt 0))
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
-    'bt-elenco': PS_INIZIO + String.raw`try {
-` + PS_ATTESA + PS_RADIO_TIPI + String.raw`  $null = [Windows.Devices.Bluetooth.BluetoothDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
-  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
-  $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
-} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+    // La strada di riserva: di solito l'elenco lo dà il lettore della home, già acceso (statoSistema.js).
+    'bt-elenco': PS_INIZIO + String.raw`try { Remove-TypeData System.Array } catch {}
 try {
-  $tutte = Attendi ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
-  $bt = @($tutte | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
-  if ($bt.Count -eq 0) { Dice 'errore' 'nessuna-radio'; exit 0 }
-  Dice 'acceso' ([int](@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0))
-  $visti = @{}
-  $classici = Attendi ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync([Windows.Devices.Bluetooth.BluetoothDevice]::GetDeviceSelectorFromPairingState($true))) ([Windows.Devices.Enumeration.DeviceInformationCollection])
-  foreach ($d in @($classici)) {
-    try {
-      $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothDevice])
-      if ($null -eq $dev) { continue }
-      $ind = '{0:x12}' -f $dev.BluetoothAddress
-      if ($visti.ContainsKey($ind)) { continue }
-      $visti[$ind] = 1
-      Dice 'dispositivo' $ind
-      Dice 'nome' ([string]$d.Name)
-      Dice 'collegato' ([int]([string]$dev.ConnectionStatus -eq 'Connected'))
-    } catch {}
-  }
-  $le = Attendi ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync([Windows.Devices.Bluetooth.BluetoothLEDevice]::GetDeviceSelectorFromPairingState($true))) ([Windows.Devices.Enumeration.DeviceInformationCollection])
-  foreach ($d in @($le)) {
-    try {
-      $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice])
-      if ($null -eq $dev) { continue }
-      $ind = '{0:x12}' -f $dev.BluetoothAddress
-      if ($visti.ContainsKey($ind)) { continue }
-      $visti[$ind] = 1
-      Dice 'dispositivo' $ind
-      Dice 'nome' ([string]$d.Name)
-      Dice 'collegato' ([int]([string]$dev.ConnectionStatus -eq 'Connected'))
-    } catch {}
-  }
+` + PS_ATTESA + String.raw`} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+` + PS_ELENCO_BT + String.raw`try {
+  $e = ElencoBt
+  if ($e.errore) { Dice 'errore' $e.errore; exit 0 }
+  Dice 'elenco' (ConvertTo-Json -InputObject $e -Compress -Depth 5)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
     'bt-collega': PS_INIZIO + String.raw`$indirizzo = [string]$env:FILO_SIS_INDIRIZZO
