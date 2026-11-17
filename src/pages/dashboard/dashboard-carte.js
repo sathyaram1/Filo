@@ -378,9 +378,9 @@
   // Il modello sta nella shell della finestra: la carta ne mostra testo e azioni, e ogni gesto torna a lei.
   const TITOLO_DA_ICONA = { warning: 'Avviso', download: 'Scaricamento', timer: 'Timer', alarm: 'Sveglia' };
   function cartaCornice(a) {
-    const gesto = (azione) => () => d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione });
-    const chiudi = gesto('chiudi');
-    const azioni = (a.azioni || []).map((etichetta, i) => ({ etichetta, fai: gesto(String(i)) })).filter((x) => x.etichetta);
+    const allaShell = (azione) => () => d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione });
+    const chiudi = allaShell('chiudi');
+    const azioni = (a.azioni || []).map((etichetta, i) => ({ etichetta, fai: allaShell(String(i)) })).filter((x) => x.etichetta);
     return {
       chiave: `cornice:${a.id}`, tipo: 'cornice', icona: a.icona || 'bell',
       titolo: a.titolo || TITOLO_DA_ICONA[a.icona] || 'Filo', stato: a.testo, lungo: true,
