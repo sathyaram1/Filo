@@ -107,8 +107,10 @@
   ];
 
   // Se l'utente ha chiesto ISTRUZIONI («come faccio a…»), spiegargliele è la risposta giusta:
-  // il segnale vale solo quando voleva che la cosa venisse fatta.
-  const HOWTO_QUESTION_RE = new RegExp([
+  // il segnale vale solo quando voleva che la cosa venisse fatta. Gira sul testo di
+  // normalizzaDomanda (senza accenti): una forma per variante, non una per grafia (#474).
+  // «non si può…», «non è possibile…» sono lamentele: lì la proposta deve restare.
+  const HOWTO_QUESTION_RE = new RegExp('(?<!\\bnon )(?:' + [
     '\\b(come|dove)\\s+(si|posso|puoi|potrei|faccio|fare|far|trovo|attivo|apro|cambio|metto|funziona|configuro|imposto)',
     'come si fa',
     'dove si trova',
@@ -118,16 +120,20 @@
     'spiegami',
     'mi spieghi',
     'insegnami',
-    'mi dici come',
-    'si pu(o|ò) ',
-    '(e|è)\' ?possibile',
+    '\\b(dimmi|mi dici|mi diresti|(puoi|potresti) dirmi|mi (puoi|potresti) dire) (come|dove|se|qual|quale|quali|cosa|che cosa|in che modo)\\b',
+    '\\bsi puo ',
+    '\\b(e|sarebbe|sara) possibile',
+    '\\bc\'e (un |qualche |il )?(modo|maniera|sistema|verso|comando|tasto|scorciatoia)',
+    '\\bci sono (dei |altri )?(modi|sistemi|comandi)',
+    '\\bqual(e\\s+|\\s*\'\\s*|\\s+)e\\s+((il|lo|la|un|una)\\s+)?(modo|maniera|sistema|procedura|comando|tasto|scorciatoia)',
+    '(^|[^a-z])sai (come|dove|se|quale?|quando|cosa|che cosa|[a-z]+(are|ere|ire)(l[aoie]|mi|ti|ci|vi|si|ne)?)\\b',
     'cosa sai fare',
     'cosa puoi fare',
     'cosa riesci',
     'quali (funzioni|cose|capacit)',
     'che cosa sai',
     'a cosa serve',
-  ].join('|'), 'i');
+  ].join('|') + ')', 'i');
 
   // Una risposta di sole indicazioni è lunga: sotto la soglia è più probabile un frammento
   // o un errore di parsing.
