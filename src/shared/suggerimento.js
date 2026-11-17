@@ -424,6 +424,27 @@
     }
   }
 
+  // Il fumetto non prende il puntatore: la rotella sopra il pezzo scorre lui finché ha testo da mostrare, poi la pagina.
+  // In ascolto solo mentre un fumetto troppo lungo è aperto: un ascolto della rotella che blocca rallenta ogni pagina.
+  const ROTELLA = { capture: true, passive: false };
+  let rotellaAccesa = false;
+  function suRotella(e) {
+    if (!visibile || !corrente || corrente.origine !== 'puntatore' || !tipEl || e.ctrlKey) return;
+    const max = tipEl.scrollHeight - tipEl.clientHeight;
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tipEl.clientHeight : e.deltaY;
+    const su = tipEl.scrollTop;
+    if (max <= 0 || !dy || (dy > 0 && su >= max - 1) || (dy < 0 && su <= 0)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    tipEl.scrollTop = su + dy;
+  }
+  function accendiRotella(serve) {
+    if (serve === rotellaAccesa) return;
+    rotellaAccesa = serve;
+    if (serve) document.addEventListener('wheel', suRotella, ROTELLA);
+    else document.removeEventListener('wheel', suRotella, ROTELLA);
+  }
+
   function installa(opzioni = {}) {
     if (installato) return;
     installato = true;
