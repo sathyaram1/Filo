@@ -175,6 +175,7 @@ test('il documento rientra nel prompt intero, fonti comprese', async ({ app, she
 });
 
 // #951 — «quali dati condividi?»: il modello trova il documento sulla privacy fra gli strumenti, lo chiede e lo riceve intero.
+// Da #1483 la privacy è breve e rimanda a «privacy-completa»: anche quella, chiesta dopo, arriva intera (#2563).
 test('a «quali dati condividi?» il documento sulla privacy arriva al modello, intero', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
@@ -203,11 +204,13 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      if (n === 1) {
-        try { onToolCall && onToolCall({ id: 't1', name: 'filo_su_di_se' }); } catch (_) {}
+      if (n <= 2) {
+        const id = `t${n}`;
+        const doc = n === 1 ? 'privacy' : 'privacy-completa';
+        try { onToolCall && onToolCall({ id, name: 'filo_su_di_se' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 't1', name: 'filo_su_di_se', arguments: '{"azione":"documento","doc":"privacy"}' }],
+          toolCalls: [{ id, name: 'filo_su_di_se', arguments: JSON.stringify({ azione: 'documento', doc }) }],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
@@ -223,17 +226,26 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
   const calls = await app.evaluate(() => globalThis.__calls);
   const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'filo_su_di_se');
   expect(strumento, 'filo_su_di_se non arriva al modello').toBeTruthy();
-  expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
+  expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'privacy-completa', 'security']));
   // Da #1564 il documento ci sta col suo titolo, che dice di cosa parla, non con una frase sugli argomenti.
   expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy «[^»]+»[^)]*\): [^\n]*leggilo prima di rispondere/);
+  expect(strumento.function.description).toMatch(/privacy-completa «[^»]+»/);
 
-  const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
-  const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
-  expect(tool.content).toContain('Privacy');
-  expect(tool.content).toContain('Safe Browsing');
-  expect(tool.content).toContain('I punti deboli');
-  expect(tool.content).not.toContain('NON esiste');
-  expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
+  const breve = calls[1].messages.filter((x) => x.role === 'tool').pop();
+  const interoBreve = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
+  expect(breve.content).toContain('Privacy');
+  expect(breve.content).toContain('I punti deboli');
+  expect(breve.content, 'la privacy breve deve dire al modello dove stanno i dettagli').toContain('privacy-completa');
+  expect(breve.content).not.toContain('NON esiste');
+  expect(breve.content.length).toBeGreaterThanOrEqual(interoBreve.length);
+
+  const completa = calls[2].messages.filter((x) => x.role === 'tool').pop();
+  const interoCompleta = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy-completa'));
+  expect(completa.content).toContain('Safe Browsing');
+  expect(completa.content).toContain('I punti deboli');
+  expect(completa.content).not.toContain('NON esiste');
+  expect(completa.content, 'il documento arriva tagliato').not.toContain('documento troncato');
+  expect(completa.content.length).toBeGreaterThanOrEqual(interoCompleta.length);
 });
 
 // #888 — «quanto costa Filo?»: prima l'agente chiedeva la sezione su come Filo
