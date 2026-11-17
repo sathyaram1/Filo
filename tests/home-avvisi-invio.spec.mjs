@@ -22,8 +22,7 @@ for (const [W, H] of [[1280, 840], [900, 700], [720, 640]]) {
     await page.evaluate(() => {
       window.__larghezze = new Set();
       const f = document.getElementById('inputForm');
-      const giro = () => { window.__larghezze.add(Math.round(f.getBoundingClientRect().width)); window.__giro = requestAnimationFrame(giro); };
-      giro();
+      window.__giro = setInterval(() => window.__larghezze.add(Math.round(f.getBoundingClientRect().width)), 30);
     });
     await shell.evaluate(() => {
       window.filoNotify('Il catalogo è pronto: 14 pagine, 3 offerte nuove', { durationSec: 0 });
