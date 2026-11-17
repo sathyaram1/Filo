@@ -102,7 +102,7 @@ test('la chat e i gesti passano dallo stesso salvataggio: aggiungi e togli dalla
   const S = Servizio();
   const dalGesto = await S.modifica({ tipo: 'aggiungi', url: 'https://www.wikipedia.org/', nome: 'Wikipedia' });
   assert.equal(dalGesto.cambiato, true);
-  const r = await S.daChat({ type: 'BARRA_SITI', operazione: 'metti', indirizzo: 'youtube.com', nome: 'YouTube' });
+  const r = await S.daChat({ type: 'BARRA_SITI', operazione: 'metti', elemento: 'youtube.com', nome: 'YouTube' });
   assert.equal(r.executed, true);
   assert.equal(r.output.voce, 'YouTube');
   assert.equal(nomi(r.cambiate), 'Wikipedia,YouTube', 'chi esegue riceve le voci da annunciare alle home');
