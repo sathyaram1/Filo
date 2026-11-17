@@ -687,12 +687,6 @@
     send({ type: MSG.UPDATE_SETTINGS, settings: { homeSistema: { [voce]: mostra } } }).catch(() => {});
   }
 
-  async function copia(opt) {
-    try { await navigator.clipboard.writeText(box ? box.copia : ''); } catch (_) { chiudiBox(); return; }
-    opt.textContent = 'Copiato';
-    setTimeout(chiudiBox, 700);
-  }
-
   function apriBox(v, ancora, punto) {
     chiudiBox();
     const d = descrizione();
