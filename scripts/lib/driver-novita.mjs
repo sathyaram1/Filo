@@ -200,7 +200,13 @@ export function driver({ base, ours, theirs, marcatori = '7', cwd = process.cwd(
         const lati = forcella && forcella.ok && onto && onto.ok
           ? { forcella: forcella.out, onto: onto.out, manifestoOnto: json(gitIn(cwd, ['show', `${capi.onto}:package.json`])) }
           : {};
-        r = unisciNelRebase({ base: readFileSync(base, 'utf8'), ours: readFileSync(ours, 'utf8'), theirs: readFileSync(theirs, 'utf8'), manifesto, oggi, ...lati });
+        const lato = { base: readFileSync(base, 'utf8'), ours: readFileSync(ours, 'utf8'), theirs: readFileSync(theirs, 'utf8') };
+        r = unisciNelRebase({ ...lato, manifesto, oggi, ...lati });
+        if (!r.ok) {
+          const d = gitIn(cwd, ['diff', '--no-index', '--no-color', '-U0', base, theirs]);
+          const m = d.status === 1 ? mossaSuOurs({ ours: lato.ours, theirs: lato.theirs, hunks: hunkDa(d.out) }) : { ok: false };
+          if (m.ok && registroLeggibile(m.src)) r = m;
+        }
       } catch (_) { /* un lato che non si legge: resta la fusione di testo */ }
       if (r.ok) {
         writeFileSync(ours, r.src, 'utf8');
