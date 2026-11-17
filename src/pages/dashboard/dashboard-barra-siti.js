@@ -320,11 +320,12 @@
     new MutationObserver((cambi) => {
       if (!ripiegata || !pronta) return;
       // Anche la risposta che cresce in una bolla nata prima del ripiego (lo streaming scrive dentro, non aggiunge bolle).
-      const diFilo = (n) => {
+      const dentro = (n) => {
         const e = n && (n.nodeType === 1 ? n : n.parentElement);
-        return !!(e && (e.closest('.dash-bubble-filo') || (e.querySelector && e.querySelector('.dash-bubble-filo'))));
+        return !!(e && e.closest('.dash-bubble-filo'));
       };
-      const nuova = cambi.some((c) => diFilo(c.target) || [...c.addedNodes].some(diFilo));
+      const porta = (n) => dentro(n) || (n.nodeType === 1 && !!n.querySelector('.dash-bubble-filo'));
+      const nuova = cambi.some((c) => dentro(c.target) || [...c.addedNodes].some(porta));
       if (nuova) d.freccia.dataset.nuovo = '1';
     }).observe(d.bubbles, { childList: true, subtree: true, characterData: true });
   }
