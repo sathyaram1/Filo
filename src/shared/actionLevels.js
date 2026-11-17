@@ -278,8 +278,12 @@
     return fatto ? frase('Carta', ' spostata nella home') : frase('Spostare la carta', ' nella home');
   }
 
-  const OP_BARRA_SITI = { metti: 'aggiungi', aggiungi: 'aggiungi', togli: 'togli', rimuovi: 'togli', rinomina: 'rinomina', sposta: 'sposta', elenca: 'elenca', leggi: 'elenca' };
-  function opBarraSiti(a) { return OP_BARRA_SITI[String((a && (a.operazione ?? a.op)) || '').trim().toLowerCase()] || ''; }
+  // L'operazione la riconosce src/shared/barraSiti.js; dove non è caricato (una pagina) resta la parola detta.
+  function opBarraSiti(a) {
+    if (!global.SN_BARRA_SITI && typeof require === 'function') { try { require('./barraSiti.js'); } catch (_) {} }
+    const B = global.SN_BARRA_SITI;
+    return B ? B.operazione(a) : String((a && (a.operazione ?? a.op)) || '').trim().toLowerCase();
+  }
   // Il programma si mostra col percorso intero: è quello che partirà al clic.
   function descriviBarraSiti(a, fatto) {
     const op = opBarraSiti(a);
