@@ -334,6 +334,7 @@ export const PROVE_DI_CHI_DECIDE = new Map([
   ['src/shared/actionLevels.js', PROVE_AUTONOMIA],
   ['src/shared/autonomia.js', PROVE_AUTONOMIA],
   ['src/main/services/handlers.js', PROVE_AUTONOMIA],
+  ['src/main/services/autonomiaFonti.js', PROVE_AUTONOMIA],
 ]);
 
 /**
