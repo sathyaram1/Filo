@@ -380,8 +380,7 @@ for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 
       expect(await ilSitoDietro(app), 'una voce è finita sul sito che aspetta l\'accesso').toEqual({ hash: '#uno', segno: true, zoom: 0, schermoPieno: false });
     }
 
-    // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.
-    await app.evaluate(({ app: a }) => { a.removeAllListeners('window-all-closed'); a.on('window-all-closed', () => {}); });
+    await comeSuMac(app);
     await voce(chiusura);
     await expect.poll(async () => (await stato(app, accesso)).accesso, { message: `«${chiusura}» non ha chiuso la finestrella davanti`, timeout: 10000 }).toBe(0);
     await new Promise((r) => setTimeout(r, 500));
