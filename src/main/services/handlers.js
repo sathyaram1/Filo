@@ -3521,7 +3521,6 @@ async function eseguiAzioneFilo(action, {
           // Le miniature le mostra solo il riquadro delle pagine di Filo: da un sito si conferma il testo, e parte quello.
           const conAllegati = globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action);
           const daSito = !!sender && !/^filo:/i.test(String(sender?.tab?.url || sender?.url || ''));
-          if (conAllegati && daSito) avvisoAllegati = 'da una pagina web gli allegati non partono: la segnalazione è partita col solo testo';
           if (conAllegati && !daSito) {
             const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
             const { voci } = await require('./allegatiDellaChat').voci(action, chatDellAzione);
