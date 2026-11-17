@@ -1327,11 +1327,10 @@
     // chat parte poi a un clic: costo 3, così lo conferma chi l'ha chiesto e mai solo un testo letto in una pagina.
     BARRA_SITI: {
       costo: (a) => {
-        const op = opBarraSiti(a);
-        if (op === 'elenca') return 0;
-        return op === 'aggiungi' && String((a && a.percorso) || '').trim() ? 3 : 1;
+        if (opBarraSiti(a) === 'elenca') return 0;
+        return programmaDellaBarra(a) ? 3 : 1;
       },
-      campo: (a) => (opBarraSiti(a) === 'aggiungi' && String((a && a.percorso) || '').trim() ? 'file' : null),
+      campo: (a) => (programmaDellaBarra(a) ? 'file' : null),
       describe: (a) => descriviBarraSiti(a, false),
       describeDone: (a) => descriviBarraSiti(a, true),
     },
