@@ -1578,18 +1578,22 @@ function normalizzaRichiesta(r) {
     const out = { cosa };
     if (vero(q.elenca)) { out.elenca = true; return out; }
     const nome = testo(cosa === 'wifi' ? (q.rete ?? q.nome ?? q.ssid) : (q.dispositivo ?? q.nome));
-    if (nome) {
-      const errore = nomeValido(nome);
-      if (errore) return { errore: `nome ${errore}` };
+    // Riquadro e tasto destro passano anche l'indirizzo: trova il dispositivo anche senza nome, e fra due nomi uguali.
+    const indirizzo = cosa === 'bluetooth' && normalizzaIndirizzo(q.indirizzo, 'win32') ? String(q.indirizzo).trim() : null;
+    if (nome || indirizzo) {
+      if (nome) {
+        const errore = nomeValido(nome);
+        if (errore) return { errore: `nome ${errore}` };
+      }
       out.nome = nome;
+      if (indirizzo) out.indirizzo = indirizzo;
       // #2096 — dimenticare il dispositivo abbinato o la rete conosciuta: chi la chiede la conferma prima.
       if (vero(q.dimentica)) { out.dimentica = true; return out; }
-      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori: l'indirizzo, se c'è, sceglie fra due nomi uguali.
+      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori.
       if (cosa === 'bluetooth' && q.preferito != null && q.preferito !== '') {
         const b = booleano(q.preferito);
         if (b === null) return { errore: 'preferito non capito: true o false' };
         out.preferito = b;
-        if (typeof q.indirizzo === 'string' && /^[0-9A-Fa-f:-]{12,17}$/.test(q.indirizzo)) out.indirizzo = q.indirizzo;
         return out;
       }
       if (cosa === 'bluetooth') {
