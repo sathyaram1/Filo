@@ -80,7 +80,7 @@ function avvisa(t, incognito) {
   const testo = sveglia ? `Sveglia${nome}: è ora` : `Timer${nome} scaduto`;
   // La suoneria c'è già (la shell, finché suona): l'avviso non aggiunge il suo tono.
   require('./avvisoFinestra').avvisoNellaFinestra(testo, {
-    chiave: chiaveAvviso(t.id), carta: chiaveAvviso(t.id), icona: sveglia ? 'alarm' : 'timer', tipo: sveglia ? 'sveglia' : 'timer',
+    tipo: 'timer_scaduto', chiave: chiaveAvviso(t.id), carta: chiaveAvviso(t.id), icona: sveglia ? 'alarm' : 'timer',
     durataSec: 0, suono: false, incognito, azioni: [{ label: 'Ferma', fermaTimer: String(t.id) }],
   });
 }
