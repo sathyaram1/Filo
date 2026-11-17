@@ -1468,16 +1468,28 @@ async function eseguiScript(comando, p) {
   const { shell, script, env } = costruisci(comando, p, piattaforma);
   // Fuori da Windows i messaggi dei programmi si leggono in inglese; i nomi restano in UTF-8.
   const lingua = piattaforma === 'linux' ? { LC_ALL: 'C.UTF-8' } : {};
+  // Senza preludio UTF-8 (chcp costa un secondo): le righe «FILO:» sono tutte ASCII, gli script le scrivono già così.
   const r = await terminale.runCommand(script, {
     shell: terminale.resolveShell(shell),
     env: { ...process.env, ...lingua, ...env },
     timeoutMs: TEMPI_MS[comando],
+    preludio: false,
   });
   const u = leggiUscita(r.stdout);
-  if (r.timedOut && !u.voci.length) u.voci.push({ k: 'errore', v: 'tempo-comando', righe: [] });
+  if (r.timedOut) {
+    // Un elenco fermato a metà vale per quello che è arrivato, e lo dice; un comando a metà non è riuscito.
+    if (ELENCHI.has(comando) && u.voci.length && !u.primo('errore')) u.tempoScaduto = true;
+    else if (!u.primo('errore')) u.voci.unshift({ k: 'errore', v: 'tempo-comando', righe: [] });
+  }
   if (r.truncated) u.troncato = true;
+  const errore = u.primo('errore');
+  if (errore || u.tempoScaduto) {
+    const dettaglio = u.primo('dettaglio') || String(r.stderr || '').trim().slice(0, 500);
+    console.warn('[Filo] comando del sistema:', comando, errore || 'elenco a metà', dettaglio || '');
+  }
   return u;
 }
+const ELENCHI = new Set(['bt-elenco', 'wifi-elenco']);
 
 // Il computer vero, oppure quello delle prove: stessa forma, dati già interpretati.
 const COMPUTER = {
