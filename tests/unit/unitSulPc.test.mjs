@@ -44,7 +44,7 @@ function repo() {
   mkdirSync(senzaHook);
   execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
   for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs',
-    'scripts/lib/unit-sul-pc.mjs', 'scripts/lib/routine-role.mjs', 'scripts/lib/routine-ticket.mjs', 'scripts/lib/tools-pin.mjs', 'scripts/lib/unit-sulla-fusione.mjs']) {
+    'scripts/lib/unit-sul-pc.mjs', 'scripts/lib/routine-role.mjs', 'scripts/lib/routine-ticket.mjs', 'scripts/lib/tools-pin.mjs', 'scripts/lib/git-main.mjs']) {
     mkdirSync(dirname(join(lavoro, f)), { recursive: true });
     copyFileSync(join(ROOT, f), join(lavoro, f));
   }
