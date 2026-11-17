@@ -450,7 +450,8 @@ test('una radio letta più di due giri fa è «vecchia» per chi riceve lo stato
     assert.equal(L.stato().bluetooth.acceso, false);
     L.radioLetta('wifi', 'forse');
     assert.equal(L.stato().wifi.acceso, true, 'una lettura che non dice sì o no non cambia niente');
-  } finally { await P.usaLettore(null).catch(() => {}); }
+    // Il lettore non si rende al computer vero: su Windows partirebbe un PowerShell che non esce e il file non finisce più.
+  } finally { await P.usaLettore(async () => ({ batteria: null, rete: null, bluetooth: null })).catch(() => {}); }
 });
 
 test('Windows: «Unknown» della radio non è spento', () => {
