@@ -114,7 +114,7 @@ test('le attività contate nelle pagine mandano solo i campi della loro misura',
 test('gli avvisi d’errore del main e delle pagine di Filo si contano, con una chiave dell’elenco chiuso', () => {
   const fuori = [
     ['src', 'main', 'services', 'handlers', 'wallet.js'], ['src', 'main', 'services', 'handlers', 'ai.js'],
-    ['src', 'main', 'services', 'handlers.js'], ['src', 'main', 'services', 'handlers', 'misc.js'],
+    ...percorsiDiHandlers().map((p) => p.split('/')), ['src', 'main', 'services', 'handlers', 'misc.js'],
     ['src', 'renderer', 'shell.js'], ['src', 'pages', 'decks', 'decks.js'], ['src', 'pages', 'editor', 'editor.js'],
     ['src', 'main', 'shim', 'storage.js'], ['src', 'main', 'updater.js'],
     ['src', 'pages', 'downloads', 'downloads.js'], ['src', 'pages', 'dashboard', 'dashboard-carte.js'],
