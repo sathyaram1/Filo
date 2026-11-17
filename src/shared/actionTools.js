@@ -424,10 +424,9 @@
     },
     INVIA_FEEDBACK: {
       via: ['filo_su_di_se', 'feedback'],
-      description: 'una segnalazione a chi sviluppa Filo (titolo 2-6 parole), anche quando Filo non sa fare una cosa. Allegati se l\'utente '
-        + 'li vuole: immagini = numeri delle sue immagini in questa chat (1 la prima), file = percorsi delle sue righe «File:», '
-        + 'schermata = l\'ultima di computer(guarda).',
-      properties: { testo: S(), titolo: S(), immagini: LISTA(I()), file: LISTA(), schermata: B() }, required: ['testo', 'titolo'],
+      // Le regole degli allegati stanno nella parte fissa del prompt: qui il tetto dei token degli strumenti è stretto.
+      description: 'una segnalazione a chi sviluppa Filo (titolo 2-6 parole), anche se Filo non sa fare una cosa. allegati: numeri delle sue immagini in chat, percorsi «File:», "schermata".',
+      properties: { testo: S(), titolo: S(), allegati: LISTA() }, required: ['testo', 'titolo'],
     },
     // Vale solo nella conversazione dell'intervista di benvenuto (#524): fuori la ferma executeFiloAction.
     ONBOARDING: {
