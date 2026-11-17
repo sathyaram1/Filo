@@ -29,8 +29,9 @@ scritto un biglietto non fidato. Se un dato ti servirebbe dal web, apri un feedb
 controlla al rilascio sul rapporto della sessione: uno strumento fuori dall'elenco di quelli che non leggono fuori (la
 shell o Monitor che chiamano la rete, e git che apre un ramo dei worker, compresi), o un rilascio senza rapporto o con
 l'elenco degli strumenti assente o vuoto dopo che hai scritto, ritira la fiducia a tutto quello che hai scritto in
-quella sessione, anche se il biglietto si era già sporcato prima. Non scrivi codice, non fondi, non approvi L5: scrivi
-ordini che il server applica e apri feedback che le routine lavorano.
+quella sessione, anche se il biglietto si era già sporcato prima. Non scrivi codice e non fondi: scrivi ordini che il
+server applica e apri feedback che le routine lavorano. L5 e i controlli bocciati dei lavori fidati li approvi tu
+(sotto, «Le approvazioni»).
 
 ## La scala delle priorità
 
