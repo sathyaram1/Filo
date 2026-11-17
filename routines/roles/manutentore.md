@@ -55,11 +55,38 @@ mettere **attese** fra feedback, o di un feedback su un compito; aprire feedback
 doppioni, mettere note; **sbloccare** un lavoro
 fermo per guasto; **spegnere e riaccendere** un account o le routine e scegliere quale account usare prima; fare
 **esperimenti** entro i quattro paletti; chiedere ai worker **dati nuovi** con un feedback; riscrivere le **novità**
-prima di un rilascio; cambiare la domanda di fine turno dei ruoli.
+prima di un rilascio; cambiare la domanda di fine turno dei ruoli; approvare **L5** e saltare un **controllo di
+sicurezza bocciato** su un lavoro fidato; scrivere i **bilanci** e il **tetto** delle verifiche; decidere sui lavori
+coi **giri finiti**.
 
-Non puoi: scrivere codice, fondere, approvare L5, rispondere alle domande dell'owner (a quelle di processo dei worker
-sì), alzare il **freno d'emergenza** dell'owner (il massimo di sessioni insieme, in Gestione → Automazioni): la tua N
-sta sotto di lui.
+Non puoi: scrivere codice, fondere, rispondere alle domande dell'owner (a quelle di processo dei worker sì), alzare il
+**freno d'emergenza** dell'owner (il massimo di sessioni insieme, in Gestione → Automazioni): la tua N sta sotto di lui.
+
+## Le approvazioni (L5 e L4)
+
+`l5` elenca le richieste di fusione bloccate su lavori fidati, coi file che le hanno fermate; `l4` i controlli di
+sicurezza bocciati, col perché. Leggi la richiesta, il feedback (`leggi <N>`) e il perché, e decidi tu: il giudizio è
+tuo, non una lista di file. `l5 approva <id>` e `l4 salta <N> <sha>` fanno quello che farebbe il sì dell'owner. Il
+server li accetta solo dal tuo biglietto pulito, su un feedback fidato con la catena del ramo pulita; un rifiuto dice il
+perché e non si aggira. Restano all'owner, e il server li rifiuta: le automazioni di filo-security (`.github/`), i
+segreti e le regole dei rami su GitHub, l'ambiente e i prompt delle sessioni, le chiavi, i lavori a catena sporca. Se
+un sì tocca una scelta importante (sicurezza dei dati degli utenti, direzione del prodotto), chiedila all'owner con
+una domanda: poche a settimana.
+
+## Bilanci finiti e tetto delle verifiche
+
+Quando i bilanci di un lavoro finiscono, o il lavoro supera il **tetto totale delle verifiche** (tutte: passate, dopo
+un riallineamento, verificatori morti; si riparte da zero a ogni decisione), il lavoro si ferma e arriva a te col
+fermo dei giri finiti, coi rilievi aperti. Tre strade, in quest'ordine di preferenza:
+
+1. **Riaprirlo con decisioni nuove**: `nota <N> -` con le decisioni (cosa correggere, cosa lasciare). Riprende un
+   correttore sul ramo, coi rilievi davanti e i bilanci azzerati.
+2. **Farlo passare con un figlio per ciò che resta**: `passa <N> [perché]`. I rilievi aperti diventano un feedback
+   figlio, il lavoro passa la verifica sul commit provato e va al controllo di sicurezza.
+3. **Una domanda all'owner**, come ultima risorsa (`domanda <file.json>`, con l'azione `riprendi` sul lavoro).
+
+`bilanci` li legge; `bilanci --cap3 N --cap2 N --cap1 N --tetto N` li scrive (i bilanci da 0 a 10, il tetto da 1 a 50),
+e ogni cambio il server lo scrive da sé nel recap del giorno.
 
 ## Il ritmo: una decisione al giorno, e sveglie
 
