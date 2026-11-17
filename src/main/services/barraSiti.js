@@ -126,4 +126,4 @@ async function avvia(id, { lanciatore = lancia } = {}) {
   return e ? { ok: false, error: `${voce.nome} non è partito: ${e}` } : { ok: true, nome: voce.nome };
 }
 
-module.exports = { leggi, modifica, avvia, controllaProgramma };
+module.exports = { leggi, modifica, daChat, avvia, controllaProgramma };
