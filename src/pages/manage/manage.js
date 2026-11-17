@@ -797,7 +797,7 @@
         if (r?.error) console.error(`[manage] salvataggio ${field}:`, r.error);
         return;
       }
-      const confermato = clampCap(r[field] != null ? r[field] : val, f.min);
+      const confermato = clampCap(r[field] != null ? r[field] : val, f.min, f.max);
       const saved = confermato === null ? val : confermato;
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
