@@ -278,7 +278,7 @@
     BARRA_SITI: (a) => {
       const o = a._output || {};
       const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
-      const nome = corto(o.voce || a.voce || a.nome || a.indirizzo);
+      const nome = corto(o.voce || a.elemento || a.voce || a.nome || a.indirizzo);
       const op = String(a.operazione || '').toLowerCase();
       if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
       if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
