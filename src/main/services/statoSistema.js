@@ -1082,6 +1082,16 @@ async function statoPerChat() {
   return frescoPer(chiesto) ? stato : null;
 }
 
+// #2394 — su Windows gli elenchi di comandiSistema.js li legge il PowerShell di questo lettore, già acceso: si tiene
+// sveglio come per un turno di chat (il giro lo rispegne). null: il lettore non può, si passa allo script.
+async function elencoDalLettore(cosa) {
+  if (process.platform !== 'win32' || lettoreProve) return null;
+  richiedi({ unaVolta: true });
+  const w = lettoreDiWindows();
+  w.assicura();
+  return w.chiedi(cosa);
+}
+
 // Chi deve dire «sei offline» (gli errori della chat) chiede qui: la risposta non aspetta un giro. Col lettore sveglio
 // vale anche la piattaforma (nessuna strada fuori); addormentato, il suo stato è vecchio e resta Chromium.
 function offline() {
