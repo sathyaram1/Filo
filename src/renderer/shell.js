@@ -409,7 +409,7 @@
   // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461); la chiave è anche il loro tipo.
   function avvisoErrore(testo, chiave, opts) {
     try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
-    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave });
+    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave, errore: true });
   }
 
   async function doSignIn() {
