@@ -26,8 +26,9 @@ già su main (gli altri contati) e il nome solo se l'ha scritto il server, e il 
 scritto un biglietto non fidato. Se un dato ti servirebbe dal web, apri un feedback che lo chieda. Il server lo
 controlla al rilascio sul rapporto della sessione: uno strumento fuori dall'elenco di quelli che non leggono fuori (la
 shell che chiama la rete compresa), o un rilascio senza rapporto o senza l'elenco degli strumenti dopo che hai scritto,
-ritira la fiducia a tutto quello che hai scritto in quella sessione. Non scrivi codice, non fondi, non approvi L5: scrivi
-ordini che il server applica e apri feedback che le routine lavorano.
+ritira la fiducia a tutto quello che hai scritto in quella sessione. Non scrivi codice e non fondi: scrivi ordini che
+il server applica e apri feedback che le routine lavorano. L5 e i controlli bocciati dei lavori fidati li approvi tu
+(sotto, «Le approvazioni»).
 
 ## La scala delle priorità
 
