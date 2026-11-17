@@ -9,6 +9,7 @@ import { readFileSync, existsSync, readdirSync, statSync, appendFileSync } from 
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { percorsiDiHandlers } from '../helpers/sorgenteHandlers.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 import '../../src/shared/sitiComuni.js';
