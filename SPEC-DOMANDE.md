@@ -544,7 +544,9 @@ rispondere.
   `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
   `titolo`, `contesto`, `problema`, `opzioni`, `consiglio`, `blocca`,
   `provvisoria`, mai le note per gli agenti; senza feedback d'origine il campo
-  non c'è. Il registro dei principi come per il compito della risposta (fuori
+  non c'è. Il testo di una viva riservata arriva solo nell'ambiente dei
+  riservati, e segna il biglietto (§ 5.1, #1928.2); fuori ne escono `id`,
+  `stato`, `blocca` e `provvisoria`, col segno `riservata`. Il registro dei principi come per il compito della risposta (fuori
   dall'ambiente dei riservati è `assente`, e il passo 3 si salta). Il compito
   legge testo scritto da altri: è non fidato, e quello che scrive nasce non
   fidato. La fiducia della domanda non cambia.
@@ -1129,7 +1131,8 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     giudice (§ 4.6);
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
-    registro delle decisioni (§ 3.6), che è testo di altre domande;
+    registro delle decisioni (§ 3.6), che è testo di altre domande, o il
+    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2);
     l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
     riservato, cosa che il server sa già quando li crea. Le eccezioni sono
     due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,
