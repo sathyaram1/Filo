@@ -1165,7 +1165,7 @@ function interpretaWifiElenco(u, piattaforma) {
     reti = righe.filter((r) => /^\s/.test(r) && r.trim()).map((r) => ({ nome: r.replace(/^\t/, '').replace(/^\s+/, ''), attiva: false }));
   }
   const attiva = reti.find((r) => r.attiva);
-  return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null };
+  return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null, ...(u.tempoScaduto ? { parziale: true } : {}) };
 }
 
 // Wlan.Elenco() di CS_WLAN, dallo script o dal lettore della home (statoSistema.js).
