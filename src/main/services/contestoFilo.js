@@ -65,6 +65,19 @@ function ricordaImmagini(chat, ts, immagini) {
   while (caratteriFoto > MAX_CARATTERI_FOTO && foto.size > 1) togliFoto(foto.keys().next().value);
 }
 
+// L'ultima finestra guardata in una chat, solo perché l'utente la possa allegare a una segnalazione (#1668): in memoria,
+// mai su disco né al modello della chat, una per chat; se ne va con la chat come le foto.
+const MAX_SCHERMATE = 32;
+const schermate = new Map();
+function ricordaSchermata(chat, { dataUrl, nome } = {}) {
+  if (!chat || typeof dataUrl !== 'string' || !/^data:image\//i.test(dataUrl)) return;
+  if (require('../shim/storage').inIncognito()) chatIncognito.add(chat);
+  schermate.delete(chat);
+  schermate.set(chat, { dataUrl, nome: String(nome || '') });
+  while (schermate.size > MAX_SCHERMATE) schermate.delete(schermate.keys().next().value);
+}
+const schermataDi = (chat) => (chat && schermate.get(chat)) || null;
+
 // Un messaggio uscito dal tratto non torna più davanti al modello: le sue immagini non servono più.
 function potaFoto(vecchi) {
   if (!foto.size) return;
