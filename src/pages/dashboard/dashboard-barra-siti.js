@@ -327,7 +327,7 @@
 
   function applicaImpostazioni(s) {
     if (!s || !d) return;
-    d.dash.dataset.barraSiti = s.barraSiti && s.barraSiti.visibile === false ? '0' : '1';
+    if (s.barraSiti && typeof s.barraSiti === 'object') d.dash.dataset.barraSiti = s.barraSiti.visibile === false ? '0' : '1';
     if (typeof s.chatRipiegata === 'boolean') mostraRipiegata(s.chatRipiegata);
   }
 
