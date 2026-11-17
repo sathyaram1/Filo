@@ -338,6 +338,7 @@ export function preparaClone(principale, n, {
   ensureSessionExcludes(dir);
   try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(dir);
+  ensureDriverNovita(dir);
 
   const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
   if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
