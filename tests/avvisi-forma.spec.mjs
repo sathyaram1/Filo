@@ -98,8 +98,7 @@ test('nella home un avviso senza carta: angolo, poi volo in cima alla colonna; a
   await home.evaluate(() => {
     window.__larghezze = new Set();
     const f = document.getElementById('inputForm');
-    const giro = () => { window.__larghezze.add(Math.round(f.getBoundingClientRect().width)); window.__giro = requestAnimationFrame(giro); };
-    giro();
+    window.__giro = setInterval(() => window.__larghezze.add(Math.round(f.getBoundingClientRect().width)), 30);
   });
   await shell.evaluate(() => window.filoNotify('Errore di prova: la pagina non si apre', {
     durationSec: 1, actions: [{ label: 'Riprova', onClick() { window.__riprovato = (window.__riprovato || 0) + 1; } }],
