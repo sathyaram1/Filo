@@ -281,6 +281,7 @@
       const nome = corto(o.voce || a.voce || a.nome || a.indirizzo);
       const op = String(a.operazione || '').toLowerCase();
       if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
+      if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
       const cosa = { aggiungi: 'Messo nella barra dei siti', metti: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
       return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}` };
     },
