@@ -501,7 +501,17 @@ while ($true) {
   $json = ConvertTo-Json -InputObject $o -Compress -Depth 5
   $json = [regex]::Replace($json, '[^ -~]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
   if ($json -ne $ultimo) { [Console]::Out.WriteLine($json); [Console]::Out.Flush(); $ultimo = $json }
-  Start-Sleep -Milliseconds 2000
+  $fine = (Get-Date).AddMilliseconds(2000)
+  while ($null -ne $richiesta) {
+    $resta = [int](($fine - (Get-Date)).TotalMilliseconds)
+    if ($resta -le 0) { break }
+    try { if (-not $richiesta.Wait($resta)) { break } } catch { $richiesta = $null; break }
+    $riga = $richiesta.Result
+    if ($null -eq $riga) { exit }
+    Rispondi $riga.Trim()
+    $richiesta = $ingresso.ReadLineAsync()
+  }
+  if ($null -eq $richiesta) { Start-Sleep -Milliseconds 2000 }
 }
 `;
 
