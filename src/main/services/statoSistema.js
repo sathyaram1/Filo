@@ -515,10 +515,11 @@ while ($true) {
 }
 `;
 
-// Il volume si legge con lo stesso C# con cui comandiSistema.js lo cambia: una copia sola.
+// Il volume, gli abbinati e le reti si leggono con lo stesso codice degli script di comandiSistema.js: una copia sola.
 function scriptWindows(pid) {
-  const volume = require('./comandiSistema')._interni.CS_VOLUME;
-  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0)).replace('__VOLUME__', () => volume);
+  const { CS_VOLUME, PS_ELENCO_BT, CS_WLAN } = require('./comandiSistema')._interni;
+  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0))
+    .replace('__VOLUME__', () => CS_VOLUME).replace('__ELENCO_BT__', () => PS_ELENCO_BT).replace('__WLAN__', () => CS_WLAN);
 }
 
 // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}.
