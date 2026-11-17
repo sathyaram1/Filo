@@ -105,6 +105,8 @@
     // Disposizione delle carte della home (#870): { versione, destra, tolte, sinistra, nascoste }.
     // La forma e le mosse stanno in src/shared/carteHome.js; la scrive solo src/main/services/carteHome.js.
     FILO_CARTE_HOME: 'filo_carte_home',
+    // La barra dei siti della nuova scheda (#1803): array di voci; forma e mosse in src/shared/barraSiti.js.
+    FILO_BARRA_SITI: 'filo_barra_siti',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
     // True quando la micro-intervista di benvenuto è FINITA (#524), non quando è cominciata:
