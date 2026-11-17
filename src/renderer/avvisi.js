@@ -109,8 +109,8 @@
     if (c.trascina) card.dataset.trascina = '1'; else delete card.dataset.trascina;
     const msg = card.querySelector('.shell-notif-msg');
     if (msg.textContent !== c.testo) msg.textContent = c.testo;
-    if (card.dataset.svg !== c.svg) {
-      card.dataset.svg = c.svg;
+    if (card._svg !== c.svg) {
+      card._svg = c.svg;
       let ico = card.querySelector('.shell-notif-ico');
       if (c.svg && !ico) { ico = document.createElement('span'); ico.className = 'shell-notif-ico'; card.insertBefore(ico, msg); }
       if (ico) { if (c.svg) ico.innerHTML = c.svg; else ico.remove(); }
