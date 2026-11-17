@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
@@ -83,7 +84,7 @@ test('una pagina delicata esce in una forma sola, la stessa per la ricerca nel f
   assert.deepEqual(C.soloSito('non un indirizzo'), { sito: 'sito', url: '' });
   const d = C.perModello(voce('banca', '2026-10-28T09:00:00', { url: 'https://www.banca.example:8443/conto' }), { delicata: true });
   assert.deepEqual({ titolo: d.titolo, url: d.url }, { titolo: 'banca.example:8443', url: 'https://www.banca.example:8443/' });
-  const handlers = require('node:fs').readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
+  const handlers = sorgenteHandlers();
   assert.ok(!/https:\/\/\$\{sito\}\//.test(handlers), 'la ricerca nel filo non riscrive per conto suo il sito di una pagina delicata');
 });
 

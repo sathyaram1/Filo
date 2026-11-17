@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const memoria = {};
@@ -85,7 +86,7 @@ test('risposta vuota fermata ragionando: nota e «Continua» dove ci sono, error
   assert.equal(CE.erroreDelTaglio(vuota, { intera: true }).code, 'RISPOSTA_TAGLIATA');
   assert.equal(CE.erroreDelTaglio(vuota, { senzaSeguito: true }).code, 'RISPOSTA_TAGLIATA');
   assert.equal(CE.erroreDelTaglio({ ...vuota, finishReason: 'length' }).code, 'RISPOSTA_TAGLIATA');
-  const handlers = src('src/main/services/handlers.js');
+  const handlers = sorgenteHandlers();
   assert.match(handlers, /erroreDelTaglio\(r, \{ intera, senzaSeguito: !conSeguito \}\)/);
   assert.match(intorno(handlers, 'action: ACTIONS.FILO_CHAT,\n        payload: { ...payloadBase, threadMessages },', 200), /conSeguito: true/);
   assert.match(intorno(src('src/main/services/handlers/scryfall.js'), 'action: ACTIONS.DECKS_CHAT,', 200), /conSeguito: true/);

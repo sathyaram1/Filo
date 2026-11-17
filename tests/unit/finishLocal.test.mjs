@@ -128,7 +128,7 @@ describe('quali spec lanciare', () => {
         const s = readFileSync(resolve(ROOT, f), 'utf8');
         return f !== 'src/shared/autonomia.js' && s.includes('SN_AUTONOMIA') && /\.decide(?:Dettaglio)?\(/.test(s);
       });
-      assert.ok(decidono.includes('src/main/services/handlers.js'), decidono.join(','));
+      assert.ok(decidono.includes('src/main/services/autonomiaFonti.js'), decidono.join(','));
       for (const f of new Set([...decidono, ...PROVE_DI_CHI_DECIDE.keys()])) {
         assert.ok(existsSync(resolve(ROOT, f)), `${f} non c’è più: la mappa punta a un file che non esiste`);
         const out = specsForChangedFiles([f], veri);

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -112,8 +113,8 @@ test('a parole, una porta sola fra la parola e il posto: chi esegue, la conferma
   // Chi esegue, la conferma, la riga nelle attività e il filo passano da qui, senza una regola loro.
   const { readFileSync } = await import('node:fs');
   const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
-  const handlers = leggi('src', 'main', 'services', 'handlers.js');
-  const caso = handlers.slice(handlers.indexOf("case 'SPOSTA_ICONA':"), handlers.indexOf("case 'PANNELLO_APP':"));
+  const handlers = sorgenteHandlers();
+  const caso = handlers.slice(handlers.indexOf('async function azioneSpostaIcona('), handlers.indexOf('async function azionePannelloApp('));
   assert.match(caso, /D\.zonaDellAzione\(action\)/);
   assert.doesNotMatch(caso, /=== 'menu'|zonaDaDove/);
   assert.match(leggi('src', 'shared', 'actionLevels.js'), /function doveDellIcona\(a\) \{[\s\S]{0,160}D\.zonaDellAzione\(a\)/);

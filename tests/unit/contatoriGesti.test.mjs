@@ -8,6 +8,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -331,8 +332,8 @@ test('i tipi dei moduli dell’Editor sono quelli che i contatori conoscono', ()
 test('ogni posa delle icone passa da una porta sola, e ognuna dice la sua via', () => {
   // La posa dell'utente nella barra passa da `_posa` (registro dei cambi), quella nella fila del tasto destro dal gestore
   // della barra con la stessa porta (#1434), quella chiesta da `posa` del gestore della chat.
-  const pose = [...sorgenti()].flatMap(([f, s]) => [...s.matchAll(/(?:Layout|require\('\.\/layoutIcone'\))\.posa\(/g)].map(() => f));
-  assert.deepEqual([...new Set(pose)].sort(), ['src/main/barraLaterale.js', 'src/main/services/handlers.js', 'src/main/services/handlers/barra.js'],
+  const pose = [...sorgenti()].flatMap(([f, s]) => [...s.matchAll(/(?:Layout|require\('\.\.?\/layoutIcone'\))\.posa\(/g)].map(() => f));
+  assert.deepEqual([...new Set(pose)].sort(), ['src/main/barraLaterale.js', 'src/main/services/azioni/impostazioni.js', 'src/main/services/handlers/barra.js'],
     'nessun’altra porta scrive la disposizione');
   // Dal menu del tasto destro: un cambio «dal menu del tasto destro», e da dove viene l'icona per i contatori.
   const dalMenu = leggi('src/main/services/handlers/barra.js');
@@ -342,7 +343,7 @@ test('ogni posa delle icone passa da una porta sola, e ognuna dice la sua via', 
   const viaBarra = [...barra.matchAll(/this\._posa\(([^;]*)\);/g)].map((m) => m[1]).join('\n');
   assert.match(viaBarra, /via: 'rimessa_nel_menu'/);
   assert.match(viaBarra, /origine: 'icona_barra'/);
-  assert.match(leggi('src/main/services/handlers.js'), /layoutIcone'\)\.posa\([\s\S]{0,200}via: 'chat'/);
+  assert.match(sorgenteHandlers(), /layoutIcone'\)\.posa\([\s\S]{0,200}via: 'chat'/);
   // «Altro…» della barra: le aperture e l'icona scelta lì.
   assert.match(barra, /'altro_del_menu', \{ aperto: true \}/);
   assert.match(barra, /'altro_del_menu', \{ icona: id \}/);

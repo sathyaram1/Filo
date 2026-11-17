@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -130,7 +131,7 @@ test('#1994 — il file magic e l\'opzione che forza valgono anche accorciati o 
 });
 
 test('il main dà al classificatore la sonda del disco, per i comandi scritti a mano e per quelli di Filo', () => {
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   const i = h.indexOf('function perimetroLettura(');
   const corpo = h.slice(i, h.indexOf('\n}\n', i));
   assert.match(corpo, /defineProperty\(perimetro, 'esiste'/, 'senza la sonda una sovrascrittura resta a 2');

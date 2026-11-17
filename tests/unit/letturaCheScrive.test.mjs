@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -374,7 +375,7 @@ test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repo
 });
 
 test('il main dà al classificatore la sonda git, per i comandi scritti a mano e per quelli di Filo', () => {
-  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const h = sorgenteHandlers();
   const i = h.indexOf('function perimetroLettura(');
   const corpo = h.slice(i, h.indexOf('\n}\n', i));
   assert.match(corpo, /defineProperty\(perimetro, 'gitLancia'/, 'senza la sonda un repository ostile resta una lettura');

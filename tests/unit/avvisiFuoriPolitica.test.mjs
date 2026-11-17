@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const { crea, PAUSA_MS } = require('../../src/main/services/avvisiFuoriPolitica.js');
@@ -71,7 +72,7 @@ test('la pagina prende l’avviso prima di mostrarlo, e al fuoco chiede quelli i
   const toast = /if \(msg\?\.type === MSG\.SHOW_TOAST\) \{([\s\S]*?)\n {4}\}/.exec(content)[1];
   assert.match(toast, /msg\.avviso[\s\S]*prendiAvvisiInCoda\(msg\.avviso\)/);
   assert.match(content, /window\.addEventListener\('focus', \(\) => \{ prendiAvvisiInCoda\(\); \}\)/);
-  const handlers = readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
+  const handlers = sorgenteHandlers();
   const avvisa = /function avvisaFuoriPolitica\([^)]*\) \{([\s\S]*?)\n\}/.exec(handlers)[1];
   assert.match(avvisa, /AvvisiFuoriPolitica\.avvisa\(/);
   assert.doesNotMatch(avvisa, /broadcastToTabs/, 'nessuna spinta che salti la coda');

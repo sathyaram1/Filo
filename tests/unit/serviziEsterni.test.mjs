@@ -36,7 +36,7 @@ const NON_DI_RETE = [
 
 // Esempi e identificatori: indirizzi scritti nel codice che nessuno contatta.
 const ESEMPI = [
-  { file: 'src/main/services/handlers.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
+  { file: 'src/main/services/porteUscita.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
   { file: 'src/main/services/accessoGoogle.js', url: 'https://accounts.google.com/', perche: 'sceglie la sessione delle schede in cui vivono i cookie di Google' },
@@ -48,7 +48,7 @@ const COMPOSTI = [
   { file: 'src/main/services/llmsTxt.js', testo: '`https://${domain}/llms.txt`', servizio: 'llms-txt' },
   { file: 'src/main/services/fontiSegnaposto.js', testo: '`https://${lingua}.wikipedia.org`', servizio: 'fonti-segnaposti' },
   { file: 'src/main/services/geoBlockClassifier.js', testo: 'SB.ownerOf(url || `https://${host}/`', perche: 'chiave del conto dei giudizi per sito' },
-  { file: 'src/main/services/handlers.js', testo: 'url : `https://${url}`', perche: 'chiede al blocco dei siti di un indirizzo scritto senza schema' },
+  { file: 'src/main/services/azioni/naviga.js', testo: 'url : `https://${url}`', perche: 'chiede al blocco dei siti di un indirizzo scritto senza schema' },
   { file: 'src/main/services/permessiPagine.js', testo: '`http://${t}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/services/safebrowse/normalize.js', testo: "new URL('http://' + s)", perche: 'normalizza l’indirizzo da controllare' },
   { file: 'src/main/services/safebrowse/index.js', testo: 's : `https://${s}`', perche: 'la voce dei siti fidati per un sito scritto senza schema' },
