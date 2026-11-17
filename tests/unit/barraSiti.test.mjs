@@ -184,16 +184,19 @@ test('ogni piattaforma ha il suo ramo: Windows vuole .exe/.lnk/.url, Mac un .app
 
 test('dalla chat: un sito costa 1, un programma chiede conferma (costo 3) e si mostra col percorso intero', () => {
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', indirizzo: 'youtube.com' }), 1);
-  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'togli', voce: 'YouTube' }), 1);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'youtube.com' }), 1);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'togli', elemento: 'YouTube' }), 1);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'ripiega' }), 1);
   assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'elenca' }), 0);
-  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'metti', percorso: 'C:\\Giochi\\x.exe' }), 3);
-  assert.equal(L.campoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', percorso: 'C:\\Giochi\\x.exe' }), 'file');
-  assert.match(L.describe({ type: 'BARRA_SITI', operazione: 'aggiungi', percorso: 'C:\\Giochi\\x.exe' }), /programma C:\\Giochi\\x\.exe/);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'metti', elemento: 'C:\\Giochi\\x.exe' }), 3);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: '/usr/games/x' }), 3);
+  assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'togli', elemento: 'C:\\Giochi\\x.exe' }), 1, 'togliere un programma si disfa');
+  assert.equal(L.campoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'C:\\Giochi\\x.exe' }), 'file');
+  assert.match(L.describe({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'C:\\Giochi\\x.exe' }), /programma C:\\Giochi\\x\.exe/);
   const T = globalThis.SN_ACTION_TOOLS;
-  const azioni = T.toolCallsToActions([{ id: 'c1', function: { name: 'home', arguments: JSON.stringify({ azione: 'barra_siti', operazione: 'aggiungi', indirizzo: 'youtube.com' }) } }]);
+  const azioni = T.toolCallsToActions([{ id: 'c1', function: { name: 'home', arguments: JSON.stringify({ azione: 'barra_siti', operazione: 'aggiungi', elemento: 'youtube.com' }) } }]);
   assert.equal(azioni[0].type, 'BARRA_SITI');
-  assert.equal(azioni[0].indirizzo, 'youtube.com');
+  assert.equal(azioni[0].elemento, 'youtube.com');
 });
 
 test('i canali della barra rispondono solo alle pagine di Filo, e la chiave sta coi dati dell\'utente', () => {
