@@ -61,12 +61,13 @@ test.afterEach(async ({ app }) => {
 });
 
 test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la home la voce dice «leggo», mai «spento», poi acceso', async ({ app }) => {
-  await computerFinto(app, { ritardo: 1500, stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
+  const RITARDO = 4000;
+  await computerFinto(app, { ritardo: RITARDO, stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', 'spento', { timeout: 8_000 });
   // L'elenco letto all'apertura della home è finito.
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length, { timeout: 8_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(RITARDO + 300);
   // Il lettore dorme da minuti; intanto il Bluetooth si accende dal sistema. La lettura che riparte tarda (PC lento).
   await app.evaluate(() => {
     globalThis.__pc.bluetooth = { acceso: true, dispositivi: [] };
@@ -75,16 +76,17 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
     globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__libera = () => r(globalThis.__pc); }));
     globalThis.SN_SISTEMA_MAIN._perProve.invecchia(5 * 60 * 1000);
   });
-  await page.evaluate(() => {
+  // La home si riapre: ogni stato che la voce del Bluetooth mostra, dal primo disegno.
+  await page.addInitScript(() => {
     window.__visti = [];
-    const el = document.querySelector('#sistema .dash-sis-voce[data-voce="bluetooth"]');
-    // Solo i cambi: la voce ridisegnata uguale non è uno stato nuovo mostrato.
-    let ultimo = el.dataset.stato;
-    new MutationObserver(() => { if (el.dataset.stato !== ultimo) window.__visti.push((ultimo = el.dataset.stato)); })
-      .observe(el, { attributes: true, attributeFilter: ['data-stato'] });
-    // La home torna davanti: chiede subito lo stato.
-    document.dispatchEvent(new Event('visibilitychange'));
+    new MutationObserver((cambi) => {
+      for (const c of cambi) {
+        const el = c.target;
+        if (el.dataset && el.dataset.voce === 'bluetooth' && !el.hidden && window.__visti[window.__visti.length - 1] !== el.dataset.stato) window.__visti.push(el.dataset.stato);
+      }
+    }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['data-stato', 'hidden'] });
   });
+  await page.reload();
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', 'leggendo', { timeout: 5_000 });
   await voce(page, 'bluetooth').click();
   await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Leggo lo stato del Bluetooth…');
