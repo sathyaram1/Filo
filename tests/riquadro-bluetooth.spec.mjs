@@ -86,8 +86,7 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   await voce(page, 'bluetooth').click();
   await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Leggo lo stato del Bluetooth…');
   // Finché non si sa, nessun interruttore che direbbe il contrario del vero.
-  await expect(opzione(page, 'Accendi il Bluetooth')).toHaveCount(0);
-  await expect(opzione(page, 'Spegni il Bluetooth')).toHaveCount(0);
+  await expect(riquadro(page).locator('.dash-sis-comandi > .sn-select-option')).toBeHidden();
   await page.screenshot({ path: 'tests/.shots/2394-bluetooth-leggo.png' }).catch(() => {});
   // L'elenco dei dispositivi legge anche la radio: basta lui, senza aspettare il lettore che tarda.
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
