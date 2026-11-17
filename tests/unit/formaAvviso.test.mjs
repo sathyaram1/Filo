@@ -60,7 +60,17 @@ test('la shell carica il modulo e sceglie la forma solo da lì', () => {
   const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   assert.match(shell, /const FORMA = window\.SN_FORMA_AVVISO;/);
   assert.match(shell, /FORMA\.forma\(/);
-  // La notifica del sistema nasce in un posto solo del main.
-  const alarm = readFileSync(join(ROOT, 'src', 'main', 'services', 'alarmWatcher.js'), 'utf8');
-  assert.doesNotMatch(alarm, /new Notification\(/);
+});
+
+test('la notifica del sistema nasce in un posto solo: avvisoSistema.js', () => {
+  const trovate = [];
+  const giro = (dir) => {
+    for (const n of readdirSync(dir)) {
+      const p = join(dir, n);
+      if (statSync(p).isDirectory()) giro(p);
+      else if (p.endsWith('.js') && /new Notification\(|new (?:electron\.)?Notification\b/.test(readFileSync(p, 'utf8'))) trovate.push(relative(ROOT, p).split('\\').join('/'));
+    }
+  };
+  giro(join(ROOT, 'src'));
+  assert.deepEqual(trovate, ['src/main/services/avvisoSistema.js']);
 });
