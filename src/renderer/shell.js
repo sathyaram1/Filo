@@ -1826,6 +1826,8 @@
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
         if (!card || card.dataset.closing === '1') return;
+        // #2390 — la home aveva già la carta di questa cosa e l'ha fatta notare: l'avviso non serve più.
+        if (dati.azione === 'assorbi') { if (card.dataset.carta) dismiss(card, 'ritirata'); return; }
         const btn = dati.azione === 'chiudi'
           ? card.querySelector('.shell-notif-close')
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
