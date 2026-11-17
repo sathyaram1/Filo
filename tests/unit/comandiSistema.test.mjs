@@ -290,8 +290,16 @@ test('Windows: senza posizione il Wi-Fi lo dice, e la radio spenta si riconosce'
 });
 
 test('Windows: i dispositivi abbinati con nome, indirizzo e stato; un dispositivo che non è audio lo dice', () => {
-  const u = C.leggiUscita('FILO:acceso=1\nFILO:dispositivo=001122aabbcc\nFILO:nome=WH-1000XM4\nFILO:collegato=0\nFILO:dispositivo=zz\nFILO:nome=strano\n');
-  assert.deepEqual(C.interpretaBtElenco(u, 'win32'), { ok: true, acceso: true, dispositivi: [{ indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false }] });
+  const elenco = { acceso: true, errore: null, dispositivi: [
+    { indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false, le: false, contenitore: 'c1' },
+    { indirizzo: 'zz', nome: 'strano', collegato: null, le: false, contenitore: '' },
+  ] };
+  const u = C.leggiUscita(`FILO:elenco=${JSON.stringify(elenco)}\n`);
+  assert.deepEqual(C.interpretaBtElenco(u, 'win32'), { ok: true, acceso: true, dispositivi: [{ indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false, le: false, contenitore: 'c1' }] });
+  // Lo stesso elenco dal lettore della home: una lettura sola per le due strade.
+  assert.deepEqual(C.elencoBtWindows(elenco), C.interpretaBtElenco(u, 'win32'));
+  // PowerShell 5.1 scrive un elenco di un solo elemento senza le parentesi.
+  assert.equal(C.elencoBtWindows({ acceso: true, dispositivi: elenco.dispositivi[0] }).dispositivi.length, 1);
   const na = C.interpretaBtCollega(C.leggiUscita('FILO:errore=non-audio\n'), 'win32', true);
   assert.equal(na.errore, 'non-audio');
   assert.equal(C.IMPOSTAZIONI[C.spiega('non-audio', { piattaforma: 'win32' }).apri], 'ms-settings:bluetooth');
