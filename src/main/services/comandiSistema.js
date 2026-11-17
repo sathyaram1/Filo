@@ -67,16 +67,19 @@ function ElencoBt {
   $proprieta = [string[]]@('System.Devices.Aep.DeviceAddress', 'System.Devices.Aep.IsConnected', 'System.Devices.Aep.ContainerId', 'System.Devices.Aep.ProtocolId')
   $tipo = [Windows.Devices.Enumeration.DeviceInformationKind]::AssociationEndpoint
   $abbinati = 'System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True'
+  $q = [string][char]34
+  $protocollo = { param($id) 'System.Devices.Aep.ProtocolId:=' + $q + '{' + $id + '}' + $q }
   $insieme = [Windows.Devices.Enumeration.DeviceInformationCollection]
   $trovati = $null
   try {
-    $trovati = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync("(System.Devices.Aep.ProtocolId:=""{$classico}"" OR System.Devices.Aep.ProtocolId:=""{$basso}"") AND $abbinati", $proprieta, $tipo)) $insieme 8000
+    $filtro = '(' + (& $protocollo $classico) + ' OR ' + (& $protocollo $basso) + ') AND ' + $abbinati
+    $trovati = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync($filtro, $proprieta, $tipo)) $insieme 8000
     if ($null -eq $trovati) { $esito.errore = 'tempo-comando'; return $esito }
   } catch {
     # Una ricerca per protocollo, se Windows non accetta l'OR.
     $trovati = @()
     foreach ($p in @($classico, $basso)) {
-      $parte = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync("System.Devices.Aep.ProtocolId:=""{$p}"" AND $abbinati", $proprieta, $tipo)) $insieme 8000
+      $parte = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync(((& $protocollo $p) + ' AND ' + $abbinati), $proprieta, $tipo)) $insieme 8000
       if ($null -eq $parte) { $esito.errore = 'tempo-comando'; return $esito }
       $trovati += @($parte)
     }
