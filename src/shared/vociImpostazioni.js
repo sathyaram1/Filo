@@ -17,6 +17,7 @@
         theme: 'theme',
         textScale: 'textScale',
         showHomeMessage: 'showHomeMessage',
+        barraSitiVisibile: 'barraSiti.visibile',
         homeSisOra: 'homeSistema.ora',
         homeSisBatteria: 'homeSistema.batteria',
         homeSisRete: 'homeSistema.rete',
