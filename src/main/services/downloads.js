@@ -1145,7 +1145,7 @@ function finalizeManual(rec, state, savePath) {
 function annunciaStreaming(rec, state) {
   if (state === 'completed') {
     shellToast(`Scaricato: ${shortName(rec.filename)}`, {
-      durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
+      ...cartaDi(rec), durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
       actions: [{ label: 'Apri file', openDownloadId: rec.id }, { label: 'Apri cartella', revealDownloadId: rec.id }],
     }, scopeOf(rec));
   } else if (state === 'interrupted') {
