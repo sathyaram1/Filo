@@ -175,6 +175,7 @@ test('il documento rientra nel prompt intero, fonti comprese', async ({ app, she
 });
 
 // #951 — «quali dati condividi?»: il modello trova il documento sulla privacy fra gli strumenti, lo chiede e lo riceve intero.
+// Da #1483 la privacy è breve e rimanda a «privacy-completa»: anche quella, chiesta dopo, arriva intera (#2563).
 test('a «quali dati condividi?» il documento sulla privacy arriva al modello, intero', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
