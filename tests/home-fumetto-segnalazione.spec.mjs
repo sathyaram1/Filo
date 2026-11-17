@@ -79,8 +79,7 @@ test('#1635 la segnalazione proposta e quella inviata mostrano titolo e testo ne
     await expect(spuntato).toBeVisible({ timeout: 10_000 });
     await fumettoDellaSegnalazione(page, spuntato, 'partita');
     await page.getByRole('button', { name: /Ha preparato una segnalazione/ }).first().click();
-    await page.waitForTimeout(1500);
-    console.log('DEBUG', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.dash-activity-row, .dash-activity-head, [class*="dash-activity"]')].map((e) => `${e.className} | ${e.textContent.slice(0, 80)} | vis=${!!e.getClientRects().length}`))));
+    await page.locator('.dash-bubble-filo .dash-activity-seg-head', { hasText: 'Preparata una segnalazione' }).first().click();
     const riga = page.locator('.dash-bubble-filo .dash-activity-row', { hasText: `Segnalazione inviata · ${TITOLO}` }).first();
     await expect(riga).toBeVisible({ timeout: 10_000 });
     await fumettoDellaSegnalazione(page, riga, 'inviata');
