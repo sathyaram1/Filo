@@ -271,6 +271,7 @@
     host.style.setProperty('display', 'block', 'important');
     // Riaperto ogni volta: sale sopra a quello che è entrato nello strato più alto dopo di lui (una finestra modale).
     try { if (host.matches(':popover-open')) host.hidePopover(); host.showPopover(); } catch (_) {}
+    if (nuovo || daCapo) tipEl.scrollTop = 0;
     const misura = host.getBoundingClientRect();
     const p = posiziona({ ancora: r, w: misura.width, h: misura.height, vw, vh });
     host.style.setProperty('left', `${p.x / zoom}px`, 'important');
