@@ -50,7 +50,7 @@ test('l\'inventario conta le immagini dell\'utente in ordine e salta quelle scri
 test('un\'immagine uscita dalla memoria conserva il numero delle altre e non si inventa', () => {
   const inv = AS.inventario(messaggi, (m) => (m.ts === 't1' ? null : memoria[m.ts]));
   assert.deepEqual(inv.immagini.map((x) => x.numero), [3]);
-  const { voci, scartati } = AS.scegli({ immagini: [1, 3] }, inv, null);
+  const { voci, scartati } = AS.scegli({ allegati: ['1', '3'] }, inv, null);
   assert.deepEqual(voci.map((v) => v.id), ['immagine:3']);
   assert.deepEqual(scartati, ['immagine 1']);
 });
