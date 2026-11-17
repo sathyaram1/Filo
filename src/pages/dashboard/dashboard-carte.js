@@ -1249,6 +1249,9 @@
 
   global.SN_DASH_CARTE = {
     init,
+    // Lo stesso menu e lo stesso avviso per le altre parti della home (la barra dei siti, #1803).
+    apriMenu,
+    avviso,
     aperta: (nome) => dati.aperte[nome] === true,
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
