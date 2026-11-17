@@ -107,11 +107,19 @@ Può, da solo e senza passare dall'owner:
 - fare **esperimenti** dal vivo entro i paletti del § 6;
 - chiedere ai worker **dati nuovi** (registrazioni al rilascio), via feedback;
 - riscrivere le **novità** prima di un rilascio (§ 8);
-- cambiare la domanda di fine turno dei ruoli.
+- cambiare la domanda di fine turno dei ruoli;
+- approvare **L5** e saltare un **controllo di sicurezza bocciato** (L4) su un
+  lavoro fidato a catena pulita, dal suo biglietto pulito (#2338);
+- scrivere i **bilanci** per livello e il **tetto totale delle verifiche**
+  (`tettoVerifiche` in `config/routines`, si parte da 6): ogni cambio il server
+  lo scrive nel recap;
+- decidere sui lavori coi **giri finiti** (bilanci finiti o tetto superato):
+  riaprirli con una nota, farli passare con un figlio per ciò che resta
+  (`passa`), o, come ultima risorsa, una domanda all'owner. Col manutentore
+  spento decide l'owner, come prima.
 
-Non può: scrivere codice, fondere, approvare L5, rispondere alle domande
-dell'owner (quelle di processo dei worker sì: § 4), alzare il freno
-d'emergenza.
+Non può: scrivere codice, fondere, rispondere alle domande dell'owner (quelle
+di processo dei worker sì: § 4), alzare il freno d'emergenza.
 
 ## 4. Ritmo: una decisione al giorno, e sveglie
 
