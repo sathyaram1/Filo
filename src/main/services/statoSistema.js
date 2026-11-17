@@ -611,9 +611,9 @@ function elencoDaRiga(riga) {
   return e && typeof e === 'object' && (e.cosa === 'bluetooth' || e.cosa === 'wifi') ? e : null;
 }
 
-// Il tempo per la risposta a un elenco: col PowerShell già acceso bastano le attese dello script (8 s per la ricerca,
-// 3 s per un nome), mentre uno che parte su un PC lento ci mette da solo decine di secondi (#2394).
-const ELENCO_ACCESO_MS = 20 * 1000;
+// Il tempo per la risposta a un elenco: col PowerShell già acceso bastano le attese dello script (al più 5 s per le
+// radio, 16 per le ricerche, 6 per i nomi), mentre uno che parte su un PC lento ci mette da solo decine di secondi (#2394).
+const ELENCO_ACCESO_MS = 40 * 1000;
 const ELENCO_A_FREDDO_MS = 60 * 1000;
 
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
