@@ -32,9 +32,12 @@ assente o senza l'elenco dopo aver scritto, ritira la fiducia a tutto quello
 che la sessione ha scritto), anche quando la sessione chiude senza un rilascio
 vivo o non chiude affatto. La tenuta la prova
 `functions/test/manutentore-tenuta-2337.test.js` di filo-security, che chiama
-ogni sua operazione con dati non fidati. Non scrive codice, non fonde, non
-approva L5. Scrive ordini che il server applica e apre feedback che le routine
-lavorano.
+ogni sua operazione con dati non fidati. Non scrive codice e non fonde. Scrive
+ordini che il server applica e apre feedback che le routine lavorano. Dal #2338
+(decisione dell'owner dell'08/11) approva L5 e salta un controllo di sicurezza
+bocciato sui lavori fidati a catena pulita, solo dal suo biglietto pulito; i
+workflow di filo-security, i segreti e le regole dei rami, gli ambienti e i
+prompt delle sessioni, le chiavi e i lavori a catena sporca restano all'owner.
 
 Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
 consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
