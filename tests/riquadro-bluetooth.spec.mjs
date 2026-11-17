@@ -61,7 +61,7 @@ test.afterEach(async ({ app }) => {
 });
 
 test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la home la voce dice «leggo», mai «spento», poi acceso', async ({ app }) => {
-  await computerFinto(app, { stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
+  await computerFinto(app, { ritardo: 1500, stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('data-stato', 'spento', { timeout: 8_000 });
   // Il lettore dorme da minuti; intanto il Bluetooth si accende dal sistema. La lettura che riparte tarda (PC lento).
