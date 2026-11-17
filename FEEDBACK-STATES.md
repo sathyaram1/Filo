@@ -324,7 +324,8 @@ riallineamento e risposte dell'owner li assegna il server come sempre, anche per
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
 semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
-dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
+dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i lavori
+già iniziati, i feedback dell'ordine, il resto nell'ordine della coda; e
 accendono una sessione per ciascuno fino ai posti liberi, e per ogni routine non più di
 quanti biglietti al minuto il server dà alla sua chiave, meno uno per il manutentore: le
 altre vanno all'altro account o al giro dopo (#2343). Una priorità 3 già in viaggio non
@@ -341,8 +342,9 @@ prende prima il prossimo dell'ordine, poi il resto, e non il posto che una sessi
 per l'ordine e ancora in viaggio sta per prendere. Quando
 una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
 lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
-dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
-nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+dell'ordine chiuso o inesistente non conta, e un ordine senza lavori che una voce possa
+cominciare adesso vale come nessun ordine: non conta un lavoro server con l'interruttore
+spento, né uno che resterebbe locale, per qualunque chiave chieda (#2269.1). Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
 un pacchetto nato prima del 30/10 si chiudono solo sulle strade della fusione: un «fatto»
 consegnato da un ruolo non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
