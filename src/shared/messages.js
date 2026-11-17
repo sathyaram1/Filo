@@ -1154,6 +1154,9 @@
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
     // L'utente ha detto no alla stessa conferma: non parte niente, lo contano solo i contatori (#1461). { action }
     FILO_CONFIRM_RIFIUTATA: 'filo_confirm_rifiutata',
+    // Le miniature di quello che una segnalazione della chat allegherebbe (#1668), prese dalla conversazione. Solo
+    // pagine filo://. { action, chatId } → { allegati: [{ id, tipo, nome, anteprima?, problema? }], scartati, limiti }
+    FILO_FEEDBACK_ALLEGATI: 'filo_feedback_allegati',
     // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
     // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
     CAMBI_LEGGI: 'cambi_leggi',
