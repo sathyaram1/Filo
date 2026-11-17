@@ -842,12 +842,10 @@ function pubblica(grezzo, { fresco = true, radio = null } = {}) {
 function radioLetta(voce, acceso) {
   if (!stato || !RADIO.includes(voce) || typeof acceso !== 'boolean') return;
   const prima = stato[voce];
-  if (prima && prima.acceso === acceso && !radioVecchie().includes(voce)) { letteRadio[voce] = Date.now(); return; }
   const grezzo = { ...stato };
   if (voce === 'wifi') grezzo.wifi = { acceso };
   else grezzo.bluetooth = acceso ? { acceso: true, dispositivi: prima && prima.acceso === true ? prima.dispositivi : null } : { acceso: false, dispositivi: [] };
-  letteRadio[voce] = Date.now();
-  pubblica(grezzo, { fresco: false });
+  pubblica(grezzo, { fresco: false, radio: voce });
 }
 
 // Il lettore dorme quando nessuno guarda: la rete che cade, e su Linux la batteria che scende, si vedono senza
