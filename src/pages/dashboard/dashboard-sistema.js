@@ -662,9 +662,13 @@
       if (!box.muto.classList.contains('dash-sis-occupato')) box.muto.textContent = x.muto ? 'Togli il muto' : 'Metti muto';
       return;
     }
-    if (box.firma !== undefined && box.firma !== firmaRadio(box.voce, x) && elencoDaLeggere(box.voce, x)) caricaElenco(box);
+    const firma = firmaRadio(box.voce, x);
+    if (firma !== null && box.firma !== undefined && box.firma !== firma && elencoDaLeggere(box.voce, x)) caricaElenco(box, { daCapo: true });
+    else if (firma !== null && box.firma === undefined && box.letture) box.firma = firma;
     if (box.radio.classList.contains('dash-sis-occupato')) return;
     if (box.voce === 'bluetooth') {
+      // Finché non si sa se è acceso, nessun interruttore: quale dei due mostrare lo dice la lettura che arriva.
+      box.radio.hidden = !!x.ignoto;
       box.radio.textContent = x.spento ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
       return;
     }
