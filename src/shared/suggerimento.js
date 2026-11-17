@@ -35,6 +35,14 @@
     return { x: Math.round(x), y: Math.round(y), sotto };
   }
 
+  // Un testo lungo non copre il pezzo che lo mostra: alto quanto il lato più libero, il resto scorre (#1635).
+  // Un'ancora che lascia meno di ALTEZZA_MINIMA su entrambi i lati non ha lato libero: vale la vista intera.
+  const ALTEZZA_MINIMA = 48;
+  function altezzaMassima({ ancora, vh, margine = MARGINE, stacco = STACCO }) {
+    const lato = Math.max(vh - ancora.bottom - stacco - margine, ancora.top - stacco - margine);
+    return Math.floor(lato >= ALTEZZA_MINIMA ? lato : vh - 2 * margine);
+  }
+
   function msDi(valore, predefinito) {
     const T = global.SN_THEME_TOKENS;
     const n = T && typeof T.durataMs === 'function' ? T.durataMs(valore) : NaN;
