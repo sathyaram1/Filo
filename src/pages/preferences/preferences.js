@@ -830,6 +830,7 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'barraSiti.visibile': return $('barraSitiVisibile').checked;
       case 'homeSistema.ora': return $('homeSisOra').checked;
       case 'homeSistema.batteria': return $('homeSisBatteria').checked;
       case 'homeSistema.rete': return $('homeSisRete').checked;
