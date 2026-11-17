@@ -1569,6 +1569,37 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return 0;
     }
     case 'spesa': { const r = await chiama(cred, 'spesa'); return esito(r, (x) => righeSpesa(x).join('\n')); }
+    // L4, L5 e giri finiti (#2338): il server li accetta solo da un biglietto pulito, su un lavoro fidato a catena pulita.
+    case 'l5': {
+      if (arg === 'approva') {
+        if (!argv[2]) { console.error('RIFIUTATO: l5 approva <id della richiesta> (l5 la elenca). Non ho scritto niente.'); return 1; }
+        const r = await chiama(cred, 'l5.approva', { id: String(argv[2]) });
+        return esito(r, (x) => `#${String(x.numero || '').replace(/^#/, '')} (${x.repo}): L5 approvata, esito ${x.result || x.esito || 'registrato'}.`);
+      }
+      const r = await chiama(cred, 'l5.elenco');
+      return esito(r, (x) => righeL5(x).join('\n'));
+    }
+    case 'l4': {
+      if (arg === 'salta') {
+        const num = numeroDi(argv[2]);
+        if (!num || !argv[3]) { console.error('RIFIUTATO: l4 salta <N> <sha del commit bocciato> (l4 li elenca). Non ho scritto niente.'); return 1; }
+        const r = await chiama(cred, 'l4.salta', { numero: num, sha: String(argv[3]) });
+        return esito(r, (x) => `#${x.numero}: controllo saltato, esito ${x.esito || 'registrato'}.`);
+      }
+      const r = await chiama(cred, 'l4.elenco');
+      return esito(r, (x) => righeL4(x).join('\n'));
+    }
+    case 'bilanci': {
+      const d = datiBilanci(argv);
+      if (d.errore) { console.error(`RIFIUTATO: ${d.errore}. Non ho scritto niente.`); return 1; }
+      const r = await chiama(cred, 'bilanci', d.dati);
+      return esito(r, rigaBilanci);
+    }
+    case 'passa': {
+      const testo = senzaOpzioni(argv.slice(2)).join(' ').trim();
+      const r = await chiama(cred, 'passa', { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
+      return esito(r, (x) => `#${x.numero} passa al controllo di sicurezza${x.figli && x.figli.length ? `; quello che resta va in ${x.figli.join(', ')}` : ''}.`);
+    }
     default: console.error(USO); return 1;
   }
 }
