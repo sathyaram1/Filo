@@ -179,8 +179,13 @@
     };
   }
 
-  function descriviBluetooth(b) {
+  // `vecchio`: l'ultima lettura ha più di due giri e il lettore la sta rifacendo; né acceso né spento finché non arriva.
+  function descriviBluetooth(b, vecchio = false) {
     if (!b) return null;
+    if (vecchio || b.acceso === null) {
+      const riga = vecchio ? 'Leggo lo stato del Bluetooth…' : 'Il sistema non dice se il Bluetooth è acceso';
+      return { testo: '', hover: vecchio ? 'Bluetooth: leggo lo stato' : 'Bluetooth', icona: 'bluetooth', spento: false, ignoto: true, leggendo: vecchio, dettaglio: [riga], copia: riga };
+    }
     if (!b.acceso) {
       return { testo: '', hover: 'Bluetooth spento', icona: 'bluetoothOff', spento: true, dettaglio: ['Bluetooth spento'], copia: 'Bluetooth spento' };
     }
