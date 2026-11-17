@@ -188,7 +188,8 @@ test('smista mostra: una viva riservata senza testo dice perché, non «senza ti
   const coperta = { id: 'D-250', stato: 'aperta', titolo: null, contesto: null, problema: null, opzioni: null, consiglio: null, blocca: true, provvisoria: null, riservata: true };
   const testo = formattaFascicoloSmistamento({ domanda: { id: 'D-251', opzioni: [] }, feedback: { num: '#1398' }, registro: { voci: [] }, vive: [coperta], viveAltre: 0 });
   assert.match(testo, /D-250 \[aperta · ferma il lavoro · riservata: il testo arriva solo a chi gira nei riservati, non sai che scelta chiede\]/);
-  assert.ok(!testo.includes('senza titolo'));
+  assert.ok(!testo.includes('D-250 (senza titolo)'));
+  assert.ok(!testo.includes('non ferma il lavoro'));
 });
 
 test('registro: col biglietto passa dal canale, da una sessione da ownerDomande e chi stampa un principio non fidato si sporca', async () => {
