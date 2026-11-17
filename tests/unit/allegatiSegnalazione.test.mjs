@@ -97,9 +97,10 @@ test('oltre i limiti non si taglia: si rifiuta col numero', () => {
 });
 
 test('il riquadro rimanda gli id tenuti: restano solo quelli', () => {
-  const a = { type: 'INVIA_FEEDBACK', testo: 'x', immagini: [1, 2], file: ['/a/n.txt'], schermata: true };
+  const a = { type: 'INVIA_FEEDBACK', testo: 'x', allegati: ['1', '2', '/a/n.txt', 'schermata'] };
   const b = AS.soloQuesti(a, ['immagine:2', 'schermata', 'immagine:7']);
   assert.deepEqual(AS.richiesti(b), { immagini: [2], file: [], schermata: true });
+  assert.deepEqual(AS.richiesti(AS.soloQuesti(a, ['file:/a/n.txt'])).file, ['/a/n.txt']);
   assert.equal(AS.haAllegati(AS.soloQuesti(a, [])), false);
 });
 
