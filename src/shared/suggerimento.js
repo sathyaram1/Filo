@@ -250,11 +250,15 @@
   function disegna(testo) {
     bolla();
     colora();
-    tipEl.textContent = testo;
+    if (tipEl.textContent !== testo) {
+      tipEl.textContent = testo;
+      tipEl.scrollTop = 0;
+    }
     const zoom = Number(host.currentCSSZoom) || 1;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    host.style.setProperty('--fumetto-altezza', `${Math.max(16, (vh - 2 * MARGINE) / zoom)}px`);
+    const r = ancoraDi(corrente);
+    host.style.setProperty('--fumetto-altezza', `${Math.max(16, altezzaMassima({ ancora: r, vh }) / zoom)}px`);
     host.style.setProperty('left', '0px', 'important');
     host.style.setProperty('top', '0px', 'important');
     host.style.setProperty('display', 'block', 'important');
