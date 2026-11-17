@@ -2,11 +2,11 @@
 // Nessuna pagina è garantita aperta, quindi è qui che le scadenze vengono
 // marcate; chi le rende percepibili lo dice il pattern «farsi sentire ovunque».
 //
-// Ogni pochi secondi: gcTimers() marca `ringing`, ogni scadenza NUOVA fa una
-// notifica di sistema, e broadcastLiveUpdate() sveglia le superfici aperte —
+// Ogni pochi secondi: gcTimers() marca `ringing`, ogni scadenza NUOVA fa un
+// avviso (la forma la sceglie la shell), e broadcastLiveUpdate() sveglia le superfici aperte —
 // la shell fa partire la suoneria, la nuova scheda mostra la sua scheda.
 
-const { BrowserWindow, Notification } = require('electron');
+const { BrowserWindow } = require('electron');
 
 const CHECK_MS = 5000;
 let handle = null;
