@@ -226,17 +226,26 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
   const calls = await app.evaluate(() => globalThis.__calls);
   const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'filo_su_di_se');
   expect(strumento, 'filo_su_di_se non arriva al modello').toBeTruthy();
-  expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
+  expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'privacy-completa', 'security']));
   // Da #1564 il documento ci sta col suo titolo, che dice di cosa parla, non con una frase sugli argomenti.
   expect(strumento.function.description).toMatch(/- documento\(doc\?\): un documento di trasparenza \([^)]*privacy «[^»]+»[^)]*\): [^\n]*leggilo prima di rispondere/);
+  expect(strumento.function.description).toMatch(/privacy-completa «[^»]+»/);
 
-  const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
-  const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
-  expect(tool.content).toContain('Privacy');
-  expect(tool.content).toContain('Safe Browsing');
-  expect(tool.content).toContain('I punti deboli');
-  expect(tool.content).not.toContain('NON esiste');
-  expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
+  const breve = calls[1].messages.filter((x) => x.role === 'tool').pop();
+  const interoBreve = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
+  expect(breve.content).toContain('Privacy');
+  expect(breve.content).toContain('I punti deboli');
+  expect(breve.content, 'la privacy breve deve dire al modello dove stanno i dettagli').toContain('privacy-completa');
+  expect(breve.content).not.toContain('NON esiste');
+  expect(breve.content.length).toBeGreaterThanOrEqual(interoBreve.length);
+
+  const completa = calls[2].messages.filter((x) => x.role === 'tool').pop();
+  const interoCompleta = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy-completa'));
+  expect(completa.content).toContain('Safe Browsing');
+  expect(completa.content).toContain('I punti deboli');
+  expect(completa.content).not.toContain('NON esiste');
+  expect(completa.content, 'il documento arriva tagliato').not.toContain('documento troncato');
+  expect(completa.content.length).toBeGreaterThanOrEqual(interoCompleta.length);
 });
 
 // #888 — «quanto costa Filo?»: prima l'agente chiedeva la sezione su come Filo
