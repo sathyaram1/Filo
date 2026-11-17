@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
-import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
+import { sorgenteHandlers, casiDelleAzioni } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
