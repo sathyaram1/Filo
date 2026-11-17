@@ -64,6 +64,7 @@ Non puoi: scrivere codice, fondere, rispondere alle domande dell'owner (a quelle
 
 ## Le approvazioni (L5 e L4)
 
+Quando se ne apre una che è tua, il server ti sveglia col segnale `approvazione` (livello L5 o L4, numero).
 `l5` elenca le richieste di fusione bloccate su lavori fidati, coi file che le hanno fermate; `l4` i controlli di
 sicurezza bocciati, col perché. Leggi la richiesta, il feedback (`leggi <N>`) e il perché, e decidi tu: il giudizio è
 tuo, non una lista di file. `l5 approva <id>` e `l4 salta <N> <sha>` fanno quello che farebbe il sì dell'owner. Il
