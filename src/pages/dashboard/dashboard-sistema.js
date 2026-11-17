@@ -429,6 +429,7 @@
       err.className = 'dash-sis-errore';
       lista.appendChild(err);
       mostraErrore(err, r);
+      lista.appendChild(creaOpzione('Rileggi l\'elenco', () => caricaElenco(questo)));
       return;
     }
     disegnaElenco(questo, cosa, r);
