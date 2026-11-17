@@ -231,9 +231,10 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà co
   expect((await stato(app, accesso)).normali).toBe(1);
 });
 
-// Senza finestre con schede, con la finestrella dietro, ogni voce che agisce su una scheda o sulla finestra la ridà, e poi
-// fa la sua cosa lì (#2031.2). Avanti e il pannello degli strumenti su un sito non cambiano niente da guardare: si
-// guarda che la richiesta sia arrivata alla finestra rifatta.
+// Senza finestre con schede ogni voce che agisce sulla finestra la ridà, e poi fa la sua cosa lì (#2031.2). Quelle della
+// scheda con la finestrella davanti agiscono su di lei (prova più sotto): la ridanno chiusa anche lei. Avanti, Indietro e
+// il pannello degli strumenti su un sito appena riaperto non cambiano niente da guardare: si guarda che la richiesta sia
+// arrivata alla finestra rifatta.
 const rifatta = (app) => app.evaluate(({ BrowserWindow }) => {
   const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
   if (!w) return null;
