@@ -719,6 +719,11 @@
     cap3: { input: mgCap3, save: mgCap3Save, msg: mgCap3Msg, cacheKey: CAP3_KEY, min: AUTOMATION.CAP_MIN },
     cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
     cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
+    // Il tetto totale accanto ai bilanci (#2338): stesso meccanismo, intervallo suo.
+    tettoVerifiche: {
+      input: mgTettoVerifiche, save: mgTettoVerificheSave, msg: mgTettoVerificheMsg, cacheKey: TETTO_KEY,
+      min: AUTOMATION.TETTO_VERIFICHE_MIN ?? 1, max: AUTOMATION.TETTO_VERIFICHE_MAX ?? 50,
+    },
   };
 
   function setCapMsg(field, text, kind) {
