@@ -544,7 +544,9 @@ rispondere.
   `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
   `titolo`, `contesto`, `problema`, `opzioni`, `consiglio`, `blocca`,
   `provvisoria`, mai le note per gli agenti; senza feedback d'origine il campo
-  non c'è. Il registro dei principi come per il compito della risposta (fuori
+  non c'è. Il testo di una viva riservata arriva solo nell'ambiente dei
+  riservati, e segna il biglietto (§ 5.1, #1928.2); fuori ne escono `id`,
+  `stato`, `blocca` e `provvisoria`, col segno `riservata`. Il registro dei principi come per il compito della risposta (fuori
   dall'ambiente dei riservati è `assente`, e il passo 3 si salta). Il compito
   legge testo scritto da altri: è non fidato, e quello che scrive nasce non
   fidato. La fiducia della domanda non cambia.
