@@ -107,10 +107,12 @@ test('la chat e i gesti passano dallo stesso salvataggio: aggiungi e togli dalla
   assert.equal(r.output.voce, 'YouTube');
   assert.equal(nomi(r.cambiate), 'Wikipedia,YouTube', 'chi esegue riceve le voci da annunciare alle home');
   assert.equal(nomi(salvato), 'Wikipedia,YouTube', 'scritto dove scrivono i gesti');
-  const sposta = await S.daChat({ type: 'BARRA_SITI', operazione: 'sposta', voce: 'YouTube', verso: 'cima' });
+  const sposta = await S.daChat({ type: 'BARRA_SITI', operazione: 'sposta', elemento: 'YouTube', verso: 'cima' });
   assert.equal(sposta.executed, true);
   assert.equal(nomi(await S.leggi()), 'YouTube,Wikipedia');
-  const tolta = await S.daChat({ type: 'BARRA_SITI', operazione: 'togli', voce: 'wikipedia' });
+  const rinomina = await S.daChat({ type: 'BARRA_SITI', operazione: 'rinomina', elemento: 'wikipedia.org', nome: 'Enciclopedia' });
+  assert.equal(rinomina.output.voce, 'Enciclopedia');
+  const tolta = await S.daChat({ type: 'BARRA_SITI', operazione: 'togli', elemento: 'enciclopedia' });
   assert.equal(tolta.executed, true);
   assert.equal(nomi(await S.leggi()), 'YouTube');
   const elenco = await S.daChat({ type: 'BARRA_SITI', operazione: 'elenca' });
