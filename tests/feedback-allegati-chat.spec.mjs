@@ -73,6 +73,9 @@ test('immagine incollata, «manda questo come feedback»: miniatura nel riquadro
 test('un\'immagine che la chat non ha non si inventa, e una tolta nel riquadro non parte', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
+  // Nel tema scuro: la nota e la miniatura tolta devono leggersi anche lì.
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await depositoFinto(app);
   await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: ['1', '7'] })] }, { text: 'Inviata.' }]);
   await incolla(page, ['#3b7ac4']);
