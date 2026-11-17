@@ -520,6 +520,7 @@ try {
   Dice 'collegato' ([int]($stato -eq 'Connected'))
 } catch { Dice 'collegato' '' }
 `,
+    // La strada di riserva, come per il Bluetooth: di solito risponde il lettore della home.
     'wifi-elenco': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
   $e = [FiloWlan.Wlan]::Elenco()
   Dice 'codice' $e.Codice
