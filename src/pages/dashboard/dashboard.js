@@ -362,6 +362,18 @@
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
   });
+  // La barra dei siti e la freccia che ripiega la chat (#1803).
+  const BarraSiti = self.SN_DASH_BARRA_SITI;
+  BarraSiti.init({
+    send,
+    dash: $('dash'),
+    riga: $('barraRiga'),
+    barra: $('barraSiti'),
+    freccia: $('ripiegaChat'),
+    bubbles: $('bubbles'),
+    inputForm,
+    iconaDelSito: (url) => iconaDelSito(url),
+  });
   // ===== Helpers messaggi =====
   function send(msg) {
     return new Promise((resolve) => {
