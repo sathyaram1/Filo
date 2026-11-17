@@ -615,12 +615,14 @@
       const bottoni = si.map(([label, classe, esito]) => {
         const b = makeBtn(row, label, classe);
         b.addEventListener('click', (e) => {
+          if (allegati.oltre()) return;
           if (!visto()) avanti();
           else if (!troppoPresto(e)) done(esito);
         });
         return b;
       });
-      const aggiorna = () => { for (const b of bottoni) inAttesa(b, !visto()); };
+      // Oltre i tetti degli allegati il sì non c'è: la nota dice quanti togliere, e sceglie l'utente.
+      const aggiorna = () => { for (const b of bottoni) { inAttesa(b, !visto()); b.disabled = !!allegati.oltre(); } };
       const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
       aggiorna();
