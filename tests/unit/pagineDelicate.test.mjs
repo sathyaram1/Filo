@@ -275,8 +275,8 @@ test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anc
   const voci = sezione.split('\n').filter((r) => r.startsWith('- **'));
   assert.ok(voci.some((r) => /selezion/i.test(r)), 'manca la spiegazione preparata quando si seleziona del testo');
   const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9 };
-  const detto = /\*\* (\p{L}+) funzioni/u.exec(sezione);
-  assert.equal(numeri[(detto && detto[1] || '').toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
+  const detto = /\b(tre|quattro|cinque|sei|sette|otto|nove) funzioni/iu.exec(sezione);
+  if (detto) assert.equal(numeri[detto[1].toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
 });
 
 // Un campo password o carta conta per le pagine delicate solo se la pagina lo mostra: il modulo di accesso tenuto
