@@ -821,7 +821,7 @@ function pubblica(grezzo, { fresco = true, radio = null } = {}) {
   if (radio) letteRadio[radio] = Date.now();
   const tenute = {};
   // Una riga di prima del sonno non smentisce la radio che l'elenco ha appena letto.
-  if (!fresco && stato) for (const v of RADIO) if ((letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
+  if (!fresco && stato) for (const v of RADIO) if (v !== radio && (letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
   const nuovo = S().normalizza({ ...grezzo, ...tenute });
   const f = JSON.stringify(nuovo);
   stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
