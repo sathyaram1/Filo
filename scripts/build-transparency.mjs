@@ -134,7 +134,7 @@ function renderInline(text, sources, docIds) {
   return out.replace(/(\d+)/g, (_all, i) => `<code>${codici[Number(i)]}</code>`);
 }
 
-function renderBody(body, sources) {
+function renderBody(body, sources, docIds) {
   const lines = body.split(/\r?\n/);
   const html = [];
   const sections = [];
@@ -143,7 +143,7 @@ function renderBody(body, sources) {
 
   const flushPara = () => {
     if (!para.length) return;
-    html.push(`<p>${renderInline(para.join(' '), sources)}</p>`);
+    html.push(`<p>${renderInline(para.join(' '), sources, docIds)}</p>`);
     para = [];
   };
   const flushList = () => {
@@ -165,7 +165,7 @@ function renderBody(body, sources) {
       const title = h2[1].trim();
       const id = slugify(title);
       sections.push({ id, title });
-      html.push(`<h2 id="${id}">${renderInline(title, sources)}</h2>`);
+      html.push(`<h2 id="${id}">${renderInline(title, sources, docIds)}</h2>`);
       continue;
     }
 
@@ -173,7 +173,7 @@ function renderBody(body, sources) {
     if (ol) {
       flushPara();
       if (list !== 'ol') { flushList(); html.push('<ol>'); list = 'ol'; }
-      html.push(`<li>${renderInline(ol[2], sources)}</li>`);
+      html.push(`<li>${renderInline(ol[2], sources, docIds)}</li>`);
       continue;
     }
 
@@ -181,7 +181,7 @@ function renderBody(body, sources) {
     if (ul) {
       flushPara();
       if (list !== 'ul') { flushList(); html.push('<ul>'); list = 'ul'; }
-      html.push(`<li>${renderInline(ul[1], sources)}</li>`);
+      html.push(`<li>${renderInline(ul[1], sources, docIds)}</li>`);
       continue;
     }
 
@@ -195,10 +195,12 @@ function renderBody(body, sources) {
 
 // Testo piano per l'agente: niente marcatori, i numeri delle fonti restano come
 // [1] così se Filo cita un passaggio può dire anche da dove viene.
-function renderPlain(body, sources) {
+function renderPlain(body, sources, docIds) {
   const seen = [];
   let out = body
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_a, label, url) => {
+      const interno = linkInterno(url, docIds);
+      if (interno) return `${label} (documento «${interno.id}»)`;
       let idx = seen.indexOf(url);
       if (idx === -1) { seen.push(url); idx = seen.length - 1; }
       return `${label} [${idx + 1}]`;
