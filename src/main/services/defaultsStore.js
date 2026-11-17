@@ -642,6 +642,7 @@ async function getRoutineCaps(idToken) {
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
+  if (doc && doc.tettoVerifiche != null) out.tettoVerifiche = clampTetto(doc.tettoVerifiche);
   // Spento di serie: solo un true esplicito nel documento lo accende.
   out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
