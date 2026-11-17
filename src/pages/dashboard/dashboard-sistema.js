@@ -385,12 +385,12 @@
     p.then((r) => { if (r && r.ok && Array.isArray(r.elenco)) ultimiElenchi[cosa] = { r, quando: Date.now() }; });
     return p;
   }
-  // Solo gli abbinati: le reti conosciute su Windows vogliono la posizione, e si leggono solo quando l'utente apre il
-  // riquadro della rete (patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md).
+  // Solo gli abbinati, e dove leggerli non chiede permessi (lo decide il main): le reti conosciute su Windows vogliono
+  // la posizione (patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md).
   function precaricaElenchi() {
     if (document.visibilityState === 'hidden' || visibili.bluetooth === false) return;
     const u = ultimiElenchi.bluetooth;
-    if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco('bluetooth').catch(() => {});
+    if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco('bluetooth', { precarica: true }).catch(() => {});
   }
 
   function rigaAttesa(testo) {
