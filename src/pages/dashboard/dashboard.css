@@ -1694,6 +1694,10 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   animation: sn-rinomina-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
 }
 .dash-sis-attesa .dash-sis-rotella { margin-right: 0; }
+/* #2394 — l'elenco di prima resta in vista mentre arriva quello nuovo: la rotellina accanto al titolo lo dice. */
+.dash-sis-titolo .dash-sis-aggiorno { width: 7px; height: 7px; margin: 0 0 0 6px; }
+.dash-sis-titolo .dash-sis-aggiorno[hidden] { display: none; }
+.dash-sis-errore.dash-sis-parziale { color: var(--sn-muted); }
 @media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: calc(2.4s * var(--sn-motion, 1)); } }
 .dash-sis-box .sn-select-option.dash-sis-occupato { color: var(--sn-muted); cursor: progress; }
 .dash-sis-box .sn-select-option.dash-sis-attuale { font-weight: 600; }
