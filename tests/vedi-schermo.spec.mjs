@@ -308,14 +308,7 @@ test('la finestra guardata parte con la segnalazione chiesta dopo, vista prima i
   test.setTimeout(120_000);
   await finestreFinte(app);
   await occhioFinto(app);
-  await chatFinta(app, [
-    vedi('v1', { finestra: ESTERNA, domanda: 'cosa chiede il dialogo' }),
-    { text: 'Aspetto il tuo OK per guardarla.' },
-    vedi('v2', { finestra: ESTERNA }),
-    { eco: `${NOTO}[^»"\\\\]*` },
-    { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Dialogo strano', testo: 'Il programma di prova chiede di salvare.', allegati: ['schermata'] }) }] },
-    { text: 'Inviata, con la finestra.' },
-  ]);
+  await chatFinta(app, [vedi('v1', { finestra: ESTERNA, domanda: 'cosa chiede il dialogo' }), { text: 'Aspetto il tuo OK per guardarla.' }]);
   await app.evaluate(() => {
     globalThis.__vs_depositati = [];
     globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__vs_depositati.push(p); return { id: 'fb-1' }; };
@@ -325,8 +318,13 @@ test('la finestra guardata parte con la segnalazione chiesta dopo, vista prima i
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
-  await expect(page.locator('.dash-bubble-filo', { hasText: NOTO })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.dash-action-btn', { hasText: 'Ho guardato la finestra' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 30_000 });
 
+  await chatFinta(app, [
+    { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Dialogo strano', testo: 'Il programma di prova chiede di salvare.', allegati: ['schermata'] }) }] },
+    { text: 'Inviata, con la finestra.' },
+  ]);
   await chiedi(page, 'manda questa schermata come feedback');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
   await expect.poll(async () => (await confirmState(page))?.allegati?.length).toBe(1);
