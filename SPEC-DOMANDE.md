@@ -435,6 +435,18 @@ Un turno non fidato dopo la ricalcola come sempre. La nascita del biglietto di
 un lavoro server prevede questo sporco come il ritiro, e lo stesso per le
 provvisorie: un lavoro che resterebbe locale non accende una sessione.
 
+«Segna fidata» copre anche quello che la risposta ha scritto sui lavori (#2235):
+la risposta di una domanda non fidata, o data dalla chiave owner-non-fidato o
+da una sessione, sporca la conversazione del lavoro, e un lavoro server con un
+biglietto sporco resta locale. Quando una risposta così scrive su un lavoro
+server fidato e aperto, il server apre subito un «da fare» legato al lavoro,
+«Conferma la risposta a D-n», che non lo ferma: il suo «Fatto», premuto dalla
+finestra (mai da una sessione o dalla chiave), segna fidata D-n e il lavoro
+riparte da solo. Si chiude da sé quando l'owner segna fidata D-n dalle Domande
+o dichiara fidato il contenuto del lavoro. Il motivo «resta locale» porta la
+causa (quale risposta, da quale chiave o biglietto) sulle schede del
+manutentore e in `leggi`.
+
 Stanno nel documento della domanda, sul server: non in un feedback (una domanda
 non è sempre una cosa da fare) e non nel repo pubblico. Se il lavoro esiste già,
 la domanda ha un feedback o un ramo nei `collegamenti`, e le note puntano lì.
