@@ -90,6 +90,18 @@ test('in fondo alla vista il fumetto si capovolge sopra il controllo', () => {
   assert.equal(alto.y, 600 - 300 - 4);
 });
 
+test('un testo lungo è alto al più quanto il lato più libero, così non copre il tasto (#1635)', () => {
+  const ancora = { left: 100, right: 140, top: 400, bottom: 420 };
+  const h = S.altezzaMassima({ ancora, vh: 600 });
+  assert.equal(h, 400 - 6 - 4);
+  const p = S.posiziona({ ancora, w: 300, h, vw: 800, vh: 600 });
+  assert.equal(p.sotto, false);
+  assert.ok(p.y + h <= ancora.top, 'il fumetto finisce sopra il tasto');
+  assert.equal(S.altezzaMassima({ ancora: { left: 0, right: 10, top: 20, bottom: 40 }, vh: 600 }), 600 - 40 - 6 - 4);
+  // Un pezzo che riempie la vista non lascia un lato libero: vale la vista intera, come prima.
+  assert.equal(S.altezzaMassima({ ancora: { left: 0, right: 10, top: 10, bottom: 590 }, vh: 600 }), 600 - 8);
+});
+
 test('il nome di un tasto si mostra solo se il tasto non ha già parole scritte', () => {
   for (const s of ['×', '↵', '↑', '', '  ', '✕', '▾']) assert.equal(S.senzaParole(s), true, JSON.stringify(s));
   for (const s of ['Copia', 'OK', '2', 'Invia ↵']) assert.equal(S.senzaParole(s), false, s);
