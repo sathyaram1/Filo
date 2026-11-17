@@ -105,6 +105,46 @@ test('più commit del ramo sul registro e una riga già arrivata su main: nessun
   assert.deepEqual(blocchi(leggi(s.work))[0], ['0.2.11', ['a', 'di main', 'due', 'uno'], []]);
 });
 
+// Il salvataggio automatico fa un commit per ogni modifica: la riga scritta e poi ritoccata arriva come due commit.
+test('la riga del ramo scritta e poi ritoccata in un altro commit: il rebase va liscio e tiene la versione ritoccata', () => {
+  const s = scena();
+  git(s.work, ['checkout', '-qb', 'worker/ritocco']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'auto: src/shared/patchNotes.js');
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'del ramo, ritoccata'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'auto: src/shared/patchNotes.js');
+  s.suMain((d) => scrivi(d, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'di main'] }, { v: '0.2.10', features: ['vecchia'] }])));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(blocchi(leggi(s.work)), [['0.2.11', ['a', 'di main', 'del ramo, ritoccata'], []], ['0.2.10', ['vecchia'], []]]);
+  // Il rebase seguente rigioca gli stessi due commit: non si ferma di nuovo.
+  s.suMain((d) => scrivi(d, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'di main', 'ancora di main'] }, { v: '0.2.10', features: ['vecchia'] }])));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const di = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  assert.equal(di.status, 0, di.out);
+  assert.deepEqual(blocchi(leggi(s.work))[0], ['0.2.11', ['a', 'di main', 'ancora di main', 'del ramo, ritoccata'], []]);
+});
+
+test('un ramo già riallineato col commit che ha portato la sua riga in cima: il rebase seguente va liscio', () => {
+  const s = scena();
+  s.suMain((d) => {
+    scrivi(d, 'package.json', '{\n  "name": "filo",\n  "version": "0.2.11"\n}\n');
+    scrivi(d, NOVITA, sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  }, 'esce la 0.2.11');
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  git(s.work, ['checkout', '-qb', 'worker/riallineato', 'origin/main']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'il lavoro, riallineato con la riga rimasta sotto la versione uscita');
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.12', features: ['di main', 'del ramo'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'novità: una riga del ramo da versioni uscite al blocco 0.2.12');
+  s.suMain((d) => scrivi(d, NOVITA, sorgente([{ v: '0.2.12', features: ['di main', 'altra'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }])));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(blocchi(leggi(s.work)).map((b) => [b[0], b[1]]), [['0.2.12', ['di main', 'altra', 'del ramo']], ['0.2.11', ['a']], ['0.2.10', ['vecchia']]]);
+});
+
 test('main intanto ha pubblicato il blocco del ramo: nel rebase la riga va nel blocco della prossima versione', () => {
   const s = scena();
   git(s.work, ['checkout', '-qb', 'worker/tardi']);
