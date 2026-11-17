@@ -118,7 +118,7 @@ test('le anteprime portano l\'immagine solo delle immagini e il problema di chi 
 test('con degli allegati la segnalazione chiede sempre, anche se l\'utente l\'ha chiesta', () => {
   const ctx = { richiesta: 'manda questo come feedback' };
   const senza = L.ingressi({ type: 'INVIA_FEEDBACK', testo: 'x', titolo: 'y' }, ctx);
-  const con = L.ingressi({ type: 'INVIA_FEEDBACK', testo: 'x', titolo: 'y', immagini: [1] }, ctx);
+  const con = L.ingressi({ type: 'INVIA_FEEDBACK', testo: 'x', titolo: 'y', allegati: ['1'] }, ctx);
   assert.equal(senza.dentroPerimetro, true);
   assert.equal(con.dentroPerimetro, false);
   assert.match(con.perchePerimetro, /allegati/);
