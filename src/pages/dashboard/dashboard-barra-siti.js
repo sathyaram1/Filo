@@ -120,7 +120,7 @@
   function togli(v) {
     const i = voci.findIndex((x) => x.id === v.id);
     const dopo = i >= 0 ? voci[i + 1] : null;
-    muovi({ tipo: 'togli', id: v.id }).then((r) => {
+    muovi({ tipo: 'togli', id: v.id, cosa: v.nome }).then((r) => {
       if (!r || !r.ok) return;
       tolta = { voce: v, prima: dopo ? dopo.id : null };
       d.rimetti.textContent = `Rimetti ${v.nome}`;
