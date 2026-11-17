@@ -751,7 +751,7 @@ export function righeStato(st) {
   ];
 }
 
-const quando = (ms) => (Number(ms) > 0 ? new Date(Number(ms)).toISOString() : '?');
+const istanteIso = (ms) => (Number(ms) > 0 ? new Date(Number(ms)).toISOString() : '?');
 
 /**
  * Le pause in corso di ogni voce e il perché dell'ultimo giro di ognuna (#2488): senza, «in pausa», «niente da fare» e
@@ -762,11 +762,11 @@ export function righePause(pause, voci) {
   const elenco = Object.entries(pause || {});
   const righe = [
     `Pause in corso (${pause ? elenco.length : 'stato del pacemaker non letto'}):`,
-    ...elenco.map(([voce, p]) => `- ${unaRiga(voce)} fino a ${quando(p && p.finoMs)}, perché ${unaRiga(p && p.perche) || '?'}, `
+    ...elenco.map(([voce, p]) => `- ${unaRiga(voce)} fino a ${istanteIso(p && p.finoMs)}, perché ${unaRiga(p && p.perche) || '?'}, `
       + `fallimenti di fila ${Number(p && p.strikes) || 0}${p && p.dettaglio ? `: ${unaRiga(p.dettaglio).slice(0, 200)}` : ''}`),
   ];
   const perche = Object.entries(voci || {}).filter(([, v]) => v && v.perche);
-  righe.push(`Ultimo giro per voce: ${perche.map(([voce, v]) => `${unaRiga(voce)} ${unaRiga(v.perche)} dal ${quando(v.percheMs)}`).join('; ') || 'nessuno scritto'}.`);
+  righe.push(`Ultimo giro per voce: ${perche.map(([voce, v]) => `${unaRiga(voce)} ${unaRiga(v.perche)} dal ${istanteIso(v.percheMs)}`).join('; ') || 'nessuno scritto'}.`);
   return righe;
 }
 
