@@ -142,8 +142,6 @@
       ],
       fixes: [
         { testo: 'Se fai a Filo una domanda come «è possibile…?», «c\'è un modo per…?» o «sai…?», non ti propone più di mandare una segnalazione.', segnalazione: 474 },
-      ],
-      fixes: [
         'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
