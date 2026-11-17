@@ -109,6 +109,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
 
+  on(MSG.FILO_FEEDBACK_ALLEGATI, soloFilo(async (msg) => {
+    const chatId = msg && typeof msg.chatId === 'string' ? msg.chatId : '';
+    return { ok: true, ...(await require('../allegatiDellaChat').anteprima(msg && msg.action, chatId)) };
+  }));
+
   // L'utente ha detto no a una conferma: l'azione non parte e non lo sa nessuno, se non i contatori (#1461).
   on(MSG.FILO_CONFIRM_RIFIUTATA, async (msg, sender) => {
     const action = msg && msg.action;
