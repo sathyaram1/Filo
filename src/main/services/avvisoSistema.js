@@ -104,7 +104,6 @@ function richiama(voce) {
       win = require('../window').mostraFinestraNormale();
     }
   } catch (_) {}
-  if (perProva === false) perProva = true;
   annuncia();
   if (win && !win.isDestroyed() && voce.uid) {
     try { win.webContents.send('avvisi:richiama', { uid: voce.uid }); } catch (_) {}
