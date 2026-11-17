@@ -753,19 +753,19 @@
       if (!f.input) continue;
       let val = null;
       if (remote[field] != null) {
-        val = clampCap(remote[field], f.min);
+        val = clampCap(remote[field], f.min, f.max);
         if (val !== null) chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
       } else if (!lettoDalServer) {
         // Ripiego sulla cache locale (non admin / offline).
         try {
           const data = await chrome.storage.local.get(f.cacheKey);
-          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.min);
+          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.min, f.max);
         } catch (_) {}
       }
       // Sul server manca: si mostra vuoto e si dice. Senza questo numero la
       // verifica (server e locale) si ferma con un errore, non usa un default.
       f.input.value = val === null ? '' : String(val);
-      if (val === null && lettoDalServer) setCapMsg(field, 'Non impostato sul server: scrivi un numero (0 compreso) e salva.', 'err');
+      if (val === null && lettoDalServer) setCapMsg(field, `Non impostato sul server: scrivi un numero${f.min === 0 ? ' (0 compreso)' : ''} e salva.`, 'err');
       else if (val !== null) setCapMsg(field, '', null);
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
