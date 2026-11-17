@@ -1236,10 +1236,12 @@
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
         caricaPrimoIncontro().catch(() => {});
+        // Tornata davanti: un avviso con la sua carta arrivato mentre era dietro adesso si fa notare.
+        disegna();
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
-      caricaAperte(true)]).catch(() => {});
+      caricaAperte(true), caricaCornice()]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {
