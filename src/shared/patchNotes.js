@@ -15,6 +15,8 @@
       ],
       fixes: [
         { testo: 'Nella home il campo per scrivere non si stringe più quando arriva un avviso.', segnalazione: 2390 },
+        { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R, Indietro, Avanti e lo zoom agiscono su di lei anche se hai chiuso la finestra principale.', segnalazione: 2031 },
+        { testo: 'Su Mac, con la finestra di Filo ridotta a icona, Cmd+W la riporta davanti invece di chiuderti una scheda che non vedi.', segnalazione: 2031 },
       ],
     },
     {

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import Module, { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -77,6 +78,15 @@ test('senza schede da ridare la finestra nasce con la sua scheda nuova, e lo dic
   await carica(win);
   assert.deepEqual(await W.quandoPronta(win), { ripristinata: false });
   assert.deepEqual(win._filoTabs.tabs, ['filo://newtab/']);
+});
+
+test('ridotta a icona, la finestra si ripristina prima di mostrarsi, e le voci della barra non lo riscrivono (#2031.2)', () => {
+  const passi = [];
+  const win = { isMinimized: () => true, restore() { passi.push('restore'); }, show() { passi.push('show'); }, showInactive() { passi.push('show'); }, moveTop() {}, focus() {} };
+  W.portaDavanti(win);
+  assert.deepEqual(passi, ['restore', 'show']);
+  const menu = readFileSync(join(ROOT, 'src', 'main', 'menu.js'), 'utf8');
+  assert.doesNotMatch(menu, /\.restore\(\)/, 'una seconda copia della regola: chi corregge come riappare la finestra su Mac ne lascia indietro una');
 });
 
 test('chiusa prima di essere pronta, chi aspetta non resta appeso', async () => {
