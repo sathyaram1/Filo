@@ -3540,7 +3540,9 @@ async function eseguiAzioneFilo(action, {
               });
             } catch (_) {}
           }
-          if (r && r.id) return { executed: true, kept: false };
+          const allegati = (payload.images || []).length + (payload.files || []).length;
+          const nonSaliti = r && Array.isArray(r.failed) ? r.failed.map((f) => f && f.name).filter(Boolean) : [];
+          if (r && r.id) return { executed: true, kept: false, ...(allegati ? { output: { allegati, ...(nonSaliti.length ? { allegatiNonSaliti: nonSaliti } : {}) } } : {}) };
           return { executed: false, kept: false, output: { error: 'il server delle segnalazioni non l\'ha presa' } };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);
