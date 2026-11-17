@@ -276,7 +276,9 @@ function divergenzeManifesto(T, voce) {
   const scritte = T.NAV.filter((n) => T.ids().includes(n.id));
   const mancanti = T.NAV.filter((n) => !T.ids().includes(n.id));
   const elenco = /transparency\.html \(([^)]*)\)/.exec(voce.invoke);
-  const dichiarate = elenco ? elenco[1].split(/,\s*|\s+e\s+/).map((s) => s.trim()).filter(Boolean) : [];
+  // Un nome con la virgola dentro («Privacy, tutti i dettagli») si scrive fra caporali.
+  const dichiarate = elenco ? (elenco[1].match(/«[^»]*»|[^,«]+/g) || []).flatMap((s) => (/^\s*«/.test(s) ? [s] : s.split(/\s+e\s+/)))
+    .map((s) => s.trim().replace(/^«|»$/g, '')).filter(Boolean) : [];
   const attese = scritte.map((n) => n.label);
   if (dichiarate.join('|') !== attese.join('|')) {
     problemi.push(`«invoke» elenca le sezioni (${dichiarate.join(', ')}), quelle scritte sono (${attese.join(', ')})`);
