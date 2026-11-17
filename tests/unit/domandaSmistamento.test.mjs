@@ -183,6 +183,14 @@ test('smista mostra: le altre domande vive sullo stesso feedback, provvisorie co
   assert.match(formattaFascicoloSmistamento(base), /il server non le ha mandate, non sai se ce ne sono/);
 });
 
+// #1928.2: fuori dall'ambiente dei riservati il server manda di una viva riservata solo i dati strutturati.
+test('smista mostra: una viva riservata senza testo dice perché, non «senza titolo»', () => {
+  const coperta = { id: 'D-250', stato: 'aperta', titolo: null, contesto: null, problema: null, opzioni: null, consiglio: null, blocca: true, provvisoria: null, riservata: true };
+  const testo = formattaFascicoloSmistamento({ domanda: { id: 'D-251', opzioni: [] }, feedback: { num: '#1398' }, registro: { voci: [] }, vive: [coperta], viveAltre: 0 });
+  assert.match(testo, /D-250 \[aperta · ferma il lavoro · riservata: il testo arriva solo a chi gira nei riservati, non sai che scelta chiede\]/);
+  assert.ok(!testo.includes('senza titolo'));
+});
+
 test('registro: col biglietto passa dal canale, da una sessione da ownerDomande e chi stampa un principio non fidato si sporca', async () => {
   assert.deepEqual(leggiArgomenti(['registro', 'crediti', 'dichiarati']), { cmd: 'registro', parole: 'crediti dichiarati' });
   assert.match(leggiArgomenti(['registro']).errore, /le parole da cercare/);
