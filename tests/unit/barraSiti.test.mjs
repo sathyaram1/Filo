@@ -120,6 +120,10 @@ test('la chat e i gesti passano dallo stesso salvataggio: aggiungi e togli dalla
   assert.equal(no.executed, false);
   assert.match(no.output.error, /non c'è questa voce/);
   assert.equal((await S.daChat({ type: 'BARRA_SITI', operazione: 'balla' })).output.error, 'operazione sconosciuta');
+  // Ripiegare a parole scrive l'impostazione della freccia, e non tocca la barra.
+  assert.deepEqual((await S.daChat({ type: 'BARRA_SITI', operazione: 'ripiega' })).impostazioni, { chatRipiegata: true });
+  assert.deepEqual((await S.daChat({ type: 'BARRA_SITI', operazione: 'riapri' })).impostazioni, { chatRipiegata: false });
+  assert.equal(nomi(await S.leggi()), 'YouTube');
 });
 
 test('due mosse quasi insieme non si cancellano: il main le mette in fila', async () => {
