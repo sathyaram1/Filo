@@ -68,6 +68,11 @@ async function daChat(action) {
   const tipo = B.operazione(a);
   if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
   if (tipo === 'elenca') return { executed: true, kept: false, output: { voci: B.descrivi(await leggi()) } };
+  // La stessa impostazione che scrive la freccia: chi esegue la salva e la annuncia alle home.
+  if (tipo === 'ripiega' || tipo === 'riapri') {
+    const ripiegata = tipo === 'ripiega';
+    return { executed: true, kept: false, output: { chat: ripiegata ? 'ripiegata' : 'aperta' }, impostazioni: { chatRipiegata: ripiegata } };
+  }
   const chi = tipo === 'rinomina' ? (a.voce ?? a.indirizzo) : (a.voce ?? a.indirizzo ?? a.nome);
   const mossa = {
     tipo,
