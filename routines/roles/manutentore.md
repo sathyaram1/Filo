@@ -113,8 +113,9 @@ scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se
   accensione nata morta di qualunque voce (la voce nel dettaglio: A, B, serverA, reteAperta, riservatiB…; `causa`
   `quota` se all'accensione l'account era oltre il 100% della settimana, `non_quota` se no, con `pct` e `rinnovoMs`:
   la pausa finisce al più al rinnovo, quindi una `quota` non chiede niente), domanda di
-  processo di un worker, richiesta dell'owner dalla chat. `stato` dice quale voce è in pausa fino a quando e perché
-  ogni voce non ha acceso all'ultimo giro (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
+  processo di un worker, richiesta dell'owner dalla chat, richiesta L5 o controllo bocciato su un lavoro fidato
+  (`approvazione`). `stato` dice quale voce è in pausa fino a quando e perché ogni voce non ha acceso all'ultimo giro
+  (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
