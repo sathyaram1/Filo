@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVIZI = join(ROOT, 'src', 'main', 'services');
 const ENTRATA = join(SERVIZI, 'handlers.js');
-const MARCA = /nat[ao] da handlers\.js/;
+const MARCA = /nat[ao] da handlers\.js/i;
 
 // I percorsi assoluti, nell'ordine in cui handlers.js li carica: lui per primo.
 export function fileDiHandlers() {
