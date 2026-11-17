@@ -91,7 +91,8 @@ class AvvisiSopraPagina {
     this.schedaAttiva = schedaAttiva;
     this.vista = null;
     this.pronta = false;
-    this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} } };
+    this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} }, colonna: [] };
+    this.firmaColonna = '[]';
     this.misura = { w: 0, h: 0 };
     this.altezza = 0;
     this.larghezza = 0;
