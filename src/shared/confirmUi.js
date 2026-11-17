@@ -660,7 +660,7 @@
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-danger');
       ok.disabled = true;
 
-      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
+      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase() && !allegati.oltre();
       const aggiorna = () => {
         ok.disabled = !parola();
         inAttesa(ok, parola() && !visto());
