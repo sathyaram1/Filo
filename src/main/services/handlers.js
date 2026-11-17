@@ -674,6 +674,7 @@ const handlerCtx = {
   broadcastToTabs,
   broadcastToFiloPages,
   annunciaCarteHome,
+  annunciaBarraSiti,
   ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,
