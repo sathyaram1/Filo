@@ -1,6 +1,6 @@
 // Il driver di git per il registro delle novità (#2224): nel rebase le righe dei due lati si tengono tutte, con la regola
 // del cancello (src/shared/novitaFusione.js); fuori dal rebase, o se la regola non basta, è la fusione di testo di git.
-// Si imposta dove nasce la copia di lavoro, accanto al carattere di commento. Sentinella: tests/unit/driverNovita.test.mjs.
+// Si imposta dove nasce la copia di lavoro (scripts/lib/prepara-copia.mjs). Sentinella: tests/unit/driverNovita.test.mjs.
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
