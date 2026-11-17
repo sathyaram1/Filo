@@ -431,7 +431,7 @@
   const ROTELLA = { capture: true, passive: false };
   let rotellaAccesa = false;
   function suRotella(e) {
-    if (!visibile || !corrente || corrente.origine !== 'puntatore' || !tipEl || e.ctrlKey) return;
+    if (!visibile || !corrente || corrente.origine !== 'puntatore' || !tipEl || e.ctrlKey || e.metaKey) return;
     const max = tipEl.scrollHeight - tipEl.clientHeight;
     const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tipEl.clientHeight : e.deltaY;
     const su = tipEl.scrollTop;
