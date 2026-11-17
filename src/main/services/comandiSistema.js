@@ -1247,6 +1247,9 @@ function pannelliImpostazioni(piattaforma = piattaformaPannelli || process.platf
   return { ...(PANNELLI[piattaforma] || {}) };
 }
 
+// Solo per un codice che nessuno script scrive (un RadioAccessStatus nuovo di Windows, per esempio).
+const FRASE_RISERVA = 'Il sistema non ha eseguito il comando.';
+
 // Ogni codice d'errore ha la sua frase (cosa è successo, cosa può fare l'utente): la sentinella è in
 // tests/unit/comandiSistema.test.mjs. Il dettaglio tecnico va nel log (eseguiScript), non qui.
 function spiega(errore, { cosa, piattaforma = process.platform, nome = '', elenca = false } = {}) {
