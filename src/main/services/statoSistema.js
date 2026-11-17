@@ -369,6 +369,36 @@ Add-Type -TypeDefinition @'
 __VOLUME__'@
 $conVolume = $true
 } catch {}
+function Scrivi($oggetto) {
+  $j = ConvertTo-Json -InputObject $oggetto -Compress -Depth 6
+  $j = [regex]::Replace($j, '[^ -~]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
+  [Console]::Out.WriteLine($j); [Console]::Out.Flush()
+  return $j
+}
+__ELENCO_BT__
+$wlanPronta = $false
+function Rispondi([string]$cosa) {
+  if ($cosa -eq 'bluetooth') {
+    try { $e = ElencoBt } catch { $e = [ordered]@{ errore = 'eccezione' } }
+    $null = Scrivi ([ordered]@{ elenco = [ordered]@{ cosa = 'bluetooth'; acceso = $e.acceso; dispositivi = $e.dispositivi; errore = $e.errore } })
+  } elseif ($cosa -eq 'wifi') {
+    $r = [ordered]@{ cosa = 'wifi' }
+    try {
+      if (-not $script:wlanPronta) {
+        Add-Type -TypeDefinition @'
+__WLAN__'@
+        $script:wlanPronta = $true
+      }
+      $w = [FiloWlan.Wlan]::Elenco()
+      $r.codice = $w.Codice; $r.interfacce = $w.Interfacce; $r.reti = @($w.Reti); $r.attuale = $w.Attuale
+    } catch { if ($script:wlanPronta) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
+    $null = Scrivi ([ordered]@{ elenco = $r })
+  }
+}
+# Le richieste degli elenchi arrivano su stdin, una riga ciascuna; stdin chiuso vuol dire che Filo non c'è più.
+$ingresso = $null
+$richiesta = $null
+try { $ingresso = New-Object System.IO.StreamReader([Console]::OpenStandardInput()); $richiesta = $ingresso.ReadLineAsync() } catch { $richiesta = $null }
 $ultimo = ''
 $btPrima = $null
 $nomiPrima = $null
