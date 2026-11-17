@@ -186,6 +186,7 @@ function dimentica(chat) {
     esiti.clear();
     foto.clear();
     caratteriFoto = 0;
+    schermate.clear();
     preamboli.clear();
     giri.clear();
     fotografie.normale = null;
@@ -194,6 +195,7 @@ function dimentica(chat) {
   }
   for (const mappa of [esiti, preamboli, giri]) for (const k of [...mappa.keys()]) if (k.startsWith(`${chat}|`)) mappa.delete(k);
   for (const k of [...foto.keys()]) if (k.startsWith(`${chat}|`)) togliFoto(k);
+  schermate.delete(chat);
 }
 
 // Tutto il filo in messaggi, in ordine di tempo. A parità d'ora decide la conversazione: lo stesso ordine a ogni turno.
