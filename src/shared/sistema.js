@@ -212,14 +212,18 @@
     };
   }
 
+  // Le radio che il main dà come lette più di due giri fa (`stato.vecchio`, statoSistema.js): non si dicono accese né spente.
+  const vecchie = (stato) => (stato && Array.isArray(stato.vecchio) ? stato.vecchio : []);
+
   // Le voci della home: null dove il dato manca, e la voce non compare.
   function descrivi(stato, adesso = new Date()) {
     const s = normalizza(stato);
+    const v = vecchie(stato);
     return {
       ora: descriviOra(adesso),
       batteria: descriviBatteria(s.batteria),
-      rete: descriviRete(s.rete, s.wifi),
-      bluetooth: descriviBluetooth(s.bluetooth),
+      rete: descriviRete(s.rete, v.includes('wifi') ? null : s.wifi),
+      bluetooth: descriviBluetooth(s.bluetooth, v.includes('bluetooth')),
       volume: descriviVolume(s.volume),
     };
   }
