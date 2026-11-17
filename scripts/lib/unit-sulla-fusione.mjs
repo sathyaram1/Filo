@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
+import { gitIn, refspecMain } from './git-main.mjs';
 
 // Lo stesso di SN_NOVITA_FUSIONE.FILE: lo controlla tests/unit/unitSullaFusione.test.mjs.
 export const FILE_NOVITA = 'src/shared/patchNotes.js';
