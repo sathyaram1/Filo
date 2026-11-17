@@ -268,10 +268,12 @@
   let volumeVoluto = null;
   let volumeInVolo = false;
 
+  // Le frasi d'errore le scrive il main (comandiSistema.js); questa è solo per una risposta che non arriva.
+  const NON_RISPOSTO = 'Filo non ha risposto: riprova.';
   async function comanda(richiesta) {
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_COMANDA, richiesta }); } catch (_) {}
-    return r && typeof r === 'object' ? r : { ok: false, frase: 'Filo non ha risposto: riprova.' };
+    return r && typeof r === 'object' ? r : { ok: false, frase: NON_RISPOSTO };
   }
 
   function creaOpzione(testo, fn, cls = '') {
