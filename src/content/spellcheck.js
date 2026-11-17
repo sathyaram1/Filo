@@ -3875,6 +3875,7 @@
     erroriDaCorreggere,
     correggiTutti,
     riempi,
+    righeDelPerche,
     cercaDiNuovo,
     valoreSotto,
     controlloSuRichiesta,
