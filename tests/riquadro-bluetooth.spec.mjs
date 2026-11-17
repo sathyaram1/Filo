@@ -84,13 +84,17 @@ test('Bluetooth spento, il lettore dorme, lo si accende da fuori: riaperta la ho
   await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Leggo lo stato del Bluetooth…');
   // Finché non si sa, nessun interruttore che direbbe il contrario del vero.
   await expect(opzione(page, 'Accendi il Bluetooth')).toHaveCount(0);
+  await expect(opzione(page, 'Spegni il Bluetooth')).toHaveCount(0);
   await page.screenshot({ path: 'tests/.shots/2394-bluetooth-leggo.png' }).catch(() => {});
+  // L'elenco dei dispositivi legge anche la radio: basta lui, senza aspettare il lettore che tarda.
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  await expect(opzione(page, 'Spegni il Bluetooth')).toBeVisible();
+  await expect(riquadro(page).locator('.dash-sis-info')).toHaveText('Bluetooth acceso');
   await page.keyboard.press('Escape');
   await app.evaluate(() => globalThis.__libera());
-  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  await page.waitForTimeout(500);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso');
   expect(await page.evaluate(() => window.__visti)).not.toContain('spento');
-  await voce(page, 'bluetooth').click();
-  await expect(opzione(page, 'Spegni il Bluetooth')).toBeVisible();
 });
 
 test('un dispositivo che Windows lascia senza nome ha il nome di Windows, si collega dal riquadro e dal tasto destro', async ({ app }) => {
