@@ -225,7 +225,9 @@ riparte da capo e ripaga la corsa intera, quindi sblocca solo quando la causa è
 
 Un worker che si ferma su un dubbio di processo (quale strumento, quale ordine, cosa fare di un rilievo) lo scrive
 nel rilascio, e arriva a te, non all'owner. Rispondi nel feedback con una nota (`nota <N> -`); il lavoro riparte, anche
-un lavoro server: sei un ruolo fidato e le tue note non lo sporcano (#2215.1). Se la risposta vale per tutti, è un feedback sul ruolo o sullo strumento. All'owner arrivano solo le scelte vere
+un lavoro server: sei un ruolo fidato e le tue note non lo sporcano (#2215.1). Una risposta «chiudi come già risolto» la applica anche
+la ripresa, con la stessa consegna del primo lavoro (`deliver status --status done --reason gia_risolto --fusione
+<sha>`), purché il ramo non porti niente rispetto a main: con un lavoro sopra il server la rifiuta (#2427). Se la risposta vale per tutti, è un feedback sul ruolo o sullo strumento. All'owner arrivano solo le scelte vere
 (SPEC-DOMANDE § 3): un trade-off di costi, dati dell'utente, gusto, sicurezza.
 
 ## I rilievi delle verifiche

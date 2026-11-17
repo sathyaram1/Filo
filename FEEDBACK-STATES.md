@@ -256,7 +256,7 @@ dirette verso `done`, strette: `todo → done` della pipeline per una segnalazio
 un pacchetto fuso (o un derivato in correzione fuso col suo lavoro, `statusReason: in_correzione`,
 §4c), e `working → done` della routine per un feedback già risolto su main.
 Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
-lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
+lavoro, o dalla sua ripresa su un ramo che non porta niente rispetto a main (#2427), con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
 altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
 illegale.
 
@@ -375,7 +375,8 @@ la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `de
 status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
 → done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
 sta sulla linea principale di `origin/main`; il server lo riprova da sé e lo accetta
-solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale (una
+solo dal primo lavoro (o dalla sua ripresa, se il ramo non porta niente rispetto a main
+né nell'app né sul server: #2427), da `working`, se la fusione sta sulla linea principale (una
 fusione più vecchia di quanto il server rilegge di main, ~12.000 commit, basta che sia
 arrivata su main), porta una citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
 la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report

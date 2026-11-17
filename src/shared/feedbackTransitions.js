@@ -78,7 +78,8 @@
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
-      // «Già risolto su main» (FEEDBACK-STATES.md §3a): il server la accetta solo dal primo lavoro con `gia_risolto` e
+      // «Già risolto su main» (FEEDBACK-STATES.md §3a): il server la accetta dal primo lavoro, o dalla sua ripresa su un
+      // ramo che non porta niente rispetto a main (#2427), con `gia_risolto` e
       // la fusione provata (linea principale, cita il feedback, dopo nascita e riapertura; un doppione: è la fusione
       // dell'originale, chiuso, dopo la riapertura); ogni altra consegna no.
       done:                ['routine'],
