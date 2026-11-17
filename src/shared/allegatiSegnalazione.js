@@ -88,9 +88,11 @@
     const r = richiesti(action);
     return {
       ...action,
-      immagini: r.immagini.filter((n) => tieni.has(`immagine:${n}`)),
-      file: r.file.filter((p) => tieni.has(`file:${p}`)),
-      schermata: r.schermata && tieni.has('schermata'),
+      allegati: [
+        ...r.immagini.filter((n) => tieni.has(`immagine:${n}`)).map(String),
+        ...r.file.filter((p) => tieni.has(`file:${p}`)),
+        ...(r.schermata && tieni.has('schermata') ? ['schermata'] : []),
+      ],
     };
   }
 
