@@ -523,6 +523,82 @@
     return btn;
   }
 
+  // Le miniature di quello che partirebbe (#1668). Ogni voce porta `tieni`, che un clic cambia: chi ha aperto la
+  // conferma lo legge dopo l'OK. Una voce con `problema` non parte e non si rimette. `oltre()`: la frase dei tetti superati.
+  function allegatiIn(box, { allegati, scartati, limiti }, onCambio) {
+    const doc = global.document;
+    const voci = (Array.isArray(allegati) ? allegati : []).filter((v) => v && typeof v === 'object');
+    const via = (Array.isArray(scartati) ? scartati : []).map(String).filter(Boolean);
+    const L = limiti && typeof limiti === 'object' ? limiti : { immagini: 5, file: 5 };
+    for (const v of voci) v.tieni = !v.problema;
+    const conta = (tipo) => voci.filter((v) => v.tieni && v.tipo === tipo).length;
+    const oltre = () => {
+      const frasi = [];
+      const im = conta('immagine');
+      const fi = conta('file');
+      if (im > L.immagini) frasi.push(`${im} immagini: ne partono al massimo ${L.immagini}, togline ${im - L.immagini}`);
+      if (fi > L.file) frasi.push(`${fi} file: ne partono al massimo ${L.file}, togline ${fi - L.file}`);
+      return frasi.join('. ');
+    };
+    if (!voci.length && !via.length) return { oltre };
+    if (voci.length) {
+      const fila = doc.createElement('div');
+      fila.className = 'sn-confirm-allegati';
+      for (const v of voci) {
+        const t = doc.createElement('button');
+        t.type = 'button';
+        t.className = 'sn-confirm-allegato';
+        t.dataset.id = String(v.id || '');
+        if (typeof v.anteprima === 'string' && /^data:image\//i.test(v.anteprima)) {
+          const img = doc.createElement('img');
+          img.src = v.anteprima;
+          img.alt = String(v.nome || '');
+          t.appendChild(img);
+        } else {
+          const n = doc.createElement('span');
+          n.className = 'sn-confirm-allegato-nome';
+          n.textContent = String(v.nome || 'allegato');
+          t.appendChild(n);
+        }
+        const segno = doc.createElement('span');
+        segno.className = 'sn-confirm-allegato-segno';
+        t.appendChild(segno);
+        const mostra = () => {
+          t.classList.toggle('sn-tolto', !v.tieni);
+          segno.textContent = v.tieni ? '×' : '+';
+          t.title = v.problema ? `${v.nome}: ${v.problema}` : `${v.nome}: ${v.tieni ? 'parte, clic per toglierlo' : 'tolto, clic per rimetterlo'}`;
+          t.setAttribute('aria-pressed', v.tieni ? 'true' : 'false');
+        };
+        if (v.problema) t.setAttribute('aria-disabled', 'true');
+        t.addEventListener('click', () => {
+          if (v.problema) return;
+          v.tieni = !v.tieni;
+          mostra();
+          onCambio();
+        });
+        mostra();
+        fila.appendChild(t);
+      }
+      box.appendChild(fila);
+    }
+    const nota = doc.createElement('div');
+    nota.className = 'sn-confirm-allegati-nota';
+    box.appendChild(nota);
+    const rotti = voci.filter((v) => v.problema);
+    const fisse = [
+      ...rotti.map((v) => `«${v.nome}» non parte: ${v.problema}.`),
+      ...(via.length ? [`${via.length === 1 ? `«${via[0]}» non è` : `${via.map((x) => `«${x}»`).join(', ')} non sono`} in questa chat: non ${via.length === 1 ? 'parte' : 'partono'}.`] : []),
+    ];
+    const aggiornaNota = () => {
+      const o = oltre();
+      nota.classList.toggle('sn-oltre', !!o);
+      nota.textContent = [o ? `${o}.` : '', ...fisse].filter(Boolean).join(' ');
+      nota.hidden = !nota.textContent;
+    };
+    aggiornaNota();
+    return { oltre, aggiornaNota };
+  }
+
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('confirm', opts);
@@ -530,6 +606,7 @@
     return new Promise((resolve) => {
       const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
       header(box, { title, parti: partiDi(text, parti) });
+      const allegati = allegatiIn(box, opts || {}, () => { allegati.aggiornaNota(); aggiorna(); });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       // Anche il secondo sì aspetta il testo letto e il mezzo secondo, come OK.
