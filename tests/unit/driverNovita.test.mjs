@@ -88,7 +88,7 @@ test('il caso della segnalazione: due rami scrivono nello stesso blocco, il reba
   assert.deepEqual(blocchi(leggi(s.work)), [['0.2.11', ['a', 'del primo', 'del secondo'], ['correzione del primo']], ['0.2.10', ['vecchia'], []]]);
   assert.equal(git(s.work, ['status', '--porcelain']).out, '');
   assert.equal(git(s.work, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], { ok: false }).status, 0, 'il ramo sta sopra main');
-  assert.equal(git(s.work, ['diff', '--name-only', 'origin/main', 'HEAD']).out.split('\n').filter(Boolean).sort().join(','), `${NOVITA},nuovo.txt`);
+  assert.equal(git(s.work, ['diff', '--name-only', 'origin/main', 'HEAD']).out.split('\n').filter(Boolean).sort().join(','), `nuovo.txt,${NOVITA}`);
 });
 
 test('più commit del ramo sul registro e una riga già arrivata su main: nessuna riga persa, nessun doppione', () => {
