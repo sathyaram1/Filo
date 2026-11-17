@@ -1792,9 +1792,9 @@ globalThis.SN_COMANDI_SISTEMA = api;
 module.exports = {
   ...api,
   PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE, IMPOSTAZIONI, INDIRIZZO,
-  costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
+  costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega, FRASE_RISERVA,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
-  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI,
-  campiNmcli, erroreWlan,
-  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
+  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI, elencoBtWindows, elencoWifiWindows, rifinisciDispositivi,
+  campiNmcli, erroreWlan, eseguiScript,
+  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, PS_ELENCO_BT, SH_INIZIO, psCompila },
 };
