@@ -134,6 +134,10 @@
   text-underline-offset: 2px;
 }
 
+/* Link a un altro documento: al passaggio la sottolineatura si ispessisce, come un filo tirato. */
+.sn-doc-link:hover,
+.sn-doc-link:focus-visible { text-decoration-thickness: 2px; }
+
 /* Riferimento numerato: piccolo e discreto, ma con un'area di tocco decente. */
 .sn-ref {
   font-size: 0.68em;
@@ -245,6 +249,7 @@ html:not([data-sn-theme]) body {
     <nav class="sn-nav">
       <a class="sn-nav-item" href="./models.html">Modelli</a>
       <a class="sn-nav-item" href="./privacy.html">Privacy</a>
+      <a class="sn-nav-item" href="./privacy-completa.html">Privacy, tutti i dettagli</a>
       <a class="sn-nav-item" href="./security.html">Sicurezza</a>
       <a class="sn-nav-item is-active is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
@@ -252,7 +257,7 @@ html:not([data-sn-theme]) body {
   <h1>Come si sostiene</h1>
   <article id="doc-body">
 <p>Questa pagina la scrivo quando Filo comincerà a chiedere pagamenti: dirà quanto costa, dove vanno i soldi e quanto ci guadagno. Fino ad allora è tutto offerto. Se usi una tua chiave OpenRouter, paghi solo quella.</p>
-<p>Intanto puoi leggere: <a href="./models.html">Politica sui modelli</a>, <a href="./privacy.html">Privacy</a>, <a href="./security.html">Sicurezza</a>.</p>
+<p>Intanto puoi leggere: <a href="./models.html">Politica sui modelli</a>, <a href="./privacy.html">Privacy</a>, <a href="./privacy-completa.html">Privacy, tutti i dettagli</a>, <a href="./security.html">Sicurezza</a>.</p>
   </article>
 </main>
 </body>
