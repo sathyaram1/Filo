@@ -10,20 +10,23 @@
 
   const lista = (v) => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]));
 
-  // Quello che il modello ha indicato, ripulito: numeri interi positivi, percorsi non vuoti, niente doppioni.
+  // `allegati` dell'azione: un numero è un'immagine della chat (1 la prima), «schermata» l'ultima finestra guardata,
+  // il resto un percorso di una riga «File:». Ripulito: niente vuoti, niente doppioni.
   function richiesti(action) {
     const a = action && typeof action === 'object' ? action : {};
     const immagini = [];
-    for (const v of lista(a.immagini)) {
-      const n = Number(String(v).trim().replace(/^#/, ''));
-      if (Number.isInteger(n) && n > 0 && !immagini.includes(n)) immagini.push(n);
-    }
     const file = [];
-    for (const v of lista(a.file)) {
-      const p = String(v == null ? '' : v).trim();
-      if (p && !file.includes(p)) file.push(p);
+    let schermata = false;
+    for (const v of lista(a.allegati)) {
+      const s = String(v == null ? '' : v).trim();
+      if (!s) continue;
+      if (/^(immagine\s*)?#?\d+$/i.test(s)) {
+        const n = Number(s.replace(/\D/g, ''));
+        if (n > 0 && !immagini.includes(n)) immagini.push(n);
+      } else if (/^schermata$/i.test(s)) schermata = true;
+      else if (!file.includes(s)) file.push(s);
     }
-    return { immagini, file, schermata: a.schermata === true || a.schermata === 'true' };
+    return { immagini, file, schermata };
   }
 
   function haAllegati(action) {
