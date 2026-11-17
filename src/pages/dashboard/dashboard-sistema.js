@@ -43,9 +43,9 @@
     for (const v of ORDINE) voci[v] = creaVoce(v);
     disegna();
     // La prima richiesta aspetta le impostazioni: chi ha nascosto le tre voci non sveglia il lettore a ogni scheda.
-    setTimeout(() => { if (!impostazioniLette) { impostazioniLette = true; chiedi(); } }, 2000);
+    setTimeout(() => { if (!impostazioniLette) { impostazioniLette = true; chiedi(); precaricaElenchi(); } }, 2000);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); }
+      if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); precaricaElenchi(); }
       programmaRichiamo();
     });
     // Il browser se ne accorge per primo: il main rilegge subito invece di aspettare il suo giro.
