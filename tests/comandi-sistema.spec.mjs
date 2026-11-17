@@ -385,11 +385,11 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
   await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
   await expect(riquadro(page)).toHaveCount(0);
 
-  // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
+  // Dalla prima voce, freccia su gira in fondo (Nascondi, poi l'ultima rete), sotto il bordo del riquadro.
   await voce(page, 'rete').click();
   await expect(ultima).toBeAttached({ timeout: 5_000 });
   await riquadro(page).locator('.sn-select-option').first().focus();
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
   await expect(page.locator(':focus')).toHaveText('Collegati a Rete numero 40');
   await page.keyboard.press('Enter');
