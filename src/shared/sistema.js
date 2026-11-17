@@ -50,7 +50,9 @@
     return { online: true, tipo, nome: tipo === 'wifi' ? pulisciNome(r.nome) : null };
   }
 
+  // `acceso: null`: c'è un Bluetooth ma il sistema non dice se è acceso («Unknown» di Windows): non è spento.
   function normalizzaBluetooth(b) {
+    if (b && typeof b === 'object' && b.acceso === null) return { acceso: null, dispositivi: null };
     if (!b || typeof b !== 'object' || typeof b.acceso !== 'boolean') return null;
     if (!b.acceso) return { acceso: false, dispositivi: [] };
     let lista = b.dispositivi;
