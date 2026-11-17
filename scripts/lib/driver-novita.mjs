@@ -94,6 +94,8 @@ export function driver({ base, ours, theirs, marcatori = '7', cwd = process.cwd(
       }
     }
   }
-  const m = gitIn(cwd, ['merge-file', `--marker-size=${/^\d+$/.test(String(marcatori)) ? marcatori : '7'}`, ours, base, theirs]);
+  const [lA, lO, lB] = etichette(cwd);
+  const misura = /^\d+$/.test(String(marcatori)) ? marcatori : '7';
+  const m = gitIn(cwd, ['merge-file', `--marker-size=${misura}`, '-L', lA, '-L', lO, '-L', lB, ours, base, theirs]);
   return m.status === 0 ? 0 : 1;
 }
