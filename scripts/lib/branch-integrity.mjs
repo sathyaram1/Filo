@@ -674,6 +674,7 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(root);
+  ensureDriverNovita(root);
 
   // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
   // rinascerebbe da main accanto al lavoro già spinto (#1632).
