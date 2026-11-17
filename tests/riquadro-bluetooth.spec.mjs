@@ -118,6 +118,12 @@ test('un dispositivo che Windows lascia senza nome ha il nome di Windows, si col
   await expect(riquadro(page).locator('.dash-sis-errore:not([hidden])')).toHaveCount(0);
   const collegati = (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1]);
   expect(collegati).toEqual([{ indirizzo: '00:11:22:33:44:55', collega: true }]);
+  // Un comando dal riquadro senza nome né indirizzo non mostra la frase tecnica scritta per il modello.
+  const r = await page.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage(
+    { type: globalThis.SN_MSG.MSG.SISTEMA_COMANDA, richiesta: { cosa: 'bluetooth', dispositivo: '', collega: true } }, ok)));
+  expect(r.ok).toBe(false);
+  expect(r.frase).not.toMatch(/passa acceso/);
+  expect(r.frase).toMatch(/riaprilo e riprova/);
 });
 
 test('il riquadro di sistema non ha più «Copia»: restano Nascondi e, sulla riga, «Copia il nome»', async ({ app }) => {
