@@ -432,7 +432,7 @@ test('la porta conta ogni blocco una volta, da qualunque strada; chi giudica sol
     assert.match(s, /controllaUscita: portaUscite/, `${f} riceve la porta da ctx col suo nome`);
     assert.match(s, /const controllaUscita = (ContatoriSicurezza|require\('\.\.\/contatoriSicurezza'\))\.contaUscite\(portaUscite\)/, `${f} non la avvolge`);
   }
-  const tutti = ['src/main/services/handlers.js', ...['ai.js', 'misc.js', 'filo.js'].map((f) => join(dir, f))].map(leggi).join('\n');
+  const tutti = [...percorsiDiHandlers(), ...['ai.js', 'misc.js', 'filo.js'].map((f) => join(dir, f))].map(leggi).join('\n');
   assert.match(tutti, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(/);
   assert.doesNotMatch(tutti, /misura\('uscitaFermata'/, 'un chiamante che conta da sé conterebbe due volte');
 });
