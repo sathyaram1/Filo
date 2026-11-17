@@ -90,7 +90,22 @@ function parseFrontMatter(raw) {
 // Inline: link → nota numerata, poi grassetto. L'ordine conta: si escapa PRIMA
 // (così il testo del documento non può iniettare HTML), poi si applicano i
 // pattern, che sopravvivono all'escape perché usano solo [ ] ( ) e *.
-function renderInline(text, sources) {
+// Un link fra documenti si scrive col solo id del documento, `[testo](models)` o `[testo](privacy#sezione)`:
+// diventa un link alla pagina, non una fonte numerata. Un id che non esiste ferma la generazione.
+const LINK_INTERNO = /^([a-z0-9][a-z0-9-]*)(#[a-z0-9-]+)?$/;
+function linkInterno(url, docIds) {
+  const m = LINK_INTERNO.exec(url);
+  if (!m) return null;
+  if (!docIds.has(m[1])) throw new Error(`link a un documento che non esiste: «${url}» (documenti: ${[...docIds].join(', ')})`);
+  return { id: m[1], ancora: m[2] || '' };
+}
+
+// La pagina dentro Filo sceglie il documento con la query, il sito con un file per documento.
+function htmlPerSito(html) {
+  return html.replace(/ href="\?doc=([a-z0-9-]+)(#[a-z0-9-]+)?"/g, (_a, id, ancora) => ` href="./${id}.html${ancora || ''}"`);
+}
+
+function renderInline(text, sources, docIds) {
   let out = escapeHtml(text);
 
   // Un comando da copiare (`…`) si mette da parte prima di link e grassetto: dentro non vale nessun altro segno.
