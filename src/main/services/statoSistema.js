@@ -796,25 +796,56 @@ async function lettoreDiSistema() {
 function annuncia() {
   try {
     const { MSG } = globalThis.SN_MSG;
-    require('./handlers').broadcastToFiloPages({ type: MSG.SISTEMA_AGGIORNATO, stato });
+    require('./handlers').broadcastToFiloPages({ type: MSG.SISTEMA_AGGIORNATO, stato: statoDaDare() });
   } catch (_) {}
+}
+
+// #2394 — le radio lette più di due giri fa (il lettore dormiva, o il PowerShell sta ripartendo) non si danno per
+// accese o spente: chi riceve lo stato le trova in `vecchio` e dice «leggo». L'elenco dei dispositivi rinfresca il
+// Bluetooth (`radioLetta`), e fra due letture della stessa radio vale la più recente.
+const VECCHIO_MS = GIRO_MS * 2;
+const RADIO = ['bluetooth', 'wifi'];
+const letteRadio = { bluetooth: 0, wifi: 0 };
+const lettaAlle = (voce) => Math.max(stato ? stato.letto || 0 : 0, letteRadio[voce] || 0);
+const radioVecchie = (adesso = Date.now()) => (stato ? RADIO.filter((v) => adesso - lettaAlle(v) > VECCHIO_MS) : []);
+function statoDaDare() {
+  const vecchie = radioVecchie();
+  return stato && vecchie.length ? { ...stato, vecchio: vecchie } : stato;
 }
 
 // `letto` è l'ora della lettura vera: una riga di prima del sonno ridisegnata non la rinfresca.
 // Rete caduta o tornata, batteria sotto una soglia, Bluetooth collegato entrano nel filo da qui (#1561): ogni lettura
 // passa di qui, chiunque l'abbia chiesta. Senza una lettura prima non c'è niente da confrontare.
 function pubblica(grezzo, { fresco = true } = {}) {
-  const nuovo = S().normalizza(grezzo);
+  const daRileggere = radioVecchie();
+  const tenute = {};
+  // Una riga di prima del sonno non smentisce la radio che l'elenco ha appena letto.
+  if (!fresco && stato) for (const v of RADIO) if ((letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
+  const nuovo = S().normalizza({ ...grezzo, ...tenute });
   const f = JSON.stringify(nuovo);
   stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
   const prima = ultimoPerFilo;
   ultimoPerFilo = nuovo;
-  if (f !== firma) {
+  // Uno stato uguale a quello di prima si annuncia lo stesso se chi l'ha ricevuto lo sapeva vecchio.
+  const rinfrescate = daRileggere.length > radioVecchie().length;
+  if (f !== firma || rinfrescate) {
     firma = f;
     annuncia();
-    if (prima) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
+    if (prima && f !== JSON.stringify(prima)) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
   }
   return stato;
+}
+
+// La radio letta da un elenco (comandiSistema.js): vale come una lettura del lettore, per quella radio sola.
+function radioLetta(voce, acceso) {
+  if (!stato || !RADIO.includes(voce) || typeof acceso !== 'boolean') return;
+  const prima = stato[voce];
+  if (prima && prima.acceso === acceso && !radioVecchie().includes(voce)) { letteRadio[voce] = Date.now(); return; }
+  const grezzo = { ...stato };
+  if (voce === 'wifi') grezzo.wifi = { acceso };
+  else grezzo.bluetooth = acceso ? { acceso: true, dispositivi: prima && prima.acceso === true ? prima.dispositivi : null } : { acceso: false, dispositivi: [] };
+  letteRadio[voce] = Date.now();
+  pubblica(grezzo, { fresco: false });
 }
 
 // Il lettore dorme quando nessuno guarda: la rete che cade, e su Linux la batteria che scende, si vedono senza
