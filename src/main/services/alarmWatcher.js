@@ -98,12 +98,6 @@ function rientraDaTuttoSchermo(incognito) {
   }
 }
 
-// Il click sulla notifica deve portare dove la suoneria si ferma, cioè in una
-// finestra NORMALE: altrimenti l'unica cosa che l'utente vede non porta da nessuna parte.
-function mostraFinestra() {
-  require('../window').mostraFinestraNormale();
-}
-
 function start() {
   if (handle) return;
   handle = setInterval(() => { tick().catch(() => {}); }, CHECK_MS);
