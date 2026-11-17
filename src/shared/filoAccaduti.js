@@ -194,10 +194,9 @@
         const x = oggetto(m.mossa) ? m.mossa : null;
         if (!x || !['aggiungi', 'togli', 'rinomina', 'sposta'].includes(x.tipo)) return null;
         const a = { type: 'BARRA_SITI', operazione: x.tipo };
-        if (stringa(x.url)) a.indirizzo = x.url;
-        if (stringa(x.percorso)) a.percorso = x.percorso;
+        const cosa = x.tipo === 'aggiungi' ? (x.percorso || x.url) : x.cosa;
+        if (stringa(cosa)) a.elemento = cosa;
         if (stringa(x.nome)) a.nome = x.nome;
-        if (stringa(x.cosa)) a.voce = x.cosa;
         return a;
       },
       riuscita: riuscito,
