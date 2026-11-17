@@ -309,6 +309,7 @@
     }
     visibile = false;
     corrente = null;
+    accendiRotella(false);
     if (!spogliati.size) smettiDiOsservare();
   }
 
