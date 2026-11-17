@@ -18,6 +18,18 @@
 }
 .shell-notif.show { opacity: 1; transform: translateX(0); }
 .shell-notif-msg { line-height: 1.4; word-break: break-word; }
+/* L'icona dice di cosa parla l'avviso (#2390), nel colore d'accento come le carte della home. */
+.shell-notif.con-icona { padding-left: 38px; }
+.shell-notif-ico {
+  position: absolute;
+  left: 13px;
+  top: 11px;
+  width: 16px;
+  height: 16px;
+  color: var(--accent, currentColor);
+  pointer-events: none;
+}
+.shell-notif-ico svg { display: block; }
 /* L'avviso di un file arrivato si prende col mouse come il file (#588.8). */
 .shell-notif[data-trascina="1"] { cursor: grab; }
 .shell-notif[data-trascina="1"] button { cursor: pointer; }

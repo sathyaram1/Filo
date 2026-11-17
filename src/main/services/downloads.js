@@ -594,9 +594,12 @@ function contaProgramma(rec, evento) {
 function avvisaNonRiuscito(rec) {
   const riprova = /^https?:/i.test(String(rec.url || '')) ? [{ label: 'Riprova', riprovaDownloadId: rec.id }] : [];
   shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, {
-    ...chiaveAvviso(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
+    ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
   }, scopeOf(rec));
 }
+
+// #2390 — la carta della home che racconta lo stesso scaricamento: lì la home fa notare lei invece dell'avviso.
+const cartaDi = (rec) => (rec && rec.id ? { carta: `download:${rec.id}` } : {});
 
 function shellToast(text, opts, scope = '') {
   try {
@@ -779,6 +782,7 @@ function completa(rec) {
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
     ...chiaveAvviso(rec),
+    ...cartaDi(rec),
     durationSec: 8,
     tipo: 'download_finito',
     indirizzo: rec.url,
@@ -1144,13 +1148,13 @@ function finalizeManual(rec, state, savePath) {
 function annunciaStreaming(rec, state) {
   if (state === 'completed') {
     shellToast(`Scaricato: ${shortName(rec.filename)}`, {
-      durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
+      ...cartaDi(rec), durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
       actions: [{ label: 'Apri file', openDownloadId: rec.id }, { label: 'Apri cartella', revealDownloadId: rec.id }],
     }, scopeOf(rec));
   } else if (state === 'interrupted') {
     // «Riprova» solo dove riprovare può servire: un limite d'età non cambia ripetendo.
     shellToast(rec.nota || `Video non salvato: ${shortName(rec.filename)}`, {
-      durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
+      ...cartaDi(rec), durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
       ...(rec._riprovabile ? { actions: [{ label: 'Riprova', riprovaDownloadId: rec.id }] } : {}),
     }, scopeOf(rec));
   }

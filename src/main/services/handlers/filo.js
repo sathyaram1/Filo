@@ -837,6 +837,27 @@ module.exports = function register(on, ctx) {
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
   }));
 
+  // #2390 — le carte della colonna nate dagli avvisi della barra: le tiene la shell della finestra della home che chiede.
+  const avvisiDellaHome = (sender) => {
+    const wc = sender && sender.wc;
+    if (!wc) return null;
+    try {
+      for (const w of require('electron').BrowserWindow.getAllWindows()) {
+        const a = !w.isDestroyed() && w._filoTabs && w._filoTabs.avvisi;
+        if (a && a.dellaFinestra(wc)) return a;
+      }
+    } catch (_) {}
+    return null;
+  };
+  on(MSG.AVVISI_COLONNA_LEGGI, soloFilo(async (_msg, sender) => {
+    const a = avvisiDellaHome(sender);
+    return { ok: true, carte: a ? a.colonna() : [] };
+  }));
+  on(MSG.AVVISI_COLONNA_AZIONE, soloFilo(async (msg, sender) => {
+    const a = avvisiDellaHome(sender);
+    return { ok: !!(a && a.azioneDallaHome(msg && msg.id, msg && msg.azione)) };
+  }));
+
   // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
   on(MSG.CARTE_HOME_GET, soloFilo(async () => {
     const Carte = require('../carteHome');

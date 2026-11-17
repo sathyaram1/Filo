@@ -138,7 +138,9 @@ test('la barra delle schede: chiusure per via, spostamenti, voci del menu, massi
   await expect.poll(async () => (await finestra(app)).ambiente, { timeout: 10_000 }).toMatch(/:scuro$/);
 });
 
-test('le notifiche: tipo ed esito, mai il testo; letta, in attesa, sostituita, scaduta', async ({ app, shell, avvisi }) => {
+test('le notifiche: tipo ed esito, mai il testo; letta, in attesa, sostituita, scaduta', async ({ app, shell, avvisi, openTab, testServer }) => {
+  // Su una pagina: nella home un avviso scaduto vola nella colonna invece di uscire di scena (#2390).
+  await testServer.openReady(openTab, '<h1>Una pagina</h1>');
   await shell.evaluate(() => window.filoNotify('Da chiudere con la X', { durationSec: 0, tipo: 'sito_bloccato' }));
   const vista = await avvisi();
   const carta = vista.locator('.shell-notif.show', { hasText: 'Da chiudere con la X' });

@@ -158,6 +158,19 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:pila', wrapped);
       return () => ipcRenderer.removeListener('avvisi:pila', wrapped);
     },
+    // #2390 — Filo davanti o no (lo sa il main), la notifica del sistema, e il suo clic che riporta qui l'avviso.
+    davanti: () => ipcRenderer.invoke('avvisi:davanti'),
+    onDavanti: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:davanti', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:davanti', wrapped);
+    },
+    sistema: (dati) => ipcRenderer.invoke('avvisi:sistema', dati),
+    onRichiama: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:richiama', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:richiama', wrapped);
+    },
   },
   // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
   barra: {

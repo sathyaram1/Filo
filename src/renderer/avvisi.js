@@ -75,6 +75,8 @@
       azioni: Array.isArray(c && c.azioni) ? c.azioni.map((a) => String(a || '')) : [],
       chiusa: !!(c && c.chiusa),
       trascina: !!(c && c.trascina),
+      // L'SVG lo scrive il main dalla libreria delle icone: niente che venga da chi manda l'avviso.
+      svg: typeof (c && c.svg) === 'string' && c.svg.startsWith('<svg') ? c.svg : '',
     })).filter((c) => c.id);
   }
 
@@ -107,6 +109,13 @@
     if (c.trascina) card.dataset.trascina = '1'; else delete card.dataset.trascina;
     const msg = card.querySelector('.shell-notif-msg');
     if (msg.textContent !== c.testo) msg.textContent = c.testo;
+    if (card._svg !== c.svg) {
+      card._svg = c.svg;
+      let ico = card.querySelector('.shell-notif-ico');
+      if (c.svg && !ico) { ico = document.createElement('span'); ico.className = 'shell-notif-ico'; card.insertBefore(ico, msg); }
+      if (ico) { if (c.svg) ico.innerHTML = c.svg; else ico.remove(); }
+      card.classList.toggle('con-icona', !!c.svg);
+    }
     const firma = JSON.stringify(c.azioni);
     if (card.dataset.firma !== firma) {
       card.dataset.firma = firma;

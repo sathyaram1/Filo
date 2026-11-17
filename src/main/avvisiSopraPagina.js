@@ -11,9 +11,27 @@ const AZIONE = /^(chiudi|\d{1,2})$/;
 const PILA = /^(apri|riduci|chiudi-tutti)$/;
 const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
+const ICONA = /^[a-z][A-Za-z]{0,30}$/;
+const CARTA = /^(timer|download):[A-Za-z0-9_-]{1,80}$/;
+// L'azione dalla home su una carta della colonna (#2390): quelle della vista, più «assorbi» (la home ha già la carta).
+const AZIONE_HOME = /^(chiudi|assorbi|\d{1,2})$/;
+
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
 const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
+const icona = (v) => (ICONA.test(testo(v)) ? testo(v) : '');
+
+// L'SVG dell'icona lo scrive il main dalla libreria: la vista non carica script d'altre origini.
+function svgIcona(nome) {
+  if (!nome) return '';
+  try {
+    if (!globalThis.SN_ICONS) require('../shared/icons.js');
+    const I = globalThis.SN_ICONS;
+    const f = I && Object.prototype.hasOwnProperty.call(I, nome) ? I[nome] : null;
+    const svg = typeof f === 'function' ? f(16) : '';
+    return typeof svg === 'string' && svg.startsWith('<svg') ? svg : '';
+  } catch (_) { return ''; }
+}
 
 // Lo stato arriva dalla shell: se ne tengono solo le forme attese, senza tagliare i testi.
 function pulisci(stato) {
@@ -26,6 +44,18 @@ function pulisci(stato) {
       chiusa: c.chiusa === true,
       indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
       trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
+      icona: icona(c.icona),
+    }));
+  const colonna = (Array.isArray(stato && stato.colonna) ? stato.colonna : [])
+    .filter((c) => c && typeof c === 'object' && c.id)
+    .map((c) => ({
+      id: testo(c.id),
+      testo: testo(c.testo),
+      azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
+      icona: icona(c.icona),
+      titolo: testo(c.titolo).slice(0, 80),
+      carta: CARTA.test(testo(c.carta)) ? testo(c.carta) : '',
+      vola: Math.max(0, Math.round(Number(c.vola) || 0)),
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
   const aperta = !!(stato && stato.aperta === true);
@@ -36,7 +66,18 @@ function pulisci(stato) {
       if (NOME_VAR.test(k) && typeof v === 'string') vars[k] = v;
     }
   }
-  return { carte, altre, aperta, tema: { vars } };
+  return { carte, altre, aperta, tema: { vars }, colonna };
+}
+
+// Le home di questa finestra (anche quella tenuta pronta per la prossima scheda nuova).
+function homeDi(win) {
+  const tm = win && !win.isDestroyed?.() ? win._filoTabs : null;
+  if (!tm) return [];
+  let viste = [];
+  try { viste = require('./tabs/riservaNuovaScheda').vistePerAnnunci(tm); } catch (_) { viste = []; }
+  return viste.filter(({ wc }) => {
+    try { return wc && !wc.isDestroyed() && /^filo:\/\/newtab\//i.test(wc.getURL() || ''); } catch (_) { return false; }
+  });
 }
 
 class AvvisiSopraPagina {
@@ -52,7 +93,8 @@ class AvvisiSopraPagina {
     this.schedaAttiva = schedaAttiva;
     this.vista = null;
     this.pronta = false;
-    this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} } };
+    this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} }, colonna: [] };
+    this.firmaColonna = '[]';
     this.misura = { w: 0, h: 0 };
     this.altezza = 0;
     this.larghezza = 0;
@@ -70,12 +112,43 @@ class AvvisiSopraPagina {
   aggiorna(stato) {
     this.stato = pulisci(stato);
     this._nelFilo(this.stato.carte);
+    this._allaHome();
     if (!this.stato.carte.length) {
       if (this.vista) { this._invia(); this.posa(); }
       return;
     }
     if (!this._vista()) return;
     this._invia();
+  }
+
+  // #2390 — la colonna della home è della finestra: ogni sua home la riceve quando cambia.
+  _allaHome() {
+    const firma = JSON.stringify(this.stato.colonna);
+    if (firma === this.firmaColonna) return;
+    this.firmaColonna = firma;
+    const M = globalThis.SN_MSG && globalThis.SN_MSG.MSG;
+    if (!M) return;
+    const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
+    for (const { wc, inVista } of homeDi(this.win)) {
+      try { spingiAllaScheda(wc, { type: M.AVVISI_COLONNA, carte: this.stato.colonna }, { inVista }); } catch (_) {}
+    }
+  }
+
+  // Chi è la home che chiede: una di questa finestra, o nessuna.
+  dellaFinestra(wc) {
+    return homeDi(this.win).some((v) => v.wc === wc);
+  }
+
+  colonna() { return this.stato.colonna; }
+
+  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista.
+  azioneDallaHome(id, azione) {
+    const i = testo(id);
+    const a = testo(azione);
+    if (!AZIONE_HOME.test(a) || !this.stato.colonna.some((c) => c.id === i)) return false;
+    if (!this.win || this.win.isDestroyed()) return false;
+    try { this.win.webContents.send('avvisi:azione', { id: i, azione: a }); } catch (_) { return false; }
+    return true;
   }
 
   // Ogni carta che la cornice mette a schermo, o il cui testo cambia, è un avviso visto: entra nel filo da qui, chiunque
@@ -206,6 +279,12 @@ class AvvisiSopraPagina {
         : { label: 'Mostra tutti', action: 'avvisi:apri' });
     } else {
       voci.push(...carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label));
+      // #2390 — «apri»: il sito da cui l'avviso è nato, in una scheda.
+      if (carta.indirizzo) {
+        let host = '';
+        try { host = new URL(carta.indirizzo).hostname.replace(/^www\./, ''); } catch (_) { host = ''; }
+        if (host) voci.push({ label: `Apri ${host}`, action: 'avviso:apri' });
+      }
       if (voci.length) voci.push({ type: 'separator' });
       voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
     }
@@ -217,6 +296,11 @@ class AvvisiSopraPagina {
       const s = testo(scelta);
       const comando = /^@action:avvisi:([a-z-]+)$/.exec(s);
       if (comando) { this._pila(comando[1]); return; }
+      if (s === '@action:avviso:apri') {
+        if (carta && carta.indirizzo) { try { this.win._filoTabs.openTab(carta.indirizzo); } catch (_) {} }
+        this.restituisciTastiera();
+        return;
+      }
       const m = /^@action:avviso:(chiudi|\d{1,2})$/.exec(s);
       if (!m || !carta) return;
       try { this.win.webContents.send('avvisi:azione', { id, azione: m[1] }); } catch (_) {}
@@ -263,7 +347,8 @@ class AvvisiSopraPagina {
 
   _invia() {
     if (!this.pronta || !this.vista) return;
-    try { this.vista.webContents.send('avvisi:stato', this.stato); } catch (_) {}
+    const carte = this.stato.carte.map((c) => ({ ...c, svg: svgIcona(c.icona) }));
+    try { this.vista.webContents.send('avvisi:stato', { ...this.stato, carte, colonna: undefined }); } catch (_) {}
   }
 
   _vista() {
