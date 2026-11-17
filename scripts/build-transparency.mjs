@@ -98,6 +98,10 @@ function renderInline(text, sources) {
   out = out.replace(/`([^`]+)`/g, (_all, c) => `${codici.push(c) - 1}`);
 
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_all, label, url) => {
+    const interno = linkInterno(url, docIds);
+    if (interno) {
+      return `<a class="sn-doc-link" href="?doc=${interno.id}${interno.ancora}">${label}</a>`;
+    }
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
     if (idx === -1) {
