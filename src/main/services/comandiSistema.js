@@ -98,9 +98,10 @@ function ElencoBt {
     $contenitore = ''
     try { $contenitore = ([string]$d.Properties['System.Devices.Aep.ContainerId']).Trim('{}').ToLower() } catch {}
     $nome = [string]$d.Name
-    if ((-not $nome.Trim()) -and $le) {
+    if ((-not $nome.Trim()) -and $le -and $cercati -lt 3) {
+      $cercati += 1
       try {
-        $dev = AttendiElenco ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) 3000
+        $dev = AttendiElenco ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) 2000
         if ($null -ne $dev) { $nome = [string]$dev.Name }
       } catch {}
     }
