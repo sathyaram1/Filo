@@ -1065,6 +1065,11 @@ dicono gli esperimenti (§ 4.6).
   ne toglie al più 400 a giro (100 al primo), distanziati, e al primo rifiuto
   di GitHub per troppe richieste si ferma: il resto lo conta come rimandato al
   lunedì dopo. L'agente non allunga l'elenco.
+- **L'agente controlla che la cancellazione funzioni.** Il server gli passa
+  l'esito del suo ultimo giro (quando, tolti, rimandati, guasti): i candidati
+  già cancellabili prima di quel giro che restano non superano rimandati più
+  guasti, e un giro vecchio di oltre otto giorni vuol dire che non è partito.
+  Altrimenti è un feedback.
 - **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
   i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
   fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
