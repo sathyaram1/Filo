@@ -255,13 +255,12 @@
     }
   }
 
-  function disegna(testo) {
+  // `daCapo`: un fumetto che si apre parte dall'inizio; quello aperto che si aggiorna resta dove lo si è scorso.
+  function disegna(testo, { daCapo = false } = {}) {
     bolla();
     colora();
-    if (tipEl.textContent !== testo) {
-      tipEl.textContent = testo;
-      tipEl.scrollTop = 0;
-    }
+    const nuovo = tipEl.textContent !== testo;
+    if (nuovo) tipEl.textContent = testo;
     const zoom = Number(host.currentCSSZoom) || 1;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
