@@ -212,6 +212,13 @@
       description: 'operazione togli, rimetti, sposta (verso su|giu|cima|fondo, o prima_di), ripristina. A destra editor, suggerimenti, rapide; a sinistra timer, avvisi, scaricamenti…, detti a parole.',
       properties: { operazione: S(), carta: S(), verso: S(), prima_di: S() }, required: ['operazione'],
     },
+    BARRA_SITI: {
+      via: ['home', 'barra_siti'],
+      description: 'la barra dei siti e dei programmi della nuova scheda: operazione elenca, aggiungi (indirizzo di un sito, o percorso intero di un programma del computer; nome facoltativo), togli, rinomina (nome), sposta (verso cima|fondo|sinistra|destra, o prima_di). La voce si dice col nome o l\'indirizzo.',
+      properties: { operazione: S({ enum: ['elenca', 'aggiungi', 'togli', 'rinomina', 'sposta'] }), indirizzo: S(), percorso: S(), nome: S(), voce: S(), verso: S(), prima_di: S() },
+      required: ['operazione'],
+      risultato: true,
+    },
     SPOSTA_ICONA: {
       via: ['home', 'icona'],
       description: () => {
