@@ -3,6 +3,10 @@
 // la scelta arriva in config/routines.roleModels, si ritrova riaprendo la pagina, si toglie, e mai un valore non letto.
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import '../src/shared/routineModelli.js';
+
+// L'elenco delle fasi lo tiene tests/unit/routineModelli.test.mjs: qui la pagina deve mostrarle tutte (#2561).
+const RUOLI = globalThis.SN_ROUTINE_MODELLI.RUOLI;
 
 const URL = 'filo://manage/manage.html';
 
