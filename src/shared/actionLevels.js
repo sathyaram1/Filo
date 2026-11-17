@@ -539,7 +539,7 @@
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
       // Con degli allegati chiede sempre: le miniature di quello che parte stanno nel riquadro (#1668).
       perimetro: (a, ctx) => !segnalazioneConAllegati(a) && CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
-      perchePerimetro: (a) => (segnalazioneConAllegati(a) ? 'Con degli allegati Filo chiede sempre: guarda cosa parte.' : ''),
+      perchePerimetro: (a) => (segnalazioneConAllegati(a) ? 'Con degli allegati te lo chiedo sempre: guarda cosa parte.' : ''),
       describe: (a) => {
         // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
         // che parte a nome dell'utente, e un consenso su un testo che non si
