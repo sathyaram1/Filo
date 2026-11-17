@@ -109,7 +109,8 @@
 //         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
-//         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
+//         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione). Un doppione aggiunge
+//         `--doppione-di <num>`: la fusione è quella dell'originale, che il server vuole chiuso (#2046).
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
@@ -1651,7 +1652,7 @@ export const CAMPI_DELLA_RIGA = Object.freeze([
   'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
   'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-  'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
+  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto',
   ...CAMPI_PERIZIA,
 ]);
 
@@ -1693,7 +1694,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
+    'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1811,14 +1812,15 @@ if (isMain) {
     }
   }
 
-  // `--feedback`, `--piano`, `--fusione` e `--motivo` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
+  // `--feedback`, `--piano`, `--fusione`, `--doppione-di` e `--motivo` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
   {
     const intentoDi = () => [args[0], args[1]].find((a) => INTENTI_CONSEGNA.includes(a)) || '';
     const fuori = data.feedback !== undefined && cmd !== 'ticket' ? '--feedback vale solo con ticket'
       : data.motivo !== undefined && !(cmd === 'deliver' && intentoDi() === 'fixed') ? '--motivo vale solo con deliver fixed'
       : data.piano !== undefined && !(cmd === 'deliver' && intentoDi() === 'piano') ? '--piano vale solo con deliver piano'
         : data.fusione !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--fusione vale solo con deliver status --status done --reason gia_risolto'
-          : '';
+          : data['doppione-di'] !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--doppione-di vale solo con deliver status --status done --reason gia_risolto --fusione <sha>'
+            : '';
     if (fuori) { console.error(`${fuori}: non ho fatto niente.`); process.exit(1); }
   }
 
@@ -2362,15 +2364,22 @@ if (isMain) {
       data.piano = p.testo;
     }
     // Già risolto su main: chiude senza ramo, con la fusione che lo prova, il report e la frase.
-    if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined)) {
+    // Un doppione (#2046) porta il numero dell'originale. Quale fusione è dell'originale lo decide solo il server, che
+    // legge il suo ramo e la sua chiusura: un'approvazione dell'owner non ne cita il numero.
+    if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined || data['doppione-di'] !== undefined)) {
+      const { numeroFeedback } = await import('./lib/su-main.mjs');
+      const originale = data['doppione-di'] === undefined ? '' : numeroFeedback(data['doppione-di']);
       const manca = data.status !== 'done' || data.reason !== 'gia_risolto' ? 'va con --status done --reason gia_risolto'
         : typeof data.fusione !== 'string' ? 'vuole --fusione <sha della fusione su main>'
-          : !String(data.notes || '').trim() ? 'vuole --notes "<cosa hai controllato>"'
-            : !String(data.userNote || '').trim() ? 'vuole --frase "<cosa trova adesso chi ha segnalato>"' : '';
+          : data['doppione-di'] !== undefined && !originale ? `vuole in --doppione-di il numero dell'originale (#1776 o 1776), non "${String(data['doppione-di']).slice(0, 40)}"`
+            : !String(data.notes || '').trim() ? 'vuole --notes "<cosa hai controllato>"'
+              : !String(data.userNote || '').trim() ? 'vuole --frase "<cosa trova adesso chi ha segnalato>"' : '';
       if (manca) { console.error(`La chiusura «già risolto su main» ${manca}: non ho consegnato niente.`); process.exit(1); }
       const f = controllaFusione(ROOT, data.fusione);
       if (!f.ok) { console.error(`${f.errore} Non ho consegnato niente.`); process.exit(1); }
       data.fusione = f.sha;
+      delete data['doppione-di'];
+      if (originale) data.doppioneDi = originale;
     }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
