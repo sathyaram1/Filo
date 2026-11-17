@@ -120,6 +120,9 @@ test('il worker parte nel suo clone, sul ramo del lavoro; la cartella della sess
     const ruolo = ruoloConsegnato(json);
     assert.ok(ruolo.startsWith('## La tua cartella'), ruolo.slice(0, 200));
     assert.ok(ruolo.includes(`cd "${clone}" && …`));
+    // #2188: un Edit su un file letto altrove, o solo dalla shell, è rifiutato e costa un turno.
+    assert.match(ruolo, /Grep e Glob senza `path`[^]*cartella della sessione/);
+    assert.match(ruolo, /Prima di Edit si legge con Read, in questa sessione/);
     // Le ricette del ruolo puntano agli strumenti del clone: le consegne del worker finiscono lì. Il percorso nelle
     // ricette ha le barre normali su ogni sistema: confrontato nella forma nativa, su Windows non si trova.
     const ricetta = `node "${pinnedDirWorker(1, s.strumenti).split('\\').join('/')}/scripts/routine-channel.mjs"`;

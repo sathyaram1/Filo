@@ -95,38 +95,48 @@ test('la scheda che salta da sola su siti di domini diversi non riparte da capo;
   assert.match(tabs, /navigazioneDiFilo\(tab\.view\.webContents\);\s*if \(caduta \|\| this\._needsRecreate\(tab, target\)\)/, 'la barra degli indirizzi lo segna, anche quando la vista rinasce');
 });
 
-test('la scheda che rinasce in una vista nuova (Privacy fra siti) tiene il conto e il no; un indirizzo dell\'utente la azzera', () => {
+test('la scheda che rinasce in una vista nuova (Privacy fra siti) tiene il conto e il no; un indirizzo dell\'utente la azzera', (t) => {
+  // Orologio finto: sul vero il no e l'indirizzo scritto cadevano a volte nello stesso millisecondo, e il pari tiene il
+  // segno (#2342). Fra due passi dell'utente il tempo passa davvero.
+  t.mock.timers.enable({ apis: ['Date'], now: ADESSO });
+  const passa = (ms) => t.mock.timers.tick(ms);
   let url = 'https://primo.example/';
   const vecchia = pagina(sessione(), url);
   vecchia.getURL = () => url;
   assert.equal(esito(vecchia, false, Date.now()), 'via');
   // La pagina salta da sola su un altro sito: in Privacy la vista e la sessione sono nuove.
+  passa(1500);
   const nuova = pagina(sessione(), 'https://secondo.example/');
   P.passaScheda(vecchia, nuova);
-  assert.equal(esito(nuova, false, Date.now() + 1500), 'chiedi', 'il conto della scheda non riparte da capo');
+  assert.equal(esito(nuova, false, Date.now()), 'chiedi', 'il conto della scheda non riparte da capo');
 
+  passa(1000);
   const ferma = pagina(sessione(), 'https://terzo.example/');
   P.chiediScaricamenti(ferma, () => {});
   P.rispondi(ferma.session.avvisi.findLast((a) => a.evento === 'chiedi').dati.id, false);
+  passa(1000);
   const dopoIlNo = pagina(sessione(), 'https://quarto.example/');
   P.passaScheda(ferma, dopoIlNo);
   assert.equal(esito(dopoIlNo, false, Date.now()), 'no', 'il no dato sulla scheda resta con la vista nuova');
   assert.deepEqual(P.scelteDi(dopoIlNo).scelte.map((s) => [s.parte, s.si]), [['scaricamenti', false]], 'e si vede nel menu della scheda');
 
   // Un indirizzo scritto dall'utente segna la vista vecchia prima che rinasca: la nuova parte pulita.
+  passa(2000);
   const scritta = pagina(sessione(), 'https://scritto.example/');
   P.navigazioneDiFilo(dopoIlNo);
   P.passaScheda(dopoIlNo, scritta);
-  assert.equal(esito(scritta, false, Date.now() + 1), 'via');
+  passa(1);
+  assert.equal(esito(scritta, false, Date.now()), 'via');
   const tabs = readFileSync(new URL('../../src/main/tabs.js', import.meta.url), 'utf8');
   assert.match(tabs, /_recreateView\(tab, url, opts = \{\}\) \{[\s\S]{0,1200}?Permessi\.passaScheda\(vecchia, view\.webContents\)/, 'ogni vista che rinasce lo passa');
 });
 
 test('la chat e lo strumento che il modello legge nominano gli stessi permessi, e la chat li capisce tutti', () => {
   const strumenti = readFileSync(new URL('../../src/shared/actionTools.js', import.meta.url), 'utf8');
-  const riga = strumenti.slice(strumenti.indexOf('TOGLI_PERMESSO_SITO'), strumenti.indexOf('LEGGI_TRASPARENZA'));
+  const da = strumenti.indexOf('TOGLI_PERMESSO_SITO: {');
+  const riga = strumenti.slice(da, strumenti.indexOf('INSTALLA_AGGIORNAMENTO: {', da));
   for (const nome of P.PERMESSI_DA_CHAT) {
-    assert.match(riga, new RegExp(`"${nome}"`), `lo strumento offre «${nome}» al modello`);
+    assert.match(riga, new RegExp(`[ (]${nome}[,)]`), `lo strumento offre «${nome}» al modello`);
     assert.equal(P.togliPerChat('nessuno.example', nome).errore, undefined, `la chat capisce «${nome}»`);
   }
 });

@@ -138,7 +138,7 @@ e un modulo nuovo va aggiunto lì.
 
 Le API `chrome.*` usate dal codice nato nell'estensione sono ricreate in tre
 posti, uno per contesto: `src/main/shim/chrome-api.js` nel main,
-`src/preload/internal-preload.js` nelle pagine `filo://` (passa ogni chiamata
+`src/preload/chrome-shim.js` nelle pagine `filo://` (passa ogni chiamata
 al main via IPC), `src/preload/page-preload.js` nelle pagine web. Lo storage è
 un file JSON, `storage.json`, nella cartella dati dell'app
 (`app.getPath('userData')`), che cambia da un sistema all'altro.
@@ -155,7 +155,7 @@ Un messaggio IPC nuovo:
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~690 spec, ~4.650 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~730 spec, ~4.650 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 

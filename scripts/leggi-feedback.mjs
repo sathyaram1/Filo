@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
-import { motiviDiLettura, rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
+import { motiviDiLettura, noteFidateDaCampi, rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
 import { inBusta } from './lib/busta.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
@@ -27,7 +27,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia', globalThis.SN_FB_ATTESE.CAMPO];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia', TH.CAMPO_NOTE_FIDATE, globalThis.SN_FB_ATTESE.CAMPO];
 // Un documento testuale, o la conversazione, si stampa nella cornice fino a qui; oltre va in un file (con la cornice),
 // e la riga lo dice: una conversazione al suo tetto (400.000 byte) sarebbe un pieno di contesto a ogni turno.
 const MAX_IN_LINEA = 60000;
@@ -353,7 +353,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     cartella: dove,
   });
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
-  const motivi = motiviDiLettura({ fiducia, notes: pieno.notes });
+  const motivi = await motiviDiLettura({ fiducia, notes: pieno.notes, noteFidate: noteFidateDaCampi(f) });
   fb.attese = await attese;
   const maiGiudicato = g.esito === 'mai_giudicato' ? g.motivo : '';
   return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove), { maiGiudicato }), ...allegati].join('\n'), motivi, numero };

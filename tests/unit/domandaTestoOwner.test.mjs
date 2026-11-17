@@ -132,3 +132,17 @@ test('la regola dice la forma: titolo fino a 10 parole, almeno due opzioni con p
   assert.equal(D.TETTI.opzioniMinime, 2);
 });
 
+// #2231.1: le famiglie che chi smista chiude da sé col registro, chi chiede non le scrive; nessun pezzo lo manda a farlo.
+test('chi chiede sa le stesse famiglie che chi smista chiude col registro, e nessun pezzo gli dice di aprirne una', () => {
+  const smista = piatto(readFileSync(join(RUOLI, 'smistamento.md'), 'utf8'));
+  const famiglie = smista.slice(smista.indexOf('Due famiglie il registro le copre sempre'));
+  const principi = famiglie.slice(0, famiglie.indexOf('Restano all\'owner')).match(/D-\d+/g);
+  assert.deepEqual(principi, ['D-149', 'D-224']);
+  const regola = piatto(readFileSync(join(RUOLI, '_domanda-per-owner.md'), 'utf8'));
+  for (const d of principi) assert.ok(regola.includes(`(${d})`), `la regola per chi chiede cita ${d}`);
+  for (const [ruolo, opts] of [['new-work', {}], ['fixer', {}], ['fixer', { caso: 'ripresa' }], ['verifier', { scope: 'pieno' }]]) {
+    const t = piatto(readRoleInstructions(ruolo, opts));
+    assert.doesNotMatch(t, /priorit[àa][^.]{0,80}domanda a parte/, `${ruolo}: una priorità non va in una domanda a parte`);
+  }
+});
+

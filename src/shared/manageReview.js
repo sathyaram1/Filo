@@ -78,12 +78,31 @@
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
   }
   // Un lavoro server che nessuna routine prende perché il suo biglietto nascerebbe non fidato (#2036): i motivi li
-  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda.
-  function restaLocale(fb) {
+  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda, e solo coi
+  // lavori server accesi: spenti, il lavoro è in mano locale e il segno rimasto non dice più niente (#2036.1).
+  function restaLocale(fb, { lavoriServer } = {}) {
     const r = fb && fb.restaLocale;
+    if (lavoriServer === false) return null;
     if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
-    return motivi.length ? { motivi, atMs: Number(r.atMs) || 0 } : null;
+    if (!motivi.length) return null;
+    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, fb.branch)))];
+    return { motivi, sblocchi, atMs: Number(r.atMs) || 0 };
+  }
+  // Nessun motivo del fermo passa da solo (#2036.1): uno sporco non torna pulito, un registro bucato lo sana solo
+  // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
+  function sbloccoFermo(motivo, ramo) {
+    const m = String(motivo || '').toLowerCase();
+    if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
+    if (/ramo|registro/.test(m)) {
+      const server = /server/.test(m);
+      const nome = String(ramo || '').trim() || '<ramo>';
+      return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
+        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, «Dichiara fidato com’è» nel dettaglio, dopo averlo letto.`;
+    }
+    if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
+    if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
+    return `«${String(motivo).trim()}» non passa da solo: lo sblocca un tuo gesto o una sessione locale.`;
   }
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
@@ -1737,6 +1756,19 @@
     return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
+  // Il documento in mano alla pagina è stato scritto prima di `atMs`? L'ora firmata da chi scrive (`updatedAt`), se no
+  // quella di Firestore (`_updateTime`); senza nessuna delle due non si sa, e vale no.
+  function documentoDiPrima(fb, atMs) {
+    const at = Number(atMs);
+    if (!isFinite(at) || at <= 0) return false;
+    const valore = (v) => {
+      const ms = typeof v === 'number' ? v : Date.parse(String(v || ''));
+      return isFinite(ms) && ms > 0 ? ms : 0;
+    };
+    const doc = valore(fb && fb.updatedAt) || valore(fb && fb._updateTime);
+    return doc > 0 && doc < at;
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
@@ -1759,11 +1791,13 @@
     const ferme = pending.concat(failed);
     if (!ferme.length && fermaDaStato) {
       // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
-      // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
+      // adesso. Un lavoro server dopo il sì passa in revisione: è ancora fusa finché il documento che la pagina conosce
+      // è di prima della fusione (#2250); cambiato dopo e ancora qui, l'ha fermata il cancello del server.
       const ultima = lista('recent').slice().sort((a, b) => (Number(b.createdAtMs) || 0) - (Number(a.createdAtMs) || 0))[0];
       const ramo = String(fb.branch || '');
-      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
-        && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
+      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged'
+        && (!ramo || !ultima.branch || String(ultima.branch) === ramo)
+        && (!isLocalOnly(fb) || documentoDiPrima(fb, ultima.decidedAtMs));
       if (fusa) {
         return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
           titolo,
@@ -2151,6 +2185,17 @@
   function segnoFiducia(x) {
     return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
+  // Lo stesso scudo su ogni nota della conversazione (#1919): chi la legge si sporca solo per quelle non fidate.
+  const SEGNI_FIDUCIA_NOTA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Nota fidata',
+      testo: 'Nota fidata: l’hai scritta tu, o un lavoro che non aveva letto niente di non fidato. Chi la legge resta pulito.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Nota non fidata',
+      testo: 'Nota non fidata: l’ha scritta, o registrata come tua risposta, chi aveva letto testo non fidato; oppure è di prima che il server segnasse la fiducia delle note. Chi la legge si sporca.' }),
+  });
+  /** Il segno della fiducia di una nota, da `fidata` di SN_FEEDBACK_THREAD.fiduciaDelleNote. PURA. */
+  function segnoFiduciaNota(fidata) {
+    return fidata === true ? SEGNI_FIDUCIA_NOTA.fidata : SEGNI_FIDUCIA_NOTA.nonfidata;
+  }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
    *  frase c'è già, che si legge intera nell'hover. Soli spazi = nessuna frase. PURA. */
@@ -2176,7 +2221,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, sbloccoFermo, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, chiedeFiduciaPerLaCoda, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,
@@ -2191,7 +2236,7 @@
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
-    filtraFiducia, contaNonFidate, segnoFiducia,
+    filtraFiducia, contaNonFidate, segnoFiducia, segnoFiduciaNota,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

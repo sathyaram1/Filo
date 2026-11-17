@@ -175,6 +175,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo riquadri] campoTesto.js', e); }
   try { require(path.join(SHARED_DIR, 'schedeInChat.js')); } catch (e) { console.error('[Filo riquadri] schedeInChat.js', e); }
   try { require(path.join(SHARED_DIR, 'schedaTrascinata.js')); } catch (e) { console.error('[Filo riquadri] schedaTrascinata.js', e); }
+  try { require(path.join(SHARED_DIR, 'testoDiAltri.js')); } catch (e) { console.error('[Filo riquadri] testoDiAltri.js', e); }
   try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo riquadri] ricercaCampo.js', e); }
   try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo riquadri] accessoFisso.js', e); }
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo riquadri] urlNav.js', e); }

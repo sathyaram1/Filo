@@ -66,7 +66,9 @@ test('main: le schede del messaggio arrivano al modello come letture di pagina, 
   assert.match(nota, /pageReadsForPrompt\(letture\)/);
   // La stessa lettura di LEGGI_PAGINA.
   assert.match(src, /case 'LEGGI_PAGINA': \{[\s\S]{0,2000}leggiPaginaDa\(url, da, sender\)/);
-  const turno = src.slice(src.indexOf('async function turnoFiloChat'), src.indexOf('async function turnoFiloChat') + 30000);
+  // Fino alla graffa che chiude la funzione: una finestra di lunghezza fissa si rompe appena la funzione cresce.
+  const inizioTurno = src.indexOf('async function turnoFiloChat');
+  const turno = src.slice(inizioTurno, src.indexOf('\n}\n', inizioTurno));
   assert.match(turno, /azioniViste\.push\(\.\.\.lettureGettoni\)/);
   assert.match(turno, /renderedActions = \[\.\.\.lettureGettoni\]/);
   assert.match(turno, /notaDeiGettoni\(lettureGettoni\)/);

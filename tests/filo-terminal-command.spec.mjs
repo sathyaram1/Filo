@@ -92,10 +92,20 @@ test('livello 3: rm, comando inventato e concatenazione richiedono "conferma"', 
   // La concatenazione resta livello 3 SOLO se contiene un comando rischioso
   // (qui `rm`): il massimo dei pezzi vince. Una sequenza di sole letture è
   // gestita dal test successivo (#201).
-  for (const comando of ['rm qualcosa', 'comandoinventato', 'echo a && rm b']) {
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+  // Il comando sconosciuto dopo una lettura; cancellare per sempre vuole la parola a conversazione pulita, e dopo una
+  // lettura è un no (#1840).
+  const sconosciuto = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'comandoinventato' });
+  expect(sconosciuto.executed).toBe(false);
+  expect(sconosciuto.needsConfirm).toBe(3);
+  for (const comando of ['rm qualcosa', 'echo a && rm b']) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando }, {});
     expect(r.executed, comando).toBe(false);
     expect(r.needsConfirm, comando).toBe(3);
+  }
+  for (const comando of ['rm qualcosa', 'echo a && rm b']) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, comando).toBe(false);
+    expect(r.no, comando).toBe(true);
   }
 });
 
@@ -165,12 +175,14 @@ test('#516 — una lettura composta (conteggio, controllo che la cartella esista
     expect(r.executed).toBe(true);
     expect(r.output.stdout.trim()).toBe('3');
 
-    // Lo stesso costrutto con dentro una cancellazione resta a «conferma», e il file c'è ancora.
+    // Lo stesso costrutto con dentro una cancellazione resta a «conferma» (dopo una lettura è un no), e il file c'è ancora.
     const file = path.join(dir, 'a.txt');
     for (const pericoloso of [`if (Test-Path "${file}") { Remove-Item "${file}" }`, `ls (Remove-Item "${file}")`]) {
-      const p = await execAction(app, { type: 'ESEGUI_COMANDO', comando: pericoloso });
+      const p = await execAction(app, { type: 'ESEGUI_COMANDO', comando: pericoloso }, {});
       expect(p.executed, pericoloso).toBe(false);
       expect(p.needsConfirm, pericoloso).toBe(3);
+      const letto = await execAction(app, { type: 'ESEGUI_COMANDO', comando: pericoloso });
+      expect(letto.executed, pericoloso).toBe(false);
     }
     expect(fs.existsSync(file)).toBe(true);
   } finally {

@@ -83,6 +83,8 @@
     user('filo-dashboard', 'Generazione della home', 'Home', A.FILO_DASHBOARD),
     user('filo-lesson', 'Cosa vale la pena ricordare dopo una conversazione', 'Memoria', A.FILO_LESSON),
     user('filo-compact', 'Riordino dei ricordi', 'Memoria', A.FILO_COMPACT),
+    user('filo-compattazione', 'Compattazione della chat', 'Home', A.FILO_COMPATTAZIONE,
+      'Quando la chat ha davanti troppo (70.000 token di serie), riassume il pezzo più vecchio in righe con l\'ora, così le richieste restano sotto la soglia oltre la quale il modello costa cinque volte tanto. Vuoto: il modello della chat.'),
     user('filo-chat-triage', 'Titolo e tipo di una chat finita', 'Home', A.FILO_CHAT_TRIAGE,
       'Alla chiusura di una chat le dà un titolo breve e decide se era una conversazione da rileggere o solo un comando. Senza, le chat restano in archivio col primo messaggio come titolo, tutte fra le conversazioni.'),
 

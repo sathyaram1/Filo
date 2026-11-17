@@ -24,11 +24,12 @@ test('il costo: compare 1, scritto dal modello 3', () => {
   assert.equal(L.costoFor({ type: 'NAVIGA', url, _nonCompare: true }), 3);
 });
 
-test('coi dati della memoria dentro, l\'indirizzo scritto chiede un OK e non finisce nell\'elenco fisso', () => {
+test('coi dati della memoria dentro, l\'indirizzo scritto chiede un OK e non è un segreto che esce', () => {
   const url = 'https://www.comune.bologna.it/quartieri/navile';
   for (const type of ['NAVIGA', 'LEGGI_PAGINA']) {
     const ing = L.ingressi({ type, url, _nonCompare: true, _exfilReason: 'contiene più dati presi dalla tua memoria/contesto' });
-    assert.equal(ing.elenco, '', type);
+    assert.equal(ing.segreto, '', type);
+    assert.equal(ing.costo, 3, `${type}: non è un costo 4`);
     assert.equal(A.decide({ ...ing, livello: 'default', stato: 'contaminato' }), 'conferma', `${type}: il main la rende un OK`);
     assert.equal(A.decide({ ...ing, livello: 'automatico', stato: 'contaminato' }), 'chiede', type);
   }

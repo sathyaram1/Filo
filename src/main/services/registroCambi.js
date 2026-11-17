@@ -200,7 +200,19 @@ async function livelloDi(id) {
   await attesa();
   const lista = await leggiLista();
   const e = daRimettere(bersaglio(lista, id), lista);
-  return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id } : null;
+  return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id, ...(await annulloAllenta(e)) } : null;
+}
+// Il verso del freno lo giudica la regola delle preferenze sul pezzo che l'annullo scriverebbe adesso (#1840): rimettere
+// com'era una protezione la stringe. Senza saperlo giudicare, vale come abbassata. `dove`: la pagina per farlo a mano.
+const DOVE_IGNOTO = 'Si rimette a mano nelle impostazioni di Filo, dove sta la voce.';
+async function annulloAllenta(e) {
+  try {
+    const P = globalThis.SN_PREF;
+    if (!P || typeof P.doveSeAllenta !== 'function') return { allenta: true, dove: DOVE_IGNOTO };
+    const correnti = await globalThis.SN_STORAGE.getSettings();
+    const dove = P.doveSeAllenta(K().annulloImpostazioni(e, correnti, globalThis.SN_STORAGE.REPLACE_KEYS), correnti);
+    return { allenta: !!dove, dove };
+  } catch (_) { return { allenta: true, dove: DOVE_IGNOTO }; }
 }
 
 // Senza id: l'ultimo cambio ancora in piedi che non sia a sua volta un annullo.
@@ -233,6 +245,23 @@ async function annullaOra(id, prov = {}) {
   if (K().annullati(lista).has(trovato.id)) return { ok: false, motivo: 'già annullato', id: trovato.id };
   const e = daRimettere(trovato, lista);
   if (!K().annullabile(e)) return { ok: false, motivo: 'il valore di prima non è conservato (è un segreto)', id: e.id };
+  // Rimettere com'era un cambio che stringeva quanto esce verso i modelli lo riallarga: vuole «conferma» (#1589). La
+  // chat ci arriva dopo il suo riquadro con la parola scritta, le pagine la chiedono e ritornano con `confermato`.
+  if (e.tipo === 'impostazioni' && prov.confermato !== true) {
+    const LP = globalThis.SN_LIVELLI_PRIVACY;
+    const correnti = await globalThis.SN_STORAGE.getSettings();
+    const parziale = K().annulloImpostazioni(e, correnti, globalThis.SN_STORAGE.REPLACE_KEYS);
+    const sec = (s) => (s && s.security && typeof s.security === 'object' ? s.security : {});
+    const dopo = {
+      security: {
+        privacy: { ...(sec(correnti).privacy || {}), ...(sec(parziale).privacy || {}) },
+        pagineDelicate: { ...(sec(correnti).pagineDelicate || {}), ...(sec(parziale).pagineDelicate || {}) },
+      },
+    };
+    if (LP && parziale && parziale.security && LP.alzaTutto(correnti, dopo)) {
+      return { ok: false, motivo: 'conferma', id: e.id, conferma: LP.confermaAnnullo(K().frase(e)) };
+    }
+  }
   const raccolti = [];
   let saltati = [];
   let riuscito = true;

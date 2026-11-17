@@ -41,6 +41,12 @@
     // #589.11 — il clic su una voce che il sito copriva non parte.
     menu_click_covered: 'Il menu era coperto: clic ignorato',
     menu_explain_loading: 'Spiegazione…',
+    // #1589 — dove il livello di privacy chiede prima, la sezione del menu aspetta il clic.
+    menu_chiedi_spiega: 'Spiega',
+    menu_chiedi_descrivi: 'Descrivi',
+    menu_chiedi_link: 'Spiega il link',
+    menu_chiedi_perche: 'Su questa pagina Filo manda ai modelli solo quello che chiedi',
+    menu_chiedi_perche_campi: 'La pagina mostra un campo password o carta: le immagini partono solo se le chiedi',
 
     // Menu — pagina
     menu_help: 'Aiuto',
@@ -395,6 +401,7 @@
     options_api_key: 'API key',
     options_models: 'Modelli per azione',
     options_chain_primary: 'modello principale',
+    options_chain_come_chat: 'come la chat',
     options_chain_fallback: 'fallback',
     options_chain_add: 'Aggiungi un modello di fallback',
     options_chain_remove: 'Rimuovi questo modello',
@@ -469,6 +476,7 @@
     options_action_tab_search: 'Ricerca semantica nell’archivio (re-rank)',
     options_action_filo_dashboard: 'Home — generazione della dashboard',
     options_action_filo_chat: 'Home — chat con Filo',
+    options_action_filo_compattazione: 'Home — compattazione della chat',
     options_action_filo_chat_triage: 'Home — titolo e tipo di una chat finita',
     options_action_decks_chat: 'Mazzi — chat di ricerca carte',
     options_action_decks_opinion: 'Mazzi — parere su una carta',
@@ -572,6 +580,7 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_soglia: 'Soglia di compattazione',
     admin_defaults_contesto_cache: 'Durata della cache',
     admin_defaults_contesto_cache_5m: '5 minuti',
     admin_defaults_contesto_cache_1h: 'un\'ora',
@@ -715,16 +724,14 @@
       'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
       'arriva solo un pezzo dell\'impronta degli indirizzi che apri, mai gli indirizzi.',
     // #1004 — pagine delicate
-    options_security_delicate: 'Non mandare ai modelli le pagine delicate',
-    options_security_delicate_desc:
-      'Posta, banca, sanità, pubblica amministrazione e le pagine dove hai visto un campo password o carta. ' +
-      'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
-      'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
-      'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
-      'solo dal tasto destro. I file scaricati da qui non prendono un nome da soli, e una pagina salvata prende la ' +
-      'categoria dal solo tipo. Il correttore resta acceso: manda al modello quello che scrivi, non la pagina.',
+    // #1589 — i livelli di privacy: i nomi e la riga di ogni livello stanno in livelliPrivacy.js.
+    options_privacy_title: 'Quanto Filo manda ai modelli',
+    options_privacy_chiedi: 'Chiedi prima anche su',
+    options_privacy_incognito: 'In incognito',
+    options_privacy_siti_anticipo_label: 'Siti dove Filo prepara tutto in anticipo, uno per riga',
+    options_privacy_pavimento: 'Password, numeri di carta e CVV, codici usa e getta, chiavi e token non escono a nessun livello, nemmeno se lo chiedi.',
     options_security_delicate_sites_label:
-      'Altri siti delicati, uno per riga',
+      'Siti dove Filo chiede sempre, uno per riga',
     options_security_delicate_sites_invalid:
       'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
       'con estensione, es. studiorossi.it): %s',
@@ -1049,6 +1056,8 @@
     spell_errore_generico: 'Da correggere.',
     spell_togli: 'Togli «%s»',
     spell_correggi_tutti: 'Correggi tutti gli errori (%s)',
+    // #1589 — dove il livello di privacy chiede prima, i controlli del modello partono da qui.
+    spell_controlla: 'Controlla',
     spell_ocra_ignora: 'Ignora',
     spell_ocra_prima: 'prima: «%s»',
     spell_ocra_controlla: 'Controlla qui',

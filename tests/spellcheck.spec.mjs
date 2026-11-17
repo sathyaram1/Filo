@@ -2,9 +2,9 @@
 // restano. Una sola app per il file, riportata com'era appena aperta prima di ogni prova (tests/helpers/appCondivisa.mjs).
 
 import { appCondivisa } from './helpers/appCondivisa.mjs';
-import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { statoDi, clicca, nelMondoDiFilo, nelMondoDelFrame } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -1144,16 +1144,16 @@ test.describe('spellcheck-segni-restano', () => {
   }
 
   // Gli errori confermati dal controllo rapido: le parole «xq…» sono anche candidati del dizionario, sbiaditi prima.
-  const blu = (page) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)');
+  const blu = (page) => segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)');
   const scan = (app) => app.evaluate(() => globalThis.__scan);
 
   // Per `ms` guarda il riquadro a ogni giro: i segni attesi, sul testo che c'è adesso nella casella.
   async function restanoPer(page, attesi, ms) {
-    return page.evaluate(async ([attesi, ms]) => {
+    return nelMondoDelFrame(page, null, async ([attesi, ms]) => {
       const visti = [];
       const fine = performance.now() + ms;
       while (performance.now() < fine) {
-        const o = document.querySelector('.sn-spell-overlay');
+        const o = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay');
         const ta = document.getElementById('ta');
         const segni = o ? [...o.querySelectorAll('.sn-errore:not(.sn-dubbio)')].map((s) => s.textContent) : [];
         const allineato = !!o && o.textContent === ta.value;

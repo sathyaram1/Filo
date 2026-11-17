@@ -5,14 +5,18 @@
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, readSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { gitIn, lavoroVivo, timbroFile, comandoLeggibile } from './branch-integrity.mjs';
+import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
-import { leggiMeta, rigaSintetica } from '../session-report.mjs';
+import { attesaDichiarata, leggiMeta, rigaSintetica } from '../session-report.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
 export const SOGLIA_FERMO_MS = 20 * 60 * 1000;
+// Un worker che ha già reso il suo esito non tornerà a rilasciare: dopo la chiusura basta il tempo del rilascio che stava
+// per fare (spinta e rapporto), non venti minuti di posto occupato (#2324).
+export const SOGLIA_CHIUSO_MS = 2 * 60 * 1000;
+const CHIUSURE = new Set(['SubagentHandback']);
 // Sotto i due minuti del tempo di serie di una chiamata: un timeout dimenticato non la uccide a metà rilascio.
 export const FETTA_MS = 90 * 1000;
 export const PASSO_MS = 10 * 1000;
@@ -25,15 +29,45 @@ const LANCI = new Set(['Agent', 'Task']);
 
 /**
  * Il giudizio su un worker, da segni già letti. PURA.
- * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella.
- * @returns {{ stato: 'finito'|'lavora'|'fermo', fermoMs: number }}
+ * `tempi`: i momenti in cui ha dato segni di vita; `processi`: quanti ne girano nella sua cartella; `chiusoMs`: quando
+ * il worker ha chiuso la sua sessione (NaN se lavora ancora).
+ * @returns {{ stato: 'finito'|'lavora'|'chiuso'|'fermo', fermoMs: number }}
  */
-export function giudica({ finito = false, processi = 0, tempi = [], adesso = Date.now(), soglia = SOGLIA_FERMO_MS } = {}) {
+export function giudica({
+  finito = false, processi = 0, tempi = [], chiusoMs = NaN, adesso = Date.now(), soglia = SOGLIA_FERMO_MS, sogliaChiuso = SOGLIA_CHIUSO_MS,
+} = {}) {
   if (finito) return { stato: 'finito', fermoMs: 0 };
   const noti = tempi.filter((t) => Number.isFinite(t));
   if (processi > 0 || !noti.length) return { stato: 'lavora', fermoMs: 0 };
   const fermoMs = Math.max(0, adesso - Math.max(...noti));
+  if (Number.isFinite(chiusoMs) && fermoMs >= sogliaChiuso) return { stato: 'chiuso', fermoMs };
   return { stato: fermoMs >= soglia ? 'fermo' : 'lavora', fermoMs };
+}
+
+/**
+ * Quando un transcript ha chiuso la sua sessione: l'ultimo turno dell'assistente rende l'esito (handback) o finisce
+ * senza strumenti. Un messaggio arrivato dopo (una notifica che lo risveglia) la riapre. NaN se lavora ancora. PURA.
+ */
+export function chiusuraDi(righe) {
+  let chiuso = NaN;
+  let consegna = '';
+  for (const r of righe) {
+    let o;
+    try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
+    if (!o || typeof o !== 'object') continue;
+    const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    if (o.type === 'assistant') {
+      if (rigaSintetica(o.message)) { chiuso = NaN; continue; }
+      const usi = c.filter((x) => x && x.type === 'tool_use');
+      const resa = usi.find((x) => CHIUSURE.has(String(x.name || '')));
+      const ms = Date.parse(String(o.timestamp || ''));
+      if (resa) { chiuso = ms; consegna = String(resa.id || ''); } else if (usi.length) { chiuso = NaN; } else if (o.message && o.message.stop_reason === 'end_turn') { chiuso = ms; consegna = ''; }
+    } else if (o.type === 'user') {
+      const soloEsito = c.length > 0 && c.every((x) => x && x.type === 'tool_result' && consegna && x.tool_use_id === consegna);
+      if (!soloEsito) chiuso = NaN;
+    }
+  }
+  return chiuso;
 }
 
 /** L'ultimo strumento chiesto e rimasto senza risposta, dalle righe di un transcript. PURA. */
@@ -80,7 +114,7 @@ const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice
 
 /**
  * L'ultimo passo di un transcript, senza il testo del worker: lo strumento chiamato per ultimo (ora, risposta avuta),
- * di che tipo è l'ultima riga e il modello dell'ultimo turno. PURA.
+ * di che tipo è l'ultima riga, il modello dell'ultimo turno e l'attesa dichiarata che finisce più tardi. PURA.
  */
 export function ultimoPasso(righe) {
   const nomi = new Map();
@@ -88,12 +122,15 @@ export function ultimoPasso(righe) {
   let strumento = null;
   let passo = null;
   let modello = '';
+  let attesa = null;
   for (const r of righe) {
     let o;
     try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
     if (!o || typeof o !== 'object') continue;
     const ms = Date.parse(String(o.timestamp || ''));
     const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    const dichiarata = attesaDichiarata(o);
+    if (dichiarata && (!attesa || dichiarata.finoMs >= attesa.finoMs)) attesa = dichiarata;
     let cosa = '';
     if (o.type === 'assistant' && rigaSintetica(o.message)) {
       cosa = 'errore dell\'API o richiesta interrotta';
@@ -125,6 +162,7 @@ export function ultimoPasso(righe) {
     strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
     passo,
     modello,
+    attesa,
   };
 }
 
@@ -151,6 +189,11 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
     const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
     const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
     parti.push(`Ultimo passo per traccia: ${righe.join(', ')}${altre}${elenco.length === 1 ? '; nessun sotto-agente' : ''}.`);
+    const attesa = elenco.map((e) => e.attesa).filter(Boolean).reduce((a, b) => (!a || b.finoMs >= a.finoMs ? b : a), null);
+    if (attesa) {
+      const tentativo = attesa.tentativo ? `, tentativo ${attesa.tentativo}${attesa.di ? ` di ${attesa.di}` : ''}` : '';
+      parti.push(`Ultima attesa dichiarata dal fornitore: dalle ${ora(attesa.inizioMs)} alle ${ora(attesa.finoMs)}${tentativo}.`);
+    }
   }
   const cmd = Array.isArray(comandi) ? comandi : [];
   if (!processiLetti) parti.push('Processi nella cartella: non letti.');
@@ -169,10 +212,13 @@ export const NOTA_FERMO = 'fermo dalla veglia:';
 export const notaDelFermo = (quadro) => (String(quadro || '').trim() ? `${NOTA_FERMO} ${pulito(quadro).trim()}` : '');
 
 /** Il guasto da dichiarare per un worker fermo, col gruppo davanti e il quadro prima della coda. PURA. */
-export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '' } = {}) {
+export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '', chiusoMs = NaN } = {}) {
   const minuti = Math.round(fermoMs / 60000);
   const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
   const coda = `${String(quadro || '').trim() ? `${String(quadro).trim()} ` : ''}Rilasciato dalla veglia di chi guida il giro.`;
+  if (Number.isFinite(chiusoMs)) {
+    return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
+  }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
@@ -228,13 +274,62 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [] };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN, fornitoreFinoMs: NaN, file: [] };
   const ultimoMs = Math.max(...file.map((f) => f.m));
   const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
   const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
   const attesa = attese.length ? attese.reduce((a, b) => ((b.ms || 0) >= (a.ms || 0) ? b : a)) : null;
   const elenco = lette.map(({ f, righe }) => ({ nome: nomeTraccia(f.p), ms: f.m, ...ultimoPasso(righe) })).sort((a, b) => b.ms - a.ms);
-  return { viste: true, ultimoMs, attesa, elenco };
+  // Il worker è la traccia lanciata da chi guida il giro (senza lanciatore nel meta); i suoi figli ne hanno uno.
+  const worker = lette.filter(({ f }) => { const m = leggiMeta(f.p); return !(m && typeof m.parentAgentId === 'string' && m.parentAgentId.trim()); })
+    .reduce((a, b) => (!a || b.f.m >= a.f.m ? b : a), null);
+  const fini = elenco.map((e) => (e.attesa ? e.attesa.finoMs : NaN)).filter(Number.isFinite);
+  return {
+    viste: true, ultimoMs, attesa, elenco,
+    chiusoMs: worker ? chiusuraDi(worker.righe) : NaN,
+    fornitoreFinoMs: fini.length ? Math.max(...fini) : NaN,
+    file: file.map((f) => f.p),
+  };
+}
+
+/**
+ * I sotto-agenti lanciati da un agente e non ancora chiusi, dalle voci della cartella delle tracce (`id`, `meta`, `ms`
+ * dell'ultima scrittura): Claude Code segna `finished` nel meta quando un agente chiude. Il worker senza un'attesa per
+ * loro faceva un turno al secondo per non sembrare fermo (#2304). Non contano i figli di un agente già chiuso, né
+ * quelli zitti da più della soglia della veglia: un figlio morto non tiene fermo il rilascio per sempre. PURA.
+ */
+export function sottoAgentiAlLavoro(voci, { adesso = Date.now(), soglia = SOGLIA_FERMO_MS } = {}) {
+  const lista = Array.isArray(voci) ? voci.filter((v) => v && v.meta && typeof v.meta === 'object') : [];
+  const chiusi = new Set(lista.filter((v) => v.meta.finished === true).map((v) => v.id));
+  return lista
+    .filter((v) => {
+      const padre = typeof v.meta.parentAgentId === 'string' ? v.meta.parentAgentId.trim() : '';
+      return padre && v.meta.finished !== true && !chiusi.has(padre) && Number.isFinite(v.ms) && adesso - v.ms < soglia;
+    })
+    .map((v) => ({
+      tipo: 'sotto-agente',
+      nome: nomeSicuro(v.meta.agentType) || 'sotto-agente',
+      descrizione: pulito(v.meta.description).replace(/\s+/g, ' ').trim().slice(0, 80),
+      etaMs: Math.max(0, adesso - v.ms),
+    }));
+}
+
+/** Le voci della cartella delle tracce: id, meta e ultima scrittura della traccia (del meta, se la traccia manca). */
+export function vociSottoAgenti(dir) {
+  let nomi = [];
+  try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.meta.json')) : []; } catch (_) { nomi = []; }
+  return nomi.map((n) => {
+    const base = n.slice(0, -'.meta.json'.length);
+    let meta = null;
+    try { meta = JSON.parse(readFileSync(join(dir, n), 'utf8')); } catch (_) { meta = null; }
+    const traccia = mtime(join(dir, `${base}.jsonl`));
+    return { id: base.replace(/^agent-/, ''), meta, ms: Number.isFinite(traccia) ? traccia : mtime(join(dir, n)) };
+  });
+}
+
+/** I sotto-agenti al lavoro nella sessione, come segni di lavoro vivo per l'attesa e il rilascio del worker. */
+export function sottoAgentiVivi({ sessione = process.env.CLAUDE_CODE_SESSION_ID, configDir = '', adesso = Date.now() } = {}) {
+  return sottoAgentiAlLavoro(vociSottoAgenti(cartellaSottoAgenti({ sessione, configDir })), { adesso });
 }
 
 /** Quando il server ha dato il biglietto, dal registro che il comando ticket scrive per il gancio. NaN se non c'è. */
@@ -272,9 +367,28 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
-  const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
+  // Un'attesa dichiarata dal fornitore vale come un passo fino alla sua fine: il segno di vita sta nel futuro.
+  if (Number.isFinite(tracce.fornitoreFinoMs)) tempi.push(tracce.fornitoreFinoMs);
+  const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
-  return { mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce };
+  // Il tetto di costo della corsa di un compito (#2303), scritto da dispatch nel marcatore; `dalMs` è da quando contare.
+  const tetto = mio ? Number(m.tettoUsd) : NaN;
+  return {
+    mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce,
+    chiusoMs: tracce.viste ? tracce.chiusoMs : NaN,
+    ...(Number.isFinite(tetto) && tetto > 0 ? { tettoUsd: tetto, dalMs: dopoMs } : {}),
+  };
+}
+
+/**
+ * Il tetto superato, dai segni e dai dollari misurati: { usd, tettoUsd } da rilasciare, o null. PURA.
+ * Senza tetto, o senza una misura, non si ferma niente.
+ */
+export function oltreIlTetto(s, misura) {
+  const tetto = Number(s && s.tettoUsd);
+  const usd = Number(misura && misura.usd);
+  if (!(tetto > 0) || !Number.isFinite(usd)) return null;
+  return usd > tetto ? { usd: Math.round(usd * 100) / 100, tettoUsd: tetto } : null;
 }
 
 /**
@@ -288,7 +402,8 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   const tracce = s.tracce || {};
   if (!(s.processi > 0) && !tracce.viste) return {};
   const noti = (s.tempi || []).filter((t) => Number.isFinite(t));
-  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.max(...noti) : NaN);
+  // Un segno nel futuro (un'attesa dichiarata dal fornitore) vale «adesso».
+  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.min(adesso, Math.max(...noti)) : NaN);
   if (!Number.isFinite(attivitaMs)) return {};
   const out = { attivitaMs: Math.round(attivitaMs) };
   const a = tracce.attesa;
@@ -296,34 +411,59 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   return out;
 }
 
+export const FERMA_IL_WORKER = 'Il worker però è ancora acceso e spende: fermalo adesso con lo strumento TaskStop (se non lo vedi, caricalo con ToolSearch «select:TaskStop»), passandogli l’id che ti ha dato il suo lancio.';
+
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
 
 /**
  * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio, quadro)`
- * dichiara il guasto), altrimenti alla fine della fetta. I testi sono fissi: niente del worker arriva a chi guida il giro.
- * @returns {Promise<{ uscita: number, testo: string, guasto?: string }>}
+ * dichiara il guasto), altrimenti alla fine della fetta. Un compito col tetto di costo (#2303) si misura con `costo(s)`
+ * una volta per fetta, e oltre il tetto `rilasciaOltre(oltre, mio)` lo ferma. I testi sono fissi: niente del worker
+ * arriva a chi guida il giro.
+ * @returns {Promise<{ uscita: number, testo: string, guasto?: string, oltreTetto?: object }>}
  */
 export async function veglia({
-  leggi, rilascia, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+  leggi, rilascia, costo = null, rilasciaOltre = null, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
   fetta = FETTA_MS, passo = PASSO_MS, soglia = SOGLIA_FERMO_MS,
 } = {}) {
   const fine = adesso() + fetta;
+  let misurato = false;
   for (;;) {
-    const s = leggi();
+    const s = await leggi();
     const g = giudica({ ...s, adesso: adesso(), soglia });
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
+    if (!misurato && costo && rilasciaOltre && s && s.tettoUsd > 0) {
+      misurato = true;
+      const oltre = oltreIlTetto(s, await costo(s));
+      if (oltre) {
+        const r = await rilasciaOltre(oltre, s.mio);
+        const esito = r && r.ok
+          ? 'biglietto rilasciato, il compito non riparte'
+          : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+        return {
+          uscita: USCITA_FERMO,
+          oltreTetto: oltre,
+          // Un worker in sottofondo sopravvive al giro chiuso e spenderebbe ancora col biglietto già chiuso (#2303).
+          testo: `Compito oltre il tetto di costo della corsa (${oltre.usd} $ su ${oltre.tettoUsd} $): ${esito}. ${FERMA_IL_WORKER} Poi chiudi il giro: non chiedere biglietti e non lanciare altri worker.`,
+        };
+      }
+    }
     const minuti = Math.round(g.fermoMs / 60000);
-    if (g.stato === 'fermo') {
+    if (g.stato === 'fermo' || g.stato === 'chiuso') {
+      const chiuso = g.stato === 'chiuso';
       const quadro = quadroDelFermo(s);
-      const guasto = testoGuasto({ fermoMs: g.fermoMs, attesa: s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro });
+      const guasto = testoGuasto({
+        fermoMs: g.fermoMs, attesa: chiuso ? null : s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro, chiusoMs: chiuso ? s.chiusoMs : NaN,
+      });
       const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok
         ? 'biglietto rilasciato con un guasto dichiarato'
         : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;
+      const cosa = chiuso ? 'Worker chiuso senza rilasciare il biglietto' : `Worker fermo da ${minuti} minuti senza segni di vita`;
       return {
         uscita: USCITA_FERMO,
         guasto,
-        testo: `Worker fermo da ${minuti} minuti senza segni di vita: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
+        testo: `${cosa}: ${esito}. Chiudi il giro come dopo un guasto: non chiedere biglietti e non lanciare altri worker.`,
       };
     }
     if (adesso() + passo >= fine) {

@@ -18,14 +18,6 @@ async function tornaAllaHome(shell) {
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), h.id);
 }
 
-const esitoPerIlModello = async (app, id) => {
-  for (const msgs of await chiamateAlModello(app)) {
-    const m = msgs.find((x) => x.role === 'tool' && x.tool_call_id === id);
-    if (m) return String(m.content);
-  }
-  return '';
-};
-
 // Due schede sulla stessa pagina (un doppione che Filo chiude da sé) e due pagine diverse.
 async function schedeDaRiordinare(openTab, testServer, shell) {
   const doppia = testServer.html('<title>Doppia</title><p>doppia');
@@ -37,7 +29,21 @@ async function schedeDaRiordinare(openTab, testServer, shell) {
   await tornaAllaHome(shell);
 }
 
-const giudizioCheArchivia = (app, titolo) => app.evaluate((_e, t) => {
+// Quello che il modello riceve quando il lavoro riprende dopo l'OK (#1685): l'esito sta nell'ultima chiamata.
+const esitoDopoLOk = async (app) => {
+  const ultima = (await chiamateAlModello(app)).at(-1) || [];
+  return ultima.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+};
+
+// Riordinare è costo 2: a Normale, finché manca il guardiano, chiede col bottone come a Conservativo (#1840).
+async function alBottone(page) {
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  await expect(btn).toHaveText(/Riordina e archivia/, { timeout: 15_000 });
+  await btn.click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+}
+
+const giudizioCheArchivia =(app, titolo) => app.evaluate((_e, t) => {
   globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
     decisions: tabs.map((x, i) => ({ i, action: x.title === t ? 'archive' : 'keep', reason: 'test' })),
   });
@@ -58,11 +64,12 @@ test('a Normale «riordinami le tab» archivia e la chat dice quante', async ({ 
     { text: 'Ho archiviato due schede.' },
   ]);
   await chiedi(page, 'riordinami le tab');
+  await alBottone(page);
 
   await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile']);
   const riga = page.locator('.dash-activity').last();
   await expect(riga).toContainText('Schede riordinate · 2 archiviate', { timeout: 10_000 });
-  expect(await esitoPerIlModello(app, 'p1')).toContain('Schede riordinate: 2 archiviate');
+  await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('fatta: Schede riordinate · 2 archiviate');
   await ripristina(app);
 });
 
@@ -77,20 +84,19 @@ test('a Normale un giudizio che non arriva è un errore col perché, anche coi d
     { text: 'Non sono riuscito a valutare le schede: i crediti sono finiti.' },
   ]);
   await chiedi(page, 'riordinami le tab');
+  await alBottone(page);
 
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' })).toBeVisible({ timeout: 15_000 });
   // Il doppione si chiude per regola, le altre restano: nessuna valutata.
-  expect(await titoli(shell)).toEqual(['Doppia', 'Utile', 'Vecchia']);
-  const riga = page.locator('.dash-activity').last();
-  await riga.locator('.dash-activity-head').click();
-  await expect(riga).toContainText('Riordino non riuscito');
-  await expect(riga).toContainText('ha chiuso solo un doppione');
-  await expect(riga).toContainText('crediti sono finiti');
-  await expect(riga).not.toContainText('Schede riordinate');
-  const esito = await esitoPerIlModello(app, 'f1');
-  expect(esito).toContain('Riordino NON riuscito');
+  await expect.poll(() => titoli(shell), { timeout: 15_000 }).toEqual(['Doppia', 'Utile', 'Vecchia']);
+  await expect.poll(() => esitoDopoLOk(app), { timeout: 10_000 }).toContain('NON riuscita: PULISCI_TAB');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'i crediti sono finiti' }).last()).toBeVisible({ timeout: 15_000 });
+  // Dopo l'OK il perché sta sotto il bottone, come a Conservativo.
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn').first()).toHaveText(/Chiusi solo un doppione · riprova/, { timeout: 15_000 });
+  await expect(page.locator('.dash-riordino-motivo')).toContainText('crediti sono finiti');
+  const esito = await esitoDopoLOk(app);
+  expect(esito).toContain('ha chiuso solo un doppione');
   expect(esito).toContain(MOTIVO);
-  expect(esito).not.toMatch(/^Schede riordinate/);
+  expect(esito).not.toContain('fatta: Schede riordinate');
   await page.screenshot({ path: 'tests/.shots/chat-riordino-giudizio-mancato.png' });
   await ripristina(app);
 });

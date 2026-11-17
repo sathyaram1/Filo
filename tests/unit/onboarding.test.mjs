@@ -46,8 +46,9 @@ test("l'elenco copre le cose da scoprire E quelle da dire", () => {
   for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'contatori', 'modelli', 'crediti']) {
     assert.ok(ids.includes(id), `manca la voce "${id}"`);
   }
-  // I contatori anonimi sono una scelta da fare, non una cosa da dire (#1461).
-  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia', 'contatori']);
+  // I contatori anonimi sono una scelta da fare, non una cosa da dire (#1461); la privacy pure: quanto Filo manda ai
+  // modelli lo dice l'utente, con un clic (#1589).
+  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia', 'privacy', 'contatori']);
   assert.equal(new Set(ids).size, ids.length, 'id duplicati');
   for (const i of O.ITEMS) {
     assert.ok(i.label && i.detail, `voce ${i.id} senza etichetta o dettaglio`);
@@ -393,7 +394,7 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
   // L'azione è uno strumento nativo (actionTools.js) che c'è sempre ma vale solo durante l'intervista: il prompt
   // deve dirlo, altrimenti il modello non sa che può usarlo adesso.
-  assert.match(conOnb, /strumento ONBOARDING vale solo adesso/, 'senza l’azione non può spuntare niente');
+  assert.match(conOnb, /filo_su_di_se\(intervista\) vale solo adesso/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
   // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
   // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
@@ -461,7 +462,8 @@ test('l’autonomia è una voce da scoprire, e la si spunta dopo la scelta (#118
   const voce = O.ITEMS.find((i) => i.id === 'autonomia');
   assert.equal(voce.kind, 'scoprire');
   assert.match(voce.applica, /"autonomia": true/, 'il modello deve sapere come mostrare la scelta');
-  assert.match(voce.applica, /cambia solo lui/, 'e che il livello non lo cambia lui');
+  assert.match(voce.applica, /il clic lo salva già/, 'che il clic non va rifatto');
+  assert.match(voce.applica, /impostazioni\(imposta\) con chiave autonomia/, 'e che detto a parole lo cambia come in chat (#1312)');
   assert.match(O.renderChecklistForPrompt(O.emptyState()), /\[ \] autonomia/);
 });
 
@@ -482,6 +484,23 @@ test('con la scelta dell’autonomia a schermo l’intervista non si chiude da s
   for (let i = 0; i < O.HARD_MAX_EXCHANGES; i++) lunga = O.mostraSceltaAutonomia(O.appendTurn(lunga, { role: 'user', text: `m${i}` }));
   assert.equal(O.shouldForceClose(lunga), true);
   assert.equal(O.autonomiaInSospeso(O.restart(mostrata)), false, 'rifarla riparte senza scelte in sospeso');
+});
+
+// #1589 — la scelta del livello di privacy segue la regola della scelta dell'autonomia.
+test('la scelta della privacy: voce da scoprire, resta sotto il turno, tiene aperta l’intervista finché l’utente non scrive', () => {
+  const voce = O.ITEMS.find((i) => i.id === 'privacy');
+  assert.equal(voce.kind, 'scoprire');
+  assert.match(voce.applica, /"privacy": true/);
+  assert.match(voce.detail, /Password, carte e codici non escono/);
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: 'Quanto mando ai modelli?', privacy: true });
+  assert.equal(O.normalize(JSON.parse(JSON.stringify(s))).thread[0].privacy, true);
+  const mostrata = O.mostraSceltaPrivacy(O.tick(O.emptyState(), O.ITEM_IDS).state);
+  assert.equal(O.privacyInSospeso(O.normalize(JSON.parse(JSON.stringify(mostrata)))), true);
+  assert.equal(O.shouldForceClose(mostrata), false, 'elenco completo, ma la scelta è a schermo');
+  const risposto = O.appendTurn(mostrata, { role: 'user', text: 'Scelgo Chiedi sempre.' });
+  assert.equal(O.privacyInSospeso(risposto), false);
+  assert.equal(O.shouldForceClose(risposto), true);
+  assert.equal(O.privacyInSospeso(O.restart(mostrata)), false);
 });
 
 // #1297 — «Riprendiamola» riprende dalla domanda in sospeso, non dalla prima.
@@ -611,8 +630,8 @@ test('la voce dei contatori dice come applicare una risposta data a parole, con 
   const voce = O.ITEMS.find((i) => i.id === 'contatori');
   assert.match(voce.applica, /a parole/);
   assert.doesNotMatch(voce.applica, /non hai un.azione/i);
-  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
-  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  const m = /impostazioni\(imposta\), chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina impostazioni(imposta) e la sua chiave');
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });

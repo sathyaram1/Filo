@@ -23,6 +23,8 @@ export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
 export const TETTO_ROSSI = 40;
 const MAIN = 'main';
+// Esplicito: in un clone a ramo singolo `fetch origin main` muove solo FETCH_HEAD, e origin/main resta vecchio (#2237.3).
+export const refspecMain = (main = MAIN) => `+refs/heads/${main}:refs/remotes/origin/${main}`;
 const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-fusione@filo.invalid', '-c', 'commit.gpgsign=false'];
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
@@ -375,7 +377,7 @@ export function provaUnitSullaFusione({
 }
 
 function mainDiOrigin({ git, gitStoria }) {
-  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  const f = gitStoria(['fetch', '--quiet', 'origin', refspecMain()]);
   if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
   const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
   const mainSha = m.ok ? m.out.trim() : '';

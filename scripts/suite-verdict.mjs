@@ -43,10 +43,11 @@
 // USO
 //   node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>]
 //                                  [--rossi <rossi-noti.json>] [--chiavi <file>]
-//                                  [--parti <N> --esiti <cartella>]
+//                                  [--errori <file>] [--parti <N> --esiti <cartella>]
 //
 //   --chiavi scrive le chiavi dell'allarme (scripts/build-alarm.mjs), una per
 //   riga: cosa è rotto, perché il server non apra un doppione per lo stesso guasto.
+//   --errori scrive l'errore di ogni rosso nuovo, per il testo del feedback.
 //
 //   Come si produce il JSON (Playwright ≥ 1.49):
 //   PLAYWRIGHT_JSON_OUTPUT_NAME=suite.json npx playwright test --reporter=list,json
@@ -93,6 +94,38 @@ export function statoFinale(test) {
   return 'unexpected'; // failed, timedOut, interrupted
 }
 
+/** Un percorso di un errore relativo alla radice del repo, barre normali; '' per uno di node_modules. PURA. */
+function relativoAllaRadice(p, radice) {
+  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  let f = String(p || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
+    .replace(/(:\d+){1,2}$/, '');
+  if (!f || f.includes('/node_modules/')) return '';
+  if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
+  else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+  return f;
+}
+
+/**
+ * Il testo di un errore di Playwright senza i colori del terminale, con la posizione in testa: è quello che chi
+ * prende il feedback legge, perché dalla cloud gli artifact della corsa non si scaricano (#2313). PURA.
+ */
+export function testoErrore(e, radice = ROOT) {
+  if (!e || typeof e !== 'object') return '';
+  const testo = String(e.message || e.value || e.stack || '').replace(COLORI, '').replace(/\r/g, '').trim();
+  const file = e.location?.file ? relativoAllaRadice(e.location.file, radice) : '';
+  const dove = file ? `in ${file}${e.location.line ? `:${e.location.line}` : ''}` : '';
+  return [dove, testo].filter(Boolean).join('\n');
+}
+
+/** Gli errori dell'ultimo tentativo di un test rosso, uniti; '' per un test che non è rosso. PURA. */
+export function erroreDelTest(test, radice = ROOT) {
+  if (statoFinale(test) !== 'unexpected') return '';
+  const results = Array.isArray(test?.results) ? test.results : [];
+  const ultimo = results[results.length - 1];
+  const errori = Array.isArray(ultimo?.errors) && ultimo.errors.length ? ultimo.errors : ultimo?.error ? [ultimo.error] : [];
+  return [...new Set(errori.map((e) => testoErrore(e, radice)).filter(Boolean))].join('\n\n');
+}
+
 /**
  * Tutti i casi del JSON, appiattiti: { spec, titolo, titoloCompleto, stato }.
  * `titoloCompleto` porta anche i describe che lo contengono (« › » fra un
@@ -118,6 +151,7 @@ export function raccogliCasi(json) {
           titoloCompleto: [...corniceQui, titolo].join(' › '),
           stato: statoFinale(t),
           nonGirato: !Array.isArray(t?.results) || t.results.length === 0,
+          errore: erroreDelTest(t),
         });
       }
     }
@@ -190,18 +224,13 @@ export function ultimoTestDelWorker(e) {
  * posizione di Playwright, poi chi importava il modulo che manca, poi il primo percorso sotto tests/. PURA.
  */
 function fileNelTesto(e, radice) {
-  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').replace(new RegExp(ELENCO_DEL_WORKER, 'g'), '');
   // Un percorso può avere spazi (una cartella utente): «imported from» si prende fino a fine riga.
   const percorsi = [...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0]);
   const candidati = [e?.location?.file, testo.match(/imported from\s+(.+?)['"]?\s*$/m)?.[1],
     ...percorsi.filter((p) => /\.spec\.m?js$/.test(p)), ...percorsi];
   for (const c of candidati) {
-    let f = String(c || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
-      .replace(/(:\d+){1,2}$/, '');
-    if (!f || f.includes('/node_modules/')) continue;
-    if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
-    else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+    const f = relativoAllaRadice(c, radice);
     if (f.startsWith('tests/')) return f;
   }
   return '';
@@ -291,6 +320,7 @@ export function verdetto(json, noti) {
     const strascico = casoDelloStrascico(e, casi);
     v.nuovi.push({
       spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: strascico ? '' : fileDellErrore(e),
+      errore: testoErrore({ ...e, message: e?.stack || e?.message }),
       ...(strascico ? { strascicoDi: `tests/${strascico.spec}.spec.mjs:${strascico.riga}` } : {}),
     });
   }
@@ -337,6 +367,51 @@ export function rigaRosso(c) {
     return `errore fuori dai casi: ${c.titolo}${c.strascicoDi ? ` (strascico di ${c.strascicoDi}, non un guasto a sé)` : ''}`;
   }
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
+}
+
+/** I tetti del testo degli errori, che finisce nel feedback: il server ne tiene 10.000 caratteri in tutto. */
+export const RIGHE_PER_ERRORE = 15;
+export const CARATTERI_PER_ERRORE = 1500;
+export const TETTO_ERRORI = 5000;
+
+/** Un errore entro le sue righe e i suoi caratteri, rientrato sotto il suo rosso; un taglio si dice col numero. PURA. */
+function erroreRientrato(errore, righe, caratteri) {
+  const tutte = String(errore || '').split('\n').map((r) => r.trimEnd()).filter((r, i, a) => r || (a[i - 1] && i < a.length - 1));
+  const tenute = [];
+  let lunghezza = 0;
+  for (const r of tutte) {
+    if (tenute.length >= righe || lunghezza + r.length > caratteri) break;
+    tenute.push(r);
+    lunghezza += r.length + 1;
+  }
+  // Una prima riga più lunga di tutto il tetto si accorcia: senza nemmeno quella il rosso resterebbe muto.
+  if (!tenute.length && tutte.length) tenute.push(`${tutte[0].slice(0, caratteri)} … (riga accorciata)`);
+  const tolte = tutte.length - tenute.length;
+  if (tolte > 0) tenute.push(`… altre ${tolte} righe: l'errore intero sta nel registro della parte della suite`);
+  return tenute.map((r) => (r ? `    ${r}` : '')).join('\n');
+}
+
+/**
+ * L'errore di ogni rosso nuovo, sotto la sua riga: dalla cloud gli artifact della corsa non si scaricano, e senza
+ * l'errore nel feedback chi lo prende rilancia la suite per vederlo (#2313). I rossi senza un errore (una parte
+ * senza esito, il tetto della corsa) non ci sono: la loro riga dice già tutto. Oltre il tetto si dice quanti mancano.
+ * PURA.
+ */
+export function testoErrori(nuovi, { righe = RIGHE_PER_ERRORE, caratteri = CARATTERI_PER_ERRORE, tetto = TETTO_ERRORI } = {}) {
+  const conErrore = (Array.isArray(nuovi) ? nuovi : []).filter((c) => String(c?.errore || '').trim());
+  const blocchi = [];
+  let lunghezza = 0;
+  for (const c of conErrore) {
+    const blocco = `✗ ${rigaRosso(c)}\n${erroreRientrato(c.errore, righe, caratteri)}`;
+    if (blocchi.length && lunghezza + blocco.length > tetto) break;
+    blocchi.push(blocco);
+    lunghezza += blocco.length + 2;
+  }
+  const mancano = conErrore.length - blocchi.length;
+  if (mancano > 0) {
+    blocchi.push(`… altri ${mancano} rossi senza il loro errore qui (tetto di ${tetto} caratteri): gli errori stanno nei registri delle parti della suite`);
+  }
+  return blocchi.join('\n\n');
 }
 
 /** La chiave dell'allarme quando la suite non è partita o non ha lasciato un esito. */
@@ -396,7 +471,7 @@ export function testoRiassunto(v) {
 
 /** Le opzioni della riga di comando. PURA. */
 export function leggiArgomenti(argv) {
-  const out = { file: '', out: '', rossi: '', chiavi: '', parti: 0, esiti: '' };
+  const out = { file: '', out: '', rossi: '', chiavi: '', errori: '', parti: 0, esiti: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--parti') {
@@ -404,14 +479,14 @@ export function leggiArgomenti(argv) {
       if (!Number.isInteger(n) || n < 1) throw new Error('--parti vuole il numero delle parti della suite');
       out.parti = n;
       i += 1;
-    } else if (a === '--out' || a === '--rossi' || a === '--chiavi' || a === '--esiti') {
+    } else if (a === '--out' || a === '--rossi' || a === '--chiavi' || a === '--errori' || a === '--esiti') {
       const k = a.slice(2);
       const val = argv[i + 1];
       if (!val || val.startsWith('--')) throw new Error(`${a} vuole un percorso`);
       out[k] = val;
       i += 1;
     } else if (a.startsWith('--')) {
-      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file> --parti <N> --esiti <cartella>`);
+      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file> --errori <file> --parti <N> --esiti <cartella>`);
     } else if (!out.file) {
       out.file = a;
     } else {
@@ -432,8 +507,13 @@ function scriviChiavi(opt, chiavi) {
   if (opt.chiavi) writeFileSync(resolve(opt.chiavi), chiavi.length ? `${chiavi.join('\n')}\n` : '', 'utf8');
 }
 
+function scriviErrori(opt, nuovi) {
+  const testo = testoErrori(nuovi);
+  if (opt.errori) writeFileSync(resolve(opt.errori), testo ? `${testo}\n` : '', 'utf8');
+}
+
 async function main() {
-  const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--parti <N> --esiti <cartella>]';
+  const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--errori <file>] [--parti <N> --esiti <cartella>]';
   let opt;
   try {
     opt = leggiArgomenti(process.argv.slice(2));
@@ -451,11 +531,12 @@ async function main() {
     ? rossiDellePartiMancanti(partiSenzaEsito(opt.parti, existsSync(cartellaEsiti) ? readdirSync(cartellaEsiti) : []), opt.parti)
     : [];
   // Senza un verdetto sui casi, le parti mancanti sono l'unica cosa che si sa: si dicono, e finiscono nel file dei nuovi.
-  const fermo = (messaggio, chiavi) => {
+  const fermo = (messaggio, chiavi, nuovi = []) => {
     console.error(messaggio);
     for (const c of parti) console.error(`  ✗ ${rigaRosso(c)}`);
     if (opt.out && parti.length) writeFileSync(resolve(opt.out), `${parti.map(rigaRosso).join('\n')}\n`, 'utf8');
     scriviChiavi(opt, parti.length && !chiavi.includes(CHIAVE_NON_PARTITA) ? [...chiavi, CHIAVE_NON_PARTITA] : chiavi);
+    scriviErrori(opt, nuovi);
     process.exit(2);
   };
   const fileJson = resolve(opt.file);
@@ -482,7 +563,7 @@ async function main() {
   if (v.totale === 0) {
     const errori = Array.isArray(json.errors) ? json.errors : [];
     fermo(['La suite NON ha eseguito nessun caso: non è un verde.', ...errori.map((e) => `  errore: ${primaRiga(e)}`)].join('\n'),
-      chiaviSenzaCasi(json.errors));
+      chiaviSenzaCasi(json.errors), v.nuovi);
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
   // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
@@ -493,6 +574,7 @@ async function main() {
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
   scriviChiavi(opt, chiaviDelVerdetto(v));
+  scriviErrori(opt, v.nuovi);
   process.exit(parti.length ? 2 : v.nuovi.length ? 1 : 0);
 }
 

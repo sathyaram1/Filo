@@ -74,8 +74,10 @@ import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
 import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
+import { cambiatiSoloNeiCommenti } from './lib/solo-commenti.mjs';
+import { specCheUsano, leggiSorgenti, SOGLIA_SPEC_DI_UN_MODULO } from './lib/spec-che-usano.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
-import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
@@ -183,9 +185,9 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
- * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
- * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
+ * I file da cui scegliere gli spec: il ramo contro `base`; in un giro di riallineamento SOLO quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il lavoro l'ha già
+ * provato la verifica e il lato di main la sua suite: senza file risolti restano gli unit (#1907, #2237).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
@@ -200,12 +202,26 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
     const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
     return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])].sort();
   const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
+  const lavoro = changed.filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...daRiprovare])],
-    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
+    changed: daRiprovare,
+    nota: `Giro di riallineamento: scelgo gli spec dai soli file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}${daRiprovare.length ? '' : ', quindi corro solo gli unit'}. Il resto del lavoro (${lavoro} file) l'ha già provato la verifica, il resto del lato arrivato da main (${resto} file) la suite di main.`,
   };
+}
+
+/** Scarica main su origin/main: i controlli fondevano e sceglievano gli spec su un main vecchio senza dirlo (#2237.3). */
+export function aggiornaMain(root = ROOT) {
+  const fetchOk = git(['fetch', '--quiet', 'origin', refspecMain(MAIN)], { cwd: root }).ok;
+  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`], { cwd: root }).ok;
+  return { fetchOk, remoteRefOk };
+}
+
+/** La riga che dice su quale commit di main si confronta e si prova la fusione. PURA. */
+export function testoBaseMain({ base, sha, fetchOk }) {
+  const corto = String(sha || '').slice(0, 8) || '(commit illeggibile)';
+  return `▸ Linea principale: ${base} a ${corto}${fetchOk ? ', appena scaricata' : ', NON aggiornata (lo scaricamento non è riuscito)'}.`;
 }
 
 /**
@@ -410,6 +426,47 @@ export function specsForChangedFiles(changed, tracked) {
   return [...specs];
 }
 
+function elencoCorto(file, mostrati = 8) {
+  return file.slice(0, mostrati).join(', ') + (file.length > mostrati ? ` e altri ${file.length - mostrati}` : '');
+}
+
+/**
+ * Perché la scelta degli spec è quella, quando non è ovvio: nessuno spec, o file tolti perché cambiano solo nei
+ * commenti. Un lavoro sul server fa girare qui solo gli unit, e chi legge deve sapere perché (#2425). PURA.
+ */
+export function motivoDellaScelta({ changed = [], soloCommenti = [], troppoLarghi = [], specs = 0 }) {
+  const tolti = soloCommenti.filter((f) => changed.includes(f));
+  const larghi = troppoLarghi.filter((l) => changed.includes(l.file));
+  // Un modulo che quasi ogni spec usa non è «non provato da nessuno spec»: lo prova la suite intera, che qui non parte.
+  const rigaLarghi = larghi.length
+    ? `▸ Non lancio gli spec che usano ${larghi.map((l) => `${l.file} (${l.spec})`).join(', ')}: oltre ${SOGLIA_SPEC_DI_UN_MODULO} sono quasi la suite intera, che gira su main a ogni fusione.`
+    : '';
+  const conLarghi = (riga) => [riga, rigaLarghi].filter(Boolean).join('\n');
+  if (specs > 0) return conLarghi(tolti.length ? `▸ Cambiano solo nei commenti, e non scelgono spec: ${elencoCorto(tolti)}.` : '');
+  if (!changed.length) return '▸ Nessuno spec da lanciare: il ramo non cambia file rispetto alla linea principale. Corro solo gli unit.';
+  const altri = changed.filter((f) => !tolti.includes(f) && !larghi.some((l) => l.file === f));
+  const parti = [
+    ...(tolti.length ? [`${tolti.length} cambiano solo nei commenti (${elencoCorto(tolti)})`] : []),
+    ...(altri.length ? [`${tolti.length || larghi.length ? 'gli altri' : `tutti (${changed.length})`} non li prova nessuno spec (${elencoCorto(altri)})`] : []),
+  ];
+  return conLarghi(parti.length ? `▸ Nessuno spec da lanciare, corro solo gli unit: dei file cambiati, ${parti.join('; ')}.` : '▸ Nessuno spec da lanciare, corro solo gli unit.');
+}
+
+/**
+ * Gli spec da lanciare per `changed`, fra quelli tracciati in `root`: per area e nome, più quelli che importano o
+ * lanciano un modulo cambiato (#2551). Con loro i file che non scelgono perché cambiano solo nei commenti, e i moduli
+ * usati da troppi spec per lanciarli tutti.
+ */
+export function specDellaScelta({ changed, base, root = ROOT }) {
+  // `ls-files` e filtro in memoria: `--error-unmatch` stampava un errore per ogni spec inesistente, e sembrava un guasto.
+  const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: root }).out.split('\n').filter(Boolean));
+  const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
+  const veri = changed.filter((f) => !soloCommenti.includes(f));
+  const perUso = specCheUsano(veri, leggiSorgenti(root));
+  const specs = [...new Set([...specsForChangedFiles(veri, [...tracked]), ...perUso.specs])].filter((s) => tracked.has(`${s}.spec.mjs`));
+  return { specs, soloCommenti, troppoLarghi: perUso.troppoLarghi };
+}
+
 /**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
@@ -513,7 +570,8 @@ export function stimaDurataControlli(nSpec) {
   const n = Math.max(0, Math.floor(Number(nSpec) || 0));
   const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
   const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
-  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${n} spec, circa mezzo minuto l'uno con un worker).` };
+  const cosa = n ? `unit più ${n} spec, circa mezzo minuto l'uno con un worker` : 'solo unit, nessuno spec scelto';
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (${cosa}).` };
 }
 
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
@@ -659,6 +717,48 @@ export async function dopoLaFusioneDellApp({ reply, id, ramo }, { of, inSospeso 
   return { reply: { ...resto, closed: true }, riga: `  la parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva: era l'ultima` };
 }
 
+/**
+ * Il passo 5 del finish: riapre la pratica per il server se serve, registra la punta, chiede la fusione con la prova
+ * degli unit e, fusa, ricontrolla i rami del server (#1336.2). Le parti del server fuori da main si contano a ogni
+ * richiesta: quando main si muove e la prova si rifà, il server può essere arrivato intanto. `deps` è per le prove.
+ * @returns {Promise<{ fermo?: true, prova, reply?, riga: string }>}
+ */
+export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null }, deps = {}) {
+  const log = deps.log || ((s) => console.log(s));
+  const of = deps.of || await import('./owner-feedback.mjs');
+  const chiedi = deps.askServerMerge || askServerMerge;
+  const id = pratica && pratica.id ? String(pratica.id) : '';
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const inSospeso = () => (id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(root) }) : []);
+  const fuori = inSospeso();
+  if (fuori.length) {
+    const riga = await riapriPerIlServer({ id, ramo: branch, pendingParts: fuori }, { of });
+    if (riga) log(riga);
+  }
+  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
+  for (const riga of await (deps.registraNelRegistro || registraNelRegistro)({ ramo: branch, sha: cur, feedbackId: id, root })) log(`  ${riga}`);
+  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
+  if (primaProva) log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
+  let tentativo = 0;
+  const giro = await chiediConProva({
+    root, punta: cur, primaProva,
+    ...(deps.prova ? { prova: deps.prova } : {}),
+    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
+    chiedi: (provaUnit) => {
+      const pendingParts = tentativo++ === 0 ? fuori : inSospeso();
+      log('\n▸ Chiedo al server di fondere');
+      log(id ? `  pratica ${pratica.seq ? `#${pratica.seq}` : id}` : '  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+      for (const p of pendingParts) log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+      return chiedi({ branch, sha: cur, feedbackId: id, pendingParts, provaUnit });
+    },
+    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
+    scrivi: (s) => log(`\n${s}`),
+  });
+  if (giro.fermo) return { fermo: true, prova: giro.prova, riga: '' };
+  const dopo = id ? await dopoLaFusioneDellApp({ reply: giro.reply, id, ramo: branch }, { of, inSospeso }) : { reply: giro.reply, riga: '' };
+  return { prova: giro.prova, reply: dopo.reply, riga: dopo.riga };
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
@@ -793,10 +893,10 @@ async function main() {
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
   // la base del diff per gli spec mirati e la guardia sul ramo rimasto indietro.
-  const fetchOk = git(['fetch', 'origin', MAIN]).ok;
-  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`]).ok;
+  const { fetchOk, remoteRefOk } = aggiornaMain(ROOT);
   const { base, note } = resolveDiffBase({ fetchOk, remoteRefOk });
   if (note) console.log(`\n${note}`);
+  console.log(`\n${testoBaseMain({ base, sha: git(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]).out, fetchOk })}`);
 
   {
     const behind = Number(git(['rev-list', '--count', `${shaProvato}..${base}`]).out);
@@ -822,11 +922,10 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
-    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
-    // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
+    // Il riallineamento senza file risolti l'ha già detto nella sua nota.
+    const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
+    if (motivo) console.log(`\n${motivo}`);
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
@@ -862,9 +961,6 @@ async function main() {
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
-    }
-    if (spec.rilancia && !specs.length) {
-      console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
 
@@ -974,43 +1070,13 @@ async function main() {
   }
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
-  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
-  //    lega al main su cui sono girati.
-  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
-  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
-  if (pendingParts.length) {
-    const riga = await riapriPerIlServer({ id: pratica.id, ramo: branch, pendingParts }, { of: await import('./owner-feedback.mjs') });
-    if (riga) console.log(riga);
-  }
-  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
-  for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
-  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
-  if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
-  const giro = await chiediConProva({
-    root: ROOT, punta: cur, primaProva,
-    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
-    chiedi: (provaUnit) => {
-      process.stdout.write('\n▸ Chiedo al server di fondere\n');
-      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
-      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
-      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
-    },
-    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
-    scrivi: (s) => console.log(`\n${s}`),
-  });
+  //    un'identità che qui non esiste.
+  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo });
   if (giro.fermo) {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
   }
-  const dopo = pratica && pratica.id
-    ? await dopoLaFusioneDellApp({ reply: giro.reply, id: pratica.id, ramo: branch }, {
-      of: await import('./owner-feedback.mjs'),
-      inSospeso: () => partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }),
-    })
-    : { reply: giro.reply, riga: '' };
-  const reply = dopo.reply;
+  const { reply } = giro;
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
@@ -1021,7 +1087,7 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
-  if (dopo.riga) console.log(dopo.riga);
+  if (giro.riga) console.log(giro.riga);
   if (pratica && pratica.id) {
     const { fraseDaScrivere } = await import('./owner-feedback.mjs');
     const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);

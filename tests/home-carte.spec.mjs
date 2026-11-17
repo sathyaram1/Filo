@@ -419,7 +419,7 @@ test('chiesta a parole col solo nome, la carta di sinistra si trova: la richiest
   await expect(page.locator('#tieni .dash-carta[data-tipo="editor"]')).toHaveCount(1);
   // Le istruzioni generali mandano anche le carte di sinistra allo strumento delle carte.
   const istruzioni = String((await app.evaluate(() => globalThis.__letti[0][0].content)) || '');
-  expect(istruzioni).toMatch(/CARTE DELLA HOME[^\n]*sinistra[^\n]*avvisi/);
+  expect(istruzioni).toMatch(/a sinistra le carte di quello che sta accadendo[^\n]*avvisi/);
   expect(istruzioni).not.toMatch(/si tolgono togliendo la cosa/);
   // La riga di attività nomina la carta tolta davvero, non l'Editor che ha «documento» fra i suoi nomi.
   await page.getByText('Ha sistemato 2 carte della home').click();

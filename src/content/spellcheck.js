@@ -21,6 +21,9 @@
   const PRIMA_MAX = 4000;
   // Il testo sopra il campo che resta al main, dove si cerca chi chiede una password (correttoreRiservati.js).
   const CONVERSAZIONE_MAX = 1500;
+  // La pagina intorno al campo in cui si cercano gli anni detti, per le date senza anno.
+  const INTORNO_MAX = 1500;
+  const INTORNO_MS = 1500;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
   // Il lampo sul valore che Filo ha appena messo al posto delle x: si vede dove è cambiato il testo, poi sfuma.
@@ -43,6 +46,9 @@
   let formeDizionario = new Map();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
+  // Dove il livello di privacy chiede prima (#1589) i controlli del modello non partono più da soli: il motivo resta
+  // qui finché le impostazioni non cambiano, e il campo ha «Controlla» nel tasto destro.
+  let chiedeQui = null;
   // L'applyFix dell'autocorrect dispatcha un input che rientrerebbe nel listener: questa flag salta una passata.
   let suppressAutocorrect = false;
   // Quello che Filo impara dai rifiuti (#1447), com'è salvato: conti e parole da non correggere più da sé.
@@ -133,6 +139,8 @@
 
   function updateSettings(s) {
     settings = s;
+    // Un livello di privacy cambiato si rilegge alla prossima domanda (#1589).
+    chiedeQui = null;
     segnaRadice();
     if (!attivo()) { detachAll(); return; }
     const state = activeEl && monitored.get(activeEl);
@@ -355,6 +363,10 @@
     const pos = cursoreNelCampo(el);
     const fine = A().fineDellaParola(testo, pos);
     if (fine < 0) return;
+    // Si corregge e si conta solo una parola battuta dall'utente: una messa dal sito, anche prima che l'utente entrasse,
+    // rimessa con la maiuscola gli direbbe che è nel dizionario.
+    const chiusa = A().parolaPrima(testo, fine);
+    if (chiusa && (toccaPezzi(state.diSito, chiusa.start, fine) || toccaPezzi(state.visti, chiusa.start, fine))) return;
     seguiIlTesto(state);
     if (automaticaAttiva() && !state.rifiutateQui.some((x) => x.end === fine && testo.slice(x.start, x.end) === x.segment)) {
       const c = A().correzioneAFineParola(testo, fine, {
@@ -446,12 +458,15 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     state.annullando = u;
-    try { document.execCommand('undo'); } catch (_) {}
-    const ora = getEditableText(el);
-    if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
-    state.annullando = null;
-    if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
-    if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    state.filoScrive = TUTTO;
+    try {
+      try { document.execCommand('undo'); } catch (_) {}
+      const ora = getEditableText(el);
+      if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
+      state.annullando = null;
+      if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
+      if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    } finally { seguiIlTesto(state); state.filoScrive = null; }
   }
 
   // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
@@ -702,8 +717,30 @@
 
   // Dentro il campo uno strato prende il cursore e il testo dell'utente, e parte col modulo: col corpo modificabile
   // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
+  // Su un sito gli strati stanno in un'ombra chiusa (#2299): un segno che manca dice che la parola è nel dizionario
+  // personale, fra i nomi noti o fra le imparate, e dal documento lo script del sito lo leggerebbe.
+  const PAGINA_DI_FILO = !!global.SN_FILO_UI?.paginaDiFilo;
+  // `filoScrive` mentre Filo annulla col tasto: quello che il browser riporta è comunque dell'utente.
+  const TUTTO = {};
+  let ombraDegliStrati = null;
   function casaDegliStrati(el) {
-    return radiceDi(el) || (el === document.body || el === document.documentElement ? document.documentElement : document.body);
+    const qui = radiceDi(el);
+    if (qui) return qui;
+    const padre = el === document.body || el === document.documentElement ? document.documentElement : document.body;
+    if (PAGINA_DI_FILO || !padre) return padre || document.documentElement;
+    if (!ombraDegliStrati) {
+      const UI = global.SN_FILO_UI;
+      const stile = 'all:initial!important;display:contents!important;';
+      // Lo specchio tiene il font del campo, che ripete il testo del sito: generici solo i valori sopra le x.
+      if (UI?.stratoChiuso) ombraDegliStrati = UI.stratoChiuso(stile, UI.fogliChiusi(['spellcheck.css'], { ambito: '.sn-spell-valori' }), { riquadro: false });
+      else {
+        const host = document.createElement('div');
+        host.style.cssText = stile;
+        ombraDegliStrati = { host, radice: host.attachShadow({ mode: 'closed' }) };
+      }
+    }
+    if (ombraDegliStrati.host.parentNode !== padre) padre.appendChild(ombraDegliStrati.host);
+    return ombraDegliStrati.radice;
   }
 
   // ============================================================================
@@ -764,8 +801,12 @@
     if (state) return state;
     state = {
       el, overlay: null, ro: null, attivo: false, riquadro: null,
+      // Da dove viene il testo (#2299): i pezzi scritti dal sito, quelli trovati entrando, l'ultimo tasto premuto qui.
+      diSito: [], visti: [], entrato: false, tasto: null, tastoPrima: '', filoScrive: null,
+      primaDelGesto: null, intento: null, taglio: 0,
+      proprietari: new Map(), proprietariCaratteri: 0,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
-      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
+      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null, dateDaGiudicare: [],
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
       baseRapido: '', baseRagionato: '',
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
@@ -773,7 +814,7 @@
       riaperte: { rapido: null, ragionato: null },
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), inVista: [],
+      rimandati: new Set(), inVista: [], intorno: null, ritaglio: '', fotogrammi: 0,
       // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
       valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
@@ -798,8 +839,40 @@
         if (!vivo) return;
         if (vivo.attivo) seguiIlTesto(vivo);
         primaDellAnnulla(vivo, e);
+        if (e.isTrusted) siAspettaDallUtente(vivo, e, ammessoDa(vivo, e, { consuma: false }));
       }, true);
+      // Un editor ricco (Lexical) ferma l'incolla e scrive da sé il testo degli appunti, senza `beforeinput`.
+      el.addEventListener('paste', (e) => {
+        const vivo = monitored.get(el);
+        if (!vivo || !e.isTrusted) return;
+        let t = null;
+        try { t = e.clipboardData && e.clipboardData.getData('text/plain'); } catch (_) { t = null; }
+        if (t) siAspettaDallUtente(vivo, e, (pezzo) => senzaSpazi(t).includes(senzaSpazi(pezzo)));
+      }, true);
+      el.addEventListener('cut', (e) => { const vivo = monitored.get(el); if (vivo && e.isTrusted) vivo.taglio = Date.now(); }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
+      // Il tasto spiega il carattere che l'`input` dopo scrive (ammessoDa). Si entra col clic, anche in una casella che
+      // aveva il fuoco da script, o col rilascio di Tab, che cade già sulla casella nuova.
+      for (const tipo of ['pointerdown', 'keydown', 'keyup']) {
+        el.addEventListener(tipo, (e) => {
+          const vivo = monitored.get(el);
+          if (!vivo || !e.isTrusted) return;
+          if (tipo === 'keydown') {
+            // Su Windows AltGr arriva come Ctrl+Alt, e scrive @ # [ ] €: è un carattere, non un comando.
+            vivo.tasto = { key: String(e.key || ''), mod: !!(e.metaKey || (e.ctrlKey && !e.altKey)), morto: vivo.tastoPrima === 'Dead' };
+            vivo.tastoPrima = vivo.tasto.key;
+            // Anche il primo tasto battuto nella casella è un ingresso: chi ci arriva col fuoco già dentro (Modifica, una
+            // bozza ripristinata) e scrive solo con la tastiera ritrova i segni sul testo che c'era.
+            entra(vivo);
+            return;
+          }
+          if (tipo === 'keyup') {
+            if (vivo.tasto && vivo.tasto.key === e.key) vivo.tasto = null;
+            if (e.key !== 'Tab') return;
+          }
+          entra(vivo);
+        }, true);
+      }
     }
     if (!state.ro) {
       try {
@@ -808,9 +881,12 @@
       } catch (_) {}
     }
     state.attivo = true;
+    state.entrato = false;
+    state.intorno = null;
     activeEl = el;
     ensureOverlay(state);
     seguiIlTesto(state);
+    entra(state);
     aggiornaCodice(state, { senzaDisegno: true });
     syncOverlay(state);
     // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
@@ -838,6 +914,12 @@
   }
 
   function suInput(state, evento) {
+    // Un `input` finto su un testo che non è cambiato non ha niente da rifare: ripetuto, darebbe al sito una misura.
+    if (evento && !evento.isTrusted && !global.SN_FILO_UI?.veroONostro?.(evento) && state.codiceTesto != null
+      && getEditableText(state.el) === state.codiceTesto && getEditableText(state.el) === state.testo) return;
+    const storia = !!evento && (evento.inputType === 'historyUndo' || evento.inputType === 'historyRedo');
+    seguiIlTesto(state, ammessoDa(state, evento), { storia });
+    if (evento && evento.isTrusted) state.intento = null;
     if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
     fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
@@ -892,6 +974,8 @@
 
   function ensureOverlay(state) {
     if (state.overlay && state.overlay.isConnected) return;
+    // Staccato con l'ombra dal sito, tornerebbe col nuovo quando l'ombra rientra.
+    if (state.overlay) state.overlay.remove();
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
@@ -943,6 +1027,223 @@
     o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO + SPORGENZA_SEGNI}px`);
 
     renderOverlayContent(state);
+  }
+
+  // I segni si vedono solo dove si vede il campo: non oltre i contenitori che lo tagliano (la colonna di una mail che
+  // scorre) né sopra quello che la pagina gli mette davanti (un'intestazione fissa, un menu a tendina) (#1115.2).
+  const PUNTI_RITAGLIO_MAX = 160;
+  const RITAGLIO_OGNI = 6;
+  const genitoreDi = (n) => n.assignedSlot || n.parentElement || (n.getRootNode && n.getRootNode().host) || null;
+  function contiene(p, n) {
+    for (let x = n, i = 0; x && i < 200; x = genitoreDi(x), i++) if (x === p) return true;
+    return false;
+  }
+
+  // Un DOM che non risponde come ci si aspetta lascia lo strato com'era: il ritaglio non deve fermare il disegno.
+  function ritaglia(state) {
+    try { ritagliaOra(state); } catch (e) { console.warn('[SN] correttore, ritaglio dei segni:', e); }
+  }
+
+  function ritagliaOra(state) {
+    const o = state.overlay;
+    const el = state.el;
+    const u = state.riquadro;
+    if (!o || !el || !u) return;
+    if (!state.inVista.length) {
+      if (state.ritaglio) { state.ritaglio = ''; o.style.clipPath = ''; }
+      return;
+    }
+    const box = { l: u.left, t: u.top, r: u.left + u.width, b: u.top + u.height + SPORGENZA_SEGNI };
+    const v = { ...box };
+    let vuoto = false;
+    const radiceDoc = document.documentElement;
+    // Chi è posato in assoluto non lo taglia un antenato statico fino al suo contenitore; chi è fissato, nessuno.
+    let fuga = window.getComputedStyle(el).position;
+    for (let p = fuga === 'fixed' ? null : genitoreDi(el); p && !vuoto; p = genitoreDi(p)) {
+      // L'overflow di html e body taglia la finestra, che taglia già lo strato.
+      if (p === radiceDoc || p === document.body) break;
+      let cs;
+      try { cs = window.getComputedStyle(p); } catch (_) { break; }
+      const posato = cs.position !== 'static';
+      const x = cs.overflowX !== 'visible';
+      const y = cs.overflowY !== 'visible';
+      if ((x || y) && (fuga !== 'absolute' || posato)) {
+        const q = p.getBoundingClientRect();
+        const l = q.left + p.clientLeft;
+        const t = q.top + p.clientTop;
+        if (x) { v.l = Math.max(v.l, l); v.r = Math.min(v.r, l + p.clientWidth); }
+        if (y) { v.t = Math.max(v.t, t); v.b = Math.min(v.b, t + p.clientHeight); }
+        vuoto = v.r <= v.l || v.b <= v.t;
+      }
+      if (cs.position === 'fixed') break;
+      if (posato) fuga = cs.position;
+    }
+    const coperti = vuoto ? [] : copertiSuiSegni(state, v, u.top + u.height);
+    let clip = '';
+    if (vuoto) clip = 'inset(50%)';
+    else if (coperti.length || v.l > box.l || v.t > box.t || v.r < box.r || v.b < box.b) {
+      let pezzi = [v];
+      for (const c of coperti) pezzi = senza(pezzi, c);
+      const n = (k) => Math.round(k * 10) / 10;
+      clip = pezzi.length
+        ? `path('${pezzi.map((p) => `M${n(p.l - box.l)} ${n(p.t - box.t)}H${n(p.r - box.l)}V${n(p.b - box.t)}H${n(p.l - box.l)}Z`).join('')}')`
+        : 'inset(50%)';
+    }
+    if (clip !== state.ritaglio) {
+      state.ritaglio = clip;
+      o.style.clipPath = clip;
+    }
+  }
+
+  // Si chiede alla pagina chi sta in cima nei punti dei segni (la parola e i suoi puntini), dentro il campo: quello che
+  // non è il campo lo copre, con tutto il suo strato.
+  function copertiSuiSegni(state, v, fondo) {
+    const el = state.el;
+    const radice = el.getRootNode();
+    const q = radice && typeof radice.elementFromPoint === 'function' ? radice : document;
+    const UI = global.SN_FILO_UI;
+    const coperti = [];
+    let punti = 0;
+    const prova = (x, y) => {
+      if (punti >= PUNTI_RITAGLIO_MAX || x < v.l || x >= v.r || y < v.t || y >= Math.min(v.b, fondo)) return;
+      if (coperti.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) return;
+      punti++;
+      let h = null;
+      try { h = q.elementFromPoint(x, y); } catch (_) { h = null; }
+      if (!h || contiene(el, h) || contiene(h, el) || (UI && UI.inside(h))) {
+        const velo = veli.find((w) => x >= w.l && x < w.r && y >= w.t && y < w.b);
+        if (velo) dubbi.push({ x, y, velo });
+        return;
+      }
+      const c = stratoDi(h, el).getBoundingClientRect();
+      if (c.width > 0 && c.height > 0) coperti.push({ l: c.left, t: c.top, r: c.right, b: c.bottom });
+    };
+    const veli = veliDipinti().map((e) => { const c = e.getBoundingClientRect(); return { e, l: c.left, t: c.top, r: c.right, b: c.bottom }; })
+      .filter((w) => w.r > v.l && w.l < v.r && w.b > v.t && w.t < v.b);
+    const dubbi = [];
+    for (const s of state.overlay.querySelectorAll('.sn-errore, .sn-suggerimento')) {
+      for (const r of s.getClientRects()) {
+        if (!r.width || r.right <= v.l || r.left >= v.r || r.bottom <= v.t || r.top >= v.b) continue;
+        const passi = Math.min(6, Math.max(1, Math.ceil(r.width / 16)));
+        for (const y of [r.top + r.height / 2, r.bottom + 4]) {
+          for (let i = 0; i <= passi; i++) prova(r.left + 1 + ((r.width - 2) * i) / passi, y);
+        }
+      }
+    }
+    if (dubbi.length) for (const w of veliSopraIlCampo(state, dubbi)) coperti.push(w);
+    return coperti;
+  }
+
+  // Un velo fissato che lascia passare il mouse (un'intestazione con pointer-events:none) non risponde a elementFromPoint:
+  // quelli dipinti si cercano a parte, nel tempo libero e al più ogni VELI_MS. Uno trasparente (il contenitore degli
+  // avvisi di un sito) non copre niente e non si conta.
+  const VELI_MS = 1500;
+  let veliVisti = { t: 0, v: [], inCorso: false };
+  function veliDipinti() {
+    if (!veliVisti.inCorso && Date.now() - veliVisti.t >= VELI_MS) {
+      veliVisti.inCorso = true;
+      const cerca = () => {
+        const v = [];
+        try {
+          const UI = global.SN_FILO_UI;
+          const tutti = document.body ? document.body.getElementsByTagName('*') : [];
+          for (let i = 0; i < tutti.length; i++) {
+            const e = tutti[i];
+            // Solo chi è fissato ha offsetParent null (con chi non è disegnato): la lettura costosa resta a pochi.
+            if (e.offsetParent !== null || (UI && UI.inside(e))) continue;
+            const cs = window.getComputedStyle(e);
+            if (cs.position !== 'fixed' || cs.pointerEvents !== 'none' || cs.visibility === 'hidden') continue;
+            if (coperturaDelVelo(e, cs) >= 0.5) v.push(e);
+          }
+        } catch (_) {}
+        veliVisti = { t: Date.now(), v, inCorso: false };
+      };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(cerca, { timeout: 1000 }); else setTimeout(cerca, 0);
+    }
+    return veliVisti.v.filter((e) => e.isConnected);
+  }
+
+  // Quanto un velo nasconde quello che sta sotto, da 0 a 1. La grana leggera, una vignettatura trasparente al centro o
+  // un velo in fusione lasciano leggere la parola: non coprono i segni (#1115.2).
+  const alfaDi = (c) => {
+    if (c === 'transparent') return 0;
+    const m = /^rgba?\(([^)]+)\)$/.exec(c);
+    return m ? Number(m[1].split(/[,\s/]+/)[3] ?? '1') : 0;
+  };
+  function coperturaDelVelo(e, cs) {
+    if (cs.mixBlendMode && cs.mixBlendMode !== 'normal') return 0;
+    let opacita = 1;
+    for (let x = e; x && x.nodeType === 1; x = x.parentElement) {
+      opacita *= Number((x === e ? cs : window.getComputedStyle(x)).opacity);
+      if (!(opacita > 0)) return 0;
+    }
+    let immagine = 0;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') {
+      // Un'immagine non si legge: copre. Un gradiente copre ovunque solo se nessuna sua tappa è trasparente.
+      if (/url\(/.test(cs.backgroundImage)) immagine = 1;
+      else {
+        const tappe = cs.backgroundImage.match(/rgba?\([^)]*\)|transparent/g) || [];
+        immagine = tappe.length ? Math.min(...tappe.map(alfaDi)) : 1;
+      }
+    }
+    return opacita * Math.max(alfaDi(cs.backgroundColor), immagine);
+  }
+
+  // I punti dei segni sotto un velo: si chiede alla pagina, per un attimo senza veli, cosa sta sopra al campo.
+  const SENZA_VELI = typeof CSSStyleSheet === 'function' ? (() => {
+    try { const s = new CSSStyleSheet(); s.replaceSync('*:not(.sn-spell-overlay):not(.sn-spell-overlay *) { pointer-events: auto !important; }'); return s; } catch (_) { return null; }
+  })() : null;
+  function veliSopraIlCampo(state, dubbi) {
+    const out = [];
+    if (!SENZA_VELI) return out;
+    const el = state.el;
+    const prima = document.adoptedStyleSheets;
+    try {
+      document.adoptedStyleSheets = [...prima, SENZA_VELI];
+      for (const { x, y, velo } of dubbi) {
+        if (out.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) continue;
+        for (const h of document.elementsFromPoint(x, y)) {
+          if (h === state.overlay || state.overlay.contains(h)) continue;
+          if (contiene(el, h) || contiene(h, el)) break;
+          if (contiene(velo.e, h)) { out.push({ l: velo.l, t: velo.t, r: velo.r, b: velo.b }); break; }
+        }
+      }
+    } catch (_) {
+    } finally {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== SENZA_VELI);
+    }
+    return out;
+  }
+
+  // Lo strato di chi copre: il primo antenato fissato o posato sopra la pagina (l'intestazione intera, non il suo logo),
+  // senza salire a chi contiene il campo né oltre un velo che lascia passare il mouse.
+  function stratoDi(h, el) {
+    let n = h;
+    for (let i = 0; i < 40; i++) {
+      let cs;
+      try { cs = window.getComputedStyle(n); } catch (_) { return h; }
+      if (cs.position === 'fixed' || cs.position === 'sticky' || cs.position === 'absolute') return n;
+      const p = genitoreDi(n);
+      if (!p || p === document.documentElement || p === document.body || contiene(p, el)) return h;
+      try { if (window.getComputedStyle(p).pointerEvents === 'none') return n; } catch (_) { return h; }
+      n = p;
+    }
+    return h;
+  }
+
+  // Un rettangolo meno un altro: i pezzi che restano, senza sovrapporsi.
+  function senza(pezzi, c) {
+    const out = [];
+    for (const p of pezzi) {
+      if (c.r <= p.l || c.l >= p.r || c.b <= p.t || c.t >= p.b) { out.push(p); continue; }
+      if (c.t > p.t) out.push({ l: p.l, t: p.t, r: p.r, b: c.t });
+      if (c.b < p.b) out.push({ l: p.l, t: c.b, r: p.r, b: p.b });
+      const t = Math.max(p.t, c.t);
+      const b = Math.min(p.b, c.b);
+      if (c.l > p.l) out.push({ l: p.l, t, r: c.l, b });
+      if (c.r < p.r) out.push({ l: c.r, t, r: p.r, b });
+    }
+    return out;
   }
 
   // Svuotare e riempire lo specchio lo riporta in cima: ogni disegno riprende lo scorrimento della casella. Sul campo
@@ -1037,6 +1338,7 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
+    ritaglia(state);
     disegnaValori(state);
     seguiIlCampo();
     passaggiInCorso(state);
@@ -1121,9 +1423,9 @@
     proposte.delete(el);
   }
 
-  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
-  // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
-  // Anche il testo: una chat che svuota la casella da script all'invio non manda input, e lo strato terrebbe il vecchio.
+  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra) o fargli scendere sopra
+  // un'intestazione: finché il campo attivo ha segni, a ogni fotogramma il riquadro si confronta con l'ultimo disegno, e
+  // ogni RITAGLIO_OGNI si ritaglia. Anche il testo: una chat che svuota la casella da script all'invio non manda input.
   const SEGUI_TESTO_DOPO_TASTO_MS = 10000;
   let seguendo = false;
   function seguiIlCampo() {
@@ -1146,6 +1448,7 @@
       const r = state.el.getBoundingClientRect();
       const u = state.riquadro;
       if (!u || r.left !== u.left || r.top !== u.top || r.width !== u.width || r.height !== u.height) syncOverlay(state);
+      else if (++state.fotogrammi % RITAGLIO_OGNI === 0) ritaglia(state);
       requestAnimationFrame(giro);
     };
     requestAnimationFrame(giro);
@@ -1298,11 +1601,35 @@
   // ============================================================================
   // Chi cambia il testo perde i segni del modello che il cambio tocca: gli altri restano dov'erano finché un controllo
   // non li rinnova (#1111), sugli offset giusti per «Correggi».
-  function seguiIlTesto(state) {
+  // `ammesso(pezzo)`: il pezzo nuovo l'ha scritto l'utente (ammessoDa). Un cambio che né lui né Filo spiegano è del sito.
+  function seguiIlTesto(state, ammesso = null, { storia = false } = {}) {
     const ora = getEditableText(state.el);
     if (ora === state.testo) return;
     const prima = state.testo;
     state.testo = ora;
+    if (!PAGINA_DI_FILO && !radiceDi(state.el)) {
+      const c = cambio(prima, ora);
+      const nuovo = ora.slice(c.p, c.fineNuovo);
+      const f = state.filoScrive;
+      const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
+      // Il tasto che un editor ricco ha fermato per scriverlo da sé (siAspettaDallUtente).
+      const i = state.intento;
+      if (!ammesso && i && Date.now() - i.alle < INTENTO_MS) ammesso = i.ammesso;
+      if (i && ammesso === i.ammesso) state.intento = null;
+      const spiegato = !storia && (daFilo || !!(ammesso && ammesso(nuovo)));
+      const riportato = storia ? proprietariDi(state, ora) : null;
+      if (riportato) {
+        state.diSito = riportato.diSito;
+        state.visti = riportato.visti;
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = [];
+      } else {
+        state.diSito = scorriPezzi(state.diSito, c);
+        state.visti = scorriPezzi(state.visti, c);
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = scorriPezzi(state.primaDelGesto.pezzi, c);
+        if (!spiegato) cambioDelSito(state, prima, ora, c, nuovo);
+      }
+      ricordaProprietari(state);
+    }
     // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora», e dice come si scrive
     // in questa pagina.
     if (!ora.trim()) {
@@ -1357,18 +1684,13 @@
     if (!z) return null;
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineVecchio = vecchio.length - s;
+    const { p, fineVecchio, fineNuovo } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     let a;
     let b;
     if (z.end <= p) { a = z.start; b = z.end; } else if (z.start >= fineVecchio) { a = z.start + delta; b = z.end + delta; } else {
       a = Math.min(z.start, p);
-      b = Math.max(z.end + delta, nuovo.length - s);
+      b = Math.max(z.end + delta, fineNuovo);
     }
     a = Math.max(0, Math.min(nuovo.length, a));
     b = Math.max(a, Math.min(nuovo.length, b));
@@ -1408,12 +1730,7 @@
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
     if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineCambio = vecchio.length - s;
+    const { p, fineVecchio: fineCambio } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     const out = [];
     for (const it of lista) {
@@ -1458,23 +1775,298 @@
     return nuovo;
   }
 
+  // Su un sito si controlla solo il testo dell'utente (#2299): quello che scrive coi suoi tasti o tramite Filo, e quello
+  // che c'era quando è entrato nella casella. Il resto lo ha scritto il sito, e i segni, la correzione da sé o la durata
+  // del controllo gli direbbero cosa c'è nel dizionario personale. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
+  function cambio(prima, ora) {
+    const corto = Math.min(prima.length, ora.length);
+    let p = 0;
+    while (p < corto && prima[p] === ora[p]) p++;
+    let s = 0;
+    while (s < corto - p && prima[prima.length - 1 - s] === ora[ora.length - 1 - s]) s++;
+    return { p, fineVecchio: prima.length - s, fineNuovo: ora.length - s };
+  }
+  // Un pezzo che il cambio tocca perde solo la parte cambiata: quello che resta ai lati resta di chi era.
+  function scorriPezzi(lista, { p, fineVecchio, fineNuovo }) {
+    const delta = fineNuovo - fineVecchio;
+    const out = [];
+    for (const z of lista) {
+      if (z.end <= p) out.push(z);
+      else if (z.start >= fineVecchio) out.push({ start: z.start + delta, end: z.end + delta });
+      else {
+        if (z.start < p) out.push({ start: z.start, end: p });
+        if (z.end > fineVecchio) out.push({ start: fineNuovo, end: z.end + delta });
+      }
+    }
+    return unisciPezzi(out);
+  }
+  function unisciPezzi(lista) {
+    const out = [];
+    for (const z of [...lista].filter((x) => x.end > x.start).sort((a, b) => a.start - b.start)) {
+      const u = out[out.length - 1];
+      if (u && z.start <= u.end) u.end = Math.max(u.end, z.end); else out.push({ start: z.start, end: z.end });
+    }
+    return out;
+  }
+  function toccaPezzi(lista, a, b) { return lista.some((z) => a < z.end && b > z.start); }
+  // Gli spazi non dicono niente del dizionario, e un campo modificabile scrive lo spazio in fondo come unificatore e lo
+  // riscrive al tasto dopo: chi ha scritto un pezzo si giudica senza.
+  function senzaSpazi(s) { return String(s).replace(/[\s ]/g, ''); }
+
+  // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
+  // testo, la composizione il suo. Mai un cambio intero: un gesto vero senza testo (un'immagine incollata) non spiega
+  // quello che il sito ci mette nello stesso evento. Uno script ha `isTrusted` anche con execCommand. L'annulla e il
+  // rifai non scrivono niente di nuovo: riportano un testo già visto, coi suoi proprietari (proprietariDi).
+  function ammessoDa(state, e, { consuma = true } = {}) {
+    if (!e) return null;
+    if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
+    const tipo = e.inputType || '';
+    const dentro = (fonte) => (typeof fonte === 'string' && fonte
+      ? (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo))
+      : (pezzo) => !senzaSpazi(pezzo));
+    const k = state.tasto;
+    // Cancella l'utente col suo tasto o col suo taglia; una cancellatura che non spiegano è del sito (cambioDelSito).
+    if (tipo.startsWith('delete')) {
+      const tasto = !!k && ['Backspace', 'Delete', 'Unidentified', 'Process'].includes(k.key);
+      const taglio = tipo === 'deleteByCut' && Date.now() - state.taglio < INTENTO_MS;
+      if (!tasto && !taglio) return null;
+      if (consuma) { if (tasto) state.tasto = null; else state.taglio = 0; }
+      return dentro(null);
+    }
+    if (tipo === 'insertText') {
+      if (consuma) state.tasto = null;
+      if (!k || k.mod || typeof e.data !== 'string') return null;
+      const libero = k.morto || k.key === 'Unidentified' || k.key === 'Process';
+      const suo = [...k.key].length === 1 && e.data === k.key;
+      return suo || (libero && [...e.data].length <= 3) ? dentro(e.data) : null;
+    }
+    if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => !senzaSpazi(pezzo);
+    if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return dentro(e.data);
+    if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop' || tipo === 'insertFromPasteAsQuotation') {
+      let fonte = typeof e.data === 'string' ? e.data : null;
+      if (!fonte) { try { fonte = e.dataTransfer?.getData?.('text/plain'); } catch (_) { fonte = null; } }
+      return dentro(fonte);
+    }
+    return null;
+  }
+
+  // Un gesto vero che l'editor ferma per scrivere da sé (Lexical: la prima lettera di un paragrafo, l'incolla) non
+  // porta un `input`: il cambio che arriva subito dopo vale quanto quello che il gesto spiega, e niente di più.
+  const INTENTO_MS = 1000;
+  function siAspettaDallUtente(state, e, ammesso) {
+    if (!ammesso || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    state.intento = { ammesso, alle: Date.now() };
+    setTimeout(() => {
+      if (!e.defaultPrevented || !state.attivo || state.intento?.ammesso !== ammesso) return;
+      if (getEditableText(state.el) !== state.testo) suInput(state, null);
+    }, 0);
+  }
+
+  // Un cambio che né l'utente né Filo spiegano. Quello che il sito scrive è suo; una parola che il sito ricompone
+  // cancellando o spezzando lettere dell'utente («le zanzare di otto terra» → «le zanzottera») è sua anche lei. E il
+  // testo trovato entrando torna del sito: tenerlo dell'utente gli darebbe, cancellando e annullando, una misura a
+  // piacere (#2299, giro 4).
+  const DI_PAROLA = /[\p{L}\p{N}\p{M}'’_-]/u;
+  function cambioDelSito(state, prima, ora, c, nuovo) {
+    const tolto = prima.slice(c.p, c.fineVecchio);
+    const tocca = DI_PAROLA.test(ora[c.p - 1] || '') && DI_PAROLA.test(ora[c.fineNuovo] || '');
+    if (!senzaSpazi(nuovo) && !senzaSpazi(tolto) && !(nuovo && tocca)) return;
+    const pezzi = [];
+    if (senzaSpazi(nuovo)) pezzi.push({ start: c.p, end: c.fineNuovo });
+    else {
+      let a = c.p;
+      let b = c.fineNuovo;
+      while (a > 0 && DI_PAROLA.test(ora[a - 1])) a--;
+      while (b < ora.length && DI_PAROLA.test(ora[b])) b++;
+      if (b > a) pezzi.push({ start: a, end: b });
+    }
+    state.diSito = unisciPezzi([...state.diSito, ...pezzi]);
+    revocaVisti(state);
+  }
+  function revocaVisti(state) {
+    if (!state.visti.length && ![...state.proprietari.values()].some((g) => g.visti.length)) return;
+    state.diSito = unisciPezzi([...state.diSito, ...state.visti]);
+    state.visti = [];
+    for (const g of state.proprietari.values()) {
+      if (!g.visti.length) continue;
+      g.diSito = unisciPezzi([...g.diSito, ...g.visti]);
+      g.visti = [];
+    }
+  }
+
+  // Il testo che c'era nella casella prima del gesto che ci porta l'utente, fotografato prima che la pagina lo veda
+  // (ascolto in cattura su window, messo prima dei suoi): quello che il sito ci mette durante il gesto non si adotta.
+  const FOTO_MS = 2000;
+  function primaDelGesto(e) {
+    try {
+      if (!e || !e.isTrusted || PAGINA_DI_FILO || !settings || !attivo()) return;
+      for (const el of new Set([activeEl, editabileDellEvento(e)])) {
+        if (!el || radiceDi(el)) continue;
+        const state = statoDi(el);
+        if (state.attivo && state.entrato) continue;
+        seguiIlTesto(state);
+        state.primaDelGesto = { alle: Date.now(), pezzi: state.diSito.map((z) => ({ ...z })) };
+      }
+    } catch (_) {}
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'keydown']) window.addEventListener(tipo, primaDelGesto, true);
+  }
+  function intersezione(a, b) {
+    const out = [];
+    for (const x of a) for (const y of b) {
+      const s = Math.max(x.start, y.start);
+      const t = Math.min(x.end, y.end);
+      if (t > s) out.push({ start: s, end: t });
+    }
+    return unisciPezzi(out);
+  }
+  function sottraiPezzi(a, b) {
+    let out = unisciPezzi(a);
+    for (const y of b) {
+      out = out.flatMap((x) => [
+        ...(x.start < y.start ? [{ start: x.start, end: Math.min(x.end, y.start) }] : []),
+        ...(x.end > y.end ? [{ start: Math.max(x.start, y.end), end: x.end }] : []),
+      ]);
+    }
+    return unisciPezzi(out);
+  }
+
+  // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
+  // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. L'impronta trova, il testo
+  // intero conferma: un'impronta corta il sito la falsificherebbe. Un testo dimenticato torna come del sito.
+  const PROPRIETARI_MAX = 2000;
+  const PROPRIETARI_CARATTERI = 4_000_000;
+  function improntaDi(t) {
+    let a = 0x811c9dc5;
+    let b = 0x9747b28c;
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      a = Math.imul(a ^ c, 0x01000193);
+      b = Math.imul(b ^ c, 0x5bd1e995);
+    }
+    return `${t.length}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
+  }
+  function ricordaProprietari(state) {
+    if (PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const m = state.proprietari;
+    const testo = state.testo;
+    const k = improntaDi(testo);
+    const vecchio = m.get(k);
+    if (vecchio) { m.delete(k); state.proprietariCaratteri -= vecchio.testo.length; }
+    m.set(k, { testo, diSito: state.diSito.map((z) => ({ ...z })), visti: state.visti.map((z) => ({ ...z })) });
+    state.proprietariCaratteri += testo.length;
+    while (m.size > 1 && (m.size > PROPRIETARI_MAX || state.proprietariCaratteri > PROPRIETARI_CARATTERI)) {
+      const primo = m.keys().next().value;
+      state.proprietariCaratteri -= m.get(primo).testo.length;
+      m.delete(primo);
+    }
+  }
+  function proprietariDi(state, testo) {
+    const g = state.proprietari.get(improntaDi(testo));
+    if (!g || g.testo !== testo) return null;
+    return { diSito: g.diSito.map((z) => ({ ...z })), visti: g.visti.map((z) => ({ ...z })) };
+  }
+
+  // Il gesto vero che porta l'utente nella casella (il clic, il rilascio di Tab) fa suo il testo che c'è: una volta per
+  // ingresso, non a ogni clic, perché ogni misura in più è una parola letta.
+  function entra(state) {
+    if (state.entrato || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const G = global.SN_GESTO;
+    if (!G || !G.prendi('codice', undefined, G.dentro(state.el))) return;
+    state.entrato = true;
+    seguiIlTesto(state);
+    const foto = state.primaDelGesto;
+    state.primaDelGesto = null;
+    const adottati = foto && Date.now() - foto.alle < FOTO_MS ? intersezione(state.diSito, foto.pezzi) : state.diSito;
+    if (!adottati.length) return;
+    state.visti = unisciPezzi([...state.visti, ...adottati]);
+    state.diSito = sottraiPezzi(state.diSito, adottati);
+    ricordaProprietari(state);
+    if (state.attivo) aggiornaCodice(state);
+  }
+
+  // Filo scrive `testo` nella casella (una correzione, l'Incolla del menu, la dettatura): vale come scritto dall'utente.
+  // Gli editor che rifanno il testo dopo l'evento lo mostrano al giro dopo: lì si guarda ancora, poi si chiude.
+  function scriveFilo(el, testo) {
+    let state = el ? monitored.get(el) : null;
+    // Chi scrive in un editor ricco può avere in mano un nodo dentro il campo, o il campo dentro il nodo.
+    if (!state && el && activeEl && (activeEl.contains(el) || (typeof el.contains === 'function' && el.contains(activeEl)))) state = monitored.get(activeEl);
+    if (!state && el) { const campo = findSupportedEditable(el); if (campo) state = statoDi(campo); }
+    if (!state) return;
+    // Quello che il sito aveva cambiato prima resta suo.
+    seguiIlTesto(state);
+    const t = String(testo ?? '');
+    state.filoScrive = t;
+    setTimeout(() => {
+      if (state.filoScrive !== t) return;
+      seguiIlTesto(state);
+      state.filoScrive = null;
+      if (state.attivo) aggiornaCodice(state);
+    }, 0);
+  }
+
+  // Il testo da controllare con le parole del sito spente (spazi, gli a capo restano): fuori dai controlli, e uguali
+  // nel costo qualunque cosa dica il dizionario. Per il dizionario (`ripetute` falso), fra le parole trovate entrando
+  // una ripetuta conta una volta: mille copie della stessa non moltiplicano la differenza.
+  function soloDellUtente(state, d, { ripetute = true } = {}) {
+    if (PAGINA_DI_FILO || radiceDi(state.el) || (!state.diSito.length && !state.visti.length)) return d.testo;
+    const n = d.testo.length;
+    const sito = new Uint8Array(n);
+    const visto = new Uint8Array(n);
+    for (const [lista, segna] of [[state.diSito, sito], [state.visti, visto]]) {
+      for (const z of lista) {
+        const a = Math.max(0, d.verso(z.start));
+        const b = Math.min(n, z.end >= state.testo.length ? n : d.verso(z.end));
+        for (let i = a; i < b; i++) segna[i] = 1;
+      }
+    }
+    const out = d.testo.split('');
+    const giaViste = new Set();
+    for (const m of d.testo.matchAll(/[\p{L}\p{N}\p{M}'’_-]+/gu)) {
+      const a = m.index;
+      const b = a + m[0].length;
+      let delSito = false;
+      let vista = false;
+      for (let i = a; i < b; i++) { if (sito[i]) delSito = true; if (visto[i]) vista = true; }
+      // Contate come le conta il dizionario: «1_zanzottera» e «2_zanzottera» sono la stessa parola.
+      if (!delSito && vista && !ripetute) {
+        const parole = R() ? R().parole(m[0]) : [{ start: 0, end: m[0].length, parola: m[0] }];
+        for (const w of parole) {
+          const chiave = w.parola.toLowerCase();
+          if (!giaViste.has(chiave)) { giaViste.add(chiave); continue; }
+          for (let i = a + w.start; i < a + w.end; i++) out[i] = ' ';
+        }
+      }
+      if (delSito) for (let i = a; i < b; i++) out[i] = ' ';
+    }
+    for (let i = 0; i < n; i++) if (sito[i] && out[i] !== '\n') out[i] = ' ';
+    return out.join('');
+  }
+
   function calcolaCodice(state) {
+    seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     const Rg = R();
-    if (!Rg) { state.codice = []; return false; }
+    if (!Rg) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
+    const testo = soloDellUtente(state, d);
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
-    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
+    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
-    const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
+    const perDizionario = soloDellUtente(state, d, { ripetute: false });
+    const pareri = erroriAttivi() ? pareriDelTesto(perDizionario) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
-      ...Rg.erroriFissi(d.testo),
-      ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
-      ...Rg.candidatiDizionario(d.testo, {
+      ...Rg.erroriFissi(testo),
+      ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
+      ...Rg.candidatiDizionario(perDizionario, {
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
+    const tutte = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date(), intornoDelCampo(state)) : [];
+    const date = tutte.filter((x) => !x.daGiudicare).map(segnoDaData);
+    // Le date che il codice non giudica (un altro anno scritto intorno) partono col controllo ragionato, senza segno.
+    state.dateDaGiudicare = tutte.filter((x) => x.daGiudicare);
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
@@ -1548,7 +2140,8 @@
       ...delModello.filter((m) => m.tipo === 'segnaposto' && valido(m)),
     ] : [];
     const sulleX = (x) => x.segno === 'errore' && xVolute.some((s) => x.start < s.end && x.end > s.start);
-    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo)
+    // Nemmeno il modello segna il testo del sito (soloDellUtente).
+    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo) && !toccaPezzi(state.diSito, x.start, x.end)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
       && !(scrive && x.start < scrive.end && x.end > scrive.start);
     const ordina = (k) => [
@@ -1572,7 +2165,7 @@
   // Il rapido: dopo la pausa breve, al più ogni `ogniRapidoMs` mentre si continua a scrivere, e subito a ogni candidato
   // nuovo. Senza un gesto (#1070) quello già chiesto si sposta soltanto.
   function programmaRapido(state, { gesto = false, subito = false } = {}) {
-    if (!modelloErrori()) return;
+    if (!modelloErrori() || chiedeQui) return;
     if (!gesto && !state.timerRapido) return;
     const T = tempi();
     if (state.timerRapido) clearTimeout(state.timerRapido);
@@ -1594,13 +2187,13 @@
       state.timerFine = null;
       if (!state.attivo) return;
       aggiornaCodice(state);
-      if (state.restaParola && modelloErrori() && !state.timerRapido) controlloRapido(state);
+      if (state.restaParola && modelloErrori() && !chiedeQui && !state.timerRapido) controlloRapido(state);
     }, tempi().pausaRagionatoMs + 30);
   }
 
   // Il ragionato: a fine frase, sulle frasi chiuse, e dopo la pausa lunga su quello che è cambiato.
   function programmaRagionato(state, { gesto = false, fineFrase = false } = {}) {
-    if (!ragionatoAttivo()) return;
+    if (!ragionatoAttivo() || chiedeQui) return;
     if (!gesto && !state.timerRagionato) return;
     if (state.timerRagionato) clearTimeout(state.timerRagionato);
     state.timerRagionato = setTimeout(() => {
@@ -1643,6 +2236,7 @@
         ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
         ...(ripeti ? { riprova: true } : {}),
       })).then((res) => {
+        if (res && res.code === 'CHIEDI_PRIMA' && !suRichiesta) chiedeQui = res.motivo || 'sempre';
         if (res && res.ok && typeof res.text === 'string') {
           esiti.set(chiave, { ok: true, text: res.text, senzaContesto: !!res.senzaContesto });
           while (esiti.size > ESITI_MAX) esiti.delete(esiti.keys().next().value);
@@ -1745,9 +2339,9 @@
     applicaRisposta(state, res.text, { fonte: 'rapido', viaggio });
   }
 
-  async function controlloRagionato(state, { fineFrase = false } = {}) {
+  async function controlloRagionato(state, { fineFrase = false, suRichiesta = false } = {}) {
     if (!ragionatoAttivo() || !state.el || !state.el.isConnected) return;
-    if (document.hidden) { state.rimandati.add('ragionato'); return; }
+    if (document.hidden && !suRichiesta) { state.rimandati.add('ragionato'); return; }
     const Rg = R();
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
@@ -1777,6 +2371,8 @@
     const payload = {
       prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      date: soloSegnaposti ? [] : (state.dateDaGiudicare || []).filter((x) => x.start >= g.start && x.end <= g.end)
+        .map((x) => ({ pezzo: x.segment, ...x.daGiudicare })),
       contesto,
       ripetizioni: ripetizioniAttive(),
       segnaposti: segnapostiAttivi(),
@@ -1792,7 +2388,7 @@
     let res = null;
     try {
       // Le date relative cambiano a mezzanotte: il giorno è parte della domanda.
-      res = await chiediERipeti(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString() });
+      res = await chiediERipeti(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString(), suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, controllo ragionato:', err);
     } finally {
@@ -1950,7 +2546,8 @@
   }
 
   // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
-  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
+  // CHIEDI_PRIMA è il livello di privacy (#1589) che la ferma prima: per chi scrive è la stessa pagina che non cerca da sola.
+  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', CHIEDI_PRIMA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
 
   // I contatori dei segnaposti (#1586): da dove viene il valore e che fine fa, mai la domanda né il valore. La ricerca
   // che una pagina delicata non lascia partire, e quella chiesta poi col clic, sono anche il costo della privacy.
@@ -1983,7 +2580,8 @@
           pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}),
           ...(cerca.prima ? { giaLette: { domanda: cerca.prima.domanda, dove: cerca.prima.dove } } : {}),
         },
-      }, { giorno: new Date().toDateString() });
+        // Il clic è un gesto: anche fuori, perché livello di privacy e tetto delle automatiche guardano lì (#2466).
+      }, { giorno: new Date().toDateString(), suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, segnaposto:', err);
     }
@@ -2070,6 +2668,7 @@
   // clic; e i lampi. Sta fuori dallo specchio, che taglia ai bordi del campo e lascia passare il mouse.
   function strato(state) {
     if (state.valori && state.valori.isConnected) return state.valori;
+    if (state.valori) state.valori.remove();
     const v = document.createElement('div');
     v.className = 'sn-spell-valori';
     global.SN_FILO_UI?.mark(v);
@@ -2386,6 +2985,20 @@
     if (!e) return { errore: false };
     // Il modello va ai contatori del correttore, con la proposta che ne esce (#1461).
     return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo, modello: String(res.model || '') };
+  }
+
+  // «Controlla» (#1589): dove il livello di privacy chiede prima, i due controlli del modello partono sul campo intero
+  // quando l'utente li chiede. Il menu la offre solo lì, e solo se il modello del correttore è acceso.
+  function chiedePrima(el) {
+    return Boolean(chiedeQui && el && (modelloErrori() || ragionatoAttivo()) && monitored.get(el));
+  }
+  async function controllaOra(el) {
+    const state = el && monitored.get(el);
+    if (!state) return;
+    await Promise.all([
+      modelloErrori() ? controlloRapido(state, { suRichiesta: true, ignoraScrittura: true }) : null,
+      ragionatoAttivo() ? controlloRagionato(state, { suRichiesta: true }) : null,
+    ]);
   }
 
   // Cerca di estrarre frase precedente e successiva al campo editabile, per la parola sotto il tasto destro.
@@ -2705,7 +3318,8 @@
     return el.ownerDocument.body || el.ownerDocument.documentElement;
   }
 
-  function contestoDelCampo(el, { soloPrima = 0 } = {}) {
+  // `intorno`: solo i primi caratteri prima e dopo il campo, per le date (intornoDelCampo).
+  function contestoDelCampo(el, { soloPrima = 0, intorno = 0 } = {}) {
     const vuoto = { prima: '', dopo: '', troncato: false };
     // Nei riquadri di Filo intorno c'è Filo, non la pagina.
     if (!el || radiceDi(el)) return vuoto;
@@ -2759,10 +3373,11 @@
         }
         return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
       };
-      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, CONTESTO_DOPO_MAX);
+      const tettoDopo = intorno || CONTESTO_DOPO_MAX;
+      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, tettoDopo);
       let testoDopo = cuci(dopo.pezzi);
-      if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
-      const tettoPrima = soloPrima || CONTESTO_MAX - testoDopo.length;
+      if (testoDopo.length > tettoDopo) testoDopo = testoDopo.slice(0, tettoDopo);
+      const tettoPrima = soloPrima || intorno || CONTESTO_MAX - testoDopo.length;
       const prima = raccogli(false, tettoPrima);
       let testoPrima = cuci(prima.pezzi.reverse());
       if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
@@ -2773,6 +3388,56 @@
     }
   }
 
+  // La pagina intorno per le date senza anno (coerenza.dateDi): si rilegge al più ogni INTORNO_MS, non a ogni tasto.
+  function intornoDelCampo(state) {
+    const ora = Date.now();
+    if (state.intorno && ora - state.intorno.t < INTORNO_MS) return state.intorno.v;
+    const c = contestoDelCampo(state.el, { intorno: INTORNO_MAX });
+    const titolo = radiceDi(state.el) ? '' : titoliSopra(state.el);
+    state.intorno = { t: ora, v: { prima: c.prima, dopo: c.dopo, titolo } };
+    return state.intorno.v;
+  }
+
+  // Il titolo della pagina e l'ultima intestazione prima del campo, anche fuori dal contenitore del contesto.
+  function titoliSopra(el) {
+    const pezzi = [];
+    try {
+      pezzi.push(String(document.title || '').slice(0, 300));
+      let cima = el;
+      for (let i = 0; i < 32; i++) { const h = cima.getRootNode && cima.getRootNode().host; if (!h) break; cima = h; }
+      const UI = global.SN_FILO_UI;
+      let h1 = null;
+      let altra = null;
+      for (const h of document.querySelectorAll('h1, h2, h3, [role="heading"]')) {
+        if (!(h.compareDocumentPosition(cima) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (UI && UI.inside(h)) continue;
+        if (h.tagName === 'H1') h1 = h; else altra = h;
+      }
+      for (const h of [h1, altra]) if (h) pezzi.push(String(h.textContent || '').slice(0, 300));
+      pezzi.push(campoTitoloSopra(el).slice(0, 300));
+    } catch (_) {}
+    return pezzi.join('\n');
+  }
+
+  // Il titolo scritto in un campo sopra il corpo (la casella del titolo di una nota, «Diario 2024»): l'ultimo campo prima
+  // di questo, salendo di pochi livelli. Serve solo all'anno delle date: al modello va la sola riga con l'anno.
+  const TIPI_TITOLO = new Set(['text', 'search', '']);
+  function campoTitoloSopra(el) {
+    let a = el.parentElement;
+    for (let i = 0; a && i < 6 && a !== document.body && a !== document.documentElement; i++, a = a.parentElement) {
+      let ultimo = null;
+      for (const c of a.querySelectorAll('input, textarea, [contenteditable]')) {
+        if (c === el || el.contains(c) || c.contains(el)) continue;
+        if (!(c.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (c.tagName === 'INPUT' ? !TIPI_TITOLO.has(c.type) : (c.tagName !== 'TEXTAREA' && (!c.isContentEditable || (c.parentElement && c.parentElement.isContentEditable)))) continue;
+        if (typeof c.checkVisibility === 'function' && !c.checkVisibility({ visibilityProperty: true })) continue;
+        ultimo = c;
+      }
+      if (ultimo) return String((ultimo.isContentEditable ? ultimo.textContent : ultimo.value) || '');
+    }
+    return '';
+  }
+
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
@@ -2781,6 +3446,7 @@
   // Falso se il campo è rimasto com'era: allora lo si riscrive.
   function sostituisciComeBattuta(el, range, testo, cursorMode) {
     testo = String(testo ?? '');
+    scriveFilo(el, testo);
     const prima = el.value;
     const caret = el.selectionEnd;
     // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
@@ -2805,6 +3471,7 @@
 
   // Una correzione applicata da Filo: Ctrl/Cmd+Z subito dopo la disfa, e i contatori lo sanno (#1461).
   function applyFix(el, range, replacement, opts = {}) {
+    scriveFilo(el, replacement);
     const prima = getEditableText(el);
     const r = applicaCorrezione(el, range, replacement, opts);
     try {
@@ -3078,6 +3745,7 @@
   // Scrive `pezzo` in un punto, come una battuta: `dove` è la posizione in una casella, il punto del documento in un
   // campo modificabile.
   function scriviNelPunto(el, dove, pezzo) {
+    scriveFilo(el, pezzo);
     const prima = getEditableText(el);
     const doc = el.ownerDocument || document;
     const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
@@ -3190,6 +3858,8 @@
     cercaDiNuovo,
     valoreSotto,
     controlloSuRichiesta,
+    chiedePrima,
+    controllaOra,
     proposteDelBrowser,
     sbagliataPerIlBrowser,
     contestoDelCampo,
@@ -3204,6 +3874,7 @@
     sostituisciNelCampo,
     rimettiNelCampo,
     sostituisciComeBattuta,
+    scriveFilo,
     riallineaIssues,
     addToDictionary,
     isInDictionary,

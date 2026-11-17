@@ -10,6 +10,11 @@ export function leggiTentativo(ramo) {
   return m ? { id: m[1], stampo: m[2] } : null;
 }
 
+/** Il momento `ms` scritto come lo stampo di un tentativo (`20261105T142931Z`); '' se non è una data. */
+export function stampoDi(ms) {
+  return Number.isFinite(ms) ? new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z') : '';
+}
+
 /**
  * I rami superati fra `tentativi` ([{ ramo, fuso, vuoto }]): un tentativo non fuso più vecchio dell'ultimo lavoro dello
  * stesso feedback arrivato su main è morto anche se nessuno l'ha fuso. Arrivato è un tentativo fuso che non sia `vuoto`

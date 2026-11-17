@@ -94,3 +94,18 @@ test('gli host di YouTube: i sottodomini sì, i nomi che gli somigliano no', () 
   assert.equal(R.hostDi('https://www.youtube.com:8443/watch?v=x'), 'www.youtube.com');
   assert.equal(R.hostDi('filo://dashboard'), '');
 });
+
+test('le regole a jolly («youtube.*») seguono l\'elenco unico dei siti: un sito aggiunto lì le prende anche così', () => {
+  for (const base of R.BASI) {
+    const radice = base.replace(/\.[^.]+$/, '');
+    for (const d of [`${radice}.*`, `www.${radice}.*`]) {
+      assert.equal(R.leggi(`${d}##+js(set, a, 1)`).regole.length, 1, d);
+    }
+  }
+  const prima = R.BASI.length;
+  R.BASI.push('sitonuovo.com');
+  try {
+    assert.equal(R.leggi('sitonuovo.*##+js(set, a, 1)').regole.length, 1, 'il sito nuovo vale anche a jolly');
+  } finally { R.BASI.length = prima; }
+  for (const d of ['notyoutube.*', 'youtube.com.*', 'altro.*']) assert.equal(R.leggi(`${d}##+js(set, a, 1)`).regole.length, 0, d);
+});

@@ -21,15 +21,20 @@
     try { return new URL(s).hostname; } catch (_) { return ''; }
   }
 
-  // `v`: un indirizzo, un host, un sito o il dominio di un cookie (.google.com).
-  function diGoogle(v) {
+  // Il dominio vero di un marchio con un dominio per paese (google, amazon, yandex): la stessa regola per l'accesso Google
+  // e per le ricerche nel filo (#2293). `v`: un indirizzo, un host, un sito o il dominio di un cookie (.google.com).
+  function delMarchio(v, marchio, { altri = null } = {}) {
     const host = hostDi(v);
-    if (!host) return false;
+    if (!host || !marchio) return false;
     let info = null;
     try { info = Sito.getDomainInfo(host, { soloPsl: true }); } catch (_) { return false; }
     if (!info || !info.registrable || info.ospitato || info.isIp || info.single) return false;
-    if (ALTRI.has(info.registrable)) return true;
-    return info.sld === 'google' && SUFFISSO_GOOGLE.test(info.publicSuffix || '');
+    if (altri && altri.has(info.registrable)) return true;
+    return info.sld === String(marchio).toLowerCase() && SUFFISSO_GOOGLE.test(info.publicSuffix || '');
+  }
+
+  function diGoogle(v) {
+    return delMarchio(v, 'google', { altri: ALTRI });
   }
 
   // Il sito che dà il nome al contenitore: per tutti i domini di Google è google.com.
@@ -66,7 +71,7 @@
   }
 
   const api = {
-    SITO_GOOGLE, diGoogle, sitoDelContenitore, googleNellElenco, ElencoConGoogle, sitiDeiFidati, cookieDiAccesso, NOMI_ACCESSO,
+    SITO_GOOGLE, diGoogle, delMarchio, sitoDelContenitore, googleNellElenco, ElencoConGoogle, sitiDeiFidati, cookieDiAccesso, NOMI_ACCESSO,
   };
   global.SN_DOMINI_GOOGLE = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

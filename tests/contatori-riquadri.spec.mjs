@@ -9,6 +9,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 import { voceOggi as voceOra, chiestiOggi } from './helpers/riquadriOggi.mjs';
+import { livelloPrivacy } from './helpers/privacy.mjs';
 
 // I modelli finti nel main: le risposte a pezzi si fermano finché la prova non le libera, se `__ferma`.
 async function modelliFinti(app) {
@@ -130,6 +131,7 @@ test('la spiegazione preparata alla selezione e aperta col tasto destro è «pro
 test('su una pagina delicata la spiegazione non preparata conta come costo della privacy, e il tasto destro che la chiede pure', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   const page = await testServer.openReady(openTab, PAGINA);
   await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
   await page.locator('#parola').dblclick();
@@ -137,6 +139,8 @@ test('su una pagina delicata la spiegazione non preparata conta come costo della
   expect(await app.evaluate(() => globalThis.__spiegazioni), 'da una pagina delicata non parte niente da solo').toBe(0);
   await page.locator('#parola').click({ button: 'right' });
   const menu = menuDi(page);
+  // #1589 — aperto il menu non parte niente: parte al clic su «Spiega».
+  await menu.locator('.sn-menu-inline-explain .sn-menu-inline-chiedi-tasto').click({ timeout: 10_000 });
   await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
   await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1, chiesto: 1 });
   expect(await voceOra(app, 'anticipo_al_gesto', 'spiega'), 'fermata dalla privacy, non dal tetto delle automatiche').toBeNull();

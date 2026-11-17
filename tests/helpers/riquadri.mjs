@@ -72,6 +72,22 @@ async function nelRiquadro(page, frame, code) {
   return result.value;
 }
 
+// Come nelMondoDiFilo, ma basta la Page: il mondo si cerca col protocollo di debug, anche nel frame principale. Un frame
+// che ha cambiato pagina ha un mondo nuovo, e si cerca di nuovo. `fn` può essere anche il suo sorgente.
+export async function nelMondoDelFrame(page, frame, fn, arg = null) {
+  const f = frame || page.mainFrame();
+  const code = `(${String(fn)})(${JSON.stringify(arg)})`;
+  if (f.url().startsWith('filo://')) return f.evaluate(code);
+  try {
+    return await nelRiquadro(page, f, code);
+  } catch (_) {
+    const m = sessioni.get(f);
+    sessioni.delete(f);
+    if (m) await m.s.detach().catch(() => {});
+    return nelRiquadro(page, f, code);
+  }
+}
+
 // Esegue `fn(arg)` nel mondo dei content script dello strato dei riquadri sopra la scheda di `page`.
 // undefined se la scheda non ne ha uno (o è una pagina di Filo, dove i riquadri restano nel documento).
 export async function nelloStrato(app, page, fn, arg = null) {
@@ -134,6 +150,22 @@ export async function statoDi(app, page, sel, frame = null) {
   if (qui) return qui;
   const su = await nelloStrato(app, page, STATO, sel);
   return su ? { ...su, nelloStrato: true } : null;
+}
+
+// Le radici chiuse di Filo nel documento del sito che portano qualcosa oltre agli strati del correttore, ognuna con le
+// classi di ciò che contiene. Il correttore sta lì per forza, sopra il campo del sito, e ne ripete solo il testo (#2299):
+// «nel sito non entra niente» vale per tutto il resto. [] quando non c'è niente.
+export async function riquadriNelSito(app, page, frame = null) {
+  return nelMondoDiFilo(app, page, () => {
+    const UI = globalThis.SN_FILO_UI;
+    const out = [];
+    for (const host of document.querySelectorAll(`[${UI.RIQUADRO}]`)) {
+      const r = UI.ombraDi(host);
+      const pezzi = r ? [...r.children].map((c) => String(c.getAttribute('class') || c.tagName)) : ['(radice non nostra)'];
+      if (!pezzi.every((c) => /^sn-spell-/.test(c))) out.push(pezzi.join(' + '));
+    }
+    return out;
+  }, null, frame);
 }
 
 export async function conta(app, page, sel, frame = null) {

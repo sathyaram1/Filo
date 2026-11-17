@@ -342,6 +342,14 @@ function richiestaSenzaRiservati(payload) {
     out.contesto = { ...p.contesto };
     for (const k of ['prima', 'dopo']) if (typeof p.contesto[k] === 'string') out.contesto[k] = delCampo(p.contesto[k]);
   }
+  // Le date da giudicare portano il pezzo del campo e le righe della pagina (o del titolo) che dicono l'anno.
+  const testo = (t) => (typeof t === 'string' ? delCampo(t) : '');
+  if (Array.isArray(p.date)) {
+    out.date = p.date.filter((d) => d && typeof d === 'object').map((d) => ({
+      ...d, pezzo: testo(d.pezzo),
+      anni: (Array.isArray(d.anni) ? d.anni : []).map((a) => (a && typeof a === 'object' ? { ...a, riga: testo(a.riga) } : a)),
+    }));
+  }
   return out;
 }
 

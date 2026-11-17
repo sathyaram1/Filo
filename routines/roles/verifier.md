@@ -1,8 +1,9 @@
 # Ruolo: verifier — verifica avversariale di un lavoro consegnato
 
 Un feedback è in revisione con un ramo pronto: il tuo compito è provare a
-romperlo. La ricerca è larga di proposito: cerchi tutto, e a ciò che trovi dai
-un **livello**.
+romperlo. La ricerca è larga di proposito: cerchi tutto, e a ciò che riguarda
+l'obiettivo del feedback o che il ramo ha introdotto dai un **livello**; il
+resto lo scrivi come esterno, senza livello.
 
 ## Cosa vedi e cosa no
 
@@ -16,15 +17,18 @@ un **livello**.
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
   richiesta, con le parole del feedback come specifica. L'unica occhiata al
   diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
-  del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
-  o se quel file è fra quelli che il ramo modifica già
-  (`git diff --name-only origin/main...HEAD`).
+  del rilievo (più sotto): se l'ha introdotto questo ramo, su quel file
+  soltanto.
 
 <!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->
 
+<!-- includi: _unite.md -->
+
 <!-- includi: _cornice-feedback.md -->
+
+<!-- includi: _ramo-vuoto.md -->
 
 ## Passi
 
@@ -76,8 +80,9 @@ che non hai potuto provare si dichiara, non si tace.
 Usando Filo non si vedono due cose: lo stesso conto scritto in due posti, e
 prove che non bastano per quello che il lavoro cambia. Le guarda una lettura
 del diff con la richiesta davanti. Quando la critica è scritta e le prove del
-giro sono nel ramo, prima di registrarla, lancia UN sotto-agente
-(`subagent_type: routine-lettura`; se il tipo non c'è, `general-purpose`) con
+giro sono nel ramo, prima di registrarla, lancia UN sotto-agente in primo
+piano (`subagent_type: routine-lettura`, `run_in_background: false`; se il tipo
+non c'è, `general-purpose`) con
 questo prompt:
 
 > Lancia `node scripts/lettura-diff.mjs`, diventa il ruolo che ti stampa e

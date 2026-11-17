@@ -25,7 +25,7 @@ const domanda = (titolo) => ({
   ],
   consiglio: { opzione: 0, perche: 'Filo è caldo.' },
 });
-const CRITICA = 'Provato tutto.\n[2i] Non salva.\n[1i?] Il bordo è grigio freddo: caldo come il resto?\n[1e?] Il menu delle schede è lento: un indice?';
+const CRITICA = 'Provato tutto.\n[2i] Non salva.\n[1i?] Il bordo è grigio freddo: caldo come il resto?\n[e?] Il menu delle schede è lento: un indice?';
 
 test('ogni rilievo col «?» prende la sua domanda nell\'ordine della critica; gli altri restano senza', () => {
   const f = V.parseFindings(CRITICA).findings;
@@ -40,7 +40,7 @@ test('un rilievo «?» senza domanda, o una domanda di troppo, fermano prima del
   const f = V.parseFindings(CRITICA).findings;
   const manca = rilieviConDomanda(f, [domanda('Bordo caldo o freddo?')]);
   assert.equal(manca.ok, false);
-  assert.match(manca.errore, /il rilievo 3 col «\?» non ha la sua domanda \(\[1e\?\] Il menu delle schede è lento: un indice\?\)/);
+  assert.match(manca.errore, /il rilievo 3 col «\?» non ha la sua domanda \(\[e\?\] Il menu delle schede è lento: un indice\?\)/);
   assert.match(manca.errore, /con più rilievi un elenco, uno per rilievo nell'ordine della critica/);
   assert.match(rilieviConDomanda(f, []).errore, /i rilievi 2, 3 col «\?» non hanno la sua domanda/);
   const troppe = rilieviConDomanda(V.parseFindings('Provato.\n[2i] Non salva.').findings, [domanda('Altro?')]);
@@ -52,7 +52,7 @@ test('verifierRound: la domanda viaggia col rilievo strutturato, il campo mancan
   const norm = V.normalizeFindings([
     { level: 1, sede: 'i', text: 'Bordo freddo', decision: true, domanda: domanda('Bordo caldo o freddo?') },
     { level: 2, sede: 'i', text: 'Non salva', decision: false, domanda: domanda('Non serve') },
-    { level: 1, sede: 'e', text: 'Menu lento', decision: true },
+    { level: null, sede: 'e', text: 'Menu lento', decision: true },
     { level: 1, sede: 'i', text: 'Elenco storto', decision: true, domanda: [domanda('x')] },
   ]);
   assert.equal(norm[0].domanda.titolo, 'Bordo caldo o freddo?');
@@ -64,7 +64,7 @@ test('verifierRound: la domanda viaggia col rilievo strutturato, il campo mancan
   assert.equal(V.titoloDelDerivato(gruppi[0]), 'Bordo caldo o freddo?');
   assert.equal(V.titoloDelDerivato(V.derivedGroups([norm[1]])[0]), '', 'i rimasti hanno il loro titolo di sempre');
   // La decisione del giro porta la domanda con sé fino ai derivati.
-  const d = V.decideRound({ findings: norm.slice(0, 1), caps: { cap3: 1, cap2: 1, cap1: 1, cap0: 0 }, counts: {} });
+  const d = V.decideRound({ findings: norm.slice(0, 1), caps: { cap3: 1, cap2: 1, cap1: 1 }, counts: {} });
   assert.equal([...(d.derived || []), ...(d.external || [])][0]?.domanda?.titolo, 'Bordo caldo o freddo?');
 });
 

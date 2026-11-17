@@ -147,7 +147,7 @@ describe('quali spec lanciare', () => {
     });
 
     test('la chiamata vera passa l’elenco degli spec tracciati', () => {
-      assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
+      assert.match(SORGENTE, /specsForChangedFiles\(\w[^,]*, \[\.\.\.tracked\]\)/);
     });
   });
 });
@@ -760,13 +760,15 @@ test('la durata prevista cresce con gli spec, e un ramo largo passa l’ora', ()
   assert.ok(pochi.a < largo.da, 'quattro spec durano meno di duecento');
   const niente = stimaDurataControlli(0);
   assert.ok(niente.da > 0, 'gli unit girano anche senza spec');
+  assert.ok(niente.a < pochi.a, 'un riallineamento senza file risolti dura meno di uno con quattro spec');
+  assert.match(niente.testo, /solo unit/, 'chi lo lancia legge prima di partire che corrono i soli unit (#2237)');
   assert.deepEqual(stimaDurataControlli(undefined), niente);
 });
 
 test('la durata prevista si stampa dopo la scelta degli spec e prima degli unit', () => {
   const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   const main = src.slice(src.indexOf('async function main('));
-  const scelta = main.indexOf('specsForChangedFiles(changed');
+  const scelta = main.indexOf('specDellaScelta({ changed');
   const stima = main.indexOf('stimaDurataControlli(specs.length)');
   const unit = main.indexOf("'run-unit-tests.mjs'");
   assert.ok(scelta > 0 && stima > scelta && unit > stima, `scelta ${scelta}, stima ${stima}, unit ${unit}`);

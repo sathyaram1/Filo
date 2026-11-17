@@ -75,8 +75,12 @@
       const c = t.chat(id);
       if (!c) return null;
       const prima = Array.isArray(c.fonti) ? c.fonti : [];
+      // Una fonte scaduta alla compattazione e letta di nuovo si riscrive con l'ora nuova (filoEventi, CHAT_FONTI).
+      const C = globalThis.SN_COMPATTAZIONE;
+      const lato = !!(globalThis.SN_CONTESTO_FILO && globalThis.SN_CONTESTO_FILO.diIncognito(id));
+      const viva = (p) => !C || !C.fonteScaduta(p, lato);
       const nuove = (Array.isArray(fonti) ? fonti : []).filter((f) => f && Number.isInteger(f.classe)
-        && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe));
+        && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe && viva(p)));
       if (nuove.length) await t.scrivi([t.evento(T().CHAT_FONTI, { chat: id, fonti: nuove }, { autore: 'filo' })]);
       return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
     });
@@ -166,10 +170,11 @@
   }
 
   // Il testo di una chat cancellata se ne va anche dalle sue copie: cache, richieste ai modelli, vettori ed esiti
-  // tenuti per il contesto della chat (#868).
+  // tenuti per il contesto della chat, righe del diario della compattazione (#868).
   async function dimenticaCopie(chat) {
     try { global.SN_CONTESTO_FILO?.dimentica(chat.id); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(chat.id);
+    await global.SN_COMPATTAZIONE?.dimenticaChat(chat.id).catch((e) => console.warn('[Filo] diario della chat cancellata:', e?.message || e));
     const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
     if (!forme.length) return;
     const C = global.SN_AI_CACHE;
@@ -230,6 +235,7 @@
     }
     try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
+    await global.SN_COMPATTAZIONE?.dimenticaChat(null).catch(() => {});
     return [];
   }
 

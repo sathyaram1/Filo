@@ -417,8 +417,8 @@ service cloud.firestore {
         && unisceValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
         // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
-        // dell'unione. Come la fiducia, li scrive solo il server.
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn'])
+        // dell'unione. Come la fiducia, li scrive solo il server. Anche `noteFidate`, la fiducia delle note (#1919).
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn', 'noteFidate'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
@@ -1010,7 +1010,7 @@ service cloud.firestore {
         'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
         'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
         'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
-        'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+        'filo-lesson', 'filo-compact', 'filo-compattazione', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
         'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
         'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
         'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test', 'feedback-l0', 'feedback-l0-immagini'

@@ -29,7 +29,10 @@ const improntaFinta = (b) => createHash('sha256').update(Buffer.from(b)).digest(
 let istanza = null;
 Immagini.perFilo = () => istanza;
 
-async function scarica({ nome, contenuto, url, pagina = '', apertaDa = '', primo = url, settings = {} }) {
+// I livelli di privacy (#1589): qui di norma «Chiedi sulle delicate»; di serie la banca parte in anticipo.
+const CHIEDI_DELICATE = { security: { privacy: { livello: 'delicate' } } };
+
+async function scarica({ nome, contenuto, url, pagina = '', apertaDa = '', primo = url, settings = CHIEDI_DELICATE }) {
   const dir = cartellaTemporanea('filo-nome-delicate-');
   try {
     impostazioni = settings;
@@ -109,8 +112,9 @@ test('da una pagina normale la chiamata parte e il file prende il nome', async (
   assert.equal(daFilo.chiamate.length, 1);
 });
 
-test('con le pagine delicate spente resta tutto come prima: la chiamata parte anche dalla banca', async () => {
-  const settings = { security: { pagineDelicate: { enabled: false } } };
-  const { chiamate } = await scarica({ settings, nome: 'documento.txt', contenuto: SALDO, url: 'https://www.intesasanpaolo.com/doc/1', pagina: 'https://www.intesasanpaolo.com/conto' });
-  assert.equal(chiamate.length, 1);
+test('col livello di serie, e a «Tutto in anticipo», la chiamata parte anche dalla banca', async () => {
+  for (const settings of [{}, { security: { privacy: { livello: 'anticipo', chiedi: [] } } }]) {
+    const { chiamate } = await scarica({ settings, nome: 'documento.txt', contenuto: SALDO, url: 'https://www.intesasanpaolo.com/doc/1', pagina: 'https://www.intesasanpaolo.com/conto' });
+    assert.equal(chiamate.length, 1);
+  }
 });

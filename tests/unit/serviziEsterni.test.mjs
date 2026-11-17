@@ -36,7 +36,6 @@ const NON_DI_RETE = [
 
 // Esempi e identificatori: indirizzi scritti nel codice che nessuno contatta.
 const ESEMPI = [
-  { file: 'src/shared/actionTools.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/handlers.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
@@ -58,6 +57,8 @@ const COMPOSTI = [
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
   { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/urlExfil.js', testo: 'new URL(`http://${s}`)', perche: 'l’indirizzo che un comando contatta, per giudicarlo prima che parta (#2293)' },
+  { file: 'src/shared/urlExfil.js', testo: '`http://${u.slice(s[0].length)}`', perche: 'la forma web di un indirizzo con un altro schema, per giudicarlo prima che parta (#2293)' },
   { file: 'src/shared/nomiSito.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },

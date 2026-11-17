@@ -335,9 +335,9 @@ const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 function tettiContesto(o) {
   const FC = globalThis.SN_FILO_CONTESTO;
   const out = {};
-  for (const k of ['giorni', 'token']) {
-    const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
-    if (v != null) out[k] = k === 'token' ? Math.round(v) : v;
+  for (const k of FC ? FC.NUMERI_DEI_TETTI : []) {
+    const v = FC.numeroDelTetto(k, o && o[k]);
+    if (v != null) out[k] = v;
   }
   const cache = FC ? FC.durataIn(o && o.cache) : null;
   if (cache) out.cache = cache;
@@ -597,7 +597,7 @@ async function setLavoriServer(on, idToken) {
 // nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
 // da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
 // è un valore valido per tutti.
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
   const out = { fixInstructions: '', giroStretto: false };
@@ -862,7 +862,8 @@ async function setJudgeBudget(patch, idToken) {
 // `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
 // della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
 async function getWorkerLog(idToken, { severo = false } = {}) {
-  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  // Il giro della Gestione lo chiede ogni minuto: il resto del documento (bilanci, manopole) non serve (#2470).
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken, { campi: ['workerLog'] });
   if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
   const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];

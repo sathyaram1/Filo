@@ -112,12 +112,12 @@ test('la busta per l\'Aiuto: candidati numerati, cartella coi nomi di Filo, si m
   assert.match(t, /cartella: Download › Bollette/);
   assert.match(t, /"file": <il suo numero>/);
   assert.ok(!t.includes('percorso:'));
-  assert.ok(!t.includes('APRI_FILE'));
+  assert.ok(!t.includes('file(mostra)'));
   assert.ok(!t.includes(CASA));
-  // La stessa funzione nella chat della home dà il percorso e APRI_FILE.
+  // La stessa funzione nella chat della home dà il percorso e file(mostra).
   const chat = PROMPTS.documentiTrovati({ cercato: 'bolletta', risultati: [{ percorso: BOLLETTA, nome: 'scan_00231.pdf', tipo: 'pdf', trovati: ['bolletta'] }], indice: {} });
   assert.match(chat, /percorso: /);
-  assert.match(chat, /APRI_FILE/);
+  assert.match(chat, /file\(mostra\)/);
   // Nel turno automatico dell'Aiuto la busta entra dopo la nota.
   const turno = PROMPTS.turnoAutomaticoAiuto({ nota: 'ho cercato', dati: { documenti: Aiuto.perIlModello(wc) } });
   assert.match(turno, /DOCUMENTI_TROVATI/);

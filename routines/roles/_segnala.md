@@ -18,10 +18,11 @@ ognuna col suo pro, il suo contro e l'azione
 `{ "tipo": "riprendi", "feedbackId": "<payload.id>" }`; il consiglio è quella che
 prenderesti tu, col perché; in `notePerAgenti` va quello che hai già esplorato,
 per chi riprende. Ogni opzione deve sbloccare questo lavoro (`riprendi` o
-`archivia` su `<payload.id>`): una priorità o un'automazione vanno in una
-domanda a parte, e un lavoro che serve sul server lo passi tu ai lavori server
-(«Se il lavoro si fa solo in locale»). L'owner risponde nella sezione Domande
-della Gestione.
+`archivia` su `<payload.id>`). Quale lavoro fare prima, o se conviene farlo,
+non si chiede (sezione «Una domanda per l'owner si scrive per lui»); un lavoro
+che serve sul server, o un passo che solo l'owner può fare come cambiare
+un'automazione, segue «Se il lavoro si fa solo in locale». L'owner risponde
+nella sezione Domande della Gestione.
 
 **Una domanda che blocca FERMA il lavoro** (senza `blocca` blocca; la regola
 per sceglierlo sta in «Una domanda per l'owner si scrive per lui»). Il feedback

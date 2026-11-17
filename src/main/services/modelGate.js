@@ -203,12 +203,20 @@
     // contiene diventano letti, e la porta delle uscite li ferma (#810).
     async function senzaSegreti(messages, action) {
       try { ricordaEsterni(messages); } catch (_) {}
+      return pavimento(await custoditiFuori(messages, action));
+    }
+    async function custoditiFuori(messages, action) {
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
       const lista = await custoditi();
       const fuori = G.oscuraSegreti(messages, lista);
       if (fuori !== messages) contaTolti(action, lista, (valori) => G.oscuraSegreti(messages, valori) !== messages);
       return fuori;
+    }
+    // Il pavimento della privacy (#1589): password, carte, codici usa e getta, chiavi e token non arrivano a nessun
+    // modello, da qualunque strada vengano, anche scritti dall'utente.
+    function pavimento(valore) {
+      return (global.SN_PAVIMENTO || require('../../shared/pavimento.js')).oscuraTutto(valore);
     }
 
     async function custoditi() {
@@ -487,9 +495,10 @@
       const G = global.SN_GUARDIANO_STATICO;
       const oscura = (v, valori = lista) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
       const prima = (Array.isArray(requests) ? requests : []).map((r) => ({ state: r && r.state, questions: r && r.questions }));
-      const richieste = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
+      const senzaCustoditi = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
       const toglie = (valori) => prima.some((r) => oscura(r.state, valori) !== r.state || oscura(r.questions, valori) !== r.questions);
-      if (richieste.some((r, i) => r.state !== prima[i].state || r.questions !== prima[i].questions)) contaTolti(action, lista, toglie);
+      if (senzaCustoditi.some((r, i) => r.state !== prima[i].state || r.questions !== prima[i].questions)) contaTolti(action, lista, toglie);
+      const richieste = senzaCustoditi.map((r) => ({ state: pavimento(r.state), questions: pavimento(r.questions) }));
       let ultimo = null;
       for (const [indice, a] of usable.entries()) {
         const P = providerOf(a.provider);

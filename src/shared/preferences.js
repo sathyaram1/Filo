@@ -109,7 +109,8 @@
       scrive: [percorso],
       aiuto: aiuto || 'true | false',
       costo: 2,
-      allenta: (r) => spentoAllenta && dentro(r.partial, percorso) === false,
+      // Senza un verso che abbassa una difesa non è un freno: spegnerlo manda fuori meno, quindi stringe (costo 1).
+      ...(spentoAllenta ? { allenta: (r) => dentro(r.partial, percorso) === false } : { stringe: (r) => dentro(r.partial, percorso) === false }),
       avviso: (r, at) => (dentro(r.partial, percorso) === true ? principaleSpento(sotto, at) : ''),
       risk,
       build(v) {
@@ -125,6 +126,25 @@
     if (!global.SN_FILO_CONTESTO && typeof require === 'function') require('./filoContesto.js');
     return global.SN_FILO_CONTESTO;
   }
+
+  // Un tetto del contesto chiesto a parole («50 mila», «2 milioni»): i limiti e l'arrotondamento sono quelli dei campi
+  // di Preferenze e Modelli predefiniti (numeroDelTetto). null se non è un numero.
+  function tettoAParole(k, v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s);
+    if (!Number.isFinite(n)) return null;
+    if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
+    else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
+    return contestoFilo().numeroDelTetto(k, n);
+  }
+  // Il cambio a parole di un tetto in token e la sua riga nella cronologia: uno per tutti i tetti, come i campi.
+  const cambioDelTetto = (k, nome) => (v) => {
+    if (predefinito(v)) return { partial: { contestoFilo: { [k]: null } }, label: `${nome} → come i predefiniti` };
+    const n = tettoAParole(k, v);
+    if (n == null) return null;
+    return { partial: { contestoFilo: { [k]: n } }, label: `${nome} → ${n.toLocaleString('it-IT', { useGrouping: true })}` };
+  };
+  const limitiDelTetto = (k) => contestoFilo().LIMITI[k].map((n) => n.toLocaleString('it-IT', { useGrouping: true })).join('-');
 
   function lunghezzaRisposte() {
     if (!global.SN_LUNGHEZZA_RISPOSTE && typeof require === 'function') require('./lunghezzaRisposte.js');
@@ -394,14 +414,16 @@
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
       avviso: (r, at) => (r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length ? principaleSpento(sotto, at) : ''),
-      allenta: (r, at) => {
-        const e = r.elenco;
-        if (!allentaSe || !e) return false;
-        if (e.op !== 'sostituisci') return e.op === allentaSe;
-        const prima = at ? dentro(at, percorso) : null;
-        if (!Array.isArray(prima)) return true;
-        return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
-      },
+      ...(allentaSe ? {
+        allenta: (r, at) => {
+          const e = r.elenco;
+          if (!e) return false;
+          if (e.op !== 'sostituisci') return e.op === allentaSe;
+          const prima = at ? dentro(at, percorso) : null;
+          if (!Array.isArray(prima)) return true;
+          return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
+        },
+      } : {}),
       risk,
       build(v) {
         const o = opElenco(v, RIDUZIONI[percorso]);
@@ -475,11 +497,10 @@
       risk: 'Su un sito di cui ti fidi Filo non ti mostra più l\'avviso «sospetto»: un nome che somiglia a un marchio, un dominio '
         + 'nato da poco, una password chiesta senza connessione protetta. Restano l\'avviso «pericoloso» e la lista nera di Google.',
     });
-    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso.
+    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso (freno).
     return {
       ...base,
       costo: 2,
-      costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
       build(v) {
         const o = opElenco(v, null, voceFidataDa);
         if (!o || o.rifiuto) return o;
@@ -738,9 +759,145 @@
     return rigore[nuovo] < prima;
   }
 
+  // ── I livelli di privacy (#1589) ─────────────────────────────────────────────
+  // Abbassare quanto esce parte; alzarlo (un livello più largo, una categoria che smette di chiedere, un sito in anticipo
+  // in più) vuole «conferma» a ogni livello: lo dice `alza` della regola, da qualunque strada arrivi.
+  function livelliPrivacy() {
+    if (!global.SN_LIVELLI_PRIVACY && typeof require === 'function') require('./livelliPrivacy.js');
+    return global.SN_LIVELLI_PRIVACY;
+  }
+  // Senza le impostazioni di adesso vale la più stretta: ogni cambio conta come alzare.
+  function privacyAttuale(at) {
+    const L = livelliPrivacy();
+    if (!at) return { livello: 'sempre', incognito: 'sempre', chiedi: L.CATEGORIE.slice(), sitiAnticipo: [] };
+    const r = L.regola(at);
+    return { livello: r.livello, incognito: r.incognito, chiedi: r.chiedi, sitiAnticipo: r.sitiAnticipo };
+  }
+  const PAROLE_LIVELLO = {
+    anticipo: /^(?:anticipo|tutto in anticipo|in anticipo|largo|massimo|aperto)$/,
+    delicate: /^(?:delicate|delicata|delicati|chiedi sulle delicate|sulle delicate|chiedi solo sulle delicate|medio|normale)$/,
+    sempre: /^(?:sempre|chiedi sempre|stretto|minimo|niente|chiuso|massima privacy)$/,
+  };
+  function livelloDetto(v) {
+    const t = String(v == null ? '' : v).trim().toLowerCase().replace(/[«»"'.!]/g, '').replace(/\s+/g, ' ');
+    for (const [id, re] of Object.entries(PAROLE_LIVELLO)) if (re.test(t)) return id;
+    return null;
+  }
+  const PAROLE_CATEGORIA = [
+    ['posta', /^(?:posta|mail|email|e-mail|gmail)$/],
+    ['banche', /^(?:banca|banche|conto|conti|bank|pagamenti)$/],
+    ['sanita', /^(?:sanita|sanità|salute|medico|medici|referti|health)$/],
+    ['pa', /^(?:pa|enti pubblici|ente pubblico|pubblica amministrazione|inps|fisco)$/],
+    ['campi', /^(?:password|campi|carte|carta|pagine con password|pagine con una password)$/],
+  ];
+  function categoriaDetta(p) {
+    const t = String(p || '').trim().toLowerCase();
+    const c = PAROLE_CATEGORIA.find(([, re]) => re.test(t));
+    return c ? c[0] : null;
+  }
+  function privacySetters() {
+    const L = livelliPrivacy();
+    const nome = (id) => L.nomeLivello(id);
+    const alza = (r, at) => L.alza(privacyAttuale(at), r.partial.security.privacy);
+    return [
+      {
+        // «tutto» e «di serie» riscrivono anche le categorie: chi le possiede, e le mostra in lettura, è privacy_categorie.
+        scrive: ['security.privacy.livello'],
+        aiuto: '"anticipo" (Tutto in anticipo) | "delicate" (Chiedi sulle delicate) | "sempre" (Chiedi sempre) | "meno" (un passo più '
+          + 'stretto) | "più" (un passo più largo) | "tutto" (in anticipo anche la sanità e ogni categoria) | "di serie": quanto Filo '
+          + 'manda ai modelli dalle pagine senza che l\'utente lo chieda (spiegazioni e descrizioni del tasto destro, correttore, '
+          + 'screenshot, riassunto e pulizia delle schede, nomi dei file scaricati, categorie delle pagine salvate). Password, carte '
+          + 'e codici non escono a nessun livello',
+        keys: ['livello_privacy', 'livello di privacy', 'privacy', 'quanto manda ai modelli', 'cosa manda ai modelli',
+          'manda ai modelli', 'pagine delicate', 'pagine_delicate'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide quanto Filo manda ai modelli dalle pagine senza che tu lo chieda: spiegazioni e descrizioni del tasto '
+          + 'destro, controlli del correttore, screenshot, riassunto e pulizia delle schede, nomi dei file scaricati e categorie '
+          + 'delle pagine salvate. Un livello più largo fa partire da '
+          + 'sole anche posta, banca e sanità; password, carte e codici restano comunque sul computer.',
+        build(v, at) {
+          const t = String(v == null ? '' : v).trim().toLowerCase().replace(/[«»"'.!]/g, '');
+          const ordine = L.ORDINE;
+          const ora = privacyAttuale(at).livello;
+          let livello = livelloDetto(t);
+          let chiedi;
+          if (/^(?:tutto|manda tutto|tutto quanto)$/.test(t)) { livello = 'anticipo'; chiedi = []; }
+          else if (/^(?:di serie|predefinito|default|come prima)$/.test(t)) { livello = L.PREDEFINITA.livello; chiedi = L.PREDEFINITA.chiedi.slice(); }
+          else if (/^(?:meno|stringi|abbassa|più stretto|piu stretto|più privacy|piu privacy)$/.test(t)) livello = ordine[Math.min(ordine.length - 1, ordine.indexOf(ora) + 1)];
+          else if (/^(?:più|piu|di più|di piu|allarga|alza|più largo|piu largo)$/.test(t)) livello = ordine[Math.max(0, ordine.indexOf(ora) - 1)];
+          if (!livello) return null;
+          const privacy = { livello, ...(chiedi ? { chiedi } : {}) };
+          const altro = chiedi && !chiedi.length ? ' (nessuna categoria chiede)' : '';
+          return { partial: { security: { privacy } }, label: `Livello di privacy → ${nome(livello)}${altro}` };
+        },
+      },
+      {
+        scrive: ['security.privacy.incognito'],
+        aiuto: '"anticipo" | "delicate" | "sempre": il livello di privacy nelle finestre in incognito (di serie «sempre»: niente parte da solo)',
+        keys: ['privacy_incognito', 'livello di privacy in incognito', 'privacy in incognito', 'incognito privacy'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide quanto Filo manda ai modelli dalle pagine aperte in incognito senza che tu lo chieda. Un livello più '
+          + 'largo fa partire da sole spiegazioni, descrizioni e controlli anche lì.',
+        build(v) {
+          const livello = livelloDetto(v);
+          if (!livello) return null;
+          return { partial: { security: { privacy: { incognito: livello } } }, label: `Livello di privacy in incognito → ${nome(livello)}` };
+        },
+      },
+      {
+        scrive: ['security.privacy.chiedi'],
+        aiuto: '"aggiungi <categorie>" | "togli <categorie>" | "solo <categorie>" | "nessuna": le categorie su cui Filo chiede prima '
+          + 'anche a «Tutto in anticipo». Categorie: posta, banca, sanità, enti pubblici, password (pagine con un campo password o carta); di serie la sanità',
+        keys: ['privacy_categorie', 'categorie che chiedono', 'chiedi su', 'chiedi prima su', 'categorie delicate'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide su quali pagine delicate Filo chiede prima anche a «Tutto in anticipo»: posta, banca, sanità, enti '
+          + 'pubblici, pagine con una password. Una categoria tolta fa partire da sole le sue pagine.',
+        build(v, at) {
+          const s = String(v == null ? '' : v).trim();
+          if (!s) return null;
+          if (SVUOTA.test(s) || /^nessuna$/i.test(s)) return { partial: { security: { privacy: { chiedi: [] } } }, label: 'Categorie che chiedono → nessuna' };
+          let op = 'aggiungi';
+          let resto = s;
+          for (const [n, re] of OP_ELENCO) {
+            const m = s.match(re);
+            if (m) { op = n; resto = s.slice(m[0].length); break; }
+          }
+          const pezzi = resto.split(/\s*(?:,|;|\be\b|\bed\b)\s*/i).map((x) => x.trim()).filter(Boolean);
+          const voci = [];
+          for (const p of pezzi) {
+            const c = categoriaDetta(p);
+            if (!c) return { rifiuto: `«${p.slice(0, 40)}» non è una categoria: posta, banca, sanità, enti pubblici o password` };
+            if (!voci.includes(c)) voci.push(c);
+          }
+          if (!voci.length) return null;
+          const prima = privacyAttuale(at).chiedi;
+          const chiedi = op === 'togli' ? prima.filter((c) => !voci.includes(c))
+            : op === 'sostituisci' ? voci : [...new Set([...prima, ...voci])];
+          const ordinate = L.CATEGORIE.filter((c) => chiedi.includes(c));
+          const lista = ordinate.length ? ordinate.map(L.nomeCategoria).join(', ') : 'nessuna';
+          return { partial: { security: { privacy: { chiedi: ordinate } } }, label: `Categorie che chiedono → ${lista}` };
+        },
+      },
+      elenco({
+        keys: ['siti_anticipo', 'siti in anticipo', 'manda tutto su', 'siti dove manda tutto'],
+        percorso: 'security.privacy.sitiAnticipo',
+        allentaSe: 'aggiungi',
+        nome: 'Siti dove Filo manda in anticipo',
+        aiuto: 'siti dove spiegazioni, descrizioni e controlli partono da soli a ogni livello di privacy, anche se delicati (fuori dall\'incognito). '
+          + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
+        risk: 'Fa partire da sole verso i modelli spiegazioni, descrizioni e controlli del testo delle pagine di questi siti, '
+          + 'anche quando il livello di privacy direbbe di chiedere. Password, carte e codici restano comunque sul computer.',
+      }),
+    ];
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
-  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat; `allenta(r, attuali)` dice se il
-  // valore abbassa una difesa (vuole «conferma» a ogni livello); `elencoFisso` la mette nell'elenco fisso.
+  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat. Una voce con `allenta(r, attuali)` è un
+  // freno (regola del freno, #1312): toglierlo è costo 4, stringerlo costo 1; il suo `costo` resta quello del cambio
+  // per il registro dei cambi; `stringe(r)` dà costo 1 al verso che toglie portata a Filo in una voce che non è un freno.
   // `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
   const PREF_SETTERS = [
     {
@@ -1028,6 +1185,7 @@
       // Accenderla vuole sempre un OK, a ogni livello di autonomia: un clic, non la parola (#778). Non abbassa una
       // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
       chiede: (r) => r.partial.schermo.guarda === true,
+      stringe: (r) => r.partial.schermo.guarda === false,
       risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
         + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
         + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
@@ -1700,7 +1858,7 @@
     {
       scrive: ['monthlyLimitEur'],
       aiuto: 'numero in euro (limite di spesa mensile)',
-      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
+      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget', 'tetto di spesa', 'tetto spesa'],
       costo: 2,
       allenta: (r, at) => {
         const tetto = (v) => (Number(v) > 0 ? Number(v) : Infinity);
@@ -2045,8 +2203,7 @@
         percorso: 'menuDelSito.siti',
         nome: 'Siti dove il tasto destro apre il menu del sito',
         aiuto: 'siti col loro menu del tasto destro (Google Docs, Figma…) dove il tasto destro apre il menu del sito e quello di Filo '
-          + 'resta a Shift + tasto destro; per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) '
-          + 'o «scheda: <titolo come in TAB APERTE>»',
+          + 'resta a Shift + tasto destro; per un sito aperto: il suo nome come in TAB APERTE, o «questo sito» (la scheda web davanti)',
         risk: 'Cambia su quali siti il tasto destro apre il menu del sito invece di quello di Filo; '
           + 'il menu di Filo resta a Shift + tasto destro.',
       }),
@@ -2058,7 +2215,7 @@
       keys: ['bluetooth_preferiti', 'dispositivi bluetooth preferiti', 'preferiti bluetooth'],
       scrive: ['bluetoothPreferiti'],
       aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth in qualunque forma, '
-        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
+        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa computer(bluetooth) con dispositivo e preferito)',
       costo: 1,
       risk: 'Cambia quali dispositivi Bluetooth stanno in cima all\'elenco della home.',
       build(v) {
@@ -2072,7 +2229,7 @@
         const s = String(v == null ? '' : v).trim();
         const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
         if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
-          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con BLUETOOTH' };
+          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con computer(bluetooth)' };
         }
         const o = opElenco(v, null, indirizzo);
         if (!o || o.rifiuto) return o;
@@ -2152,20 +2309,19 @@
     },
     {
       scrive: ['contestoFilo.token'],
-      aiuto: 'token 2.000-2.000.000, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)',
+      aiuto: () => `token ${limitiDelTetto('token')}, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)`,
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
       costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
-      build(v) {
-        if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        let n = parseItalianNumber(s);
-        if (!Number.isFinite(n)) return null;
-        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
-        else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
-        const token = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.token));
-        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
-      },
+      build: cambioDelTetto('token', 'Tetto in token della chat'),
+    },
+    {
+      scrive: ['contestoFilo.soglia'],
+      aiuto: () => `token ${limitiDelTetto('soglia')}, o "predefinito" (oltre questa misura la chat riassume la parte più vecchia della conversazione prima di rispondere)`,
+      keys: ['soglia_compattazione', 'soglia di compattazione', 'soglia della compattazione', 'compattazione della chat', 'contestofilo.soglia'],
+      costo: 2,
+      risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
+      build: cambioDelTetto('soglia', 'Soglia di compattazione della chat'),
     },
     {
       scrive: ['contestoFilo.cache'],
@@ -2250,7 +2406,7 @@
     // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
     {
       scrive: ['traduzionePagina.nascoste'],
-      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, dal menu, e spende meno)',
+      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, da sole appena si vedono, e spende meno)',
       costo: 1,
       keys: ['traduzione_sezioni_nascoste', 'traduzione delle sezioni nascoste', 'traduzione delle sezioni chiuse',
         'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
@@ -2296,34 +2452,17 @@
         return { partial: { security: { riquadriRotti: { modello: b } } }, label: `Contenuti incorporati rotti guardati da un modello → ${b ? 'sì' : 'no'}` };
       },
     },
-    interruttore({
-      keys: ['pagine_delicate', 'pagine delicate', 'non mandare ai modelli le pagine delicate', 'proteggi le pagine delicate',
-        'pagine riservate'],
-      percorso: 'security.pagineDelicate.enabled',
-      nome: 'Pagine delicate tenute lontane dai modelli',
-      stati: ['sì', 'no'],
-      aiuto: 'true | false (posta, banche, sanità, pubblica amministrazione, pagine con un campo password o carta e i siti delicati '
-        + 'scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli, la chat ne vede '
-        + 'solo il nome del sito, screenshot e immagini copiate da lì non vanno al modello delle immagini neanche incollati '
-        + 'altrove, la spiegazione parte solo dal tasto destro; il correttore resta acceso e manda quello che l\'utente scrive, '
-        + 'non la pagina; acceso di serie)',
-      risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
-        + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
-        + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
-        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, la '
-        + 'spiegazione si prepara anche lì appena selezioni un testo, e con le funzioni accese i file scaricati da lì '
-        + 'tornano al modello dei nomi e le pagine salvate a quello delle categorie con titolo e testo.',
-    }),
+    ...privacySetters(),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
       percorso: 'security.pagineDelicate.siti',
       allentaSe: 'togli',
       nome: 'Siti delicati aggiunti da te',
-      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche, sanità e pubblica amministrazione: niente di loro va ai modelli nei lavori automatici. '
+      aiuto: 'siti dove Filo chiede sempre prima di mandare qualcosa ai modelli, a ogni livello di privacy: niente di loro parte da solo. '
         + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
-      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine le funzioni che partono '
-        + 'da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) non mandano niente ai modelli. Un '
-        + 'sito tolto torna a mandarlo.',
+      risk: 'Cambia i siti dove Filo chiede sempre prima di mandare: delle loro pagine le funzioni che partono da sole '
+        + '(riassunto e pulizia delle schede, screenshot, spiegazioni, descrizioni e controlli del testo) non mandano niente ai '
+        + 'modelli finché non lo chiedi. Un sito tolto torna a seguire il livello di privacy.',
     }),
     elenco({
       keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
@@ -2338,33 +2477,35 @@
         + 'tornano a mandare ai modelli.',
     }),
 
-    // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.
+    // Il livello di autonomia è il primo freno: alzarlo è costo 4, abbassarlo 1 (#1312), con la regola di Preferenze.
+    // Senza le impostazioni attuali ogni cambio vale alzarlo, e yolo non si sceglie finché manca il guardiano.
     // Sta in fondo perché i sinonimi corti («auto») trovino prima le voci di sopra.
     {
-      scrive: [],
-      aiuto: '"conservativo" | "default" | "automatico" (lo sceglie solo l\'utente in Preferenze: dalla chat non si cambia)',
-      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
-      costo: 3,
-      elencoFisso: 'regole',
-      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo»: aprigli la pagina lì '
-        + 'con NAVIGA filo://preferences/preferences.html#autonomia',
+      scrive: ['autonomia.livello'],
+      aiuto: () => {
+        const A = global.SN_AUTONOMIA;
+        const nomi = A ? A.livelliSelezionabili().map((l) => `"${l.nome.toLowerCase()}"`).join(' | ') : '"conservativo" | "normale" | "automatico"';
+        return `${nomi} (quanto Filo fa da solo; abbassarlo vale subito, alzarlo vuole che l'utente scriva «conferma»)`;
+      },
+      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
+      costo: 2,
+      allenta: (r, at) => !at || global.SN_AUTONOMIA.richiestaCambioLivello((at.autonomia || {}).livello, r.partial.autonomia.livello) !== 'si',
+      dove: 'Il livello di autonomia si cambia anche in Preferenze, sotto «Autonomia di Filo».',
+      risk: 'Cambia quante cose Filo fa da solo senza chiederti prima.',
       build(v) {
         const A = global.SN_AUTONOMIA;
+        if (!A) return null;
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const lv = A && A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
-        return { partial: {}, label: `Autonomia di Filo → ${lv ? lv.nome : (s || '?')}` };
+        const lv = A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
+        if (!lv) return null;
+        if (!A.selezionabile(lv.id)) {
+          return { rifiuto: `${lv.nome} non si può ancora scegliere`, perModello: `I livelli che l'utente può scegliere sono ${A.livelliSelezionabili().map((l) => l.nome).join(', ')}.` };
+        }
+        return { partial: { autonomia: { livello: lv.id } }, label: `Autonomia di Filo → ${lv.nome}` };
       },
     },
   ];
 
-  // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
-  // così una voce nuova arriva alla chat da sola (#949).
-  function righeDescrizione(ctx = {}) {
-    return PREF_SETTERS.map((s) => {
-      const aiuto = typeof s.aiuto === 'function' ? s.aiuto(ctx) : s.aiuto;
-      return `• ${s.keys[0]}: ${aiuto}${s.costo >= 2 ? ' [conferma]' : ''}`;
-    });
-  }
 
   // Il nome con cui la pagina mostra la voce di un setter: è quello che legge l'utente, la chiave è per il modello.
   function nomeVoce(setter) {
@@ -2438,7 +2579,7 @@
     return scelte.length === 1 ? { setter: scelte[0] } : { ambigui: scelte };
   }
 
-  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, elencoFisso, dove,
+  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, dove,
   // risk, testo?, avviso? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
   // Oppure { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
   // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
@@ -2452,7 +2593,7 @@
       };
     }
     const setter = r.setter;
-    const b = setter.build(rawVal);
+    const b = setter.build(rawVal, attuali);
     if (b && b.rifiuto) return b.perModello ? { rifiuto: b.rifiuto, perModello: b.perModello } : { rifiuto: b.rifiuto };
     if (!b) return null;
     let allenta = false;
@@ -2461,19 +2602,34 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
-    // `costoDi`: un elenco che costa diverso nei due versi (#967); senza, il costo dichiarato.
-    let costo = setter.costo;
-    try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
+    // Un freno costa 4 tolto e 1 stretto, nei due versi di un elenco come di un interruttore (#1312, #967).
+    const freno = typeof setter.allenta === 'function';
+    let stringe = false;
+    try { stringe = !freno && typeof setter.stringe === 'function' && !!setter.stringe(b, attuali); } catch (_) { stringe = false; }
+    const finale = freno ? (allenta ? 4 : 1) : (stringe ? 1 : setter.costo);
     return {
       ...b,
-      costo,
+      costo: finale,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
-      elencoFisso: setter.elencoFisso || '',
-      dove: setter.dove || '',
+      dove: setter.dove || (finale === 4 ? doveAMano(setter) : ''),
       risk: setter.risk || '',
     };
+  }
+  // La strada a mano che il «no» del costo 4 dice dopo una lettura (#1312, #835.1): la pagina dove sta la voce.
+  // La pagina la sa il catalogo delle voci (src/shared/vociImpostazioni.js), una fonte sola.
+  const INDIRIZZO_PAGINA = Object.freeze({
+    preferences: 'filo://preferences/preferences.html', security: 'filo://security/security.html',
+    options: 'filo://options/options.html', altro: 'filo://options/altro.html',
+  });
+  function doveAMano(setter) {
+    const scrive = new Set(Array.isArray(setter && setter.scrive) ? setter.scrive.map(String) : []);
+    const voce = (global.SN_VOCI_IMPOSTAZIONI && global.SN_VOCI_IMPOSTAZIONI.voci ? global.SN_VOCI_IMPOSTAZIONI.voci() : [])
+      .find((v) => v.pagina && scrive.has(v.percorso));
+    return voce && INDIRIZZO_PAGINA[voce.pagina]
+      ? `Si cambia a mano nella pagina ${voce.titolo} (${INDIRIZZO_PAGINA[voce.pagina]}).`
+      : 'Si cambia a mano nelle impostazioni di Filo, dove sta la voce.';
   }
 
   // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
@@ -2483,14 +2639,14 @@
     if (!r || !r.setter) {
       return {
         rifiuto: `«${detta}» non è un'impostazione che Filo conosce`,
-        perModello: 'Usa una chiave dell\'elenco di IMPOSTA_PREFERENZA; per cercarla c\'è LEGGI_IMPOSTAZIONI.',
+        perModello: 'Cerca la chiave giusta con impostazioni(leggi): ogni voce porta la sua chiave e i valori ammessi.',
       };
     }
     const aiuto = typeof r.setter.aiuto === 'function' ? r.setter.aiuto({}) : r.setter.aiuto;
     const valore = typeof rawVal === 'string' ? rawVal.trim().slice(0, 60) : String(rawVal);
     return {
       rifiuto: `«${valore}» non è un valore che «${nomeVoce(r.setter)}» accetta`,
-      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'vedi l\'elenco di IMPOSTA_PREFERENZA'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
+      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'li dice impostazioni(leggi) con la chiave'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
     };
   }
   function pianoChiave(s) {
@@ -2524,9 +2680,33 @@
   const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti. Senza, le richieste '
     + 'le pagano i crediti di Filo, e lì i fornitori esclusi restano esclusi';
 
+  // Un pezzo di impostazioni scritto per intero, come l'annullo di un cambio (#1840): abbassa una difesa se uno dei freni
+  // che tocca, giudicato dal suo setter come una richiesta in chat, la allenta. Un freno che non si sa giudicare la abbassa.
+  // La prima voce che `partial` allenterebbe: { setter }, { setter: null } se non si sa giudicare (vale allentata), o null.
+  function freniAllentati(partial, attuali) {
+    for (const s of PREF_SETTERS) {
+      if (typeof s.allenta !== 'function' || !Array.isArray(s.scrive)) continue;
+      for (const p of s.scrive) {
+        const percorso = String(p).replace(/\.\*$/, '');
+        const v = dentro(partial, percorso);
+        if (v === undefined) continue;
+        const r = Array.isArray(v) ? { partial, elenco: { percorso, op: 'sostituisci', voci: v } } : { partial };
+        try { if (s.allenta(r, attuali)) return { setter: s }; } catch (_) { return { setter: null }; }
+      }
+    }
+    return null;
+  }
+  function allentaParziale(partial, attuali) { return !!freniAllentati(partial, attuali); }
+  // La strada a mano per un cambio di più voci che toglie un freno («rimetti com'era», il ripristino di serie): '' se non ne toglie.
+  function doveSeAllenta(partial, attuali) {
+    const f = freniAllentati(partial, attuali);
+    if (!f) return '';
+    return (f.setter && f.setter.dove) || doveAMano(f.setter);
+  }
+
   global.SN_PREF = {
-    buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    buildPreferencePartial, allentaParziale, doveSeAllenta, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
+    applicaElenco, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
     SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -24,6 +24,17 @@ test('cartellaDelServer: il checkout del server accanto al repo, dal checkout pr
   assert.equal(cartellaDelServer(resolve('/y', 'Filo'), () => false), '');
 });
 
+// #2237.5: dal clone di un worker (/tmp/filo-lavori/N) il clone del server non sta accanto, ma dove lo mette `git-server clone`.
+test('cartellaDelServer: da un clone di worker trova il clone dei lavori server; da un checkout qualunque no', () => {
+  const clone = resolve('/casa', 'filo-security');
+  const worker = resolve('/tmp', 'filo-lavori', '1');
+  const server = join(clone, 'functions', 'tools', 'server-fondi.js');
+  const marcatore = join(worker, '.claude', 'filo-worker.json');
+  assert.equal(cartellaDelServer(worker, (p) => p === server || p === marcatore, { clone }), join(clone, 'functions'));
+  assert.equal(cartellaDelServer(worker, (p) => p === marcatore, { clone }), '', 'senza il clone del server, niente');
+  assert.equal(cartellaDelServer(resolve('/y', 'Filo'), (p) => p === server, { clone }), '', 'fuori da un worker vale solo il checkout accanto');
+});
+
 test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende le opzioni', () => {
   assert.deepEqual(leggiArgomenti(['claude/x', '--feedback', '910']), { ramo: 'claude/x', pratica: '910', dryRun: false, soloServer: false, nota: null });
   assert.equal(leggiArgomenti(['claude/x', '--feedback', '910', '--solo-server']).soloServer, true);
@@ -533,10 +544,20 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.equal(classifyServerMerge(403, {}).outcome, 'denied');
   assert.equal(classifyServerMerge(0, {}).outcome, 'unreachable');
   assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
+  // #2533: le spinte sui rami non accendono più la suite, e il PC non deve aspettare una corsa che non parte.
+  const senzaCorse = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'assente' });
+  assert.equal(senzaCorse.suite, 'assente');
+  assert.match(messageForServerMerge(senzaCorse, 'worker/x'), /non è mai partita: avviala da Actions di filo-security .*Run workflow sul ramo worker\/x/);
+  assert.match(messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'in_corso' })), /non è ancora verde/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
   // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
   const si = ok('chiedi_si', { sha: 'c'.repeat(40), detail: 'il ramo del server tocca functions/src/l5/gates.js' });
   assert.equal(si.outcome, 'chiedi_si');
   assert.match(messageForServerMerge(si, 'worker/x'), /^Il cancello non porta worker\/x su main di filo-security senza il tuo sì: .*functions\/src\/l5\/gates\.js/);
+  // L'app in attesa del server (#2199.5): il cancello la porta prima del server, e la riga lo dice.
+  const insieme = ok('merged', { sha: 'a'.repeat(40), app: 'd'.repeat(40) });
+  assert.equal(insieme.app, 'd'.repeat(40));
+  assert.match(messageForServerMerge(insieme, 'claude/x'), /parte dell’app in attesa su main di Filo \(ddddddddd\), poi claude\/x su main di filo-security \(aaaaaaaaa\)/);
+  assert.doesNotMatch(messageForServerMerge(ok('merged', { sha: 'a'.repeat(40) }), 'claude/x'), /app/);
 });

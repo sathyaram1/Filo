@@ -311,12 +311,24 @@
       try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
       try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
     });
+    // Un testo incollato o trascinato nella casella l'ha scritto qualcun altro: la conversazione ha letto (#1840). La
+    // regola è quella della home; senza il modulo ogni testo vale di altri, che chiede di più e mai di meno.
+    let testoDiAltri = false;
+    const altri = global.SN_TESTO_DI_ALTRI ? global.SN_TESTO_DI_ALTRI.crea() : { dopoInput: (_t, v) => !!v };
+    ta.addEventListener('input', (e) => { testoDiAltri = altri.dopoInput(e.inputType, ta.value, testoDiAltri); });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
       if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
       const { immagini, riferimenti } = allegati;
       const schede = gettoni ? gettoni.schede() : [];
+      // Un riferimento trascinato porta il testo intero dell'elemento, che può citare altri: conta come incollato.
+      if (testoDiAltri || immagini.length || riferimenti.length) {
+        try {
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_TESTO_DI_ALTRI, immagini: !testoDiAltri && !riferimenti.length })).catch(() => {});
+        } catch (_) {}
+      }
+      testoDiAltri = false;
       ta.value = '';
       if (gettoni) gettoni.svuota();
       allegati = { immagini: [], riferimenti: [] };

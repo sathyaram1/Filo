@@ -93,7 +93,9 @@ Prompt del worker (minimo): dichiarati routine (`export FILO_ROUTINE=1`),
 lancia `node scripts/dispatch.mjs --ticket <biglietto>`, diventa il ruolo che
 ti stampa, esegui fino in fondo. Tutto ciò che conta va REGISTRATO via script
 (esiti, notes, claim, guasti): il tuo testo di ritorno non viene letto. I file nati da
-shell si salvano al tuo Edit/Write successivo o al rilascio, non prima.
+shell si salvano al tuo Edit/Write successivo o al rilascio, non prima. Dove il
+ruolo dice altro da questo prompt (percorsi degli strumenti compresi), vale il
+ruolo.
 
 Il worker si lancia in primo piano, mai `run_in_background`. È una regola del
 tuo lancio, non dei suoi comandi, e nel prompt non va: i comandi lunghi il

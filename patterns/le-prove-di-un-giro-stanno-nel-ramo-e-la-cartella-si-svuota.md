@@ -78,7 +78,12 @@ la cartella.
   rilanciano le prove che li nominano; la configurazione di Playwright, che le usa tutte, le
   rilancia tutte. Quelli si rimettono com'erano in una copia del ramo a parte, mai al loro posto,
   perché un rilancio interrotto non lasci un file vecchio da committare; uno aggiunto si toglie
-  dalla copia. Nella pulizia un file di supporto non conta fra le prove tolte.
+  dalla copia. Un file sotto `tests/` che il ramo aveva già cambiato alla critica non è un aiuto
+  ma il lavoro stesso (uno strumento come la prova da utente, #2546): rimesso com'era, la prova
+  girerebbe sul codice da correggere e non passerebbe mai. Resta com'è, come il codice di `src/`;
+  chi verifica fuori dal giro non scrive, quindi quei cambi sono di chi lavora. Il prezzo: un aiuto
+  che il lavoro aveva già toccato non è più protetto dal rilancio, e lo guarda la lettura del diff.
+  Nella pulizia un file di supporto non conta fra le prove tolte.
 - **La pulizia non spegne un caso rosso.** Prima di registrarla si rilanciano, sul codice
   della critica, le prove a cui ha tolto un caso e quelle della cartella di un file di supporto
   a cui ha tolto righe: ogni caso rosso prima deve restare rosso dopo (il confronto è per titolo del

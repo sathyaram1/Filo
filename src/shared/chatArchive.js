@@ -133,7 +133,7 @@
       if (n <= cap) return full;
       const a = Math.floor(cap * 0.6);
       const b = n - Math.floor(cap * 0.4);
-      return `${full.slice(0, a)}\n…(parte centrale omessa: caratteri ${a}-${b} di ${n}; si legge richiamando CERCA_CHAT con questo id e da = ${a})…\n${full.slice(b)}`;
+      return `${full.slice(0, a)}\n…(parte centrale omessa: caratteri ${a}-${b} di ${n}; si legge richiamando filo(cerca) con questo id e da = ${a})…\n${full.slice(b)}`;
     }
     const a = Math.min(n, Math.max(0, Math.floor(inizio)));
     const b = Math.min(n, a + pezzo);

@@ -85,18 +85,9 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
-  // #892.5 — le righe che il campo ha avuto da fuori: svuotato e riportato con Annulla, un testo incollato lo resta.
-  // Si tengono le impronte, non i testi; un'impronta uguale per caso chiede di più, mai di meno.
-  const righeDaFuori = new Set();
-  const impronta = (s) => {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
-    return `${s.length}:${h >>> 0}`;
-  };
-  const ricordaDaFuori = (s) => {
-    righeDaFuori.add(impronta(s));
-    if (righeDaFuori.size > 2000) righeDaFuori.delete(righeDaFuori.values().next().value);
-  };
+  // #892.5 — svuotato e riportato con Annulla, un testo incollato lo resta: la regola è dell'Aiuto e della home insieme.
+  const testiDiAltri = self.SN_TESTO_DI_ALTRI.crea();
+  const ricordaDaFuori = (s) => testiDiAltri.ricorda(s);
   // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
   let testoIncollato = null;
   const percorsiImmagini = new Map();
@@ -132,7 +123,7 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
-    sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    sceltaAutonomia: (a) => Accoglienza.scelteDi(a._output),
     sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
@@ -1009,6 +1000,17 @@
     PULSANTE_PREFERENZE: 'Uso le Preferenze…',
     CHIUDI_SCHEDE: 'Chiudo le schede…',
     ACCOUNT: 'Sistemo l\'accesso…',
+    // Gli strumenti generali (SPEC-CONTESTO § Gli strumenti): all'inizio arriva il nome, l'azione dopo con gli argomenti.
+    IMPOSTAZIONI: 'Guardo le impostazioni…',
+    SCHEDA: 'Mi occupo delle schede…',
+    HOME: 'Sistemo la home…',
+    PROMEMORIA: 'Preparo un promemoria…',
+    FILE: 'Guardo i tuoi file…',
+    COMPUTER: 'Chiedo al computer…',
+    WEB: 'Cerco sul web…',
+    MEMORIA: 'Guardo cosa ricordo…',
+    FILO: 'Cerco nel filo…',
+    FILO_SU_DI_SE: 'Verifico cosa so fare…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -1407,7 +1409,8 @@
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
     const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
-    const daFuori = incollato || immagini.length > 0 || file.length > 0;
+    // Un file allegato entra come percorso: quando Filo lo apre la lettura ha la classe del file, non quella di un incollato.
+    const daFuori = incollato || immagini.length > 0;
     testoDaFuori = false;
     const righeFile = [...file.map((f) => f.percorso), ...immagini.map((d) => percorsi.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
@@ -2244,10 +2247,7 @@
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', (e) => {
-    if (!inputEl.value) testoDaFuori = false;
-    else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
-    else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && righeDaFuori.has(impronta(inputEl.value))) testoDaFuori = true;
-    if (testoDaFuori && inputEl.value) ricordaDaFuori(inputEl.value);
+    testoDaFuori = testiDiAltri.dopoInput(e.inputType, inputEl.value, testoDaFuori);
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {
@@ -2428,6 +2428,9 @@
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
       if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
+      if (msg.settings && msg.settings.security && msg.settings.security.privacy) {
+        Accoglienza.aggiornaSceltaPrivacy(msg.settings.security.privacy.livello);
+      }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -3060,7 +3063,8 @@
       while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
       self.SN_FEEDBACK_UI?.open({ testo: q.testo });
     } else if (q.tipo === 'chiedi') {
-      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      // Porta l'indirizzo scelto dal sito: è testo di altri, come un incollato (#1840).
+      if (!inAccoglienza) { if (!sending) { testoDaFuori = true; submitMessage(q.testo); } return; }
       inputEl.value = q.testo;
       testoDaFuori = true;
       autoGrowInput();
@@ -3146,6 +3150,8 @@
   // Hook per i test Playwright: rende azioni come farebbe una bolla di chat, senza l'LLM.
   window.__filoDashActions = {
     renderActions: Att.renderActions,
+    // Le parole dell'utente che una conferma rimanda al main: un segreto che ha scritto lui può uscire (#810).
+    scriveUtente: (testo) => { threadHistory.push({ role: 'user', text: String(testo || '') }); },
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,

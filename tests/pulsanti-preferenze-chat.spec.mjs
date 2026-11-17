@@ -3,7 +3,7 @@
 // poteva solo spiegare dove cliccare.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -170,11 +170,11 @@ test('«rimetti tutte le impostazioni di serie»: OK con l\'elenco, poi tutte di
   expect((await confirmState(chat)).text).toContain('durata delle notifiche: 30 s');
   expect((await impostazioni(app)).theme).toBe('dark');
   await chat.screenshot({ path: 'tests/.shots/pulsanti-preferenze-ripristino-conferma.png' });
-  // Tocca anche i modelli scelti: vuole la parola «conferma».
+  // Tocca anche i modelli scelti, ma tornare a quelli di Filo non toglie un freno (#1840): un OK, senza la parola.
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible();
-  await fillConfirmInput(chat, 'conferma');
+  expect((await confirmState(chat)).hasInput).toBe(false);
   await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'danger');
+  await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
   const dopo = await impostazioni(app);
   expect(dopo.notifications.durationSec).toBe(5);
@@ -231,9 +231,8 @@ test('il ripristino da Automatico coi modelli scelti a mano: una riga vera per i
   expect(testo).not.toContain('→ nessuno');
   expect(testo).toMatch(/modelli scelti a mano per \d+ funzioni: tolti, valgono quelli predefiniti di Filo/);
   expect(testo).toContain('Restano le chiavi API, il registro dei modelli e l\'autonomia di Filo');
-  await fillConfirmInput(chat, 'conferma');
   await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'danger');
+  await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
   expect((await impostazioni(app)).autonomia.livello).toBe('automatico');
   await ripristina(app);

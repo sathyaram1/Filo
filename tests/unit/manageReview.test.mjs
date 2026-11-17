@@ -1687,6 +1687,31 @@ test('approvata e fusa, stato non ancora aggiornato: non aspetta l’owner (#104
   assert.ok(MR.ownerActions(fb, opts).some((a) => a.to === 'archived'));
 });
 
+// #2250: un lavoro server appena fuso non torna rosso nel minuto in cui il documento nuovo non è ancora arrivato.
+test('lavoro server fuso: «fusa» finché il documento è di prima della fusione, «senza» se è cambiato dopo', () => {
+  const FUSA_ALLE = Date.parse('2026-11-07T10:48:58Z');
+  const server = (extra) => ({
+    _id: 'f1249', seq: 1249, status: 'design', statusReason: 'l5', branch: 'claude/x',
+    localOnly: { by: 'owner@x', at: 1790000000000 }, ...extra,
+  });
+  const opts = { fusioniLette: true, fusioni: { recent: [
+    { id: 'r0', feedbackId: 'f1249', used: true, outcome: 'merged', branch: 'claude/x', createdAtMs: FUSA_ALLE - 3600e3, decidedAtMs: FUSA_ALLE - 3000e3 },
+    { id: 'r1', feedbackId: 'f1249', used: true, outcome: 'merged', branch: 'claude/x', createdAtMs: FUSA_ALLE - 600e3, decidedAtMs: FUSA_ALLE },
+  ] } };
+  const prima = server({ updatedAt: '2026-11-07T10:44:00Z' });
+  assert.equal(MR.statoFusione(prima, opts), 'fusa');
+  assert.equal(MR.fusioneInAttesa(prima, opts), false);
+  assert.notEqual(MR.livelloL5(prima, opts).colore, MR.REASONS.attack.color);
+  // Scritto dopo la fusione e ancora in l5: l'ha fermata il cancello del server.
+  assert.equal(MR.statoFusione(server({ updatedAt: '2026-11-07T10:49:14Z' }), opts), 'senza');
+  // Senza `updatedAt` vale l'ora di Firestore; senza nessuna delle due non si sa, e resta ferma.
+  assert.equal(MR.statoFusione(server({ _updateTime: '2026-11-07T10:44:00.123456Z' }), opts), 'fusa');
+  assert.equal(MR.statoFusione(server({ _updateTime: '2026-11-07T10:50:00Z' }), opts), 'senza');
+  assert.equal(MR.statoFusione(server({}), opts), 'senza');
+  // Una fusa di un altro ramo non conta.
+  assert.equal(MR.statoFusione(server({ updatedAt: '2026-11-07T10:44:00Z', branch: 'claude/y' }), opts), 'senza');
+});
+
 // #1327 punto 4 (#928): finché c'è una fusione da decidere, o il ramo approvato non è in main, la riga non chiude.
 test('ownerActions: niente Risolto né chiusure mentre una fusione aspetta (#928)', () => {
   const chiusure = (acts) => acts.filter((a) => ['done', 'archived', 'attack_confirmed', 'spam_confirmed'].includes(a.to));
@@ -2139,13 +2164,39 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
 test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
   const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
   const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
-  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], atMs: 5 });
   assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
+  assert.equal(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: false }), null, 'lavori server spenti: in mano locale (#2036.1)');
+  assert.ok(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: true }));
   assert.equal(MR.restaLocale(srv({ restaLocale: null })), null, 'tolto dal server quando il motivo passa');
   assert.equal(MR.restaLocale(srv({ status: 'working', restaLocale: segno })), null, 'partito: non è più fermo');
   assert.equal(MR.restaLocale({ status: 'todo', restaLocale: segno }), null, 'solo un lavoro server');
   assert.equal(MR.restaLocale(srv({ restaLocale: { motivi: [] } })), null);
   assert.equal(MR.restaLocale(null), null);
+});
+
+test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno promette una ripartenza da sola (#2036.1)', () => {
+  const ramo = MR.sbloccoFermo('ramo non pulito', 'worker/x-1');
+  assert.match(ramo, /sanatoria/);
+  assert.match(ramo, /fiducia:sana -- worker\/x-1;/);
+  assert.match(MR.sbloccoFermo('ramo del server non pulito', 'worker/x-1'), /fiducia:sana -- worker\/x-1 --server/);
+  assert.match(MR.sbloccoFermo('ramo non pulito'), /fiducia:sana -- <ramo>/, 'senza ramo noto non inventa un nome');
+  // Lo sporco lo toglie il gesto di #2258 in Gestione, non una sessione sul PC.
+  assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito da solo.*«Dichiara fidato com’è»/);
+  assert.match(ramo, /biglietto sporco, «Dichiara fidato com’è»/);
+  assert.doesNotMatch(ramo, /sessione locale/);
+  assert.doesNotMatch(MR.sbloccoFermo('ramo scritto da un biglietto sporco'), /sanatoria/, 'uno sporco non si sana');
+  assert.match(MR.sbloccoFermo('feedback non fidato'), /segni fidato/);
+  for (const m of ['note per gli agenti di una domanda non fidata', 'testo di una domanda aperta non fidata']) {
+    assert.match(MR.sbloccoFermo(m), /domanda .*segni fidata in Domande/, 'la fiducia da dare è della domanda, non del feedback');
+  }
+  assert.match(MR.sbloccoFermo('motivo nuovo del server'), /«motivo nuovo del server» non passa da solo/);
+  for (const m of ['ramo non pulito', 'ramo del server non pulito', 'contenuto scritto da un biglietto sporco', 'feedback non fidato', 'altro']) {
+    assert.doesNotMatch(MR.sbloccoFermo(m), /riparte da solo|passa da sé/i, m);
+  }
+  const doppio = { status: 'todo', localOnly: { by: 'owner', at: 1 }, branch: 'b',
+    restaLocale: { motivi: ['contenuto scritto da un biglietto sporco', 'ramo scritto da un biglietto sporco'] } };
+  assert.equal(MR.restaLocale(doppio).sblocchi.length, 1, 'lo stesso gesto si dice una volta');
 });
 
 test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {

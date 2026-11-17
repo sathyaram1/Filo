@@ -9,6 +9,9 @@ const BASI = ['youtube.com', 'youtube-nocookie.com', 'youtubekids.com'];
 // Quelli che servono solo il lettore incorporato in un altro sito: lì il «Salta» vale dentro il riquadro, mai in scheda.
 const SOLO_INCORPORATI = ['youtube-nocookie.com'];
 
+// Dal main ai frame di YouTube rimasti senza regole: ce ne sono di nuove, chiedetele.
+const CANALE_PRONTE = 'filo:youtube-regole-pronte';
+
 const sotto = (h, basi) => basi.some((b) => h === b || h.endsWith('.' + b));
 
 function hostYouTube(host) {
@@ -155,9 +158,12 @@ function valeSu(dom, host) {
   return dom.pos.length === 0 || dom.pos.some((d) => dominio(d, host));
 }
 
+// Per «youtube.*» vale lo stesso elenco dei siti, senza il dominio di primo livello.
+const radici = () => BASI.map((b) => b.replace(/\.[^.]+$/, ''));
+
 // Una regola entra solo se nomina per sé un sito di YouTube: «*» o «~youtube.com» non bastano.
 function perYouTube(dom) {
-  return dom.pos.some((d) => (d.endsWith('.*') ? /(^|\.)youtube(kids|-nocookie)?$/.test(d.slice(0, -2)) : hostYouTube(d)));
+  return dom.pos.some((d) => (d.endsWith('.*') ? sotto(d.slice(0, -2), radici()) : hostYouTube(d)));
 }
 
 // ─── lettura ───────────────────────────────────────────────────────────────
@@ -222,4 +228,4 @@ function perHost(insieme, host) {
   return out;
 }
 
-module.exports = { BASI, SOLO_INCORPORATI, hostYouTube, hostYouTubeInScheda, hostDi, nomeNoto, valuta, righeAttive, inclusi, argomenti, domini, valeSu, leggi, perHost };
+module.exports = { BASI, SOLO_INCORPORATI, CANALE_PRONTE, hostYouTube, hostYouTubeInScheda, hostDi, nomeNoto, valuta, righeAttive, inclusi, argomenti, domini, valeSu, leggi, perHost };

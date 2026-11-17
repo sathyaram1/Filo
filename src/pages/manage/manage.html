@@ -377,9 +377,6 @@
     .mg-dq-sez { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
     .mg-dq-h { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sn-muted); }
     .mg-dq-md { overflow-wrap: anywhere; }
-    .mg-dq-assorbite { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
-    .mg-dq-assorbite li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-    .mg-dq-assorbita-titolo { overflow-wrap: anywhere; }
     .mg-dq-opzioni { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .mg-dq-opzione { padding: 10px 12px; border: 1px solid var(--sn-border); border-radius: 8px; }
     .mg-dq-opzione--consigliata { border-color: color-mix(in srgb, var(--sn-accent) 60%, var(--sn-border)); }
@@ -1209,6 +1206,7 @@
     .mg-bubble-who {
       font-size: 11px; color: var(--sn-muted); font-weight: 600; margin-bottom: 4px;
     }
+    .mg-bubble-who .mg-fiducia-segno { margin-left: 6px; vertical-align: -1px; }
     .mg-bubble-body {
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
@@ -1492,6 +1490,10 @@
     }
     /* Pronto e fermo per il PC (#1159): la tinta d'accento lo stacca dalle righe di chi sta lavorando. */
     .mg-attesa-server { color: var(--sn-accent, var(--sn-fg)); }
+    /* «Dichiara fidato com'è» (#2258): sotto il motivo del fermo, e la conferma dice cosa diventa fidato. */
+    .mg-dichiara { margin-top: 8px; font-size: 12.5px; color: var(--sn-fg); }
+    .mg-dichiara ul { margin: 4px 0 8px; padding-left: 18px; color: var(--sn-muted); }
+    .mg-dichiara-tasti { display: flex; flex-wrap: wrap; gap: 6px; }
 
     /* «Aspetta #N» (#903): la forma del segno locale, tinta d'accento solo sui numeri non ancora fusi. */
     /* Con tante attese va a capo fra un numero e l'altro invece di uscire dalla scheda: i numeri si leggono tutti. */
@@ -1754,6 +1756,9 @@
     .mg-rc-giorni .mg-chip { min-width: 42px; justify-content: center; padding: 7px 8px; }
     .mg-rc-anteprima { font-size: 12px; color: var(--sn-muted); padding-bottom: 8px; }
     .mg-rc-anteprima--no { color: var(--sn-error); }
+    /* Il tetto in dollari tiene «automatico, 124 $» senza tagliarlo; la stima gli sta accanto, sottovoce. */
+    .sn-page .mg-cp-scelta input.mg-rc-tetto-campo { width: 132px; }
+    .mg-rc-tetto-stima { font-size: 12px; color: var(--sn-muted); align-self: center; }
     :root[data-sn-theme="dark"] .mg-rc-form input[type="time"] { color-scheme: dark; }
     :root[data-sn-theme="light"] .mg-rc-form input[type="time"] { color-scheme: light; }
     .mg-rc-form .mg-cp-azioni { margin: 2px 0 0; }
@@ -1860,6 +1865,7 @@
     }
     .mg-role-head { font-size: 12px; font-weight: 600; color: var(--sn-muted); }
     .mg-role-name { grid-column: 1 / -1; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--sn-fg); }
+    .mg-role-stima { grid-column: 1 / -1; font-size: 12px; color: var(--sn-muted); cursor: help; }
     /* Un punto e due di margine in meno: a 1280px la colonna è la più stretta, e lì la scritta deve starci intera. */
     .mg-role-models .sn-select-button { padding: 6px 8px; font-size: 12px; }
 
@@ -2802,10 +2808,10 @@
             <div class="mg-auto-col">
               <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
               <section class="mg-auto-block" id="mgCap3Block">
-                <label class="mg-auto-field-label" for="mgCap3">Correzioni per i difetti gravi (livello 3)</label>
+                <label class="mg-auto-field-label" for="mgCap3">Correzioni per i lavori che non risolvono (livello 3)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte un difetto di sicurezza, di soldi o che rende Filo
-                  inutilizzabile può tornare indietro per essere corretto. Finito il
+                  Quante volte torna indietro un lavoro che non risolve il problema
+                  nella maggior parte dei casi, o che ne porta uno più grave. Finito il
                   bilancio, usa quelli dei livelli sotto; finiti anche quelli, il
                   lavoro si ferma e decidi tu.
                 </p>
@@ -2818,14 +2824,14 @@
               </section>
 
               <section class="mg-auto-block" id="mgCap2Block">
-                <label class="mg-auto-field-label" for="mgCap2">Correzioni per le funzioni rotte (livello 2)</label>
+                <label class="mg-auto-field-label" for="mgCap2">Correzioni per i lavori a metà (livello 2)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte un difetto che impedisce di ottenere la cosa chiesta
-                  nel caso normale può tornare indietro per essere corretto. Finito
-                  il bilancio, usa quelli dei livelli sotto; finiti anche quelli, il
-                  lavoro passa e i difetti rimasti diventano feedback a parte, figli
-                  del lavoro, a priorità 1: li porta nella rosa il manutentore, se
-                  contano oggi.
+                  Quante volte torna indietro un lavoro che risolve in meno dell'80%
+                  dei casi, o che porta un problema nuovo meno grave dell'originale.
+                  Finito il bilancio, usa quello del livello 1; finito anche quello, il
+                  lavoro passa e i difetti rimasti diventano un feedback a parte,
+                  figlio del lavoro, a priorità 1: lo mette nell'ordine il
+                  manutentore, se conta.
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgCap2" class="mg-auto-number"
@@ -2836,34 +2842,19 @@
               </section>
 
               <section class="mg-auto-block" id="mgCap1Block">
-                <label class="mg-auto-field-label" for="mgCap1">Correzioni per i rilievi minori (livello 1)</label>
+                <label class="mg-auto-field-label" for="mgCap1">Correzioni per i casi rari (livello 1)</label>
                 <p class="mg-auto-block-desc">
-                  Quante volte cosmetica e attrito fuori dal cammino principale
-                  possono tornare indietro per essere corretti. Finito il bilancio, usa
-                  quello del livello 0; finito anche quello, il lavoro passa e i
-                  rilievi rimasti diventano un feedback a parte, figlio del lavoro.
+                  Quante volte torna indietro un lavoro per un caso molto raro, un
+                  miglioramento incerto o un problema raro. A zero non si correggono
+                  da soli: vanno nel feedback a parte, e si correggono quando nello
+                  stesso giro c'è altro da correggere. Lo usano anche i livelli sopra,
+                  quando hanno finito il loro.
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgCap1" class="mg-auto-number"
                     min="0" max="10" step="1" inputmode="numeric" />
                   <button type="button" class="sn-btn" id="mgCap1Save">Salva</button>
                   <span class="mg-action-msg" id="mgCap1Msg" role="status"></span>
-                </div>
-              </section>
-
-              <section class="mg-auto-block" id="mgCap0Block">
-                <label class="mg-auto-field-label" for="mgCap0">Correzioni per i soli casi rari (livello 0)</label>
-                <p class="mg-auto-block-desc">
-                  A zero, i casi rari trovati da soli non si correggono mai: vanno nel
-                  feedback a parte. Si correggono comunque quando nello stesso giro
-                  c'è altro da correggere. Lo usano anche i livelli sopra, quando
-                  hanno finito il loro.
-                </p>
-                <div class="mg-auto-field-row">
-                  <input type="number" id="mgCap0" class="mg-auto-number"
-                    min="0" max="10" step="1" inputmode="numeric" />
-                  <button type="button" class="sn-btn" id="mgCap0Save">Salva</button>
-                  <span class="mg-action-msg" id="mgCap0Msg" role="status"></span>
                 </div>
               </section>
 
@@ -3185,6 +3176,10 @@
           </table>
         </div>
         <p class="sn-muted" id="ownerRuns"></p>
+        <!-- Gli account anonimi (#2067): quanti sono, quanti nati dentro le prove, e la pulizia che decide l'owner. -->
+        <h3 class="sn-wallet-sub" id="ownerAnonimiTitle">Account anonimi</h3>
+        <ul class="sn-wallet-numeri" id="ownerAnonimi" aria-label="Account anonimi"></ul>
+        <div class="sn-wallet-anonimi-pulizia" id="ownerAnonimiPulizia" role="status"></div>
       </section>
     </section>
 
@@ -3302,9 +3297,11 @@
           <p class="sn-muted" id="contesto-desc"></p>
           <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
             <label for="contestoGiorni" id="l-contesto-giorni"></label>
-            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+            <input type="number" id="contestoGiorni" step="0.5" style="width:120px;" />
             <label for="contestoToken" id="l-contesto-token"></label>
-            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+            <input type="number" id="contestoToken" step="1000" style="width:160px;" />
+            <label for="contestoSoglia" id="l-contesto-soglia"></label>
+            <input type="number" id="contestoSoglia" step="1000" style="width:160px;" />
             <label for="contestoCache" id="l-contesto-cache"></label>
             <select id="contestoCache" style="width:240px;">
               <option value="" id="contestoCacheDiSerie"></option>
@@ -3312,6 +3309,7 @@
               <option value="1h" id="contestoCache1h"></option>
             </select>
           </div>
+          <p class="sn-muted" id="contestoSogliaStima" aria-live="polite"></p>
         </section>
 
         <section id="sec-lunghezza">
@@ -3348,6 +3346,8 @@
   <script src="manageManutentore.js"></script>
   <script src="manageUtenti.js"></script>
   <script src="manageContatori.js"></script>
+  <script src="filo://shared/filoContesto.js"></script>
+  <script src="filo://shared/filoCompattazione.js"></script>
   <script src="managePredefiniti.js"></script>
   <script src="manageCompiti.js"></script>
   <script src="manageRicorrenti.js"></script>

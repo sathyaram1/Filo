@@ -12,7 +12,10 @@ regola**.
 - **Serve il codice del server** e tu non hai le istruzioni del lavoro server.
   Consegna così, e il resto lo decide il server: un feedback fidato passa alla
   routine dei lavori server, che riparte dal tuo ramo con la tua nota; uno non
-  fidato va davanti all'owner come richiesta di renderlo fidato.
+  fidato va davanti all'owner come richiesta di renderlo fidato. Per un fidato
+  è un ripiego: il suo primo lavoro lo prende già una routine che può toccare
+  il server, e arriva qui solo se è diventato fidato dopo la partenza o se
+  quelle routine sono spente.
 
   ```bash
   node scripts/routine-channel.mjs deliver status --status design --reason locale \

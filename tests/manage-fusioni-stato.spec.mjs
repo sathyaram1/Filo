@@ -244,25 +244,85 @@ test('scheda: in volo la rotella gira accanto a una frase leggibile; il ruolo si
   const stato = card.locator('.sn-mac-status');
   await expect(stato).toBeVisible();
   const vista = await stato.evaluate((el) => {
-    const prima = getComputedStyle(el, '::before');
     const card = el.closest('.sn-mac-card');
+    const tasto = card.querySelector('.sn-mac-btn-go');
+    const prima = getComputedStyle(tasto, '::before');
     return {
       rotella: prima.content !== 'none' && prima.animationName === 'sn-mac-gira',
+      tastoOpacita: getComputedStyle(tasto).opacity,
       colore: getComputedStyle(el).color,
       // Il ramo ha il colore del testo normale: la frase d'attesa deve avere lo stesso.
       testo: getComputedStyle(card.querySelector('.sn-mac-branch')).color,
       opacita: getComputedStyle(card).opacity,
     };
   });
+  // #2250: in volo il tasto non somiglia a uno spento: rotella, «Sto fondendo», pieno di colore.
   expect(vista.rotella).toBe(true);
+  expect(vista.tastoOpacita).toBe('1');
   expect(vista.opacita).toBe('1');
   expect(vista.colore).toBe(vista.testo);
   await expect(go).toBeDisabled();
+  await expect(go).toHaveText('Sto fondendo');
+  // Il tempo dal clic scorre da solo.
+  const trascorso = stato.locator('.sn-mac-trascorso');
+  await expect(trascorso).toHaveText(/^da \d+ s$/);
+  const primo = await trascorso.textContent();
+  await expect.poll(() => trascorso.textContent(), { timeout: 5_000 }).not.toBe(primo);
+  await card.screenshot({ path: 'tests/.shots/fusioni-stato-volo-tasto.png' });
   // Il quadrato in cima dice quello che dicono lista e pannello: in volo non è più rosso «bloccato».
   await expect(scheda(page, 'volo')).toContainText('in fusione');
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).not.toHaveClass(/mg-forma--attack/);
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).toHaveClass(/mg-forma--scelta/);
   await page.screenshot({ path: 'tests/.shots/fusioni-stato-volo.png' });
+});
+
+// #2250: con un elenco lungo il tasto sta in fondo al pannello; la frase col tempo dal sì compare sotto e deve vedersi.
+const vociLunghe = (n, p) => Array.from({ length: n }, (_, i) => ({ file: `src/${p}${i}.js`, riga: i + 1, testo: `exec('${p}-${i}');` }));
+async function approvaInFondo(openTab) {
+  const blocks = [
+    { gate: 'g1', gruppo: 'capacita', label: 'Avvia un programma', voci: vociLunghe(13, 'a'), more: 0 },
+    { gate: 'g2', gruppo: 'contenuto', label: 'Diff da leggere', voci: vociLunghe(27, 'b'), more: 0 },
+  ];
+  const page = await apri(openTab, [fb('lunga', 1867, { status: 'design', statusReason: 'l5' })],
+    { pending: [richiesta('a'.repeat(24), 'lunga', 1867, { blocks })] }, { approva: 'mai' });
+  await page.evaluate(() => window.__mgTest.openDetail('lunga'));
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  const go = page.locator('#mgSideBody .sn-mac-card .sn-mac-btn-go');
+  await expect(go).toHaveText('Apri le 16 voci');
+  await go.click();
+  await expect(go).toHaveText('Approva e fondi');
+  await page.locator('#mgSideBody').evaluate((n) => {
+    for (let e = n; e; e = e.parentElement) if (e.scrollHeight > e.clientHeight + 1) e.scrollTop = e.scrollHeight;
+  });
+  await expect(go).toBeInViewport();
+  await go.click();
+  await go.click();
+  await expect(go).toHaveText('Sto fondendo');
+  return page;
+}
+
+test('scheda: approvata in fondo a un elenco lungo, la frase d’attesa col tempo dal sì viene in vista', async ({ openTab }) => {
+  const page = await approvaInFondo(openTab);
+  const trascorso = page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso');
+  await expect(trascorso).toHaveText(/^da \d+ s$/);
+  await expect(trascorso).toBeInViewport();
+  await expect(page.locator('#mgSideBody .sn-mac-card .sn-mac-btn-go')).toBeInViewport();
+});
+
+test('scheda: chiuso e riaperto il pannello a metà volo, il tempo continua dal sì e non riparte da zero', async ({ openTab }) => {
+  const page = await approvaInFondo(openTab);
+  const trascorso = page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso');
+  await expect(trascorso).toHaveText(/^da [3-9] s$/, { timeout: 8_000 });
+  await page.evaluate(() => { document.querySelector('#mgSideBody .sn-mac-card').dataset.vecchia = '1'; });
+  await page.locator('#mgSideClose').click();
+  await expect(page.locator('#mgSide')).toBeHidden();
+  await page.evaluate(() => window.__mgTest.openDetail('lunga'));
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  await expect(page.locator('#mgSideBody .sn-mac-card .sn-mac-btn-go')).toHaveText('Sto fondendo');
+  // Una card nuova, disegnata a metà volo: non quella di prima rimasta lì.
+  await expect(page.locator('#mgSideBody .sn-mac-card[data-vecchia]')).toHaveCount(0);
+  const secondi = Number((await page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso').textContent()).match(/\d+/)[0]);
+  expect(secondi).toBeGreaterThanOrEqual(3);
 });
 
 test('scheda: dopo un sì finito in conflitto dice che il giro parte da solo', async ({ openTab }) => {

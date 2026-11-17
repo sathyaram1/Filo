@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
-import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda, riquadriNelSito } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'zibaldone-segreto-1509 del mio conto';
@@ -62,7 +62,7 @@ async function nienteAlSito(app, p, sel, testo) {
   await p.waitForTimeout(400);
   expect(await p.evaluate(() => window.cosaHaVisto())).not.toContain(testo.split(' ')[0]);
   expect(await p.evaluate((s) => window.trova(s), testo.split(' ')[0])).toBe(false);
-  expect(await p.evaluate(() => document.querySelector('[data-sn-riquadro]')), 'nel documento del sito non entra niente').toBeNull();
+  expect(await riquadriNelSito(app, p), 'nel documento del sito non entra niente').toEqual([]);
   return strato;
 }
 

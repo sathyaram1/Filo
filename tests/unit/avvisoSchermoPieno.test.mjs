@@ -69,8 +69,9 @@ test('a parole: la durata si scrive, e fuori dai limiti è un rifiuto col numero
   assert.deepEqual(P.buildPreferencePartial('avviso_schermo_pieno', '8').partial, { avvisoSchermoPieno: { durataMs: 8000 } });
   assert.match(P.buildPreferencePartial('avviso_schermo_pieno', '20 secondi').rifiuto, /20\.000 ms.*1\.000 a 10\.000/);
   assert.match(P.buildPreferencePartial('avviso_schermo_pieno', '500 ms').rifiuto, /500 ms.*1\.000 a 10\.000/);
-  const righe = P.righeDescrizione({ sistema: 'win32', shellPref: '' }).join('\n');
-  assert.ok(righe.includes('• avviso_schermo_pieno: '));
+  require(join(ROOT, 'src', 'shared', 'vociImpostazioni.js'));
+  const righe = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, {}).righe.join('\n');
+  assert.ok(righe.includes('[chiave avviso_schermo_pieno'), 'impostazioni(leggi) non la nomina');
   assert.equal(globalThis.SN_CAMBI.fraseCambio({ chiave: 'avvisoSchermoPieno.durataMs', prima: 3000, dopo: 5000 }),
     'durata dell\'avviso del sito a schermo intero: 3.000 ms → 5.000 ms');
 });

@@ -53,6 +53,21 @@ test('con la sola chiave il manutentore apre feedback e domande e scrive la doma
   assert.equal(togli.inviati[0].dati.testo, null);
 });
 
+// #2303: lo sblocco di un compito fermo per guasto è la strada normale per farlo ripartire; un feedback resta sulla nota.
+test('sblocca C-n manda al server il compito con la nota, e un feedback resta sblocco con la sua nota', () => {
+  const c = lancia(['sblocca', 'C-3915', 'clone', 'tornato'], { sblocca: { ok: true, compito: 'C-3915', sbloccato: 'guasto' } });
+  assert.equal(c.status, 0, c.out);
+  assert.deepEqual(c.inviati, [{ op: 'sblocca', dati: { compito: 'C-3915', testo: 'clone tornato' }, cred: 'chiave' }]);
+  assert.match(c.out, /C-3915: sbloccato, riparte con chi lo prende dopo\./);
+  const vuota = lancia(['sblocca', 'c-12'], { sblocca: { ok: true, compito: 'C-12', sbloccato: 'guasto' } });
+  assert.deepEqual(vuota.inviati, [{ op: 'sblocca', dati: { compito: 'C-12', testo: 'Sbloccato dal manutentore: riprendi.' }, cred: 'chiave' }]);
+  const no = lancia(['sblocca', 'C-12'], { sblocca: { ok: false, errore: 'niente_da_sbloccare', dettaglio: 'C-12 non è fermo per un guasto' } });
+  assert.notEqual(no.status, 0, 'un rifiuto del server non si legge come sbloccato');
+  assert.doesNotMatch(no.out, /sbloccato, riparte/);
+  const fb = lancia(['sblocca', '812', 'riparato'], { sblocca: { ok: true, numero: '812', sbloccato: 'guasto' } });
+  assert.deepEqual(fb.inviati, [{ op: 'sblocca', dati: { numero: '812', testo: 'riparato' }, cred: 'chiave' }]);
+});
+
 // #2217: il segno «lavoro server» lo manda chi apre, e un server che non lo conferma non lo perde in silenzio.
 test('feedback e pacchetto con --server mandano il segno lavoro server, e dicono se il server non l\'ha messo', () => {
   const f = lancia(['feedback', 'Il pacemaker sbaglia', '-', '--server', '--priorita', '3'], { feedback: { ok: true, numero: '2215', fiducia: 'non fidato', lavoroServer: true } }, 'Tutto in functions/src.');
@@ -129,6 +144,32 @@ test('un taccuino vuoto da stdin non parte: lo cancellerebbe', () => {
   assert.deepEqual(pieno.inviati, [{ op: 'taccuino.scrivi', dati: { testo: 'stato: N 4', versione: 3 }, cred: 'chiave' }]);
 });
 
+// #2340: il taccuino si aggiorna a sezioni, con la stessa guardia di versione della riscrittura intera.
+test('taccuino sezione manda la sola sezione con la versione letta; vuota, senza versione o senza nome non parte', () => {
+  const r = lancia(['taccuino', 'sezione', 'problemi', '-', '--versione', '7'], { 'taccuino.sezione': { ok: true, versione: 8, sezione: 'problemi' } }, '- #2300: guasto npm, ricontrollo alle 16\n');
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(r.inviati, [{ op: 'taccuino.sezione', dati: { sezione: 'problemi', testo: '- #2300: guasto npm, ricontrollo alle 16\n', versione: 7 }, cred: 'chiave' }]);
+  assert.match(r.out, /Sezione «problemi» riscritta, il resto del taccuino com'era \(versione 8\)/);
+  const cambiato = lancia(['taccuino', 'sezione', 'stato', '-', '--versione', '7'], { 'taccuino.sezione': { ok: false, reason: 'taccuino_cambiato' } }, 'N 3');
+  assert.equal(cambiato.status, 4);
+  assert.match(cambiato.out, /RIFIUTATO dal server: taccuino_cambiato/);
+  for (const [argv, input, motivo] of [
+    [['taccuino', 'sezione', 'stato', '-', '--versione', '7'], ' \n', /la sezione «stato» da stdin è vuota/],
+    [['taccuino', 'sezione', 'stato', '-'], 'N 3', /taccuino sezione vuole --versione <V>/],
+    [['taccuino', 'sezione', '-', '--versione', '7'], 'N 3', /vuole il nome della sezione/],
+  ]) {
+    const no = lancia(argv, {}, input);
+    assert.notEqual(no.status, 0, argv.join(' '));
+    assert.deepEqual(no.inviati, [], argv.join(' '));
+    assert.match(no.out, motivo);
+  }
+  // La forma del nome la giudica il server, una regola in un posto solo: lo strumento passa il nome com'è.
+  const storto = lancia(['taccuino', 'sezione', 'Stato Oggi', '-', '--versione', '7'],
+    { 'taccuino.sezione': { ok: false, reason: 'malformed', detail: 'sezione è il nome di un\'intestazione del taccuino, una parola minuscola' } }, 'N 3');
+  assert.deepEqual(storto.inviati.map((x) => x.dati.sezione), ['Stato Oggi']);
+  assert.match(storto.out, /RIFIUTATO dal server: malformed: .*una parola minuscola/);
+});
+
 test('il biglietto passato con --ticket non entra nei testi scritti', () => {
   const i = lancia(['indicazione', 'priorità', 'alla', 'grafica', '--ticket', 'SEGRETO123'], { taccuino: { ok: true, testo: '', versione: 0 } });
   const scritto = i.inviati.find((x) => x.op === 'taccuino.scrivi');
@@ -159,15 +200,15 @@ test('gli elenchi del rilascio tengono quanto il server accetta', () => {
   assert.equal(dentroBudget(voci).length, 200);
 });
 
-test('una promessa scritta con parole comuni senza il suo lavoro nella rosa si rifiuta', () => {
+test('una promessa scritta con parole comuni senza il suo lavoro nell\'ordine si rifiuta', () => {
   const blocco = { version: '0.2.255', features: [{ testo: 'Le schede si trascinano.' }], fixes: [] };
-  const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const schede = [{ num: '812', priorita: 1 }, { num: '900', priorita: 2 }];
+  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['I formati audio arriveranno con il prossimo aggiornamento.', 'Nella prossima versione: i formati audio.',
     'Stiamo preparando i formati audio.', 'In futuro anche i formati audio.', 'Coming soon: audio.', 'Sarà disponibile anche l\'audio.']) {
     assert.equal(prova(riga).ok, false, riga);
-    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nell'ordine)`);
+    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   assert.equal(prova({ testo: 'Ora il prossimo video parte da solo.', da: [1] }).ok, true);
 });
@@ -199,14 +240,14 @@ test('una promessa al futuro non dichiarata si riconosce anche fuori dall\'elenc
 test('una promessa si riconosce dal non avere fonte, non dalle parole: ogni riga dice da quali righe dei worker nasce', () => {
   const blocco = { version: '0.2.256', features: ['Le schede si trascinano fra le finestre.', 'Il menu si apre più in fretta.'], fixes: ['Il download non si blocca.'] };
   const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['Tra poco potrai allegare i PDF.', 'Stiamo per portare la chat sul telefono.', 'Il supporto ai PDF è quasi pronto.',
     'I PDF sono il prossimo passo.', 'Tra qualche giorno anche i PDF.', 'Potremo leggere i PDF nel prossimo giro.']) {
     const r = prova([riga]);
     assert.equal(r.ok, false, riga);
     assert.match(r.errori.join('\n'), /non dice da quali righe dei worker nasce/, riga);
-    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nell'ordine)`);
+    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   // Una riga copiata uguale ha già la sua fonte; una riscritta la cita, features e fixes contati di seguito.
   assert.equal(prova(['Il menu si apre più in fretta.']).ok, true);

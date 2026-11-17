@@ -85,7 +85,7 @@ test('un testo arrivato da fuori non entra nella citazione, né una risposta che
   const nota = FC.notaRisposta(R.risolvi({ chat: 'c-term', i: 0 }, () => comando, { max: R.PER_IL_MODELLO }));
   assert.ok(!nota.includes('COOKIE'), nota);
   assert.match(nota, /arrivato dall'output di un comando/);
-  assert.match(nota, /CERCA_CHAT e l'id "c-term"/);
+  assert.match(nota, /filo\(cerca\) e l'id "c-term"/);
   assert.equal(FC.notaRisposta({ chat: 'x', i: 2, manca: true }), "(l'utente risponde a un tuo messaggio che nel filo non c'è più)");
   assert.equal(FC.notaRisposta(null), '');
 });

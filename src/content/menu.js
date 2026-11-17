@@ -394,6 +394,21 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
+  // L'evento «scroll» arriva al fotogramma dopo lo scorrimento: quello di uno scorrimento finito prima dell'apertura (la
+  // pagina portata sotto il puntatore appena prima del tasto destro) non sposta niente sotto il menu, e non lo chiude (#2452).
+  function fotoDelloScorrimento(x, y) {
+    const posa = (n) => (n && n.nodeType === 1 ? `${n.scrollLeft},${n.scrollTop}` : `${global.scrollX},${global.scrollY}`);
+    const foto = new Map([[document, posa(document)]]);
+    try {
+      for (let n = document.elementFromPoint(x, y); n; n = n.parentElement) foto.set(n, posa(n));
+    } catch (_) {}
+    return function scorsoDopo(e) {
+      const t = e && e.target;
+      const chi = t && t.nodeType === 1 && t !== document.documentElement && t !== document.scrollingElement ? t : document;
+      return !foto.has(chi) || foto.get(chi) !== posa(chi);
+    };
+  }
+
   // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
   // onClick, items? }. 'row' è la fila di icone in cima (#1434), 'inline' mostra contenuto dinamico, 'paste' apre la
   // cronologia.
@@ -408,6 +423,7 @@
     if (tastiera && opener && !(x > 0 || y > 0)) {
       try { const r = opener.getBoundingClientRect(); x = r.left + 8; y = r.bottom; } catch (_) {}
     }
+    const scorsoDopo = fotoDelloScorrimento(x, y);
     const root = document.createElement('div');
     root.className = 'sn-menu';
     // UI di Filo dentro la pagina del sito, marcata alla nascita: la traduzione la salta senza
@@ -709,7 +725,7 @@
         }
         if (nelSub(t)) return;
       }
-      if (keepOnScroll) return;
+      if (keepOnScroll || !scorsoDopo(e)) return;
       close();
     };
     // La finestra che si accorcia è lo stesso difetto dall'altro verso: il fondo del menu
@@ -848,37 +864,22 @@
   // attraversa (#589.8). I fogli di stile del documento lì dentro non arrivano: si portano i nostri.
   const HOST_CHIUSO = 'all:initial!important;display:block!important;position:fixed!important;'
     + 'top:0!important;left:0!important;width:0!important;height:0!important;z-index:2147483646!important;';
-  // Un font chiamato per nome il sito lo ridefinisce col suo, e dai pezzi che il browser carica sa quali caratteri
-  // ha disegnato il pannello (#589.8): sui siti solo famiglie generiche, che nessun @font-face rimpiazza.
-  const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
-  const FONT_SOLO_GENERICO = '\n.sn-menu, .sn-menu *, .sn-menu ::before, .sn-menu ::after, .sn-menu ::placeholder'
-    + ' { font-family: system-ui, sans-serif !important; }\n';
+  // Lo strato chiuso e i suoi fogli, coi soli caratteri generici sui siti (#589.8), li fa SN_FILO_UI.stratoChiuso.
   let fogli = null;
-  function fogliDelMenu() {
-    if (fogli) return fogli;
-    let testo = '';
-    try {
-      const fs = require('node:fs');
-      const path = require('node:path');
-      testo = ['theme.css', 'menu.css']
-        .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
-    } catch (_) {}
-    if (!PAGINA_DI_FILO) testo += FONT_SOLO_GENERICO;
-    const foglio = new CSSStyleSheet();
-    try { foglio.replaceSync(testo); } catch (_) {}
-    fogli = [foglio];
-    return fogli;
-  }
   // Nello strato di Filo sopra la scheda (#1054) non c'è un sito da cui chiuderla: il pannello sta nel documento.
   const NELLO_STRATO = (() => { try { return location.href.startsWith('filo://menu/'); } catch (_) { return false; } })();
   function pannelloChiuso(contenuto) {
     if (NELLO_STRATO) return contenuto;
-    const host = document.createElement('div');
-    global.SN_FILO_UI?.mark(host);
-    host.style.cssText = HOST_CHIUSO;
-    const ombra = global.SN_FILO_UI?.ombra ? global.SN_FILO_UI.ombra(host) : host.attachShadow({ mode: 'closed' });
-    try { ombra.adoptedStyleSheets = fogliDelMenu(); } catch (_) {}
-    ombra.appendChild(contenuto);
+    const UI = global.SN_FILO_UI;
+    if (!UI?.stratoChiuso) {
+      const host = document.createElement('div');
+      host.style.cssText = HOST_CHIUSO;
+      host.attachShadow({ mode: 'closed' }).appendChild(contenuto);
+      return host;
+    }
+    fogli = fogli || UI.fogliChiusi(['theme.css', 'menu.css'], { ambito: '.sn-menu' });
+    const { host, radice } = UI.stratoChiuso(HOST_CHIUSO, fogli);
+    radice.appendChild(contenuto);
     return host;
   }
 
@@ -1770,6 +1771,7 @@
     _test: { cronologia: statoCronologia },
     daTastiera,
     open,
+    fotoDelloScorrimento,
     misuraLeAzioni,
     azioneInCorso: () => azioneInCorso,
     close,

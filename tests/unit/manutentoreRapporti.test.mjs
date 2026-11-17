@@ -31,12 +31,12 @@ function serverFinto(t, risposte) {
 }
 
 test('la richiesta: numero, sotto-numeri, finestra per date o per giorni, pagine', () => {
-  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, cache: false, json: false });
+  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, cache: false, rifiuti: false, json: false });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '#1790', '--sottonumeri', '--somma'], NOW).dati, { numero: '1790', sottonumeri: true, somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni', '7', '--somma'], NOW).dati, { da: '2026-10-28T12:00:00.000Z', somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni=2', '--a', '2026-11-01'], NOW).dati, { da: '2026-10-30T00:00:00.000Z', a: '2026-11-01' });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--da', '2026-10-28', '--a', '2026-11-04T08:00Z', '--limite', '200', '--cursore', 'ab12', '--tutte'], NOW),
-    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, cache: false, json: false });
+    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, cache: false, rifiuti: false, json: false });
 });
 
 test('le richieste storte si fermano prima del server, col perché', async (t) => {
@@ -193,4 +193,62 @@ test('rapporti --cache: i dollari scritti dal rapporto vincono sulla stima al pr
   assert.equal(c.totale.stimati, 2);
   assert.match(M.righeCache(c).join('\n'), /\n2 rapporti senza i dollari della cache/);
   assert.doesNotMatch(M.righeCache(M.contoCache([{ report: { cache, tokens: {} } }])).join('\n'), /senza i dollari/);
+});
+
+// #2188: i rifiuti di Edit si misurano prima e dopo con un comando, dalla nota del rapporto o, per i rapporti nati
+// prima della nota, dagli strumenti falliti del biglietto.
+const NOTA_NUOVA = 'rifiuti di scrittura: non letto 4 (letto prima 1, letto in un\'altra cartella 0, solo dalla shell 2, mai letto 1), modificato dopo la lettura 1 (shell in mezzo 1, senza shell in mezzo 0)';
+const BIGLIETTI_RIFIUTI = [
+  { ticket: 'v1', ruolo: 'verifier', report: { role: 'verifier', notes: ['altro', NOTA_NUOVA] },
+    // La nota vince sull'elenco, che è a budget: le stesse voci non si contano due volte.
+    strumentiFalliti: [{ nome: 'Edit', errore: 'File has not been read yet. Read it first before writing to it.' }] },
+  { ticket: 'v2', ruolo: 'verifier', report: { role: 'verifier', notes: [] },
+    strumentiFalliti: [
+      { nome: 'Edit', errore: 'File has not been read yet. Read it first before writing to it.', poi: 'Read' },
+      { nome: 'Write', errore: 'File has not been read yet. Read it first before writing to it.' },
+      { nome: 'Edit', errore: 'File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.' },
+      { nome: 'Bash: unit', errore: 'exit 1: File has not been read yet' },
+    ] },
+  { ticket: 'n1', ruolo: 'new-work', report: { role: 'new-work', notes: [] } },
+];
+
+test('rapporti --rifiuti: per ruolo i rifiuti per file non letto e modificato, con la causa dalla nota, e al giorno', () => {
+  const finestra = { da: '2026-10-28T12:00:00.000Z', a: '2026-11-04T12:00:00.000Z' };
+  const c = M.contoRifiuti(BIGLIETTI_RIFIUTI, finestra);
+  const v = c.perRuolo.find((g) => g.ruolo === 'verifier');
+  assert.deepEqual(c.perRuolo.map((g) => g.ruolo), ['verifier', 'new-work']);
+  assert.deepEqual(v.nonLetto, { prima: 1, altraCartella: 0, shell: 2, mai: 1, senzaCausa: 2 });
+  assert.deepEqual(v.modificato, { shell: 1, senzaShell: 0, senzaCausa: 1 });
+  assert.equal(v.nonLettoTot, 6);
+  assert.equal(v.conRifiuti, 2);
+  assert.equal(c.totale.biglietti, 3);
+  assert.equal(c.totale.dalSoloElenco, 1);
+  assert.equal(c.totale.nonLettoAlGiorno, 6 / 7);
+  const testo = M.righeRifiuti(c, finestra).join('\n');
+  assert.match(testo, /^Edit e Write rifiutati dal 2026-10-28T12:00:00\.000Z al 2026-11-04T12:00:00\.000Z, per ruolo:/);
+  assert.match(testo, /\n {2}verifier: 2 biglietti \(2 con rifiuti\) · non letto 6 \(letto prima 1, solo dalla shell 2, mai letto 1, senza causa 2\) · modificato dopo la lettura 2 \(shell in mezzo 1, senza causa 1\)/);
+  assert.match(testo, /\n {2}new-work: 1 biglietti \(0 con rifiuti\) · non letto 0 · modificato dopo la lettura 0/);
+  assert.match(testo, /\nNon letto: 0\.9 al giorno su 7\.0 giorni\./);
+  assert.match(testo, /\n1 rapporti senza la nota dei rifiuti/);
+});
+
+test('rapporti --rifiuti legge tutte le pagine e stampa il conto; non va con --cache, --somma o un cursore', async (t) => {
+  assert.equal(M.richiestaRapporti(['rapporti', '--giorni', '7', '--rifiuti'], NOW).tutte, true);
+  assert.match(M.controlliLocali('rapporti', ['rapporti', '--rifiuti', '--cache']), /un conto per volta/);
+  assert.match(M.controlliLocali('rapporti', ['rapporti', '--rifiuti', '--somma']), /--rifiuti le legge tutte/);
+  assert.match(M.controlliLocali('rapporti', ['rapporti', '--rifiuti', '--cursore', 'x']), /--rifiuti legge la finestra intera/);
+  const finestra = { da: '2026-11-03T12:00:00.000Z', a: '2026-11-04T12:00:00.000Z' };
+  const pagine = {
+    '': { ok: true, finestra, rapporti: BIGLIETTI_RIFIUTI.slice(0, 1), cursore: 'p2' },
+    p2: { ok: true, finestra, rapporti: BIGLIETTI_RIFIUTI.slice(1), cursore: null },
+  };
+  const s = serverFinto(t, { rapporti: (b) => [200, pagine[b.dati.cursore || '']] });
+  assert.equal(await M.main(['rapporti', '--giorni', '1', '--rifiuti'], CHIAVE), 0);
+  assert.equal(s.corpi.length, 2);
+  assert.match(s.out.join('\n'), /\n {2}TOTALE: 3 biglietti \(2 con rifiuti\) · non letto 6 [^\n]*\nNon letto: 6\.0 al giorno su 1\.0 giorni\./);
+  const j = serverFinto(t, { rapporti: (b) => [200, pagine[b.dati.cursore || '']] });
+  assert.equal(await M.main(['rapporti', '--giorni', '1', '--rifiuti', '--json'], CHIAVE), 0);
+  const o = JSON.parse(j.out.join('\n'));
+  assert.equal(o.totale.nonLettoTot, 6);
+  assert.equal(o.totale.modificatoTot, 2);
 });

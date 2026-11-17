@@ -28,6 +28,7 @@
     overviewLoaded = true;
     loadOverview().catch(() => {});
     loadInstallazioni().catch(() => {});
+    loadAnonimi().catch(() => {});
   }
 
   async function load() {
@@ -398,6 +399,172 @@
       ], ev.clientX, ev.clientY);
     });
     return li;
+  }
+
+  // ── Gli account anonimi (#2067) ────────────────────────────────────────────
+  // Il server li conta una volta al giorno e mette le nascite contro le corse delle prove su GitHub. La pulizia dei mai
+  // tornati senza portafoglio parte solo da qui, dopo un secondo sì, e la fa il server a fette.
+  const PULIZIA_OGNI_MS = 30 * 1000;
+  const NOMI_WORKFLOW = { 'suite.yml': 'suite delle prove', 'verifica-linux.yml': 'verifica Linux', 'release.yml': 'rilasci' };
+  let letturaAnonimi = 0;
+  let giroPulizia = null;
+  let anonimi = null;
+
+  async function loadAnonimi(op = { op: 'stato' }) {
+    const mia = ++letturaAnonimi;
+    const r = await chrome.runtime.sendMessage({ type: MSG.ACCOUNT_ANONIMI, ...op })
+      .catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
+    if (mia !== letturaAnonimi) return r;
+    if (r && r.ok) anonimi = { censimento: r.censimento || null, pulizia: r.pulizia || null };
+    else console.warn('[credits/owner] account anonimi:', op.op, r && r.error);
+    renderAnonimi(r && r.ok ? null : { op: op.op, error: (r && r.error) || 'nessuna risposta' });
+    return r;
+  }
+
+  function riquadroAnonimi(valore, nome, spiega, copiabile, opz) {
+    const li = riquadro(valore, nome, spiega, opz);
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      apriMenu([
+        ...(copiabile != null ? [['Copia il numero', () => copia(String(copiabile))]] : []),
+        ['Rileggi', () => { loadAnonimi().catch(() => {}); }],
+      ], ev.clientX, ev.clientY);
+    });
+    return li;
+  }
+
+  function bottone(etichetta, classe, titolo, azione) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `sn-btn ${classe}`;
+    b.textContent = etichetta;
+    if (titolo) b.title = titolo;
+    b.addEventListener('click', () => { if (!b.disabled) azione(b); });
+    return b;
+  }
+
+  function testo(t) {
+    const s = document.createElement('span');
+    s.textContent = t;
+    return s;
+  }
+
+  function renderAnonimi(guasto) {
+    const lista = $('ownerAnonimi');
+    const riga = $('ownerAnonimiPulizia');
+    lista.innerHTML = '';
+    riga.replaceChildren();
+    const c = anonimi && anonimi.censimento;
+    const p = anonimi && anonimi.pulizia;
+    if (c) {
+      const almeno = c.completo === false ? 'almeno ' : '';
+      lista.appendChild(riquadroAnonimi(`${almeno}${formatInt(c.anonimi)}`, 'account anonimi',
+        `Senza accesso Google né email, su ${formatInt(c.totale)} account in tutto. Contati ${formatDateTime(c.at)}.`, c.anonimi));
+      lista.appendChild(riquadroAnonimi(`${almeno}${formatInt(c.maiRientrati)}`, 'mai tornati, senza portafoglio',
+        `Nessun accesso dopo ${finestraRientro(c)} e nessun portafoglio: account che nessuno usa.`, c.maiRientrati));
+      const o = c.origine || null;
+      if (o) {
+        const per = o.perWorkflow || {};
+        const inCorsa = Object.values(per).reduce((a, n) => a + (Number(n) || 0), 0);
+        const tot = Number(o.totale) || 0;
+        const corseLette = Object.entries(c.corse || {}).filter(([, v]) => v && v.completo === false)
+          .map(([f]) => NOMI_WORKFLOW[f] || f);
+        // Le corse coprono una parte grande del tempo: la quota dentro si legge solo accanto a quella del tempo coperto.
+        const copre = Number.isFinite(o.copertura) ? Math.round(o.copertura * 100) : null;
+        const orari = o.natiPerOra || {};
+        const spiega = [
+          ...(copre != null ? [`Le corse coprono il ${copre}% del tempo: con le nascite slegate dalle prove la quota dentro sarebbe circa quella.`] : []),
+          ...(orari.dentro != null || orari.fuori != null
+            ? [`Nati all'ora: ${orari.dentro != null ? formatInt(Math.round(orari.dentro)) : '—'} durante le corse, ${orari.fuori != null ? formatInt(Math.round(orari.fuori)) : '—'} fuori.`] : []),
+          ...Object.entries(per).map(([f, n]) => `${conMaiuscola(NOMI_WORKFLOW[f] || f)}: ${formatInt(n)}`),
+          `Fuori dalle prove: ${formatInt(o.fuori)}`,
+          ...(corseLette.length ? [`Corse lette in parte: ${corseLette.join(', ')}.`] : []),
+        ].join('\n');
+        lista.appendChild(riquadroAnonimi(tot ? `${Math.round((inCorsa * 100) / tot)}%` : '—',
+          `nati dentro le prove in ${o.giorni} giorni`, spiega, tot ? inCorsa : null,
+          { nota: `${formatInt(inCorsa)} su ${formatInt(tot)}${copre != null ? `, corse sul ${copre}% del tempo` : ''}` }));
+        const giorni = (Array.isArray(o.perGiorno) ? o.perGiorno : []).slice(-7).reverse()
+          .map((g) => `${giornoBreve(g.giorno)}: ${formatInt(g.nati)}, ${formatInt(g.inCorsa)} nelle prove`
+            + (Number.isFinite(g.copertura) ? ` (corse sul ${Math.round(g.copertura * 100)}% del giorno)` : ''));
+        lista.appendChild(riquadroAnonimi(formatInt(o.ultime24h), 'nati nel giorno prima del conto',
+          ['Account anonimi nati nelle 24 ore prima del conto.', ...giorni].join('\n'), o.ultime24h));
+      }
+    }
+
+    if (p && p.stato === 'in_corso') {
+      riga.append(
+        testo(`Cancellati ${formatInt(p.cancellati)} su circa ${formatInt(p.attesi)}…`),
+        bottone('Ferma', 'sn-btn-secondary', 'Ferma la pulizia: quelli già cancellati restano cancellati',
+          (b) => { b.disabled = true; loadAnonimi({ op: 'ferma' }).catch(() => {}); }),
+      );
+    } else {
+      if (p && p.stato === 'finita') riga.appendChild(testo(`Cancellati ${formatInt(p.cancellati)} il ${formatDateTime(p.finitaIl)}.`));
+      if (p && p.stato === 'fermata') {
+        riga.appendChild(testo(p.motivo === 'portafogli'
+          ? `Pulizia fermata dal server dopo ${formatInt(p.cancellati)}: ha letto ${formatInt(p.portafogliLetti)} portafogli invece di ${formatInt(p.portafogli)}, e non sapeva più chi salvare.`
+          : `Pulizia fermata dopo ${formatInt(p.cancellati)}.`));
+      }
+      if (c && c.superato) riga.appendChild(testo('Il server li riconta a breve.'));
+      else if (c && Number(c.cancellabili) > 0) riga.appendChild(bottoneCancella(c));
+    }
+    if (!c && !guasto) riga.appendChild(testo('Il server non li ha ancora contati.'));
+    if (guasto) {
+      const certo = guastoCerto(guasto.error);
+      const prima = guasto.op === 'cancella' ? (certo ? 'Pulizia non partita' : 'Non so se la pulizia è partita')
+        : guasto.op === 'ferma' ? (certo ? 'Pulizia non fermata' : 'Non so se la pulizia si è fermata') : '';
+      // Un rifiuto motivato del server (conto da rifare, numero mancante) si dice con le sue parole.
+      const motivo = (/callable \w+ 400: (.+)$/.exec(String(guasto.error)) || [])[1] || fraseGuasto(guasto.error);
+      riga.append(
+        testo(prima ? `${prima}: ${motivo}.` : `${conMaiuscola(motivo)}.`),
+        bottoneRiprova(() => loadAnonimi(), 'Rileggi gli account anonimi dal server'),
+      );
+    }
+    pianificaPulizia();
+  }
+
+  // I criteri si dicono coi numeri che il server ha applicato: l'owner conferma una cancellazione che non si disfa.
+  function finestraRientro(c) {
+    const ore = Number(c && c.criteri && c.criteri.rientroOre);
+    if (!(ore > 0)) return 'la finestra di rientro del server';
+    return ore === 1 ? 'la prima ora' : `le prime ${formatInt(ore)} ore`;
+  }
+
+  // Il tasto chiede un secondo sì nello stesso posto: la cancellazione non si disfa.
+  function bottoneCancella(c) {
+    const n = Number(c.cancellabili);
+    const soglia = c.criteri && c.criteri.natiPrimaDi ? ` e nati prima del ${formatDate(c.criteri.natiPrimaDi)}` : '';
+    return bottone(`Cancella ${formatInt(n)} account`, 'sn-btn-danger',
+      `Anonimi, senza portafoglio, mai tornati dopo ${finestraRientro(c)}${soglia}. Non si torna indietro.`, () => {
+        const riga = $('ownerAnonimiPulizia');
+        const no = bottone('No', 'sn-btn-secondary', '', () => renderAnonimi(null));
+        const si = bottone('Cancella', 'sn-btn-danger', '', (b) => {
+          b.disabled = true; no.disabled = true;
+          riga.replaceChildren(testo('Cancello…'));
+          loadAnonimi({ op: 'cancella', attesi: n }).catch(() => {});
+        });
+        riga.replaceChildren(
+          testo(`Cancellare ${formatInt(n)} account anonimi? Non si torna indietro: chi tornasse ripartirebbe da un account nuovo.`),
+          si, no,
+        );
+        riga.addEventListener('keydown', function esc(ev) {
+          if (ev.key !== 'Escape') return;
+          riga.removeEventListener('keydown', esc);
+          if (!no.disabled) renderAnonimi(null);
+        });
+        no.focus();
+      });
+  }
+
+  // Mentre la pulizia va, il conto si rilegge ogni mezzo minuto, solo con la scheda davanti.
+  function pianificaPulizia() {
+    clearTimeout(giroPulizia);
+    giroPulizia = null;
+    const p = anonimi && anonimi.pulizia;
+    if (!p || p.stato !== 'in_corso') return;
+    giroPulizia = setTimeout(() => {
+      if (mostrata() && paginaInVista) loadAnonimi().catch(() => {});
+      else pianificaPulizia();
+    }, PULIZIA_OGNI_MS);
   }
 
   // ── Chi ha usato Filo: il numero apre le persone che ha contato ────────────

@@ -1,4 +1,4 @@
-// A chi va la foto di una pagina (#589.5) e, per un modello, l'unico punto che la scatta: coperta prima del JPEG (#1721).
+// A chi va la foto di una pagina (#589.5) e, per un modello, l'unico punto che la copre prima del JPEG (#1721), anche dentro lo schermo.
 // Mai a una scheda di sfondo, a un riquadro o a un popup; una foto che non si riesce a coprire non parte.
 // Prove: tests/foto-al-modello-coperture.spec.mjs, tests/aiuto-foto-leggera.spec.mjs, tests/unit/fotoDellaPagina.test.mjs.
 'use strict';
@@ -255,31 +255,66 @@ async function misura(wc) {
   return { ...m, attesi };
 }
 
+/** `scatta()` fra due misure di ogni pagina di `pagine`: `{ img, pagine }`, per ognuna `{ no }` (chiave di PERCHE)
+ *  quando non si può coprire, altrimenti `{ lista, vista }` in pixel CSS. Una foto sola può contenerne più d'una (lo
+ *  schermo, #2116.5). */
+async function copertureIntorno(pagine, scatta) {
+  const fuori = Promise.all(pagine.map((wc) => campiSegretiFuoriPagina(wc).catch(() => ({ campi: [], nonCoperti: true }))));
+  const prima = await Promise.all(pagine.map(misura));
+  let img = null;
+  try { img = await scatta(); } catch (_) { img = null; }
+  const dopo = img ? await Promise.all(pagine.map(misura)) : [];
+  const f = await fuori;
+  return {
+    img,
+    pagine: pagine.map((_, i) => {
+      const no = rifiutoDellaMisura(prima[i]) || rifiutoDellaMisura(dopo[i]) || (f[i].nonCoperti ? 'segreti' : null);
+      return no ? { no } : { lista: coperture([prima[i], dopo[i]], f[i].campi), vista: prima[i].vista };
+    }),
+  };
+}
+
+function daCoprire(p) {
+  return !!(p && (p.no || (p.lista && p.lista.length)));
+}
+
+/** Le coperture di una pagina misurata (`p` da copertureIntorno) dentro una foto più grande: `dove` è il rettangolo
+ *  della pagina nella foto, in pixel della foto. Allargate di `margine` e ritagliate alla pagina. PURA. */
+function copertureNellaFoto(p, dove, margine = 0) {
+  const sx = dove.width / p.vista.w, sy = dove.height / p.vista.h;
+  const out = [];
+  for (const c of p.lista || []) {
+    const r = interseca({
+      left: dove.left + c.left * sx - margine, top: dove.top + c.top * sy - margine,
+      width: c.width * sx + 2 * margine, height: c.height * sy + 2 * margine,
+    }, dove);
+    if (r) out.push({ ...c, ...r });
+  }
+  return out;
+}
+
+/** `img` con `lista` dipinta sopra (`scala`: pixel della foto per unità di `lista`), o null se il bitmap non torna. */
+function dipintaSu(img, lista, scala) {
+  const { width, height } = img.getSize();
+  const bitmap = img.toBitmap();
+  if (bitmap.length !== width * height * 4) return null;
+  dipingi(bitmap, width, height, lista, scala);
+  const { nativeImage } = require('electron');
+  return nativeImage.createFromBitmap(bitmap, { width, height });
+}
+
 /** La foto di `wc` per un modello: `{ ok: true, img, piena }` coperta, o `{ ok: false, code, piena? }` quando qualcosa
  *  non si può coprire (`code` fra le chiavi di PERCHE) o la foto è vuota (`vuota`). `piena` è per chi la tiene lui. */
 async function fotoPerModello(wc) {
   if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return { ok: false, code: 'vuota' };
-  const scatto = (async () => {
-    const prima = await misura(wc);
-    let img = null;
-    try { img = await wc.capturePage(); } catch (_) { img = null; }
-    return { prima, img, dopo: img ? await misura(wc) : null };
-  })();
-  const [{ prima, img, dopo }, fuori] = await Promise.all([
-    scatto,
-    campiSegretiFuoriPagina(wc).catch(() => ({ campi: [], nonCoperti: true })),
-  ]);
+  const { img, pagine: [p] } = await copertureIntorno([wc], () => wc.capturePage());
   if (!img || img.isEmpty()) return { ok: false, code: 'vuota' };
+  if (p.no) return { ok: false, code: p.no, piena: img };
+  if (!p.lista.length) return { ok: true, img, piena: img };
   const { width, height } = img.getSize();
-  const no = rifiutoDellaMisura(prima) || rifiutoDellaMisura(dopo) || (fuori.nonCoperti ? 'segreti' : null);
-  if (no) return { ok: false, code: no, piena: img };
-  const lista = coperture([prima, dopo], fuori.campi);
-  if (!lista.length) return { ok: true, img, piena: img };
-  const bitmap = img.toBitmap();
-  if (bitmap.length !== width * height * 4) return { ok: false, code: 'misura', piena: img };
-  dipingi(bitmap, width, height, lista, { x: width / prima.vista.w, y: height / prima.vista.h });
-  const { nativeImage } = require('electron');
-  return { ok: true, img: nativeImage.createFromBitmap(bitmap, { width, height }), piena: img };
+  // Lo stesso conto dello schermo intero, con la foto intera come posto: i due non possono divergere.
+  const coperta = dipintaSu(img, copertureNellaFoto(p, { left: 0, top: 0, width, height }), { x: 1, y: 1 });
+  return coperta ? { ok: true, img: coperta, piena: img } : { ok: false, code: 'misura', piena: img };
 }
 
 /** La foto intera, per chi la tiene (Screenshot): mai verso un modello, né nel feedback, che la vuole coperta (#2116). */
@@ -296,5 +331,5 @@ function fotoDellaBarra(win, altezza) {
 module.exports = {
   paginaDaFotografare, barraDaFotografare, fattoreDiScala, fotoLeggera, QUALITA_LEGGERA,
   fotoPerModello, fotoPiena, fotoDellaBarra, perche, frameDiAltreOrigini, rifiutoDellaMisura, coperture, dipingi, colore, codiceMisura,
-  GRIGIO, PERCHE,
+  copertureIntorno, copertureNellaFoto, daCoprire, dipintaSu, GRIGIO, PERCHE,
 };

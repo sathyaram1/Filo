@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste, minutiFraDownload } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste, NASCOSTE_TRADUZIONE, minutiFraDownload } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -879,6 +879,7 @@
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
       case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
+      case 'contestoFilo.soglia': return tettoContesto('soglia', $('contestoSoglia').value);
       case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn($('contestoCache').value);
       case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
       case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
@@ -983,6 +984,7 @@
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
       case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
+      case 'contestoFilo.soglia': return tettoContesto('soglia', s.contestoFilo && s.contestoFilo.soglia);
       case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn(s.contestoFilo && s.contestoFilo.cache);
       case 'lunghezzaRisposte.conversazioni':
       case 'lunghezzaRisposte.testi':
@@ -1026,13 +1028,11 @@
   }
 
   // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
-  function tettoContesto(k, v) {
-    const FC = window.SN_FILO_CONTESTO;
-    const c = FC.numeroIn(v, FC.LIMITI[k]);
-    return c != null && k === 'token' ? Math.round(c) : c;
-  }
+  const tettoContesto = (k, v) => window.SN_FILO_CONTESTO.numeroDelTetto(k, v);
   function canonContesto() {
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+    const FC = window.SN_FILO_CONTESTO;
+    for (const k of FC.NUMERI_DEI_TETTI) {
+      const id = FC.campoDelTetto(k);
       const v = tettoContesto(k, $(id).value);
       $(id).value = v == null ? '' : String(v);
     }
@@ -1047,13 +1047,21 @@
     }
   }
 
+  // Accanto alla soglia di compattazione, la sua stima: costo al mese e attesa, coi prezzi di adesso (filo_design.txt).
+  const stimaSoglia = window.SN_FILO_CONTESTO.stimatoreSoglia({
+    campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
+    chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
+  });
+  window.SN_FILO_CONTESTO.limitiAiCampi($);
+
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
   async function segnapostiContesto() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
-      if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
-      if (d.token != null) $('contestoToken').placeholder = String(d.token);
+      const FC = window.SN_FILO_CONTESTO;
+      for (const k of FC.NUMERI_DEI_TETTI) if (d[k] != null) $(FC.campoDelTetto(k)).placeholder = String(d[k]);
+      stimaSoglia();
       if (d.cache) $('contestoCachePredefinita').textContent = `Come i predefiniti (${d.cache === '1h' ? 'un\'ora' : '5 minuti'})`;
       const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
       for (const [f, id] of CAMPI_LUNGHEZZA) if (l[f] != null) $(id).placeholder = String(l[f]);
@@ -1208,6 +1216,7 @@
     const cf = settings.contestoFilo || {};
     if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
     if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+    if (vuole('contestoFilo.soglia')) $('contestoSoglia').value = cf.soglia == null ? '' : String(cf.soglia);
     if (vuole('contestoFilo.cache')) $('contestoCache').value = window.SN_FILO_CONTESTO.durataIn(cf.cache) || '';
     const lr = settings.lunghezzaRisposte || {};
     for (const [f, id] of CAMPI_LUNGHEZZA) {
@@ -1826,6 +1835,8 @@
       label.append(input, testo);
       box.appendChild(label);
     }
+    const sempre = $('autonomiaSempre');
+    if (sempre) sempre.textContent = Autonomia.FRASE_COSTO_4 || '';
   }
 
   function mostraAutonomia(livello) {
@@ -1917,6 +1928,8 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // I valori della tendina li scrive constants.js: la pagina nomina solo quale dei due (#1290.2).
+    for (const o of $('traduzioneNascoste').options) o.value = NASCOSTE_TRADUZIONE[o.dataset.modo];
     // Prima di ogni altro ascoltatore: quando parte persist() il campo è già segnato.
     for (const [id, k] of Object.entries(CAMPO_DI)) {
       const el = $(id);
@@ -1992,7 +2005,8 @@
       });
     }
     $('testoCampiCancella').addEventListener('click', cancellaTestoCampi);
-    for (const id of ['contestoGiorni', 'contestoToken']) {
+    $('contestoSoglia').addEventListener('input', stimaSoglia);
+    for (const id of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI.map(window.SN_FILO_CONTESTO.campoDelTetto)) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonContesto);

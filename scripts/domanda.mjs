@@ -319,6 +319,11 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   if (Array.isArray(x.collegamenti) && x.collegamenti.length) {
     righe.push(`collegamenti: ${x.collegamenti.map((c) => `${visibile(c.tipo)} ${visibile(c.id)}`).join(', ')}`);
   }
+  // L'assorbimento della revisione (§3.6) lega le domande nei due sensi.
+  if (Array.isArray(x.assorbite) && x.assorbite.length) righe.push(`assorbe: ${x.assorbite.map(visibile).join(', ')}`);
+  const dentro = D.assorbitaIn(x);
+  if (dentro) righe.push(`assorbita in ${visibile(dentro)}`);
+  else if (x.stato === 'superata' && x.esito && x.esito.superataDa) righe.push(`superata da ${visibile(x.esito.superataDa)}`);
   if (x.contesto) righe.push('', 'Contesto', rientro(x.contesto));
   if (x.problema) righe.push('', 'Problema', rientro(x.problema));
   const opzioni = Array.isArray(x.opzioni) ? x.opzioni : [];
@@ -357,11 +362,6 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
       + `${e.compito ? ` · compito ${visibile(e.compito.stato || '')}` : ''}`
       + `${e.automatica ? ' · risposta automatica' : ''}${e.smistata ? ` · smistata: ${visibile(e.smistata)}` : ''}`);
   }
-  const madre = D.assorbitaIn(x);
-  if (madre) righe.push(`Assorbita in ${madre}: la risposta lì vale anche per questa (l'owner la riapre se non è lo stesso caso).`);
-  else if (x.stato === 'superata' && x.esito && D.numeroDi(x.esito.superataDa) !== null) righe.push(`Superata da ${x.esito.superataDa.trim()}.`);
-  const dentro = D.assorbiteDi(x);
-  if (dentro.length) righe.push('', `Domande assorbite: ${dentro.join(', ')}`);
   if (x.principio) righe.push('', 'Principio', rientro(x.principio));
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
   if (x.stato === 'aperta') {

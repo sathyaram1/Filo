@@ -77,6 +77,30 @@ fidato) e **si sporca** appena il server gli consegna qualcosa di non fidato:
 Uno sporco non torna pulito. Quello che un biglietto scrive prende la fiducia
 che il biglietto ha **in quel momento**.
 
+Vale anche per ogni **nota** della conversazione di un feedback (#1919):
+consegne delle routine, note delle sessioni locali, allarmi. Il server, quando
+ne scrive una da un biglietto pulito o da sé, aggiunge l'impronta del turno a
+`noteFidate`; le note dell'owner (i suoi turni) sono fidate, tranne quelle che
+il server scrive come sue risposte per chi non è fidato (la chiave
+owner-non-fidato, una sessione sporca): di quelle l'impronta va nel campo col
+prefisso `!`, e valgono non fidate. Chi legge un
+feedback si sporca solo per il testo non fidato: quello del feedback, se non è
+fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
+(anche una scritta prima del campo, o riscritta dopo) vale non fidata.
+Una sessione locale che scrive la nota da sé la fa segnare con l'op
+`notaFidata` del biglietto locale: il server la segna solo da un biglietto
+aperto e pulito, e solo per l'ultimo turno non dell'owner.
+Una sessione che legge un feedback attraverso il server conta solo la fiducia
+delle note, non il segno `scrittoSporco` (#1919.3). Una nota scritta da una
+sessione segna il feedback solo se entra davvero: un passaggio respinto o un
+testo già presente non lo segnano. La nota del manutentore nasce fidata (D-297);
+quella della chiave owner-non-fidato no.
+Le routine, a cui la conversazione la consegna il server, restano per ora sul
+segno `scrittoSporco`, anche quando leggono i testi dal cloud (compito di
+gestione del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
+note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco.
+Passano alla regola delle note col timbro delle note di prima (#1918).
+
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
 
@@ -209,6 +233,16 @@ lo può scrivere anche un agente pulito.
   commit lo dice la traccia che la copia scrive alla sua nascita (`scripts/lib/spinte.mjs`): un commit
   senza traccia è arrivato da fuori, e uno che porta il lavoro di un'altra sessione o di un commit arrivato
   da fuori (uno squash, un cherry-pick anche con conflitto) non lo dichiara chi spinge.
+- `noteFidate: [impronta… | !impronta…]` sul feedback (§ 1.2; `!` = turno
+  dell'owner registrato per chi non è fidato): lo SHA-256 esadecimale del
+  turno sotto il suo marcatore, righe-allegato comprese, a capo in `\n` e senza
+  spazi ai bordi. Lo calcola `improntaDelTurnoAggiunto` di
+  `src/shared/feedbackThread.js` (note di prima e di dopo la scrittura) e lo
+  legge `fiduciaDelleNote`; il server ne tiene uno specchio, con la prova che
+  dia le stesse impronte del modulo dell'app (incorporarlo col bake lo
+  renderebbe una fonte protetta). I casi fissati (impronte, fiducia e motivo)
+  stanno in `tests/fixtures/fiducia-note-casi.json`, provati dalle due parti.
+  Scritto come `fiducia`.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
@@ -657,7 +691,10 @@ Come funziona oggi (#1152):
   quelle dell'addetto comunicazioni (§ 4.1). Il compito:
   - raggruppa le domande aperte;
   - assorbe in una domanda sola quelle che sono casi dello stesso problema e
-    propone il ripensamento del sistema (le assorbite diventano `superata`).
+    propone il ripensamento del sistema (le assorbite diventano `superata`,
+    legate nei due sensi a quella che le assorbe). L'owner riapre
+    un'assorbita come una risposta automatica: torna da rispondere, esce
+    dall'elenco di quella che la assorbiva e la revisione non ce la riassorbe.
     Una domanda che ferma un lavoro non si assorbe, perché solo la sua
     risposta lo riprende: si raggruppa con le altre del suo caso;
   - rivede le priorità;
@@ -671,9 +708,11 @@ Come funziona oggi (#1152):
     l'ultima settimana), ognuna col riassunto del manutentore (titolo,
     stato, ultimo aggiornamento) e le domande aperte o in lavorazione
     collegate, per origine, collegamenti, azioni, fermo, perché gli
-    aggiornamenti le nominano, o perché titolo, testo o aggiornamenti del
-    lavoro nominano il feedback che la domanda ferma o da cui è nata (#2149:
-    D-266 ferma #2101, e #2105 che la attua nomina solo #2101). Il feedback intero (`feedback.leggi`) di un
+    aggiornamenti le nominano, perché il lavoro fuso è nato mentre si lavorava
+    il feedback che la domanda ferma o da cui è nata (l'origine che il server
+    scrive col biglietto, #2149.1), o perché titolo, testo o aggiornamenti del
+    lavoro nominano quel feedback (#2149: D-266 ferma #2101, e #2105 che la
+    attua nomina solo #2101). Il feedback intero (`feedback.leggi`) di un
     lavoro fuso porta anche gli aggiornamenti, cioè cosa ha fatto: la
     revisione decide su quello, non sulla sola richiesta, e chi li ha
     scritti da sporco sporca anche lei. La chiusura è `domande.chiudi`, col
@@ -895,8 +934,9 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   suo, invece, la regola è in SPEC-MANUTENTORE.md § 7. Le indagini lunghe le fanno
   sotto-agenti, e il suo contesto resta piccolo.
 - **Segue un problema da vicino:**
-  - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
-    massimo, così la cache (60 minuti) resta calda;
+  - resta accesa quanto serve; fra due accensioni la cache non resta calda
+    (in cloud dura cinque minuti), quindi il battito è ogni 2 ore
+    (SPEC-MANUTENTORE.md § 4);
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
 - **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
@@ -1273,9 +1313,11 @@ e controllo cieco. La funzione gira in due momenti:
 
 - a ogni modifica del feedback, con un trigger: copre anche le modifiche che
   l'owner fa da Gestione senza passare dal server;
-- ogni 10 minuti nel pacemaker, come rete. Un feedback che ha bisogno di un
-  compito e non ce l'ha lo riceve. Un compito aperto il cui feedback è andato
-  avanti si chiude come «superato».
+- ogni 20 minuti nel pacemaker, come rete, con la cadenza del recupero degli
+  arenati (#2467: legge tutti i compiti aperti, uno per feedback in coda); se
+  resta a metà riparte al giro dopo. Un feedback che ha bisogno di un compito e
+  non ce l'ha lo riceve. Un compito aperto il cui feedback è andato avanti si
+  chiude come «superato».
 
 Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
@@ -1429,7 +1471,11 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
   Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
   collegati e la rete limitata:
   - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
-    riceve solo lavori server fidati; le altre chiavi non
+    riceve i lavori server fidati e, dal #2500, il primo lavoro di ogni
+    feedback fidato anche non segnato: se tocca il server, la stessa sessione
+    fa app e server; il segno arriva con la prima spinta registrata. Le altre
+    chiavi lo ricevono solo se nessuna voce server si può accendere, o se
+    dalla chiave server nascerebbe sporco. Le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare. Lo prende una parola d'ordine normale a
     rete limitata, e il pacemaker lo conta sull'account che ne ha almeno una

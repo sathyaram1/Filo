@@ -137,8 +137,8 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   // messaggio `tool` per chiamata.
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls.length).toBe(2);
-  expect(calls[0].tools).toContain('CERCA_WEB');
-  expect(calls[0].tools).toContain('TIMER');
+  expect(calls[0].tools).toContain('web');
+  expect(calls[0].tools).toContain('promemoria');
   const sys = calls[0].messages[0];
   expect(sys.role).toBe('system');
   expect(sys.content).not.toContain('"actions"');

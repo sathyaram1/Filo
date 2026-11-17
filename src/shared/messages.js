@@ -254,6 +254,9 @@
     WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
+    // ACCOUNT_ANONIMI (#2067, solo owner): il censimento degli account anonimi e la loro pulizia, dal server.
+    //   { op: 'stato' } | { op: 'cancella', attesi } | { op: 'ferma' } → { ok, censimento, pulizia } | { ok:false, error }
+    ACCOUNT_ANONIMI: 'account_anonimi',
     // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
     //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
     //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }; sotto le cinque
@@ -690,13 +693,13 @@
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, routinesEnabled, lavoriServer } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
     // I bilanci dei giri di correzione, uno per livello (doc config/routines,
-    // campi `cap3`, `cap2`, `cap1`, `cap0` — feedback #561) e il testo della
+    // campi `cap3`, `cap2`, `cap1` — feedback #561, tre dal #2339) e il testo della
     // fase 2 (`fixInstructions`, vuoto = quello del server):
-    //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+    //   cap3/cap2/cap1  giri per i rilievi di livello 3/2/1 (come si
     //         spendono: decideRound in verifierRound.js).
     // Li applica il SERVER quando registra la critica. Owner-only.
-    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions, giroStretto } | { ok:false, error }
-    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, cap0?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
+    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, fixInstructions, giroStretto } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
     // Come partono le sessioni delle routine (doc config/routines):
     //   maxSessions      il freno d'emergenza: il massimo di sessioni insieme
     //                    (intero 1–20; campo assente = 20), sopra la N del manutentore;
@@ -790,6 +793,8 @@
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
     // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
     FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId, fidato?: false per toglierla } → { ok, fiducia } | { ok:false, error }
+    // Ramo e note di un lavoro dichiarati fidati com'erano (#2258): `prova` dice cosa, `visto` è la sua risposta.
+    FIDUCIA_DICHIARA: 'fiducia_dichiara', // { feedbackId, prova?:true } → { ok, rami, stato, visto } | { ok, niente } ; { feedbackId, visto } → { ok } | { ok:false, error }
     // I compiti delle routine (SPEC-DOMANDE.md §6), dalla callable ownerCompiti: quelli delle fasi li scrive solo il
     // server; a mano se ne crea e annulla uno senza feedback. Solo pagine `filo://`, solo il proprietario.
     COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }
@@ -1092,6 +1097,12 @@
     FILO_MEMORY_RESTORE: 'filo_memory_restore',
     // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
     FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Una memoria proposta dalla compattazione di un tratto sospetto (SPEC-CONTESTO fase 4) che aspetta l'utente:
+    // { id, tieni }. Risposta: { ok, scritta }. Solo pagine filo://.
+    FILO_MEMORIA_PROPOSTA: 'filo_memoria_proposta',
+    // Quanto costa e quanto fa aspettare una soglia di compattazione: { soglia }. Risposta: { ok, testo } (la frase
+    // accanto al campo). Solo pagine filo://.
+    FILO_STIMA_SOGLIA: 'filo_stima_soglia',
     // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
     FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
@@ -1171,6 +1182,8 @@
     FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
     // #530 — l'Aiuto si è aperto: comincia una conversazione nuova, che non ha ancora letto niente. {}
     FILO_AIUTO_NUOVO: 'filo_aiuto_nuovo',
+    // #1840 — nell'Aiuto è entrato un testo incollato o trascinato, o un'immagine: la conversazione ha letto. { immagini? }
+    FILO_AIUTO_TESTO_DI_ALTRI: 'filo_aiuto_testo_di_altri',
 
     // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
     // uscite. { url, parole } → { aperto, frase }

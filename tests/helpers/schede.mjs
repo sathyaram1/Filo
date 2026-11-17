@@ -5,7 +5,8 @@
 const bersagli = new WeakMap();
 
 // Il bersaglio di una Page non cambia finché la Page vive; un errore (pagina chiusa a metà) non resta in memoria.
-function bersaglioDi(page) {
+// Nel main lo stesso id lo dà `webContents.getOrCreateDevToolsTargetId()`.
+export function bersaglioDi(page) {
   let p = bersagli.get(page);
   if (!p) {
     p = (async () => {

@@ -355,25 +355,25 @@ export function rilieviMessiDaParte(rilievi, daCorreggere) {
 }
 
 /**
- * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, un vicino col `?`, o un interno col `?`
- * di livello 0 o 1 (un 2 col `?` si corregge con la consigliata, #1202).
+ * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno (anche il vicino dello stato vecchio), o
+ * un interno di livello 1 col `?` senza `!` (un 2 col `?` si corregge con la consigliata, #1202; un `?!` ferma).
  * La sua prova esce PRIMA del verdetto, col commit della critica (#1555; il perché: routines/roles/_critica-e-livelli.md). PURA.
  */
 export function esceInOgniEsito(f) {
   const sede = String((f && f.sede) || 'i').toLowerCase();
-  if (sede === 'e') return true;
-  return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
+  if (sede === 'e' || sede === 'v') return true;
+  return !!(f && f.decision) && f.irreversibile !== true && Number(f.level) <= 1;
 }
 
 /**
- * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202). La
- * domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o col `!` a ogni livello (#1202,
+ * #2339). La domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
  * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
  */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
     && String(f.sede || 'i').toLowerCase() === 'i'
-    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
+    && (Number(f.level) >= 3 || f.irreversibile === true));
 }
 
 // I titoli dei casi (anche dei describe) scritti come testo: un titolo composto a runtime non si legge, e non ferma.
@@ -568,7 +568,9 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
     const nomi = cambiati(PROVE_GIRO, 'DM');
     const prove = toccateDalRamo(proveTolte(nomi), shaPrima, root, principale);
     const nellaCartella = proveDelleCartelle(shaPrima, toccateDalRamo(supportoDelGiro([...nomi, ...cambiati(PROVE_GIRO, 'A')]), shaPrima, root, principale), root);
-    const aiuti = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
+    const toccati = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
+    const opera = operaDelRamo(shaPrima, root, principale);
+    const aiuti = toccati.filter((f) => !opera.has(f));
     // La configurazione di Playwright la usano tutte: un filtro aggiunto lì spegne un caso rosso come un aiuto svuotato.
     const config = toccateDalRamo(cambiati('playwright.config.*', 'ADM').filter((f) => CONFIG_PLAYWRIGHT.test(f)), shaPrima, root, principale);
     const cartelle = aiuti.length || config.length ? cartelleDelRamo(nomi, root, principale) : [];
@@ -580,8 +582,19 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
     for (const [p, l] of [...Object.entries(dipFuori.via), ...Object.entries(conConfig.via)]) tutte[p] = [...new Set([...(tutte[p] || []), ...l])];
     const via = Object.fromEntries(Object.entries(tutte).filter(([p]) => !prove.includes(p)));
     const fuori = [...aiuti.filter((a) => Object.values(dipFuori.via).some((l) => l.includes(a))), ...config];
-    return { prove: [...prove, ...Object.keys(via)], via, fuori };
+    return { prove: [...prove, ...Object.keys(via)], via, fuori, lavoro: toccati.filter((f) => opera.has(f)) };
   } catch (_) { return null; }
+}
+
+// I file fuori dal giro sotto tests/ che il ramo aveva già cambiato alla critica sono il suo lavoro, non aiuti (#2546):
+// rimessi com'erano, la prova girerebbe sullo strumento da correggere. La verifica lì non scrive (codice-fermo.mjs).
+// Senza main non si sa cosa è del ramo: nessuno, e il rilancio resta il più severo.
+function operaDelRamo(shaPrima, root, principale) {
+  if (!principale) return new Set();
+  try {
+    const base = gitOut(['merge-base', shaPrima, principale], root).trim();
+    return new Set(aiutiFuoriDalGiro(gitOut(['diff', '--name-only', '-z', '--no-renames', base, shaPrima, '--', 'tests/'], root).split('\0').filter(Boolean)));
+  } catch (_) { return new Set(); }
 }
 
 // Le cartelle del giro di questo ramo: quelle cambiate dopo la critica e quelle che il ramo ha toccato rispetto a main.
@@ -932,6 +945,7 @@ export function controllaProveTolte({
   const pulite = conPulizia ? toccateDallaPulizia(shaCritica, shaPrima, root) : null;
   const accorciate = pulite ? pulite.prove.filter((f) => !prove.includes(f) && !esenti.has(f)) : [];
   if (!prove.length && !accorciate.length) return { ferma: false, testo: '' };
+  if (dal.lavoro?.length) log(`Restano come sono adesso, perché il ramo li aveva già cambiati prima della critica e sono il suo lavoro: ${dal.lavoro.join(', ')}.`);
   const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, {
     log, fuori: dal.fuori || [], versioni, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}),
   });

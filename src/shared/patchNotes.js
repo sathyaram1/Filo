@@ -9,10 +9,70 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.285', date: '2026-11-15',
+      features: [],
+      fixes: [
+        { testo: 'Una pagina che cancelli dalla Cronologia esce anche dal diario di Filo quando l\'avevi aperta poco prima di scrivergli, e le altre righe del diario restano al loro posto.', segnalazione: 1563 },
+      ],
+    },
+    {
+      version: '0.2.281', date: '2026-11-14',
+      features: [
+        { testo: 'Se chiedi a Filo cosa è successo in un certo momento, anche giorni fa, rilegge com\'era andata davvero, coi messaggi e le pagine di quelle ore, invece di fermarsi al riassunto.', segnalazione: 1564 },
+      ],
+      fixes: [
+        { testo: 'Quando Filo guarda lo schermo intero, le finestre di Filo che ci si vedono, comprese le finestrelle di accesso, arrivano al modello con password e carte coperte, come quando guarda una di quelle finestre da sola. Su Linux con Wayland le coperture restano sulle finestre di Filo finché scegli nel selettore del sistema.', segnalazione: 2116 },
+      ],
+    },
+    {
+      version: '0.2.280', date: '2026-11-13',
+      features: [
+        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
+        { testo: 'Il livello di autonomia lo cambi anche chiedendolo a Filo, per esempio «mettiti a Conservativo». Abbassarlo vale subito. Alzarlo vuole che tu scriva «conferma», come alzare il limite di spesa, sbloccare un sito o spegnere una protezione.', segnalazione: 1312 },
+        { testo: 'Puoi chiedere a Filo di cancellare tutta la sua memoria in un colpo: ti fa scrivere «conferma» e la svuota.', segnalazione: 1312 },
+      ],
+      fixes: [
+        { testo: 'Togliere una protezione di Filo dalla chat, come alzare il tetto di spesa o il livello o sbloccare un sito, chiede sempre di scrivere «conferma». Una pagina letta non può chiederlo al posto tuo: dopo che Filo ha letto cose scritte da altri, lo fai tu a mano.', segnalazione: 1312 },
+        { testo: 'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.', segnalazione: 1312 },
+        { testo: 'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.', segnalazione: 1312 },
+        { testo: 'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.', segnalazione: 1312 },
+        { testo: 'Un testo o un\'immagine incollati in chat o nell\'Aiuto, un suggerimento della home, la domanda partita dall\'avviso di un sito pericoloso, le pagine di Filo che mostrano nomi scelti dai siti (come Scaricamenti), i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
+      ],
+    },
+    {
+      version: '0.2.279', date: '2026-11-13',
+      features: [],
+      fixes: [
+        { testo: 'Il correttore non segna più come sbagliata una data giusta per l\'anno di cui parla la pagina. Se la chat ricorda il matrimonio «nel 2024», o la nota si chiama «Diario 2024», «mercoledì 9 ottobre» lo giudica il controllo col modello, che capisce a quale anno si riferisce, anche quando l\'anno scritto parla d\'altro, come «fondata nel 1999».', segnalazione: 1115 },
+        { testo: 'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.', segnalazione: 1115 },
+      ],
+    },
+    {
+      version: '0.2.278', date: '2026-11-13',
+      fixes: [
+        { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
+        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
+        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
+        'Il menu del tasto destro aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.',
+        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
+        { testo: 'I segni del correttore li vedi solo tu: un sito non li legge più, e non può scoprire quali parole hai nel tuo dizionario personale.', segnalazione: 2299 },
+      ],
+    },
+    {
+      version: '0.2.277', date: '2026-11-12',
+      fixes: [
+        { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
+      ],
+    },
+    {
       version: '0.2.276', date: '2026-11-12',
       features: [
         { testo: 'Il testo che stai scrivendo in un sito non si perde più: se la pagina si ricarica, chiudi la scheda per sbaglio o Filo si chiude, lo ritrovi nel campo com\'era. Lo tiene il tuo computer, mai per password e carte, e si spegne nelle Preferenze.', segnalazione: 2378 },
         { testo: 'Prima che un feedback parta, Filo lo rilegge per te: se ci vede una password, dati di altre persone o uno screenshot con altre schede aperte, te lo mostra evidenziato e scegli tu se correggere o mandarlo così.', segnalazione: 1403 },
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
+      ],
+      fixes: [
+        { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
       ],
     },
     {
@@ -92,6 +152,7 @@
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
+      features: [],
     },
     {
       version: '0.2.266', date: '2026-11-05',

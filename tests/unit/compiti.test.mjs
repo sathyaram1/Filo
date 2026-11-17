@@ -202,6 +202,34 @@ test('elenco: va a ownerCompiti con la pagina chiesta e torna con aperti, storic
   assert.deepEqual(r.ambiti, ambiti);
 });
 
+test('elenco a delta (#2468): dopo la prima lettura il main chiede solo i cambiati e dà alla pagina l’elenco intero, fuso', async () => {
+  const manuale = (id, extra = {}) => Object.assign({ id, numero: Number(id.slice(2)), tipo: 'manuale', stato: 'aperto', aperto: true, urgenza: 30, creatoIl: 10, biglietti: [] }, extra);
+  rispondi = (data) => {
+    if (!(Number(data.dopo) > 0)) {
+      return { status: 200, body: { result: { ok: true, aperti: [manuale('C-1'), manuale('C-2'), manuale('C-3')], storico: [manuale('C-8', { aperto: false, stato: 'fatto', chiusoIl: 50 })], altri: false, adesso: 1000, ambiti: [] } } };
+    }
+    // Cambiati dopo `dopo`: C-2 sale di urgenza, C-3 è chiuso.
+    return { status: 200, body: { result: { ok: true, delta: true, aperti: [manuale('C-2', { urgenza: 90 })], storico: [manuale('C-3', { aperto: false, stato: 'annullato', chiusoIl: 900 })], adesso: 2000, ambiti: [] } } };
+  };
+  const prima = await chiama({ type: MSG.COMPITI_ELENCO, storico: 77 });
+  assert.deepEqual(ricevute.map((x) => x.data), [{ op: 'elenco', storico: 77 }]);
+  assert.deepEqual(prima.aperti.map((c) => c.id), ['C-1', 'C-2', 'C-3']);
+
+  const seconda = await chiama({ type: MSG.COMPITI_ELENCO, storico: 77 });
+  assert.deepEqual(ricevute.map((x) => x.data), [{ op: 'elenco', storico: 77, dopo: 1000 }]);
+  assert.deepEqual(seconda.aperti.map((c) => [c.id, c.urgenza]), [['C-2', 90], ['C-1', 30]], 'il cambiato aggiornato e in ordine, il chiuso esce, il non toccato resta');
+  assert.deepEqual(seconda.storico.map((c) => c.id), ['C-3', 'C-8']);
+  assert.equal(seconda.adesso, 2000);
+
+  const terza = await chiama({ type: MSG.COMPITI_ELENCO, storico: 77 });
+  assert.equal(ricevute[0].data.dopo, 2000, 'il delta riparte dall’ora del server dell’ultima risposta');
+  assert.deepEqual(terza.aperti.map((c) => c.id), ['C-2', 'C-1']);
+
+  // I più vecchi dello storico sono un'altra vista: si chiedono sempre interi.
+  await chiama({ type: MSG.COMPITI_ELENCO, storico: 77, prima: 50 });
+  assert.equal('dopo' in ricevute[0].data, false);
+});
+
 test('crea: il main rifiuta prima del server quello che il server rifiuterebbe; il resto passa ripulito', async () => {
   rispondi = () => ({ status: 200, body: { result: { ok: true, id: 'C-9', numero: 9 } } });
   const no = await chiama({ type: MSG.COMPITO_CREA, compito: { titolo: '', urgenza: 5 } });
@@ -223,8 +251,8 @@ test('annulla e gli errori del server detti per l\'owner', async () => {
   assert.match((await chiama({ type: MSG.COMPITI_ELENCO })).error, /non sono ancora pubblicati/);
 });
 
-const RICORRENTE = { nome: ' Revisione delle domande ', testo: ' Leggi le domande. ', giorni: [3, 1, 1], ora: '06:00', ambito: 'domande', urgenza: '30', modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '', extra: 'x' };
-const PULITO = { nome: 'Revisione delle domande', testo: 'Leggi le domande.', giorni: [1, 3], ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '' };
+const RICORRENTE = { nome: ' Revisione delle domande ', testo: ' Leggi le domande. ', giorni: [3, 1, 1], ora: '06:00', ambito: 'domande', urgenza: '30', modello: 'opus', sforzo: 'high', tettoUsd: '90,5', attivo: true, domandaFineTurno: '', extra: 'x' };
+const PULITO = { nome: 'Revisione delle domande', testo: 'Leggi le domande.', giorni: [1, 3], ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', tettoUsd: 90.5, attivo: true, domandaFineTurno: '' };
 
 test('ricorrenti: l\'elenco va a ownerCompiti e torna coi ricorrenti, gli ambiti e l\'ora del server', async () => {
   const ambiti = A.elenco();
@@ -245,6 +273,7 @@ test('ricorrenti: il salvataggio rifiuta prima del server quello che il server r
     [{ ...RICORRENTE, ora: '6:00' }, /06:30/],
     [{ ...RICORRENTE, urgenza: 100 }, /da 0 a 99/],
     [{ ...RICORRENTE, modello: 'gpt-5' }, /Modello fra/],
+    [{ ...RICORRENTE, tettoUsd: 'tanti' }, /tetto di costo è un numero di dollari/],
     [{ ...RICORRENTE, ambito: 'Non Valido!' }, /non è fra quelli/],
     [{ ...RICORRENTE, id: '../tutti' }, /identificativo/],
     [null, /oggetto/],

@@ -195,9 +195,14 @@ test('niente da incognito, sessioni che non restano, pagine delicate, siti dove 
   }
   impostazioni = {};
   assert.deepEqual(await Testo.stato(), { ok: true, pagine: 0, campi: 0 });
-  // La regola delle delicate spenta dall'utente: nessuna pagina è delicata, nemmeno qui.
+  // L'interruttore vecchio delle delicate non c'è più (#1589): scritto a mano non apre la posta.
   impostazioni = { security: { pagineDelicate: { enabled: false } } };
+  assert.equal((await scrivi(mittente('https://mail.google.com/'), [campo('x')])).segui, false);
+  // Un sito delicato dove l'utente manda tutto in anticipo ai modelli tiene il testo; uno suo «chiedi sempre» no.
+  impostazioni = { security: { privacy: { sitiAnticipo: ['google.com'] } } };
   assert.equal((await scrivi(mittente('https://mail.google.com/'), [campo('x')])).segui, true);
+  impostazioni = { security: { privacy: { sitiAnticipo: ['mio-sito.it'] }, pagineDelicate: { siti: ['mio-sito.it'] } } };
+  assert.equal((await scrivi(mittente('https://mio-sito.it/'), [campo('x')])).segui, false);
 });
 
 test('cancellare li toglie tutti, dal disco; spegnere la voce li toglie già', async () => {

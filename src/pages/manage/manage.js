@@ -39,8 +39,8 @@
   const mgRiservatiTettoSave = document.getElementById('mgRiservatiTettoSave');
   const mgRiservatiTettoMsg  = document.getElementById('mgRiservatiTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
-  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
-  // per i soli 0; più il testo in coda alla risposta (fixInstructions).
+  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1; più il
+  // testo in coda alla risposta (fixInstructions).
   const mgCap3     = document.getElementById('mgCap3');
   const mgCap3Save = document.getElementById('mgCap3Save');
   const mgCap3Msg  = document.getElementById('mgCap3Msg');
@@ -50,9 +50,6 @@
   const mgCap1     = document.getElementById('mgCap1');
   const mgCap1Save = document.getElementById('mgCap1Save');
   const mgCap1Msg  = document.getElementById('mgCap1Msg');
-  const mgCap0     = document.getElementById('mgCap0');
-  const mgCap0Save = document.getElementById('mgCap0Save');
-  const mgCap0Msg  = document.getElementById('mgCap0Msg');
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
@@ -79,6 +76,7 @@
   const mgRoleModels      = document.getElementById('mgRoleModels');
   const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
   const roleSelects       = new Map();
+  const roleStime         = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -220,6 +218,11 @@
   // #903: gli aspettati che l'elenco non ha caricato, letti a parte una volta (id → riga, o { missing: true }).
   const attesiFuori = new Map();
   const attesiChiesti = new Set();
+  // I compiti aspettati (#2269) non sono feedback: il loro stato viene dall'elenco dei compiti, riletto al più ogni minuto
+  // perché chi li aspetta esca da «Aspettano» quando chiudono.
+  const COMPITI_ATTESI_OGNI_MS = 60 * 1000;
+  let compitiAttesiLettiMs = 0;
+  let compitiAttesiInLettura = false;
   let atteseApertePer = '';     // la pratica su cui l'owner ha aperto la casella delle attese
 
   // Etichette/testi vuoto per le tab-lista (DB1).
@@ -285,7 +288,7 @@
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
-    // server uno per rilievo, figli #N.k, priorità dal livello (un 2 nasce a 1): categoria
+    // server uno per rilievo, figli #N.k, a priorità 1 (#2269): categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
@@ -374,7 +377,6 @@
   const CAP3_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP3) || 'filo_automation_cap3';
   const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
-  const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
   // Nessun default dei bilanci nel codice: i numeri stanno solo nel documento del server; un
   // campo che lì non c'è si mostra vuoto, e lo si dice.
@@ -676,7 +678,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgRiservatiSwitch) mgRiservatiSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
       mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
@@ -686,8 +688,8 @@
   }
 
   // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
-  // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+  // Quattro campi sul doc Firestore config/routines (feedback #561, §4; #2339):
+  //   cap3/cap2/cap1  giri per i rilievi di livello 3/2/1 (come si
   //         spendono: decideRound in verifierRound.js);
   //   fixInstructions  il testo che il server aggiunge in coda alla risposta
   //         a una critica (vuoto = il testo del server).
@@ -710,7 +712,6 @@
     cap3: { input: mgCap3, save: mgCap3Save, msg: mgCap3Msg, cacheKey: CAP3_KEY, min: AUTOMATION.CAP_MIN },
     cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
     cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
-    cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
   };
 
   function setCapMsg(field, text, kind) {
@@ -1245,7 +1246,7 @@
         sel.dataset.ruolo = r.id;
         sel.dataset.campo = campo;
         sel.setAttribute('aria-label', `${RM.NOME_CAMPO[campo]}: ${r.nome}`);
-        sel.append(new Option(RM.VUOTO, ''));
+        sel.append(new Option(RM.vuotoDi(r.id, campo), ''));
         for (const s of RM.SCELTE[campo]) sel.append(new Option(s.nome, s.id));
         sel.disabled = !isAdmin;
         sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
@@ -1254,6 +1255,24 @@
         sel.selectedIndex = -1;
         roleSelects.set(`${r.id}.${campo}`, sel);
       }
+      // Una fase con un costo da scegliere porta la stima accanto alla scelta (#2344).
+      if (RM.stimaDi(r.id, '')) {
+        const s = cella('mg-role-stima', '');
+        s.dataset.ruolo = r.id;
+        mgRoleModels.append(s);
+        roleStime.set(r.id, s);
+      }
+    }
+    aggiornaStime();
+  }
+
+  function aggiornaStime() {
+    for (const [id, s] of roleStime) {
+      // Non letta, la scelta non ha ancora un costo da mostrare: sarebbe già una risposta.
+      const v = roleScelta(`${id}.effort`);
+      const stima = v === null ? null : RM.stimaDi(id, v);
+      s.textContent = stima ? stima.testo : '';
+      s.title = stima ? stima.perche : '';
     }
   }
 
@@ -1291,6 +1310,7 @@
       }
       sel.value = v;
     }
+    aggiornaStime();
     mostraRoleMsg();
   }
 
@@ -1339,6 +1359,7 @@
     const chiave = `${ruolo}.${campo}`;
     const scelta = { chiave, valore };
     roleInAttesa.push(scelta);
+    aggiornaStime();
     setRoleMsg('Salvo…', null);
     const nome = RM.nomeRuolo(ruolo);
     // Una fila sola per tutte le tendine: le risposte arrivano nell'ordine delle scelte.
@@ -1573,6 +1594,7 @@
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
+  const FIDUCIA_DICHIARA = (window.SN_MSG?.MSG?.FIDUCIA_DICHIARA) || 'fiducia_dichiara';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
@@ -1757,14 +1779,16 @@
     const risposta = Promise.resolve()
       .then(() => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }))
       .catch((e) => ({ ok: false, error: e?.message || String(e) }));
-    approvazioniInVolo.set(req.id, { risposta, attesa });
+    // L'istante del sì: una card ridisegnata a metà volo conta il tempo da qui (#2250).
+    const volo = { risposta, attesa, daMs: Date.now() };
+    approvazioniInVolo.set(req.id, volo);
     // Registrata per prima: chi aspetta la stessa risposta trova già l'esito al suo posto.
     risposta.then((reply) => {
       approvazioniInVolo.delete(req.id);
       if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
       statoFusioniCambiato();
     });
-    if (UI) UI.seguiSulPosto(document, req.id, { risposta, attesa });
+    if (UI) UI.seguiSulPosto(document, req.id, volo);
     statoFusioniCambiato();
     return risposta;
   }
@@ -1840,7 +1864,7 @@
   function opzioniFusioni(extra) {
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
-      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onDone: () => { setTimeout(() => loadMergeApprovals(null, { fresco: true }), 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
       inVolo: (req) => approvazioniInVolo.get(req.id) || null,
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
@@ -1895,7 +1919,9 @@
     }));
   }
 
-  async function loadMergeApprovals(already) {
+  // `fresco`: dopo una decisione, che cambia gli elenchi; senza, il main risponde con la copia letta da poco (#2470).
+  let fusioniRiletturaTimer = null;
+  async function loadMergeApprovals(already, { fresco = false, dalGiro = false } = {}) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI) return 0;
     const spegni = () => {
@@ -1920,12 +1946,17 @@
     if (!isAdmin) return spegni();
     let r = already || null;
     try {
-      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET });
+      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET, ...(fresco ? { fresco: true } : {}) });
     } catch (err) {
       console.error('[manage] fusioni in attesa:', err);
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
+    // Un cambio di stato visto dal giro può voler dire una richiesta appena aperta dal server, che la copia del main
+    // non ha ancora: la si richiede quando la copia scade.
+    if (dalGiro && r.daCopia && Number(r.scadeTraMs) > 0 && !fusioniRiletturaTimer) {
+      fusioniRiletturaTimer = setTimeout(() => { fusioniRiletturaTimer = null; loadMergeApprovals(); }, Number(r.scadeTraMs) + 500);
+    }
     // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
     // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
@@ -2875,7 +2906,8 @@
         ${priorityDotsHtml(fb)}
         ${fiduciaSegnoHtml(fb)}
       `;
-      item.innerHTML = progress
+      // Un lavoro server in coda fermo «resta locale» (#2258) non ha iter, ma il suo fermo si dice lo stesso.
+      item.innerHTML = progress || (leggibile && fermoRestaLocale(fb, progress))
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
@@ -2936,8 +2968,8 @@
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
   // Lo scudo della fiducia (#1575): pieno se fidata, vuoto e tratteggiato se no; il colore lo ripete il bordo destro.
-  function fiduciaSegnoHtml(x) {
-    const s = MR.segnoFiducia(x);
+  function fiduciaSegnoHtml(x, segno) {
+    const s = segno || MR.segnoFiducia(x);
     return `<span class="mg-fiducia-segno mg-fiducia-segno--${s.classe}" title="${esc(s.testo)}" aria-label="${esc(s.parola)}" role="img">`
       + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.scudo}"/></svg></span>`;
   }
@@ -2976,6 +3008,16 @@
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
+  // Il segno lo ripulisce solo un giro che rivaluta il lavoro fra i pronti: fuori dai pronti per altro (lavori server
+  // spenti, una domanda bloccante, attesi non fusi, un'istanza al lavoro) vale quel motivo, non il fermo (#2036.1).
+  // Una regola sola per riga, dettaglio e «Dichiara fidato com'è» (#2258); un lavoro in coda non ha iter (progress null).
+  function fermoRestaLocale(fb, progress = fb && statoLeggibile(fb) ? MR.workProgress(fb) : null) {
+    if (!fb || (progress && progress.active)) return null;
+    const fermo = MR.restaLocale(fb, { lavoriServer: !!(mgLavoriServer && mgLavoriServer.checked) });
+    if (!fermo || MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) || (ATT && ATT.aspettaAncora(fb, trovaAtteso))) return null;
+    return fermo;
+  }
+
   function workStateHtml(progress, fb) {
     // Un lavoro server passato aspetta il cancello, GitHub o il PC (#1159); coi lavori server alle routine, un fidato
     // segue il loro iter.
@@ -2983,10 +3025,10 @@
     if (attesa) {
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
     }
-    const fermo = fb ? MR.restaLocale(fb) : null;
+    const fermo = fermoRestaLocale(fb, progress);
     if (fermo) {
       const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
-      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Riparte da solo quando il motivo passa.${dal}`;
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
@@ -3689,8 +3731,10 @@
     // Solo per i feedback nell'iter; stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
-      mgWorkState.hidden = !progress;
-      mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
+      const mostra = !!progress || (leggibile && !!fermoRestaLocale(fb, progress));
+      mgWorkState.hidden = !mostra;
+      mgWorkState.innerHTML = mostra ? workStateHtml(progress, fb) : '';
+      if (mostra) aggiungiDichiara(fb);
     }
 
     renderThread(fb);
@@ -3834,6 +3878,91 @@
     });
   }
 
+  // ── «Dichiara fidato com'è» (#2258) ───────────────────────────────────────
+  // Un lavoro server fermo perché il suo biglietto nascerebbe sporco: l'owner, letti ramo e note, li dichiara fidati.
+  // Prima il server dice cosa toglierebbe, poi la conferma rimanda quello che l'owner ha visto: se è cambiato, rifiuta.
+  const TITOLO_DICHIARA = 'Ramo e note di questo lavoro diventano fidati così come sono, a tuo nome: il lavoro riparte al giro dopo. La fiducia del feedback non cambia.';
+  function aggiungiDichiara(fb) {
+    if (!isAdmin || !mgWorkState || !fermoRestaLocale(fb)) return;
+    const posto = document.createElement('div');
+    posto.className = 'mg-dichiara';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-star-btn mg-fiducia-btn';
+    btn.id = 'mgDichiaraBtn';
+    btn.textContent = '🤝 Dichiara fidato com’è';
+    btn.title = TITOLO_DICHIARA;
+    btn.addEventListener('click', () => guardaDichiara(fb._id, posto, btn));
+    posto.appendChild(btn);
+    mgWorkState.appendChild(posto);
+  }
+  // Si dichiara fidato dopo averlo letto: ogni ramo apre le sue modifiche rispetto a main.
+  const CONFRONTO_DICHIARA = { app: 'https://github.com/sathyaram1/Filo/compare/', server: 'https://github.com/sathyaram1/filo-security/compare/' };
+  function modificheDelRamo(repo, ramo) {
+    const r = String(ramo || '');
+    if (!CONFRONTO_DICHIARA[repo] || !/^[A-Za-z0-9._/-]{1,200}$/.test(r) || r.includes('..')) return '';
+    return `${CONFRONTO_DICHIARA[repo]}main...${r.split('/').map(encodeURIComponent).join('/')}`;
+  }
+  function righeDichiara(r, ramo) {
+    const dove = { app: 'Ramo dell’app', server: 'Ramo del server' };
+    const righe = (r.rami || []).map((x) => {
+      const nome = esc(dove[x.repo] || x.repo);
+      const url = modificheDelRamo(x.repo, ramo);
+      const testa = url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Le modifiche rispetto a main">${nome}</a>` : nome;
+      return `${testa}, all’ultimo commit ${esc(String(x.punta || '').slice(0, 7))}: ${esc(x.motivo || 'non pulito')}`;
+    });
+    const n = Number(r.stato) || 0;
+    // Quando e da chi: l'owner trova fra le note quelle da leggere senza rileggerle tutte.
+    const chi = (ruolo) => (ruolo === 'unito' ? 'da un feedback unito' : ruolo ? roleLabel(ruolo) : '');
+    const scritti = (r.scritti || []).map((s) => [chi(s.ruolo), formatDateTime(s.at)].filter(Boolean).join(' ')).filter(Boolean);
+    if (n) righe.push(esc(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`) + (scritti.length ? `: ${esc(scritti.join('; '))}` : ''));
+    return righe;
+  }
+  async function guardaDichiara(id, posto, btn) {
+    btn.disabled = true;
+    setManageMsg('Guardo cosa tiene sporco il lavoro…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, prova: true }).catch((e) => ({ ok: false, error: e.message }));
+    btn.disabled = false;
+    if (selectedId !== id || !posto.isConnected) return;
+    if (!r || r.ok === false) { setManageMsg(`Non riesco a guardarlo: ${(r && r.error) || 'il server non ha risposto'}`, 'err'); return; }
+    if (r.niente) {
+      const fermo = fermoRestaLocale(allFeedbacks.find((f) => f._id === id));
+      setManageMsg(`Ramo e note sono già puliti: lo tiene fermo altro${fermo ? ` (${fermo.motivi.join(', ')})` : ''}.`, 'ok');
+      return;
+    }
+    setManageMsg('', '');
+    posto.innerHTML = `<div class="mg-dichiara-cosa">Diventano fidati così come sono:<ul>${righeDichiara(r, (allFeedbacks.find((f) => f._id === id) || {}).branch).map((x) => `<li>${x}</li>`).join('')}</ul></div>
+      <div class="mg-dichiara-tasti"><button type="button" class="mg-star-btn mg-fiducia-btn" id="mgDichiaraSi">Li ho letti: dichiara fidati</button>
+      <button type="button" class="mg-star-btn" id="mgDichiaraNo">Annulla</button></div>`;
+    const si = posto.querySelector('#mgDichiaraSi');
+    posto.querySelector('#mgDichiaraNo').addEventListener('click', () => {
+      const fb = allFeedbacks.find((f) => f._id === id);
+      posto.remove();
+      if (fb) aggiungiDichiara(fb);
+    });
+    si.addEventListener('click', () => confermaDichiara(id, r.visto, si));
+    si.focus();
+  }
+  async function confermaDichiara(id, visto, si) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
+    const chi = num ? ` di #${num}` : '';
+    si.disabled = true;
+    setManageMsg('Lo dichiaro fidato…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, visto }).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || r.ok === false) {
+      si.disabled = false;
+      setManageMsg(`Non dichiarato fidato: ${(r && r.error) || 'il server non ha risposto'}`, 'err');
+      return;
+    }
+    // Il server ha tolto il segno: la rilettura porterà lo stesso, intanto la pagina lo dice subito.
+    if (fb) fb.restaLocale = null;
+    if (selectedId === id) openDetail(id, { ridisegno: true });
+    renderList();
+    updateTabCounts();
+    setManageMsg(`Ramo e note del lavoro${chi} sono fidati: riparte al prossimo giro, se non lo ferma altro.`, 'ok');
+  }
+
   // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
   // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
   // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
@@ -3847,13 +3976,16 @@
   function caricaAttesiFuori() {
     if (!ATT || !isAdmin || !dataLoaded) return;
     const mancano = [];
+    const compiti = new Set();
     for (const fb of allFeedbacks) {
       for (const w of ATT.atteseDi(fb)) {
+        if (ATT.eCompito(w.id)) { compiti.add(w.id); continue; }
         if (attesiChiesti.has(w.id) || allFeedbacks.some((f) => f._id === w.id)) continue;
         attesiChiesti.add(w.id);
         mancano.push(w.id);
       }
     }
+    if (compiti.size) caricaCompitiAttesi(compiti);
     if (!mancano.length) return;
     (async () => {
       let righe = await FB.getMany(mancano, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 });
@@ -3869,10 +4001,31 @@
     })().catch(() => { /* restano «stato non letto»: chi li aspetta resta fra quelli che aspettano, come per la coda */ });
   }
 
+  // Aperto se l'elenco dei compiti aperti lo porta, chiuso altrimenti: la regola della coda (un compito chiuso scioglie
+  // l'attesa, qualunque esito). Su un errore restano «stato non letto», e chi li aspetta resta fra quelli che aspettano.
+  function caricaCompitiAttesi(ids) {
+    if (compitiAttesiInLettura) return;
+    const nuovi = [...ids].some((id) => !attesiChiesti.has(id));
+    if (!nuovi && Date.now() - compitiAttesiLettiMs < COMPITI_ATTESI_OGNI_MS) return;
+    for (const id of ids) attesiChiesti.add(id);
+    compitiAttesiInLettura = true;
+    (async () => {
+      const r = await sendToMain({ type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.COMPITI_ELENCO) || 'compiti_elenco' });
+      compitiAttesiLettiMs = Date.now();
+      if (!r || !r.ok || !Array.isArray(r.aperti)) return;
+      const aperti = new Set(r.aperti.map((c) => String((c && c.id) || '')));
+      for (const id of ids) attesiFuori.set(id, { _id: id, compito: true, status: aperti.has(id) ? 'todo' : 'done' });
+      renderList();
+      const aperto = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (aperto) reflectAttese(aperto);
+    })().catch(() => {}).finally(() => { compitiAttesiInLettura = false; });
+  }
+
   function numeroDi(doc) {
     return doc ? FB.formatNum(doc.seq, doc.subSeq) : '';
   }
   function statoAttesaTesto(w) {
+    if (ATT.eCompito(w.id)) return w.stato === ATT.STATO.APERTO ? 'aperto' : w.stato === ATT.STATO.FUSO ? 'chiuso' : ATT.ETICHETTA[w.stato] || w.stato;
     if (w.stato !== ATT.STATO.APERTO) return ATT.ETICHETTA[w.stato] || w.stato;
     const doc = trovaAtteso(w.id);
     const info = doc && window.SN_FB_STATUS && window.SN_FB_STATUS.STATUSES[MR.normalizeStatus(doc).status];
@@ -5259,22 +5412,35 @@
     }
     if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
     const turni = TH.splitNotes(notes);
+    const bolle = [];
     turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
       const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      bolle.push(b);
       const chiave = `${i}:${seg.body.length}`;
       // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
       // arriva mentre la si legge (niente che si richiude da solo).
       if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
       else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
     });
+    segnaFiduciaNote(fb, notes, bolle);
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
     // l'owner sta già guardando.
     if (fb._dettaglioMancato) appendRiprovaDettaglio();
+  }
+
+  // Le impronte si calcolano dopo il disegno; una bolla che un ridisegno ha già tolto non si segna.
+  function segnaFiduciaNote(fb, notes, bolle) {
+    window.SN_FEEDBACK_THREAD.fiduciaDelleNote(notes, fb[window.SN_FEEDBACK_THREAD.CAMPO_NOTE_FIDATE]).then((turni) => {
+      turni.forEach((t, i) => {
+        const who = bolle[i] && bolle[i].isConnected ? bolle[i].querySelector('.mg-bubble-who') : null;
+        if (who) who.insertAdjacentHTML('beforeend', fiduciaSegnoHtml(null, MR.segnoFiduciaNota(t.fidata)));
+      });
+    }).catch(() => {});
   }
 
   // La riga che leggerà chi ha segnalato è l'ULTIMO turno: l'unica cosa che il mittente vede
@@ -5565,7 +5731,7 @@
       toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
       // La richiesta nuova sta negli elenchi, una pratica che ha cambiato stato nel documento: si rilegge tutto.
       // Riaperta, la frase serve finché la richiesta non è nel pannello: una scadenza futura non deve ritrovarla lì.
-      Promise.resolve(loadMergeApprovals()).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
+      Promise.resolve(loadMergeApprovals(null, { fresco: true })).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
       if (m === RIAPRI_ESITI.non_ferma) refreshFromRemote({ force: true }).catch(() => {});
     });
     return box;
@@ -5649,7 +5815,7 @@
         }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
-        setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
+        setTimeout(() => { loadMergeApprovals(null, { fresco: true }); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
       } catch (e) {
         esito.dataset.kind = 'err';
         esito.textContent = e.message || 'Non riuscito.';
@@ -6013,7 +6179,7 @@
       // statistiche seguono anche questo giro (feedback #496).
       if (giro && live.inVista()) fsSegueLive([], []).catch(() => {});
     },
-    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
+    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(null, { dalGiro: true }); },
     avvisi: (testo) => segnaAvvisoGiro(testo),
     segno: () => { aggiornaSegnoFerma(); domandeDalVivo(); },
     quandoInVista: () => domandeDalVivo(),
@@ -6819,6 +6985,9 @@
     // Le due letture non dipendono l'una dall'altra: partono insieme.
     const [lista, log] = await Promise.all([
       (async () => {
+        // La lista in pagina è già TUTTI i feedback, tenuta in pari dal giro: rileggerli interi costava migliaia di
+        // letture a ogni apertura (#2470). Il dettaglio che manca (l'esito della sicurezza) lo chiede fsCompletaRighe.
+        if (dataLoaded) return { rows: allFeedbacks.slice(), complete: !caricoIncompleto, ripiego: false };
         try {
           const r = await FB.listAllPaged({});
           return { rows: r.rows, complete: r.complete !== false, ripiego: false };
@@ -6901,13 +7070,14 @@
     if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
   }
 
-  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
-  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
-  // A scheda davanti la si legge intera, una volta per caricamento.
+  // Una riga d'elenco non porta i campi di dettaglio: il suo controllo di sicurezza risulterebbe «non letto»
+  // (#997). A scheda davanti si leggono intere le sole righe che i conti della finestra chiedono, una volta per
+  // caricamento: le statistiche partono dalla lista in pagina, e leggerle tutte intere era il conto di #2470.
   let fsChiesteIntere = new Set();
   async function fsCompletaRighe() {
+    const servono = new Set((fsStat && fsStat.auditIds && fsStat.auditIds.nonLetti) || []);
     const ids = (fsFeedbacks || [])
-      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .filter((f) => f && f._proiezione && f._id && servono.has(f._id) && !fsChiesteIntere.has(f._id))
       .map((f) => f._id);
     if (!ids.length) return false;
     for (const id of ids) fsChiesteIntere.add(id);
@@ -8103,6 +8273,10 @@
     renderFsDrill();
     if (mgFsDrillList && scorrimento) mgFsDrillList.scrollTop = scorrimento;
     fsRiprendiFuoco(fuoco);
+    // Una finestra nuova può chiedere l'esito di righe che non si sono ancora lette intere.
+    if (!fsRipiego && fsPannelloAperto() && ((stat.auditIds && stat.auditIds.nonLetti) || []).some((id) => !fsChiesteIntere.has(id))) {
+      fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+    }
   }
 
   // Finestra, mittenti e riquadri: un solo ascoltatore per la scheda.

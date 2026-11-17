@@ -17,6 +17,8 @@ Non richiedere quello che ha già deciso.
 
 <!-- includi: _immagini.md -->
 
+<!-- includi: _unite.md -->
+
 <!-- includi: _cornice-feedback.md -->
 
 ## Prima di tutto: è già risolto su main?
@@ -39,6 +41,25 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
   Il server ricontrolla la fusione: se rifiuta (exit 4), lavora il feedback
   come sempre e scrivi il motivo del rifiuto nel report;
 - se la fusione ne copre solo una parte, lavori il resto e lo dici nel report.
+
+`payload.commitProvato`, se c'è, dice che il feedback è un allarme della
+suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
+averlo già corretto la fusione di un altro feedback, arrivata mentre la suite
+girava: non cita questo feedback e può essere più vecchia della sua nascita.
+Le candidate sono le fusioni arrivate su `main` dopo quel commit:
+
+```bash
+git fetch origin main
+git log --first-parent --merges --format='%H %cI %s' <commitProvato>..origin/main
+```
+
+Prova i rossi dell'allarme sulla punta di `origin/main`. Se sono tutti verdi,
+cerca la fusione che li ha corretti (quella che tocca il file rosso o il codice
+che prova) e chiudi con lei, con lo stesso comando qui sopra; nel report scrivi
+quale prova hai rilanciato e dove. Il server accetta una fusione sulla linea
+principale che il commit provato non contiene, successiva all'ultima
+riapertura e diversa da quella del lavoro stesso. Se anche un solo rosso resta,
+lavori il feedback.
 
 **Il feedback si lavora intero.** Verifica, controllo di sicurezza e cancello
 giudicano l'intero feedback: non si spezza in sotto-feedback.
@@ -66,6 +87,9 @@ fermato prima di consegnare, e il tuo ramo è nato dalla sua punta
 tentativi più vecchi che il tuo ramo non contiene: guardali
 (`git log origin/main..origin/<ramo>`), e se ti serve qualcosa fondilo
 (`git merge origin/<ramo>`), così alla fusione si chiude anche quel ramo.
+Il main di adesso è già dentro, se si fondeva senza conflitti; se no
+`ripartenza.conflittiConMain` elenca i file in conflitto: prima di tutto
+`git merge origin/main`, risolvi quei conflitti e poi lavora.
 
 Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:
 il testo è la spec, con cosa cambia per ognuna e come si verifica. Passa o non
@@ -102,21 +126,23 @@ trovi.
 
 <!-- includi: _criteri-verifica.md -->
 
+<!-- includi: _prova-da-utente.md -->
+
 Dopo il verdetto, una lettura del diff con la tua richiesta davanti si chiede
 in più:
 
 <!-- includi: _criteri-struttura.md -->
 
-A ogni difetto il verificatore dà un livello, col metro della frequenza
-(quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
-della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa
-chiesta — o se l'ha creato il tuo ramo; **vicino** se tocca a un altro lavoro
-ma sta in un file che il tuo ramo modifica già; **esterno** se tocca a un altro
-lavoro. Usa lo stesso metro: chiudi lo scenario e le porte della stessa causa,
-col 20% dello sforzo che dà l'80% del risultato. **Niente oltre al chiesto**:
-un difetto vicino o fuori dallo scenario, o una funzione che nessuno ha
-chiesto, non si fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
-correzione aggiunge a generare i rilievi del giro dopo.
+Il verificatore dà un livello solo ai difetti che riguardano l'**obiettivo**
+del feedback o che il tuo ramo ha **introdotto**, misurandoli sull'obiettivo;
+tutto il resto è **esterno**, senza livello, e diventa un feedback nuovo. La
+scala sta per intero in `routines/roles/_livelli-e-sede.md`, l'unico posto
+dove si scrive. Usa lo stesso metro: chiudi l'obiettivo e
+le porte della stessa causa, col 20% dello sforzo che dà l'80% del risultato.
+**Niente oltre al chiesto**: un difetto fuori dall'obiettivo, o una funzione
+che nessuno ha chiesto, non si fa — lo scrivi nel report e diventerà un
+feedback suo. È ciò che una correzione aggiunge a generare i rilievi del giro
+dopo, e un difetto in un'aggiunta è tuo.
 
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi

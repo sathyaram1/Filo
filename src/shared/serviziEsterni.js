@@ -396,7 +396,7 @@
       occasione: 'quando scrivi nella barra qualcosa che non è un indirizzo, o scegli «cerca» dal tasto destro',
       riceve: 'la ricerca',
       frase: 'la ricerca si apre sulla pagina dei risultati di Google',
-      dove: ['src/shared/urlNav.js', 'src/content/actions.js'],
+      dove: ['src/shared/urlNav.js'],
     },
     {
       id: 'google-lens', nome: 'Google Lens',
@@ -404,7 +404,7 @@
       occasione: 'quando cerchi un’immagine dal tasto destro',
       riceve: 'l’indirizzo dell’immagine',
       frase: 'apre Google Lens',
-      dove: ['src/content/actions.js'],
+      dove: ['src/shared/urlNav.js'],
     },
     {
       id: 'pagina-accesso-google', nome: 'La pagina di accesso di Google',
@@ -434,6 +434,13 @@
       occasione: 'solo per il proprietario di Filo, quando da «Inviti e utenti» in Gestione apre la ricarica del conto',
       riceve: 'la visita, come ogni sito',
       dove: ['src/pages/manage/manageUtenti.js'],
+    },
+    {
+      id: 'modifiche-rami-github', nome: 'Le modifiche di un lavoro su GitHub',
+      base: ['https://github.com/sathyaram1/Filo/compare/', 'https://github.com/sathyaram1/filo-security/compare/'],
+      occasione: 'solo per il proprietario di Filo, quando prima di dichiarare fidato un lavoro in Gestione ne apre le modifiche',
+      riceve: 'la visita, come ogni sito',
+      dove: ['src/pages/manage/manage.js'],
     },
     {
       id: 'sito-filo', nome: 'Il sito di Filo',

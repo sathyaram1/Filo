@@ -26,7 +26,7 @@ const P = globalThis.SN_PREF;
 const build = (k, v) => P.buildPreferencePartial(k, v);
 
 test('preferenze estetiche/comportamentali → livello 1, partial giusto', () => {
-  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', costo: 1, allenta: false, elencoFisso: '', dove: '', risk: '' });
+  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', costo: 1, allenta: false, dove: '', risk: '' });
   assert.equal(build('correttore', 'off').costo, 1);
   assert.deepEqual(build('correttore', 'off').partial, { featureFlags: { spellcheck: false } });
   assert.deepEqual(build('sidebar_aiuto', 'attiva').partial, { featureFlags: { help: true } });
@@ -34,43 +34,46 @@ test('preferenze estetiche/comportamentali → livello 1, partial giusto', () =>
   assert.deepEqual(build('archivia_se_inattivo', 'no').partial, { autoArchive: { onIdle: false } });
 });
 
-test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
+test('sicurezza/privacy: togliere un freno è costo 4, stringerlo 1 (#1312); partial annidato corretto', () => {
   const cookie = build('gestione_cookie', 'privacy');
-  assert.equal(cookie.costo, 2);
+  assert.equal(cookie.costo, 1, 'il più stretto non toglie niente');
+  assert.equal(build('gestione_cookie', 'manuale').costo, 4, 'col valore di adesso ignoto, scendere toglie un freno');
   assert.deepEqual(cookie.partial, { security: { cookies: { mode: 'privacy' } } });
 
   assert.deepEqual(build('gestione_cookie', 'automatico').partial, { security: { cookies: { mode: 'default' } } });
   assert.deepEqual(build('gestione_cookie', 'manuale').partial, { security: { cookies: { mode: 'manual' } } });
 
   const fp = build('fingerprint', 'off');
-  assert.equal(fp.costo, 2);
+  assert.equal(fp.costo, 4);
   assert.deepEqual(fp.partial, { security: { fingerprint: { mode: 'off' } } });
   assert.deepEqual(build('fingerprint', 'privacy').partial, { security: { fingerprint: { mode: 'privacy' } } });
 
   assert.deepEqual(build('navigazione_sicura', 'disattiva').partial, { security: { safeBrowse: { enabled: false } } });
   assert.deepEqual(build('protezione_ip', 'off').partial, { security: { protectIpLeak: false } });
   assert.deepEqual(build('blocco_popup', 'on').partial, { security: { blockPopups: true } });
-  assert.equal(build('blocco_popup', 'on').costo, 2);
+  assert.equal(build('blocco_popup', 'on').costo, 1);
+  assert.equal(build('blocco_popup', 'off').costo, 4);
   // #576 — «togli la pubblicità» scritto a Filo fa quello che fa la casella in Sicurezza.
   assert.deepEqual(build('blocco_pubblicita', 'sì').partial, { security: { adblock: { enabled: true } } });
   assert.deepEqual(build('blocca la pubblicità', 'off').partial, { security: { adblock: { enabled: false } } });
-  assert.equal(build('blocco_pubblicita', true).costo, 2);
+  assert.equal(build('blocco_pubblicita', true).costo, 1);
 });
 
-test('modelli / provider / chiavi / costi → livello 2', () => {
+test('modelli / provider / chiavi / costi: credenziali costo 4, freni secondo il verso', () => {
   const prov = build('provider', 'openrouter');
-  assert.equal(prov.costo, 2);
+  assert.equal(prov.costo, 4);
   assert.equal(prov.label, 'Provider → OpenRouter');
   assert.deepEqual(prov.partial, { provider: 'openrouter' });
   // Google non è più un fornitore di Filo: chiederlo a parole non deve
   // scrivere niente.
   assert.equal(build('provider', 'gemini'), null);
   assert.equal(build('chiave_gemini', 'AIzaSEGRETO1234'), null);
-  assert.equal(build('modelli_predefiniti', 'off').costo, 2);
+  assert.equal(build('modelli_predefiniti', 'off').costo, 4);
+  assert.equal(build('modelli_predefiniti', 'on').costo, 1);
   assert.deepEqual(build('modelli_predefiniti', 'off').partial, { useDefaultModels: false });
 
   const k = build('chiave_openrouter', 'sk-or-v1-SEGRETO1234');
-  assert.equal(k.costo, 2);
+  assert.equal(k.costo, 4);
   assert.deepEqual(k.partial, { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } });
   // L'etichetta NON stampa l'intera chiave (solo testa/coda).
   assert.doesNotMatch(k.label, /SEGRETO1234/);
@@ -79,7 +82,9 @@ test('modelli / provider / chiavi / costi → livello 2', () => {
   assert.deepEqual(build('chiave_tavily', 'tvly-abcd1234').partial, { apiKeys: { tavily: 'tvly-abcd1234' } });
 
   const limit = build('limite_spesa', '12 euro');
-  assert.equal(limit.costo, 2);
+  assert.equal(limit.costo, 4, 'tetto attuale ignoto: alzarlo');
+  assert.equal(P.buildPreferencePartial('limite_spesa', '12 euro', { attuali: { monthlyLimitEur: 20 } }).costo, 1);
+  assert.equal(P.buildPreferencePartial('limite_spesa', '12 euro', { attuali: { monthlyLimitEur: 5 } }).costo, 4);
   assert.deepEqual(limit.partial, { monthlyLimitEur: 12 });
 });
 
@@ -245,7 +250,6 @@ test('#592: ogni preferenza a testo libero è di livello 2 con tetto, o dichiara
 test('REGOLA #183: ogni setter di costo ≥ 2 o che abbassa una difesa dichiara un rischio non vuoto', () => {
   const senzaRischio = P.PREF_SETTERS
     .filter((s) => s.costo >= 2 || typeof s.allenta === 'function')
-    .filter((s) => !s.elencoFisso)
     .filter((s) => !s.risk || String(s.risk).trim().length < 20)
     .map((s) => s.keys[0]);
   assert.deepEqual(senzaRischio, [], `setter di livello 2 senza messaggio di rischio (#183): ${senzaRischio.join(', ')}`);
@@ -253,7 +257,7 @@ test('REGOLA #183: ogni setter di costo ≥ 2 o che abbassa una difesa dichiara 
 
 test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla del rischio', () => {
   const term = build('terminale', 'on');
-  assert.equal(term.costo, 2);
+  assert.equal(term.costo, 4);
   assert.equal(term.allenta, true, 'accendere il terminale abbassa una difesa');
   assert.match(term.risk, /shell/i, 'la modalità terminale spiega l’accesso alla shell');
 
@@ -358,7 +362,7 @@ test('#592: una lezione oltre il tetto è rifiutata col perché; il testo è que
 
 // #630 — durata e suono degli avvisi si cambiano anche a parole, con gli stessi limiti del campo nelle Preferenze.
 test('durata_notifiche: secondi, minuti, «restano», e oltre il tetto un rifiuto col numero', () => {
-  assert.deepEqual(build('durata_notifiche', 10), { partial: { notifications: { durationSec: 10 } }, label: 'Durata degli avvisi → 10 s', costo: 1, allenta: false, elencoFisso: '', dove: '', risk: '' });
+  assert.deepEqual(build('durata_notifiche', 10), { partial: { notifications: { durationSec: 10 } }, label: 'Durata degli avvisi → 10 s', costo: 1, allenta: false, dove: '', risk: '' });
   assert.deepEqual(build('durata_notifiche', '8 secondi').partial, { notifications: { durationSec: 8 } });
   assert.deepEqual(build('durata delle notifiche', '2 minuti').partial, { notifications: { durationSec: 120 } });
   assert.deepEqual(build('durata_notifiche', 0).partial, { notifications: { durationSec: 0 } });
@@ -374,7 +378,7 @@ test('suono_notifiche: sì/no lo accende o spegne, un tono lo accende con quel t
   assert.deepEqual(build('suono_notifiche', true).partial, { notifications: { soundEnabled: true } });
   assert.deepEqual(build('suono_notifiche', 'no').partial, { notifications: { soundEnabled: false } });
   assert.deepEqual(build('suono_notifiche', 'carillon'), {
-    partial: { notifications: { soundEnabled: true, sound: 'chime' } }, label: 'Suono degli avvisi → Carillon', costo: 1, allenta: false, elencoFisso: '', dove: '', risk: '',
+    partial: { notifications: { soundEnabled: true, sound: 'chime' } }, label: 'Suono degli avvisi → Carillon', costo: 1, allenta: false, dove: '', risk: '',
   });
   assert.deepEqual(build('suono delle notifiche', 'Delicata').partial, { notifications: { soundEnabled: true, sound: 'gentle' } });
   assert.equal(build('suono_notifiche', 'tromba'), null);
@@ -388,10 +392,10 @@ test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
     const etichetta = globalThis.SN_SOUNDS.TONE_LABELS[id];
     assert.equal(build('suono_notifiche', etichetta).partial.notifications.sound, id, `tono ${etichetta} non riconosciuto`);
   }
-  // E il modello li legge nell'elenco delle chiavi, insieme alla durata.
-  require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
-  const desc = globalThis.SN_ACTION_TOOLS.definitions()
-    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  // E il modello li legge con impostazioni(leggi), coi valori ammessi, insieme alla durata.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'cambi.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'vociImpostazioni.js'));
+  const desc = globalThis.SN_VOCI_IMPOSTAZIONI.righePerModello({}, { cerca: 'notifiche' }).righe.join('\n');
   assert.match(desc, /durata_notifiche/);
   assert.match(desc, /suono_notifiche/);
   for (const etichetta of Object.values(globalThis.SN_SOUNDS.TONE_LABELS)) {
@@ -418,7 +422,7 @@ test('Preferenze, Notifiche: l’etichetta del suono non spiega l’interfaccia'
 
 test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicurezza abbassa una difesa', () => {
   const allenta = (k, v, at) => P.buildPreferencePartial(k, v, { attuali: at || null }).allenta;
-  for (const k of ['blocco_pubblicita', 'blocco_siti', 'liste_pubbliche_blocco', 'controlli_rete_siti', 'giudizio_ai_siti', 'link_sospetti_isolati', 'pagine_delicate']) {
+  for (const k of ['blocco_pubblicita', 'blocco_siti', 'liste_pubbliche_blocco', 'controlli_rete_siti', 'giudizio_ai_siti', 'link_sospetti_isolati']) {
     assert.equal(allenta(k, 'off'), true, `${k} spento`);
     assert.equal(allenta(k, 'on'), false, `${k} acceso`);
   }
@@ -436,6 +440,30 @@ test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicur
   }
   assert.equal(allenta('siti_delicati', 'togli x.com'), true);
   assert.equal(allenta('domini_esclusi', 'aggiungi x.com'), false, 'non è una difesa');
+  // #1589 — alzare quanto esce verso i modelli, da ogni chiave dei livelli di privacy.
+  const di = { security: { privacy: { livello: 'delicate', incognito: 'sempre', chiedi: ['sanita'], sitiAnticipo: [] } } };
+  assert.equal(allenta('livello_privacy', 'anticipo', di), true);
+  assert.equal(allenta('livello_privacy', 'tutto', di), true);
+  assert.equal(allenta('livello_privacy', 'meno', di), false, 'manda meno roba ai modelli');
+  assert.equal(allenta('livello_privacy', 'sempre', di), false);
+  assert.equal(allenta('privacy_incognito', 'delicate', di), true);
+  assert.equal(allenta('privacy_categorie', 'togli sanità', di), true);
+  assert.equal(allenta('privacy_categorie', 'aggiungi posta', di), false);
+  assert.equal(allenta('siti_anticipo', 'aggiungi miodottore.it', di), true);
+  assert.equal(allenta('siti_anticipo', 'togli miodottore.it', di), false);
+  assert.equal(allenta('livello_privacy', 'delicate'), true, 'senza le impostazioni di adesso vale come alzare');
+});
+
+test('#1589: il livello di privacy a parole, anche relativo a quello di adesso', () => {
+  const at = { security: { privacy: { livello: 'anticipo', chiedi: ['sanita'] } } };
+  const p = (k, v, a = at) => P.buildPreferencePartial(k, v, { attuali: a }).partial.security.privacy;
+  assert.deepEqual(p('privacy', 'meno'), { livello: 'delicate' });
+  assert.deepEqual(p('privacy', 'meno', { security: { privacy: { livello: 'delicate' } } }), { livello: 'sempre' });
+  assert.deepEqual(p('privacy', 'manda tutto'), { livello: 'anticipo', chiedi: [] });
+  assert.deepEqual(p('privacy', 'di serie'), { livello: 'anticipo', chiedi: ['sanita'] });
+  assert.deepEqual(p('privacy_categorie', 'aggiungi banca e posta'), { chiedi: ['posta', 'banche', 'sanita'] });
+  assert.match(P.buildPreferencePartial('privacy_categorie', 'aggiungi cucina', { attuali: at }).rifiuto, /non è una categoria/);
+  assert.equal(P.buildPreferencePartial('livello_privacy', 'boh', { attuali: at }), null);
 });
 
 test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è un rifiuto col numero, e si spegne', () => {
@@ -467,6 +495,25 @@ test('#1290 — i due valori delle sezioni chiuse stanno in un posto solo: chi l
   for (const p of ['src/content/extractContext.js', 'src/content/translatePage.js', 'src/pages/preferences/preferences.js']) {
     assert.doesNotMatch(leggi(p), /['"](subito|apertura)['"]/, `${p} riscrive a mano un valore delle sezioni chiuse`);
   }
+  // #1290.2 — anche la tendina delle Preferenze e la frase con cui Filo annuncia il cambio.
+  const html = leggi('src/pages/preferences/preferences.html');
+  const inizio = html.indexOf('id="traduzioneNascoste"');
+  const tendina = html.slice(inizio, html.indexOf('</select>', inizio));
+  assert.doesNotMatch(tendina, /value=/, 'la tendina delle sezioni chiuse scrive a mano i suoi valori');
+  assert.deepEqual([...tendina.matchAll(/data-modo="(\w+)"/g)].map((m) => m[1]).sort(),
+    Object.keys(globalThis.SN_CONST.NASCOSTE_TRADUZIONE).sort());
+  const cambi = leggi('src/shared/cambi.js');
+  const da = cambi.indexOf("'traduzionePagina.nascoste'");
+  const voce = cambi.slice(da, cambi.indexOf('livello', da));
+  assert.doesNotMatch(voce, /\b(subito|apertura)\s*:|['"](subito|apertura)['"]/, 'il cambio delle sezioni chiuse riscrive a mano un valore');
+});
+
+test('#1290.2 — il cambio delle sezioni chiuse si dice a parole per tutti e due i valori', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'cambi.js'));
+  const C = globalThis.SN_CONST;
+  const frase = (prima, dopo) => globalThis.SN_CAMBI.fraseCambio({ chiave: 'traduzionePagina.nascoste', prima, dopo });
+  assert.match(frase(C.NASCOSTE_TRADUZIONE.TRADUCI, C.NASCOSTE_TRADUZIONE.RIMANDA), /subito, insieme al resto → solo quando le apri/);
+  assert.match(frase(undefined, C.NASCOSTE_TRADUZIONE.RIMANDA), /solo quando le apri/);
 });
 
 test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {

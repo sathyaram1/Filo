@@ -9,7 +9,32 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/statusline.mjs', import.meta.url));
-const { barra, invia, letturaDa, quotaFile, invioFile, INVIO_OGNI_MS } = await import('../../scripts/statusline.mjs');
+const { barra, invia, letturaDa, quotaFile, invioFile, INVIO_OGNI_MS, INVIO_COMUNQUE_MS } = await import('../../scripts/statusline.mjs');
+
+// #2470: ownerCrediti partiva ogni cinque minuti anche coi numeri fermi.
+test('barra: coi numeri già arrivati non si rimanda prima della mezz ora; numeri nuovi sì, dopo i cinque minuti', async () => {
+  const home = cartellaTemporanea('filo-barra-');
+  try {
+    let lanci = 0;
+    const opts = { home, lancia: () => { lanci += 1; }, scrivi: () => {} };
+    barra(JSON.stringify(STDIN), { ...opts, nowMs: NOW });
+    assert.equal(lanci, 1);
+    await invia({ home, nowMs: NOW + 1, token: 'tok', fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ result: { ok: true } }) }) });
+    for (const dopo of [INVIO_OGNI_MS + 2, 2 * INVIO_OGNI_MS + 2, INVIO_COMUNQUE_MS - 1000]) {
+      barra(JSON.stringify(STDIN), { ...opts, nowMs: NOW + dopo });
+    }
+    assert.equal(lanci, 1, 'gli stessi numeri non ripartono');
+    barra(JSON.stringify(STDIN), { ...opts, nowMs: NOW + INVIO_COMUNQUE_MS + 2 });
+    assert.equal(lanci, 2, 'dopo mezz ora parte comunque');
+    await invia({ home, nowMs: NOW + INVIO_COMUNQUE_MS + 3, token: 'tok', fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ result: { ok: true } }) }) });
+    const nuovi = JSON.parse(JSON.stringify(STDIN));
+    nuovi.rate_limits.seven_day.used_percentage = 63;
+    barra(JSON.stringify(nuovi), { ...opts, nowMs: NOW + INVIO_COMUNQUE_MS + 60e3 });
+    assert.equal(lanci, 2, 'numeri nuovi aspettano i cinque minuti dall ultimo invio');
+    barra(JSON.stringify(nuovi), { ...opts, nowMs: NOW + INVIO_COMUNQUE_MS + INVIO_OGNI_MS + 10 });
+    assert.equal(lanci, 3, 'numeri nuovi partono');
+  } finally { togliCartella(home); }
+});
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
 const STDIN = {

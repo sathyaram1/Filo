@@ -561,9 +561,10 @@ module.exports = function register(on, ctx) {
     require('../contatoriFinestra').misura('download', luogoDownload(msg, s), azione, { incognito: !!ambito(s) });
     return fn(msg, s, o);
   };
-  on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(contata('svuota', async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) }))));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(contata('rimuovi', async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) }))));
+  // L'elenco viaggia col suo numero (`rev`): la shell non lo lascia riscrivere un evento arrivato dopo la foto (#2307).
+  on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, ...DL().elenco(ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(contata('svuota', async (_m, s) => { DL().clearCompleted(ambito(s)); return { ok: true, ...DL().elenco(ambito(s)) }; })));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(contata('rimuovi', async (msg, s) => { DL().remove(msg.id, ambito(s)); return { ok: true, ...DL().elenco(ambito(s)) }; })));
   // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
   // senza, il main risponde needsConfirm e non tocca shell.openPath. Il sì alla conferma è lo stesso gesto: non conta.
   on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => {

@@ -139,9 +139,9 @@
   // caratteri equivale a leggerlo. La misura è larga apposta e cambiarla non rompe i vecchi.
   const CIPHER_PAD = 32;
 
-  // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────
-  // I NUMERI non stanno qui. Li detta l'owner dalla dashboard (doc Firestore
-  // `config/routines`, campi `cap3`, `cap2`, `cap1`, `cap0`, Gestione →
+  // ── I tre bilanci dei giri di correzione (feedback #561, §4; tre dal #2339) ──
+  // I NUMERI non stanno qui. Li scrivono owner e manutentore (doc Firestore
+  // `config/routines`, campi `cap3`, `cap2`, `cap1`, Gestione →
   // Automazioni) e li applica il SERVER quando registra la critica — mai il
   // prompt, mai un conteggio dichiarato dal client. Dal 2026-09-16 nel codice
   // non c'è un default: chi ha bisogno dei bilanci li legge dal server, e se
@@ -150,12 +150,12 @@
   // `verifierRound.js` (decideRound), incorporato anch'esso dal server al
   // deploy; una sentinella tiene questa lista uguale alla sua e ai campi della
   // dashboard.
-  //   cap3/cap2/cap1/cap0: giri per i rilievi di livello 3/2/1/0. Finito il suo,
+  //   cap3/cap2/cap1: giri per i rilievi di livello 3/2/1. Finito il suo,
   //   un rilievo paga col più alto aperto sotto (D88, #744); senza più bilanci
   //   un 3 ferma la pratica (statusReason `loop`), gli altri escono in un
   //   feedback derivato e il lavoro passa. Chi paga, e quanto: decideRound.
-  //   I vicini non pagano e da soli non fanno partire un giro (#1202).
-  const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
+  //   Un `cap0` rimasto nel documento dalla scala a quattro livelli si ignora.
+  const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1'];
 
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,

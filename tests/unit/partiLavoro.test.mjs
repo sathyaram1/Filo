@@ -99,8 +99,9 @@ test('la parte del server che manca si giudica su origin/main appena riletto: un
 
 test('finish manda al server le parti del server che mancano, solo con la pratica', async () => {
   const src = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
-  assert.match(src, /partiServerInSospeso\(branch, \{ cartellaServer: cartellaDelServer\(ROOT\) \}\)/);
-  assert.match(src, /askServerMerge\(\{ branch, sha: cur, feedbackId: [^}]*pendingParts(, provaUnit)? \}\)/);
+  // Il passo 5 per intero, coi rami veri del server, ha le sue prove in praticaRiaperta.test.mjs («finish per intero»):
+  // qui si tiene che il finish passi da lì.
+  assert.match(src, /await chiediLaFusione\(\{ branch, cur, pratica, provaDelRamo \}\)/);
 
   process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
   const corpi = [];

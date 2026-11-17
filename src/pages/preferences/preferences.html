@@ -277,6 +277,7 @@
       <h2 id="autonomiaTitolo">Autonomia di Filo</h2>
       <p class="sn-muted">Filo fa da solo quello che può disfare. Quando legge cose scritte da altri, fa meno. Tu scegli con un livello quanto si fida.</p>
       <div class="sn-cookie-modes" id="autonomiaLivelli" role="radiogroup" aria-labelledby="autonomiaTitolo"></div>
+      <p class="sn-muted" id="autonomiaSempre"></p>
       <span id="autonomiaHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
@@ -626,11 +627,15 @@
         <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Gli ultimi giorni di conversazioni, di tutte le schede, che Filo ha davanti a ogni messaggio. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
             <span>Giorni</span>
-            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+            <input type="number" id="contestoGiorni" step="0.5" style="width:120px;" />
           </label>
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
             <span>Tetto in token</span>
-            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+            <input type="number" id="contestoToken" step="1000" style="width:160px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quando una richiesta della chat supererebbe questa misura, Filo riassume la parte più vecchia della conversazione in righe con l'ora prima di mandarla. Vuoto: il valore predefinito. Sopra i 100.000 token Haiku costa cinque volte tanto.">
+            <span>Soglia di compattazione</span>
+            <input type="number" id="contestoSoglia" step="1000" style="width:160px;" />
           </label>
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quanto il modello tiene da parte le istruzioni fisse della chat, per rileggerle a prezzo basso. Un'ora costa il doppio a metterle da parte e regge le pause lunghe. Vale coi modelli Anthropic.">
             <span>Durata della cache</span>
@@ -641,6 +646,7 @@
             </select>
           </label>
         </div>
+        <p class="sn-muted" id="contestoSogliaStima" aria-live="polite"></p>
       </section>
 
       <section id="sec-lunghezza">
@@ -665,11 +671,11 @@
            0,26 $ e 0,38 $ per milione di token (OpenRouter), un terzo di testo in più nelle sezioni chiuse. -->
       <section id="sec-traduzione">
         <h2>Traduzione della pagina</h2>
-        <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Menu, fisarmoniche, schede e pannelli che ancora non si vedono. Subito: quando li apri sono già tradotti, e paghi anche quelli che non apri. Solo quando li apri: li traduci dal menu, aspettando un paio di secondi.">
+        <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Menu, fisarmoniche, schede e pannelli che ancora non si vedono. Subito: quando li apri sono già tradotti, e paghi anche quelli che non apri. Solo quando li apri: si traducono da soli appena li apri, in un paio di secondi.">
           <span>Sezioni chiuse</span>
           <select id="traduzioneNascoste" style="width:460px;max-width:100%;">
-            <option value="subito">Subito, insieme al resto (circa 0,40 $ al mese, già pronte all'apertura)</option>
-            <option value="apertura">Solo quando le apro (circa 0,30 $ al mese, 2 s dopo l'apertura)</option>
+            <option data-modo="TRADUCI">Subito, insieme al resto (circa 0,40 $ al mese, già pronte all'apertura)</option>
+            <option data-modo="RIMANDA">Solo quando le apro (circa 0,30 $ al mese, 2 s dopo l'apertura)</option>
           </select>
         </label>
       </section>

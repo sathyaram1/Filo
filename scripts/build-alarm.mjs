@@ -47,7 +47,7 @@ export const TETTO_TESTO = 10000;
 export function testoEntroIlTetto(text, max = TETTO_TESTO) {
   const s = String(text || '');
   if (s.length <= max) return s;
-  const nota = `\n\n… testo tagliato a ${max} caratteri (era di ${s.length}): il resto sta nel registro e nell'artifact di questa esecuzione (Actions).`;
+  const nota = `\n\n… testo tagliato a ${max} caratteri (era di ${s.length}): il resto sta nei registri dei lavori di questa esecuzione (Actions), che dalla cloud si leggono con gh api.`;
   return s.slice(0, Math.max(0, max - nota.length)) + nota;
 }
 

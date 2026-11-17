@@ -3,7 +3,7 @@
 // Test: tests/unit/suMain.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
 
 const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepath=off', ...args], {
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
@@ -58,10 +58,29 @@ export function lineaPrincipale(root, ref = 'origin/main') {
   return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
 }
 
-/** La data (ISO) della fusione più recente del lavoro stesso di #N su `ref` («merge-gate: #N …»), '' se non c'è. */
-export function ultimaFusionePropria(root, num, { ref = 'origin/main' } = {}) {
-  if (!numeroFeedback(num)) return '';
-  return git(root, ['log', '--first-parent', ref, '-E', `--grep=^merge-gate: ${regexCitazione(num)}`, '-n1', '--format=%cI']).trim();
+/** L'oggetto è la fusione del lavoro stesso di #N («merge-gate: #N …»), non di un altro che lo cita. PURA. */
+export function fusionePropria(oggetto, num) {
+  return !!numeroFeedback(num) && new RegExp(`^merge-gate: ${regexCitazione(num)}`).test(String(oggetto || ''));
+}
+
+/**
+ * Il lavoro di ogni feedback arrivato su `ref`, letto sulla linea principale: regge anche dopo la potatura del ramo
+ * fuso. «finish: worker/<id>-<stampo>» nomina il tentativo; «merge-gate: #N» solo il numero, che `numeri`
+ * ({ N: id }) traduce. → { id: stampo del più recente } per tentativiSuperati.
+ */
+export function fusioniSuMain(root, { ref = 'origin/main', numeri = {} } = {}) {
+  const perNumero = Object.entries(numeri || {}).filter(([n, id]) => numeroFeedback(n) && id);
+  const out = {};
+  const arriva = (id, stampo) => { if (id && stampo && !(out[id] >= stampo)) out[id] = stampo; };
+  const righe = git(root, ['log', '--first-parent', ref, '-E', '--grep=^(merge-gate|finish): ', '--format=%cI%x09%s']).split('\n');
+  for (const riga of righe.filter(Boolean)) {
+    const [data, ...o] = riga.split('\t');
+    const oggetto = o.join('\t');
+    const nominato = leggiTentativo((/^(?:merge-gate|finish): (\S+)/.exec(oggetto) || [])[1]);
+    if (nominato) { arriva(nominato.id, nominato.stampo); continue; }
+    for (const [n, id] of perNumero) if (fusionePropria(oggetto, n)) arriva(id, stampoDi(Date.parse(data)));
+  }
+  return out;
 }
 
 /**
@@ -137,9 +156,10 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
  * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
  * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
  * sessione si guarda chi lavora già sugli stessi file. Sono rami di lavoro solo `worker/` e `claude/`; `fuori`, se
- * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge.
+ * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge. `numeri` ({ N: id }) come
+ * in fusioniSuMain.
  */
-export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null } = {}) {
+export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null, numeri = {} } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
@@ -150,7 +170,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
   const linea = lineaPrincipale(root, base);
-  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })));
+  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })),
+    { fusioni: fusioniSuMain(root, { ref: base, numeri }) });
   const perId = new Map();
   for (const t of tutti) {
     const l = leggiTentativo(t.ramo);
@@ -187,14 +208,54 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
 
+// Un file di filo-security nelle schede e negli elenchi: `filo-security:functions/x.js` (o con la barra); un ramo del
+// server (`repo: 'server'`) porta i suoi percorsi nudi, relativi al suo repo.
+const PREFISSO_SERVER = /^filo-security[:/]/;
+const percorso = (f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '');
+
+/** Il file di un ramo come lo legge chi confronta repo diversi: quelli del server col prefisso. PURA. */
+export function fileConRepo(r, f) {
+  return r && r.repo === 'server' ? `filo-security:${f}` : f;
+}
+
 /**
- * I rami che toccano uno dei file: uguale, o dentro una cartella dell'elenco (una voce che finisce con «/»). PURA.
- * → [{ ramo, comuni }]
+ * I rami che toccano uno dei file: uguale, o dentro una cartella dell'elenco (una voce che finisce con «/»). Un ramo
+ * del server confronta le voci col prefisso filo-security e quelle nude (le schede non sempre lo scrivono); uno
+ * dell'app solo quelle nude. PURA. → [{ ramo, repo, feedback, comuni }]
  */
 export function incroci(rami, file) {
-  const voci = (Array.isArray(file) ? file : []).map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')).filter(Boolean);
-  const tocca = (f) => voci.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
+  const voci = (Array.isArray(file) ? file : []).map(percorso).filter(Boolean);
+  const nude = voci.filter((v) => !PREFISSO_SERVER.test(v));
+  const delServer = voci.map((v) => v.replace(PREFISSO_SERVER, ''));
+  const tocca = (elenco) => (f) => elenco.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
   return (Array.isArray(rami) ? rami : [])
-    .map((r) => ({ ramo: r.ramo, feedback: r.feedback || [], comuni: (r.file || []).filter(tocca) }))
+    .map((r) => ({ ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
+      comuni: (r.file || []).filter(tocca(r.repo === 'server' ? delServer : nude)) }))
     .filter((r) => r.comuni.length);
+}
+
+/**
+ * Le coppie di lavori in corso che toccano gli stessi file, app e filo-security insieme: un lavoro è il ramo dell'app
+ * più il suo gemello col nome uguale sul server, e un file del server si confronta solo con file del server. PURA.
+ * → [{ a: { ramo, feedback, repo }, b: {…}, comuni: [file, quelli del server col prefisso] }]
+ */
+export function incrociFraRami(rami) {
+  const lavori = new Map();
+  for (const r of Array.isArray(rami) ? rami : []) {
+    const l = lavori.get(r.ramo) || { ramo: r.ramo, feedback: [], repo: new Set(), file: new Set() };
+    l.repo.add(r.repo || 'app');
+    for (const n of r.feedback || []) if (!l.feedback.includes(n)) l.feedback.push(n);
+    for (const f of r.file || []) l.file.add(fileConRepo(r, f));
+    lavori.set(r.ramo, l);
+  }
+  const elenco = [...lavori.values()];
+  const descr = (l) => ({ ramo: l.ramo, feedback: l.feedback, repo: l.repo.size > 1 ? 'app e server' : [...l.repo][0] });
+  const coppie = [];
+  for (let i = 0; i < elenco.length; i += 1) {
+    for (let j = i + 1; j < elenco.length; j += 1) {
+      const comuni = [...elenco[i].file].filter((f) => elenco[j].file.has(f)).sort();
+      if (comuni.length) coppie.push({ a: descr(elenco[i]), b: descr(elenco[j]), comuni });
+    }
+  }
+  return coppie;
 }

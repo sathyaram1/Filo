@@ -75,14 +75,14 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, ramoLegatoDaRiprendere, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
   lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
-import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
+import { fileRiscritti, fusionePropria, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
   proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
@@ -93,7 +93,7 @@ import { accendi as accendiClone, cloneDelGiro, preparaIntestazione, preparaPerI
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
-  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito,
+  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito, annotaTetto,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
@@ -103,12 +103,13 @@ import { LOCKFILE, rimettiLockfile, sporcoSoloDalLockfile } from './lib/lockfile
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_BYTES, SEGNALA_TOLTA, leggiTestoLivello } from './lib/livelli.mjs';
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
-import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
+import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo, scriviRispostaVerifica } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { dentroLaBusta } from './lib/busta.mjs';
-import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { assicuraStoria, TETTO_STORIA_MS, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
+import { leggiRispostaCritica, scriviRispostaCritica } from './lib/risposta-critica.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -135,7 +136,7 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 const ROUTINES_DOC = 'config/routines';
 
 // I bilanci dei giri di correzione, uno per livello (feedback #561: cap3 per
-// i rilievi di livello 3, cap2 per i 2, cap1, cap0) li CONSUMA il SERVER quando
+// i rilievi di livello 3, cap2 per i 2, cap1 per gli 1) li CONSUMA il SERVER quando
 // registra la critica, coi numeri che l'owner scrive in config/routines: qui
 // non esistono, nemmeno come riferimento (fino al 2026-09-16 c'era una copia
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
@@ -157,12 +158,12 @@ export const VERIFIER_ROUND = (() => {
     parseFindings(text) {
       const findings = [];
       for (const line of String(text || '').split('\n')) {
-        const m = /^\s*\[\s*([0-3])\s*([ievIEV])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
-        if (m) findings.push({ level: Number(m[1]), sede: m[2].toLowerCase(), text: m[4].trim(), decision: m[3] === '?' });
+        const m = /^\s*\[\s*(?:([1-3])\s*[iI]|([eE]))\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: m[1] ? Number(m[1]) : null, sede: m[2] ? 'e' : 'i', text: m[4].trim(), decision: m[3] === '?' });
       }
       return { summary: '', findings, rifiutati: [] };
     },
-    formatFinding(f) { return `- [${f.level}${f.sede === 'e' || f.sede === 'v' ? f.sede : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
+    formatFinding(f) { return `- [${f.sede === 'e' ? 'e' : `${f.level}i`}${f.decision ? '?' : ''}] ${f.text}`; },
     formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
     primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
     groupLabel(g) { return g.tipo; },
@@ -576,7 +577,7 @@ export function rilieviConDomanda(findings, domande) {
   const lista = Array.isArray(findings) ? findings.map((f) => ({ ...f })) : [];
   const conSegno = lista.map((f, i) => ({ f, n: i + 1 })).filter((x) => x.f.decision);
   const d = Array.isArray(domande) ? domande : [];
-  const riga = (x) => `[${x.f.level}${x.f.sede}?] ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
+  const riga = (x) => `${typeof VERIFIER_ROUND.findingTag === 'function' ? VERIFIER_ROUND.findingTag(x.f) : `[${x.f.sede === 'e' ? 'e' : `${x.f.level}i`}?]`} ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
   if (conSegno.length > d.length) {
     const senza = conSegno.slice(d.length);
     return { ok: false, errore: `${senza.length === 1 ? `il rilievo ${senza[0].n}` : `i rilievi ${senza.map((x) => x.n).join(', ')}`} col «?» `
@@ -605,6 +606,34 @@ function puntaDellaCartella() {
   } catch (_) {
     return '';
   }
+}
+
+// Scaricato adesso: una copia vecchia potrebbe essere la base del commit verificato, e la consegna passerebbe senza rebase.
+// '' se non si scarica: la consegna allora chiede l'ultimo main, come prima di #2236.
+export function mainAllaPresa(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['fetch', '--quiet', 'origin', refspecMain(main)], { cwd: root, stdio: 'ignore', timeout: 120000 });
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Il ramo non porta niente rispetto alla sua base con main (#1363): false anche se git non risponde. */
+export function ramoSenzaModifiche(root = ROOT, main = MAIN_BRANCH) {
+  try {
+    execFileSync('git', ['diff', '--quiet', `refs/remotes/origin/${main}...HEAD`], { cwd: root, stdio: 'ignore' });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Un lavoro server porta le sue modifiche nel diff del server: lì un'app senza modifiche non dice niente.
+export function segnaRamoVuoto(bucket, ctx, { senzaModifiche = () => ramoSenzaModifiche() } = {}) {
+  const ruolo = bucket && bucket.role;
+  if ((ruolo === 'verifier' || ruolo === 'fixer') && ctx && !ctx.lavoroServer && senzaModifiche()) ctx.ramoVuoto = true;
+  return ctx;
 }
 
 /**
@@ -879,6 +908,8 @@ export function serialAwarenessNote(role, history, dropped = 0) {
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
 
 const LAVORO_SERVER_FILE = '_lavoro-server.md';
+// Il primo lavoro di un fidato non segnato (#2500, busta `lavoroServer.seServe`): il server solo se il lavoro lo tocca.
+const LAVORO_SERVER_SE_SERVE_FILE = '_lavoro-server-se-serve.md';
 
 export { cloneDentroIlRepo, cartellaCloneServer };
 
@@ -893,11 +924,13 @@ export function rigaCartellaDiPartenza(cwd, root) {
 }
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
-export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs'), seServe = false } = {}) {
   const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
   if (!existsSync(f)) return '';
   const avanti = (p) => String(p).split('\\').join('/');
-  const testo = readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+  const prima = resolve(ROLES_DIR, LAVORO_SERVER_SE_SERVE_FILE);
+  const pezzi = [seServe && existsSync(prima) ? readFileSync(prima, 'utf8').trim() : '', readFileSync(f, 'utf8')].filter(Boolean);
+  const testo = pezzi.join('\n\n').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
   return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
@@ -1036,10 +1069,22 @@ function testoDiffVuoto({ commitPropri = null, soloMedia = 0 } = {}, diffServer 
   return commitPropri === 0 ? `Il diff è vuoto davvero: ${perche}, quindi non porta nessuna modifica.` : `Il diff è vuoto davvero: ${perche}.`;
 }
 
+// Il fatto sta nel payload, cosa farne nel ruolo (§ «Un ramo che non porta niente», _ramo-vuoto.md).
+export const TESTO_RAMO_VUOTO = 'Il ramo non porta nessuna modifica rispetto a main: vale la sezione «Un ramo che non porta niente» delle tue istruzioni.';
+function conRamoVuoto(ctx) {
+  return ctx && ctx.ramoVuoto === true ? { ramoVuoto: TESTO_RAMO_VUOTO } : {};
+}
+
 // Il piano che una sessione precedente ha scritto per questo lavoro (SPEC-RIDISEGNO-LAVORO.md § 2): chi riprende
 // riparte da lì. Lo conserva e lo rimanda il server.
 function conPiano(ctx) {
   return typeof ctx.piano === 'string' && ctx.piano.trim() ? { piano: ctx.piano } : {};
+}
+
+// Un allarme della suite: il commit su cui ha dato il rosso, scritto dal server (FEEDBACK-STATES.md, Già risolto su main).
+function conCommitProvato(ctx) {
+  const c = String((ctx && ctx.commitProvato) || '').toLowerCase();
+  return /^[0-9a-f]{40}$/.test(c) ? { commitProvato: c } : {};
 }
 
 /**
@@ -1060,9 +1105,7 @@ function suMainDi(bucket, ctx) {
 
 /** Segna `propria` la fusione del lavoro stesso del feedback («merge-gate: #N …»). PURA. */
 export function segnaProprie(fusioni, num) {
-  const n = numeroFeedback(num);
-  const propria = new RegExp(`^merge-gate: #${n.replace('.', '\\.')}\\b(?!\\.\\d)`);
-  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (n && propria.test(String(f.oggetto || '')) ? { ...f, propria: true } : f));
+  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (fusionePropria(f.oggetto, num) ? { ...f, propria: true } : f));
 }
 
 export function buildPayload(bucket, ctx = {}) {
@@ -1101,6 +1144,7 @@ export function buildPayload(bucket, ctx = {}) {
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
         ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
+        ...conRamoVuoto(ctx),
       };
     case 'fixer': {
       // La ripresa dopo la risposta dell'owner: il lavoro si era fermato su una
@@ -1128,6 +1172,7 @@ export function buildPayload(bucket, ctx = {}) {
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRamoVuoto(ctx),
       };
     }
     case 'new-work': {
@@ -1136,7 +1181,8 @@ export function buildPayload(bucket, ctx = {}) {
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
       if (bucket.ripartenza) out.ripartenza = bucket.ripartenza;
-      return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}) };
+      if (bucket.ripartenzaPersa) out.ripartenzaPersa = { ...bucket.ripartenzaPersa, nota: testoRipartenzaPersa(bucket.ripartenzaPersa) };
+      return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}), ...conCommitProvato(ctx) };
     }
     case 'risposta': {
       const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
@@ -1202,9 +1248,8 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
   const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
   if (!branch) return guasto('nessun ramo di cui calcolare il diff');
   // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
-  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
-  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
-  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  // diff di modifiche già fuse. Niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', refspecMain(main)]);
   const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
   if (!baseSha.ok) {
     return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
@@ -1449,7 +1494,7 @@ function sealTransition(state, by) {
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
- * si stampa intera: non sta da nessun'altra parte.
+ * si stampa intera e resta in un file della consegna (lib/risposta-critica.mjs).
  */
 async function recordVerifier(id, critiqueText, domande = []) {
   const guard = guardIdentity(id);
@@ -1600,7 +1645,9 @@ export function derivatiAperti(derived) {
     if (!f || typeof f !== 'object') continue;
     const rilievi = Array.isArray(f.findings) ? f.findings.filter((x) => x && typeof x === 'object') : [f];
     const num = String(f.num || '').trim();
-    const priorita = Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null);
+    // Un esterno nasce senza livello né priorità (#2339): Number(null) varrebbe 0, una priorità inventata.
+    const numero = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+    const priorita = numero(f.priority) ?? numero(f.level);
     const gia = num ? perNumero.get(num) : null;
     if (gia) {
       gia.rilievi.push(...rilievi);
@@ -1632,7 +1679,9 @@ function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
     const gruppo = { tipo: d.tipo, priority: d.priority, decision: d.rilievi.some((f) => f.decision === true), findings: d.rilievi };
-    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}` : ''}`;
+    const etichetta = d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}`
+      : d.esterno ? `, ${VERIFIER_ROUND.groupLabel(gruppo)}, senza livello: lo classifica chi classifica ogni feedback` : '';
+    const dove = `feedback ${d.num || '(numero non comunicato)'}${etichetta}`;
     const conTesto = d.rilievi.filter((f) => f.text);
     return conTesto.length ? `${conTesto.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n')}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
@@ -1650,13 +1699,22 @@ export function numeraRisposta(reply, critica) {
   return r;
 }
 
+/** La riga che dice dove sta la risposta intera; un file non scritto si dice, la stampa resta. */
+export function rispostaSuFile(scrivi) {
+  try {
+    return `\n(La risposta intera è anche nel file ${scrivi()}: rileggila da lì, non si ristampa.)`;
+  } catch (e) {
+    return `\n(Non ho potuto salvare la risposta in un file: ${e.message}. Vale quella stampata qui sopra.)`;
+  }
+}
+
 export function verifierReplyText(reply, id = '<id>') {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
   // server non manda (un server vecchio) non si inventa.
-  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1', 'cap0'];
+  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1'];
   const budgets = b && typeof b === 'object'
     ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
@@ -1709,6 +1767,9 @@ export function verifierReplyText(reply, id = '<id>') {
         ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : VERIFIER_ROUND.RILIEVI_CHE_FERMANO,
       perSegnalazione ? null : fmt(r.blocking),
+      // Il destinatario lo calcola il server (destinatarioDelFermo, #2339): qui si dice a chi è andata la domanda.
+      !perSegnalazione && Array.isArray(r.blocking) && r.blocking.some((f) => f && f.destinatario === 'manutentore')
+        ? 'La scelta difficile da disfare va al manutentore: risponde lui con una nota, o la porta all\'owner.' : null,
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       budgets ? `Bilanci: ${budgets}` : null,
@@ -1818,10 +1879,17 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
   // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
   if (spedisce) {
-    const sped = ch.spedisciRiallineamento(ROOT);
+    const sped = ch.spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
     process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
+  } else if (ferma || domanda) {
+    // Una consegna che si ferma lascia il ramo a chi riprende: prima su origin (#2516).
+    const canale = ch || await import('./routine-channel.mjs');
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const sped = canale.spedisciPrimaDellaFermata(ROOT, readTicket(ROOT));
+    for (const riga of sped.righe || []) process.stderr.write(`${riga}\n`);
+    if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
@@ -2116,12 +2184,14 @@ export function usageText() {
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
+    '                         con livello e sede davanti ([2i] …, [1i] …; [e] … senza livello = esterno; [1i?] = chiede una decisione,',
     '                         [2i?!] = una scelta difficile da disfare; ognuna porta la sua domanda: --domanda con',
     '                         una, o un elenco nell\'ordine dei rilievi col «?»);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
+    '  --risposta-critica [<id>] [--ticket <b>]   ristampa la risposta del server all\'ultima critica',
+    '                         registrata su questo ramo (sola lettura: niente server, niente stato)',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
@@ -2266,6 +2336,7 @@ export async function run() {
     id: w.id || undefined,
     num: w.num || '',
     branch: w.branch || '',
+    ramoLegato: w.role === 'new-work' && w.payload && typeof w.payload.ramoLegato === 'string' ? w.payload.ramoLegato : '',
   };
   if (bucket.id) {
     // Lo stato locale resta il ripiego quando il server non risponde: si
@@ -2304,6 +2375,12 @@ export function tornaAllaLineaPrincipale() {
   return { ok: true, head: headSha(ROOT) };
 }
 
+/** La frase di una ripartenza persa (#2516), per chi lavora e per la conversazione del feedback. PURA. */
+export function testoRipartenzaPersa({ ramo = '', invece = '' } = {}) {
+  return `Il ramo ${ramo} a cui il lavoro era legato prima della fermata non c'è più su origin: si riparte da ${invece || MAIN_BRANCH}. `
+    + 'Quello che il piano o la ripresa danno per fatto su quel ramo va controllato nel codice e, se manca, rifatto.';
+}
+
 /**
  * A + D: posiziona la directory sul branch del bucket e registra nello stato
  * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
@@ -2337,12 +2414,22 @@ function positionOnBranch(bucket) {
   // Le basi feature/N del Modello B restano abolite (SPEC-RIDISEGNO-MAX.md §1).
   const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, num: bucket.num, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
   if (!precedenti.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin i tentativi precedenti di ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${precedenti.errore}` };
+  // Il ramo legato al feedback prima della fermata (#2516): base se nessun tentativo lo supera, e se manca si dice.
+  const legato = isNew && !dalBiglietto
+    ? ramoLegatoDaRiprendere({ root: ROOT, legato: bucket.ramoLegato, mainBranch: MAIN_BRANCH, escludi: branch })
+    : { ok: true, stato: 'nessuno', ramo: '' };
+  if (!legato.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin il ramo ${bucket.ramoLegato} a cui era legato ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${legato.errore}` };
+  const sorgente = precedenti.scelto || (legato.stato === 'presente' ? { ramo: legato.ramo, propri: legato.propri } : null);
+  if (legato.stato === 'perso') {
+    bucket.ripartenzaPersa = { ramo: legato.ramo, ...(sorgente ? { invece: sorgente.ramo } : {}) };
+    process.stderr.write(`[dispatch] ${bucket.id}: il ramo ${legato.ramo} a cui era legato non c'è più su origin; ${sorgente ? `si riparte da ${sorgente.ramo}` : `si riparte da ${MAIN_BRANCH}`}, e il piano o la ripresa che lo danno per fatto non valgono\n`);
+  }
   const res = prepareBranch({
     root: ROOT,
     branch,
     create: isNew && !dalBiglietto,
     createIfMissing: dalBiglietto,
-    base: precedenti.scelto ? precedenti.scelto.ramo : '',
+    base: sorgente ? sorgente.ramo : '',
     mainBranch: MAIN_BRANCH,
     checkpoint,
   });
@@ -2354,18 +2441,28 @@ function positionOnBranch(bucket) {
       : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
   }
   if (isNew) {
-    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH });
+    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH, num: bucket.num, id: bucket.id });
     if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
     if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
   }
-  const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
+  const ripartito = !!sorgente && res.base === `origin/${sorgente.ramo}`;
   if (ripartito) {
-    const { scelto, altri } = precedenti;
+    const scelto = sorgente;
+    const altri = precedenti.altri || [];
+    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
+    const a = allineaAMain({ root: ROOT, mainBranch: MAIN_BRANCH });
+    if (!a.ok) return { ok: false, kind: 'transient', message: `${branch}: non riesco a portare dentro il ${MAIN_BRANCH} di adesso, e senza si lavorerebbe sul codice di quando ${scelto.ramo} era partito: ${a.errore}` };
+    if (a.fuso) {
+      res.head = a.head;
+      process.stderr.write(`[dispatch] ${branch}: dentro anche il ${MAIN_BRANCH} di adesso, fuso senza conflitti\n`);
+    } else if (a.conflitti.length) {
+      process.stderr.write(`[dispatch] ${branch}: il ${MAIN_BRANCH} di adesso va in conflitto in ${a.conflitti.join(', ')}: non fuso, lo risolve per primo chi lavora\n`);
+    }
     bucket.ripartenza = {
       ramo: scelto.ramo, commit: scelto.propri,
       ...(altri.length ? { altri: altri.map((t) => ({ ramo: t.ramo, commit: t.propri })) } : {}),
+      ...(a.conflitti.length ? { conflittiConMain: a.conflitti } : {}),
     };
-    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
   }
   const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {
@@ -2541,6 +2638,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // riallinea lo sha che aveva passato la verifica (la base del confronto alla consegna).
       ...(role !== 'verifier' && typeof (payload && payload.piano) === 'string' ? { piano: payload.piano } : {}),
       ...(role === 'new-work' && Array.isArray(payload && payload.suMain) ? { suMain: payload.suMain } : {}),
+      ...(role === 'new-work' ? conCommitProvato(payload) : {}),
       ...(role === 'fixer' && /^[0-9a-f]{40}$/i.test(String((payload && payload.shaVerificato) || '')) ? { shaVerificato: payload.shaVerificato } : {}),
       // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
       ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
@@ -2614,7 +2712,10 @@ async function finalizeBucket(bucket, fromServer) {
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
-    const presa = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    const presa = await deliverToChannel('status', {
+      status: 'working', branch: bucket.branch || '',
+      ...(bucket.ripartenzaPersa ? { notes: testoRipartenzaPersa(bucket.ripartenzaPersa), ripartenzaPersa: bucket.ripartenzaPersa.ramo } : {}),
+    });
     // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
     if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
       const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
@@ -2630,6 +2731,7 @@ async function finalizeBucket(bucket, fromServer) {
     if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
   }
   const ctx = serverCtx(bucket, fromServer, diff);
+  segnaRamoVuoto(bucket, ctx);
 
   emit(bucket, ctx);
   return { exit: 0 };
@@ -2644,6 +2746,16 @@ async function finalizeBucket(bucket, fromServer) {
 // diverso da quello davvero consegnato.
 let lastEmitted = null;
 export function lastChoice() { return lastEmitted; }
+
+/**
+ * Il tetto di costo della corsa di un compito (#2303) va dove la veglia di chi guida il giro lo legge: il marcatore del
+ * biglietto. Un compito senza tetto lo toglie, così un marcatore riusato non ne porta uno vecchio.
+ */
+export function tettoNelMarcatore(root, bucket, ctx) {
+  if (!bucket || bucket.role !== 'compito') return false;
+  const mk = leggiMarcatoreBiglietto(root);
+  return !!(mk && mk.ticket) && annotaTetto(root, mk.ticket, ctx && ctx.compito && ctx.compito.tettoUsd);
+}
 
 export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443): resta come
@@ -2672,7 +2784,13 @@ export function emit(bucket, ctx) {
     process.stderr.write(`[dispatch] il commit verificato (${unaRiga(ctx.shaVerificato).slice(0, 12)}) qui non c'è e da origin non è arrivato: alla consegna il confronto lo rifà il server\n`);
   }
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
+  else {
+    writeRole(ROOT, bucket.role, {
+      dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '',
+      main: riallinea ? mainAllaPresa() : '',
+    });
+  }
+  tettoNelMarcatore(ROOT, bucket, ctx);
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
@@ -2683,10 +2801,10 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato, mancante, baseVecchia })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
-  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer(), seServe: ctx.lavoroServer.seServe === true }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
-  const cartella = preparaIntestazione(ROOT);
+  const cartella = preparaIntestazione(ROOT, { strumenti: TOOLS_ROOT });
   const instructions = cartella ? `${cartella}\n\n${corpo}` : corpo;
   const stampaCon = (payload, istr = instructions, file = '') => ({
     role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
@@ -2828,8 +2946,24 @@ if (isMainModule) {
       if (!lette.ok) { console.error(lette.errore); process.exit(1); }
       const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply, id));
+      const risposta = `stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}\n${verifierReplyText(s.reply, id)}`;
+      // La critica è già registrata: un file che non si scrive non la disfa, ma chi legge deve sapere che la stampa è l'unica copia.
+      let salvata = '';
+      try { salvata = scriviRispostaCritica(ROOT, { id, ramo: ramoCorrente(ROOT), sha: s.verifierSha || headSha(ROOT) || '', testo: risposta }); } catch (e) {
+        process.stderr.write(`[dispatch] risposta non salvata su file (${e.message}): questa stampa è l'unica copia, leggila intera.\n`);
+      }
+      console.log(risposta);
+      const suFile = rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta));
+      // Una riga sola in fondo, perché sopravviva a un `| tail`, che è il filtro che l'ha persa (#2316).
+      console.log(salvata ? `\nLa risposta intera sta anche in ${salvata}; se l'hai filtrata o persa la ristampa: node scripts/dispatch.mjs --risposta-critica ${id}` : suFile);
+      process.exit(0);
+    } else if (flag === '--risposta-critica') {
+      // Sola lettura: niente server, niente stato, niente battito. Il biglietto a mano si accetta e non serve.
+      const [, id, ...avanzo] = argv;
+      if ((id && SEMBRA_OPZIONE(id)) || avanzo.length) { console.error('Uso: --risposta-critica [<id>] [--ticket <b>]. Niente è stato toccato.'); process.exit(1); }
+      const r = leggiRispostaCritica(ROOT, { id: id || '', ramo: ramoCorrente(ROOT) });
+      if (r.errore) { console.error(r.errore); process.exit(2); }
+      console.log(r.testo);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;

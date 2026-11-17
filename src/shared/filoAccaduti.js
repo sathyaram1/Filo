@@ -39,7 +39,7 @@
 
   // La ricerca scritta nell'indirizzo di un motore o di un sito («cercato orche su YouTube»). Null se non è una ricerca.
   const MOTORI = [
-    { host: /(^|\.)google\.[a-z.]+$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Google' },
+    { host: /(^|\.)google\.[a-z.]+$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Google', marchio: 'google' },
     { host: /(^|\.)bing\.com$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Bing' },
     { host: /(^|\.)duckduckgo\.com$/, percorso: /^\/(html\/?)?$/, chiavi: ['q'], nome: 'DuckDuckGo' },
     { host: /(^|\.)search\.yahoo\.com$/, percorso: /^\/search/, chiavi: ['p'], nome: 'Yahoo' },
@@ -47,16 +47,15 @@
     { host: /(^|\.)startpage\.com$/, percorso: /^\/(sp\/)?search/, chiavi: ['query', 'q'], nome: 'Startpage' },
     { host: /(^|\.)search\.brave\.com$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Brave' },
     { host: /(^|\.)qwant\.com$/, percorso: /^\/?$/, chiavi: ['q'], nome: 'Qwant' },
-    { host: /(^|\.)yandex\.[a-z.]+$/, percorso: /^\/search/, chiavi: ['text'], nome: 'Yandex' },
+    { host: /(^|\.)yandex\.[a-z.]+$/, percorso: /^\/search/, chiavi: ['text'], nome: 'Yandex', marchio: 'yandex' },
     { host: /(^|\.)baidu\.com$/, percorso: /^\/s$/, chiavi: ['wd'], nome: 'Baidu' },
     { host: /(^|\.)youtube\.com$/, percorso: /^\/results$/, chiavi: ['search_query'], nome: 'YouTube' },
-    { host: /(^|\.)amazon\.[a-z.]+$/, percorso: /^\/s\/?$/, chiavi: ['k'], nome: 'Amazon' },
-    { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay' },
+    { host: /(^|\.)amazon\.[a-z.]+$/, percorso: /^\/s\/?$/, chiavi: ['k'], nome: 'Amazon', marchio: 'amazon' },
+    { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay', marchio: 'ebay' },
     { host: /(^|\.)wikipedia\.org$/, percorso: /^\/w\/index\.php$/, chiavi: ['search'], nome: 'Wikipedia' },
   ];
-  const PERCORSO_CERCA = /(^|\/)(search|cerca|ricerca|results|risultati|find|suche|recherche|buscar)(\/|$|\.)/i;
-  const CHIAVI_CERCA = ['q', 'query', 'search', 'search_query', 's', 'k', 'term', 'keyword', 'keywords', 'text'];
-
+  // Solo motori e siti riconosciuti: un qualunque sito può portare a un suo «/search?q=…» con le parole che vuole, e
+  // quelle non sono una ricerca dell'utente (#2293). Della pagina resta il titolo, come delle altre.
   function ricercaNellIndirizzo(url) {
     let u;
     try { u = new URL(String(url || '')); } catch (_) { return null; }
@@ -69,7 +68,11 @@
       }
       return '';
     };
-    const motore = MOTORI.find((m) => m.host.test(host));
+    // Un marchio con un dominio per paese vale solo sui suoi domini veri, con la regola dell'accesso Google: non
+    // google.inganno.com, google.xyz, google.blogspot.com o google.com.de, che chiunque può prendere (#2293).
+    const G = global.SN_DOMINI_GOOGLE || (typeof require === 'function' ? require('./dominiGoogle.js') : null);
+    const delMotore = (m) => !m.marchio || (!!G && G.delMarchio(host, m.marchio));
+    const motore = MOTORI.find((m) => m.host.test(host) && delMotore(m));
     if (motore) {
       if (!motore.percorso.test(u.pathname)) return null;
       const testo = leggi(motore.chiavi);
@@ -77,10 +80,7 @@
     }
     const SC = global.SN_SITI_COMUNI;
     const r = SC && typeof SC.riconosci === 'function' ? SC.riconosci(u.href) : null;
-    if (r && r.tipo === 'cerca' && stringa(r.parole)) return { testo: r.parole.trim(), sito: r.sito };
-    if (!PERCORSO_CERCA.test(u.pathname)) return null;
-    const testo = leggi(CHIAVI_CERCA);
-    return testo ? { testo, sito: host } : null;
+    return r && r.tipo === 'cerca' && stringa(r.parole) ? { testo: r.parole.trim(), sito: r.sito } : null;
   }
 
   // ── Il sistema: solo i cambi che contano, non ogni punto di batteria ──

@@ -2,6 +2,8 @@
 // ruolo riceve e come si scrive il suo perimetro. Lo usano dispatch (routine) e
 // verify-local (giro locale): una regola sola per le due strade.
 
+import { createRequire } from 'node:module';
+
 // Un valore che non conosco vale «pieno»: mai meno verifica per un valore storto.
 export const VERIFIER_SCOPE_FILE = {
   pieno: 'verifier.md',
@@ -24,8 +26,12 @@ const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
 const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(unaRiga(v)) ? unaRiga(v) : '');
 
 // Livello E sede, come il lettore della critica li pretende: un perimetro
-// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
-const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
+// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta. Il modulo condiviso si carica solo
+// qui, quando chi chiama non passa il suo: la copia degli strumenti fissati importa questo file anche senza src/.
+function formatoMinimo(list) {
+  if (!globalThis.SN_VERIFIER_ROUND) createRequire(import.meta.url)('../../src/shared/verifierRound.js');
+  return list.map((f) => `- ${globalThis.SN_VERIFIER_ROUND.findingTag(f)} ${unaRiga(f.text)}`).join('\n');
+}
 
 // La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
 function lineaServer(ramo, sha) {
@@ -40,7 +46,9 @@ function rigaVerificato(sha, scartato) {
   if (!sha) return 'Commit che aveva passato la verifica: non comunicato.';
   if (scartato === 'punta') {
     return `Commit che aveva passato la verifica: il server ha mandato \`${sha}\`, che è la punta di questo ramo: `
-      + 'il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica.';
+      + 'il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica. '
+      // Senza un commit da cui partire chi verifica restava fermo (#1514, #2236): gli si dà il diff che c'è.
+      + 'Al suo posto leggi il lavoro intero sopra main, `git diff origin/main...HEAD`, a cominciare dai file che il report qui sotto nomina in conflitto.';
   }
   if (scartato === 'assente') {
     return `Commit che aveva passato la verifica: \`${sha}\`, ma in questa copia non c'è e da origin non è arrivato. `
@@ -119,7 +127,22 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, 
         : conDiff
           ? '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)'
           : '  (nessun report e nessun confronto: cerca le zone fra i file del lavoro, `git diff --stat origin/main...HEAD`, e nella critica dichiara che il confronto mancava)',
+      ...righeFileDelServer(p),
     ].join('\n');
   }
   return '';
+}
+
+// I file che il server ha confrontato da sé (#2344): la verifica si ferma lì, il resto del lavoro è identico a quello passato.
+function righeFileDelServer(p) {
+  const nomi = (v) => (Array.isArray(v) ? v.map(unaRiga).filter(Boolean) : []);
+  const conflitto = nomi(p.fileInConflitto);
+  const codice = nomi(p.codice).filter((f) => !conflitto.includes(f));
+  if (!conflitto.length && !codice.length) return [];
+  return [
+    '',
+    'Il server ha confrontato le modifiche del lavoro prima e dopo il riallineamento. Guarda solo questi file: negli altri il lavoro è identico a quello che aveva passato la verifica.',
+    ...(conflitto.length ? [`- in conflitto con \`main\`: ${conflitto.map((f) => `\`${f}\``).join(', ')}`] : []),
+    ...(codice.length ? [`- con le modifiche del lavoro cambiate dal riallineamento: ${codice.map((f) => `\`${f}\``).join(', ')}`] : []),
+  ];
 }

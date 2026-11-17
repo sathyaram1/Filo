@@ -10,7 +10,8 @@ import '../src/shared/feedback.js';
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineStateAdmin';
 const GIORNO = 24 * 60 * 60 * 1000;
 const FINESTRA_PREDEFINITA = 30 * GIORNO;
-const LIVELLI = [3, 2, 1, 0];
+const SENZA_LIVELLO = 'e';
+const LIVELLI = [3, 2, 1, 0, SENZA_LIVELLO];
 const ESITI = ['passa', 'corregge', 'corretto', 'fermato'];
 const USO = 'Uso: node scripts/storico-giri.mjs [--da <data>] [--a <data>] [--json]\n'
   + '  <data>: AAAA-MM-GG, GG/MM/AAAA o GG/MM (anno in corso). --a comprende tutto quel giorno.\n'
@@ -52,8 +53,11 @@ export function leggiArgomenti(argv, ora = Date.now()) {
   return { da, a, json };
 }
 
+// Dalla scala a tre (#2339) un esterno non ha livello e il server lo registra `null`: ha la sua riga, mai quella dello 0,
+// che resta per i giri della scala a quattro.
 function livelli(v) {
-  return (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 3);
+  return (Array.isArray(v) ? v : []).filter((x) => x === null || (x !== '' && Number.isInteger(Number(x)) && Number(x) >= 0 && Number(x) <= 3))
+    .map((x) => (x === null ? SENZA_LIVELLO : Number(x)));
 }
 
 /** «#795», «#22.1» o l'id quando il feedback non ha numero. PURA. */
@@ -118,7 +122,8 @@ export function formatta(result, { da, a, quando = dataOra } = {}) {
   out.push('', `Totali: ${t.lavori} ${t.lavori === 1 ? 'lavoro' : 'lavori'}, ${t.giri} giri`
     + (t.nonRegistrati ? ` (più ${t.nonRegistrati} non registrati)` : ''));
   out.push(...tabella([['livello', 'trovati', 'esterni', 'corretti', 'giri pagati'],
-    ...LIVELLI.map((n) => [String(n), t.perLivello[n].trovati, t.perLivello[n].esterni, t.perLivello[n].corretti, t.perLivello[n].pagati])]));
+    ...LIVELLI.filter((n) => (n !== 0 && n !== SENZA_LIVELLO) || Object.values(t.perLivello[n]).some(Boolean))
+      .map((n) => [n === SENZA_LIVELLO ? 'senza livello' : String(n), t.perLivello[n].trovati, t.perLivello[n].esterni, t.perLivello[n].corretti, t.perLivello[n].pagati])]));
   out.push(`  esiti: ${ESITI.map((e) => `${e} ${t.perEsito[e]}`).join(' · ')}${t.senzaEsito ? ` · senza esito ${t.senzaEsito}` : ''}`);
   return out.join('\n');
 }

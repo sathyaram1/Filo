@@ -21,6 +21,14 @@ function fsState(app) {
   });
 }
 
+function nellaPagina(app, tabId, codice) {
+  return app.evaluate(({ BrowserWindow }, { tabId, codice }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tab = win._filoTabs.tabs.find((t) => t.id === tabId);
+    return tab.view.webContents.executeJavaScript(codice, true);
+  }, { tabId, codice });
+}
+
 test('la richiesta di fullscreen della pagina porta la view a tutto schermo', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html(
     '<html><body style="margin:0"><div id="box" style="width:100px;height:100px;background:#09f"></div></body></html>',
@@ -31,26 +39,18 @@ test('la richiesta di fullscreen della pagina porta la view a tutto schermo', as
   // All'inizio non siamo in fullscreen.
   expect(await fsState(app)).toBe(false);
 
-  // requestFullscreen ha bisogno di un gesto utente: lo forniamo eseguendo lo
-  // script con userGesture=true sul webContents della tab attiva.
-  await app.evaluate(({ BrowserWindow }, tabId) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    const tab = win._filoTabs.tabs.find((t) => t.id === tabId);
-    return tab.view.webContents.executeJavaScript(
-      'document.getElementById("box").requestFullscreen().catch(()=>{}); true',
-      true,
-    );
-  }, id);
+  // requestFullscreen ha bisogno di un gesto utente: executeJavaScript con userGesture=true.
+  await nellaPagina(app, id, 'document.getElementById("box").requestFullscreen().catch(()=>{}); true');
 
   // Il TabManager deve essere entrato in modalità contenuto a tutto schermo.
   await expect.poll(() => fsState(app), { timeout: 8_000 }).toBe(true);
+  // enter-html-full-screen arriva al main prima che il documento abbia il suo fullscreenElement: un
+  // exitFullscreen in quella finestra di millisecondi è rifiutato («Document not active») e niente esce (#2091.3).
+  await expect.poll(() => nellaPagina(app, id, 'document.fullscreenElement?.id || null'), { timeout: 8_000 }).toBe('box');
 
   // Uscita: la pagina esce dal fullscreen → leave-html-full-screen → torna false.
-  await app.evaluate(({ BrowserWindow }, tabId) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    const tab = win._filoTabs.tabs.find((t) => t.id === tabId);
-    return tab.view.webContents.executeJavaScript('document.exitFullscreen().catch(()=>{}); true', true);
-  }, id);
+  const uscita = await nellaPagina(app, id, 'document.exitFullscreen().then(() => "ok", (e) => String(e))');
+  expect(uscita, 'la pagina deve poter uscire dal suo schermo intero').toBe('ok');
 
   await expect.poll(() => fsState(app), { timeout: 8_000 }).toBe(false);
 });

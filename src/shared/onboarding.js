@@ -68,14 +68,14 @@
       kind: 'scoprire',
       label: 'Chi è l’utente e a cosa gli serve il computer',
       detail: 'Lavoro, studio, svago, quali siti frequenta.',
-      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
+      applica: 'Appena lo sai, chiama memoria(impara) con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       id: 'stile',
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
+      applica: 'Appena lo sai, chiama impostazioni(imposta) con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       // #1188: il livello di autonomia si sceglie qui e in Preferenze, non più dalla casella della home.
@@ -83,19 +83,21 @@
       kind: 'scoprire',
       label: 'Quanto vuole che Filo faccia da solo',
       detail: 'Se preferisce che gli chieda prima di quasi tutto, che faccia da solo quello che si rimedia, o anche di più.',
-      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo cambia solo lui, tu non hai un’azione per farlo: non dire di averlo cambiato. Se risponde a parole, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno chiama filo_su_di_se(intervista) con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo sceglie lui: il clic lo salva già; se invece ne nomina uno a parole sue, chiama impostazioni(imposta) con chiave autonomia (alzarlo gli fa scrivere «conferma»); se non è chiaro quale, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Non dire di averlo cambiato finché l’esito non lo dice. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'estetica',
       kind: 'dire',
       label: 'L’aspetto si cambia parlando',
-      detail: 'Una frase, tipo «preferisci il tema scuro? dimmelo». Se te lo chiede, applicalo subito con IMPOSTA_PREFERENZA o IMPOSTA_ESTETICA.',
+      detail: 'Una frase, tipo «preferisci il tema scuro? dimmelo». Se te lo chiede, applicalo subito con impostazioni(imposta) o impostazioni(aspetto).',
     },
     {
+      // #1589: quanto Filo manda ai modelli dalle pagine si sceglie qui una volta, e si rivede in Impostazioni → Sicurezza.
       id: 'privacy',
-      kind: 'dire',
-      label: 'La privacy è protetta già così',
-      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con LEGGI_TRASPARENZA doc "privacy" prima di rispondere.',
+      kind: 'scoprire',
+      label: 'Quanto Filo manda ai modelli dalle pagine',
+      detail: 'Tre livelli: tutto in anticipo (di serie: spiegazioni, descrizioni e controlli del testo partono da soli, sulla sanità chiede prima), chiedi sulle delicate (posta, banca, sanità, enti pubblici, pagine con una password), chiedi sempre. In incognito chiede sempre. Password, carte e codici non escono a nessun livello. Il resto è già protetto: cookie rifiutati, pubblicità e siti pericolosi bloccati. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con filo_su_di_se(documento) doc "privacy" prima di rispondere.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno chiama filo_su_di_se(intervista) con "privacy": true: sotto la tua risposta compaiono i tre livelli, ognuno con la riga che dice cosa esce, e sceglie lui con un clic, che ti arriva come suo messaggio. Se risponde a parole, imposta il livello con impostazioni(imposta) chiave "livello_privacy" (mandare di più vuole la sua «conferma» scritta, e la chiede il sistema). Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
     },
     {
       // #1461: i contatori anonimi sono una scelta concreta, accanto a quello che Filo dice della privacy.
@@ -103,13 +105,13 @@
       kind: 'scoprire',
       label: 'Se Filo può mandare numeri senza contenuto per migliorare',
       detail: 'Quante volte si usa ogni funzione, quanto si aspetta, cosa non va: solo numeri, mai testi, indirizzi o nomi di file, con uno pseudonimo che cambia ogni mese. Spenti, non esce niente.',
-      applica: 'Diglielo in una riga con parole tue e nello stesso turno emetti ONBOARDING con "contatori": true: sotto la tua risposta compaiono Sì e No, e sceglie lui con un clic, che ti arriva come suo messaggio già applicato. Se invece risponde a parole, applica tu quello che ha detto con IMPOSTA_PREFERENZA, chiave "contatori" e valore true o false; se non si capisce, rimostra la scelta. Spunta la voce quando ha scelto, col clic o a parole, non nel turno in cui mostri la scelta.',
+      applica: 'Diglielo in una riga con parole tue e nello stesso turno chiama filo_su_di_se(intervista) con "contatori": true: sotto la tua risposta compaiono Sì e No, e sceglie lui con un clic, che ti arriva come suo messaggio già applicato. Se invece risponde a parole, applica tu quello che ha detto con impostazioni(imposta), chiave "contatori" e valore true o false; se non si capisce, rimostra la scelta. Spunta la voce quando ha scelto, col clic o a parole, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'modelli',
       kind: 'dire',
       label: 'L’impegno sui modelli',
-      detail: 'Filo non paga i grandi laboratori chiusi tranne Anthropic, usa modelli a pesi aperti su fornitori indipendenti, e c’è un interruttore per restare solo su quelli. UNA riga, senza predica: «se ti interessa come scelgo i modelli e chi pago, chiedimelo». Se te lo chiede, leggi il documento con LEGGI_TRASPARENZA doc "models" prima di rispondere.',
+      detail: 'Filo non paga i grandi laboratori chiusi tranne Anthropic, usa modelli a pesi aperti su fornitori indipendenti, e c’è un interruttore per restare solo su quelli. UNA riga, senza predica: «se ti interessa come scelgo i modelli e chi pago, chiedimelo». Se te lo chiede, leggi il documento con filo_su_di_se(documento) doc "models" prima di rispondere.',
     },
     {
       id: 'crediti',
@@ -210,7 +212,7 @@
     return Array.isArray(thread) && thread.some((m) => m && m.role === 'user');
   }
 
-  // `daFuori`: nel turno è entrato testo di altri. `autonomia`: sotto quel turno di Filo c'era la scelta del
+  // `daFuori`: nel turno è entrato testo di altri. `autonomia`, `privacy`: sotto quel turno di Filo c'era la scelta del
   // livello, e chi riprende l'intervista la ritrova lì.
   // `congedo`: è il congedo scritto dall'app, che «Riprendiamola» toglie.
   function segni(m) {
@@ -218,6 +220,7 @@
       ...(m && m.daFuori === true ? { daFuori: true } : {}),
       ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
       ...(m && m.role === 'filo' && m.contatori === true ? { contatori: true } : {}),
+      ...(m && m.role === 'filo' && m.privacy === true ? { privacy: true } : {}),
       ...(m && m.role === 'filo' && m.congedo === true ? { congedo: true } : {}),
     };
   }
@@ -265,6 +268,7 @@
       ...(s.fermato ? { fermato: true } : {}),
       ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
       ...(s.contatoriInSospeso === true ? { contatoriInSospeso: true } : {}),
+      ...(s.privacyInSospeso === true ? { privacyInSospeso: true } : {}),
       ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
       // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
       ...(s.rifatta === true ? { rifatta: true } : {}),
@@ -288,8 +292,15 @@
   function contatoriInSospeso(state) {
     return normalize(state).contatoriInSospeso === true;
   }
+  // #1589 — la scelta del livello di privacy, con la stessa regola.
+  function mostraSceltaPrivacy(state) {
+    return { ...normalize(state), privacyInSospeso: true };
+  }
+  function privacyInSospeso(state) {
+    return normalize(state).privacyInSospeso === true;
+  }
   function sceltaInSospeso(state) {
-    return autonomiaInSospeso(state) || contatoriInSospeso(state);
+    return autonomiaInSospeso(state) || privacyInSospeso(state) || contatoriInSospeso(state);
   }
 
   function isActive(state) {
@@ -364,12 +375,13 @@
     if (!congedoApp && ultimo && ultimo.role === 'filo' && prima > 0) {
       thread.push({ role: 'user', text: RESUME_REPLY });
     }
-    const { autonomiaInSospeso: _sospesa, contatoriInSospeso: _contatori, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
+    const { autonomiaInSospeso: _sospesa, privacyInSospeso: _privacy, contatoriInSospeso: _contatori, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
     const fine = thread[thread.length - 1];
     const riaperta = {
       ...resto, done: false, closedAt: null, notice: '', thread, rifatta: true,
       ...(fine && fine.role === 'filo' && fine.autonomia ? { autonomiaInSospeso: true } : {}),
       ...(fine && fine.role === 'filo' && fine.contatori ? { contatoriInSospeso: true } : {}),
+      ...(fine && fine.role === 'filo' && fine.privacy ? { privacyInSospeso: true } : {}),
     };
     return prima > 0 ? { ...riaperta, scambiPrima: prima } : riaperta;
   }
@@ -451,7 +463,7 @@
     const text = String((turn && turn.text) || '');
     if (!text) return normalize(state);
     const tutto = togliFermato(state);
-    const { autonomiaInSospeso: _sospesa, contatoriInSospeso: _contatori, ...senza } = tutto;
+    const { autonomiaInSospeso: _sospesa, privacyInSospeso: _privacy, contatoriInSospeso: _contatori, ...senza } = tutto;
     const cur = role === 'user' ? senza : tutto;
     const last = cur.thread[cur.thread.length - 1];
     const nuovi = segni({ ...turn, role });
@@ -501,7 +513,7 @@
   function shouldForceClose(state) {
     const cur = normalize(state);
     if (cur.done) return false;
-    return (isComplete(cur) && !cur.autonomiaInSospeso && !cur.contatoriInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
+    return (isComplete(cur) && !cur.autonomiaInSospeso && !cur.privacyInSospeso && !cur.contatoriInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
   }
 
   // Elenco per il prompt: cosa resta da scoprire e da dire, con la spunta di ciò che è fatto.
@@ -523,7 +535,7 @@
     emptyState, normalize, isActive, isTicked, tick, close, restart, riprendi, conversations,
     chiaveConversazione, togliConversazione, dimentica,
     remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
-    mostraSceltaAutonomia, autonomiaInSospeso, mostraSceltaContatori, contatoriInSospeso, sceltaInSospeso,
+    mostraSceltaAutonomia, autonomiaInSospeso, mostraSceltaPrivacy, privacyInSospeso, mostraSceltaContatori, contatoriInSospeso, sceltaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

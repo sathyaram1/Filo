@@ -22,6 +22,24 @@ correggi tu, nel modo che regge su ogni sistema
 (`patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`), e
 la verifica giudica la correzione. Nel report dici quali e come.
 
+**Quando la critica chiede di correggere.** La critica la scrive il cancello,
+che non sa chi lavora dopo: un «correggi» lì nomina il difetto, non ti dà il
+compito. Tu correggi solo in tre casi: il rosso nasce da come hai risolto un
+conflitto (passo 3), è un rosso `[Windows]` (qui sopra), o è la suite del
+server che torna verde senza cambiare codice (paragrafo «Lavoro server», se
+c'è). Ogni altra correzione chiesta la consegni com'è: `--motivo "prove rosse:
+…"` e l'elenco nel report. Chi verifica dopo di te la scrive come rilievo, e la
+fa il correttore del giro che segue.
+
+**Un file generato in conflitto** (uno che uno script riscrive da una sorgente,
+come il modulo dei documenti di trasparenza, o un file di dati del server come
+`functions/tools/l5-rigioco.json`) non si fonde a righe: tieni la versione di
+`main` e rilancia lo strumento che lo genera, che il file stesso o le prove
+che lo leggono nominano. Se lo strumento non lo trovi, consegna con `--motivo
+"conflitto: <file>"` e scrivi nel report che quel file va rigenerato.
+
+<!-- includi: _ramo-vuoto.md -->
+
 <!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->
@@ -40,8 +58,9 @@ la verifica giudica la correzione. Nel report dici quali e come.
    che ha toccato quel punto, non indovinarla. Risolto un file, `git add
    <file>`; risolti tutti, `git rebase --continue`. Il push forzato non tocca a
    te: lo fa la consegna, che registra il riallineamento solo se su origin il
-   ramo è alla tua punta e contiene `main`. Se rifiuta, ti dice perché e cosa
-   fare.
+   ramo è alla tua punta e contiene `main` com'era quando hai preso il lavoro:
+   se intanto è andata avanti, il resto lo riallinea il cancello. Se rifiuta,
+   ti dice perché e cosa fare.
 
    Davanti va solo il `cd` nel tuo clone, se la sezione «La tua cartella» lo
    chiede. Nessun'altra forma: i due comandi non si legano fra loro e non

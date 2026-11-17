@@ -81,6 +81,10 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    ESPANDI_FILO: (a) => {
+      const o = a._output || {};
+      return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
+    },
     CERCA_CHAT: (a) => {
       // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni, ognuna una volta
       // anche quando ne arrivano più pezzi (#868.2).
@@ -201,7 +205,11 @@
       return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
     },
     ONBOARDING: (a) => {
-      if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
+      if (sceltaAutonomia(a)) {
+        const o = a._output;
+        const cosa = [o.sceltaAutonomia ? 'dell’autonomia' : '', o.sceltaPrivacy ? 'della privacy' : ''].filter(Boolean).join(' e ');
+        return { icon: '👋', text: `Accoglienza · scelta ${cosa}` };
+      }
       if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
@@ -224,10 +232,10 @@
     RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
     REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
     RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
-    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || 'questo sito'}` }),
+    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || a.sito || 'questo sito'}` }),
     NON_TENERE_APERTA: (a) => {
       const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
-      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || 'questo sito'}` };
+      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || a.sito || 'questo sito'}` };
     },
     STILE_PAGINA: (a) => {
       const d = String(a.descrizione || a.description || '').trim();
@@ -382,7 +390,7 @@
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     ELIMINA_FILE: 'Niente cancellato',
-    CERCA_CHAT: 'Conversazione non ritrovata',
+    CERCA_CHAT: 'Conversazione non ritrovata', ESPANDI_FILO: 'Filo di quelle ore non riletto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
@@ -516,13 +524,15 @@
   function rifiutataDallaRegola(a) {
     return !!(a && a._output && a._output.no);
   }
-  // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
   function sceltaContatori(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaContatori === true;
   }
 
+  // #1188, #1589 — nell'intervista Filo mostra i livelli di autonomia o di privacy e l'utente sceglie: la scelta la
+  // disegna l'accoglienza.
   function sceltaAutonomia(a) {
-    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output
+      && (a._output.sceltaAutonomia === true || a._output.sceltaPrivacy === true);
   }
 
   // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.

@@ -40,11 +40,12 @@ test('il livello di un comando viene solo da cmdClassify, qualunque cosa dica il
   for (const comando of ['ls -la', 'df -h', 'du -sh ~/Downloads', 'mkdir prova', 'git push', 'rm -rf build', 'Remove-Item x -Recurse', 'comandoinventato', 'ls && rm x']) {
     assert.equal(
       AL.costoFor({ type: 'ESEGUI_COMANDO', comando, ...finti }),
-      C.classify(comando),
+      C.cancellaPerSempre(comando) ? 4 : C.classify(comando),
       `«${comando}»: il livello non è quello del classificatore`,
     );
   }
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build', ...finti }), 3);
+  // Cancellare senza cestino è un «per sempre», come ELIMINA_FILE (#1840).
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build', ...finti }), 4);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato', ...finti }), 3);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'df -h' }), 1);
 });

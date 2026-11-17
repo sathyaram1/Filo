@@ -6,18 +6,26 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { RAMO_RE } from './parti-lavoro.mjs';
+import { cartellaCloneServer } from './git-server.mjs';
+import { MARCATORE_WORKER } from './dati-worker.mjs';
 
-/** La cartella functions del checkout del server accanto al repo Filo, anche da una sua worktree; '' se non c'è. */
-export function cartellaDelServer(radice, esiste = existsSync) {
+/**
+ * La cartella functions del checkout del server accanto al repo Filo, anche da una sua worktree; da un clone di worker,
+ * che non ha niente accanto, il clone dei lavori server (`git-server clone`, #2237.5). '' se non c'è.
+ */
+export function cartellaDelServer(radice, esiste = existsSync, { clone = cartellaCloneServer() } = {}) {
+  const daWorker = esiste(join(resolve(radice), MARCATORE_WORKER));
+  const valida = (f) => esiste(join(f, 'tools', 'server-fondi.js'));
   let d = resolve(radice);
   for (let i = 0; i < 8; i += 1) {
     const f = join(dirname(d), 'filo-security', 'functions');
-    if (esiste(join(f, 'tools', 'server-fondi.js'))) return f;
+    if (valida(f)) return f;
     const su = dirname(d);
     if (su === d) break;
     d = su;
   }
-  return '';
+  const delClone = daWorker && clone ? join(resolve(clone), 'functions') : '';
+  return delClone && valida(delClone) ? delClone : '';
 }
 
 const corto = (s) => String(s || '').slice(0, 8);

@@ -62,6 +62,83 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
   assert.ok(t.includes(conta), `il conto delle prove col clone vero: ${conta}`);
 });
 
+test('#2190: le prove del giro sul server hanno un nome che il cancello riconosce, ed escono dal ramo del server anche dopo un pass', () => {
+  const t = testoLavoroServer({ clone: '/home/user/filo-security' });
+  // Come si nomina una prova del giro lo dice un testo solo (testiDiRuolo.test.mjs): qui solo il prefisso del server.
+  assert.match(t, /nome e i titoli dei\s+casi delle prove del giro dell'app, preceduti da `verifica-<numero>-` e con `\.test\.js` in fondo/);
+  const pulizia = t.slice(t.indexOf('si tolgono come quelle dell\'app'));
+  assert.match(pulizia, /anche dopo un pass/, 'dopo il verdetto superato si toglie anche dal ramo del server');
+  assert.match(pulizia, /commit\s+che toglie solo quelle[^]*ramo-server/, 'commit di sola rimozione, poi spinta e registro');
+  assert.match(pulizia, /prima di registrare la critica/, 'quelle che escono in ogni esito stanno fuori dalla punta verificata');
+  // Il cancello confronta la punta del server col verdetto (#1222): la pulizia non lo fa decadere, un'aggiunta sì.
+  assert.match(t, /toglie soltanto prove del giro, file interi o casi, e niente aggiunge o cambia/);
+});
+
+// #2433: il registro conta solo i commit dichiarati sotto il nome del ramo nuovo; partire dalla vecchia punta (col
+// riallineamento scritto dal cancello) lasciava il ramo del server non fidato per sempre.
+test('ripartenza di un lavoro server: la ricetta del testo dà un ramo da main con un solo commit nuovo, il lavoro di prima dentro', () => {
+  const dir = cartellaTemporanea('filo-ripartenza-server-');
+  try {
+    const remoto = join(dir, 'remoto.git');
+    const vecchio = join(dir, 'vecchio');
+    const clone = join(dir, 'clone');
+    // Con autocrlf acceso (Windows) il merge riscrive lavoro.txt a CRLF e il confronto col contenuto cade.
+    const git = (cwd, ...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const identita = (cwd, nome) => { git(cwd, 'config', 'user.email', `${nome}@t`); git(cwd, 'config', 'user.name', nome); git(cwd, 'config', 'commit.gpgsign', 'false'); };
+    const scrivi = (cwd, f, s) => { writeFileSync(join(cwd, f), s); git(cwd, 'add', f); git(cwd, 'commit', '-m', f); };
+    execFileSync('git', ['init', '--bare', '-b', 'main', remoto]);
+    execFileSync('git', ['clone', '-q', '-c', 'core.autocrlf=false', remoto, vecchio]);
+    identita(vecchio, 'worker');
+    git(vecchio, 'checkout', '-q', '-b', 'main');
+    scrivi(vecchio, 'a.txt', 'a\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+    git(vecchio, 'checkout', '-q', '-b', 'worker/X-1');
+    scrivi(vecchio, 'lavoro.txt', 'il lavoro di prima\n');
+    const lavoroVecchio = git(vecchio, 'rev-parse', 'HEAD');
+    git(vecchio, 'checkout', '-q', 'main');
+    scrivi(vecchio, 'b.txt', 'b\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+    git(vecchio, 'checkout', '-q', 'worker/X-1');
+    identita(vecchio, 'cancello');
+    git(vecchio, 'merge', '-q', '--no-ff', '-m', 'riallineamento: main (dal cancello)', 'main');
+    const riallineamento = git(vecchio, 'rev-parse', 'HEAD');
+    git(vecchio, 'push', '-q', 'origin', 'worker/X-1');
+    identita(vecchio, 'worker');
+    git(vecchio, 'checkout', '-q', 'main');
+    scrivi(vecchio, 'c.txt', 'c\n');
+    git(vecchio, 'push', '-q', 'origin', 'main');
+
+    execFileSync('git', ['clone', '-q', '-c', 'core.autocrlf=false', remoto, clone]);
+    identita(clone, 'nuovo');
+    const t = testoLavoroServer({ clone, canale: '/x/routine-channel.mjs' });
+    const sezione = t.slice(t.indexOf('payload.ripartenza'));
+    const ricetta = sezione.slice(0, sezione.indexOf('```', sezione.indexOf('```') + 3));
+    const avanti = clone.split('\\').join('/');
+    assert.ok(t.includes(`git -C "${avanti}" checkout -b <ramo> origin/main`), 'il ramo nuovo nasce da main');
+    assert.match(ricetta, /git-server fetch "[^"]+" <ripartenza\.ramo>/, 'il tentativo di prima si prende da git-server');
+    const passi = ricetta.split('\n').filter((l) => l.startsWith(`git -C "${avanti}" `));
+    assert.ok(passi.length >= 2, `i passi di git nella ricetta: ${passi.join(' | ')}`);
+    git(clone, 'checkout', '-q', '-b', 'worker/X-2', 'origin/main');
+    git(clone, 'fetch', '-q', 'origin', 'worker/X-1');
+    for (const passo of passi) {
+      const args = [...passo.slice(`git -C "${avanti}" `.length).replace(/<ripartenza\.ramo>/g, 'worker/X-1')
+        .matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
+      git(clone, ...args);
+    }
+
+    const propri = git(clone, 'rev-list', 'origin/main..HEAD').split('\n').filter(Boolean);
+    assert.equal(propri.length, 1, 'un solo commit da dichiarare, scritto da chi riparte');
+    assert.equal(git(clone, 'log', '-1', '--format=%an'), 'nuovo');
+    for (const sha of [lavoroVecchio, riallineamento]) {
+      assert.throws(() => git(clone, 'merge-base', '--is-ancestor', sha, 'HEAD'), `${sha.slice(0, 8)} non entra nel ramo nuovo`);
+    }
+    assert.equal(readFileSync(join(clone, 'lavoro.txt'), 'utf8'), 'il lavoro di prima\n');
+    for (const f of ['a.txt', 'b.txt', 'c.txt']) assert.ok(readFileSync(join(clone, f), 'utf8'), `${f} di main resta`);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
   const server = testoLavoroServer({ clone: '/home/user/filo-security' });
   // Chi verifica consegna uno stato solo per attacco o spam (#1358): ogni altro gli sarebbe rifiutato.
@@ -86,6 +163,22 @@ test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, m
   }
   assert.equal(serverCtx({ role: 'verifier' }, { payload: { feedback: { text: 'x' } } }).lavoroServer, undefined);
   assert.equal(serverCtx({ role: 'secaudit' }, busta).lavoroServer, undefined);
+});
+
+test('#2500: il primo lavoro di un fidato riceve il server «se serve»: niente clone se resta nell’app, niente ripresa se lo tocca', () => {
+  const busta = { payload: { feedback: { text: 'x' }, lavoroServer: { repo: 'sathyaram1/filo-security', seServe: true } } };
+  assert.deepEqual(serverCtx({ role: 'new-work' }, busta).lavoroServer, { repo: 'sathyaram1/filo-security', seServe: true });
+  const certo = testoLavoroServer({ clone: '/home/user/filo-security' });
+  const seServe = testoLavoroServer({ clone: '/home/user/filo-security', seServe: true });
+  assert.doesNotMatch(certo, /solo se il lavoro lo tocca/i, 'un lavoro server certo non riceve il paragrafo');
+  assert.ok(seServe.endsWith(certo.trim()) || seServe.includes(certo.trim()), 'le istruzioni intere del lavoro server restano');
+  const prima = seServe.slice(0, seServe.indexOf(certo.trim()));
+  assert.match(prima, /Se resta tutto nell'app[^]*niente clone/, 'se il lavoro resta nell’app non si clona');
+  assert.match(prima, /«Serve il codice del server»[^]*non è\s+la tua/, 'il ripiego della ripresa non è la sua strada');
+  assert.match(prima, /ramo-server[^]*diventa lavoro\s+server/, 'la spinta registrata segna il feedback');
+  // La busta arriva da dispatch con il campo del server: il paragrafo entra nelle istruzioni stampate.
+  const src = readFileSync(join(REPO, 'scripts', 'dispatch.mjs'), 'utf8');
+  assert.match(src, /testoLavoroServer\(\{ clone: cartellaCloneServer\(\), seServe: ctx\.lavoroServer\.seServe === true \}\)/);
 });
 
 test('una sessione partita sopra i cloni: il preflight manda l’orchestratore nella radice di Filo (#1761)', () => {

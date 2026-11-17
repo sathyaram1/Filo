@@ -38,6 +38,31 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   titolo che arriva dopo, non riscrive un messaggio già mandato); si rifanno dopo una cancellazione e quando una
   loro pagina diventa delicata o della rete di casa. Una scheda mostrata col titolo che diventa delicata rifà la
   fotografia: il titolo esce dal CONTESTO e dai messaggi già mandati.
+- **Quello che esce dal tratto esce compattato** (#1563, SPEC-CONTESTO fase 4; logica in `src/shared/filoCompattazione.js`,
+  disco e porte in `src/main/services/compattazioneFilo.js`). Prima di ogni richiesta della chat, anche a metà di un
+  giro di strumenti, si stima la richiesta intera: oltre la soglia (70.000 token di serie, `contestoFilo.soglia`) il
+  pezzo più vecchio del tratto va a un modello (quello della compattazione, vuoto = quello della chat) che scrive le righe
+  delle ore; le ultime due ore o gli ultimi quattro turni, il più corto, restano grezzi (turni pesanti: meno turni,
+  l'ultimo sempre). **Una regola sola sullo spazio sopra la parte fissa misurata** (strumenti, istruzioni, CONTESTO:
+  ~43.000 token a novembre 2026, cresce a ogni strumento; `limiti` in `filoCompattazione.js`): la soglia meno la parte
+  fissa, mai meno di 30.000 token né di quanto serve a tenere, dopo il grezzo, tre turni del peso di adesso sotto
+  l'anticipo, e quello che serve si ferma sotto il listino. Da lì vengono la soglia vera, l'anticipo, il grezzo e la
+  stima accanto al campo, che dice quando la soglia scritta sale. Il tratto riparte dal punto
+  compattato (`finestra({ dopo })`), il diario entra nel CONTESTO come sezione `FILO` (che rifà la fotografia), e i
+  turni rimasti tornano byte per byte: verso Claude il loro ragionamento lo toglie l'impronta del prefisso. Le altre
+  porte: fermo oltre la durata della cache col tratto grande (timer dopo il turno), una risposta già oltre l'80% dello
+  spazio fra la parte fissa e la soglia (in sottofondo, così il messaggio dopo non aspetta), una volta al giorno le ore di ieri in una riga dei giorni.
+  Oltre i 100.000 token anche dopo, escono gli esiti dei turni passati (la risposta dice come rifarli); se non basta la
+  richiesta parte con `oltreListino` nella Cronologia AI. Una compattazione non riuscita non sposta niente e aspetta
+  dieci minuti. Il sospetto (SPEC-CONTESTO § Il sospetto non passa nel riassunto): le letture sopra la soglia di pulito
+  arrivano a chi compatta come riga del codice (ora, indirizzo, titolo, parole), le fonti delle chat scadono col punto
+  compattato (`ts` su ogni fonte, rinnovato a ogni rilettura), e da un pezzo sospetto le memorie aspettano nel
+  quaderno, con un avviso nella cornice; una lettura è sospetta con la regola della sicurezza della chat (senza fonte,
+  pulita). Le memorie che la compattazione scrive o propone citano le righe da cui nascono e portano quei messaggi come
+  fonti, come le lezioni: il quaderno ne fa il salto al punto del filo, e una riga tolta dall'utente non torna dallo
+  stesso tratto (`tornaDaTolta`), nemmeno con «Tienila in memoria». Una conversazione o una pagina cancellata porta via
+  subito le righe del diario nate da lei, anche dal disco (la pagina al primo avviso del filo, `dimenticaPagine`); una
+  conversazione nascosta le tiene, fuori dal CONTESTO finché non torna.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
   durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
   Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e

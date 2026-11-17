@@ -20,13 +20,18 @@ di questo testo.
 
 <!-- includi: _cornice-feedback.md -->
 
+<!-- includi: _ramo-vuoto.md -->
+
 ## Il perimetro
 
 Dove c'erano i conflitti, quali unit erano rossi dopo il rebase e il commit
 che aveva passato la verifica stanno in fondo a questo testo, sotto
 «Perimetro di questo giro». Guardi quattro cose.
 
-1. **Le zone in conflitto.** Per ognuna prova, usando Filo, che la cosa
+1. **Le zone in conflitto.** Se il perimetro elenca i file che il server ha
+   trovato in conflitto o riscritti, le zone stanno solo lì: negli altri file
+   le modifiche del lavoro sono identiche a quelle verificate, e non si
+   rileggono. Per ognuna prova, usando Filo, che la cosa
    chiesta dal feedback si ottenga ancora e che quello che `main` aveva
    portato in quel punto funzioni ancora. Se il commit verificato c'è, leggi
    `git diff <commit verificato>..HEAD` per trovare le zone: in questo giro
@@ -43,6 +48,10 @@ che aveva passato la verifica stanno in fondo a questo testo, sotto
    cancelletto, percorso relativo alla radice del repo, barre normali). Una
    prova che prima era verde e ora è rossa è un rilievo di livello 2,
    interno.
-4. **I controlli automatici**, descritti più sotto.
+4. **I controlli automatici**, descritti più sotto. In questo giro
+   `finish:check` sceglie gli spec dai soli file che il riallineamento ha
+   dovuto risolvere: senza file risolti corre i soli unit, e la durata
+   prevista che stampa prima di partire lo dice. Non allargarla a mano: il
+   resto del lavoro l'ha provato la verifica, il lato di `main` la sua suite.
 
 <!-- includi: _critica-e-livelli.md -->

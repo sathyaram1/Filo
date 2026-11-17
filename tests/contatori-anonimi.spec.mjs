@@ -6,10 +6,11 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
 import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
+import { batti } from './helpers/tastiera.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -563,23 +564,25 @@ test('una pagina d’errore di rete e una scheda caduta sono errori visti, col n
 test('una conferma di Filo detta di no si conta coi suoi ingressi, e l’azione non parte', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Riordinare le schede è costo 2: a Normale chiede col suo bottone. Il costo 4 (cancellare per sempre) i contatori non
+  // lo distinguono ancora, perché le regole del server ne tengono la forma.
   await chatCheFa(app, [
-    { toolCalls: [{ id: 'c1', name: 'CANCELLA_PAGINE', arguments: JSON.stringify({ periodo: 'tutto' }) }] },
+    { toolCalls: [{ id: 'c1', name: 'PULISCI_TAB', arguments: '{}' }] },
     { text: 'Te lo chiedo prima.' },
   ]);
   const home = await homeDi(app);
-  await home.locator('#input').fill('cancella tutta la cronologia');
+  await home.locator('#input').fill('riordinami le schede');
   await home.locator('#sendBtn').click();
   const bottone = home.locator('.dash-action-btn').last();
   await expect(bottone).toBeVisible({ timeout: 15_000 });
   await bottone.click();
   await expect(home.locator('.sn-confirm-host')).toBeVisible({ timeout: 8_000 });
   await home.evaluate(() => window.SN_CONFIRM_UI._test.click('cancel'));
-  await expect.poll(async () => (await oggi(app))?.conferme?.CANCELLA_PAGINE || null, { timeout: 8_000 }).not.toBeNull();
-  const conferme = Object.keys((await oggi(app)).conferme.CANCELLA_PAGINE);
+  await expect.poll(async () => (await oggi(app))?.conferme?.PULISCI_TAB || null, { timeout: 8_000 }).not.toBeNull();
+  const conferme = Object.keys((await oggi(app)).conferme.PULISCI_TAB);
   expect(conferme).toHaveLength(1);
   const [livello, stato, costo, perimetro, origine, risposta, esito] = conferme[0].split('|');
-  expect({ livello, costo, perimetro, origine, esito }).toEqual({ livello: 'default', costo: '3', perimetro: 'dentro', origine: 'chat', esito: 'rifiutata' });
+  expect({ livello, costo, perimetro, origine, esito }).toEqual({ livello: 'default', costo: '2', perimetro: 'dentro', origine: 'chat', esito: 'rifiutata' });
   expect(['chiede', 'conferma']).toContain(risposta);
   expect(['pulito', 'contaminato']).toContain(stato);
 });
@@ -638,7 +641,7 @@ test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi ho andato al mare con le ragazzo e basta ');
-  const segno = (testo) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)', { hasText: testo });
+  const segno = (testo) => segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)', { hasText: testo });
   await expect(segno('ho andato al')).toHaveCount(1, { timeout: 8000 });
   await expect(segno('le ragazzo')).toHaveCount(1, { timeout: 8000 });
   const frase = async () => Object.entries((await oggi(app))?.correttore?.frase || {});
@@ -769,7 +772,7 @@ test('Ctrl+Z conta l’annullo di una correzione di Filo, non quello di ciò che
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   // Scrive ancora dopo la correzione, e disfa la sua frase: la correzione resta, e non è un annullo di Filo.
   await page.locator('#t').click();
-  await page.keyboard.type('perchè ', { delay: 30 });
+  await batti(page, 'perchè ', { delay: 30 });
   await expect.poll(() => page.locator('#t').inputValue(), { timeout: 8_000 }).toBe('perché ');
   await page.waitForTimeout(600);
   await page.keyboard.type('scrivo ancora una frase mia', { delay: 20 });
@@ -780,7 +783,7 @@ test('Ctrl+Z conta l’annullo di una correzione di Filo, non quello di ciò che
   expect(await annullatiOggi(app)).toEqual({});
   // Disfa la correzione appena fatta: questo sì.
   await page.locator('#u').click();
-  await page.keyboard.type('perchè ', { delay: 30 });
+  await batti(page, 'perchè ', { delay: 30 });
   await expect.poll(() => page.locator('#u').inputValue(), { timeout: 8_000 }).toBe('perché ');
   await page.keyboard.press('Control+Z');
   await expect.poll(() => page.locator('#u').inputValue()).not.toBe('perché ');

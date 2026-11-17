@@ -3,12 +3,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { join, resolve } from 'node:path';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 
 const M = await import('../../scripts/manutentore.mjs');
+const { incrociFraRami } = await import('../../scripts/lib/su-main.mjs');
+const { cartellaCloneServer } = await import('../../scripts/lib/git-server.mjs');
+const RADICE_DEL_REPO = fileURLToPath(new URL('../..', import.meta.url));
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
   file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
@@ -34,9 +38,17 @@ test('ogni campo di una scheda resta su una riga: un a capo dal feedback non scr
 test('l\'ordine dice quali numeri sono ancora aperti, e che un ordine senza aperti vale come nessuno', () => {
   const indice = [{ num: '812', stato: 'todo' }];
   assert.match(M.rigaOrdine(['812', '8120'], indice), /#812 \(todo\), #8120 \(non fra gli aperti\).*il server li salta/);
-  assert.match(M.rigaOrdine(['700'], indice), /Nessuno è fra gli aperti: il server fa come senza ordine/);
+  assert.match(M.rigaOrdine(['700'], indice), /Nessun feedback è fra gli aperti/);
   assert.match(M.rigaOrdine(['700'], []), /Senza l'indice delle schede non so quali sono ancora aperti/);
   assert.match(M.rigaOrdine([], indice), /Nessun ordine/);
+  // #2269: i compiti stanno nell'ordine col loro id, e i pronti si contano contro i 2×N.
+  const conCompito = M.rigaOrdine(['812', 'C-5'], indice, { pronti: ['812', 'C-5'], servono: 4 });
+  assert.match(conCompito, /#812 \(todo\), compito C-5\. .*a qualunque priorità/);
+  assert.doesNotMatch(conCompito, /non fra gli aperti/, 'un compito non è un feedback da cercare fra le schede');
+  assert.match(conCompito, /\nORDINE CORTO: pronti 2, ne servono almeno 4 \(2×N\): #812, C-5\. Allungalo/);
+  assert.match(M.rigaPronti({ pronti: ['1', '2'], servono: 2 }), /^Pronti nell'ordine: 2, ne servono almeno 2 \(2×N\): #1, #2\.$/);
+  assert.match(M.rigaPronti(null), /il server non ha letto la coda/);
+  assert.match(M.rigaPronti(undefined), /il server non li conta ancora/);
 });
 
 test('i rami lasciati fuori si dicono, e un ramo coi suoi feedback non ne perde nessuno in silenzio', () => {
@@ -112,19 +124,213 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   g('update-ref', 'refs/remotes/origin/claude/lavoro', 'HEAD');
   writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['src/a.js'] })));
   writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
-  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  const env = { FILO_SERVER_CLONE: join(dir, 'nessun-clone') };
+  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
-  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
-  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
 });
 
+// #2340: i lavori del server si aprono in parallelo se i loro rami non si toccano, quindi rami e incroci li vedono.
+function repoConRami(rami) {
+  const repo = cartellaTemporanea('manutentore-rami');
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  for (const [ramo, file, msg] of rami) {
+    g('checkout', '-q', '-B', 'tmp', 'main');
+    mkdirSync(join(repo, file, '..'), { recursive: true });
+    writeFileSync(join(repo, file), ramo); g('add', '-A'); g('commit', '-qm', msg);
+    g('update-ref', `refs/remotes/origin/${ramo}`, 'HEAD');
+  }
+  g('checkout', '-q', 'main');
+  return repo;
+}
+function catturaConsole(t) {
+  const out = [];
+  const [l, e] = [console.log, console.error];
+  console.log = (...a) => out.push(a.join(' ')); console.error = (...a) => out.push(a.join(' '));
+  t.after(() => { console.log = l; console.error = e; });
+  return () => { const s = out.join('\n'); out.length = 0; return s; };
+}
+
+test('incroci fra i rami: due rami del server sullo stesso file si incrociano coi file, su file diversi no (#2340)', () => {
+  const s = (ramo, file, feedback = []) => ({ ramo, repo: 'server', file, feedback });
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js', 'functions/src/y.js'], ['10']), s('claude/b', ['functions/src/x.js'], ['11'])]),
+    [{ a: { ramo: 'claude/a', feedback: ['10'], repo: 'server' }, b: { ramo: 'claude/b', feedback: ['11'], repo: 'server' }, comuni: ['filo-security:functions/src/x.js'] }]);
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js']), s('claude/b', ['functions/src/y.js'])]), []);
+  // Lo stesso percorso in due repo è due file diversi.
+  assert.deepEqual(incrociFraRami([{ ramo: 'claude/app', file: ['package.json'] }, s('claude/b', ['package.json'])]), []);
+  // Un lavoro dell'app col gemello sul server incrocia un lavoro solo del server sui file del server.
+  const coppie = incrociFraRami([{ ramo: 'worker/A-1', file: ['scripts/x.mjs'], feedback: ['20'] }, s('worker/A-1', ['functions/src/z.js']), s('claude/b', ['functions/src/z.js'], ['21'])]);
+  assert.equal(coppie.length, 1);
+  assert.equal(M.rigaLavoro(coppie[0].a), 'worker/A-1 (app e server) (#20)');
+  assert.equal(M.rigaLavoro(coppie[0].b), 'claude/b sul server (#21)');
+  assert.deepEqual(coppie[0].comuni, ['filo-security:functions/src/z.js']);
+});
+
+test('rami e incroci leggono anche i rami del clone di filo-security, e se il clone manca lo dicono (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  const server = repoConRami([['claude/uno', 'functions/src/x.js', '#31 uno'], ['claude/due', 'functions/src/x.js', '#32 due'], ['claude/tre', 'functions/src/y.js', '#33 tre']]);
+  const schede = cartellaTemporanea('manutentore-schede');
+  t.after(() => { togliCartella(app); togliCartella(server); togliCartella(schede); });
+  writeFileSync(join(schede, '40.json'), JSON.stringify(scheda(40, { file_probabili: ['functions/src/y.js'] })));
+  const opz = ['--cartella', schede, '--senza-fetch', '--clone-server', server];
+
+  assert.equal(await M.main(['rami', ...opz], { root: app, env: {} }), 0);
+  const rami = leggi();
+  assert.match(rami, /^claude\/app \(#30\), 1 commit, .*: src\/a\.js$/m);
+  assert.match(rami, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(rami, /NON letti/);
+
+  assert.equal(await M.main(['incroci', ...opz], { root: app, env: {} }), 0);
+  const fra = leggi();
+  assert.match(fra, /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+  assert.doesNotMatch(fra, /claude\/tre/, 'su un file che nessun altro tocca non c\'è incrocio');
+  assert.doesNotMatch(fra, /claude\/app/);
+
+  assert.equal(await M.main(['incroci', '40', ...opz], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/tre sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
+
+  const solo = repoConRami([['claude/uno', 'functions/src/x.js', '#31'], ['claude/tre', 'functions/src/y.js', '#33']]);
+  t.after(() => togliCartella(solo));
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--clone-server', solo], { root: app, env: {} }), 0);
+  assert.match(leggi(), /Nessun file in comune fra i rami in corso \(3\)\./);
+
+  const assente = join(schede, 'filo-security');
+  assert.equal(await M.main(['rami', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  const senza = leggi();
+  assert.match(senza, /^claude\/app/m, 'i rami dell\'app restano');
+  assert.ok(senza.includes(`Rami del server NON letti: nessun clone di filo-security in ${assente}`), senza);
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  assert.match(leggi(), /Rami del server NON letti/);
+});
+
+test('il clone del server si cerca dove lo mettono le routine e la sessione locale', () => {
+  const c = (dir) => (p) => p === join(resolve(dir), '.git');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: resolve('/srv/fs') });
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: [resolve('/a')] },
+    'la cartella scelta vale da sola');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: resolve('/x/filo-security') });
+  // La cartella delle routine è quella dei lavori server: se si sposta il loro clone, il manutentore lo segue.
+  for (const env of [{}, { FILO_SERVER_CLONE: '/srv/fs' }]) {
+    assert.equal(M.cloneDelServer({ root: '/x/Filo', env, esiste: () => false }).cercati[0], cartellaCloneServer(env));
+  }
+});
+
+test('il clone del server si cerca accanto al repo anche da una sua worktree, come fanno chiusura e verifica locali', () => {
+  const ci = new Set([join(resolve('/x/filo-security'), '.git'), join(resolve('/x/filo-security'), 'functions', 'tools', 'server-fondi.js')]);
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo/.claude/worktrees/w', env: {}, esiste: (p) => ci.has(p) }), { dir: resolve('/x/filo-security') });
+});
+
+// Il server su un'origine locale: main, poi lavori spinti dopo che il clone è nato (come nella sessione cloud).
+function serverConOrigine(t, { corto = false } = {}) {
+  const base = cartellaTemporanea('manutentore-origine');
+  t.after(() => togliCartella(base));
+  const origine = join(base, 'server.git');
+  const lavoro = join(base, 'lavoro');
+  const g = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '--bare', origine], { stdio: 'ignore' });
+  execFileSync('git', ['init', '-q', '-b', 'main', lavoro], { stdio: 'ignore' });
+  g(lavoro, 'config', 'user.email', 't@t'); g(lavoro, 'config', 'user.name', 't'); g(lavoro, 'config', 'commit.gpgsign', 'false');
+  mkdirSync(join(lavoro, 'functions', 'src'), { recursive: true });
+  writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), 'x'); g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'inizio');
+  g(lavoro, 'remote', 'add', 'origin', origine); g(lavoro, 'push', '-q', 'origin', 'main');
+  const clone = join(base, 'filo-security');
+  execFileSync('git', ['clone', '-q', ...(corto ? ['--depth', '1'] : []), '--single-branch', '--branch', 'main', pathToFileURL(origine).href, clone], { stdio: 'ignore' });
+  g(clone, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+  const spingi = (ramo, msg) => {
+    g(lavoro, 'checkout', '-q', '-B', 'tmp', 'main');
+    writeFileSync(join(lavoro, 'functions', 'src', 'x.js'), ramo); g(lavoro, 'commit', '-qam', msg);
+    g(lavoro, 'push', '-q', 'origin', `tmp:refs/heads/${ramo}`);
+  };
+  return { origine, clone, spingi };
+}
+
+test('nelle routine il clone del server si aggiorna da sé, anche poco profondo e con solo main: i lavori nati dopo si vedono (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(app));
+  const { clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  spingi('claude/due', '#32 due');
+  assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.match(out, /^claude\/due sul server \(#32\)/m);
+  assert.doesNotMatch(out, /NON aggiornati/);
+  assert.equal(await M.main(['incroci', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+});
+
+test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce lo dice, col clone com\'era (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(app));
+  const { origine, clone, spingi } = serverConOrigine(t, { corto: true });
+  spingi('claude/uno', '#31 uno');
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/uno sul server \(#31\)/m);
+  // Un'origine che non risponde: l'avviso, e i rami di prima restano.
+  togliCartella(origine);
+  assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server/m);
+  assert.match(out, /Rami del server NON aggiornati \(.+\): sono quelli del clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\./);
+  // Un clone poco profondo che non si completa lo dice: i lavori del server probabilmente mancano.
+  const { origine: o2, clone: c2 } = serverConOrigine(t, { corto: true });
+  togliCartella(o2);
+  assert.equal(await M.main(['rami', '--clone-server', c2], { root: app, env: {} }), 0);
+  assert.match(leggi(), /clone poco profondo.*i lavori del server mancano/);
+});
+
+test('il contesto intero e quello piccolo portano anche i rami del server, coi file col prefisso (#2340)', () => {
+  const rami = [
+    { ramo: 'worker/A-1', repo: 'server', data: '2026-11-11T10:00:00Z', avanti: 2, file: ['functions/src/x.js'], feedback: ['900'] },
+    { ramo: 'worker/A-1', data: '2026-11-11T10:00:00Z', avanti: 1, file: ['scripts/y.mjs'], feedback: ['900'] },
+  ];
+  const intero = M.testoIntero({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [], rami });
+  assert.match(intero, /## Rami in corso \(2\)/);
+  assert.match(intero, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  const piccolo = M.testoPiccolo({ ruolo: 'R', stato: { segnali: [] }, taccuino: { testo: '', versione: 0 }, schede: [{ num: '900', priorita: 3 }], rami });
+  assert.ok(piccolo.ok, piccolo.motivo);
+  assert.match(piccolo.testo, /^worker\/A-1 sul server \(#900\), 2 commit, 2026-11-11: filo-security:functions\/src\/x\.js$/m);
+  assert.match(piccolo.testo, /^worker\/A-1 \(#900\), 1 commit, 2026-11-11: scripts\/y\.mjs$/m);
+});
+
+test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
+  const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(repo));
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('checkout', '-q', '-B', 'lungo', 'main');
+  mkdirSync(join(repo, 'f'));
+  for (let i = 0; i < 700; i += 1) writeFileSync(join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`), String(i));
+  g('add', '-A'); g('commit', '-qm', 'tanti file (#1)');
+  g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
+  g('checkout', '-q', 'main');
+  // Il comando vero, con la radice nel repo finto: --preserve-symlinks la tiene lì.
+  for (const d of ['scripts', 'src', 'node_modules']) collegaCartella(join(RADICE_DEL_REPO, d), join(repo, d));
+  const env = { ...process.env };
+  delete env.FILO_SERVER_CLONE;
+  const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath, '--preserve-symlinks', '--preserve-symlinks-main',
+    join(repo, 'scripts', 'manutentore.mjs'), 'rami', '--senza-fetch', '--clone-server', join(repo, 'manca')],
+  { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: TETTO_ATTESA_MS });
+  assert.ok(r.stdout.length > 64 * 1024, `uscita di ${r.stdout.length} byte`);
+  assert.match(r.stdout.slice(-400), /Rami del server NON letti/);
+});
+
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
   assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
-  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
+  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback né id di compiti \(C-12\): menu/);
   assert.equal(M.leggiOrdine('').ok, false);
+  // #2269: un compito sta nell'ordine col suo id; in un pacchetto no.
+  assert.deepEqual(M.leggiOrdine('C-12, 812, c-12').numeri, ['C-12', '812']);
+  assert.match(M.leggiOrdine('812,C-12', { compiti: false }).motivo, /non sono numeri di feedback: C-12/);
   const tanti = Array.from({ length: M.ORDINE_MAX + 1 }, (_, i) => String(i + 1)).join(',');
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
 });
@@ -158,6 +364,20 @@ test('la riga della scheda del server tiene a parte le attese che bloccano, col 
   assert.match(M.rigaSchedaServer({ ...s, aspetta: ['950'], aspettava: undefined }), / · aspetta #950( |$)/, 'il server di prima manda numeri nudi');
   const [f] = M.indiceDalServer([s]);
   assert.match(M.rigaScheda(scheda(1564), f), / · aspetta #1563 \(non ancora fuso\), .* · aspettava #1562/, 'la scheda locale dice lo stesso');
+});
+
+test('la riga della scheda del server dice chi ha mandato il feedback e quando è nato, prima del titolo (#2232)', () => {
+  const s = { num: '2226', stato: 'unlabeled', priorita: 2, fiducia: 'non_fidato', titolo: 'T',
+    mittente: { classe: 'routine', ruolo: 'manutentore' }, nato: '2026-11-06' };
+  assert.equal(M.rigaSchedaServer(s), '#2226 · p2 · unlabeled · non fidato · da routine/manutentore · nato 2026-11-06 — T');
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'owner' } }), / · da owner · nato 2026-11-06 — T$/);
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'utente', ruolo: 'finto' } }), / · da utente · /, 'il ruolo vale solo per le routine');
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'routine' } }), / · da routine · nato /);
+  for (const vuoto of [{}, { mittente: null, nato: '' }, { mittente: { classe: '  ' }, nato: '   ' }]) {
+    const riga = M.rigaSchedaServer({ ...s, mittente: undefined, nato: undefined, ...vuoto });
+    assert.equal(riga, '#2226 · p2 · unlabeled · non fidato — T', 'il server di prima non li manda: nessun segno');
+  }
+  assert.doesNotMatch(M.rigaSchedaServer({ ...s, mittente: { classe: 'routine', ruolo: 'a\nb' } }), /\n/);
 });
 
 test('una priorità 3 la cui attesa non la ferma non sembra bloccata, e l\'attesa si vede a parte (#2262)', () => {
@@ -221,13 +441,29 @@ test('sblocca vuole il numero del feedback fermo; il resto è la nota dell\'owne
   assert.equal(M.richiestaSblocca(['dodici']).ok, false);
 });
 
+test('#2215: dopo lo sblocco di un guasto la riga non dice «nota scritta»: nelle note non è scritto niente', () => {
+  assert.equal(M.rigaNotaOSblocco({ numero: '1919', sbloccato: 'guasto', notaScritta: false }),
+    '#1919: sbloccato (guasto), nelle note non ho scritto niente: il lavoro riparte con chi lo prende dopo.');
+  assert.match(M.rigaNotaOSblocco({ numero: '1919', sbloccato: 'processo' }), /^#1919: nota scritta, il lavoro fermo \(processo\) riparte/);
+  assert.equal(M.rigaNotaOSblocco({ numero: '7' }), '#7: nota scritta.');
+});
+
+test('sblocca anche un compito fermo per guasto (#2303), col suo C-n', () => {
+  assert.deepEqual(M.richiestaSblocca(['C-3915', 'il', 'limite', 'è', 'passato']), { ok: true, compito: 'C-3915', testo: 'il limite è passato' });
+  assert.deepEqual(M.richiestaSblocca(['c-12']), { ok: true, compito: 'C-12', testo: '' });
+  assert.deepEqual(M.datiSblocca(M.richiestaSblocca(['C-12']), 'riprendi'), { compito: 'C-12', testo: 'riprendi' });
+  assert.deepEqual(M.datiSblocca(M.richiestaSblocca(['812']), ''), { numero: '812' });
+  assert.equal(M.controlliLocali('sblocca', ['sblocca', 'C-3915']), '');
+  assert.match(M.controlliLocali('sblocca', ['sblocca', 'C-']), /sblocca 812 \[nota\], sblocca C-3915 \[nota\]/);
+});
+
 // ── SPEC-MANUTENTORE: il canale della chiave, il contesto piccolo e intero, le indicazioni, il redattore ──
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve as risolvi } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const RADICE = risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const RADICE =risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schedaServer = (num, priorita, extra = {}) => ({
   num: String(num), stato: 'todo', motivo: '', priorita, prioritaOwner: false, titolo: `Titolo del feedback numero ${num} con qualche parola in più`,
   fiducia: 'fidato', ramo: '', aspetta: [], unisce: [], lavoroServer: false, riservato: false, inLavorazione: false, aggiornatoIl: null, ...extra,
@@ -241,34 +477,59 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
   return schedaServer(n, n % 2);
 });
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
+test('le accensioni del pacemaker prendono il contesto per differenze dal payload, non lo ristampano intero (#2340)', () => {
+  const testa = RUOLO.split('\n').filter((r) => r.startsWith('>')).join(' ');
+  assert.match(testa, /payload\.manutentore/);
+  assert.match(testa, /non rilanciare `sveglia`/);
+  assert.doesNotMatch(testa, /ogni altra accensione: il contesto piccolo/);
+});
+
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
-test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segnali e il taccuino, sotto il tetto', () => {
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
-    rami: [{ ramo: 'worker/x', feedback: ['5'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
+test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, non le 2 (#2269)', () => {
+  const stato = { ...STATO, ordine: ['40', '7', 'C-5', '31'], pronti: { pronti: ['40', 'C-5'], servono: 6 } };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
+    rami: [{ ramo: 'worker/x', feedback: ['40'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
   assert.equal(p.ok, true);
   assert.ok(p.token < M.PICCOLO_TETTO_TOKEN, `${p.token} token`);
-  assert.match(p.testo, /Schede a priorità 3 e 2, e le ferme \(30 di 800\)/);
-  assert.match(p.testo, /^#1 · p3 · todo/m);
-  assert.match(p.testo, /^#29 · p1 · todo · FERMO \(guasto: guasto: npm\)/m);
-  assert.doesNotMatch(p.testo, /^#(3[1-9]|[4-9]\d|\d{3}) · /m, 'niente schede a 0 e a 1');
+  assert.match(p.testo, /Schede a priorità 3, dei lavori nell'ordine e le ferme \(8 di 800\)/);
+  const righe = p.testo.split('\n').filter((r) => /^(\[\d+° nell'ordine\] )?#\d+ · /.test(r)).map((r) => r.replace(/ · .*/, ''));
+  assert.deepEqual(righe, ['#1', '#2', '#3', '[1° nell\'ordine] #40', '[2° nell\'ordine] #7', '[4° nell\'ordine] #31', '#29', '#30'],
+    'le 3, poi l\'ordine nella sua sequenza, poi le ferme; niente 2 fuori ordine');
+  assert.match(p.testo, /ORDINE CORTO: pronti 2, ne servono almeno 6 \(2×N\): #40, C-5\./);
   assert.match(p.testo, /criterio: grafica prima/);
   assert.match(p.testo, /Versione 4/);
   assert.match(p.testo, /s1 guasto/);
   assert.match(p.testo, /^worker\/x/m);
-  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
+  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori dell\'ordine e delle 3');
+});
+
+test('la scheda del server dice perché un lavoro non parte: resta locale coi motivi e l’ora, attesa del server, domande (#2258)', () => {
+  // Il fermo come lo scrive la scheda del server (fermoDellaScheda): tipo, ora, motivi uniti nel gruppo e uno per uno.
+  const motivi = ['ramo non pulito', 'contenuto scritto da un biglietto sporco'];
+  const ferma = schedaServer(1160, 1, { lavoroServer: true, fermo: { tipo: 'resta_locale', atMs: Date.parse('2026-11-07T10:26:00Z'), gruppo: motivi.join('; '), motivi, ruolo: 'new-work' } });
+  assert.match(M.rigaSchedaServer(ferma), /^#1160 · p1 · todo · RESTA LOCALE \(ramo non pulito; contenuto scritto da un biglietto sporco; visto 2026-11-07 10:26\) · lavoro server/);
+  assert.match(M.rigaSchedaServer(schedaServer(1140, 1, { stato: 'revision_security', attesa: 'suite_server' })), / · aspetta il server \(suite_server\)/);
+  assert.match(M.rigaSchedaServer(schedaServer(1384, 1, { domandeBloccanti: ['D-12'] })), / · fermo sulle domande D-12/);
+  assert.doesNotMatch(M.rigaSchedaServer(schedaServer(1405, 1)), /RESTA LOCALE|aspetta il server|fermo sulle/);
+  // Nel contesto piccolo come le ferme per guasto: a priorità 1 o 0 la sveglia non la vedrebbe.
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: [ferma, schedaServer(1405, 1)] });
+  assert.match(p.testo, /^#1160 · p1 · todo · RESTA LOCALE/m);
+  assert.doesNotMatch(p.testo, /^#1405 /m);
 });
 
 test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
-  const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
+  const tutte = ottocento().map((s) => ({ ...s, titolo: s.titolo.repeat(3) }));
+  const lungo800 = { ...STATO, ordine: tutte.map((s) => s.num) };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: lungo800, taccuino: { testo: '', versione: 0 }, schede: tutte });
   assert.equal(p.ok, false);
-  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede delle 3 e dell'ordine \\(\\d+ token\\)\\. Togli dall'ordine`));
+  const tutte2 = tutte;
   // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
   const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
   assert.equal(lungo.ok, false);
   assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
-  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
+  assert.doesNotMatch(lungo.motivo, /Togli dall'ordine/);
 });
 
 test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
@@ -325,6 +586,36 @@ test('una priorità 3 non si abbassa: il rifiuto arriva prima del server, che no
   assert.equal(s.corpi[0].passphrase, 'chiave-di-prova');
 });
 
+// #2291: con la priorità di adesso ignota (schede illeggibili, o il feedback non fra le schede) il controllo lasciava
+// passare l'abbassamento, e una 3 scendeva a 1 senza l'owner.
+test('priorità di adesso ignota: niente scrittura sotto la 3; alzare a 3 resta possibile', async (t) => {
+  const s = serverFinto(t, { schede: [200, { ok: true, schede: [schedaServer(812, 2)] }], priorita: (b) => [200, { ok: true, numero: b.dati.numero, da: null, a: b.dati.priorita }] });
+  assert.equal(await M.main(['priorita', '1994', '1'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /#1994: non so la priorità di adesso/);
+  assert.deepEqual(s.corpi.map((c) => c.op), ['schede']);
+  assert.equal(await M.main(['priorita', '1994', '3'], CHIAVE), 0);
+  assert.equal(await M.main(['priorita', '812', '1'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.filter((c) => c.op === 'priorita').map((c) => c.dati), [{ numero: '1994', priorita: 3 }, { numero: '812', priorita: 1 }]);
+});
+
+test('schede illeggibili: la priorità non scende alla cieca', async (t) => {
+  const s = serverFinto(t, { schede: [500, { ok: false, errore: 'interno' }], priorita: [200, { ok: true, numero: '812', da: 3, a: 1 }] });
+  assert.equal(await M.main(['priorita', '812', '1'], CHIAVE), 1);
+  assert.ok(!s.corpi.some((c) => c.op === 'priorita'));
+});
+
+test('un feedback a priorità 3 non si archivia come doppione, se non di un\'altra 3; uno a 1 sì', async (t) => {
+  const s = serverFinto(t, {
+    schede: [200, { ok: true, schede: [schedaServer(812, 3), schedaServer(815, 1), schedaServer(700, 1), schedaServer(701, 3)] }],
+    archivia: (b) => [200, { ok: true, numero: b.dati.numero, doppioneDi: b.dati.doppioneDi }],
+  });
+  assert.equal(await M.main(['archivia', '812', '700'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /#812: un feedback a priorità 3 non si archivia/);
+  assert.equal(await M.main(['archivia', '815', '700'], CHIAVE), 0);
+  assert.equal(await M.main(['archivia', '812', '701'], CHIAVE), 0, 'la 3 resta aperta nell\'originale');
+  assert.deepEqual(s.corpi.filter((c) => c.op === 'archivia').map((c) => c.dati), [{ numero: '815', doppioneDi: '700' }, { numero: '812', doppioneDi: '701' }]);
+});
+
 test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => {
   const s = serverFinto(t, {
     ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 4 }],
@@ -350,6 +641,35 @@ test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => 
   assert.equal(await M.main(['parallelo', 'tanti'], CHIAVE), 1);
   assert.equal(await M.main(['taccuino', 'scrivi', '-'], CHIAVE), 1);
   assert.match(s.err.join('\n'), /--versione <V>/);
+  assert.equal(s.corpi.length, n);
+});
+
+test('#2269: l\'ordine e le attese portano gli id dei compiti, e compito ne apre uno con le istruzioni da stdin', async (t) => {
+  const s = serverFinto(t, {
+    ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 2, pronti: { pronti: ['812'], servono: 4 } }],
+    attesa: [200, { ok: true, numero: '815', aspetta: 'C-12' }],
+    compito: [200, { ok: true, compito: 'C-13', fiducia: 'non_fidato' }],
+  });
+  assert.equal(await M.main(['accendi', '812,c-12,815'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /compito C-12.*\nORDINE CORTO: pronti 1, ne servono almeno 4/);
+  assert.equal(await M.main(['attesa', '815', 'C-12'], CHIAVE), 0);
+  assert.match(s.out.join('\n'), /#815 aspetta il compito C-12: parte quando il compito chiude\./);
+  const { Readable } = await import('node:stream');
+  const stdin = Object.getOwnPropertyDescriptor(process, 'stdin');
+  Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(Readable.from([Buffer.from('Rivedi tutti gli hover.\n')]), { isTTY: false }) });
+  t.after(() => Object.defineProperty(process, 'stdin', stdin));
+  assert.equal(await M.main(['compito', 'Revisione', 'degli', 'hover', '-', '--urgenza', '30'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
+    ['ordine', { ordine: ['812', 'C-12', '815'] }], ['attesa', { numero: '815', aspetta: 'C-12' }],
+    ['compito', { titolo: 'Revisione degli hover', istruzioni: 'Rivedi tutti gli hover.', urgenza: 30 }],
+  ]);
+  assert.match(s.out.join('\n'), /Aperto il compito C-13 \(non_fidato\): mettilo nell'ordine/);
+  // Gli storti non partono.
+  const n = s.corpi.length;
+  assert.equal(await M.main(['compito', 'x', '-', '--urgenza', 'alta'], CHIAVE), 1);
+  assert.equal(await M.main(['compito', '-'], CHIAVE), 1);
+  assert.equal(await M.main(['attesa', '815', 'C-0'], CHIAVE), 1);
+  assert.equal(await M.main(['pacchetto', '900', '812,C-12'], CHIAVE), 1, 'un compito non sta in un pacchetto');
   assert.equal(s.corpi.length, n);
 });
 
@@ -384,26 +704,27 @@ test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e ris
   assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
 });
 
-test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si rifiuta, come un link nuovo', () => {
+test('il redattore: una promessa su un lavoro che non è nell\'ordine né a 3 si rifiuta, come un link nuovo (#2269)', () => {
   const blocco = { version: '0.2.255', features: ['Le schede si trascinano. Guida su https://filo.app/guida'], fixes: ['Il menu si apre.'] };
-  const schede = [schedaServer(812, 2), schedaServer(900, 1), schedaServer(950, 3)];
+  const schede = [schedaServer(812, 1), schedaServer(813, 0), schedaServer(900, 2), schedaServer(950, 3)];
+  const ordine = ['813', 'C-4', '812'];
   const base = { versione: '0.2.255', features: [{ testo: 'Le schede si trascinano (guida su https://filo.app/guida).', da: [1] }], fixes: ['Il menu si apre.'] };
-  assert.equal(M.controllaNovita(base, { blocco, schede }).ok, true);
-  const fuoriRosa = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede });
-  assert.equal(fuoriRosa.ok, false);
-  assert.match(fuoriRosa.errori.join('\n'), /promessa su #900, che non è nella rosa né a priorità 3/);
-  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede });
+  assert.equal(M.controllaNovita(base, { blocco, schede, ordine }).ok, true);
+  const fuori = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine });
+  assert.equal(fuori.ok, false);
+  assert.match(fuori.errori.join('\n'), /promessa su #900, che non è nell'ordine né a priorità 3/, 'una 2 fuori ordine non è più la rosa');
+  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede, ordine });
   assert.match(taciuta.errori.join('\n'), /non dice da quali righe dei worker nasce/);
-  for (const n of ['812', '950']) {
-    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede }).ok, true, `#${n}`);
+  for (const n of ['812', '813', '950']) {
+    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine }).ok, true, `#${n}`);
   }
-  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede });
+  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede, ordine });
   assert.match(link.errori.join('\n'), /link che le righe dei worker non avevano: www\.altro\.example\/x/);
-  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede }).errori[0], /il blocco in cima è 0\.2\.255/);
-  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede });
-  assert.match(ctx, /## La rosa \(priorità 2\)\n\n#812 /);
+  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede, ordine }).errori[0], /il blocco in cima è 0\.2\.255/);
+  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede, ordine });
+  assert.match(ctx, /## I lavori nell'ordine\n\n#813 .*\n#812 /, 'nella sequenza dell\'ordine');
   assert.match(ctx, /## Priorità 3 in corso\n\n#950 /);
-  assert.doesNotMatch(ctx, /#900/);
+  assert.doesNotMatch(ctx, /#900|rosa/);
 });
 
 test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
@@ -503,28 +824,52 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
 });
 
-// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261).
-test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti e la spesa lo consente, non a secco (#2261)', () => {
+// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261). Dal
+// #2269 non c'è più la rosa: l'ordine è l'unica condizione, e a ogni accensione ha almeno 2×N lavori pronti.
+test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe è un criterio, niente rosa (#2269)', () => {
   const piatto = (t) => t.replace(/\s+/g, ' ');
+  const ruolo = piatto(RUOLO);
   const ritmo = piatto(RUOLO.slice(RUOLO.indexOf('## Il ritmo'), RUOLO.indexOf('## La sessione accesa dal pacemaker')));
-  const regola = ritmo.slice(ritmo.indexOf('**La rosa si riempie anche di giorno.**'));
-  assert.ok(ritmo.includes('**La rosa si riempie anche di giorno.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
-  assert.match(regola, /A ogni battito e sveglia/);
-  assert.match(regola, /nell'ordine non resta un lavoro che possa partire adesso \(vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner\)/);
-  // Il conto è unico come al mattino: con «prima B, poi A» la condizione su ogni account lascerebbe la rosa vuota.
-  assert.match(regola, /spesa delle ultime 24 ore, sommata sugli account .*sotto il ritmo sostenibile fino ai rinnovi/);
-  assert.doesNotMatch(regola, /(ultime 24 ore|ultimo giorno) di ogni account/);
-  assert.match(regola, /riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole/);
+  const regola = ritmo.slice(ritmo.indexOf('**L\'ordine non resta mai corto.**'));
+  assert.ok(ritmo.includes('**L\'ordine non resta mai corto.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
+  assert.match(regola, /A ogni battito e sveglia l'ordine contiene almeno \*\*2×N\*\* lavori che possono partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano/);
+  assert.match(regola, /La spesa si regola con N, non svuotando l'ordine/);
   for (const r of ['decisione incrementale', 'scala delle classi', 'classe ereditata da chi blocca', 'incroci coi rami vivi', 'riscrivi l\'ordine', 'taccuino', 'recap del giorno dopo']) {
     assert.ok(regola.includes(r), r);
   }
   assert.match(regola, /In una giornata a secco no\./);
+  // L'ordine è l'unica condizione per cominciare, e nessuna 2 da scegliere ogni mattina.
+  assert.match(ruolo, /\*\*L'ordine è l'unica condizione per cominciare\.\*\* Un primo lavoro nell'ordine parte a qualunque priorità da 0 a 2; fuori dall'ordine parte solo una 3/);
+  assert.doesNotMatch(ruolo.replace(/\*\*Una volta sola\*\* \(#2269[^]*?contano come importanti\./, ''), /\b(la|una|nella|della|alla) rosa\b/i,
+    'la rosa resta nominata solo per dire che non c\'è più e per toglierla dal taccuino');
+  assert.doesNotMatch(ruolo, /la 2 è solo tua|Scrivi la rosa|priorità 3 e 2/);
+  // La classe è il primo criterio, non un filtro.
+  const ordine = piatto(RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')));
+  assert.match(ordine, /\*\*La classe è il primo criterio, non un filtro\.\*\*.*tocca i file probabili di un ramo vivo \(`incroci <N>`\) aspetta.*entra uno di classe più bassa in un'area libera/);
+  assert.match(ordine, /Un compito può stare davanti a un feedback/);
+  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
+  // La sequenza del server mette i lavori già iniziati davanti all'ordine: il ruolo la dice uguale.
+  assert.match(ordine, /prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza/);
+  assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
+  // Il primo mattino toglie dal taccuino le regole sulla rosa.
+  assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);
+  // I rilievi messi da parte nascono a 1.
+  assert.match(ruolo, /Un interno messo da parte nasce a 1, a ogni livello: se serve, lo metti tu nell'ordine/);
   const spec = piatto(readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'));
   const quattro = spec.slice(spec.indexOf('## 4. Ritmo'), spec.indexOf('## 5.'));
-  assert.match(quattro, /\*\*La rosa si riempie anche di giorno\.\*\* A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire adesso/);
-  assert.match(quattro, /dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
-  assert.doesNotMatch(quattro, /ultimo giorno di ogni account/);
-  assert.match(quattro, /Non in una giornata a secco\./);
+  assert.match(quattro, /\*\*L'ordine non resta mai corto\.\*\* A ogni battito e sveglia l'ordine contiene almeno 2×N lavori che possono partire subito/);
+  assert.match(quattro, /La classe è il primo criterio, non un filtro/);
+  assert.match(spec, /\*\*L'ordine è l'unica condizione per cominciare\*\* \(#2269\)/);
+  assert.doesNotMatch(spec, /la rosa \(priorità 2\)|promuove la rosa|aspettano una prossima rosa/);
+});
+
+// Il segno «lavoro server» non aspetta l'owner (#2269 punto 6): neanche lo strumento lo deve far chiedere a lui.
+test('un segno «lavoro server» non confermato non si chiede all\'owner: un fidato entra nell\'ordine lo stesso (#2269)', () => {
+  const riga = M.rigaSegnoServer(true, { ok: true, numero: '900' });
+  assert.match(riga, /^SEGNO NON MESSO/);
+  assert.match(riga, /non chiedere il segno all'owner/);
+  assert.match(riga, /mettilo nell'ordine lo stesso: il primo giro consegna «design --reason locale» e il server lo segna da sé/);
+  assert.doesNotMatch(riga, /chiedi all'owner/);
 });
 
 // Il segno lo mette il server alla consegna design + locale: aspettarlo dall'owner tiene fuori un fidato per giorni (#2261).
@@ -540,4 +885,55 @@ test('un fidato che tocca il server entra nell\'ordine senza il segno, e il segn
   const piatto = RUOLO.replace(/\s+/g, ' ');
   assert.doesNotMatch(piatto, /(chiedi|chiedere|domanda)[^.]*all'owner[^.]*segno «lavoro server»/);
   assert.doesNotMatch(piatto, /segno «lavoro server»[^.]*(lo mette|lo chiedi a|aspetta) l'owner/);
+});
+
+test('lo stato elenca le corse in coda senza lavori: repository, workflow, sha, da quanto e chi le aspetta (#2417)', () => {
+  const corseFerme = {
+    sogliaMin: 20,
+    corse: [
+      { repo: 'server', workflow: 'suite.yml', sha: 'd2e2bd6'.padEnd(40, '0'), id: 43097094859, minuti: 37, feedback: '2258', url: 'https://github.com/x/actions/runs/43097094859' },
+      { repo: 'app', workflow: 'verifica-linux.yml', sha: 'f'.repeat(40), id: 43097090341, minuti: 41, feedback: '', url: '' },
+    ],
+    errori: ['app corsa 9: lavori illeggibili (github_502)'],
+  };
+  const righe = M.righeStato({ ...STATO, corseFerme });
+  const da = righe.indexOf('Corse in coda senza lavori da più di 20 minuti (2):');
+  assert.ok(da > 0, righe.join('\n'));
+  assert.deepEqual(righe.slice(da + 1), [
+    '- server suite.yml d2e2bd600000 corsa 43097094859, in coda da 37 min, la aspetta #2258 https://github.com/x/actions/runs/43097094859',
+    '- app verifica-linux.yml ffffffffffff corsa 43097090341, in coda da 41 min, nessun feedback la aspetta',
+    '- non lette: app corsa 9: lavori illeggibili (github_502)',
+  ]);
+  assert.ok(M.righeStato({ ...STATO, corseFerme: { sogliaMin: 20, corse: [], errori: [] } }).includes('Corse in coda senza lavori da più di 20 minuti (0):'));
+  assert.ok(M.righeStato(STATO).includes('Corse in coda senza lavori: il server non le elenca ancora.'), 'un server vecchio non si scambia per nessuna corsa ferma');
+  // Un campo con un a capo non apre una sezione nel contesto.
+  const sporco = M.righeCorseFerme({ sogliaMin: 20, corse: [{ repo: 'app\n## Spesa', workflow: 'x', sha: '', id: 1, minuti: 30, feedback: '' }], errori: [] });
+  assert.ok(sporco.every((r) => !r.includes('\n')));
+  assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, corseFerme }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /la aspetta #2258/);
+});
+
+// #2340, decisione dell'owner dell'08/11: lavori server in parallelo, battito a 2 ore, contesto e taccuino a pezzi.
+test('i lavori server non vanno più uno alla volta: si decide sui file in comune fra i rami (#2340)', () => {
+  const ordine = RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')).replace(/\s+/g, ' ');
+  assert.doesNotMatch(ordine, /alla volta/);
+  assert.match(ordine, /quanti lavori del server tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami \(`incroci` senza numero\)/);
+  assert.match(ordine, /`rami` e `incroci` leggono anche i rami di filo-security/);
+});
+
+test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a sezioni, nel ruolo e nelle spec (#2340)', () => {
+  const testi = { ruolo: RUOLO, spec: readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'),
+    stati: readFileSync(risolvi(RADICE, 'FEEDBACK-STATES.md'), 'utf8'), domande: readFileSync(risolvi(RADICE, 'SPEC-DOMANDE.md'), 'utf8') };
+  for (const [nome, t] of Object.entries(testi)) assert.doesNotMatch(t.replace(/\s+/g, ' '), /ogni 55 minuti/, nome);
+  const ruolo = RUOLO.replace(/\s+/g, ' ');
+  assert.match(ruolo, /al \*\*battito\*\*, ogni 2 ore al più/);
+  assert.match(ruolo, /Il contesto piccolo porta solo quello che è cambiato dall'accensione prima/);
+  assert.match(ruolo, /Porta tutto alla prima accensione del giorno e dopo un'accensione nata morta/);
+  assert.match(ruolo, /`taccuino sezione <nome> - --versione <V>`/);
+  assert.doesNotMatch(ruolo, /riscrivi il taccuino intero|Il taccuino riscritto, intero/);
+  // L'indicazione dell'owner arriva in coda: la sezione delle indicazioni è l'ultima, o finirebbe nelle misure.
+  const sezioni = [...RUOLO.matchAll(/^- `## ([a-z]+)`/gm)].map((m) => m[1]);
+  assert.deepEqual(sezioni, ['stato', 'problemi', 'esperimenti', 'misure', 'indicazioni']);
+  const spec = testi.spec.replace(/\s+/g, ' ');
+  assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
+  assert.match(spec, /battito\*\* ogni due ore al massimo/);
 });

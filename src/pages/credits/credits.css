@@ -245,6 +245,8 @@
 .sn-page [hidden] { display: none !important; }
 
 .sn-wallet-sub { margin: 14px 0 0; font-size: 14px; color: var(--sn-muted); font-weight: 600; }
+.sn-wallet-anonimi-pulizia { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; }
+.sn-wallet-anonimi-pulizia:empty { display: none; }
 .sn-wallet-user { cursor: pointer; }
 .sn-wallet-user.is-open td { background: var(--sn-hover, rgba(0,0,0,.04)); }
 .sn-wallet-user-detail td { white-space: normal; padding: 8px 10px 12px; }

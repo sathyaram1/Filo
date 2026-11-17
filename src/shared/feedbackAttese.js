@@ -9,6 +9,9 @@
   const MAX = 20;
   const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
   const NUM_RE = /^#?(\d{1,7})(?:\.(\d{1,6}))?$/;
+  // L'id di un compito senza feedback (`C-12`), che un feedback può aspettare e l'ordine può portare (#2269).
+  const COMPITO_RE = /^C-[1-9]\d{0,8}$/;
+  const eCompito = (id) => COMPITO_RE.test(String(id == null ? '' : id));
   // Il giro di attese si cerca fino in fondo; oltre questi documenti si rifiuta invece di scrivere un giro non visto.
   const MAX_VISITATI = 2000;
   // Parole che si scrivono fra i numeri e non sono numeri.
@@ -60,7 +63,8 @@
       const id = String((w && typeof w === 'object' ? w.id : w) || '').trim();
       if (!ID_RE.test(id) || visti.has(id)) continue;
       visti.add(id);
-      out.push({ id, num: w && typeof w === 'object' ? normalizzaNumero(w.num) : '' });
+      // Un compito aspettato (#2269) ha per numero il suo id: `C-12`.
+      out.push({ id, num: eCompito(id) ? id : w && typeof w === 'object' ? normalizzaNumero(w.num) : '' });
     }
     return out;
   }
@@ -104,6 +108,7 @@
   }
 
   function etichetta(w) {
+    if (w && eCompito(w.num)) return `il compito ${w.num}`;
     return w && w.num ? `#${w.num}` : 'un feedback senza numero';
   }
 
@@ -317,7 +322,7 @@
   }
 
   global.SN_FB_ATTESE = {
-    CAMPO, MAX, STATO, ETICHETTA,
+    CAMPO, MAX, STATO, ETICHETTA, eCompito,
     normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
     daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,

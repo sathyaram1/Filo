@@ -14,8 +14,9 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
 const {
-  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti,
+  giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti, oltreIlTetto,
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
+  chiusuraDi, SOGLIA_CHIUSO_MS,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 const { processiDiSistema } = await import('../../scripts/lib/branch-integrity.mjs');
@@ -210,6 +211,41 @@ describe('i segni di vita, letti dove stanno', () => {
   });
 });
 
+// #2303: l'audit fermo per venti minuti, padre e sotto-agenti insieme, era probabilmente su un limite del fornitore. Un
+// worker che aspetta un ritentativo dichiarato non è fermo fino alla fine dell'attesa; dopo, il silenzio torna a contare.
+describe('l\'attesa dichiarata dal fornitore', () => {
+  /** Una traccia ferma da `fa` minuti, la cui ultima riga dichiara un ritentativo fra `attesaMin` minuti (null: nessuna). */
+  const inAttesa = ({ fa, attesaMin }) => {
+    const dir = cartella('filo-veglia-fornitore-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const ora = Date.now() - fa * MIN;
+    const f = join(sub, 'agent-w1.jsonl');
+    const errore = attesaMin === null ? [] : [{ type: 'system', subtype: 'api_error', level: 'error', timestamp: new Date(ora).toISOString(), retryInMs: attesaMin * MIN, retryAttempt: 4, maxRetries: 10 }];
+    writeFileSync(f, righe(uso('t1', 'Bash', { command: 'ls' }, ora - MIN), risposta('t1', ora - MIN + 500), ...errore));
+    utimesSync(f, new Date(ora), new Date(ora));
+    return dir;
+  };
+  const segni = (configDir) => segniDiVita({ root: clone({ prima: 60 }).work, ticket: B, sessione: SID, configDir });
+
+  test('fermo da venticinque minuti dentro un\'attesa di un\'ora: lavora, e il battito dice «adesso»', () => {
+    const adesso = Date.now();
+    const v = segni(inAttesa({ fa: 25, attesaMin: 60 }));
+    assert.equal(giudica({ ...v, adesso }).stato, 'lavora');
+    assert.equal(attivitaPerBattito(v, adesso).attivitaMs, adesso);
+    assert.equal(giudica({ ...segni(inAttesa({ fa: 25, attesaMin: null })), adesso }).stato, 'fermo', 'lo stesso silenzio senza attesa dichiarata');
+  });
+
+  test('a attesa finita da venti minuti è fermo, e il quadro la dice', () => {
+    const v = segni(inAttesa({ fa: 45, attesaMin: 24 }));
+    const g = giudica({ ...v, adesso: Date.now() });
+    assert.equal(g.stato, 'fermo');
+    assert.ok(g.fermoMs >= 20 * MIN && g.fermoMs < 22 * MIN, `fermo da ${g.fermoMs}`);
+    assert.match(quadroDelFermo(v), /Ultima attesa dichiarata dal fornitore: dalle \d\d:\d\d:\d\d UTC alle \d\d:\d\d:\d\d UTC, tentativo 4 di 10\./);
+    assert.doesNotMatch(quadroDelFermo(segni(inAttesa({ fa: 45, attesaMin: null }))), /attesa dichiarata/);
+  });
+});
+
 function fintoServer() {
   const ricevute = [];
   const srv = createServer((req, res) => {
@@ -369,11 +405,14 @@ describe('il quadro del worker fermo', () => {
 
   test('l\'ultimo passo: lo strumento chiamato per ultimo con la sua risposta, il tipo dell\'ultima riga, il modello', () => {
     const l = [conModello(uso('a', 'Bash', { command: 'npm run test:unit' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 2000)];
-    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5' });
+    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5', attesa: null });
     const p = ultimoPasso([...l, testo('segreto del worker', ORA + 5000), { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 6000).toISOString() }]);
     assert.deepEqual(p.passo, { cosa: 'sistema api_error', ms: ORA + 6000 });
+    assert.equal(p.attesa, null, 'un errore senza ritentativo dichiarato non è un\'attesa');
+    const ritenta = { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 7000).toISOString(), retryInMs: 90_000, retryAttempt: 2, maxRetries: 10 };
+    assert.deepEqual(ultimoPasso([...l, ritenta]).attesa, { inizioMs: ORA + 7000, finoMs: ORA + 97_000, tentativo: 2, di: 10 });
     assert.equal(ultimoPasso([testo('x', ORA)]).passo.cosa, 'testo del modello');
-    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '' });
+    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '', attesa: null });
   });
 
   test('un transcript che finisce dopo una risposta di strumento: il guasto dice quale, a che ora, con risposta, e il modello', () => {
@@ -458,5 +497,170 @@ describe('il quadro del worker fermo', () => {
     assert.equal(p.modello, 'claude-opus-5-5');
     assert.deepEqual(p.passo, { cosa: 'errore dell\'API o richiesta interrotta', ms: ORA + 2000 });
     assert.deepEqual(p.strumento, { nome: 'Bash', ms: ORA, risposta: true });
+  });
+});
+
+// #2324: il worker che ha già reso il suo esito (handback) senza rilasciare non tornerà a farlo. La veglia aspettava i
+// venti minuti del fermo con il posto occupato; ora rilascia col guasto appena la cartella è quieta da due minuti.
+describe('il worker che ha chiuso senza rilasciare', () => {
+  const ORA = Date.parse('2026-11-08T05:35:50Z');
+  const testoFinale = (ora) => ({ type: 'assistant', timestamp: new Date(ora).toISOString(), message: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'FATTO' }] } });
+  const arriva = (ora) => ({ type: 'user', timestamp: new Date(ora).toISOString(), message: { content: [{ type: 'text', text: 'notifica' }] } });
+
+  test('la chiusura: l’handback (anche con la sua risposta) o un turno finale senza strumenti; un messaggio dopo la riapre', () => {
+    assert.equal(chiusuraDi([uso('a', 'Bash', {}, ORA - 9000), risposta('a', ORA - 8000), uso('h', 'SubagentHandback', { message: 'FATTO' }, ORA)]), ORA);
+    assert.equal(chiusuraDi([uso('h', 'SubagentHandback', {}, ORA), risposta('h', ORA + 100)]), ORA);
+    assert.equal(chiusuraDi([testoFinale(ORA)]), ORA);
+    assert.ok(Number.isNaN(chiusuraDi([testoFinale(ORA), arriva(ORA + 1000)])), 'risvegliato: lavora ancora');
+    assert.ok(Number.isNaN(chiusuraDi([uso('a', 'Bash', {}, ORA)])));
+    assert.ok(Number.isNaN(chiusuraDi([])));
+  });
+
+  test('il giudizio: chiuso e quieto da due minuti senza processi; prima, o con un processo nella cartella, lavora', () => {
+    assert.deepEqual(giudica({ tempi: [ORA], chiusoMs: ORA, adesso: ORA + SOGLIA_CHIUSO_MS }), { stato: 'chiuso', fermoMs: SOGLIA_CHIUSO_MS });
+    assert.equal(giudica({ tempi: [ORA], chiusoMs: ORA, adesso: ORA + MIN }).stato, 'lavora');
+    assert.equal(giudica({ tempi: [ORA], chiusoMs: ORA, processi: 1, adesso: ORA + 30 * MIN }).stato, 'lavora', 'il rilascio che spinge è un processo');
+    assert.equal(giudica({ finito: true, tempi: [ORA], chiusoMs: ORA, adesso: ORA + 30 * MIN }).stato, 'finito');
+    assert.equal(SOGLIA_CHIUSO_MS, 2 * MIN);
+  });
+
+  test('la veglia lo rilascia subito col guasto «strumento worker», non dopo venti minuti', async () => {
+    let t = ORA;
+    const visti = [];
+    // Chi guida rilancia la veglia finché esce con 5, come dice il suo ruolo.
+    let e;
+    let giri = 0;
+    do {
+      giri += 1;
+      e = await veglia({
+        adesso: () => t, dorme: async (ms) => { t += ms; },
+        leggi: () => ({ mio: true, finito: false, tempi: [ORA], processi: 0, chiusoMs: ORA, tracce: { viste: true, attesa: null, elenco: [] } }),
+        rilascia: (g, mio) => { visti.push({ g, mio, a: t }); return { ok: true }; },
+      });
+    } while (e.uscita === USCITA_LAVORA && giri < 20);
+    assert.equal(e.uscita, USCITA_FERMO);
+    assert.equal(giri, 2, 'due fette, non le quattordici dei venti minuti');
+    assert.equal(visti.length, 1);
+    assert.ok(visti[0].a - ORA <= SOGLIA_CHIUSO_MS + 10_000, `rilasciato ${(visti[0].a - ORA) / 1000} s dopo l’handback`);
+    assert.match(visti[0].g, /^guasto: strumento worker: il worker ha chiuso la sessione alle 05:35:50 UTC senza rilasciare il biglietto/);
+    assert.match(e.testo, /^Worker chiuso senza rilasciare il biglietto: biglietto rilasciato con un guasto dichiarato\. Chiudi il giro come dopo un guasto/);
+  });
+
+  test('dai transcript: conta la chiusura del worker, non quella di un suo sotto-agente', () => {
+    const vuota = cartella('filo-veglia-chiuso-');
+    const dir = cartella('filo-veglia-chiuso-claude-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const scrivi = (nome, meta, righeDi, fa) => {
+      const f = join(sub, `agent-${nome}.jsonl`);
+      writeFileSync(f, righe(...righeDi));
+      writeFileSync(join(sub, `agent-${nome}.meta.json`), JSON.stringify(meta));
+      const m = new Date(Date.now() - fa * MIN);
+      utimesSync(f, m, m);
+    };
+    writeFileSync(join(dir, FILE_REGISTRO), JSON.stringify({ voci: [{ impronta: impronta(B), ruolo: 'verifier', ora: new Date(Date.now() - 20 * MIN).toISOString() }] }));
+    // Il figlio (Explore) ha reso il suo esito; il worker no: lavora ancora.
+    scrivi('w', { agentType: 'routine-worker', spawnDepth: 1 }, [uso('a', 'Agent', { prompt: 'esplora' }, Date.now() - 6 * MIN)], 5);
+    scrivi('figlio', { agentType: 'Explore', parentAgentId: 'w', spawnDepth: 2 }, [uso('h', 'SubagentHandback', {}, Date.now() - 5 * MIN)], 5);
+    const lavora = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir: dir, leggiProcessi: () => [] });
+    assert.ok(Number.isNaN(lavora.chiusoMs), 'il figlio chiuso non chiude il worker');
+    assert.equal(giudica({ ...lavora, adesso: Date.now() }).stato, 'lavora');
+    // Il worker rende l'handback: chiuso.
+    scrivi('w', { agentType: 'routine-worker', spawnDepth: 1 }, [uso('h2', 'SubagentHandback', { message: 'FATTO' }, Date.now() - 3 * MIN)], 3);
+    const chiuso = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir: dir, leggiProcessi: () => [] });
+    assert.ok(Number.isFinite(chiuso.chiusoMs));
+    assert.equal(giudica({ ...chiuso, adesso: Date.now() }).stato, 'chiuso');
+  });
+});
+
+// #2303: un compito ricorrente ha un tetto di costo per corsa. Chi guida il giro misura i dollari dei transcript del
+// worker e, oltre il tetto, rilascia il biglietto con l'esito «oltre il tetto»: il server chiude l'istanza.
+describe('il tetto di costo di un compito', () => {
+  const s = (extra = {}) => ({ mio: true, finito: false, tempi: [ADESSO - MIN], processi: 0, tracce: { viste: true, attesa: null, file: ['a.jsonl'] }, ...extra });
+  const orologio = () => { let t = ADESSO; return { adesso: () => t, dorme: async (ms) => { t += ms; } }; };
+
+  test('oltre il tetto sì, sotto o senza tetto o senza misura no', () => {
+    assert.deepEqual(oltreIlTetto({ tettoUsd: 120 }, { usd: 131.234 }), { usd: 131.23, tettoUsd: 120 });
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, { usd: 119.99 }), null);
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, { usd: 120 }), null, 'al tetto esatto non si ferma');
+    assert.equal(oltreIlTetto({}, { usd: 500 }), null);
+    assert.equal(oltreIlTetto({ tettoUsd: 120 }, null), null);
+  });
+
+  test('un compito oltre il tetto: rilascio con l\'esito, 3, e a chi guida i soli numeri', async () => {
+    const o = orologio();
+    const rilasci = [];
+    const e = await veglia({
+      ...o, leggi: () => s({ tettoUsd: 120 }), rilascia: () => assert.fail('nessun guasto'),
+      costo: async (x) => { assert.deepEqual(x.tracce.file, ['a.jsonl']); return { usd: 131.2 }; },
+      rilasciaOltre: (oltre, mio) => { rilasci.push({ oltre, mio }); return { ok: true }; },
+    });
+    assert.deepEqual(rilasci, [{ oltre: { usd: 131.2, tettoUsd: 120 }, mio: true }]);
+    assert.equal(e.uscita, USCITA_FERMO);
+    assert.deepEqual(e.oltreTetto, { usd: 131.2, tettoUsd: 120 });
+    assert.match(e.testo, /^Compito oltre il tetto di costo della corsa \(131\.2 \$ su 120 \$\): biglietto rilasciato, il compito non riparte\./);
+    // Il biglietto chiuso non ferma un worker in sottofondo: chi guida il giro deve fermarlo, e sapere come (#2303).
+    assert.match(e.testo, /fermalo adesso con lo strumento TaskStop[^.]*id che ti ha dato il suo lancio/);
+  });
+
+  test('le istruzioni di chi guida il giro dicono di fermare il worker oltre il tetto, e con cosa', async () => {
+    const { AL_POSTO_VIVO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+    const ruolo = readFileSync(join(REPO, 'routines', 'roles', '_veglia.md'), 'utf8');
+    assert.match(ruolo, /oltre\s+il tetto di costo[\s\S]{0,200}Ferma il worker prima di chiudere, con lo strumento TaskStop/);
+    assert.match(AL_POSTO_VIVO, /oltre il tetto di costo\): se ti dice di fermare il worker fermalo con TaskStop/);
+  });
+
+  test('sotto il tetto lavora: una misura per fetta, e senza tetto nessuna', async () => {
+    const o = orologio();
+    let misure = 0;
+    const sotto = await veglia({
+      ...o, fetta: 90_000, passo: 10_000, leggi: () => s({ tettoUsd: 120 }), rilascia: () => assert.fail('nessun guasto'),
+      costo: async () => { misure += 1; return { usd: 80 }; }, rilasciaOltre: () => assert.fail('sotto il tetto non si ferma'),
+    });
+    assert.equal(sotto.uscita, USCITA_LAVORA);
+    assert.equal(misure, 1, 'i transcript si leggono una volta per fetta, non a ogni sguardo');
+    const senza = await veglia({
+      ...o, fetta: 30_000, leggi: () => s(), rilascia: () => assert.fail('nessun guasto'),
+      costo: async () => assert.fail('senza tetto non si misura'), rilasciaOltre: () => assert.fail('niente da fermare'),
+    });
+    assert.equal(senza.uscita, USCITA_LAVORA);
+  });
+
+  test('il tetto sta nel marcatore del biglietto, scritto da dispatch: i segni lo portano con l\'inizio del biglietto', async () => {
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    const { work } = clone();
+    assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) }).tettoUsd, undefined);
+    assert.equal(annotaTetto(work, 'un-altro-biglietto', 50), false, 'solo sul marcatore di quel biglietto');
+    assert.equal(annotaTetto(work, B, 124), true);
+    const v = segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) });
+    assert.equal(v.tettoUsd, 124);
+    assert.ok(Number.isFinite(v.dalMs));
+    assert.equal(v.tracce.file.length, 1);
+    assert.equal(annotaTetto(work, B, 0), true);
+    assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 1 }) }).tettoUsd, undefined, 'un tetto nullo lo toglie');
+  });
+
+  test('da riga di comando: i dollari del transcript passano il tetto → rilascio con oltreTetto e senza guasto, exit 3', async () => {
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    const { srv, port, ricevute } = await fintoServer();
+    const { work } = clone();
+    annotaTetto(work, B, 1);
+    const configDir = claude({ fa: 1 });
+    // Un milione di token in uscita su Opus: decine di dollari, ben oltre il tetto di 1 $.
+    const f = join(configDir, 'projects', '-home-user-Filo', SID, 'subagents', 'agent-w1.jsonl');
+    appendFileSync(f, righe({ type: 'assistant', timestamp: new Date().toISOString(), sessionId: SID, message: { id: 'caro', model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1_000_000 }, content: [{ type: 'text', text: 'x' }] } }));
+    try {
+      const r = await cli(['veglia', B], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_SESSION_ID: SID,
+      });
+      assert.equal(r.code, USCITA_FERMO, `stdout: ${r.so}\nstderr: ${r.se}`);
+      assert.match(r.so, /^Compito oltre il tetto di costo della corsa \(\d+(\.\d+)? \$ su 1 \$\): biglietto rilasciato, il compito non riparte\./);
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.ok(rilascio, 'il server ha ricevuto il rilascio');
+      assert.equal(rilascio.body.fault, undefined, 'non è un guasto');
+      assert.equal(rilascio.body.oltreTetto.tettoUsd, 1);
+      assert.ok(rilascio.body.oltreTetto.usd > 1, JSON.stringify(rilascio.body.oltreTetto));
+      assert.ok(rilascio.body.report, 'con il rapporto di fine sessione, parziale');
+    } finally { srv.close(); }
   });
 });

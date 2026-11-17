@@ -130,7 +130,7 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
     });
     globalThis.__calls = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools }) => {
-      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: (tools || []).map((t) => t.function.name) });
+      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: (tools || []).map((t) => ({ name: t.function.name, description: t.function.description })) });
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (n === 1) {
         return {
@@ -153,7 +153,11 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
   // Gli strumenti restano offerti (prefisso in cache stabile): è l'esito a dire di no.
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls.length).toBe(2);
-  expect(calls[0].tools).toEqual(expect.arrayContaining(['PROXY_TAB', 'REGOLA_PROXY_DOMINIO']));
+  // Da #1564 le due azioni stanno dentro lo strumento generale delle schede.
+  const scheda = calls[0].tools.find((t) => t.name === 'scheda');
+  expect(scheda, 'lo strumento delle schede non arriva al modello').toBeTruthy();
+  expect(scheda.description).toMatch(/^- paese\(/m);
+  expect(scheda.description).toMatch(/^- regola_paese\(/m);
   const esito = (id) => (calls[1].messages.find((m) => m.role === 'tool' && m.tool_call_id === id) || {}).content || '';
   for (const id of ['r1', 'p1']) {
     expect(esito(id)).toMatch(/aprire da un altro paese non è ancora disponibile/);

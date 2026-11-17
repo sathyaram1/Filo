@@ -219,17 +219,6 @@ test('mostra: i testi degli agenti escono coi caratteri di controllo resi visibi
   assert.match(testo, /non fidata/);
 });
 
-test('mostra (#1154): l’assorbita dice in quale domanda è finita, la madre quali ha dentro', () => {
-  const q = { quando: () => 'ora' };
-  const assorbita = formattaDomanda({ id: 'D-5', stato: 'superata', titolo: 'Barra larga', esito: { ok: true, superataDa: 'D-3', assorbita: true } }, {}, q);
-  assert.match(assorbita, /Assorbita in D-3: la risposta lì vale anche per questa/);
-  const sostituita = formattaDomanda({ id: 'D-6', stato: 'superata', titolo: 'Vecchia', esito: { ok: true, superataDa: 'D-8' } }, {}, q);
-  assert.match(sostituita, /Superata da D-8\./);
-  assert.doesNotMatch(sostituita, /Assorbita/);
-  const madre = formattaDomanda({ id: 'D-3', stato: 'aperta', titolo: 'Ripensare le barre', assorbite: ['D-5', 'D-7', 'D-5', 'x'] }, {}, q);
-  assert.match(madre, /Domande assorbite: D-5, D-7\n/);
-});
-
 test('elenco a blocchi e frasi d’errore della callable', () => {
   const e = formattaElenco([{ id: 'D-2', titolo: 'b', priorita: 'quando_puoi', stato: 'aperta' }, { id: 'D-1', titolo: 'a\u001b', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }]);
   assert.ok(e.indexOf('D-1') < e.indexOf('D-2'));
@@ -303,4 +292,23 @@ test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
   const m = motivoNonFidate(tanti);
   assert.match(m, /^testo di 400 domande non fidate \(D-1, .*D-10, …\)$/);
   assert.ok(`elenco delle domande: ${m}`.length <= 300);
+});
+
+test('#2542: l’assorbimento si legge dal terminale nei due sensi', () => {
+  const q = { quando: () => 'ora' };
+  assert.match(formattaDomanda({ id: 'D-40', stato: 'aperta', titolo: 't', assorbite: ['D-41', 'D-42'] }, {}, q), /^assorbe: D-41, D-42$/m);
+  assert.match(formattaDomanda({ id: 'D-41', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'assorbita in D-40', superataDa: 'D-40' } }, {}, q), /^assorbita in D-40$/m);
+  assert.match(formattaDomanda({ id: 'D-43', stato: 'superata', titolo: 't', esito: { ok: true, superataDa: 'D-44' } }, {}, q), /^superata da D-44$/m);
+  // Le assorbite di prima del legame hanno solo il motivo: il terminale le legge come la pagina.
+  assert.match(formattaDomanda({ id: 'D-45', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'assorbita in D-40' } }, {}, q), /^assorbita in D-40$/m);
+  assert.match(formattaDomanda({ id: 'D-46', stato: 'superata', titolo: 't', esito: { ok: true, superata: 'altro', superataDa: 'D-40', assorbita: true } }, {}, q), /^assorbita in D-40$/m);
+});
+
+test('#2542: chi ha assorbito una domanda lo dice una regola sola, col segno del server o il motivo di prima', () => {
+  const D = globalThis.SN_DOMANDE;
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-7', assorbita: true } }), 'D-7');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superata: 'assorbita in D-8' } }), 'D-8');
+  assert.equal(D.assorbitaIn({ stato: 'superata', esito: { superataDa: 'D-9' } }), '', 'superata da una nata al suo posto');
+  assert.equal(D.assorbitaIn({ stato: 'aperta', esito: { superataDa: 'D-7', assorbita: true } }), '');
+  assert.equal(D.assorbitaIn(null), '');
 });

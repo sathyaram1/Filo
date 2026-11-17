@@ -67,8 +67,9 @@
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
 //   node scripts/routine-channel.mjs aspetta <biglietto>
-//       → il worker che ha solo da aspettare i suoi comandi in sottofondo (#2185), al massimo una fetta
-//         (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella, 5 = lavorano ancora (si rilancia).
+//       → il worker che ha solo da aspettare i suoi comandi e sotto-agenti in sottofondo (#2185, #2304), al massimo una
+//         fetta (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella né sotto-agente al lavoro,
+//         5 = lavorano ancora (si rilancia).
 //
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
@@ -152,7 +153,7 @@ import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-
 import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
-  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER,
+  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER, cartelleDelLavoro,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
@@ -234,6 +235,19 @@ export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fe
 }
 
 function defaultSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/**
+ * La lettura del lavoro vivo di un worker, una regola per l'attesa e il rilascio: i suoi processi nella cartella e i
+ * sotto-agenti non chiusi della sessione (#2304), che dopo il rilascio scriverebbero nella cartella del prossimo.
+ */
+async function lavoroVivoDelWorker() {
+  const { sottoAgentiVivi } = await import('./lib/veglia-worker.mjs');
+  return () => {
+    const v = lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) });
+    const figli = sottoAgentiVivi();
+    return figli.length ? { ...v, vivo: true, segni: [...figli, ...v.segni] } : v;
+  };
+}
 
 /**
  * Traduce la risposta del canale nel vocabolario delle routine. PURA.
@@ -330,8 +344,9 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
-// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
-export const ID_IMMAGINE_RE = /^(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
+// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K; con `uM.` davanti sono
+// dell'unita M di un pacchetto (#2267). Specchio di ID_RE in routine/immagini.js del server.
+export const ID_IMMAGINE_RE = /^(u\d{1,2}\.)?(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
 
 /**
  * Chi chiede un'immagine: l'id, e il biglietto se passato (davanti all'id o con `--ticket`, uguali se
@@ -345,7 +360,7 @@ export function argomentiImmagine(args, aMano = '') {
   if (lista.length === 2 && haFormaDiBigliettoVero(lista[0])) davanti = lista.shift();
   if (lista.length !== 1) return { errore: 'Uso: immagine <id> [--ticket <codice>], un id solo (s2, r1.3).' };
   const id = lista[0].trim();
-  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), come in «immagini».` };
+  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), con uM. davanti per l'unita M di un pacchetto, come in «immagini».` };
   if (davanti && mano && davanti !== mano) return { errore: 'Due biglietti diversi: passane uno solo.' };
   return { id, ticket: davanti || mano };
 }
@@ -548,6 +563,7 @@ export async function release(t, fault = '', opts, report = null, spedito = null
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   const processo = String((opts && opts.processo) || '').trim();
   if (processo) payload.domandaProcesso = processo;
+  if (opts && opts.oltreTetto) payload.oltreTetto = opts.oltreTetto;
   if (spedito && typeof spedito.branch === 'string' && spedito.branch && /^[0-9a-f]{40}$/.test(String(spedito.sha || ''))) {
     payload.branch = spedito.branch;
     payload.sha = spedito.sha;
@@ -580,6 +596,15 @@ const ATTESA_SOPRA_S = 30;
 export const PROCESSO_MAX = 4000;
 // I ruoli il cui biglietto non porta un feedback (server: guasti.domandaDiProcesso lo vuole).
 export const RUOLI_SENZA_FEEDBACK = Object.freeze(['compito', 'risposta', 'smistamento', 'manutentore', 'orchestrator']);
+
+/** «131.2:120» (spesi e tetto, in dollari) → { usd, tettoUsd } per il server (#2303), o null se non si legge. PURA. */
+export function leggiOltreTetto(v) {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$/.exec(typeof v === 'string' ? v : '');
+  if (!m) return null;
+  const usd = Number(m[1].replace(',', '.'));
+  const tettoUsd = Number(m[2].replace(',', '.'));
+  return tettoUsd > 0 ? { usd, tettoUsd } : null;
+}
 
 /**
  * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
@@ -880,7 +905,9 @@ export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = n
  * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
  * → { ok, branch, punta, main, forced } | { ok:false, tipo: 'base'|'ramo'|'spedizione', reason }
  */
-export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+// `presa`: origin/main alla presa in carico. Se main va avanti dopo il rebase (il fetch di finish:check) la punta basta
+// che contenga quello: il cancello la riallinea comunque, e rifare rebase e unit costava un giro a biglietto (#2236).
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main', presa = '' } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
@@ -893,9 +920,16 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   const nomeMain = base.replace(/^refs\/remotes\//, '');
   const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
   if (!main.ok || !main.out) return { ok: false, tipo: 'base', reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
-  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
-    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  const contiene = (sha) => run(['merge-base', '--is-ancestor', sha, punta.out]).ok;
+  const minimo = String(presa || '').trim().toLowerCase();
+  const indietro = !contiene(main.out);
+  if (indietro && !(/^[0-9a-f]{40}$/.test(minimo) && contiene(minimo))) {
+    const daQuale = /^[0-9a-f]{40}$/.test(minimo) ? `né ${nomeMain} della presa in carico (${minimo.slice(0, 9)})` : '';
+    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)})${daQuale ? `, ${daQuale}` : ''}: il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
   }
+  const avanti = indietro
+    ? `${nomeMain} è andata avanti dopo il tuo rebase (ora ${main.out.slice(0, 9)}): la punta contiene quella della presa in carico (${minimo.slice(0, 9)}), e il resto lo riallinea il cancello prima di fondere. Non serve un altro rebase.`
+    : '';
   const p = pushRamoCorrente(root, { exec, env });
   if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
   if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
@@ -909,7 +943,8 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   if (!dopo.ok || su !== dopo.out.toLowerCase()) {
     return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
   }
-  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+  const avviso = [p.avviso, avanti].filter(Boolean).join('\n');
+  return { ok: true, branch: p.branch, punta: dopo.out, main: indietro ? minimo : main.out, forced: !!p.forced, ...(avviso ? { avviso } : {}) };
 }
 
 /** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
@@ -920,7 +955,7 @@ export function testoRiallineamentoNonSpedito(sped) {
     sped.tipo === 'spedizione'
       ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro resta sul suo ramo e riparte quando il manutentore lo sblocca.'
       : sped.tipo === 'base'
-        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
+        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando. Gli unit non li rifai per intero: solo le prove dei file che questo rebase mette in conflitto, se ce ne sono; quelli sulla fusione li rifà il cancello.'
         : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
   ].join('\n');
 }
@@ -1005,6 +1040,31 @@ export function spedisciAppPrimaDelServer(root, biglietto, { exec = execFileSync
   const p = pushRamoCorrente(root, { exec, env });
   if (p.avviso) righe.push(p.avviso);
   return { ...p, righe };
+}
+
+/**
+ * Una fermata (`status design`) lascia il ramo a chi riparte: prima che il server la registri il ramo va su origin, alla
+ * punta della cartella, o il piano dà per fatto quello che nessuno ritroverà (#2516). Solo nella cartella del biglietto.
+ * → { ok, skipped, branch, punta, reason, righe }: un `ok` falso ferma la consegna.
+ */
+export function spedisciPrimaDellaFermata(root, biglietto, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (!marcatore || !marcatore.ticket || String(marcatore.ticket) !== String(biglietto || '') || bigliettoFinito(marcatore)) {
+    return { ok: true, skipped: true, branch: '', reason: 'non è la cartella di un biglietto vivo', righe: [] };
+  }
+  const p = spedisciAppPrimaDelServer(root, biglietto, { exec, env });
+  if (!p.ok || p.skipped) return p;
+  let remoto = '';
+  try {
+    remoto = String(exec('git', ['ls-remote', 'origin', `refs/heads/${p.branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '');
+  } catch (e) {
+    return { ...p, ok: false, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(String((e && (e.stderr || e.message)) || ''))}` };
+  }
+  const su = (remoto.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === `refs/heads/${p.branch}`) || [])[0] || '';
+  if (!p.punta || su.toLowerCase() !== p.punta.toLowerCase()) {
+    return { ...p, ok: false, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${String(p.punta || '?').slice(0, 9)}` };
+  }
+  return p;
 }
 
 /**
@@ -1586,7 +1646,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1612,7 +1672,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo', 'processo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo', 'oltre-tetto',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1922,19 +1982,26 @@ if (isMain) {
     const { stopBeat } = await import('./lib/routine-beat.mjs');
     const ticket = args[0];
     const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+    const rilascioForzato = (extra, mio, env = {}) => {
+      const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+        ...extra, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, ...env } });
+      const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+      if (!ok) stopBeat(ROOT, { ticket });
+      const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+      return { ok, motivo };
+    };
     const esito = await veglia({
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
-      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
-      rilascia: (guasto, mio, quadro) => {
-        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
-          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, [ENV_QUADRO_FERMO]: String(quadro || '') } });
-        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
-        if (!ok) stopBeat(ROOT, { ticket });
-        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
-        return { ok, motivo };
+      rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
+      // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
+      costo: async (s) => {
+        const { costoDeiFile } = await import('./session-report.mjs');
+        return costoDeiFile((s.tracce && s.tracce.file) || [], { since: Number.isFinite(s.dalMs) ? new Date(s.dalMs).toISOString() : '' });
       },
+      rilasciaOltre: (oltre, mio) => rilascioForzato(['--oltre-tetto', `${oltre.usd}:${oltre.tettoUsd}`], mio),
     });
     console.log(esito.testo);
     process.exit(esito.uscita);
@@ -1948,7 +2015,7 @@ if (isMain) {
     const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
     const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
     const esito = await aspettaCartella({
-      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER }),
+      controlla: await lavoroVivoDelWorker(),
       sleep: defaultSleep,
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
@@ -1980,6 +2047,12 @@ if (isMain) {
       console.error(`--processo vale per chi lavora un feedback: il ruolo ${data.role} non ne ha uno, e la domanda non arriverebbe al manutentore. Scrivila con «segnala». Non ho rilasciato niente.`);
       process.exit(1);
     }
+    // `--oltre-tetto "<spesi>:<tetto>"`: la veglia ferma un compito oltre il tetto di costo della corsa (#2303).
+    const oltreTetto = data['oltre-tetto'] === undefined ? null : leggiOltreTetto(data['oltre-tetto']);
+    if (data['oltre-tetto'] !== undefined && !oltreTetto) {
+      console.error('--oltre-tetto vuole i dollari spesi e il tetto: --oltre-tetto "131.2:120". Non ho rilasciato niente.');
+      process.exit(1);
+    }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
@@ -1989,12 +2062,12 @@ if (isMain) {
     const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
     const chiRilascia = typeof data.role === 'string' ? data.role : '';
     if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
-      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER });
+      const vivo = chiRilascia === 'orchestrator' ? lavoroVivo(ROOT, {}) : (await lavoroVivoDelWorker())();
       if (vivo.vivo) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'
           ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
-          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona: «aspetta <biglietto>» di questo stesso script), o fermali se non servono più, poi rilancia lo stesso comando.');
+          : 'Aspetta che finiscano (un comando o un sotto-agente in sottofondo si aspetta, non si abbandona: «aspetta <biglietto>» di questo stesso script), o fermali se non servono più (un sotto-agente con lo strumento TaskStop), poi rilancia lo stesso comando.');
         process.exit(USCITA_LAVORO_VIVO);
       }
     }
@@ -2065,6 +2138,7 @@ if (isMain) {
     const opzioniRilascio = {
       ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
       ...(processo ? { processo } : {}),
+      ...(oltreTetto ? { oltreTetto } : {}),
     };
     const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined, spedito);
     if (r.avviso) console.error(r.avviso);
@@ -2239,9 +2313,10 @@ if (isMain) {
       data.sha = punta;
       if (intento === 'fixed') {
         const { readMarker } = await import('./lib/routine-role.mjs');
-        if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+        const marcatore = readMarker(ROOT);
+        if (consegnaDiRiallineamento(marcatore, { ferma: data.stop, domanda: data.domanda })) {
           await novitaPrimaDiSpedire(ROOT, (r) => console.error(r));
-          const sped = spedisciRiallineamento(ROOT);
+          const sped = spedisciRiallineamento(ROOT, { presa: marcatore.mainAllaPresa });
           if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
           if (sped.avviso) console.error(sped.avviso);
           data.sha = sped.punta;
@@ -2289,6 +2364,15 @@ if (isMain) {
     }
     const fermata = fermataSenzaDomanda(intento, data);
     if (fermata) { console.error(fermata); process.exit(1); }
+    if (intento === 'status' && data.status === 'design') {
+      const sped = spedisciPrimaDellaFermata(ROOT, biglietto);
+      for (const riga of sped.righe || []) console.error(riga);
+      if (!sped.ok) {
+        console.error(`Il ramo${sped.branch ? ` '${sped.branch}'` : ''} NON è su origin: ${sped.reason}`);
+        console.error('Non ho consegnato la fermata: chi riparte cercherebbe il lavoro su un ramo che non lo ha. Se la causa sta nel ramo (detta qui sopra) sistemala e rilancia lo stesso comando; altrimenti è un guasto da dichiarare nel rilascio. Non spingere a mano.');
+        process.exit(1);
+      }
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su

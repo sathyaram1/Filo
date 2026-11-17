@@ -263,5 +263,13 @@
     return out;
   }
 
-  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome, alPercento };
+  // I nomi che un esito di BLUETOOTH o WIFI fa leggere al modello senza che li abbia chiesti (l'elenco, i candidati di
+  // un nome ambiguo): una regola per le uscite e per l'autonomia (#2305). Il nome di un collegamento è quello chiesto.
+  function nomiLetti(out) {
+    const o = out && typeof out === 'object' ? out : {};
+    return [...(Array.isArray(o.elenco) ? o.elenco.map((x) => x && x.nome) : []), ...(Array.isArray(o.candidati) ? o.candidati : [])]
+      .filter((n) => typeof n === 'string' && n.trim());
+  }
+
+  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome, alPercento, nomiLetti };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

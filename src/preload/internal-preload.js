@@ -35,114 +35,7 @@ if (IS_FILO_ORIGIN) {
   } catch (e) { console.error('[Filo internal] rilascio', e); }
 }
 
-let streamCounter = 0;
-
-const filoApi = {
-  message: (msg) => ipcRenderer.invoke('filo:message', msg),
-  getURL: (rel) => 'filo://' + String(rel || '').replace(/^\/+/, ''),
-  // 'darwin' | 'win32' | 'linux': le pagine devono nominare il tasto giusto e
-  // offrire le shell che esistono davvero. Dato del sistema, non dell'utente.
-  sistema: process.platform,
-  // Il percorso su disco di un file trascinato in una pagina di Filo (#950): '' se non viene dal disco.
-  percorsoDelFile: (file) => {
-    try { return (webUtils && webUtils.getPathForFile(file)) || ''; } catch (_) { return ''; }
-  },
-  onBroadcast: (fn) => {
-    const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
-    ipcRenderer.on('filo:broadcast', wrapped);
-    return () => ipcRenderer.removeListener('filo:broadcast', wrapped);
-  },
-  // { reqId, text }: il chiamante filtra per reqId. Ritorna un unsubscribe.
-  onReasoning: (fn) => {
-    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
-    ipcRenderer.on('filo:reasoning', wrapped);
-    return () => ipcRenderer.removeListener('filo:reasoning', wrapped);
-  },
-  // #420 — { reqId, delta } coi caratteri nuovi, oppure { reqId, reset: true }
-  // quando il ripiego impone di buttare il testo mostrato finora.
-  onAnswer: (fn) => {
-    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
-    ipcRenderer.on('filo:answer', wrapped);
-    return () => ipcRenderer.removeListener('filo:answer', wrapped);
-  },
-  // Le AZIONI in diretta durante una FILO_CHAT (tool calling nativo). Il main
-  // pusha sul canale 'filo:action' { reqId, kind, ... }: kind 'start' (il
-  // modello ha appena nominato un'azione: { type }), 'done' (eseguita, con
-  // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
-  // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
-  // risposta: { text }; con `risposta: true` è un giro di soli bottoni e il
-  // testo apre la risposta) e 'fine' (l'ultimo della diretta, #1321). Il chiamante filtra per reqId. Ritorna un unsubscribe.
-  onAction: (fn) => {
-    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
-    ipcRenderer.on('filo:action', wrapped);
-    return () => ipcRenderer.removeListener('filo:action', wrapped);
-  },
-  // #590 — una pagina aperta da NAVIGA che, a turno finito, si è spostata da sé su un sito
-  // della lista: { callId, host, reason, url }. Ritorna un unsubscribe.
-  onAperturaFermata: (fn) => {
-    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
-    ipcRenderer.on('filo:apertura-fermata', wrapped);
-    return () => ipcRenderer.removeListener('filo:apertura-fermata', wrapped);
-  },
-  aiStream: ({ action, payload, onMeta, onDelta, onReset, onDone, onError }) => {
-    const requestId = `s${Date.now()}_${++streamCounter}`;
-    const offMeta = (_e, data) => onMeta && onMeta(data);
-    const offDelta = (_e, data) => onDelta && onDelta(data.delta);
-    // #273 — reset: il provider è caduto a metà, i delta accumulati si buttano.
-    const offReset = (_e, data) => onReset && onReset(data);
-    const offDone = (_e, data) => { cleanup(); onDone && onDone(data); };
-    const offError = (_e, data) => { cleanup(); onError && onError(data); };
-    const cleanup = () => {
-      ipcRenderer.removeListener(`ai-stream:${requestId}:meta`, offMeta);
-      ipcRenderer.removeListener(`ai-stream:${requestId}:delta`, offDelta);
-      ipcRenderer.removeListener(`ai-stream:${requestId}:reset`, offReset);
-      ipcRenderer.removeListener(`ai-stream:${requestId}:done`, offDone);
-      ipcRenderer.removeListener(`ai-stream:${requestId}:error`, offError);
-    };
-    ipcRenderer.on(`ai-stream:${requestId}:meta`, offMeta);
-    ipcRenderer.on(`ai-stream:${requestId}:delta`, offDelta);
-    ipcRenderer.on(`ai-stream:${requestId}:reset`, offReset);
-    ipcRenderer.on(`ai-stream:${requestId}:done`, offDone);
-    ipcRenderer.on(`ai-stream:${requestId}:error`, offError);
-    ipcRenderer.invoke('ai-stream:start', { requestId, action, payload });
-    return {
-      abort: () => { ipcRenderer.send('ai-stream:abort', { requestId }); cleanup(); },
-    };
-  },
-  // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
-  // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
-  // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, chat, gettone, daFuori, onData, onExit, onError }) => {
-    const execId = `sh${Date.now()}_${++streamCounter}`;
-    const offData = (_e, data) => onData && onData(data);
-    const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
-    const offError = (_e, data) => { cleanup(); onError && onError(data); };
-    const cleanup = () => {
-      ipcRenderer.removeListener(`shell:${execId}:data`, offData);
-      ipcRenderer.removeListener(`shell:${execId}:exit`, offExit);
-      ipcRenderer.removeListener(`shell:${execId}:error`, offError);
-    };
-    ipcRenderer.on(`shell:${execId}:data`, offData);
-    ipcRenderer.on(`shell:${execId}:exit`, offExit);
-    ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone, daFuori: daFuori === true });
-    return {
-      sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
-      abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
-    };
-  },
-  shellHome: () => ipcRenderer.invoke('shell:home'),
-  // #892.1 — cosa chiede un comando scritto a mano prima di partire, coi livelli di quelli di Filo; il no della persona.
-  shellVaglia: (opts) => ipcRenderer.invoke('shell:vaglia', opts),
-  shellAnnulla: (gettone) => ipcRenderer.send('shell:annulla', { gettone }),
-  shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
-  // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
-  shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
-  shellPropostaVirgolette: (opts) => ipcRenderer.invoke('shell:proposta-virgolette', opts),
-  // Questo "/dominio.tld" risolve davvero? Per colorare di rosso (e non
-  // navigare verso) un sito inesistente dalla barra comando della dashboard.
-  siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
-};
+const filoApi = require('./filo-api.js')(ipcRenderer, webUtils);
 
 if (IS_FILO_ORIGIN) window.filo = filoApi;
 // Come dalle pagine web: senza, Cerca dal tasto destro chiudeva la misura al clic (#1461.1).
@@ -150,112 +43,7 @@ if (IS_FILO_ORIGIN) {
   try { globalThis.SN_APERTURA_SCELTA = require('./apertura-scelta.js')(ipcRenderer); } catch (e) { console.error('[Filo internal] apertura scelta', e); }
 }
 
-// Shim chrome.*: i moduli portati lo usano senza sapere che siamo in Electron.
-const chromeShim = {
-  runtime: {
-    id: 'filo-desktop',
-    lastError: null,
-    sendMessage: (msg, callback) => {
-      const p = filoApi.message(msg);
-      if (typeof callback === 'function') {
-        p.then((r) => { try { callback(r); } catch (_) {} },
-               (err) => { try { callback({ ok: false, error: err.message }); } catch (_) {} });
-        return undefined;
-      }
-      return p;
-    },
-    onMessage: {
-      _listeners: new Set(),
-      addListener(fn) {
-        this._listeners.add(fn);
-        if (!this._wired) {
-          this._wired = true;
-          filoApi.onBroadcast((m) => {
-            for (const l of this._listeners) {
-              try { l(m, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo] listener err', e); }
-            }
-          });
-        }
-      },
-      removeListener(fn) { this._listeners.delete(fn); },
-    },
-    connect: ({ name } = {}) => {
-      let onMessage = null;
-      let onDisconnect = null;
-      let active = null;
-      return {
-        name: name || 'unknown',
-        postMessage(msg) {
-          if (msg?.type !== 'start') return;
-          active = filoApi.aiStream({
-            action: msg.action, payload: msg.payload,
-            onMeta: (m) => onMessage && onMessage({ type: 'meta', ...m }),
-            onDelta: (delta) => onMessage && onMessage({ type: 'delta', delta }),
-            onReset: () => onMessage && onMessage({ type: 'reset' }),
-            onDone: (d) => {
-              if (onMessage) onMessage({ type: 'done', ...d });
-              if (onDisconnect) onDisconnect();
-            },
-            onError: (e) => {
-              // Tutto quello che il main ha detto sull'errore: con i soli
-              // message e code la frase già scritta per l'utente non si
-              // ricompone e arriva la riga grezza del servizio (#663).
-              if (onMessage) onMessage({ type: 'error', ...e });
-              if (onDisconnect) onDisconnect();
-            },
-          });
-        },
-        onMessage: { addListener: (fn) => { onMessage = fn; } },
-        onDisconnect: { addListener: (fn) => { onDisconnect = fn; } },
-        disconnect() { if (active) active.abort(); },
-      };
-    },
-    getURL: filoApi.getURL,
-    openOptionsPage: () => filoApi.message({ type: 'open_options' }),
-  },
-  storage: {
-    local: {
-      get(keys, callback) {
-        const p = filoApi.message({ type: '_storage:get', keys }).then(r => r?.value || {});
-        if (typeof callback === 'function') {
-          p.then(v => { try { callback(v); } catch (_) {} })
-           .catch(() => { try { callback({}); } catch (_) {} });
-          return;
-        }
-        return p;
-      },
-      async set(obj) { await filoApi.message({ type: '_storage:set', obj }); },
-      async remove(keys) { await filoApi.message({ type: '_storage:remove', keys }); },
-      async clear() { await filoApi.message({ type: '_storage:clear' }); },
-    },
-    onChanged: {
-      addListener(fn) {
-        filoApi.onBroadcast((m) => {
-          if (m?.type === '_storage:changed') {
-            try { fn(m.changes, 'local'); } catch (_) {}
-          }
-        });
-      },
-      removeListener() {},
-    },
-  },
-  tabs: {
-    async create({ url } = {}) {
-      const r = await filoApi.message({ type: '_tabs:create', url });
-      return { id: r.id };
-    },
-    async query() { return []; },
-    async remove(id) { await filoApi.message({ type: '_tabs:remove', id }); },
-    async captureVisibleTab() {
-      const r = await filoApi.message({ type: 'capture_visible_tab' });
-      return r.dataUrl;
-    },
-  },
-  action: { onClicked: { addListener() {} } },
-  commands: { onCommand: { addListener() {} } },
-  scripting: { executeScript: async () => ({}) },
-  contextMenus: { create: () => {}, onClicked: { addListener: () => {} } },
-};
+const chromeShim = require('./chrome-shim.js')(filoApi);
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // Gemello dell'adattatore in page-preload.js. La scorciatoia (Alt+E/Alt+T/
@@ -319,6 +107,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'schedeInChat.js'), 'SN_SCHEDE_IN_CHAT'); // #2085 — gettoni delle schede: PRIMA di sidebar.js
   safe(path.join(SHARED, 'schedaTrascinata.js'), 'SN_SCHEDA_TRASCINATA'); // #2084 — la scheda lasciata qui: PRIMA di sidebar.js
   safe(path.join(SHARED, 'trascinoInterno.js'), 'SN_TRASCINO_INTERNO'); // #2300 — il gettone dei trascinamenti interni: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'testoDiAltri.js'), 'SN_TESTO_DI_ALTRI'); // #1840 — il testo incollato è di altri: PRIMA di sidebar.js
   safe(path.join(SHARED, 'ricercaCampo.js'), 'SN_RICERCA_CAMPO'); // #824 — "è una ricerca?": PRIMA di content.js
   safe(path.join(SHARED, 'accessoFisso.js'), 'SN_ACCESSO_FISSO'); // #1808 — la password dell'accesso fisso: PRIMA di content.js
   safe(path.join(SHARED, 'urlNav.js'), 'SN_URL_NAV'); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi

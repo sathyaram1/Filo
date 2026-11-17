@@ -13,6 +13,7 @@ const confermata = (page, chiave, valore) => page.evaluate(
   ({ c, v }) => chrome.runtime.sendMessage({
     type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION,
     action: { type: 'IMPOSTA_PREFERENZA', chiave: c, valore: v },
+    parole: [`${c.replace(/_/g, ' ')}: ${v}`],
   }),
   { c: chiave, v: valore },
 );

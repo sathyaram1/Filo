@@ -58,7 +58,8 @@ require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google s
 require(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso, per la pulizia delle schede
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'restanoAperte.js')); // #1695 — perché una scheda resta aperta dopo una chiusura in blocco
-require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
+require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — cosa una pagina è: posta, banca, sanità, con un campo password
+require(path.join(SHARED, 'livelliPrivacy.js')); // #1589 — quanto parte da solo verso i modelli, la regola unica
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
 require(path.join(SHARED, 'scaricamentiAvanzamento.js')); // #1287 — velocità e tempo che resta di uno scaricamento (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
@@ -86,6 +87,7 @@ require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come ri
 require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
 require(path.join(SHARED, 'filoTrattoVivo.js'));  // #1562 — il CONTESTO dell'utente fotografato e quello che succede fra i messaggi (logica pura)
+require(path.join(SHARED, 'filoCompattazione.js'));  // #1563 — la compattazione del filo a livelli (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
@@ -106,11 +108,12 @@ require(path.join(SHARED, 'feedbackPublicView.js')); // dopo manageReview: lo us
 require(path.join(SHARED, 'testoDeiCampi.js')); // #2378 — le durate del testo dei campi: PRIMA di preferences, che le offre alla chat
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
-require(path.join(SHARED, 'cmdClassify.js'));
+require(path.join(SHARED, 'cmdClassify.js')); // #2493 — carica da sé le sue parti (cmdBase, cmdGit…), nel loro ordine
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: il main li cerca anche nei riquadri
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'pavimento.js')); // #1589 — cosa non esce mai verso un modello, a nessun livello (dopo guardianoStatico)
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat

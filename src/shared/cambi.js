@@ -20,6 +20,10 @@
     return /^-?\d+$/.test(i) ? `${intero(Number(i))}${d ? `,${d}` : ''}` : String(Number(v)).replace('.', ',');
   };
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
+  // I livelli di privacy (#1589) coi nomi che l'utente vede in Sicurezza.
+  const LIVELLI_PRIVACY = { anticipo: 'tutto in anticipo', delicate: 'chiedi sulle delicate', sempre: 'chiedi sempre' };
+  const CATEGORIE_PRIVACY = { posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'enti pubblici', campi: 'pagine con una password' };
+  const nomeCategoria = (c) => CATEGORIE_PRIVACY[c] || String(c);
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
 
   function etichettaColoreTab(k) {
@@ -50,6 +54,9 @@
     const T = tastiDiFilo();
     return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
   }
+
+  // Un numero di token che può tornare ai predefiniti: tetti del contesto e lunghezze delle risposte lo dicono uguale.
+  const tokenOPredefiniti = (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`);
 
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
@@ -90,7 +97,12 @@
     },
     'contestoFilo.token': {
       nome: 'tetto in token di quello che la chat ricorda',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
+      livello: 2,
+    },
+    'contestoFilo.soglia': {
+      nome: 'soglia oltre la quale la chat compatta la conversazione',
+      valore: tokenOPredefiniti,
       livello: 2,
     },
     'contestoFilo.cache': {
@@ -104,7 +116,7 @@
       ['brevi', 'brevi (spiegazioni, titoli, correttore)'],
     ].map(([f, di]) => [`lunghezzaRisposte.${f}`, {
       nome: `lunghezza massima delle risposte ${di}`,
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      valore: tokenOPredefiniti,
       livello: 2,
     }])),
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
@@ -128,7 +140,9 @@
     'feedbackRilettura.enabled': { nome: 'rilettura del feedback prima dell\'invio', valore: ATTIVA, livello: 1 },
     'traduzionePagina.nascoste': {
       nome: 'traduzione delle sezioni chiuse di una pagina',
-      valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },
+      // I due valori li dice constants.js: qui si chiede solo quale dei due è (#1290.2).
+      valore: (v) => (global.SN_CONST.modoNascoste(v) === global.SN_CONST.NASCOSTE_TRADUZIONE.RIMANDA
+        ? 'solo quando le apri' : 'subito, insieme al resto'),
       livello: 1,
     },
     'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
@@ -202,9 +216,12 @@
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
     'security.downloads.confirmExecutables': { nome: 'domanda prima di scaricare un programma', valore: ATTIVA, livello: 2 },
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
-    'security.pagineDelicate.enabled': { nome: 'pagine delicate tenute lontane dai modelli', valore: sino('sì', 'no'), livello: 2 },
-    'security.pagineDelicate.siti': { nome: 'siti delicati aggiunti da te', elenco: true, livello: 2 },
+    'security.pagineDelicate.siti': { nome: 'siti dove Filo chiede sempre', elenco: true, livello: 2 },
     'security.pagineDelicate.nonDelicati': { nome: 'siti non delicati per te, anche col campo password', elenco: true, livello: 2 },
+    'security.privacy.livello': { nome: 'livello di privacy', valori: LIVELLI_PRIVACY, livello: 2 },
+    'security.privacy.incognito': { nome: 'livello di privacy in incognito', valori: LIVELLI_PRIVACY, livello: 2 },
+    'security.privacy.chiedi': { nome: 'categorie su cui Filo chiede', elenco: true, leggibile: nomeCategoria, livello: 2 },
+    'security.privacy.sitiAnticipo': { nome: 'siti dove Filo manda in anticipo', elenco: true, livello: 2 },
     'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },
     'proxy.datacenter': { nome: 'indirizzo del proxy economico', segreto: true },
     'proxy.residential': { nome: 'indirizzo del proxy residenziale', segreto: true },
@@ -220,6 +237,7 @@
     'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
     'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
     'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
+    'security.privacy.righeScartate': 'le righe scartate dai siti in anticipo sono un avviso sulla casella, non una scelta',
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
@@ -228,7 +246,7 @@
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
     'zoom:propria': 'una pagina che scala da sé il suo contenuto (l\'editor) tiene lei il suo zoom',
-    'autonomia.*': 'quanto Filo fa da solo lo sceglie solo l\'utente in Preferenze: un «annulla» dalla chat lo cambierebbe a nome di Filo (#530)',
+    'autonomia.*': 'quanto Filo fa da solo si alza solo con la parola «conferma» (#1312): un «annulla» lo rialzerebbe con un clic',
   };
 
   function jollyDi(chiave, tabella) {
@@ -505,7 +523,8 @@
       const parti = [];
       // Gli elenchi sono di siti: münchen.de, non la forma «xn--» con cui si salva.
       const N = global.SN_NOMI_SITO;
-      const leggibili = (l) => elencoDi(N && N.leggibile ? l.map((x) => N.leggibile(x)) : l);
+      const leggi = v.leggibile || (N && N.leggibile ? (x) => N.leggibile(x) : null);
+      const leggibili = (l) => elencoDi(leggi ? l.map(leggi) : l);
       if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
       if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
       return `${nome}: ${parti.join(', ') || 'riordinati'}`;

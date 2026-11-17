@@ -127,17 +127,18 @@ test('i promemoria di sinistra hanno un tetto e cade il più vecchio', () => {
 });
 
 test('lo strumento della chat nomina ogni carta di destra e accetta anche quelle di sinistra', () => {
-  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'CARTA_HOME');
-  assert.ok(def, 'manca lo strumento CARTA_HOME');
+  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'home');
+  assert.ok(def, 'manca lo strumento home');
   const p = def.function.parameters.properties;
+  const riga = def.function.description.split('\n').find((r) => r.startsWith('- carta('));
   // #1592 — la carta dei Mazzi il Deck builder in pausa non la fa nominare: la chat la passa col nome che usa l'utente.
-  for (const id of C.IDS.filter((x) => x !== 'mazzi')) assert.match(p.carta.description, new RegExp(`\\b${id} =`), `la chat non conosce la carta ${id}`);
-  assert.doesNotMatch(`${def.function.description} ${p.carta.description}`, /mazz|deck/i, 'lo strumento nomina il Deck builder anche a chi non lo vede');
+  for (const id of C.IDS.filter((x) => x !== 'mazzi')) assert.match(riga, new RegExp(`\\b${id}\\b`), `la chat non conosce la carta ${id}`);
+  assert.doesNotMatch(def.function.description, /mazz|deck/i, 'lo strumento nomina il Deck builder anche a chi non lo vede');
   assert.equal(C.risolvi('la carta dei mazzi'), 'mazzi');
   // Un elenco chiuso rifiuterebbe «l'avviso del backup» prima ancora di arrivare al main.
   assert.equal(p.carta.enum, undefined);
   assert.equal(p.prima_di.enum, undefined);
-  assert.match(def.function.description, /sinistra/);
+  assert.match(riga, /sinistra/);
 });
 
 test('la colonna di sinistra ha lo stesso ordine per la home e per la chat', () => {

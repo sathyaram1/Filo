@@ -40,6 +40,12 @@ import {
   rossiDellePartiMancanti,
   rigaRosso,
   FUORI_DAI_CASI,
+  erroreDelTest,
+  testoErrore,
+  testoErrori,
+  RIGHE_PER_ERRORE,
+  CARATTERI_PER_ERRORE,
+  TETTO_ERRORI,
 } from '../../scripts/suite-verdict.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -156,10 +162,11 @@ describe('le funzioni pure', () => {
   });
 
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
-    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt']),
-      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt', parti: 0, esiti: '' });
+    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt', '--errori', 'e.txt']),
+      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt', errori: 'e.txt', parti: 0, esiti: '' });
     assert.deepEqual(leggiArgomenti(['r.json', '--parti', '4', '--esiti', 'blob-report']),
-      { file: 'r.json', out: '', rossi: '', chiavi: '', parti: 4, esiti: 'blob-report' });
+      { file: 'r.json', out: '', rossi: '', chiavi: '', errori: '', parti: 4, esiti: 'blob-report' });
+    assert.throws(() => leggiArgomenti(['r.json', '--errori']), /--errori vuole un percorso/);
     for (const n of ['0', '-1', '2.5', 'tre', undefined]) {
       assert.throws(() => leggiArgomenti(['r.json', '--parti', n, '--esiti', 'b'].filter((x) => x !== undefined)), /--parti/, String(n));
     }
@@ -396,7 +403,85 @@ describe('lo script da riga di comando', () => {
     assert.equal(readFileSync(join(dir, 'k-p4.txt'), 'utf8'), 'suite:non-partita\n');
   });
 
+  // #2313: dalla cloud gli artifact non si scaricano, e il feedback della suite rossa citava solo i titoli.
+  test('--errori: l\'errore di ogni rosso nuovo sotto la sua riga, i noti no, e un errore fuori dai casi col suo testo', () => {
+    const jsonFile = join(dir, 'con-errori.json');
+    const j = jsonSintetico();
+    const nuovo = j.suites[3].specs[2].tests[0];
+    nuovo.results[0].errors = [{
+      message: '\u001b[31mError: expect(locator).toBeVisible() failed\u001b[39m\n\nLocator: getByText(\'Salvato\')\nExpected: visible',
+      location: { file: resolve(__dirname, '..', 'delta.spec.mjs'), line: 42, column: 7 },
+    }];
+    j.suites[1].specs[0].tests[0].results[0].errors = [{ message: 'Error: rosso noto, non va nel feedback' }];
+    j.errors = [{ message: 'Error: Cannot find module x', stack: 'Error: Cannot find module x\n    at caricaSpec (tests/eta.spec.mjs:3:1)' }];
+    writeFileSync(jsonFile, JSON.stringify(j), 'utf8');
+    const errori = join(dir, 'errori-1.txt');
+    const r = spawnSync(process.execPath, [CLI, jsonFile, '--out', join(dir, 'n-err.txt'), '--rossi', fileNoti, '--errori', errori], { encoding: 'utf8' });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    const testo = readFileSync(errori, 'utf8');
+    assert.match(testo, /^✗ tests\/delta\.spec\.mjs › questo è nuovo\n {4}in tests\/delta\.spec\.mjs:42\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed\n\n {4}Locator: getByText\('Salvato'\)\n {4}Expected: visible$/m);
+    assert.match(testo, /^✗ errore fuori dai casi: Error: Cannot find module x\n {4}Error: Cannot find module x\n {8}at caricaSpec/m);
+    assert.doesNotMatch(testo, /rosso noto/, 'un rosso noto non è nel feedback: non è il guasto da cercare');
+    assert.doesNotMatch(testo, /\u001b\[/);
+  });
+
+  test('--errori: un verde scrive un file vuoto, e anche una suite senza casi dice l\'errore che l\'ha fermata', () => {
+    const verde = join(dir, 'errori-verde.json');
+    writeFileSync(verde, JSON.stringify(jsonSintetico({ conNuovo: false })), 'utf8');
+    const e1 = join(dir, 'errori-2.txt');
+    assert.equal(spawnSync(process.execPath, [CLI, verde, '--rossi', fileNoti, '--errori', e1]).status, 0);
+    assert.equal(readFileSync(e1, 'utf8'), '');
+    const vuoto = join(dir, 'errori-vuoto.json');
+    writeFileSync(vuoto, JSON.stringify({ suites: [], errors: [{ message: 'SyntaxError: Unexpected token\n    at tests/zeta.spec.mjs:9' }] }), 'utf8');
+    const e2 = join(dir, 'errori-3.txt');
+    assert.equal(spawnSync(process.execPath, [CLI, vuoto, '--rossi', fileNoti, '--errori', e2]).status, 2);
+    assert.match(readFileSync(e2, 'utf8'), /^✗ errore fuori dai casi: SyntaxError: Unexpected token\n {4}SyntaxError: Unexpected token\n {8}at tests\/zeta\.spec\.mjs:9$/m);
+  });
+
   test.after(() => { try { togliCartella(dir); } catch (_) { /* best effort */ } });
+});
+
+describe('il testo degli errori per il feedback', () => {
+  const rosso = (n, errore) => ({ spec: 'x', titolo: `caso ${n}`, titoloCompleto: `caso ${n}`, errore });
+
+  test('l\'errore viene dall\'ultimo tentativo, senza colori, con la posizione relativa alla radice', () => {
+    const test1 = {
+      status: 'unexpected',
+      results: [
+        { status: 'failed', errors: [{ message: 'Error: primo tentativo' }] },
+        { status: 'failed', error: { message: '\u001b[2mError: ultimo tentativo\u001b[22m', location: { file: '/radice/tests/a.spec.mjs', line: 7 } } },
+      ],
+    };
+    assert.equal(erroreDelTest(test1, '/radice'), 'in tests/a.spec.mjs:7\nError: ultimo tentativo');
+    assert.equal(erroreDelTest({ status: 'flaky', results: [{ status: 'failed', error: { message: 'x' } }, { status: 'passed' }] }), '',
+      'un flaky non è un rosso: il suo errore non va nel feedback');
+    assert.equal(testoErrore({ message: 'Error: y', location: { file: 'D:\\a\\Filo\\Filo\\tests\\b.spec.mjs', line: 3 } }, 'D:\\a\\Filo\\Filo'),
+      'in tests/b.spec.mjs:3\nError: y');
+  });
+
+  test('un errore lungo si tiene alle sue righe, e il taglio dice quante ne mancano', () => {
+    const lungo = Array.from({ length: 40 }, (_, i) => `riga ${i + 1}`).join('\n');
+    const t = testoErrori([rosso(1, lungo)]);
+    assert.equal(t.split('\n').filter((r) => /^ {4}riga \d+$/.test(r)).length, RIGHE_PER_ERRORE);
+    assert.match(t, new RegExp(`… altre ${40 - RIGHE_PER_ERRORE} righe: l'errore intero sta nel registro della parte della suite$`));
+    const unaRiga = testoErrori([rosso(2, 'x'.repeat(CARATTERI_PER_ERRORE * 3))]);
+    assert.ok(unaRiga.length < CARATTERI_PER_ERRORE + 200, 'una riga sola enorme si accorcia');
+    assert.match(unaRiga, /\(riga accorciata\)$/);
+  });
+
+  test('oltre il tetto i rossi restanti non spariscono in silenzio: si dice quanti sono', () => {
+    const molti = Array.from({ length: 30 }, (_, i) => rosso(i, `Error: ${'z'.repeat(400)}`));
+    const t = testoErrori(molti);
+    assert.ok(t.length <= TETTO_ERRORI + 200, `testo di ${t.length} caratteri`);
+    const tenuti = (t.match(/^✗ /gm) || []).length;
+    assert.ok(tenuti > 1 && tenuti < 30);
+    assert.match(t, new RegExp(`… altri ${30 - tenuti} rossi senza il loro errore qui \\(tetto di ${TETTO_ERRORI} caratteri\\)`));
+  });
+
+  test('i rossi senza errore (una parte senza esito, il tetto) non hanno un blocco; nessun errore, nessun testo', () => {
+    assert.equal(testoErrori(rossiDellePartiMancanti([2], 4)), '');
+    assert.equal(testoErrori([]), '');
+  });
 });
 
 // La strada di suite.yml fatta girare con Playwright vero: parti con --shard, l'esito di ognuna col nome che il
@@ -430,10 +515,16 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     assert.ok(existsSync(join(dir, 'suite-risultati.json')), `l'unione non ha scritto il JSON\n${unito.stdout}${unito.stderr}`);
     writeFileSync(join(dir, 'noti.json'), JSON.stringify({ contenitore: { specs: [] } }), 'utf8');
     const v = spawnSync(process.execPath, [CLI, join(dir, 'suite-risultati.json'), '--rossi', join(dir, 'noti.json'),
-      '--out', join(dir, 'nuovi.txt'), '--chiavi', join(dir, 'chiavi.txt'), '--parti', '2', '--esiti', tutti], { encoding: 'utf8' });
+      '--out', join(dir, 'nuovi.txt'), '--chiavi', join(dir, 'chiavi.txt'), '--parti', '2', '--esiti', tutti,
+      '--errori', join(dir, 'errori.txt')], { encoding: 'utf8' });
     assert.equal(v.status, 1, v.stdout + v.stderr);
     const nuovi = readFileSync(join(dir, 'nuovi.txt'), 'utf8');
     assert.match(nuovi, /^tests\/b\.spec\.mjs › rosso$/m, 'il rosso della parte arrivata in fondo');
+    // #2313: l'errore deve arrivare dall'unione vera delle parti, senza colori e con la riga dello spec.
+    const errori = readFileSync(join(dir, 'errori.txt'), 'utf8');
+    assert.match(errori, /^✗ tests\/b\.spec\.mjs › rosso\n {4}in tests\/\S*b\.spec\.mjs:2\n {4}Error: expect\(received\)\.toBe\(expected\)/m, errori);
+    assert.match(errori, /Expected: 2/);
+    assert.doesNotMatch(errori, /\u001b\[/, 'i colori del terminale nel feedback sono rumore');
     assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: [12] casi non sono girati/m, 'a macchina carica il tetto può scadere prima del caso lento');
     assert.deepEqual(readFileSync(join(dir, 'chiavi.txt'), 'utf8').split('\n').filter(Boolean).sort(), ['suite:tests/b.spec.mjs', 'suite:tetto']);
   });

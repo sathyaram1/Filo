@@ -9,7 +9,7 @@ import vm from 'node:vm';
 
 const src = (p) => readFileSync(fileURLToPath(new URL(`../../${p}`, import.meta.url)), 'utf8');
 
-function correttore({ sbagliate = [], impostazioni = {} } = {}) {
+function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' } = {}) {
   let ora = 1_000_000;
   const timers = [];
   let tid = 0;
@@ -17,8 +17,15 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   function node(tag) {
     const n = {
       tagName: tag, nodeType: 1, children: [], style: new Proxy({ setProperty() {} }, {}), dataset: {}, isConnected: true, className: '',
-      setAttribute() {}, appendChild(c) { if (c.isFrag) n.children.push(...c.children); else n.children.push(c); return c; },
-      remove() { n.isConnected = false; const fratelli = sb.document.body.children; if (fratelli.includes(n)) fratelli.splice(fratelli.indexOf(n), 1); },
+      setAttribute() {},
+      appendChild(c) {
+        if (c.isFrag) n.children.push(...c.children);
+        else if (!n.children.includes(c)) { n.children.push(c); c.parentNode = n; }
+        return c;
+      },
+      remove() { n.isConnected = false; const fratelli = n.parentNode ? n.parentNode.children : []; if (fratelli.includes(n)) fratelli.splice(fratelli.indexOf(n), 1); },
+      // Su un sito gli strati stanno nell'ombra chiusa di un host (#2299).
+      attachShadow() { n.ombra = node('#ombra'); return n.ombra; },
     };
     Object.defineProperty(n, 'innerHTML', { set() { n.children = []; }, get() { return ''; } });
     let testo = '';
@@ -44,7 +51,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     setInterval: () => 0, clearInterval: () => {},
     requestAnimationFrame: () => 0,
     ResizeObserver: class { observe() {} disconnect() {} },
-    location: { protocol: 'https:', hostname: 'chat.example' },
+    location: { protocol: protocollo, hostname: 'chat.example' },
     document: {
       hidden: false, title: 'Chat', body: node('BODY'), documentElement: { dataset: {} },
       addEventListener(t, f) { (docListeners[t] ||= []).push(f); },
@@ -73,8 +80,9 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   sb.window = sb; sb.globalThis = sb; sb.self = sb;
   sb.getComputedStyle = () => ({ borderStyle: '', direction: 'ltr', getPropertyValue: () => '' });
   sb.addEventListener = () => {};
+  sb.CSSStyleSheet = class { replaceSync() {} };
   vm.createContext(sb);
-  for (const f of ['src/shared/politicaModelli.js', 'src/shared/constants.js', 'src/content/coerenza.js', 'src/content/correttoreRegole.js', 'src/content/spellcheck.js']) {
+  for (const f of ['src/shared/politicaModelli.js', 'src/shared/constants.js', 'src/shared/filoUi.js', 'src/content/coerenza.js', 'src/content/correttoreRegole.js', 'src/content/spellcheck.js']) {
     vm.runInContext(src(f), sb);
   }
   sb.SN_SPELLCHECK.init({ featureFlags: { spellcheck: true, spellcheckContext: true }, ...impostazioni });
@@ -110,6 +118,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     const giro = (n) => {
       if (typeof n.className === 'string' && n.className.split(' ').includes(classe)) out.push({ testo: testoDi(n), dubbio: n.className.includes('sn-dubbio') });
       for (const c of n.children || []) giro(c);
+      if (n.ombra) giro(n.ombra);
     };
     for (const o of sb.document.body.children) giro(o);
     return JSON.parse(JSON.stringify(out));
@@ -121,8 +130,24 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
     visibile: () => (docListeners.visibilitychange || []).forEach((f) => f()),
-    // Scrive come una tastiera: il cursore resta in fondo.
-    scrive: (el, v, e = {}) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', e); },
+    // Scrive l'utente (qui come un incolla vero, che porta il suo testo): il cursore resta in fondo. Lo script del sito
+    // scrive uguale, ma senza un evento vero che lo spieghi.
+    scrive: (el, v, e = {}) => {
+      el.fire('keydown', { isTrusted: true, key: 'Unidentified', ctrlKey: /^history/.test(e.inputType || '') });
+      el.value = v; el.selectionStart = el.selectionEnd = v.length;
+      el.fire('input', { isTrusted: true, inputType: 'insertFromPaste', data: v, ...e });
+    },
+    // Un tasto vero che scrive `c` in fondo; `sito(v)`, se c'è, riscrive la casella dentro l'evento, prima di Filo.
+    batte: (el, c, sito = null) => {
+      el.fire('keydown', { isTrusted: true, key: c });
+      el.value += c;
+      if (sito) el.value = sito(el.value);
+      el.selectionStart = el.selectionEnd = el.value.length;
+      el.fire('input', { isTrusted: true, inputType: 'insertText', data: c });
+      el.fire('keyup', { isTrusted: true, key: c });
+    },
+    clic: (el) => el.fire('pointerdown', { isTrusted: true }),
+    scriveDaScript: (el, v) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', {}); },
     risponde: async (r, testo) => { r.r({ ok: true, text: testo }); await tick(); await tick(); },
   };
 }
@@ -311,6 +336,134 @@ test('«il il» è un errore sicuro del codice, «quasi quasi» no; spenta la pa
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore'), [{ testo: 'il', dubbio: false }]);
   assert.equal(c.rapide().length, 0);
+});
+
+// #2299: dalla mancanza di un segno il sito saprebbe cosa c'è nel dizionario personale.
+test('su un sito il testo scritto da script non riceve segni; li riceve quando l\'utente entra nella casella col clic', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  let gesto = false;
+  c.sb.SN_GESTO.prendi = () => gesto;
+  const el = c.campo();
+  c.entra(el);
+  c.scriveDaScript(el, 'oggi il il quseta ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+  el.fire('pointerdown', { isTrusted: false });
+  el.fire('keydown', { isTrusted: true, key: 'ArrowLeft' });
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore'), [], 'né un clic fabbricato dalla pagina né un tasto che non scrive');
+  gesto = true;
+  c.clic(el);
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['il', 'quseta']);
+});
+
+// #2299: a ogni gesto vero il sito riscriveva la casella e misurava quanto durava il controllo del suo testo.
+test('il testo che il sito mette in una casella già scritta dall\'utente non si controlla, nemmeno ai gesti dopo', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'cavolo', 'pomodro'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'oggi quseta e il il ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il']);
+  c.scriveDaScript(el, 'ieri cavolo oggi quseta e il il ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il'], 'i segni di prima seguono il testo, quello nuovo non si controlla');
+  c.clic(el);
+  el.fire('keydown', { isTrusted: true, key: 'End' });
+  for (const x of 'pomodro ') c.batte(el, x);
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il', 'pomodro'], 'il secondo clic e i tasti non aprono il testo del sito');
+});
+
+test('il sito che riscrive la casella dentro il tasto dell\'utente non fa controllare il suo testo', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'ciao ') c.batte(el, x);
+  c.batte(el, 'c', () => 'quseta '.repeat(50));
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+  // Un execCommand del sito è `isTrusted` anche lui, ma nessun tasto vero lo spiega.
+  el.value += 'quseta ';
+  el.fire('input', { isTrusted: true, inputType: 'insertText', data: 'quseta ' });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+});
+
+// #2299: un annulla con Ctrl premuto, o un'immagine incollata, facevano passare per dell'utente la sonda del sito.
+test('annulla e rifai riportano un testo coi suoi proprietari; un incolla senza testo non spiega quello che mette il sito', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'pomodro'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'pomodro ') c.batte(el, x);
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
+  // Il proprio annulla torna al testo dell'utente, coi suoi segni.
+  for (const x of 'ciao ') c.batte(el, x);
+  el.fire('keydown', { isTrusted: true, key: 'z', ctrlKey: true });
+  el.value = 'pomodro ';
+  el.fire('input', { isTrusted: true, inputType: 'historyUndo' });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
+  // La pila dell'annulla preparata dal sito: la sua sonda, poi di nuovo il testo dell'utente (adesso scritto da lui).
+  c.scriveDaScript(el, 'quseta quseta ');
+  c.scriveDaScript(el, 'pomodro ');
+  for (const tipo of ['historyUndo', 'historyRedo', 'historyUndo']) {
+    el.fire('keydown', { isTrusted: true, key: 'a', ctrlKey: true });
+    el.value = tipo === 'historyRedo' ? 'pomodro ' : 'quseta quseta ';
+    el.fire('input', { isTrusted: true, inputType: tipo });
+    await c.passa(5000);
+    assert.deepEqual(c.segni('sn-errore'), [], tipo);
+  }
+  // Un'immagine incollata: nessun testo negli appunti, e il sito riscrive la casella nello stesso evento.
+  el.value = 'quseta '.repeat(20);
+  el.fire('input', { isTrusted: true, inputType: 'insertFromPaste', data: null, dataTransfer: { getData: () => '' } });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+});
+
+test('la chiocciola battuta con AltGr (Ctrl+Alt su Windows) è dell\'utente: l\'indirizzo resta un indirizzo', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'scrivi a quseta') c.batte(el, x);
+  el.fire('keydown', { isTrusted: true, key: '@', ctrlKey: true, altKey: true });
+  el.value += '@';
+  el.selectionStart = el.selectionEnd = el.value.length;
+  el.fire('input', { isTrusted: true, inputType: 'insertText', data: '@' });
+  el.fire('keyup', { isTrusted: true, key: '@' });
+  for (const x of 'gmail.com ') c.batte(el, x);
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+});
+
+test('quello che c\'era entrando si controlla, una parola ripetuta una volta; quello che scrive Filo come quello dell\'utente', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'cavolo'], impostazioni: { correttore: { modelloErrori: false } } });
+  let gesto = false;
+  c.sb.SN_GESTO.prendi = () => gesto;
+  const el = c.campo();
+  c.entra(el);
+  c.scriveDaScript(el, 'quseta quseta quseta e ');
+  gesto = true;
+  c.clic(el);
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta']);
+  gesto = false;
+  c.sb.SN_SPELLCHECK.scriveFilo(el, 'cavolo ');
+  c.scriveDaScript(el, 'quseta quseta quseta e cavolo ');
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'cavolo']);
+});
+
+test('nelle pagine di Filo il campo si controlla anche senza gesto: lì non c\'è uno script del sito', async () => {
+  const c = correttore({ impostazioni: { correttore: { modelloErrori: false } }, protocollo: 'filo:' });
+  c.sb.SN_GESTO.prendi = () => false;
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'oggi il il cane ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), [{ testo: 'il', dubbio: false }]);
 });
 
 // #1580, D5: errori fissi, ripetizioni e date impossibili non aspettano il modello e non gli si chiedono.

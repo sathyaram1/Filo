@@ -127,18 +127,18 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
-  correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
-  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12
-  (#1202) entra nella correzione solo se il giro parte comunque per gli interni,
-  altrimenti va da parte col livello scritto, e non paga nessun bilancio. Ciò che
-  il lavoro non corregge diventa SUBITO un feedback derivato,
-  figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
-  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
-  Pipeline); UNO solo per tutti gli altri (interni messi da parte
-  dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
-  fra loro, con la stessa regola sul 2); —critica con rilievi
+  correggere→ `revision_security` (dal #2339, 08/11/2026, scala a tre livelli
+  misurata sull'obiettivo: un livello, `[3i]`/`[2i]`/`[1i]`, lo prende solo un
+  difetto che riguarda l'obiettivo del feedback o che il ramo ha introdotto; tutto
+  il resto è esterno, `[e]`, senza livello; la sede «vicino» e il livello 0 non ci
+  sono più e la critica che li porta si respinge col perché; lo stato scritto prima
+  si legge con 0 → 1 e vicino → esterno). Ciò che il lavoro non corregge diventa
+  SUBITO un feedback, aperto dal server in ogni esito: ogni esterno un feedback
+  nuovo senza livello, classificato dopo come ogni altro; per ogni interno col `?` un
+  derivato figlio `#N.k`, con `priorityManual` perché il giudice non la riscriva, a
+  priorità 1 a ogni livello: a cominciare lo decide l'ordine del manutentore (#2269)
+  (quello col `?` aspetta la risposta alla sua domanda: sopra, Pipeline); UNO solo per
+  tutti gli altri interni messi da parte dal bilancio, anche lui a priorità 1); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
@@ -147,8 +147,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (esauriti il bilancio dei 3 e quelli sotto)→ `design` (`statusReason: loop`); un 2
   nello stesso caso NON ferma: entra nel feedback derivato dei rimasti e il lavoro passa
   se non c'è altro (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
-  decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
-  utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
+  decisione, di livello 3 o su una scelta difficile da disfare (`?!` a ogni livello:
+  dati degli utenti, formati su disco; dal #2339 va al manutentore, non all'owner)→
+  `design` (`statusReason: decisione`); un `[2i?]`
   NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
   feedback derivato con la domanda (dal 2026-10-12, #1202), che aspetta il lavoro e si
   chiude con la sua fusione (§4c); `blocca` sulla domanda di un rilievo si respinge: la
@@ -261,37 +262,53 @@ illegale.
 
 ### 3b. Il manutentore (SPEC-MANUTENTORE.md, #1958, #1959)
 
-Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** con la sua chiave (classe
+Rivede il § 3a dove dice altro. Il manutentore è un ruolo **fidato** (decisione dell'owner, #2215.1) con la sua chiave (classe
 `manutentore`, endpoint `routineManutentore`) o col biglietto che il pacemaker lega alla sessione accesa per lui
 (ruolo `manutentore`, contesto piccolo nel payload): legge schede, testi e rapporti (testi e rapporti solo
 nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
 all'owner, il freno.
 
-- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
-  scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
-  lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare. Le 2 di prima scendono a 1 con
-  l'operazione una tantum `transizione` di `ownerManutentore`.
+- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = importante; 1 = da
+  fare; 0 = rimandato a lungo. A cominciare lo decide l'ordine del manutentore (#2269): dentro un primo lavoro parte
+  a qualunque priorità da 0 a 2, fuori solo una 3; un ordine vuoto o senza lavori pronti vale come nessun ordine, e
+  solo in quella coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del rinnovo. L'ordine
+  porta anche i compiti senza feedback (`C-12`), e un feedback può aspettare un compito (`waitsFor` col suo id:
+  l'attesa si scioglie quando il compito chiude). I giudici assegnano 3 o lasciano 1. Una 3 il manutentore la
+  può creare, non abbassare né archiviare: la toglie solo l'owner, e il limite vale per ogni automazione,
+  riordino del lunedì compreso, giudice di priorità e risposte
+  automatiche delle domande (#2000, #2291; regola unica in `src/shared/prioritaTre.js`, che il server incorpora e
+  ricontrolla sul documento al momento della scrittura, e che rifiuta anche chi scrive senza sapere la priorità di
+  adesso). Archiviarla dentro un lavoro che resta a 3 (doppione di una 3 che avanza, unione col figlio a 3) non la
+  toglie: si sposta. Ogni scrittura lascia sul feedback chi l'ha fatta e quando (`prioritaScritta`, accanto a
+  `prioritaOwner` nelle schede). Le 2 di prima scendono a 1 con l'operazione una tantum `transizione` di
+  `ownerManutentore`.
 - **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
   manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
   Gestione → Automazioni). Senza N vale il freno.
-- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché una
-  nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
-  vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
-  il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
+- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché
+  `sblocca` del manutentore o dell'owner, una loro nota o un'attesa sulla correzione non lo sbloccano; gli altri
+  lavori vanno avanti. Lo sblocco del manutentore su un guasto, anche scritto come nota, non scrive nelle note (il testo resta nello stato,
+  `ultimoSblocco`), quindi non sporca chi riprende (#2215). Una **domanda di processo** nel rilascio (`--processo`)
+  ferma il lavoro allo stesso modo e sveglia il manutentore, non l'owner; la sua risposta è una nota, che chi
+  riprende legge; col manutentore spento resta nelle note e il lavoro non si ferma.
 - **Lavori server che restano locali (#2036).** Un lavoro server il cui biglietto nascerebbe non fidato (ramo non
   pulito, contenuto sporco…) non è lavoro pronto per nessuna voce: niente accensioni, niente posto nel sondaggio. Il
   server scrive sul feedback `restaLocale { motivi, ruolo, atMs }`, che Gestione mostra come «Fermo: resta locale»
-  col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce.
+  col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce. Le schede del manutentore lo
+  mostrano come fermo `resta_locale`, e un lavoro fidato che ci resta più di un'ora lo sveglia (segnale
+  `resta_locale`, #2215). Il contenuto scritto da un biglietto sporco conta solo per i ruoli che leggono le note: il
+  controllo di sicurezza nasce pulito lo stesso. Quello che scrive il manutentore, note comprese, non sporca: un lavoro
+  server riparte dopo la sua risposta senza un gesto dell'owner (#2215.1).
 - **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
   restano sue e si sommano. Niente riserva del 10% su A.
-- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
+- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 2 ore,
   segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
   (minimo 5 minuti), con un tetto di accensioni al giorno suo. Il fermo su un guasto suo (quali accensioni
   restano) e il controllo sulle sessioni chiuse bene, con la soglia e lo stato, stanno in SPEC-MANUTENTORE.md § 7.
   Memoria nel **taccuino** (`manutentore/taccuino`,
-  riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
+  aggiornato a sezioni o riscritto, sempre con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
   Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
 
 ### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
@@ -362,6 +379,15 @@ arrivata su main), porta una citazione del feedback, è più recente della nasci
 la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report
 preceduto dalla riga della fusione e la versione di `package.json` sulla fusione. Un
 rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
+
+Un allarme della suite (`agent:costruzione`, scritto dal server) nasce col commit su cui
+la suite ha dato il rosso (`commitProvato`, dal `--commit` di `scripts/build-alarm.mjs`),
+e il primo lavoro lo riceve in `payload.commitProvato`. Per lui la prova cambia (#2148.1):
+il rosso può averlo corretto la fusione di un altro feedback arrivata mentre la suite
+girava, che non cita l'allarme ed è più vecchia della sua nascita. Il server accetta
+allora una fusione sulla linea principale (o arrivata su main, oltre la finestra) che il
+commit provato NON contiene, più recente dell'ultima riapertura (non della nascita),
+senza chiedere la citazione, e mai la propria.
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
@@ -486,7 +512,9 @@ sé con l'API di GitHub e non si fida di quello del client: per i conflitti appr
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
 nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare, e se la
 punta non contiene `origin/main`, non parte o su origin non risulta uguale, non consegna
-(#1964: altrimenti chi verifica dopo legge il commit già verificato). Vale anche per
+(#1964: altrimenti chi verifica dopo legge il commit già verificato). Basta l'`origin/main`
+scaricato alla presa in carico (`mainAllaPresa` nel marcatore): main andata avanti dopo il
+rebase la riallinea il cancello, e rifare rebase e unit costava un giro (#2236). Vale anche per
 `deliver fixed`; una consegna che si ferma con una domanda non riallinea e passa. Ogni
 guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
 lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
@@ -779,9 +807,11 @@ transazione che cambia la domanda), nessuna routine lo prende, e in dashboard st
 riparte con la decisione. La ripresa non sposta un `todo`, un `working` né un
 `revision_capability` (la decisione si accoda per il giro dopo); un `revision_security`
 torna `revision_capability` coi verdetti azzerati, perché sicurezza e fusione non leggono
-le decisioni; un `done` torna `todo`. Fanno eccezione gli ultimi due quando la scelta è la
-provvisoria di una domanda non bloccante, senza parole in più: il `revision_security` resta
-dov'è con la decisione accodata, e sul `done` la risposta dice «non serviva». Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
+le decisioni; un `done` torna `todo` quando la domanda l'ha aperta l'owner sul chiuso
+(`nataSuChiuso`). Sulla provvisoria di una domanda non bloccante: la stessa scelta senza
+parole in più lascia il `revision_security` dov'è con la decisione accodata, e sul `done`
+dice «non serviva»; un'altra scelta, o parole in più, sul `done` non lo riapre: la scelta
+continua in un figlio `#N.k` col testo della risposta, e il padre resta fuso (#2324). Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
 server fondono il ramo.
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
@@ -910,8 +940,8 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
-  stanno in `src/shared/verifierRound.js`, incorporato dal server; i quattro
-  bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
+  stanno in `src/shared/verifierRound.js`, incorporato dal server; i tre
+  bilanci `cap3/cap2/cap1`, uno per livello (quattro fino al #2339), li scrivono l'owner e il manutentore in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
   *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri

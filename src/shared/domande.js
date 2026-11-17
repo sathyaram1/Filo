@@ -124,7 +124,7 @@
   const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
   const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio',
-    'smistamento', 'principioContestato', 'assorbite']);
+    'smistamento', 'principioContestato']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
   function validaOpzione(o, i, perOwner) {
@@ -493,19 +493,15 @@
   }
 
   /**
-   * La domanda che ha assorbito questa (§3.6, la revisione): risponde anche per lei, e l'owner la può riaprire.
-   * '' per ogni altra superata (un'attesa andata avanti per un'altra strada non si riapre). PURA.
+   * La domanda che ha assorbito questa (§3.6), '' se non è un'assorbita: il segno del server, e per le assorbite prima
+   * del segno il motivo che scriveva. Una superata da una nata al suo posto non è un'assorbita. PURA.
    */
   function assorbitaIn(domanda) {
-    const e = isOggetto(domanda) && domanda.stato === 'superata' && isOggetto(domanda.esito) && domanda.esito.assorbita === true
-      ? domanda.esito.superataDa : '';
-    return typeof e === 'string' && numeroDi(e) !== null ? e.trim() : '';
-  }
-
-  /** Le domande che questa ha assorbito, valide e una volta sola, nell'ordine in cui sono entrate. PURA. */
-  function assorbiteDi(domanda) {
-    const l = isOggetto(domanda) && Array.isArray(domanda.assorbite) ? domanda.assorbite : [];
-    return [...new Set(l.filter((x) => typeof x === 'string' && numeroDi(x) !== null).map((x) => x.trim()))];
+    if (!isOggetto(domanda) || domanda.stato !== 'superata' || !isOggetto(domanda.esito)) return '';
+    const e = domanda.esito;
+    if (e.assorbita === true && numeroDi(e.superataDa) !== null) return String(e.superataDa).trim();
+    const m = /^assorbita in (D-[1-9]\d{0,8})$/.exec(String(e.superata || ''));
+    return m ? m[1] : '';
   }
 
   /**
@@ -554,7 +550,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, assorbiteDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };
 

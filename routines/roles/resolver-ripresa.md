@@ -32,6 +32,8 @@ porta solo l'ultima.
 
 <!-- includi: _immagini.md -->
 
+<!-- includi: _unite.md -->
+
 <!-- includi: _cornice-feedback.md -->
 
 1. Applica la scelta dell'owner al codice del ramo, e chiudi i rilievi rimasti.
@@ -50,6 +52,8 @@ porta solo l'ultima.
    cambiato qualcosa di visibile.
 
 <!-- includi: _criteri-verifica.md -->
+
+<!-- includi: _prova-da-utente.md -->
 
 <!-- includi: _criteri-struttura.md -->
 

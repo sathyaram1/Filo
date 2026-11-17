@@ -123,9 +123,10 @@
     return ((now == null ? Date.now() : now) - t) > WORKING_TTL_MS;
   }
 
-  // Il battito arriva ogni dieci minuti e il server lo specchia sul feedback, perché i
-  // semafori stanno altrove. Venticinque minuti tollerano due battiti persi di fila.
-  const BEAT_STALE_MS = 25 * 60 * 1000;
+  // Il battito arriva ogni dieci minuti e il server lo specchia sul feedback (i semafori stanno
+  // altrove) al più ogni mezz'ora (SPECCHIO_BATTITO_MS del server, #2469): fra due specchi passano
+  // fino a 40 minuti, e cinquanta tollerano un battito perso.
+  const BEAT_STALE_MS = 50 * 60 * 1000;
 
   // Vale l'ULTIMO segno di vita: il battito, o la presa in carico nei minuti prima del primo.
   // Guardare solo la presa in carico rendeva la scheda bugiarda su ogni lavorazione lunga.

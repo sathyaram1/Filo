@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard, contaHomeVista,
     executeFiloAction, controllaUscita: portaUscite, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
-    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
+    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, segnaTestoNellAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma, ricominciaIntervista,
   } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
@@ -126,8 +126,9 @@ module.exports = function register(on, ctx) {
   on(MSG.CAMBI_ANNULLA, soloDaFilo(async (msg) => {
     const id = String((msg && msg.id) || '').trim();
     if (!id) return { ok: false, error: 'manca il cambio' };
-    const r = await Registro.annulla(id, Registro.corrente() || { via: 'interfaccia' });
-    return r.ok ? { ok: true, id: r.id, eventi: r.eventi, saltati: r.saltati } : { ok: false, error: r.motivo };
+    const r = await Registro.annulla(id, { ...(Registro.corrente() || { via: 'interfaccia' }), confermato: msg.confermato === true });
+    if (r.ok) return { ok: true, id: r.id, eventi: r.eventi, saltati: r.saltati };
+    return { ok: false, error: r.motivo, ...(r.conferma ? { conferma: r.conferma } : {}) };
   }));
 
   // Primo dispatch (non confermato) di una singola azione di Filo richiesta
@@ -214,6 +215,11 @@ module.exports = function register(on, ctx) {
   // Anche da una pagina web: toglie solo ciò che ha letto l'Aiuto di quella scheda, e lì la pagina sporca comunque.
   on(MSG.FILO_AIUTO_NUOVO, async (msg, sender) => {
     nuovaConversazioneAiuto(sender);
+    return { ok: true };
+  });
+  // Anche da una pagina web: può solo restringere quello che l'Aiuto di quella scheda fa da sé.
+  on(MSG.FILO_AIUTO_TESTO_DI_ALTRI, async (msg, sender) => {
+    segnaTestoNellAiuto(sender, { immagini: !!(msg && msg.immagini === true) });
     return { ok: true };
   });
 
@@ -367,10 +373,27 @@ module.exports = function register(on, ctx) {
     const q = await FiloMem.quaderno();
     const moduli = [];
     for (const m of q.moduli) moduli.push({ nome: m.nome, righe: await Promise.all(m.righe.map(conFonti)) });
+    let inAttesa = [];
+    try { inAttesa = await require('../compattazioneFilo').inAttesa(); } catch (_) {}
     return {
       ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
       sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
+      inAttesa: await Promise.all(inAttesa.map(async (p) => ({ id: p.id, testo: p.testo, nata: p.ts, fonti: (await fontiNelFilo(p.fonti)) }))),
     };
+  });
+
+  // Da un tratto che aveva letto testo di fuori la compattazione propone memorie, non le scrive: le decide l'utente.
+  on(MSG.FILO_MEMORIA_PROPOSTA, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string' || typeof msg.tieni !== 'boolean') return { ok: false, error: 'bad_request' };
+    const r = await require('../compattazioneFilo').decidi(msg.id, msg.tieni);
+    if (r.ok) ctx.memoriaCambiata();
+    return r;
+  });
+
+  on(MSG.FILO_STIMA_SOGLIA, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    try { return { ok: true, testo: await ctx.stimaSogliaCompattazione(msg && msg.soglia) }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
   const viaValida = (via) => !!via && ((via.lezione && typeof via.lezione === 'object'
