@@ -3517,11 +3517,10 @@ async function eseguiAzioneFilo(action, {
             : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
           const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
           let payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
-          // #1668 — gli allegati li prende il main dalla conversazione, di nuovo qui: dal riquadro tornano solo gli id scelti.
-          // Le miniature le mostra solo il riquadro delle pagine di Filo: da un sito si conferma il testo, e parte quello.
+          // #1668 — gli allegati li prende il main dalla conversazione, di nuovo qui. Con degli allegati si passa sempre dal
+          // riquadro, e FILO_CONFIRM_ACTION lascia solo quelli che l'utente ha visto in miniatura e tenuto.
           const conAllegati = globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action);
-          const daSito = !!sender && !/^filo:/i.test(String(sender?.tab?.url || sender?.url || ''));
-          if (conAllegati && !daSito) {
+          if (conAllegati) {
             const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
             const { voci } = await require('./allegatiDellaChat').voci(action, chatDellAzione);
             const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
@@ -3531,9 +3530,9 @@ async function eseguiAzioneFilo(action, {
           const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
           const allegati = (payload.images || []).length + (payload.files || []).length;
           const nonSaliti = r && Array.isArray(r.failed) ? r.failed.map((f) => f && f.name).filter(Boolean) : [];
-          const esitoAllegati = conAllegati
-            ? { output: daSito ? { allegati: 0, allegatiNonPartiti: 'da una pagina web parte solo il testo: gli allegati si mandano dalla chat di Filo' }
-              : { allegati, ...(nonSaliti.length ? { allegatiNonSaliti: nonSaliti } : {}) } }
+          // Il modello deve sapere quanti sono partiti davvero: l'utente può averne tolti nel riquadro.
+          const esitoAllegati = conAllegati || action._allegatiIndicati === true
+            ? { output: { allegati, ...(nonSaliti.length ? { allegatiNonSaliti: nonSaliti } : {}) } }
             : {};
           // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
           if (r && r.queued) {
