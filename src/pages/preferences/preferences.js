@@ -936,6 +936,7 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'barraSiti.visibile': return !(s.barraSiti && s.barraSiti.visibile === false);
       case 'homeSistema.ora': return !(s.homeSistema && s.homeSistema.ora === false);
       case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
       case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
