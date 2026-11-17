@@ -611,7 +611,7 @@ function riparti(incognito = false) {
 }
 
 module.exports = {
-  ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
+  ricordaEsiti, ricordaImmagini, ricordaSchermata, schermataDi, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
   senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, caratteriPreambolo, ultimaFotografia, riparti, eventiDa, eventiDavanti, diIncognito, durataMs,
 };
 globalThis.SN_CONTESTO_FILO = module.exports;
