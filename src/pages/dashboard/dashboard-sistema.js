@@ -633,7 +633,7 @@
     } else {
       const radio = creaOpzione('', (o) => {
         const x2 = questo.ultimo || {};
-        const acceso = v === 'rete' ? (o.dataset.accendi === '1') : !!x2.spento;
+        const acceso = v === 'rete' ? (o.dataset.accendi === '1') : !!(x2.spento || x2.ignoto);
         esegui(o, { cosa: v === 'rete' ? 'wifi' : 'bluetooth', acceso });
       });
       wrap.appendChild(radio);
