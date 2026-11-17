@@ -23,6 +23,7 @@
     tuttiSuggerimenti: false,
     downloads: [],
     lavori: [],
+    cornice: [],
     editor: null,
     mazzi: null,
     impostazioni: null,
