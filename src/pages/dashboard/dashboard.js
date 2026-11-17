@@ -104,6 +104,7 @@
   //   SN_DASH_COMANDI     i comandi con lo slash e la colorazione dell'input
   //   SN_DASH_TERMINALE   cartella corrente, colori ANSI, comandi di shell
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
+  //   SN_DASH_BARRA_SITI  la barra dei siti e la chat ripiegata (#1803)
   //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
