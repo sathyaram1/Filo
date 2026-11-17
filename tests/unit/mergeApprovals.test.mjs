@@ -521,11 +521,24 @@ test('dopoIlConflitto: il lavoro di una routine si riallinea da solo, il resto d
 test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il browser leggono la stessa frase', () => {
   const ria = { origin: 'routine', feedbackId: 'x' };
   assert.equal(UI.testoRiallineamento(ria, true), UI.RIALLINEA_DA_SOLA);
-  assert.match(UI.testoRiallineamento(ria, false), /non è andato: rimetti la sua pratica In coda/);
+  // #2193: In coda riallinea il ramo approvato, non rifà il lavoro da zero.
+  assert.match(UI.testoRiallineamento(ria, false), /pratica In coda la routine riallinea il ramo che avevi approvato/);
+  assert.doesNotMatch(UI.testoRiallineamento(ria, false), /giro nuovo/);
   const ignoto = UI.testoRiallineamento(ria, null);
   assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
-  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda/);
+  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda e la routine riallinea il ramo che avevi approvato/);
   // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
+  // #2193: ferma su una domanda dice quale, e il fermo scritto dal server dice il suo motivo.
+  assert.match(UI.testoRiallineamento(ria, false, { domanda: 'D-7' }), /^Si riallinea da sola dopo la tua risposta a D-7/);
+  assert.doesNotMatch(UI.testoRiallineamento(ria, false, { domanda: '<b>x</b>' }), /<b>/);
+  assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'tetto' } }, false, { domanda: 'D-7' }), /si è fermato: si era già riallineato/);
+  assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'nuovo_motivo' } }, false), /si è fermato: nuovo_motivo\./);
+  // I fermi passeggeri del server (#2193) non si stampano come codice: dicono che la pratica è ferma.
+  for (const motivo of ['stato', 'domanda']) {
+    const t = UI.testoRiallineamento({ ...ria, realignBlocked: { motivo } }, false);
+    assert.doesNotMatch(t, new RegExp(`fermato: ${motivo}`), motivo);
+    assert.match(t, /^La sua pratica non è in lavorazione/, motivo);
+  }
   for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
   assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
   // Il quadrato di Gestione prende le stesse parole.
