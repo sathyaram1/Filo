@@ -1495,9 +1495,17 @@ const ELENCHI = new Set(['bt-elenco', 'wifi-elenco']);
 const COMPUTER = {
   async volume(p) { return interpretaVolume(await eseguiScript('volume', p)); },
   async radio(p) { return interpretaRadio(await eseguiScript('radio', p), process.platform, p.radio, p.acceso); },
-  async btElenco() { return interpretaBtElenco(await eseguiScript('bt-elenco', {}), process.platform); },
+  async btElenco() {
+    const o = await dalLettore('bluetooth');
+    if (o) return o.tempo ? { ok: false, errore: 'tempo-comando' } : elencoBtWindows(o);
+    return interpretaBtElenco(await eseguiScript('bt-elenco', {}), process.platform);
+  },
   async btCollega(p) { return interpretaBtCollega(await eseguiScript('bt-collega', p), process.platform, p.collega); },
-  async wifiElenco() { return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform); },
+  async wifiElenco() {
+    const o = await dalLettore('wifi');
+    if (o) return o.tempo ? { ok: false, errore: 'tempo-comando' } : elencoWifiWindows(o);
+    return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform);
+  },
   async wifiCollega(p) { return interpretaWifiCollega(await eseguiScript('wifi-collega', p), process.platform, p.rete); },
   async btDimentica(p) { return interpretaBtDimentica(await eseguiScript('bt-dimentica', p), process.platform); },
   async wifiDimentica(p) { return interpretaWifiDimentica(await eseguiScript('wifi-dimentica', p), process.platform); },
