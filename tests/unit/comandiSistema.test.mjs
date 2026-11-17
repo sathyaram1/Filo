@@ -720,6 +720,26 @@ test('dal riquadro un dispositivo si comanda col suo indirizzo, anche senza nome
   } finally { C._perProve.usaComputer(null); }
 });
 
+test('la home legge gli abbinati prima del clic su Windows e Linux, non su Mac dove chiederebbe il permesso del Bluetooth', async () => {
+  const pc = finto({ dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  C._perProve.usaComputer(pc);
+  const vera = Object.getOwnPropertyDescriptor(process, 'platform');
+  try {
+    for (const [piattaforma, letto] of [['linux', true], ['win32', true], ['darwin', false]]) {
+      Object.defineProperty(process, 'platform', { value: piattaforma });
+      pc.s.chiamate.length = 0;
+      const r = await C.comanda({ cosa: 'bluetooth', elenca: true, precarica: true });
+      assert.equal(r.ok, letto, piattaforma);
+      assert.equal(pc.s.chiamate.length, letto ? 1 : 0, piattaforma);
+      // Il clic sul riquadro legge sempre.
+      assert.equal((await C.comanda({ cosa: 'bluetooth', elenca: true })).ok, true);
+    }
+  } finally {
+    Object.defineProperty(process, 'platform', vera);
+    C._perProve.usaComputer(null);
+  }
+});
+
 test('Windows: le reti conosciute dal lettore della home si leggono come dallo script', () => {
   const dalloScript = C.interpretaWifiElenco(C.leggiUscita('FILO:codice=0\nFILO:interfacce=1\nFILO:rete=Casa\nFILO:rete=Bar\nFILO:attuale=Casa\n'), 'win32');
   const dalLettore = C.elencoWifiWindows({ cosa: 'wifi', codice: 0, interfacce: 1, reti: ['Casa', 'Bar'], attuale: 'Casa' });
