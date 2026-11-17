@@ -1878,9 +1878,81 @@
       card._alChiudere = null;
       if (typeof fn === 'function') { try { fn(); } catch (_) {} }
     }
+    // Nella colonna non scade niente; nell'angolo della home anche chi resta finché lo si chiude ci sta il tempo di
+    // leggerlo, poi vola. Le parcheggiate per il sistema tengono i loro tempi: chi aspetta la loro chiusura non resta appeso.
+    const lettura = () => window.SN_AVVISI.durata(undefined, notifConfig.durationSec);
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
-      card._tempo = tempi.avvia(ms, () => dismiss(card, 'scaduta'));
+      card._tempo = null;
+      const qui = luogo(card);
+      if (qui === 'colonna') return;
+      const t = qui === 'fuori' ? ms : FORMA.tempoNellAngolo(ms, { home: inHome(), letturaMs: lettura() });
+      card._tempo = tempi.avvia(t, () => scaduta(card));
+    }
+    function scaduta(card) {
+      if (luogo(card) === 'angolo' && davanti && FORMA.allaScadenza({ home: inHome() }) === 'vola') vola(card);
+      else dismiss(card, 'scaduta');
+    }
+    // Il volo lo disegna la home (dall'angolo alla cima della colonna): qui l'avviso cambia solo posto.
+    function vola(card) {
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = null;
+      card.dataset.vola = riduci() ? '0' : String(Date.now());
+      card.dataset.luogo = 'colonna';
+      disponi();
+    }
+    function colloca(card, forzaDavanti = false) {
+      const f = FORMA.forma({ davanti: forzaDavanti || davanti, home: inHome(), haCarta: !!card.dataset.carta, riduciMovimento: riduci() });
+      if (f === 'angolo' || f === 'sistema') {
+        card.dataset.luogo = f === 'sistema' ? 'fuori' : 'angolo';
+        avviaTempo(card, card._durata);
+        if (f === 'sistema') chiediAlSistema(card);
+      } else {
+        // `carta`: se la home ha già la carta di questa cosa la fa notare e l'avviso se ne va; se no resta una carta.
+        if (card._tempo) card._tempo.annulla();
+        card._tempo = null;
+        card.dataset.vola = '0';
+        card.dataset.luogo = 'colonna';
+      }
+      return f;
+    }
+    function chiediAlSistema(card) {
+      if (!card.dataset.uid) card.dataset.uid = `${Date.now().toString(36)}-${card.dataset.nid}-${Math.random().toString(36).slice(2, 8)}`;
+      const fuori = tutteVive().filter((c) => luogo(c) === 'fuori');
+      for (const c of fuori.slice(0, Math.max(0, fuori.length - FUORI_MAX))) dismiss(c, 'scaduta');
+      const resta = () => {
+        if (luogo(card) !== 'fuori' || card.dataset.closing === '1') return;
+        colloca(card, true);
+        disponi();
+      };
+      const chiesta = api.avvisi && api.avvisi.sistema ? api.avvisi.sistema({
+        uid: card.dataset.uid,
+        testo: card.querySelector('.shell-notif-msg')?.textContent || '',
+        titolo: card.dataset.titolo || '',
+        chiave: card.dataset.key || card.dataset.unica || '',
+      }) : false;
+      Promise.resolve(chiesta).then((ok) => { if (!ok) resta(); }, resta);
+    }
+    // Tornato davanti, quello che aspettava di essere chiuso riprende il suo posto qui; a tempo resta solo nel sistema.
+    function cambiaDavanti(ora) {
+      if (ora === davanti) return;
+      davanti = ora;
+      if (!ora) return;
+      let mosse = false;
+      for (const c of tutteVive()) {
+        if (luogo(c) === 'fuori' && !(c._durata > 0)) { colloca(c); mosse = true; }
+      }
+      if (mosse) disponi();
+    }
+    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono.
+    function cambiaLuogo() {
+      const ora = inHome();
+      if (ora === eraHome) return;
+      eraHome = ora;
+      for (const c of vive()) {
+        if (c.dataset.attesa === '1' || c._durata > 0) continue;
+        avviaTempo(c, c._durata);
+      }
     }
     // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
     function contaUscita(card, esito) {
