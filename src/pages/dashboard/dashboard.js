@@ -2439,6 +2439,7 @@
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
+      if (msg.settings) BarraSiti.applicaImpostazioni(msg.settings);
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
       if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
