@@ -1365,7 +1365,7 @@ function spiega(errore, { cosa, piattaforma = process.platform, nome = '', elenc
     'non-supportato': { frase: 'Su questo sistema Filo non sa ancora comandarlo.' },
     prove: { frase: 'Durante le prove automatiche Filo non comanda il computer vero.' },
   };
-  const voce = T[errore] || { frase: 'Il sistema non ha eseguito il comando.' };
+  const voce = T[errore] || { frase: FRASE_RISERVA };
   const fuori = { errore, frase: voce.frase };
   if (voce.dove) fuori.dove = voce.dove;
   if (voce.apri && IMPOSTAZIONI[voce.apri]) fuori.apri = voce.apri;
