@@ -1295,7 +1295,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   if (daNpm.nota) console.error(daNpm.nota);
   const argv = daNpm.args.length ? [...argvIn, ...daNpm.args] : argvIn;
   const [cmd, arg] = argv;
-  if (!SOTTOCOMANDI.includes(cmd) || (['leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
+  if (!SOTTOCOMANDI.includes(cmd) || (['leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine', 'passa'].includes(cmd) && !arg)) {
     console.error(USO);
     return 1;
   }
