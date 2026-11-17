@@ -598,6 +598,9 @@ function avvisaNonRiuscito(rec) {
   }, scopeOf(rec));
 }
 
+// #2390 — la carta della home che racconta lo stesso scaricamento: lì la home fa notare lei invece dell'avviso.
+const cartaDi = (rec) => (rec && rec.id ? { carta: `download:${rec.id}` } : {});
+
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
