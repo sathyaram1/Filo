@@ -962,17 +962,6 @@
         return { partial: { barraSiti: { visibile: b } }, label: `Barra dei siti → ${b ? 'mostrata' : 'nascosta'}` };
       },
     },
-    {
-      scrive: ['chatRipiegata'],
-      aiuto: 'true | false (true ripiega la chat della nuova scheda lasciando il campo di scrittura e la barra dei siti al centro; false la riapre)',
-      costo: 1,
-      keys: ['chat_ripiegata', 'chat ripiegata', 'ripiega la chat', 'ripiega chat', 'chiudi la chat', 'chatripiegata'],
-      build(v) {
-        const b = parsePrefBool(v);
-        if (b === null) return null;
-        return { partial: { chatRipiegata: b }, label: `Chat della home → ${b ? 'ripiegata' : 'aperta'}` };
-      },
-    },
     // #2294 — i minuti fra due messaggi sui download finiti a utente assente: un numero diventa la scelta più vicina.
     {
       scrive: ['filoParla.downloadOgniMin'],
