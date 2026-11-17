@@ -302,7 +302,7 @@ const UI_RUNTIME = `
         if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
         textNode.parentNode.replaceChild(frag, textNode);
         done[term] = true;
-        if (tail) { textNode = tail; } else { break; }
+        textNode = tail;
       }
     }
   }
