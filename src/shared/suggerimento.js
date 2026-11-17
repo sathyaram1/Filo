@@ -278,6 +278,7 @@
     host.style.setProperty('top', `${p.y / zoom}px`, 'important');
     host.dataset.lato = p.sotto ? 'sotto' : 'sopra';
     visibile = true;
+    accendiRotella(tipEl.scrollHeight > tipEl.clientHeight);
   }
 
   // Su un pezzo grande (una riga, un'immagine) il fumetto sta sotto il puntatore, non in fondo al pezzo.
