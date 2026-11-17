@@ -105,7 +105,8 @@ Solo se lo copre davvero: un principio vicino non basta, e nel dubbio decide
 l'owner. Un principio segnato come contestato non si usa: l'owner ha riaperto
 una risposta che lo usava, e finché non risponde vale come assente. La
 risposta finisce fra le risposte automatiche, e l'owner può riaprirla. Le
-opzioni che vogliono un suo gesto il server le rifiuta.
+opzioni che vogliono un suo gesto il server le rifiuta. Un «da fare» non lo
+chiude un principio: il passo lo fa l'owner, non una regola.
 
 Due famiglie il registro le copre sempre, anche quando le parole non
 combaciano, e lì il dubbio non va all'owner: quale lavoro fare prima e quale
@@ -125,6 +126,12 @@ la trova fra quelle da rispondere.
   se si sceglie male;
 - da 2 a 4 opzioni, ognuna con l'azione e con pro e contro di una riga;
 - consiglio con un motivo di una riga.
+
+Un «da fare» (`"tipo": "da_fare"`, un passo che solo l'owner può fare) resta un
+«da fare»: niente opzioni inventate, niente consiglio, niente pro e contro.
+Riscrivi i passi (problema) e il perché (contesto) nella stessa forma corta, e
+tieni il «Fatto» e, se c'era, il «Non lo faccio» con le loro azioni. Il tipo,
+come la priorità, resta quello di chi ha chiesto.
 
 Una riga sono 140 caratteri: lo strumento conta, e rifiuta col campo e il
 numero. Se chi ha chiesto ha scritto un'opzione sola, aggiungi quelle che il

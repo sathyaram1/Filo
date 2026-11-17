@@ -34,7 +34,14 @@
     // La forma (§3.1): il titolo dice di cosa si parla, e un'opzione sola non è una domanda.
     paroleTitolo: 10,
     opzioniMinime: 2,
+    // Un «da fare» (#2229): «Fatto», e facoltativo «Non lo faccio».
+    opzioniDaFare: 2,
   });
+
+  // `da_fare`: un passo che solo l'owner può fare, nella stessa lista delle domande (#2229). Assente = da decidere.
+  const TIPI_DOMANDA = Object.freeze(['da_decidere', 'da_fare']);
+  // Il nome del pulsante di un «da fare» lo dà la posizione dell'opzione, mai il testo di chi chiede (§3.3).
+  const PULSANTI_DA_FARE = Object.freeze(['Fatto', 'Non lo faccio']);
 
   // La forma che il compito «Gestisci la domanda» dà a ciò che pubblica per l'owner (§3.5). Una riga sono
   // `caratteriRiga` caratteri, un a capo ne apre un'altra.
@@ -57,8 +64,11 @@
   });
 
   const FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+  // Chi conosce il feedback solo per numero lo scrive col cancelletto («#1736», «#831.2»): il server lo traduce
+  // nell'id all'ingresso (traduciNumeri), quindi una domanda salvata porta sempre l'id. Senza cancelletto è un id.
+  const NUMERO_IN_AZIONE_RE = /^#([1-9]\d{0,8})(?:\.([1-9]\d{0,5}))?$/;
   const PARAMETRI = Object.freeze({
-    feedbackId: (v) => typeof v === 'string' && FEEDBACK_ID_RE.test(v),
+    feedbackId: (v) => typeof v === 'string' && (FEEDBACK_ID_RE.test(v) || NUMERO_IN_AZIONE_RE.test(v)),
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
@@ -84,6 +94,8 @@
     ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
+    // Solo in un «da fare» senza lavoro da riprendere: la risposta chiude la domanda e basta (#2229).
+    nessuna: tipo({}, { bulk: false, consenso: false, attivo: true }),
   });
 
   const ha = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -121,13 +133,14 @@
     return troppo || { ok: true, valore: input[campo] };
   }
 
-  const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
+  const CAMPI_DOMANDA = Object.freeze(['tipo', 'titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
   const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio',
     'smistamento', 'principioContestato']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
-  function validaOpzione(o, i, perOwner) {
+  // Pro e contro servono a scegliere: un «da fare» non chiede una scelta, e li ha facoltativi.
+  function validaOpzione(o, i, perOwner, daFare) {
     const n = i + 1;
     if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`, { campo: `opzioni[${i}]` });
     const ignoti = Object.keys(o).filter((k) => !CAMPI_OPZIONE.includes(k));
@@ -139,7 +152,7 @@
     if (!pro.ok) return Object.assign(pro, { dettaglio: `opzione ${n}: ${pro.dettaglio}` });
     const contro = testoFacoltativo(o, 'contro', TETTI.contro);
     if (!contro.ok) return Object.assign(contro, { dettaglio: `opzione ${n}: ${contro.dettaglio}` });
-    if (perOwner) {
+    if (perOwner && !daFare) {
       for (const [campo, r] of [['pro', pro], ['contro', contro]]) {
         if (r.valore.trim()) continue;
         return no(`${campo}_mancante`, `l'opzione ${n} non ha il ${campo}: ogni opzione dice cosa guadagna e cosa costa, in una riga ciascuno`,
@@ -251,6 +264,10 @@
         { campo: 'titolo', lunghezza: parole, massimo: TETTI.paroleTitolo });
     }
     if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`, { campo: 'priorita' });
+    if (input.tipo != null && !TIPI_DOMANDA.includes(input.tipo)) {
+      return no('domanda_non_valida', `il tipo va scelto fra ${TIPI_DOMANDA.join(', ')}: «da_fare» è un passo che solo l’owner può fare`, { campo: 'tipo' });
+    }
+    const fare = input.tipo === 'da_fare';
     const testi = {};
     for (const campo of ['contesto', 'problema', 'notePerAgenti', 'gruppo']) {
       const r = testoFacoltativo(input, campo, TETTI[campo]);
@@ -262,20 +279,33 @@
     if (grezze.length > TETTI.opzioni) {
       return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { campo: 'opzioni', lunghezza: grezze.length, massimo: TETTI.opzioni });
     }
-    if (perOwner && grezze.length < TETTI.opzioniMinime) {
+    if (fare && (!grezze.length || grezze.length > TETTI.opzioniDaFare)) {
+      return no(grezze.length ? 'troppe_opzioni' : 'opzioni_insufficienti', `un «da fare» ha ${grezze.length || 'nessuna opzione'}`
+        + `${grezze.length ? ' opzioni' : ''}: la prima è il pulsante «${PULSANTI_DA_FARE[0]}», la seconda, facoltativa, «${PULSANTI_DA_FARE[1]}»`,
+      { campo: 'opzioni', lunghezza: grezze.length, minimo: 1, massimo: TETTI.opzioniDaFare });
+    }
+    if (perOwner && !fare && grezze.length < TETTI.opzioniMinime) {
       const quante = grezze.length ? 'un\'opzione sola' : 'nessuna opzione';
       return no('opzioni_insufficienti', `${quante}, ne servono almeno ${TETTI.opzioniMinime}: con una scelta sola non c'è niente da decidere `
-        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è',
+        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è; '
+        + 'un passo che solo l\'owner può fare è un «da fare» (tipo: "da_fare"), che vuole un\'opzione sola',
       { campo: 'opzioni', lunghezza: grezze.length, minimo: TETTI.opzioniMinime });
     }
     const opzioni = [];
     for (let i = 0; i < grezze.length; i++) {
-      const r = validaOpzione(grezze[i], i, perOwner);
+      const r = validaOpzione(grezze[i], i, perOwner, fare);
       if (!r.ok) return r;
+      if (!fare && r.opzione.azione.tipo === 'nessuna') {
+        return no('parametri_non_validi', `opzione ${i + 1}: «nessuna» vale solo in un «da fare»; in una domanda ogni scelta fa qualcosa`, { campo: `opzioni[${i}].azione` });
+      }
       opzioni.push(r.opzione);
     }
     let consiglio = null;
-    if (opzioni.length) {
+    if (fare && input.consiglio != null) {
+      // Un consiglio si applica anche in blocco: su un «da fare» segnerebbe fatto quello che l'owner non ha fatto.
+      return no('consiglio_non_valido', 'un «da fare» non ha consiglio: c\'è una cosa sola da fare, e la segna fatta solo l\'owner', { campo: 'consiglio' });
+    }
+    if (opzioni.length && !fare) {
       const c = input.consiglio;
       if (!isOggetto(c) || !Number.isInteger(c.opzione) || c.opzione < 0 || c.opzione >= opzioni.length) {
         return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`, { campo: 'consiglio' });
@@ -301,6 +331,7 @@
       collegamenti.push(r.collegamento);
     }
     const domanda = Object.assign({ titolo, priorita: input.priorita, opzioni, consiglio, collegamenti }, testi);
+    if (fare) domanda.tipo = 'da_fare';
     if (input.blocca != null) {
       if (typeof input.blocca !== 'boolean') return no('domanda_non_valida', '«blocca» è true o false: dice se la domanda ferma il lavoro finché l’owner non risponde');
       domanda.blocca = input.blocca;
@@ -382,7 +413,7 @@
 
   // Le azioni che il compito «Gestisci la risposta» (§3.5) applica da sé: quelle che l'owner applica anche in blocco.
   // Una di consenso resta a un gesto dell'owner nella finestra (§1.4), e un compito non ne fa nascere un altro.
-  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi']);
+  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi', 'nessuna']);
 
   /** Il rifiuto per un'azione che il compito non applica, o null se la può applicare. PURA. */
   function vietataAlCompito(azione) {
@@ -418,6 +449,7 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'nessuna') return 'Chiudi senza altre azioni';
     if (a.tipo === 'ambito') {
       // Le operazioni dette con le parole dell'elenco chiuso (ambiti.js), mai con quelle di chi propone.
       const A = global.SN_AMBITI;
@@ -435,6 +467,61 @@
     if (a.tipo === 'attendi') return `${r.num} aspetta #${a.aspetta}`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
+  }
+
+  function daFare(domanda) { return isOggetto(domanda) && domanda.tipo === 'da_fare'; }
+
+  /**
+   * Il pulsante dell'opzione `i`: in un «da fare» il nome viene dalla posizione («Fatto», «Non lo faccio») e l'azione
+   * lo segue; altrove è quello di `etichettaAzione`. null = nessun pulsante. PURA.
+   */
+  function etichettaOpzione(domanda, i, riferimenti) {
+    const o = isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni[i] : null;
+    if (!isOggetto(o)) return null;
+    if (!daFare(domanda)) return etichettaAzione(o.azione, riferimenti);
+    const nome = PULSANTI_DA_FARE[i];
+    if (!nome) return null;
+    const v = validaAzione(o.azione);
+    if (!v.ok) return null;
+    if (v.azione.tipo === 'nessuna') return nome;
+    const base = etichettaAzione(v.azione, riferimenti);
+    if (!base) return null;
+    const detta = base.replace(/ con questa scelta$/, '');
+    return `${nome}: ${detta.charAt(0).toLocaleLowerCase('it')}${detta.slice(1)}`;
+  }
+
+  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id nelle azioni, senza doppioni. PURA. */
+  function numeriDaTradurre(domanda) {
+    const out = [];
+    for (const o of isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : []) {
+      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
+      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
+      const n = m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : '';
+      if (n && !out.includes(n)) out.push(n);
+    }
+    return out;
+  }
+
+  /**
+   * La domanda coi numeri delle azioni tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server). Un numero
+   * che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
+   */
+  function traduciNumeri(domanda, ids) {
+    const mappa = isOggetto(ids) ? ids : {};
+    const mancanti = numeriDaTradurre(domanda).filter((n) => !(ha(mappa, n) && FEEDBACK_ID_RE.test(String(mappa[n]))));
+    if (mancanti.length) {
+      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni`,
+        { campo: 'opzioni', numeri: mancanti });
+    }
+    if (!isOggetto(domanda) || !Array.isArray(domanda.opzioni)) return { ok: true, domanda };
+    const opzioni = domanda.opzioni.map((o) => {
+      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
+      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
+      if (!m) return o;
+      const n = m[2] ? `${m[1]}.${m[2]}` : m[1];
+      return Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) });
+    });
+    return { ok: true, domanda: Object.assign({}, domanda, { opzioni }) };
   }
 
   function rangoPriorita(p) {
@@ -550,6 +637,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
+    TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeriDaTradurre, traduciNumeri,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };

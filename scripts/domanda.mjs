@@ -309,7 +309,7 @@ const fiduciaDetta = (f) => (f === 'fidato' ? 'fidata' : 'non fidata');
 /** La domanda intera per il terminale: ogni testo d'agente coi caratteri di controllo resi visibili. PURA. */
 export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) {
   const x = d || {};
-  const righe = [`${visibile(x.id || '?')} · ${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
+  const righe = [`${visibile(x.id || '?')} · ${D.daFare(x) ? 'da fare · ' : ''}${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
@@ -330,7 +330,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   if (opzioni.length) {
     righe.push('', 'Opzioni');
     opzioni.forEach((o, i) => {
-      const etichetta = D.etichettaAzione(o.azione, riferimenti);
+      const etichetta = D.etichettaOpzione(x, i, riferimenti);
       const segni = [etichetta ? `pulsante: ${etichetta}` : 'nessun pulsante: azione non applicabile'];
       if (soloDaFilo(o.azione)) segni.push('solo dalla finestra di Filo');
       if (x.consiglio && x.consiglio.opzione === i) segni.push('consigliata');
@@ -528,6 +528,7 @@ export function formattaElenco(domande) {
     if (b.gruppo) out.push(`  gruppo «${visibile(b.gruppo)}»`);
     for (const d of b.domande) {
       const segni = [visibile(d.stato || '?'), fiduciaDetta(d.fiducia)];
+      if (D.daFare(d)) segni.unshift('da fare');
       if (d.smistamento === 'fallito') segni.push('non riscritta');
       if (D.schedaDi(d) === 'risposte_automatiche') segni.push('automatica');
       out.push(`${b.gruppo ? '    ' : '  '}${visibile(d.id || '?')}  ${visibile(d.titolo || '')}  [${segni.join(' · ')}]`);

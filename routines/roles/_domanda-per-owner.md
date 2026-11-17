@@ -18,6 +18,21 @@ La forma, che la validazione comune controlla e rifiuta dicendo il campo:
 - un resoconto senza niente da decidere non è una domanda: va nel report o
   nelle note del feedback.
 
+**Un passo che solo l'owner può fare è un «da fare»** (un segreto,
+un'impostazione di GitHub o di Firebase, una prova dal suo PC), non una frase
+nel testo o nelle note né una domanda con una scelta finta. Chi lo scopre lo
+apre con la strada delle domande e `"tipo": "da_fare"`:
+
+- `problema` i passi concreti e dove; `contesto` perché serve; `collegamenti`
+  il lavoro che aspetta;
+- un'opzione sola, «Fatto»: `riprendi` sul feedback che aspetta (`blocca:
+  true`) o `{ "tipo": "nessuna" }`; facoltativa «Non lo faccio» (di solito
+  `archivia`). I pulsanti li nomina Filo: il `testo` dice cosa è stato fatto;
+- niente pro, contro e consiglio: un consiglio applicato in blocco lo
+  segnerebbe fatto senza di lui;
+- il feedback si nomina anche per numero (`"feedbackId": "#1736"`): il server
+  lo traduce, o rifiuta un numero che non c'è.
+
 Un dubbio di processo (quale strumento, quale ordine, cosa fare di un rilievo)
 non è una domanda per l'owner: va al manutentore, nel rilascio con
 `--processo` (contratto del worker). Nemmeno quale lavoro fare prima e quale
