@@ -385,14 +385,12 @@
     p.then((r) => { if (r && r.ok && Array.isArray(r.elenco)) ultimiElenchi[cosa] = { r, quando: Date.now() }; });
     return p;
   }
+  // Solo gli abbinati: le reti conosciute su Windows vogliono la posizione, e si leggono solo quando l'utente apre il
+  // riquadro della rete (patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md).
   function precaricaElenchi() {
-    if (document.visibilityState === 'hidden') return;
-    const voci = { bluetooth: 'bluetooth', wifi: 'rete' };
-    for (const cosa of Object.keys(voci)) {
-      if (visibili[voci[cosa]] === false) continue;
-      const u = ultimiElenchi[cosa];
-      if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco(cosa).catch(() => {});
-    }
+    if (document.visibilityState === 'hidden' || visibili.bluetooth === false) return;
+    const u = ultimiElenchi.bluetooth;
+    if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco('bluetooth').catch(() => {});
   }
 
   function rigaAttesa(testo) {
