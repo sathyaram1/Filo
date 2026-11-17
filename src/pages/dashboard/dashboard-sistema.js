@@ -526,7 +526,7 @@
       okLabel: 'Dimentica',
     }) : false;
     if (!ok) return null;
-    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
+    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
   }
 
   function vociRiga(opt) {
