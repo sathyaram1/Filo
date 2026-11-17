@@ -294,6 +294,11 @@ class AvvisiSopraPagina {
       const s = testo(scelta);
       const comando = /^@action:avvisi:([a-z-]+)$/.exec(s);
       if (comando) { this._pila(comando[1]); return; }
+      if (s === '@action:avviso:apri') {
+        if (carta && carta.indirizzo) { try { this.win._filoTabs.openTab(carta.indirizzo); } catch (_) {} }
+        this.restituisciTastiera();
+        return;
+      }
       const m = /^@action:avviso:(chiudi|\d{1,2})$/.exec(s);
       if (!m || !carta) return;
       try { this.win.webContents.send('avvisi:azione', { id, azione: m[1] }); } catch (_) {}
