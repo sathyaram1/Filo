@@ -118,7 +118,7 @@ test('la chat e i gesti passano dallo stesso salvataggio: aggiungi e togli dalla
   const elenco = await S.daChat({ type: 'BARRA_SITI', operazione: 'elenca' });
   assert.deepEqual(elenco.output.voci, [{ nome: 'YouTube', indirizzo: 'https://youtube.com/' }]);
   assert.equal(elenco.cambiate, undefined);
-  const no = await S.daChat({ type: 'BARRA_SITI', operazione: 'togli', voce: 'twitch' });
+  const no = await S.daChat({ type: 'BARRA_SITI', operazione: 'togli', elemento: 'twitch' });
   assert.equal(no.executed, false);
   assert.match(no.output.error, /non c'è questa voce/);
   assert.equal((await S.daChat({ type: 'BARRA_SITI', operazione: 'balla' })).output.error, 'operazione sconosciuta');
