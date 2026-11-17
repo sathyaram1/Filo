@@ -361,7 +361,8 @@ test('ogni accaduto ha un punto solo da cui nasce', () => {
   const ilFilo = tutti.find((s) => s.p === 'src/main/services/ilFilo.js').testo;
   assert.equal((ilFilo.match(/TIPI\.RICERCA/g) || []).length, 1);
   // Un'azione entra una volta per esecuzione: executeFiloAction la manda, nessun altro.
-  const handlers = tutti.find((s) => s.p === 'src/main/services/handlers.js').testo;
+  const parti = percorsiDiHandlers();
+  const handlers = tutti.filter((s) => parti.includes(s.p)).map((s) => s.testo).join('\n');
   assert.equal((handlers.match(/azioneNelFilo\(action, finale/g) || []).length, 1);
   // Le porte dell'Aiuto che non passano da executeFiloAction (ricerca web, documenti, barra) la mandano da sé.
   assert.deepEqual(chi(/ctx\.azioneDellAiuto\(/),
