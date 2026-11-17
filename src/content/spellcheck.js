@@ -2777,7 +2777,8 @@
       b.classList.toggle('sn-cercando', !!s.cercando);
       const scritto = s.cercando ? '' : s.correzioni[0];
       if (b.textContent !== scritto) b.textContent = scritto;
-      b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
+      const spiegazione = spiegazioneDelValore(s);
+      if (b.dataset.tip !== spiegazione) b.dataset.tip = spiegazione;
       b.style.left = `${r.left + r.width / 2}px`;
       b._snX = r;
       const posto = postoDelValore(state, b, r, tr);
