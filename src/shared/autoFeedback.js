@@ -219,7 +219,7 @@
     const user = String(userMessage || '').trim();
     if (!user) return null;
     // Chi chiede istruzioni le istruzioni le vuole: nessun buco da segnalare.
-    if (HOWTO_QUESTION_RE.test(user)) return null;
+    if (isHowtoQuestion(user)) return null;
     // La risposta deve dare indicazioni manuali, non solo parlare.
     if (!MANUAL_HOWTO_PHRASES.some((p) => replyNorm.includes(p))) return null;
     // …e devono riguardare una capacità che Filo dichiara di avere.
