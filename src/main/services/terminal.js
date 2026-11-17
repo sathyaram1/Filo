@@ -456,7 +456,7 @@ function extractCwdMark(rawStdout, mark) {
 
 // Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
 // esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS, preludio = true } = {}) {
   const cmd = String(command || '').trim();
   const env = ambienteDelModello(chiesto);
   const startedAt = Date.now();
