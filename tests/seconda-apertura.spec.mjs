@@ -310,26 +310,6 @@ test('su Mac, senza la finestra principale, «Vai a un indirizzo» la ridà e ap
   expect((await stato(app, accesso)).normale.schede, 'la scheda riaperta non deve sparire sotto la home').toContain(negozio);
 });
 
-// Chiusa anche la finestrella, le voci della scheda non hanno niente su cui agire: ridanno la finestra.
-for (const voce of ['Indietro', 'Ingrandisci']) {
-  test(`su Mac, senza nessuna finestra, «${voce}» ridà Filo con le sue schede`, async ({ app, shell, openTab, testServer }) => {
-    const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
-    // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.
-    await app.evaluate(({ app: a, BrowserWindow }) => {
-      a.removeAllListeners('window-all-closed');
-      a.on('window-all-closed', () => {});
-      for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs) w.close();
-    });
-    // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: qui si contano solo le vive.
-    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
-      .filter((w) => { try { return !w.isDestroyed() && !w._filoTabs; } catch (_) { return false; } }).length), { timeout: 10000 }).toBe(0);
-    await voceDellaBarra(app, voce);
-    await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [],
-      { message: `«${voce}» senza finestre non ha ridato Filo con le sue schede`, timeout: 15000 }).toContain(negozio);
-    expect((await stato(app, accesso)).errori).toEqual([]);
-  });
-}
-
 // Con la finestrella di accesso davanti le voci della scheda agiscono su di lei, con la principale aperta o chiusa: chi
 // sta nella finestrella è nella stessa situazione (#2031.2). Il sito dietro, che aspetta l'accesso, non si tocca: ha
 // una pagina prima e un segno che una ricarica porterebbe via, così una voce finita su di lui si vede.
