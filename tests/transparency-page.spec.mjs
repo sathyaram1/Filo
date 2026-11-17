@@ -75,7 +75,8 @@ for (const { id, voce, sezione, frase } of [
     await expect(page.locator('#doc-body h2', { hasText: sezione })).toHaveCount(1);
     await expect(page.locator('#doc-body h2', { hasText: 'I punti deboli' })).toHaveCount(1);
     await expect(page.locator('#doc-body')).toContainText(frase);
-    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(5);
+    // La Privacy breve è prosa: l'unico elenco è quello delle fonti.
+    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(id === 'privacy' ? 0 : 5);
     await page.screenshot({ path: `tests/.shots/trasparenza-${id}.png`, fullPage: false });
   });
 }
