@@ -1002,18 +1002,86 @@ function dispositiviMac(righe) {
   }));
 }
 
+// `parziale`: lo script è stato fermato a tempo scaduto dopo aver già scritto qualche dispositivo (#2394).
 function interpretaBtElenco(u, piattaforma) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') return elencoBtWindows(jsonDi(u.primo('elenco')));
   let dispositivi;
   if (piattaforma === 'darwin') {
     if (intero(u.primo('uscita')) > 0) return { ok: false, errore: 'permesso-bluetooth' };
     dispositivi = dispositiviMac(u.blocco('dispositivi'));
     if (!dispositivi) return { ok: false, errore: 'sconosciuto' };
   } else dispositivi = dispositiviDaVoci(u, piattaforma);
-  const valide = dispositivi.filter((d) => d.indirizzo && INDIRIZZO[piattaforma].test(normalizzaIndirizzo(d.indirizzo, piattaforma)));
+  return validaElencoBt({ ok: true, acceso: bit(u.primo('acceso')), dispositivi, ...(u.tempoScaduto ? { parziale: true } : {}) }, piattaforma);
+}
+
+function validaElencoBt(r, piattaforma) {
+  const valide = r.dispositivi.filter((d) => d.indirizzo && INDIRIZZO[piattaforma].test(normalizzaIndirizzo(d.indirizzo, piattaforma)));
   for (const d of valide) d.indirizzo = normalizzaIndirizzo(d.indirizzo, piattaforma);
-  return { ok: true, acceso: bit(u.primo('acceso')), dispositivi: valide };
+  return { ...r, dispositivi: valide };
+}
+
+function jsonDi(v) {
+  try { return v == null ? null : JSON.parse(String(v)); } catch (_) { return null; }
+}
+// Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}; un elemento solo, senza le parentesi.
+function elencoPs(v) {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === 'object' && Array.isArray(v.value)) return v.value;
+  if (v && typeof v === 'object') return [v];
+  return v == null ? [] : null;
+}
+
+// L'elenco di ElencoBt (PS_ELENCO_BT), dallo script o dal lettore della home: una lettura sola per le due strade.
+function elencoBtWindows(o) {
+  if (!o || typeof o !== 'object') return { ok: false, errore: 'sconosciuto' };
+  if (o.errore) return { ok: false, errore: String(o.errore) };
+  const lista = elencoPs(o.dispositivi);
+  if (!lista) return { ok: false, errore: 'sconosciuto' };
+  const dispositivi = lista.filter((d) => d && typeof d === 'object').map((d) => ({
+    indirizzo: String(d.indirizzo || ''),
+    nome: typeof d.nome === 'string' ? d.nome : '',
+    collegato: typeof d.collegato === 'boolean' ? d.collegato : null,
+    le: d.le === true,
+    contenitore: typeof d.contenitore === 'string' && d.contenitore ? d.contenitore : null,
+  }));
+  return validaElencoBt({ ok: true, acceso: typeof o.acceso === 'boolean' ? o.acceso : null, dispositivi }, 'win32');
+}
+
+const indirizzoLeggibile = (ind) => {
+  const cifre = String(ind || '').replace(/[^0-9A-Fa-f]/g, '');
+  return cifre.length === 12 ? cifre.toUpperCase().match(/../g).join(':') : String(ind || '');
+};
+// Windows lascia senza nome molti dispositivi LE abbinati: si chiamano come li chiama lui, mai «».
+const nomeDiRiserva = (d) => `Dispositivo Bluetooth${d.le ? ' LE' : ''} ${indirizzoLeggibile(d.indirizzo)}`;
+// Contenitore tutto zeri: Windows non sa a quale apparecchio appartiene.
+const contenitoreVero = (c) => (typeof c === 'string' && /[1-9a-f]/i.test(c) ? c.toLowerCase() : null);
+
+// Le cuffie che parlano classico e LE sono due voci abbinate nello stesso contenitore di Windows: una sola riga,
+// con l'indirizzo classico (quello che collega l'audio), il nome di chi ce l'ha e il collegamento del classico.
+function unisciIdentita(a, b) {
+  const [base, altra] = a.le && !b.le ? [b, a] : [a, b];
+  return {
+    ...base,
+    nome: base.nome && base.nome.trim() ? base.nome : altra.nome,
+    collegato: typeof base.collegato === 'boolean' ? base.collegato : altra.collegato,
+  };
+}
+
+// Su ogni piattaforma e per ogni strada (computer vero o delle prove): nessuna riga senza nome, una per apparecchio.
+function rifinisciDispositivi(lista) {
+  const out = [];
+  const perContenitore = new Map();
+  for (const d of Array.isArray(lista) ? lista : []) {
+    if (!d || typeof d !== 'object') continue;
+    const c = contenitoreVero(d.contenitore);
+    const i = c && perContenitore.has(c) ? perContenitore.get(c) : -1;
+    if (i >= 0) { out[i] = unisciIdentita(out[i], d); continue; }
+    if (c) perContenitore.set(c, out.length);
+    out.push({ ...d });
+  }
+  return out.map(({ contenitore, ...d }) => ({ ...d, nome: typeof d.nome === 'string' && d.nome.trim() ? d.nome : nomeDiRiserva(d) }));
 }
 
 function interpretaBtCollega(u, piattaforma, collega) {
