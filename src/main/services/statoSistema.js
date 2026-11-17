@@ -829,10 +829,11 @@ function pubblica(grezzo, { fresco = true, radio = null } = {}) {
   ultimoPerFilo = nuovo;
   // Uno stato uguale a quello di prima si annuncia lo stesso se chi l'ha ricevuto lo sapeva vecchio.
   const rinfrescate = daRileggere.length > radioVecchie().length;
-  if (f !== firma || rinfrescate) {
+  const cambiato = f !== firma;
+  if (cambiato || rinfrescate) {
     firma = f;
     annuncia();
-    if (prima && f !== JSON.stringify(prima)) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
+    if (prima && cambiato) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
   }
   return stato;
 }
