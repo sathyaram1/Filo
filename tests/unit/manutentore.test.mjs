@@ -949,3 +949,29 @@ test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a s
   assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
   assert.match(spec, /battito\*\* ogni due ore al massimo/);
 });
+
+test('stato mostra le pause di ogni voce e il perché dell’ultimo giro, e un server vecchio non sembra «nessuna pausa» (#2488)', () => {
+  const fino = Date.parse('2026-11-14T15:24:00Z');
+  const pause = { serverB: { finoMs: fino, perche: 'dead_round', dettaglio: '', strikes: 1, account: 'B', oggi: 3 } };
+  const voci = {
+    normale: { perche: 'accounts_paused', percheMs: Date.parse('2026-11-14T14:04:00Z') },
+    server: { perche: 'server_paused', percheMs: Date.parse('2026-11-14T12:35:00Z') },
+    reteAperta: { perche: '', percheMs: 0 },
+    riservati: { perche: 'no_riservati_work', percheMs: Date.parse('2026-11-14T10:00:00Z') },
+  };
+  const righe = M.righeStato({ ...STATO, pause, voci });
+  const da = righe.indexOf('Pause in corso (1):');
+  assert.ok(da > 0, righe.join('\n'));
+  assert.equal(righe[da + 1], '- serverB fino a 2026-11-14T15:24:00.000Z, perché dead_round, fallimenti di fila 1');
+  assert.equal(righe[da + 2], 'Ultimo giro per voce: normale accounts_paused dal 2026-11-14T14:04:00.000Z; '
+    + 'server server_paused dal 2026-11-14T12:35:00.000Z; riservati no_riservati_work dal 2026-11-14T10:00:00.000Z.');
+  assert.ok(M.righeStato({ ...STATO, pause: {}, voci: {} }).includes('Pause in corso (0):'));
+  assert.ok(M.righeStato({ ...STATO, pause: null, voci: null }).includes('Pause in corso (stato del pacemaker non letto):'));
+  assert.ok(M.righeStato(STATO).includes('Pause delle voci: il server non le elenca ancora.'));
+  // Il messaggio di claude.ai di un rifiuto arriva in una riga sola: un a capo non apre una sezione nel contesto.
+  const sporco = M.righePause({ A: { finoMs: fino, perche: 'rejected_429', dettaglio: 'limite\n## Spesa', strikes: 2 } }, {});
+  assert.ok(sporco.every((r) => !r.includes('\n')));
+  assert.match(sporco[1], /^- A fino a .*perché rejected_429, fallimenti di fila 2: limite ## Spesa$/);
+  assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, pause, voci }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /serverB fino a/);
+  assert.match(RUOLO.replace(/\s+/g, ' '), /accensione nata morta di qualunque voce/);
+});

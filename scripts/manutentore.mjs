@@ -744,10 +744,30 @@ export function righeStato(st) {
     `Account: primo ${acc.primo || 'alternanza'}; spenti da te ${spenti.join(', ') || 'nessuno'}; esclusi dall'owner ${esclusi.join(', ') || 'nessuno'}.`,
     `Sveglia chiesta: ${s.sveglia && s.sveglia.ms ? new Date(s.sveglia.ms).toISOString() : 'nessuna'}. Mattino: ${unaRiga(JSON.stringify(s.mattino ?? null))}.`,
     `Ultimo guasto: ${s.ultimoGuasto ? `${new Date(s.ultimoGuasto.ms).toISOString()}${s.ultimoGuasto.testo ? ` ${unaRiga(s.ultimoGuasto.testo).slice(0, 300)}` : ''}` : 'nessuno'}.`,
+    ...righePause(s.pause, s.voci),
     `Segnali non letti (${segnali.length}):`,
     ...segnali.map((x) => `- ${unaRiga(x.id)} ${unaRiga(x.tipo)} ${x.atMs ? new Date(x.atMs).toISOString() : ''}${x.dettaglio ? ` ${unaRiga(JSON.stringify(x.dettaglio)).slice(0, 400)}` : ''}`),
     ...righeCorseFerme(s.corseFerme),
   ];
+}
+
+const istanteIso = (ms) => (Number(ms) > 0 ? new Date(Number(ms)).toISOString() : '?');
+
+/**
+ * Le pause in corso di ogni voce e il perché dell'ultimo giro di ognuna (#2488): senza, «in pausa», «niente da fare» e
+ * «posti pieni» si confondono. Un server che non le manda lo dice, invece di sembrare «nessuna pausa». PURA.
+ */
+export function righePause(pause, voci) {
+  if (pause === undefined) return ['Pause delle voci: il server non le elenca ancora.'];
+  const elenco = Object.entries(pause || {});
+  const righe = [
+    `Pause in corso (${pause ? elenco.length : 'stato del pacemaker non letto'}):`,
+    ...elenco.map(([voce, p]) => `- ${unaRiga(voce)} fino a ${istanteIso(p && p.finoMs)}, perché ${unaRiga(p && p.perche) || '?'}, `
+      + `fallimenti di fila ${Number(p && p.strikes) || 0}${p && p.dettaglio ? `: ${unaRiga(p.dettaglio).slice(0, 200)}` : ''}`),
+  ];
+  const perche = Object.entries(voci || {}).filter(([, v]) => v && v.perche);
+  righe.push(`Ultimo giro per voce: ${perche.map(([voce, v]) => `${unaRiga(voce)} ${unaRiga(v.perche)} dal ${istanteIso(v.percheMs)}`).join('; ') || 'nessuno scritto'}.`);
+  return righe;
 }
 
 /** Le corse di Actions in coda senza lavori oltre la soglia (#2417), come le legge il server. PURA. */
