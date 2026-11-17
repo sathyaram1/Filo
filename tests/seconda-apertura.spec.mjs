@@ -347,13 +347,10 @@ for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 
     const { accesso, negozio: html } = negozioConAccesso(testServer);
     await sentinella(app);
     const page = await testServer.openReady(openTab, html);
-    await page.evaluate(segnaPagina('uno'));
+    await segnaPagina(app, '', 'uno');
     await page.click('#b');
     await expect.poll(async () => (await stato(app, accesso)).accesso, { message: 'la finestrella di accesso non si è aperta', timeout: 10000 }).toBe(1);
-    await app.evaluate(async ({ BrowserWindow }, [b, js]) => {
-      const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && w.webContents.getURL().startsWith(b));
-      await f.webContents.executeJavaScript(js, false);
-    }, [accesso, segnaPagina('due')]);
+    await segnaPagina(app, accesso, 'due');
     if (principale === 'chiusa') {
       await expect.poll(async () => (await sessioneSalvata(app)).some((u) => u.startsWith(page.url().split('#')[0])), { timeout: 10000 }).toBe(true);
       await shell.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
