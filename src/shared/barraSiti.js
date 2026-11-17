@@ -158,7 +158,7 @@
   }
 
   // L'operazione che la chat chiede, coi sinonimi che il modello usa; '' se non è una della barra.
-  const OPERAZIONI = { aggiungi: 'aggiungi', metti: 'aggiungi', togli: 'togli', rimuovi: 'togli', rinomina: 'rinomina', sposta: 'sposta', elenca: 'elenca', leggi: 'elenca' };
+  const OPERAZIONI = { aggiungi: 'aggiungi', metti: 'aggiungi', togli: 'togli', rimuovi: 'togli', rinomina: 'rinomina', sposta: 'sposta', elenca: 'elenca', leggi: 'elenca', ripiega: 'ripiega', riapri: 'riapri' };
   function operazione(a) {
     const op = String((a && typeof a === 'object' ? (a.operazione ?? a.op) : a) || '').trim().toLowerCase();
     return OPERAZIONI[op] || '';
