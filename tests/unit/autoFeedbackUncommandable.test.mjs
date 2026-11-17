@@ -73,6 +73,53 @@ test('a chi chiede istruzioni le istruzioni si danno: nessuna segnalazione', () 
   }
 });
 
+// #474 — sulla risposta vera (lo zoom spiegato a parole) la proposta c'è solo se
+// l'utente voleva che la cosa si facesse, non se chiedeva.
+const ZOOM_A_PAROLE = 'Per ingrandire la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
+  + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.';
+
+test('#474: le domande comuni, con ogni grafia, non fanno partire la proposta', () => {
+  const domande = [
+    'è possibile ingrandire la pagina?',
+    'c\'è un modo per ingrandire la pagina?',
+    'qual è il modo per ingrandire la pagina?',
+    'sai ingrandire la pagina?',
+    'puoi dirmi come ingrandire la pagina?',
+    'dimmi come ingrandire la pagina',
+    // le tre già riconosciute e la variante con l'apostrofo
+    'come faccio a ingrandire la pagina?',
+    'dove si trova lo zoom della pagina?',
+    'cosa sai fare?',
+    'e\' possibile ingrandire la pagina?',
+    // grafie equivalenti: apostrofo tipografico, maiuscole, «qual'è», accento acuto
+    'C’è un modo per ingrandire la pagina?',
+    'E’ POSSIBILE ingrandire la pagina?',
+    'qual\'è il modo per ingrandire la pagina?',
+    'é possibile ingrandire la pagina?',
+    'c\'e\' un modo per ingrandire la pagina?',
+  ];
+  for (const q of domande) {
+    assert.equal(AF.analyzeReply(ZOOM_A_PAROLE, [], q, CAPS).kind, null, q);
+  }
+});
+
+test('#474: chi segnala un guasto vero riceve ancora la proposta', () => {
+  const guasti = [
+    'non funziona lo zoom',
+    'la pagina non si ingrandisce',
+    'non riesco a ingrandire la pagina',
+    'non è possibile ingrandire la pagina',
+    'non si può ingrandire la pagina',
+    'non sai ingrandire la pagina',
+    'ingrandisci la pagina',
+  ];
+  for (const u of guasti) {
+    const a = AF.analyzeReply(ZOOM_A_PAROLE, [], u, CAPS);
+    assert.equal(a.kind, 'capability-uncommandable', u);
+    assert.equal(a.capabilityId, 'page-zoom', u);
+  }
+});
+
 test('una risposta senza indicazioni manuali non diventa un buco', () => {
   const risposte = [
     'Lo schermo intero di Filo nasconde la barra delle schede e lascia solo la pagina: '

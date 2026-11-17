@@ -64,6 +64,11 @@
 
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
+  // La regola sta in src/shared/allegatiSegnalazione.js; senza il modulo, un campo d'allegato presente basta a chiedere.
+  const segnalazioneConAllegati = (a) => {
+    const A = global.SN_ALLEGATI_SEGNALAZIONE;
+    return A ? A.haAllegati(a) : !!(a && a.allegati && [].concat(a.allegati).length);
+  };
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
   // Decide urlExfil, la stessa regola del controllo delle uscite (#2293); caricato senza, un indirizzo o l'elenco dei
@@ -537,7 +542,9 @@
       uscita: (a) => [a.titolo ?? a.title ?? '', a.testo ?? a.text ?? a.messaggio ?? ''].join('\n'),
       // Il prompt fa proporre a Filo la segnalazione quando ammette una mancanza: se l'utente non ha chiesto
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
-      perimetro: (a, ctx) => CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
+      // Con degli allegati chiede sempre: le miniature di quello che parte stanno nel riquadro (#1668).
+      perimetro: (a, ctx) => !segnalazioneConAllegati(a) && CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
+      perchePerimetro: (a) => (segnalazioneConAllegati(a) ? 'Con degli allegati te lo chiedo sempre: guarda cosa parte.' : ''),
       describe: (a) => {
         // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
         // che parte a nome dell'utente, e un consenso su un testo che non si

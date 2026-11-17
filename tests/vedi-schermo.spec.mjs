@@ -302,3 +302,48 @@ test('l\'interruttore in Preferenze parte spento, accende e spegne davvero, e si
   await casella.uncheck();
   await expect.poll(leggi, { timeout: 10_000 }).toBe(false);
 });
+
+// #1668 — la finestra appena guardata si allega a una segnalazione: miniatura nel riquadro, e parte proprio quella.
+test('la finestra guardata parte con la segnalazione chiesta dopo, vista prima in miniatura', async ({ app }) => {
+  test.setTimeout(120_000);
+  await finestreFinte(app);
+  await occhioFinto(app);
+  await chatFinta(app, [vedi('v1', { finestra: ESTERNA, domanda: 'cosa chiede il dialogo' }), { text: 'Aspetto il tuo OK per guardarla.' }]);
+  await app.evaluate(() => {
+    globalThis.__vs_depositati = [];
+    globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__vs_depositati.push(p); return { id: 'fb-1' }; };
+  });
+  const page = await home(app);
+  await chiedi(page, 'cosa mi sta chiedendo la finestra del programma di prova?');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect(page.locator('.dash-action-btn', { hasText: 'Ho guardato la finestra' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 30_000 });
+
+  await chatFinta(app, [
+    { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Dialogo strano', testo: 'Il programma di prova chiede di salvare.', allegati: ['schermata'] }) }] },
+    { text: 'Inviata, con la finestra.' },
+  ]);
+  await chiedi(page, 'manda questa schermata come feedback');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => (await confirmState(page))?.allegati?.length).toBe(1);
+  expect((await confirmState(page)).allegati[0]).toMatchObject({ id: 'schermata', immagine: true });
+  await expect.poll(async () => (await confirmState(page)).allegati[0].caricata).toBe(true);
+  await expect.poll(async () => (await confirmState(page)).pronto).toBe(true);
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+
+  await expect.poll(() => app.evaluate(() => globalThis.__vs_depositati.length), { timeout: 10_000 }).toBe(1);
+  const colore = await app.evaluate(({ nativeImage }) => {
+    const p = globalThis.__vs_depositati[0];
+    if (!p.images || p.images.length !== 1) return null;
+    const ni = nativeImage.createFromDataURL(p.images[0].dataUrl);
+    const { width, height } = ni.getSize();
+    const b = ni.toBitmap();
+    const i = ((Math.floor(height / 2) * width) + Math.floor(width / 2)) * 4;
+    return [b[i + 2], b[i + 1], b[i]];
+  });
+  expect(colore, 'una sola immagine nel deposito').not.toBeNull();
+  expect(colore.every((c, k) => Math.abs(c - VERDE[k]) < 24)).toBe(true);
+});

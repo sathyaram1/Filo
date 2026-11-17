@@ -6,6 +6,7 @@
 //     `parti` (facoltativo, vince su `text`): stringhe di Filo e riquadri
 //     { citazione } / { elenco } col testo che non è suo (#592.7).
 //     `altroLabel`: un secondo sì, diverso da OK, che risolve 'altro'; solo nelle pagine di Filo.
+//     `allegati`/`scartati`/`limiti`: le miniature di quello che parte (#1668); il `tieni` di ogni voce dice cosa resta.
 //
 //   SN_CONFIRM_UI.confirmTyped({ title, text, word, avviso }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
@@ -84,6 +85,70 @@
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 22%, transparent);
 }
+/* Gli allegati che partirebbero (#1668): foglietti piccoli, un clic li toglie e li rimette. */
+.sn-confirm-allegati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 12px;
+}
+.sn-confirm-allegato {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--sn-fg, #1a1918) 5%, transparent);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  transition: opacity calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1)), transform calc(0.15s * var(--sn-motion, 1));
+}
+.sn-confirm-allegato:hover { border-color: var(--sn-accent, #c45a3b); transform: translateY(-1px); }
+.sn-confirm-allegato:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-offset: 1px; }
+.sn-confirm-allegato img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sn-confirm-allegato-nome {
+  padding: 4px;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--sn-fg, #1a1918);
+}
+.sn-confirm-allegato-segno {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  color: var(--sn-bg, #fff);
+  background: color-mix(in srgb, var(--sn-fg, #1a1918) 70%, transparent);
+  opacity: 0;
+  transition: opacity calc(0.15s * var(--sn-motion, 1));
+}
+.sn-confirm-allegato:hover .sn-confirm-allegato-segno,
+.sn-confirm-allegato:focus-visible .sn-confirm-allegato-segno,
+.sn-confirm-allegato.sn-tolto .sn-confirm-allegato-segno { opacity: 1; }
+.sn-confirm-allegato.sn-tolto > img,
+.sn-confirm-allegato.sn-tolto > .sn-confirm-allegato-nome { opacity: 0.35; }
+.sn-confirm-allegato[aria-disabled="true"] { cursor: not-allowed; transform: none; }
+.sn-confirm-allegati-nota {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--sn-fg, #1a1918) 70%, transparent);
+}
+.sn-confirm-allegati-nota.sn-oltre { color: var(--sn-error, #b91c1c); }
 .sn-confirm-input {
   display: block;
   width: 100%;
@@ -459,6 +524,82 @@
     return btn;
   }
 
+  // Le miniature di quello che partirebbe (#1668). Ogni voce porta `tieni`, che un clic cambia: chi ha aperto la
+  // conferma lo legge dopo l'OK. Una voce con `problema` non parte e non si rimette. `oltre()`: la frase dei tetti superati.
+  function allegatiIn(box, { allegati, scartati, limiti }, onCambio) {
+    const doc = global.document;
+    const voci = (Array.isArray(allegati) ? allegati : []).filter((v) => v && typeof v === 'object');
+    const via = (Array.isArray(scartati) ? scartati : []).map(String).filter(Boolean);
+    const L = limiti && typeof limiti === 'object' ? limiti : { immagini: 5, file: 5 };
+    for (const v of voci) v.tieni = !v.problema;
+    const conta = (tipo) => voci.filter((v) => v.tieni && v.tipo === tipo).length;
+    const oltre = () => {
+      const frasi = [];
+      const im = conta('immagine');
+      const fi = conta('file');
+      if (im > L.immagini) frasi.push(`${im} immagini: ne partono al massimo ${L.immagini}, togline ${im - L.immagini}`);
+      if (fi > L.file) frasi.push(`${fi} file: ne partono al massimo ${L.file}, togline ${fi - L.file}`);
+      return frasi.join('. ');
+    };
+    if (!voci.length && !via.length) return { oltre };
+    if (voci.length) {
+      const fila = doc.createElement('div');
+      fila.className = 'sn-confirm-allegati';
+      for (const v of voci) {
+        const t = doc.createElement('button');
+        t.type = 'button';
+        t.className = 'sn-confirm-allegato';
+        t.dataset.id = String(v.id || '');
+        if (typeof v.anteprima === 'string' && /^data:image\//i.test(v.anteprima)) {
+          const img = doc.createElement('img');
+          img.src = v.anteprima;
+          img.alt = String(v.nome || '');
+          t.appendChild(img);
+        } else {
+          const n = doc.createElement('span');
+          n.className = 'sn-confirm-allegato-nome';
+          n.textContent = String(v.nome || 'allegato');
+          t.appendChild(n);
+        }
+        const segno = doc.createElement('span');
+        segno.className = 'sn-confirm-allegato-segno';
+        t.appendChild(segno);
+        const mostra = () => {
+          t.classList.toggle('sn-tolto', !v.tieni);
+          segno.textContent = v.tieni ? '×' : '+';
+          t.title = v.problema ? `${v.nome}: ${v.problema}` : `${v.nome}: ${v.tieni ? 'parte, clic per toglierlo' : 'tolto, clic per rimetterlo'}`;
+          t.setAttribute('aria-pressed', v.tieni ? 'true' : 'false');
+        };
+        if (v.problema) t.setAttribute('aria-disabled', 'true');
+        t.addEventListener('click', () => {
+          if (v.problema) return;
+          v.tieni = !v.tieni;
+          mostra();
+          onCambio();
+        });
+        mostra();
+        fila.appendChild(t);
+      }
+      box.appendChild(fila);
+    }
+    const nota = doc.createElement('div');
+    nota.className = 'sn-confirm-allegati-nota';
+    box.appendChild(nota);
+    const rotti = voci.filter((v) => v.problema);
+    const fisse = [
+      ...rotti.map((v) => `«${v.nome}» non parte: ${v.problema}.`),
+      ...(via.length ? [`${via.length === 1 ? `«${via[0]}» non è` : `${via.map((x) => `«${x}»`).join(', ')} non sono`} in questa chat: non ${via.length === 1 ? 'parte' : 'partono'}.`] : []),
+    ];
+    const aggiornaNota = () => {
+      const o = oltre();
+      nota.classList.toggle('sn-oltre', !!o);
+      nota.textContent = [o ? `${o}.` : '', ...fisse].filter(Boolean).join(' ');
+      nota.hidden = !nota.textContent;
+    };
+    aggiornaNota();
+    return { oltre, aggiornaNota };
+  }
+
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('confirm', opts);
@@ -466,6 +607,7 @@
     return new Promise((resolve) => {
       const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
       header(box, { title, parti: partiDi(text, parti) });
+      const allegati = allegatiIn(box, opts || {}, () => { allegati.aggiornaNota(); aggiorna(); });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       // Anche il secondo sì aspetta il testo letto e il mezzo secondo, come OK.
@@ -474,12 +616,14 @@
       const bottoni = si.map(([label, classe, esito]) => {
         const b = makeBtn(row, label, classe);
         b.addEventListener('click', (e) => {
+          if (allegati.oltre()) return;
           if (!visto()) avanti();
           else if (!troppoPresto(e)) done(esito);
         });
         return b;
       });
-      const aggiorna = () => { for (const b of bottoni) inAttesa(b, !visto()); };
+      // Oltre i tetti degli allegati il sì non c'è: la nota dice quanti togliere, e sceglie l'utente.
+      const aggiorna = () => { for (const b of bottoni) { inAttesa(b, !visto()); b.disabled = !!allegati.oltre(); } };
       const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
       aggiorna();
@@ -501,6 +645,7 @@
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
       const perche = String(avviso || '').trim() || (opts && opts.reversibile ? '' : 'Questa azione non è reversibile.');
       header(box, { title, parti: [...partiDi(text, parti), `\n\n${perche ? `${perche} ` : ''}Scrivi “${word}” per procedere.`] });
+      const allegati = allegatiIn(box, opts || {}, () => { allegati.aggiornaNota(); aggiorna(); });
 
       const input = doc.createElement('input');
       input.type = 'text';
@@ -515,7 +660,7 @@
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-danger');
       ok.disabled = true;
 
-      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
+      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase() && !allegati.oltre();
       const aggiorna = () => {
         ok.disabled = !parola();
         inAttesa(ok, parola() && !visto());
@@ -601,7 +746,23 @@
         selectionBg,
         // Un sì vero (clic o invio) vale solo da qui: prima è il gesto partito per altro (#592).
         pronto: !!(active.pronto && active.pronto()),
+        allegati: Array.from(active.root.querySelectorAll('.sn-confirm-allegato')).map((t) => {
+          const img = t.querySelector('img');
+          return {
+            id: t.dataset.id || '', tolto: t.classList.contains('sn-tolto'), immagine: !!img,
+            caricata: !!(img && img.complete && img.naturalWidth > 0), larghezza: t.getBoundingClientRect().width,
+          };
+        }),
+        notaAllegati: (q('.sn-confirm-allegati-nota') && !q('.sn-confirm-allegati-nota').hidden && q('.sn-confirm-allegati-nota').textContent) || '',
       };
+    },
+    // Toglie o rimette un allegato, come un clic sulla sua miniatura.
+    allegato(id) {
+      if (!active) return false;
+      const t = Array.from(active.root.querySelectorAll('.sn-confirm-allegato')).find((x) => x.dataset.id === String(id));
+      if (!t) return false;
+      t.click();
+      return true;
     },
     // Clicca un bottone: which = 'ok' | 'cancel' | 'danger' | 'altro'.
     // Ritorna false se non c'è dialogo, bottone assente o disabilitato.

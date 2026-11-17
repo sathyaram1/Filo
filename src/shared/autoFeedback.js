@@ -107,8 +107,10 @@
   ];
 
   // Se l'utente ha chiesto ISTRUZIONI («come faccio a…»), spiegargliele è la risposta giusta:
-  // il segnale vale solo quando voleva che la cosa venisse fatta.
-  const HOWTO_QUESTION_RE = new RegExp([
+  // il segnale vale solo quando voleva che la cosa venisse fatta. Gira sul testo di
+  // normalizzaDomanda (senza accenti): una forma per variante, non una per grafia (#474).
+  // «non si può…», «non è possibile…» sono lamentele: lì la proposta deve restare.
+  const HOWTO_QUESTION_RE = new RegExp('(?<!\\bnon )(?:' + [
     '\\b(come|dove)\\s+(si|posso|puoi|potrei|faccio|fare|far|trovo|attivo|apro|cambio|metto|funziona|configuro|imposto)',
     'come si fa',
     'dove si trova',
@@ -118,16 +120,20 @@
     'spiegami',
     'mi spieghi',
     'insegnami',
-    'mi dici come',
-    'si pu(o|ò) ',
-    '(e|è)\' ?possibile',
+    '\\b(dimmi|mi dici|mi diresti|(puoi|potresti) dirmi|mi (puoi|potresti) dire) (come|dove|se|qual|quale|quali|cosa|che cosa|in che modo)\\b',
+    '\\bsi puo ',
+    '\\b(e|sarebbe|sara) possibile',
+    '\\bc\'e (un |qualche |il )?(modo|maniera|sistema|verso|comando|tasto|scorciatoia)',
+    '\\bci sono (dei |altri )?(modi|sistemi|comandi)',
+    '\\bqual(e\\s+|\\s*\'\\s*|\\s+)e\\s+((il|lo|la|un|una)\\s+)?(modo|maniera|sistema|procedura|comando|tasto|scorciatoia)',
+    '\\bsai (come|dove|se|quale?|quando|cosa|che cosa|[a-z]+(are|ere|ire)(l[aoie]|mi|ti|ci|vi|si|ne)?)\\b',
     'cosa sai fare',
     'cosa puoi fare',
     'cosa riesci',
     'quali (funzioni|cose|capacit)',
     'che cosa sai',
     'a cosa serve',
-  ].join('|'), 'i');
+  ].join('|') + ')', 'i');
 
   // Una risposta di sole indicazioni è lunga: sotto la soglia è più probabile un frammento
   // o un errore di parsing.
@@ -141,8 +147,20 @@
     'anche', 'tutto', 'tutte', 'sono', 'essere', 'fare', 'cosa', 'filo',
   ]);
 
+  // Apostrofi e virgolette tipografici valgono quelli dritti: sulla tastiera del Mac e del
+  // telefono «c’è» arriva col tipografico.
   function normalize(s) {
-    return String(s || '').toLowerCase().replace(/['''"""]/g, "'");
+    return String(s || '').toLowerCase().replace(/[‘’‚‛ʼ`´“”„"]/g, "'");
+  }
+
+  // Per riconoscere una domanda: «è», «e'», «é» ed «e» sono la stessa lettera.
+  function normalizzaDomanda(s) {
+    return normalize(s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/([aeiou])'(?![a-z0-9])/g, '$1');
+  }
+
+  function isHowtoQuestion(text) {
+    return HOWTO_QUESTION_RE.test(normalizzaDomanda(text));
   }
 
   // Match puro coi titoli e le descrizioni del manifesto: l'id stabile della voce, o null.
@@ -205,7 +223,7 @@
     const user = String(userMessage || '').trim();
     if (!user) return null;
     // Chi chiede istruzioni le istruzioni le vuole: nessun buco da segnalare.
-    if (HOWTO_QUESTION_RE.test(user)) return null;
+    if (isHowtoQuestion(user)) return null;
     // La risposta deve dare indicazioni manuali, non solo parlare.
     if (!MANUAL_HOWTO_PHRASES.some((p) => replyNorm.includes(p))) return null;
     // …e devono riguardare una capacità che Filo dichiara di avere.
@@ -411,6 +429,7 @@
     _COMPLAINT_PHRASES: COMPLAINT_PHRASES,
     _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
     _matchCapabilityByWords: matchCapabilityByWords,
+    _isHowtoQuestion: isHowtoQuestion,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

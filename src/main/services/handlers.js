@@ -3516,12 +3516,28 @@ async function eseguiAzioneFilo(action, {
             ? segnalazioneConfermataPulita(sender, action)
             : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
           const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
-          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          let payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          // #1668 — gli allegati li prende il main dalla conversazione, di nuovo qui. Con degli allegati si passa sempre dal
+          // riquadro, e FILO_CONFIRM_ACTION lascia solo quelli che l'utente ha visto in miniatura e tenuto.
+          const conAllegati = globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action);
+          if (conAllegati) {
+            const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
+            const { voci } = await require('./allegatiDellaChat').voci(action, chatDellAzione);
+            const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
+            if (p.errore) return { executed: false, kept: false, output: { error: p.errore } };
+            payload = p.payload;
+          }
           const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          const allegati = (payload.images || []).length + (payload.files || []).length;
+          const nonSaliti = r && Array.isArray(r.failed) ? r.failed.map((f) => f && f.name).filter(Boolean) : [];
+          // Il modello deve sapere quanti sono partiti davvero: l'utente può averne tolti nel riquadro.
+          const esitoAllegati = conAllegati || action._allegatiIndicati === true
+            ? { output: { allegati, ...(nonSaliti.length ? { allegatiNonSaliti: nonSaliti } : {}) } }
+            : {};
           // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
           if (r && r.queued) {
             try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
-            return { executed: true, kept: false };
+            return { executed: true, kept: false, ...esitoAllegati };
           }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
@@ -3532,7 +3548,7 @@ async function eseguiAzioneFilo(action, {
               });
             } catch (_) {}
           }
-          if (r && r.id) return { executed: true, kept: false };
+          if (r && r.id) return { executed: true, kept: false, ...esitoAllegati };
           return { executed: false, kept: false, output: { error: 'il server delle segnalazioni non l\'ha presa' } };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);
@@ -4206,17 +4222,25 @@ async function eseguiAzioneFilo(action, {
       }
       case 'VEDI_SCHERMO': {
         // L'immagine va solo al modello di «Descrivi immagine», senza cronologia né cache: al giro torna testo (#778).
+        // In memoria resta l'ultima della chat, che l'utente può allegare a una segnalazione (#1668).
         const CE = globalThis.SN_CHAT_ERRORS;
-        return await Schermo.guarda(action, {
+        let foto = null;
+        const visto = await Schermo.guarda(action, {
           chiave: chiaveSchermo(sender),
           domanda,
-          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => Gate.text({
-            action: ACTIONS.DESCRIBE_IMAGE,
-            messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
-            ...(segnale ? { signal: segnale } : {}),
-          }),
+          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => {
+            foto = { dataUrl, nome: finestra };
+            return Gate.text({
+              action: ACTIONS.DESCRIBE_IMAGE,
+              messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
+              ...(segnale ? { signal: segnale } : {}),
+            });
+          },
           fraseErrore: (e) => String((e && e.userMessage) || (CE && CE.friendly(e)) || ''),
         });
+        const chatDellaFoto = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
+        if (visto && visto.executed && foto && chatDellaFoto) ContestoFilo.ricordaSchermata(chatDellaFoto, foto);
+        return visto;
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
       // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente

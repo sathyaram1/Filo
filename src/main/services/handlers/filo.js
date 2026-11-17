@@ -99,7 +99,13 @@ module.exports = function register(on, ctx) {
     if (isFilo(origin) && a && a._proposta === true && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK') {
       require('../contatoriServizio').misura('proposta', 'confermata');
     }
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId });
+    // #1668 — di una segnalazione partono solo gli allegati che il riquadro di una pagina di Filo ha mostrato e l'utente ha tenuto.
+    const AS = globalThis.SN_ALLEGATI_SEGNALAZIONE;
+    let azione = msg.action;
+    if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a)) {
+      azione = { ...AS.soloQuesti(a, isFilo(origin) && Array.isArray(msg.allegatiScelti) ? msg.allegatiScelti : []), _allegatiIndicati: true };
+    }
+    const r = await executeFiloAction(azione, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
@@ -108,6 +114,11 @@ module.exports = function register(on, ctx) {
       ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
     return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
+
+  on(MSG.FILO_FEEDBACK_ALLEGATI, soloFilo(async (msg) => {
+    const chatId = msg && typeof msg.chatId === 'string' ? msg.chatId : '';
+    return { ok: true, ...(await require('../allegatiDellaChat').anteprima(msg && msg.action, chatId)) };
+  }));
 
   // L'utente ha detto no a una conferma: l'azione non parte e non lo sa nessuno, se non i contatori (#1461).
   on(MSG.FILO_CONFIRM_RIFIUTATA, async (msg, sender) => {
