@@ -192,6 +192,7 @@ const FUORI_DALLA_CHAT = {
   'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
   'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
   'security.privacy.righeScartate': 'le righe scartate dai siti in anticipo sono un avviso sulla casella, non una scelta',
+  chatRipiegata: 'la chat della home si ripiega con l\'azione BARRA_SITI (ripiega, riapri), come la freccia: è un gesto sulla pagina, non un cambio da annullare',
   'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
 };
 function foglieDiSerie(o, base = '', out = []) {
