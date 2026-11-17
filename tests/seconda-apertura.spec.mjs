@@ -243,6 +243,7 @@ const rifatta = (app) => app.evaluate(({ BrowserWindow }) => {
   return {
     barra: !!t.barra.aperta, bloccata: !!t.barra.opzioni.bloccata, schermoPieno: !!t.contentFullscreen,
     aiuto: (a && a.aiuto && a.aiuto.pannello) || 'chiuso', richieste: globalThis.__richieste2031 || [],
+    zoom: a ? a.view.webContents.getZoomLevel() : null,
   };
 });
 
