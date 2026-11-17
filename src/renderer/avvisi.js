@@ -75,6 +75,8 @@
       azioni: Array.isArray(c && c.azioni) ? c.azioni.map((a) => String(a || '')) : [],
       chiusa: !!(c && c.chiusa),
       trascina: !!(c && c.trascina),
+      // L'SVG lo scrive il main dalla libreria delle icone: niente che venga da chi manda l'avviso.
+      svg: typeof (c && c.svg) === 'string' && c.svg.startsWith('<svg') ? c.svg : '',
     })).filter((c) => c.id);
   }
 
