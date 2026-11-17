@@ -311,6 +311,7 @@ test('la finestra guardata parte con la segnalazione chiesta dopo, vista prima i
   await chatFinta(app, [
     vedi('v1', { finestra: ESTERNA, domanda: 'cosa chiede il dialogo' }),
     { text: 'Aspetto il tuo OK per guardarla.' },
+    vedi('v2', { finestra: ESTERNA }),
     { eco: `${NOTO}[^»"\\\\]*` },
     { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Dialogo strano', testo: 'Il programma di prova chiede di salvare.', allegati: ['schermata'] }) }] },
     { text: 'Inviata, con la finestra.' },
