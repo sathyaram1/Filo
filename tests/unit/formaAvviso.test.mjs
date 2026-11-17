@@ -58,7 +58,8 @@ test('la shell carica il modulo e sceglie la forma solo da lì', () => {
   const html = readFileSync(join(ROOT, 'src', 'renderer', 'shell.html'), 'utf8');
   assert.match(html, /filo:\/\/shared\/formaAvviso\.js/);
   const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
-  assert.match(shell, /SN_FORMA_AVVISO\.forma\(/);
+  assert.match(shell, /const FORMA = window\.SN_FORMA_AVVISO;/);
+  assert.match(shell, /FORMA\.forma\(/);
   // La notifica del sistema nasce in un posto solo del main.
   const alarm = readFileSync(join(ROOT, 'src', 'main', 'services', 'alarmWatcher.js'), 'utf8');
   assert.doesNotMatch(alarm, /new Notification\(/);
