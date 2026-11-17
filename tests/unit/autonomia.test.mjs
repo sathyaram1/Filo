@@ -842,7 +842,7 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   assert.match(side, /MSG\.FILO_DECIDI_PAGINA/);
   assert.match(h, /async function decisioneAzionePagina[\s\S]*?decisioneAutonomia\(/);
   // I pannelli propri della chat (riordino delle schede, svuota archivio) chiedono come dice la risposta del main.
-  assert.match(h, /case 'CANCELLA_ARCHIVIO':\s*\n[\s\S]*?domanda: decisione\./, 'i pannelli ricevono la risposta del modulo');
+  assert.match(h, /async function azioneCancellaArchivio\([\s\S]*?domanda: decisione\./, 'i pannelli ricevono la risposta del modulo');
   const att = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-attivita.js'), 'utf8');
   const pannelli = att.slice(att.indexOf('function renderBottoneRiordino('), att.indexOf('function init(deps)'))
     .replace(/async function chiediSecondoRegola[\s\S]*?\n {2}\}\n/, '');
