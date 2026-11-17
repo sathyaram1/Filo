@@ -127,4 +127,15 @@ function impostaPerProva(v) {
   annuncia();
 }
 
-module.exports = { avvia, davanti, mostra, ritira, impostaPerProva, _mostrate: mostrate };
+class NotificaDiProva {
+  static isSupported() { return true; }
+  constructor(o) { this.o = o; this.ascolta = {}; }
+  on(ev, fn) { this.ascolta[ev] = fn; }
+  show() { registroProva.push({ titolo: this.o.title, testo: this.o.body, icona: this.o.icon, chiusa: false, clic: () => this.ascolta.click?.(), n: this }); }
+  close() {
+    for (const r of registroProva) if (r.n === this) r.chiusa = true;
+    this.ascolta.close?.();
+  }
+}
+
+module.exports = { avvia, davanti, mostra, ritira, impostaPerProva, registroProva };
