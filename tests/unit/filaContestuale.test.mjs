@@ -114,7 +114,7 @@ test('a parole, una porta sola fra la parola e il posto: chi esegue, la conferma
   const { readFileSync } = await import('node:fs');
   const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
   const handlers = sorgenteHandlers();
-  const caso = handlers.slice(handlers.indexOf("case 'SPOSTA_ICONA':"), handlers.indexOf("case 'PANNELLO_APP':"));
+  const caso = handlers.slice(handlers.indexOf('async function azioneSpostaIcona('), handlers.indexOf('async function azionePannelloApp('));
   assert.match(caso, /D\.zonaDellAzione\(action\)/);
   assert.doesNotMatch(caso, /=== 'menu'|zonaDaDove/);
   assert.match(leggi('src', 'shared', 'actionLevels.js'), /function doveDellIcona\(a\) \{[\s\S]{0,160}D\.zonaDellAzione\(a\)/);
