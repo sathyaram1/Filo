@@ -623,10 +623,11 @@ test('ogni codice d\'errore dei comandi e degli elenchi ha una frase propria, di
   const sorgenti = ['comandiSistema.js', 'statoSistema.js'].map((f) => readFileSync(join(ROOT, 'src', 'main', 'services', f), 'utf8')).join('\n');
   const codici = new Set();
   for (const re of [/Dice 'errore' '([a-z][a-z-]*)'/g, /dice errore ([a-z][a-z-]*)/g, /FILO:errore=([a-z][a-z-]*)/g,
-    /errore: '([a-z][a-z-]*)'/g, /errore = '([a-z][a-z-]*)'/g, /fallito\('([a-z][a-z-]*)'/g, /return '([a-z][a-z-]*)';/g,
+    /errore: '([a-z][a-z-]*)'/g, /errore = '([a-z][a-z-]*)'/g, /fallito\('([a-z][a-z-]*)'/g,
     /\? '([a-z][a-z-]*)' : '([a-z][a-z-]*)'/g]) {
     for (const m of sorgenti.matchAll(re)) for (const c of m.slice(1)) if (c) codici.add(c);
   }
+  for (const n of [5, 1062, 1168, 87, -2144067582, 5023, -1, 12345]) codici.add(C.erroreWlan(n));
   for (const s of ['DeniedByUser', 'DeniedBySystem', 'Unspecified']) codici.add(`accesso-${s}`);
   // Non sono errori: 'richiesta' porta già la sua frase; gli altri sono valori di erroreWlan/interpretazioni intermedie.
   for (const non of ['richiesta', 'wifi', 'bluetooth']) codici.delete(non);
