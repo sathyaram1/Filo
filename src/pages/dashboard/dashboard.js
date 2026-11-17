@@ -991,6 +991,7 @@
     RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
     ELIMINA_FILE: 'Guardo i file da togliere…',
     CARTA_HOME: 'Sistemo le carte della home…',
+    BARRA_SITI: 'Sistemo la barra dei siti…',
     VOLUME: 'Cambio il volume…',
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
