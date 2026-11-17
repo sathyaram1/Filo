@@ -779,6 +779,7 @@ function completa(rec) {
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
     ...chiaveAvviso(rec),
+    ...cartaDi(rec),
     durationSec: 8,
     tipo: 'download_finito',
     indirizzo: rec.url,
