@@ -108,7 +108,8 @@
       }
       if (!nuova) return errore(voci, 'voce non valida');
       if (voci.length >= MAX_VOCI) return errore(voci, `la barra ha già ${voci.length} voci, il massimo è ${MAX_VOCI}: togline una prima`);
-      const dove = m.prima ? voci.findIndex((v) => v.id === m.prima) : -1;
+      const rif = m.prima ? (voci.find((v) => v.id === m.prima) || trova(voci, m.prima)) : null;
+      const dove = rif ? voci.indexOf(rif) : -1;
       const dopo = voci.slice();
       dopo.splice(dove >= 0 ? dove : dopo.length, 0, nuova);
       return esito(dopo, true, { voce: nuova });
