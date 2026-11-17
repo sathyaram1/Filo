@@ -126,7 +126,7 @@
     '\\bc\'e (un |qualche |il )?(modo|maniera|sistema|verso|comando|tasto|scorciatoia)',
     '\\bci sono (dei |altri )?(modi|sistemi|comandi)',
     '\\bqual(e\\s+|\\s*\'\\s*|\\s+)e\\s+((il|lo|la|un|una)\\s+)?(modo|maniera|sistema|procedura|comando|tasto|scorciatoia)',
-    '(^|[^a-z])sai (come|dove|se|quale?|quando|cosa|che cosa|[a-z]+(are|ere|ire)(l[aoie]|mi|ti|ci|vi|si|ne)?)\\b',
+    '\\bsai (come|dove|se|quale?|quando|cosa|che cosa|[a-z]+(are|ere|ire)(l[aoie]|mi|ti|ci|vi|si|ne)?)\\b',
     'cosa sai fare',
     'cosa puoi fare',
     'cosa riesci',
