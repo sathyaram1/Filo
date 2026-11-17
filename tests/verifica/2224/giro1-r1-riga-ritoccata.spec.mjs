@@ -60,6 +60,23 @@ function scena() {
   return { work, suMain };
 }
 
+test('r1 la riga del ramo scritta e poi ritoccata in un secondo commit: il rebase va liscio e tiene le righe dei due lati', () => {
+  const s = scena();
+  git(s.work, ['checkout', '-qb', 'worker/ritocco']);
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'del ramo'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'auto: src/shared/patchNotes.js');
+  scrivi(s.work, NOVITA, sorgente([{ v: '0.2.11', features: ['a', 'del ramo, ritoccata'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  committa(s.work, 'auto: src/shared/patchNotes.js');
+  s.suMain(sorgente([{ v: '0.2.11', features: ['a', 'di main'] }, { v: '0.2.10', features: ['vecchia'] }]));
+  git(s.work, ['fetch', '-q', 'origin', 'main']);
+  const r = git(s.work, ['rebase', 'origin/main'], { ok: false });
+  expect(r.status, r.out).toBe(0);
+  expect(blocchi(readFileSync(join(s.work, NOVITA), 'utf8'))).toEqual([
+    ['0.2.11', ['a', 'di main', 'del ramo, ritoccata'], []],
+    ['0.2.10', ['vecchia'], []],
+  ]);
+});
+
 test('r1 un ramo già riallineato col commit che ha portato la sua riga in cima: il rebase seguente va liscio', () => {
   const s = scena();
   s.suMain(sorgente([{ v: '0.2.12', features: ['di main'] }, { v: '0.2.11', features: ['a'] }, { v: '0.2.10', features: ['vecchia'] }]));

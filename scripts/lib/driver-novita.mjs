@@ -95,6 +95,79 @@ export function unisciNelRebase({ base, ours, theirs, manifesto, oggi, forcella 
   return r.ok ? { ok: true, src: r.src } : { ok: false, motivo: r.motivo };
 }
 
+// Una riga del registro su una riga sola: `'testo',` o `{ testo: …, segnalazione: N },`.
+const VOCE = /^\s*(?:'(?:[^'\\]|\\.)*'|\{ testo: .*\}),\s*$/;
+
+/** Gli hunk di `git diff -U0`: righe tolte e aggiunte, e la riga (da 1) di «theirs» subito prima delle aggiunte. PURA. */
+export function hunkDa(diff) {
+  const out = [];
+  let h = null;
+  for (const r of String(diff).split('\n')) {
+    const m = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(r);
+    if (m) {
+      h = { dopo: m[2] === '0' ? Number(m[1]) : Number(m[1]) - 1, tolte: [], aggiunte: [] };
+      out.push(h);
+    } else if (h && r.startsWith('-')) h.tolte.push(r.slice(1));
+    else if (h && r.startsWith('+')) h.aggiunte.push(r.slice(1));
+  }
+  return out;
+}
+
+/**
+ * Un commit che sul registro ritocca o sposta soltanto righe che «ours» ha una volta sola: la stessa mossa su «ours»,
+ * quando la regola del cancello non si applica (un rebase su un'altra base, una mano già passata sul registro). Il
+ * ritocco resta al suo posto; la riga spostata va in fondo all'elenco che la accoglie nel commit. PURA.
+ * → { ok: true, src } | { ok: false }
+ */
+export function mossaSuOurs({ ours, theirs, hunks }) {
+  const no = { ok: false };
+  const o = String(ours).split('\n');
+  const t = String(theirs).split('\n');
+  if (!hunks.length || !hunks.every((h) => [...h.tolte, ...h.aggiunte].every((r) => VOCE.test(r)))) return no;
+  const unaVolta = (riga) => { const i = o.indexOf(riga); return i >= 0 && o.indexOf(riga, i + 1) < 0 ? i : -1; };
+  const tolte = [];
+  const spostate = [];
+  for (const h of hunks) {
+    if (h.tolte.length === h.aggiunte.length) {
+      for (let k = 0; k < h.tolte.length; k++) {
+        if (h.tolte[k] === h.aggiunte[k]) continue;
+        const i = unaVolta(h.tolte[k]);
+        if (i < 0) return no;
+        o[i] = h.aggiunte[k];
+      }
+      continue;
+    }
+    tolte.push(...h.tolte);
+    spostate.push(...h.aggiunte.map((riga) => ({ riga, dopo: h.dopo })));
+  }
+  // Righe tolte e righe aggiunte altrove devono essere le stesse: una riga nuova o una tolta e basta non è una mossa.
+  if (JSON.stringify([...tolte].sort()) !== JSON.stringify(spostate.map((s) => s.riga).sort())) return no;
+  for (const riga of tolte) {
+    const i = unaVolta(riga);
+    if (i < 0) return no;
+    o.splice(i, 1);
+  }
+  const daSpostare = new Set(tolte);
+  for (const { riga, dopo } of spostate) {
+    let a = dopo - 1;
+    while (a >= 0 && VOCE.test(t[a]) && daSpostare.has(t[a])) a--;
+    if (a < 0 || !VOCE.test(t[a])) return no;
+    let i = unaVolta(t[a]);
+    if (i < 0) return no;
+    while (i + 1 < o.length && VOCE.test(o[i + 1])) i++;
+    o.splice(i + 1, 0, riga);
+  }
+  return { ok: true, src: o.join('\n') };
+}
+
+function registroLeggibile(src) {
+  try {
+    const sandbox = {};
+    vm.runInNewContext(String(src), sandbox);
+    return Array.isArray(sandbox.SN_PATCH_NOTES && sandbox.SN_PATCH_NOTES.NOTES);
+  } catch (_) { return false; }
+}
+
 const json = (r) => { try { return r.ok ? JSON.parse(r.out) : null; } catch (_) { return null; } };
 
 /** Il main su cui il rebase riporta il ramo e il punto dove il ramo se n'era staccato, dai file del rebase in corso. */
