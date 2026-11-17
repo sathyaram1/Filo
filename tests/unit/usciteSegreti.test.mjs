@@ -938,11 +938,10 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   // comando, spedire. Un caso dello switch che ne usa uno è un'uscita.
   const PRIMITIVE = [/\.openTab\(/, /\.search\(\{/, /runCommand\(/, /\.submit\(\{/, /openExternal\(/, /\bfetch\(/, /net\.request\(/, /loadURL\(/];
   test('ogni caso dello switch che porta fuori testo è nell\'elenco delle uscite', () => {
-    const sw = esegui.slice(esegui.indexOf('switch (type)'));
-    const casi = sw.split(/\n\s{6}case '/).slice(1);
+    const casi = casiDelleAzioni();
+    assert.ok(casi.length > 50, `trovati solo ${casi.length} casi: le azioni non si leggono più come prima`);
     const mancanti = [];
-    for (const c of casi) {
-      const tipo = c.slice(0, c.indexOf("'"));
+    for (const { tipo, corpo: c } of casi) {
       if (PRIMITIVE.some((re) => re.test(c)) && !X.USCITE[tipo]) mancanti.push(tipo);
     }
     assert.deepEqual(mancanti, [], `uscite che saltano la porta: ${mancanti.join(', ')}`);
