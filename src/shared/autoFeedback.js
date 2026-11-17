@@ -429,6 +429,7 @@
     _COMPLAINT_PHRASES: COMPLAINT_PHRASES,
     _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
     _matchCapabilityByWords: matchCapabilityByWords,
+    _isHowtoQuestion: isHowtoQuestion,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
