@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
-import { attesaDichiarata, codiceUscita, leggiMeta, rigaSintetica } from '../session-report.mjs';
+import { attesaDichiarata, codiceUscita, costoDeiFile, leggiMeta, rigaSintetica } from '../session-report.mjs';
 import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, pulito, testoUcciso } from './corsa-controlli.mjs';
 import { letturaMemoria } from './memoria-contenitore.mjs';
 
