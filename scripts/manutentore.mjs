@@ -1355,7 +1355,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const r = await leggiRami(indiceDalServer(sc.schede));
       const lista = r.lista;
       if (r.server.avviso) console.error(`AVVISO: ${r.server.avviso}`);
-      const dirRuoli = join(ROOT, 'routines', 'roles');
+      const dirRuoli = join(QUI, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
       const stato = st.ok === false ? { segnali: [] } : st;
