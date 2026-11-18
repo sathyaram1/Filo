@@ -1028,12 +1028,14 @@ function dopoComando(parziale) {
   const p = parziale && typeof parziale === 'object' ? parziale : {};
   if (stato) {
     const nuovo = { ...stato };
+    const radio = [];
     if (p.volume) nuovo.volume = { ...(stato.volume || {}), ...p.volume };
-    if (p.wifi && typeof p.wifi.acceso === 'boolean') nuovo.wifi = { acceso: p.wifi.acceso };
+    if (p.wifi && typeof p.wifi.acceso === 'boolean') { nuovo.wifi = { acceso: p.wifi.acceso }; radio.push('wifi'); }
     if (p.bluetooth && typeof p.bluetooth.acceso === 'boolean') {
       nuovo.bluetooth = p.bluetooth.acceso ? { acceso: true, dispositivi: stato.bluetooth ? stato.bluetooth.dispositivi : null } : { acceso: false, dispositivi: [] };
+      radio.push('bluetooth');
     }
-    pubblica(nuovo);
+    ritocca(nuovo, radio);
   }
   leggiAdesso();
   // Una radio o un collegamento si assestano in qualche secondo: si rilegge ancora, anche con la home dietro.
