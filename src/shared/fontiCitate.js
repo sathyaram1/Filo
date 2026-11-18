@@ -44,11 +44,13 @@
       const c = cp > 0xffff ? src.slice(i, i + 2) : src[i];
       // Una pagina lunga è quasi tutta ASCII: la piega costa solo sul resto.
       const t = cp < 128 ? (cp === 96 ? "'" : c.toLowerCase()) : piega(c);
-      if (/^\s+$/.test(t)) {
+      const bianco = cp < 128 ? (cp === 32 || (cp >= 9 && cp <= 13)) : /^\s+$/.test(t);
+      if (bianco) {
         if (n && !spazio) { n += ' '; mappa.push(i); }
         spazio = true;
       } else if (t) {
-        for (const x of t) { n += x; mappa.push(i); }
+        n += t;
+        for (let j = 0; j < t.length; j++) mappa.push(i);
         spazio = false;
       }
       if (c.length === 2) i++;
