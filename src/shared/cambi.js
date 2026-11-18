@@ -25,6 +25,11 @@
   const CATEGORIE_PRIVACY = { posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'enti pubblici', campi: 'pagine con una password' };
   const nomeCategoria = (c) => CATEGORIE_PRIVACY[c] || String(c);
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
+  const lettereDoppie = (l) => {
+    const D = global.SN_DOPPIO_TOCCO;
+    const voci = Array.isArray(l) ? l.filter((x) => x && x.lettera) : [];
+    return voci.length ? voci.map((x) => (D ? D.etichetta(x) : `${x.lettera}${x.lettera}`)).join(', ') : 'nessuna';
+  };
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
