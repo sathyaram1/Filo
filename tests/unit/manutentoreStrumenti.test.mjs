@@ -171,8 +171,8 @@ test('taccuino sezione manda la sola sezione con la versione letta; vuota, senza
 });
 
 test('il biglietto passato con --ticket non entra nei testi scritti', () => {
-  const i = lancia(['indicazione', 'priorità', 'alla', 'grafica', '--ticket', 'SEGRETO123'], { taccuino: { ok: true, testo: '', versione: 0 } });
-  const scritto = i.inviati.find((x) => x.op === 'taccuino.scrivi');
+  const i = lancia(['indicazione', 'priorità', 'alla', 'grafica', '--ticket', 'SEGRETO123'], { 'taccuino.indicazione': { ok: true, versione: 1 } });
+  const scritto = i.inviati.find((x) => x.op === 'taccuino.indicazione');
   assert.ok(scritto, i.out);
   assert.match(scritto.dati.testo, /priorità alla grafica/);
   assert.doesNotMatch(JSON.stringify(i.inviati), /SEGRETO123/);
