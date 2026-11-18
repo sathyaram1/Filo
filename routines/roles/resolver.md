@@ -45,7 +45,10 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
   non ha fusioni che lo citino: si chiude allo stesso modo con la fusione che
   ha chiuso l'originale, aggiungendo `--doppione-di <numero dell'originale>`.
   Il server vuole che la fusione sia dell'originale (lo cita, o è quella del
-  suo ramo) e che l'originale sia chiuso.
+  suo ramo), che l'originale sia chiuso e che la fusione venga dopo l'ultima
+  riapertura di tutti e due. Se rifiuta e nomina la fusione registrata alla
+  chiusura dell'originale come buona, riconsegna una volta con quella; se dice
+  di lavorare il feedback, lavoralo.
 
 `payload.commitProvato`, se c'è, dice che il feedback è un allarme della
 suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
