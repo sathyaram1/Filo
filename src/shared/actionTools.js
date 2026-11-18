@@ -112,7 +112,7 @@
     },
     CERCA_IMMAGINE: {
       via: ['scheda', 'lens'],
-      description: 'Google Lens su un\'immagine: immagine N della chat, o la più grande della pagina (scheda); senza, l\'ultima della chat.',
+      description: 'Google Lens: immagine N della chat, o scheda per la più grande della pagina; senza, l\'ultima della chat.',
       properties: { immagine: I(), scheda: I() }, required: [],
     },
     CHIUDI_SCHEDE: {
