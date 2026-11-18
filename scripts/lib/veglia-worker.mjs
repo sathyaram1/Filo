@@ -159,7 +159,9 @@ export function ultimoPasso(righe) {
     if (cosa) passo = { cosa, ms };
   }
   return {
-    strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
+    strumento: strumento ? {
+      nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id), uscita: risposte.has(strumento.id) ? risposte.get(strumento.id) : NaN, comando: strumento.comando,
+    } : null,
     passo,
     modello,
     attesa,
