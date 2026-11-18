@@ -148,12 +148,15 @@ export function rigaRamo(r) {
 /**
  * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no quello dei lavori server
  * (cartellaCloneServer), se no accanto al checkout di Filo anche da una sua worktree (cartellaDelServer, la ricerca di
- * chiusura e verifica locali). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ * chiusura e verifica locali), se no accanto alla cartella della sessione che il marcatore di un clone del giro nomina
+ * (#2340.2). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste` e `marcatore`.
  */
-export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
+export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync, marcatore = marcatoreWorker } = {}) {
   const dato = String(scelta || '').trim();
   const accanto = dato ? '' : cartellaDelServer(root, esiste);
-  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security')];
+  const m = dato ? null : marcatore(root);
+  const daSessione = m ? join(dirname(resolve(m.principale)), 'filo-security') : '';
+  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security'), daSessione].filter(Boolean);
   const dir = cercati.find((d) => esiste(join(d, '.git')));
   return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
 }
