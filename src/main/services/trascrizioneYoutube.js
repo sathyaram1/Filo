@@ -126,7 +126,7 @@ function segmentiDaPannello(j) {
     if (seg && typeof seg === 'object') {
       const sn = seg.snippet || {};
       const t = Array.isArray(sn.runs) ? sn.runs.map((r) => (r && typeof r.text === 'string' ? r.text : '')).join('')
-        : (typeof sn.simpleText === 'string' ? sn.simpleText : '');
+        : (typeof sn.simpleText === 'string' ? sn.simpleText : (typeof sn.content === 'string' ? sn.content : ''));
       out.push({ ms: Number(seg.startMs) || 0, t });
       return;
     }
