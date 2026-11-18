@@ -21,7 +21,7 @@ const aperte = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
   const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
   return w._filoTabs.tabs.filter((t) => { try { return t.view.webContents.getURL().startsWith(u); } catch (_) { return false; } }).length;
 }, url);
-const daiLettera = (app, l, url) => app.evaluate((x) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: x.l, url: x.url }] } }), { l, url });
+const daiLettera = (app, l, url) => app.evaluate((_, x) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: x.l, url: x.url }] } }), { l, url });
 
 async function semina(app) {
   await app.evaluate(async () => {
