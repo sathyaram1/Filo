@@ -122,7 +122,17 @@ async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {
     require('./carteHome').leggi(),
   ]);
   const lavori = require('./lavoriInCorso').elenco(ambito);
-  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+  const avvisi = avvisiVolati(sender);
+  const cornice = avvisi ? avvisi.colonna() : [];
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId, cornice }, layout);
+}
+
+// Gli avvisi volati nella colonna (#2390) li tiene la finestra di chi chiede: la chat li vede e li chiude come la home.
+function avvisiVolati(sender) {
+  const win = sender && sender.win;
+  let a = null;
+  try { a = win && !win.isDestroyed() && win._filoTabs ? win._filoTabs.avvisi : null; } catch (_) { a = null; }
+  return a && typeof a.colonna === 'function' ? a : null;
 }
 
 // Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
