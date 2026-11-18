@@ -99,9 +99,10 @@ main (`fusioniSuMain` in `scripts/lib/su-main.mjs`), che regge anche dopo la
 potatura del ramo fuso: `finish: worker/<id>-<stampo>` nomina il tentativo,
 `merge-gate: #N` solo il numero, che si traduce in id dove lo si conosce (il
 feedback che riparte; nell'elenco del manutentore, l'indice dei feedback aperti).
-A ogni lavoro nuovo dispatch toglie da origin i superati di tutti i feedback
-con la stessa regola. Resta fuori un feedback chiuso fuso con `merge-gate`
-il cui ramo fuso è già potato: da qui il suo id non si ricava, lo sa il server.
+Dispatch non toglie i superati da origin: dalla cloud la cancellazione prende
+403 dal proxy della sessione (#2518). Li toglie la potatura del lunedì sul
+server (SPEC-DOMANDE § 4.7), che ha la credenziale e sa quando il lavoro di un
+feedback chiuso è arrivato su main.
 La regola è una sola (`scripts/lib/tentativi.mjs`), con la scelta del
 tentativo vivo: l'elenco dei rami in corso del manutentore mostra quello che la
 ripresa sceglierebbe. Se origin non risponde, guasto temporaneo: non si rifà da
