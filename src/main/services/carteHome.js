@@ -35,11 +35,11 @@ function contaMossa(mossa) {
   } catch (_) {}
 }
 
-// Il segno dell'accoglienza si legge dal disco anche per una finestra incognito, che non lo vede (#1661).
+// In incognito il segno «già accolto» arriva dal disco per regola dello storage (#1661, #2578).
 async function primoIncontro(settings) {
   try {
     const K = globalThis.SN_CONST;
-    const onb = await require('../shim/storage').runNormale(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+    const onb = await globalThis.SN_FILO_MEMORY.getOnboarding();
     return Carte().primoIncontro(onb, K.whyCannotServe(settings, [K.ACTIONS.FILO_DASHBOARD, K.ACTIONS.FILO_CHAT]));
   } catch (_) { return false; }
 }

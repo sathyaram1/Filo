@@ -21,6 +21,7 @@
         { testo: 'Quando rifai l\'intervista di benvenuto, Filo parte da quello che gli dici lì: non tira fuori di sua iniziativa quello che ricorda di te e non ti fa dire cose che non hai detto.', segnalazione: 2536 },
         { testo: 'Filo propone una segnalazione solo quando gli hai chiesto una cosa che non è riuscito a fare, mai su un messaggio in cui stai solo ragionando, e la proposta dice quale funzione manca. La segnalazione automatica parte una volta sola per ogni funzione.', segnalazione: 2371 },
         { testo: 'Se insieme a un comando fai anche una domanda («metti il tema scuro, e cos\'era quel messaggio?»), Filo esegue il comando e risponde alla domanda.', segnalazione: 2371 },
+        { testo: 'In una finestra in incognito Filo non ti ripropone più l\'intervista di benvenuto se l\'hai già fatta: la chat ti risponde subito.', segnalazione: 2578 },
       ],
     },
     {
