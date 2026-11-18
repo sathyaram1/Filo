@@ -353,7 +353,7 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: '{tasto:save-for-later}, oppure l\'icona «Salva per dopo» della barra laterale, oppure chiedendolo all’Aiuto sopra la pagina («salvala per dopo»): salva allo stesso modo e chiude la scheda.',
+      invoke: '{tasto:save-for-later}, oppure l\'icona «Salva per dopo» della barra laterale, oppure chiedendolo all’Aiuto sopra la pagina o alla chat di Filo («salvala per dopo», «salva per dopo la scheda di prima»): salva allo stesso modo e chiude la scheda.',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla. Ne tiene al massimo 1000: oltre, la più vecchia esce dall’elenco e un avviso nella finestra dice quale.',
     },
     {
