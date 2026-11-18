@@ -284,7 +284,7 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
 
   const tutteFidate = finto({ elenco: { ok: true, domande: [{ id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }] } });
   await esegui(['elenco'], tutteFidate.io);
-  assert.equal(tutteFidate.sporcate.length, 0);
+  assert.deepEqual(tutteFidate.sporcate.map((x) => x.motivi), [['domande lette']]);
 });
 
 test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
