@@ -2006,12 +2006,17 @@
       ];
     },
 
+    // Righe col loro riquadro (#2374): il testo si posa sopra l'immagine dove sta. Lo legge SN_TRASCRIZIONE_RIGHE.
     transcribeImage: () =>
-      `Trascrivi ESATTAMENTE il testo presente in questa immagine. ` +
-      `Mantieni esattamente lo stesso testo, lingua, maiuscole/minuscole, punteggiatura e a-capo. ` +
-      `Non tradurre, non riformulare, non aggiungere commenti o etichette. ` +
-      `Se ci sono più colonne o paragrafi, restituiscili nell'ordine di lettura naturale. ` +
-      `Se nell'immagine non c'è testo leggibile, rispondi con una stringa vuota.`,
+      `Trascrivi ESATTAMENTE il testo presente in questa immagine, riga per riga. ` +
+      `Mantieni esattamente lo stesso testo, lingua, maiuscole/minuscole e punteggiatura. ` +
+      `Non tradurre, non riformulare, non correggere, non aggiungere commenti o etichette. ` +
+      `Dai le righe nell'ordine di lettura naturale; se ci sono più colonne, finisci una colonna prima di passare alla successiva. ` +
+      `Testi sulla stessa altezza ma separati da uno spazio largo sono righe diverse. ` +
+      `Per ogni riga dai il riquadro che la contiene, in coordinate normalizzate da 0 a 1000 rispetto a larghezza e altezza ` +
+      `dell'immagine (non in pixel): x1,y1 angolo in alto a sinistra, x2,y2 angolo in basso a destra. ` +
+      `Rispondi SOLO con JSON: {"righe":[{"testo":"...","x1":0,"y1":0,"x2":0,"y2":0}]}. ` +
+      `Se nell'immagine non c'è testo leggibile: {"righe":[]}.`,
 
     transcribeAudio: ({ lang } = {}) =>
       `Trascrivi ESATTAMENTE le parole pronunciate in questo audio. ` +
