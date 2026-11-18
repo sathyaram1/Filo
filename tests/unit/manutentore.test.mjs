@@ -892,11 +892,10 @@ test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe
   const ordine = piatto(RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')));
   assert.match(ordine, /\*\*La classe è il primo criterio, non un filtro\.\*\*.*tocca i file probabili di un ramo vivo \(`incroci <N>`\) aspetta.*entra uno di classe più bassa in un'area libera/);
   assert.match(ordine, /Un compito può stare davanti a un feedback/);
-  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
-  // La sequenza del server mette i lavori già iniziati davanti all'ordine: il ruolo la dice uguale.
-  assert.match(ordine, /prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza/);
-  // Fra i già iniziati decide il posto nell'ordine, non la priorità (#2411): il ruolo lo dice come il server.
-  assert.match(ordine, /fra loro quelli dell'ordine vanno nella sua sequenza, a qualunque priorità, e gli altri dopo, per urgenza/);
+  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: lo tieni nell'ordine, sopra i primi lavori che deve precedere/);
+  // Con un ordine decide il posto, iniziati o nuovi (#2411): il ruolo dice la sequenza del server.
+  assert.match(ordine, /prima le 3 e le risposte dell'owner, poi l'ordine, poi i lavori già iniziati fuori dall'ordine, poi il resto per urgenza/);
+  assert.match(ordine, /primi lavori o già iniziati \(verifica, correzione, controllo\), vanno nella sua sequenza, a qualunque priorità; i lavori già iniziati fuori dall'ordine vengono dopo l'ordine/);
   assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
   // Il primo mattino toglie dal taccuino le regole sulla rosa.
   assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);
