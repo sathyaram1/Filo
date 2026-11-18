@@ -8,6 +8,7 @@
   // [[fonte: indirizzo | frase della pagina | traduzione]]. Dentro, una ] da sola può stare (una nota [1] citata), e
   // anche un a capo della frase copiata; il tetto tiene lineare un [[fonte: mai chiuso.
   const MARCATORE = /\[\[\s*fonte\s*:((?:[^[\]]|\](?!\])|\[(?!\[)){0,6000}?)\]\]/gi;
+  const CON_SPAZI_PRIMA = new RegExp(`[ \\t]*${MARCATORE.source}`, 'gi');
   // Un marcatore cominciato e non chiuso in fondo al testo: in diretta sta arrivando, a fine turno è stato tagliato.
   const A_META = /\[(?:\[\s*(?:f(?:o(?:n(?:t(?:e\s*(?::(?:[^\]\n]|\](?!\]))*\]?)?)?)?)?)?)?)?$/i;
   // Segni privati: E000/E001 sono di filoMarkdown, E002/E003 il posto di un'etichetta. Il testo del modello non li porta.
