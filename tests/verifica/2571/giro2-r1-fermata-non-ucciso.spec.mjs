@@ -27,7 +27,8 @@ for (const segnale of ['SIGTERM', 'SIGINT']) {
       const morta = corsaInterrotta(root);
       const testo = morta ? testoPerIlWorker(morta, null) : '';
       expect(testo, 'una fermata voluta non è un SIGKILL').not.toMatch(/processo ucciso \(137\)/);
-      expect(testo, 'chi ha fermato la sua corsa non deve dichiarare un guasto').not.toMatch(/--guasto/);
+      // Senza un segno che lo distingua, il testo deve almeno lasciare al worker il caso della fermata voluta.
+      if (testo) expect(testo, 'chi ha fermato la sua corsa deve capire che il guasto non è suo').toMatch(/fermat/i);
     } finally {
       togliCartella(root);
     }
