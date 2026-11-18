@@ -2,6 +2,8 @@
 // in basso a destra su una pagina, nella home la carta che c'è già o il volo nella colonna di sinistra.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
+import { modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 
 async function homePage(app) {
   let page = null;
