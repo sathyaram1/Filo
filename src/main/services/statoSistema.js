@@ -940,7 +940,7 @@ function correggiCorrente(collegata) {
   avvisoCorrente = { collegata, quando: Date.now() };
   if (!giro && (!osservatoreInVista() || schermoBloccato())) return;
   if (stato && stato.batteria) {
-    pubblica({ ...stato, batteria: { ...stato.batteria, collegata, inCarica: collegata && stato.batteria.inCarica } });
+    ritocca({ ...stato, batteria: { ...stato.batteria, collegata, inCarica: collegata && stato.batteria.inCarica } });
   }
   leggiUnaVolta();
 }
