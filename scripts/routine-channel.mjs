@@ -2020,6 +2020,7 @@ if (isMain) {
     const esito = await veglia({
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
+      autopsia: (s) => autopsiaDelWorker(ROOT, s),
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
       rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
       // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
