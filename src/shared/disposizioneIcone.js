@@ -62,7 +62,8 @@
     testo: { copy: ['copy', 'menu_copy'], translate: ['translate', 'fila_translate'], search: ['search', 'menu_search_text'],
       readAloud: ['readAloud', 'menu_read_aloud'] },
     immagine: { save: ['download', 'menu_save_image_as'], copy: ['copy', 'menu_copy_image'], ask: ['sparkles', 'fila_ask_image'],
-      copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'], ...DEL_COLLEGAMENTO },
+      copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'], transcribe: ['transcribe', 'menu_transcribe'],
+      ...DEL_COLLEGAMENTO },
     link: { openTab: ['openTab', 'menu_open_in_new_tab'], copy: ['copy', 'menu_copy_link'],
       saveForLater: ['saveForLater', 'menu_save_link_for_later'], share: ['share', 'menu_share_link'] },
     // Il disegno e il nome di qui valgono per trascinarle e per la chat; aperta sul filmato, l'icona dice il suo stato.
