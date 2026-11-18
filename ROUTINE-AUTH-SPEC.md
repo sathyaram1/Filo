@@ -767,7 +767,10 @@ e la prova la dichiarava lui al server. Adesso:
   fonde senza la corsa (verifica e sicurezza l'hanno provato solo su Linux):
   `linux` risponde «main contenuto», `windows` prova il ramo stesso. Un rosso
   `[Windows]` va corretto anche nel riallineamento: la verifica che segue gira
-  su Linux e non lo vedrebbe. Al codice provato non arrivano i file dei comandi di Actions;
+  su Linux e non lo vedrebbe. Al codice del ramo non arrivano i file dei comandi di Actions,
+  in nessun passo: prove, installazione, binario di Electron, checkout e fusioni di prova
+  (#2558; sentinella: `tests/unit/comandiDiActions.test.mjs`). È un recinto contro chi usa
+  le variabili, non un muro: i file stanno in una cartella nota del runner;
 - **il server si fida solo di quello che legge da GitHub per quella coppia**
   (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
   `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo

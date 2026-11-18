@@ -3,15 +3,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { leggiArgomenti, campoDaVerdetto, provaSpec, TETTO_SPEC, ambienteDegliSpec } from '../../scripts/spec-fusione-azione.mjs';
 import { unisciParti } from '../../scripts/unit-fusione-azione.mjs';
 import { conGliSpec, richiestaDispatch } from '../../scripts/lib/prova-remota.mjs';
 import { COMANDI_DI_ACTIONS } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
 
@@ -114,4 +117,46 @@ test('il PC chiede gli spec per nome e vuole sentirsi dire che li ha avuti tutti
   assert.match(conGliSpec(verde, ['tests/a', 'tests/b']).errore, /non ha provato i 2 spec/, 'un main che non sa ancora provarli risponde coi soli unit');
   assert.match(conGliSpec({ ...verde, specChiesti: 1 }, ['tests/a', 'tests/b']).errore, /ne dice 1/);
   assert.equal(conGliSpec({ ...verde, specChiesti: 2, specProvati: 2 }, ['tests/a', 'tests/b']).esito, 'verde');
+});
+
+// Un filtro di git scritto dall'installazione del ramo gira nella fusione di prova, prima degli spec (#2558).
+test('la fusione di prova non passa al codice del ramo il file dell\'esito, e l\'esito arriva lo stesso', () => {
+  const dir = cartellaTemporanea('filo-2558-spec-');
+  const prova = join(dir, 'prova');
+  const git = (...a) => execFileSync('git', a, { cwd: prova, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const spia = join(dir, 'spia.txt').replace(/\\/g, '/');
+  const uscita = join(dir, 'uscita.txt');
+  try {
+    mkdirSync(prova);
+    git('init', '-q', '--initial-branch=main');
+    for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git('config', k, v);
+    git('config', 'filter.spia.smudge', `echo "\${GITHUB_OUTPUT:-vuoto}" >> '${spia}'; cat`);
+    writeFileSync(join(prova, '.gitattributes'), '*.txt filter=spia\n', 'utf8');
+    writeFileSync(join(prova, 'valore.txt'), 'uno\n', 'utf8');
+    git('add', '-A'); git('commit', '-qm', 'base');
+    git('checkout', '-q', '-b', 'ramo');
+    writeFileSync(join(prova, 'ramo.txt'), 'ramo\n', 'utf8');
+    git('add', '-A'); git('commit', '-qm', 'ramo');
+    const ramo = git('rev-parse', 'HEAD');
+    git('checkout', '-q', 'main');
+    writeFileSync(join(prova, 'main.txt'), 'main\n', 'utf8');
+    git('add', '-A'); git('commit', '-qm', 'main');
+    const main = git('rev-parse', 'HEAD');
+    git('checkout', '-q', ramo);
+    writeFileSync(uscita, '', 'utf8');
+    writeFileSync(spia, '', 'utf8');
+    const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
+    const p = spawnSync(process.execPath, [join(ROOT, 'scripts', 'spec-fusione-azione.mjs'), '--root', prova, '--ramo', ramo, '--main', main, '--spec', 'nessuno'], {
+      cwd: dir, env: { ...env, GITHUB_OUTPUT: uscita }, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
+    });
+    assert.equal(p.status, 0, `${p.stdout}${p.stderr}`);
+    const visti = readFileSync(spia, 'utf8').split('\n').filter(Boolean);
+    assert.ok(visti.length > 0, 'il filtro del ramo non è nemmeno girato: la prova non prova niente');
+    assert.deepEqual([...new Set(visti)], ['vuoto'], 'il codice del ramo ha visto il file dell\'esito');
+    const righe = readFileSync(uscita, 'utf8').split('\n').filter(Boolean);
+    assert.equal(righe.length, 1, righe.join('\n'));
+    assert.deepEqual(JSON.parse(righe[0].slice('campo='.length)), { ramo, main, esito: 'verde', mainSha: main, specChiesti: 1, specProvati: 0 });
+  } finally {
+    togliCartella(dir);
+  }
 });
