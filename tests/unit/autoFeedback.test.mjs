@@ -69,7 +69,7 @@ test('analyzeReply → kind:capability-gap con frase "non sono in grado di"', ()
 });
 
 test('analyzeReply → kind:capability-gap con frase "non è supportato"', () => {
-  const reply = 'Purtroppo il lettore RSS non è supportato al momento da Filo, non esiste questa funzionalità.';
+  const reply = 'Purtroppo leggere i feed non è supportato al momento da Filo, non esiste questa funzionalità.';
   const result = AF.analyzeReply(reply, [], 'puoi leggermi i feed rss?', FAKE_CAPS);
   assert.equal(result.kind, 'capability-gap');
 });
