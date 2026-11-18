@@ -2,7 +2,7 @@
 // pagina è pronta; senza trascrizione lo dicono. YouTube vero dal contenitore non si raggiunge: qui è finto, in https
 // sotto www.youtube.com (host-resolver-rules), con la risposta del lettore e la traccia json3 nella forma vera.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test as base, expect } from './fixtures/electron.mjs';
 import { createServer as createHttpsServer } from 'node:https';
 import { certificato } from './helpers/immagineFirmata.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
