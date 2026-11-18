@@ -115,20 +115,18 @@ test('#474: le domande comuni, con ogni grafia, non fanno partire la proposta', 
   }
 });
 
-test('#474: chi segnala un guasto vero riceve ancora la proposta', () => {
+test('#474: chi vuole la cosa fatta, anche dicendo che non ci riesce, riceve ancora la proposta', () => {
   const guasti = [
-    'non funziona lo zoom',
-    'la pagina non si ingrandisce',
     'non riesco a tradurre la pagina',
     'non è possibile tradurre la pagina',
     'non si può tradurre la pagina',
     'non sai tradurre la pagina',
-    'ingrandisci la pagina',
+    'traduci la pagina',
   ];
   for (const u of guasti) {
     const a = AF.analyzeReply(ZOOM_A_PAROLE, [], u, CAPS);
     assert.equal(a.kind, 'capability-uncommandable', u);
-    assert.equal(a.capabilityId, 'page-zoom', u);
+    assert.equal(a.capabilityId, 'translate-page', u);
   }
 });
 
