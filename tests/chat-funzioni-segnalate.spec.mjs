@@ -156,7 +156,7 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
   await chiedi(chat, 'chi ha scritto quella proposta?');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'segnalazione automatica.' })).toBeVisible({ timeout: 15_000 });
   const visto = JSON.stringify((await chiamateAlModello(app)).at(-1));
-  expect(visto).toContain('proposta dalla segnalazione automatica di Filo, non da te');
+  expect(visto).toContain('la segnalazione automatica di Filo (non l\'assistente): INVIA_FEEDBACK');
   expect(visto).toContain('Filo sa fare «Finestra in incognito», ma l\'assistente non ha uno strumento per farlo');
   expect(visto).toContain('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
 });
