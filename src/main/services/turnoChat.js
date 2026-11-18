@@ -1059,6 +1059,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
     const dopo = await appendToChatArchive(chatId, {
       role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
+      ...(citate.fonti.length ? { fonti: citate.fonti } : {}),
     }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
