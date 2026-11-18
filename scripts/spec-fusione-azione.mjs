@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MARCA_PARTE } from './unit-fusione-azione.mjs';
-import { COMANDI_DI_ACTIONS, TETTO_ROSSI } from './lib/unit-sulla-fusione.mjs';
+import { TETTO_ROSSI } from './lib/unit-sulla-fusione.mjs';
+import { prendiComandiDiActions, senzaComandiDiActions } from './lib/comandi-di-actions.mjs';
 import { verdetto } from './suite-verdict.mjs';
 
 const SHA = /^[0-9a-f]{40}$/;
