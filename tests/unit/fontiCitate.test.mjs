@@ -12,6 +12,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'sitiComuni.js'));
 require(join(ROOT, 'src', 'shared', 'fontiCitate.js'));
 require(join(ROOT, 'src', 'shared', 'filoMarkdown.js'));
+require(join(ROOT, 'src', 'shared', 'constants.js'));
 const F = globalThis.SN_FONTI_CITATE;
 const MD = globalThis.SN_MARKDOWN;
 
