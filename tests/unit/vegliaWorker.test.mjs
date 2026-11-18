@@ -664,3 +664,61 @@ describe('il tetto di costo di un compito', () => {
     } finally { srv.close(); }
   });
 });
+
+// #2303.1: chi lavora il compito sa quanto ha speso e quanto manca al tetto, con la stessa misura della veglia, e
+// passata la metà gli si chiede il rapporto parziale che l'istanza dopo riceverà se la corsa si ferma.
+describe('la spesa vista dal worker', () => {
+  test('la riga: spesi, tetto e quota; passata la metà chiede il rapporto parziale; senza tetto niente', () => {
+    assert.equal(testoSpesa({ usd: 45.2, tettoUsd: 120 }), 'Spesa della corsa: 45,20 $ su un tetto di 120,00 $ (38%).');
+    const meta = testoSpesa({ usd: 60, tettoUsd: 120 });
+    assert.match(meta, /^Spesa della corsa: 60,00 \$ su un tetto di 120,00 \$ \(50%\)\. Oltre il tetto la corsa si ferma/);
+    assert.match(meta, /consegna adesso un rapporto parziale \(rapporto --parziale\)/);
+    assert.equal(SOGLIA_PARZIALE, 0.5);
+    assert.equal(testoSpesa(null), '');
+    assert.equal(testoSpesa({ usd: 3, tettoUsd: 0 }), '');
+  });
+
+  /** Un compito col tetto `tetto` e un transcript da un milione di token in uscita su Opus: decine di dollari. */
+  async function compitoCaro(tetto) {
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    const { work } = clone();
+    annotaTetto(work, B, tetto);
+    const configDir = claude({ fa: 1 });
+    const f = join(configDir, 'projects', '-home-user-Filo', SID, 'subagents', 'agent-w1.jsonl');
+    appendFileSync(f, righe({ type: 'assistant', timestamp: new Date().toISOString(), sessionId: SID, message: { id: 'caro', model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1_000_000 }, content: [{ type: 'text', text: 'x' }] } }));
+    return { work, configDir };
+  }
+
+  test('`spesa` stampa la misura della veglia; un rapporto parziale porta il segno al server e la spesa in fondo', async () => {
+    const { work, configDir } = await compitoCaro(1);
+    const misura = await spesaDelCompito({ root: work, ticket: B, sessione: SID, configDir });
+    const s = segniDiVita({ root: work, ticket: B, sessione: SID, configDir });
+    assert.deepEqual(misura, { usd: (await misuraDelTetto(s)).usd, tettoUsd: 1 }, 'la stessa misura con cui la veglia ferma la corsa');
+    assert.ok(misura.usd > 1, JSON.stringify(misura));
+    const { srv, port, ricevute } = await fintoServer();
+    const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_SESSION_ID: SID };
+    try {
+      const sp = await cli(['spesa'], env);
+      assert.equal(sp.code, 0, sp.se);
+      assert.equal(sp.so.trim(), testoSpesa(misura));
+      const r = await cli(['rapporto', '--parziale', 'A metà: riparti da #900.'], env);
+      assert.equal(r.code, 0, r.se);
+      const op = ricevute.find((x) => x.url.includes('routineOperazione'));
+      assert.deepEqual([op.body.op, op.body.dati], ['rapporto', { testo: 'A metà: riparti da #900.', parziale: true }]);
+      assert.match(r.se, /Spesa della corsa: .* consegna adesso un rapporto parziale/);
+      const storto = await cli(['segnala', '--parziale', 'x'], env);
+      assert.equal(storto.code, 1);
+      assert.match(storto.se, /--parziale vale solo con rapporto/);
+    } finally { srv.close(); }
+  });
+
+  test('sotto la metà la riga dice solo i numeri; un biglietto senza tetto non ne ha', async () => {
+    const { work, configDir } = await compitoCaro(1_000_000);
+    const env = { FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_SESSION_ID: SID };
+    const sotto = await cli(['spesa'], env);
+    assert.match(sotto.so.trim(), /^Spesa della corsa: \d+,\d\d \$ su un tetto di 1000000,00 \$ \(0%\)\.$/);
+    const { annotaTetto } = await import('../../scripts/lib/routine-ticket.mjs');
+    annotaTetto(work, B, 0);
+    assert.equal((await cli(['spesa'], env)).so.trim(), 'Questa corsa non ha un tetto di costo.');
+  });
+});
