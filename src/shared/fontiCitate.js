@@ -149,6 +149,11 @@
     const lista = Array.isArray(fontiDelTurno) ? fontiDelTurno : [];
     const src = testo(text).replace(PRIVATI, '').replace(A_META, '');
     const fonti = [];
+    const normali = new Map();
+    const normaleDi = (s) => {
+      if (!normali.has(s)) normali.set(s, normalizzaConMappa(s.testo));
+      return normali.get(s);
+    };
     let out = '';
     let ultimo = 0;
     MARCATORE.lastIndex = 0;
