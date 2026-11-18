@@ -557,9 +557,10 @@
   }
 
   // Chi ha fatto la cosa, da dove l'ha chiesta: dalla chat o dall'Aiuto la fa Filo, da una pagina o dall'interfaccia l'utente.
+  // `segnalazione`: la proposta o l'invio della segnalazione automatica, che non scrive l'assistente (#2371).
   function autoreDi(via) {
     if (via === 'chat' || via === 'assistente' || via === 'filo') return 'filo';
-    if (via === 'automazione') return 'automazione';
+    if (via === 'automazione' || via === 'segnalazione') return 'automazione';
     return 'utente';
   }
 
