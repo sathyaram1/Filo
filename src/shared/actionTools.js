@@ -39,7 +39,7 @@
     // ── impostazioni ──
     LEGGI_IMPOSTAZIONI: {
       via: ['impostazioni', 'leggi'], risultato: true,
-      description: 'com\'è impostato Filo adesso: ogni voce con chiave e valori ammessi, i permessi dei siti, i token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
+      description: 'com\'è impostato Filo: chiavi e valori ammessi, permessi dei siti, token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
       properties: { cerca: S() }, required: [],
     },
     IMPOSTA_PREFERENZA: {
