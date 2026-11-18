@@ -82,6 +82,30 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
   }
 });
 
+test('una sessione al lavoro nel suo clone di filo-security non fa rosso chi prova `aspetta`, da solo o dal lanciatore (#2562)', { skip: process.platform !== 'linux' && 'i processi si leggono da /proc' }, async () => {
+  const conAspetta = readdirSync(QUI).filter((f) => {
+    const t = readFileSync(join(QUI, f), 'utf8');
+    return f.endsWith('.test.mjs') && /routine-channel\.mjs/.test(t) && /'aspetta'/.test(t);
+  });
+  assert.ok(['aspettaCartella.test.mjs', 'sottoAgentiInSottofondo.test.mjs'].every((f) => conAspetta.includes(f)), conAspetta.join(', '));
+  const casa = cartellaTemporanea('filo-prove-clone-server-');
+  const clone = join(casa, 'filo-security');
+  mkdirSync(clone);
+  // La suite del server che il worker fa girare in sottofondo, nel clone dove `aspetta` guarda.
+  const suite = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd: clone, detached: true, stdio: 'ignore' });
+  suite.unref();
+  try {
+    assert.notEqual(ambientePerITest({ FILO_SERVER_CLONE: clone }, casa).FILO_SERVER_CLONE, clone, 'il lanciatore non passa il clone vero');
+    assert.ok(ambientePerITest({}, casa).FILO_SERVER_CLONE.startsWith(casa), 'nemmeno quello di ripiego, nella casa');
+    const r = await daSoli(conAspetta.map((f) => join(QUI, f)), { FILO_SERVER_CLONE: clone }, { casa });
+    assert.equal(r.fermo, null, r.fermo);
+    assert.deepEqual(nomiRossi(r.stdout), [], String(r.stderr || '').slice(-4000));
+  } finally {
+    try { process.kill(suite.pid); } catch (_) { /* già uscito */ }
+    togliCartella(casa);
+  }
+});
+
 test('un rosso che il file ha anche senza sessione non è di questa prova; uno che solo la sessione accende sì (#2174)', async () => {
   const casa = cartellaTemporanea('filo-prove-da-sole-propri-');
   try {
