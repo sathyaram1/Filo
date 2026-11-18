@@ -12,7 +12,7 @@ import { cartellaDelServer } from './lib/ramo-server.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { fileConRepo, incroci, incrociFraRami, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
-import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
+import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, leggiNonFidati, fileProbabiliDi, validaScheda } from './schede.mjs';
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
