@@ -132,4 +132,42 @@ test.describe('chi è già stato accolto', () => {
     await expect(inc.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible();
     await expect(inc.locator('#altro')).toBeVisible();
   });
+
+  // #2578 — con un modello pronto la home incognito apriva l'intervista, e il primo messaggio diventava una sua risposta.
+  test('in incognito l\'intervista non riparte, e la chat risponde come sempre', async ({ app, shell }) => {
+    test.setTimeout(60_000);
+    const page = await home(app);
+    await app.evaluate(async () => {
+      const P = globalThis.SN_PROVIDERS;
+      globalThis.__provaPrompt = [];
+      const risposta = (attempts, messages) => {
+        const tutto = JSON.stringify(messages || []);
+        globalThis.__provaPrompt.push(tutto);
+        const text = tutto.includes('preparare la dashboard') ? JSON.stringify({ message: 'Eccoci.', suggestions: [] }) : 'Dimmi pure.';
+        return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      };
+      P.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+        const r = risposta(attempts, messages);
+        try { onDelta && onDelta(r.text); } catch (_) {}
+        return r;
+      };
+      P.completeWithFallback = async ({ attempts, messages }) => risposta(attempts, messages);
+      await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } });
+    });
+    await shell.evaluate(() => window.filoShell.openIncognito());
+    const inc = await home(app, page);
+    await expect(inc.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible({ timeout: 15_000 });
+    await expect(inc.locator('#input')).toBeVisible();
+    await expect(inc.locator('body')).not.toHaveAttribute('data-state', 'thread');
+    await expect(inc.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+
+    await inc.locator('#input').fill('che tempo fa domani?');
+    await inc.locator('#sendBtn').click();
+    await expect(inc.locator('.dash-bubble-filo', { hasText: 'Dimmi pure.' })).toBeVisible({ timeout: 15_000 });
+    await expect(inc.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+    const stato = await app.evaluate(() => globalThis.__filoStorage.runIncognito(() => globalThis.SN_FILO_MEMORY.getOnboarding()));
+    expect(stato.done).toBe(true);
+    expect(stato.thread).toEqual([]);
+    await inc.screenshot({ path: 'tests/.shots/2578-incognito-accolto.png' });
+  });
 });
