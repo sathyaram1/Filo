@@ -527,10 +527,8 @@ function chiudiFile(c, file) {
 export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID']);
 
 /**
- * Le cartelle della sessione che i test leggerebbero anche senza variabili, sostituite da cartelle loro sotto `temp`.
- * Claude: col biglietto in cartella vale il transcript più recente (#730.6). Clone di filo-security (`~/filo-security`
- * di un lavoro server): `aspetta` e il rilascio contano i processi che ci lavorano, e la suite del server del worker
- * faceva rosso un test che li lancia (#2562). PURA.
+ * Le cartelle che i test troverebbero della sessione anche senza variabili, sostituite da cartelle loro: il transcript più
+ * recente di Claude (#730.6), il clone di filo-security dove `aspetta` conta i processi del worker (#2562). PURA.
  */
 export const cartelleDeiTest = (temp) => ({ CLAUDE_CONFIG_DIR: join(temp, 'claude-dei-test'), FILO_SERVER_CLONE: join(temp, 'filo-security-dei-test') });
 
