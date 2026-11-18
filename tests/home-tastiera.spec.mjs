@@ -153,6 +153,8 @@ test('a parole: «assegna yy a example.com» lo scrive fra le lettere, e le Pref
   ]);
   await page.locator('#input').fill('fai che yy apra example.com');
   await page.locator('#sendBtn').click();
+  await page.waitForTimeout(4000);
+  console.log('DEBUG', await page.locator('#bubbles').innerText(), JSON.stringify(await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); return [s.doppioTocco, globalThis.SN_PREF.buildPreferencePartial('doppio tocco', 'y example.com', { attuali: s })]; })));
   await expect(page.locator('.dash-bubble-filo', { hasText: 'yy apre' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => lettere(app)).toEqual([{ lettera: 'y', url: 'https://example.com/' }]);
   const pref = await openTab('filo://preferences/preferences.html');
