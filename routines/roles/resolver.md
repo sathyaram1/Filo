@@ -48,7 +48,11 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
   suo ramo), che l'originale sia chiuso e che la fusione venga dopo l'ultima
   riapertura di tutti e due. Se rifiuta e nomina la fusione registrata alla
   chiusura dell'originale come buona, riconsegna una volta con quella; se dice
-  di lavorare il feedback, lavoralo.
+  di lavorare il feedback, lavoralo;
+- un rosso su main già corretto dalla fusione di un altro feedback (senza
+  `payload.commitProvato`) si chiude col doppione di quel feedback,
+  `--doppione-di <il suo numero>` con la sua fusione: il «già risolto» semplice
+  vuole una fusione che citi questo numero, arrivata dopo la sua nascita.
 
 `payload.commitProvato`, se c'è, dice che il feedback è un allarme della
 suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
