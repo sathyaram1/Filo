@@ -48,7 +48,12 @@ async function scorriEApri(page, { inFondo = false } = {}) {
     const y = r.top + r.height / 2;
     b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
     const m = document.querySelector('.sn-rinomina-menu');
-    return { copreIlPunto: !!(m && m.contains(document.elementFromPoint(x, y))), y: Math.round(y), alta: innerHeight };
+    const mr = m && m.getBoundingClientRect();
+    const sb = s.getBoundingClientRect();
+    return {
+      copreIlPunto: !!(m && m.contains(document.elementFromPoint(x, y))), x: Math.round(x), y: Math.round(y), vw: innerWidth, vh: innerHeight,
+      menu: mr && [mr.left, mr.top, mr.width, mr.height].map(Math.round), chat: [sb.left, sb.top, sb.right, sb.bottom].map(Math.round),
+    };
   }, inFondo);
 }
 
