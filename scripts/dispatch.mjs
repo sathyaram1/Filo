@@ -468,6 +468,10 @@ export function leggiOpzioniRegistrazione(list) {
       const estensione = (/\.\w+(?=>)/.exec(forma || '') || ['.md'])[0];
       if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un ${estensione} scritto prima): non ho consegnato niente.`);
       valori[nome] = file;
+    } else if (tipo === 'cartella') {
+      const dir = String(v ?? '').trim();
+      if (!dir || SEMBRA_OPZIONE(dir)) return no(`${nome} vuole la cartella della prova da utente subito dopo di sé (tests/agent/.out/prova-…): non ho consegnato niente.`);
+      valori[nome] = dir;
     } else {
       // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
       // l'identificativo sparivano dalla riga.
