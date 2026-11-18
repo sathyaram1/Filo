@@ -343,7 +343,7 @@
 
   global.SN_FB_ATTESE = {
     CAMPO, MAX, STATO, ETICHETTA, eCompito,
-    normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
+    normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, lavoroSuMain, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
     daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
   };
