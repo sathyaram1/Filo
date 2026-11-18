@@ -27,6 +27,7 @@
     RIAPRI_SCHEDA: 'restore',
     RIPRENDI_AUDIO: 'volume',
     PAUSA_AUDIO: 'volume',
+    TRASCRIVI: 'transcribe',
     MOSTRA_SCHEDA: 'openTab',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
