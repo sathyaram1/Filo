@@ -198,7 +198,6 @@
     if (!a.righe.length) {
       conta('vuoto');
       a.stato.textContent = t('toast_transcribe_empty');
-      a.stato.classList.add('sn-tr-vuoto');
       return;
     }
     // Copiabile, ma non intero: fermato al tetto di lunghezza (#1097.3).
