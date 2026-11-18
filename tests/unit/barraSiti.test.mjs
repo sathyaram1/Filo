@@ -93,7 +93,7 @@ test('#1803.1 l\'estensione di un programma la riconosce la regola dei file che 
   const r = B.applica([], { tipo: 'aggiungi', percorso: rlo });
   assert.equal(r.voci[0].nome, 'Fatturatxt');
   assert.equal(r.voci[0].percorso, rlo, 'il percorso resta quello vero, che parte al clic');
-  assert.equal(B.applica(r.voci, { tipo: 'rinomina', voce: r.voci[0].id, nome: 'Gioco\u202Eexe.txt' }).voci[0].nome, 'Gioco exe.txt'.replace(' ', ''));
+  assert.equal(B.applica(r.voci, { tipo: 'rinomina', voce: r.voci[0].id, nome: 'Gioco\u202Eexe.txt' }).voci[0].nome, 'Giocoexe.txt');
 });
 
 test('aggiungi, togli, rinomina e sposta: la barra cambia come chiede la mossa', () => {
