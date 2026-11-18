@@ -1750,6 +1750,8 @@
     PAUSA_AUDIO: senza('nessuna'),
     MOSTRA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
+    SALVA_PER_DOPO: fatta,
+    CERCA_IMMAGINE: fatta,
     WIFI: accesaOSpenta,
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
