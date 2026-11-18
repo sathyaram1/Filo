@@ -165,8 +165,7 @@ test('riaperta, la conversazione ridisegna le etichette dall\'archivio, e il tes
   expect(salvata.fonti[0]).toMatchObject({ esito: 'verificata', sito: 'sito-pubblico.test', titolo: 'Storia del ponte' });
   expect(JSON.stringify(salvata.fonti)).not.toContain('premessa sul quartiere');
 
-  // Riavviata la porta (come dopo un riavvio di Filo), la fonte giudicata col turno si apre ancora senza chiedere l'OK.
-  await app.evaluate(() => globalThis.SN_VERDETTI_USCITE_SVUOTA && globalThis.SN_VERDETTI_USCITE_SVUOTA());
+  // Riaperta, la fonte giudicata col turno si apre ancora sulla frase senza chiedere l'OK (dopo un riavvio: unit).
   await page.reload();
   const riaperta = page.locator('.dash-bubble-filo .filo-fonte').first();
   await expect(riaperta).toHaveText('sito-pubblico.test', { timeout: 20_000 });
