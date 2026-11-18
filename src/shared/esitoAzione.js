@@ -190,6 +190,7 @@
     if (v.riprova) out.riprova = true;
     if (v.no) out.no = true;
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
+    if (v.autore === 'segnalazione') out.autore = 'segnalazione';
     return out;
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
