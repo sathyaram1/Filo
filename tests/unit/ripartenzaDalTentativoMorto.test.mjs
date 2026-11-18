@@ -245,7 +245,7 @@ describe('quale tentativo precedente si riprende', () => {
       git(casa, 'merge', '-q', '--no-ff', '-m', 'merge-gate: #1141 via server', fusoC);
       git(casa, 'push', '-q', 'origin', 'main');
       git(casa, 'push', '-q', 'origin', `:refs/heads/${ramo('20261014T000000Z', conFinish)}`, `:refs/heads/${ramo('20261014T000000Z', conCancello)}`);
-      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
+      tentativo(casa, ramo('20261101T000000Z'), main, 1);
       git(casa, 'fetch', '-q', '--prune', 'origin');
 
       // Come lo chiama il manutentore: i numeri dall'indice dei feedback.
