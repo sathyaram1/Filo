@@ -371,11 +371,18 @@
 
   function init(deps) {
     d = deps;
-    const host = deps.input;
+    host = deps.host;
     if (!host) return;
     const box = el('label', 'dash-cerca-campo');
-    const ic = el('span', 'dash-cerca-lente');
-    ic.innerHTML = icona('search', 14);
+    // La lente è il tasto della ricerca rimasto in cima alla colonna: un clic la chiude, come Esc.
+    const ic = el('button', 'dash-cerca-lente');
+    ic.type = 'button';
+    ic.id = 'cercaChiudi';
+    ic.title = 'Chiudi la ricerca';
+    ic.setAttribute('aria-label', 'Chiudi la ricerca');
+    ic.setAttribute('aria-pressed', 'true');
+    ic.innerHTML = icona('search', 16);
+    ic.addEventListener('click', (e) => { e.preventDefault(); chiudi(); });
     campo = el('input', 'dash-cerca-input');
     campo.id = 'cercaInput';
     campo.type = 'search';
