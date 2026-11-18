@@ -40,18 +40,30 @@ function livelli(base, rel) {
 }
 
 /**
+ * Quando è partito il contenitore, in secondi dall'epoca: avvio del kernel più l'avvio del suo processo 1 (100 tick al
+ * secondo). Due letture diverse vogliono dire un contenitore ripartito, e contatori ripartiti da zero. PURA.
+ */
+export function avvioContenitoreS(leggi = leggiFile) {
+  const boot = chiave(leggi('/proc/stat'), 'btime');
+  const stat = String(leggi('/proc/1/stat') || '');
+  const tick = Number(stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/)[19]);
+  return Number.isFinite(boot) && stat && Number.isFinite(tick) ? boot + tick / 100 : NaN;
+}
+
+/**
  * La memoria vista dai comandi, in MB: `disponibileMb` è il minimo fra quella del sistema (MemAvailable) e il margine
- * di ogni cgroup con un tetto, al netto della cache che si libera. `piccoMb` e `uccisioniComandi` sono del cgroup dei
- * comandi, `uccisioniSistema` dell'intera macchina dall'avvio. Un numero che non si legge resta NaN. PURA (legge con `leggi`).
+ * di ogni cgroup con un tetto, al netto della cache che si libera; `usataMb` è dello stesso cgroup di `tettoMb` (senza
+ * tetto, di quello dei comandi). `piccoMb` e `uccisioniComandi` sono del cgroup dei comandi, `uccisioniSistema`
+ * dell'intera macchina dall'avvio. Senza /proc/self/cgroup vale la radice. Un numero che non si legge resta NaN. PURA.
  */
 export function letturaMemoria(leggi = leggiFile) {
   const info = leggi('/proc/meminfo');
   const sistemaMb = chiave(info, 'MemAvailable:') / 1024;
   const totaleMb = chiave(info, 'MemTotal:') / 1024;
   const uccisioniSistema = chiave(leggi('/proc/vmstat'), 'oom_kill');
-  const out = { disponibileMb: sistemaMb, totaleMb, tettoMb: NaN, usataMb: NaN, piccoMb: NaN, uccisioniComandi: NaN, uccisioniSistema };
-  const cg = cgroupDi(leggi('/proc/self/cgroup'));
-  if (!cg) return arrotonda(out);
+  const out = { disponibileMb: sistemaMb, totaleMb, tettoMb: NaN, usataMb: NaN, piccoMb: NaN, uccisioniComandi: NaN, uccisioniSistema, avvioS: avvioContenitoreS(leggi) };
+  const cg = cgroupDi(leggi('/proc/self/cgroup'))
+    || (leggi('/sys/fs/cgroup/memory.current') !== null ? { v: 2, rel: '' } : { v: 1, rel: '' });
   const base = cg.v === 1 ? '/sys/fs/cgroup/memory' : '/sys/fs/cgroup';
   const f = cg.v === 1
     ? { uso: 'memory.usage_in_bytes', tetto: 'memory.limit_in_bytes', picco: 'memory.max_usage_in_bytes', oom: 'memory.oom_control', cache: 'total_inactive_file' }
