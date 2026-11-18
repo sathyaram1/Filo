@@ -342,6 +342,32 @@ test('in chat, quello che è già com\'è chiesto non chiede conferma: rete già
   expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
 });
 
+// #2394.1 — lo «spento» letto prima di una pausa del lettore non è «già spento»: la chat chiede la conferma e spegne.
+test('in chat, col Bluetooth spento letto prima di una pausa, «spegni il Bluetooth» chiede la conferma e lo spegne davvero', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { lettureFerme: true, stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth spento', { timeout: 8_000 });
+  // Il lettore ha dormito e riparte lento; intanto il Bluetooth si è acceso dal sistema. Gli elenchi restano in volo.
+  await app.evaluate(() => {
+    globalThis.__pc.bluetooth = { acceso: true, dispositivi: [] };
+    globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__liberaLettore = () => r(globalThis.__pc); }));
+    globalThis.SN_SISTEMA_MAIN._perProve.invecchia(5 * 60 * 1000);
+  });
+  expect(await app.evaluate(() => globalThis.SN_SISTEMA_MAIN.stato().vecchio)).toContain('bluetooth');
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'v1', name: 'BLUETOOTH', arguments: JSON.stringify({ acceso: false }) }] },
+    { text: 'Spento.' },
+  ]);
+  await chiedi(page, 'spegni il Bluetooth');
+  await expect.poll(() => confirmText(page), { timeout: 15_000 }).toContain('Spegnere il Bluetooth');
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await computer(app)).bluetooth.acceso).toBe(false);
+  expect((await chiamate(app)).filter((c) => c[0] === 'radio')).toEqual([['radio', { radio: 'bluetooth', acceso: false }]]);
+  await app.evaluate(() => globalThis.__liberaLettore && globalThis.__liberaLettore());
+  await liberaLetture(app);
+});
+
 test('acceso o spento dal riquadro o da fuori, l\'elenco del riquadro aperto si rilegge e non dice il contrario della radio', async ({ app }) => {
   const cuffie = { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true };
   await computerFinto(app, { dispositivi: [cuffie], reti: ['Casa', 'Ufficio'], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: ['Cuffie'] } } });
