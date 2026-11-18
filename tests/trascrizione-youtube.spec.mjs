@@ -50,7 +50,7 @@ const fixture = test.extend({
         res.end(pagina(u.searchParams.get('v')));
         return;
       }
-      if (u.pathname === '/api/timedtext' && u.searchParams.get('fmt') === 'json3' && u.searchParams.get('v') === CON) {
+      if (u.pathname === '/api/timedtext' && u.searchParams.get('fmt') === 'json3' && u.searchParams.get('v') !== SENZA) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(TRACCIA);
         return;
