@@ -52,14 +52,17 @@
     return { x: v[0], y: v[1], w: v[2], h: v[3] };
   }
 
-  function inJpeg(dataUrl) {
+  // Con `limite` (byte) il lato si riduce perché il JPEG ci stia sotto con margine.
+  function inJpeg(dataUrl, limite = 0) {
     return new Promise((fatto) => {
       const img = new Image();
       img.onload = () => {
         try {
+          if (!img.naturalWidth || !img.naturalHeight) { fatto(dataUrl); return; }
+          const k = limite > 0 ? Math.min(0.9, Math.sqrt((limite * 0.8) / dataUrl.length)) : 1;
           const c = document.createElement('canvas');
-          c.width = img.naturalWidth;
-          c.height = img.naturalHeight;
+          c.width = Math.max(1, Math.round(img.naturalWidth * k));
+          c.height = Math.max(1, Math.round(img.naturalHeight * k));
           const g = c.getContext('2d');
           g.fillStyle = '#fff';
           g.fillRect(0, 0, c.width, c.height);
