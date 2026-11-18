@@ -2513,51 +2513,27 @@
 
 
   // ===== Bootstrap =====
-  // ===== Profilo e impostazioni in alto a destra =====
-  // Dove ogni app li mette (SPEC home). Red-team, Home, Cronologia e App stanno solo nella barra laterale (#871).
-  // Ogni click aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
-  let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  function renderControls() {
-    const host = $('dashControls');
-    if (!host) return;
-    const ICONS = self.SN_ICONS || {};
-    const items = [
-      { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'account', icon: 'user', label: 'Profilo' },
-    ];
-    host.replaceChildren();
-    accountCtrlBtn = null;
-    for (const it of items.filter(Boolean)) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dash-ctrl';
-      btn.dataset.command = it.command;
-      btn.setAttribute('aria-label', it.label);
-      btn.title = it.label;
-      const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
-      btn.innerHTML = svg || it.label.charAt(0);
-      btn.addEventListener('click', () => {
-        if (typeof it.action === 'function') it.action();
-        else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else {
-          // Il menu della shell si apre sotto l'icona, ovunque la metta la colonna destra (#1491).
-          const r = btn.getBoundingClientRect();
-          send({ type: MSG.SHELL_ACTION, command: it.command, anchor: { x: r.left, y: r.bottom } });
-        }
-      });
-      host.appendChild(btn);
-      if (it.command === 'account') accountCtrlBtn = btn;
-    }
-    refreshAccountControl();
+  // ===== Il tasto del Profilo =====
+  // È un tasto di «altro» come gli altri (#2372): lo disegna dashboard-carte.js, qui gli si mette la foto. Il clic
+  // aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
+  let accountCtrlBtn = null; // il tasto del profilo, se è disegnato (anche nel «+»)
+  let accountIco = null;
+  let ultimoProfilo;
+  function decoraProfilo(btn, ic) {
+    accountCtrlBtn = btn;
+    accountIco = ic;
+    if (ultimoProfilo !== undefined) applyAccountProfile(ultimoProfilo);
   }
 
   // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
   // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
-    if (!accountCtrlBtn) return;
+    ultimoProfilo = profile || null;
+    if (!accountCtrlBtn || !accountIco || !accountCtrlBtn.isConnected) return;
+    const btn = accountCtrlBtn;
+    const ico = accountIco;
     const ICONS = self.SN_ICONS || {};
-    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
+    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(20) : '';
     // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
     if (profile && /^filo:\/\/icone\//.test(profile.picture || '')) {
       const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
@@ -2566,17 +2542,17 @@
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
       // Se la copia non si legge ripieghiamo sull'icona utente.
-      img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
+      img.onerror = () => { ico.innerHTML = userIcon; };
       img.src = profile.picture;
-      accountCtrlBtn.replaceChildren(img);
-      accountCtrlBtn.classList.add('signed-in');
-      accountCtrlBtn.title = profile.email ? `${name} — ${profile.email}` : name;
-      accountCtrlBtn.setAttribute('aria-label', `Account: ${name}`);
+      ico.replaceChildren(img);
+      btn.classList.add('signed-in');
+      btn.title = profile.email ? `${name} — ${profile.email}` : name;
+      btn.setAttribute('aria-label', `Profilo: ${name}`);
     } else {
-      accountCtrlBtn.innerHTML = userIcon;
-      accountCtrlBtn.classList.remove('signed-in');
-      accountCtrlBtn.title = profile ? 'Profilo' : 'Accedi';
-      accountCtrlBtn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
+      ico.innerHTML = userIcon;
+      btn.classList.remove('signed-in');
+      btn.title = profile ? 'Profilo' : 'Accedi';
+      btn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
     }
   }
 
@@ -2584,6 +2560,7 @@
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
+      if (r && r.signedIn && r.profile) applyAccountProfile(r.profile);
     } catch (_) {
       Comandi.setOwner(false);
     }
