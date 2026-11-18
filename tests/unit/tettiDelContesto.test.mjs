@@ -24,7 +24,7 @@ const TETTO_PARTE_FISSA = 8000;
 const TETTO_STRUMENTI = 8200;
 const token = (s) => Math.ceil(String(s).length / CARATTERI_PER_TOKEN);
 
-test('gli strumenti della chat stanno sotto gli 8.000 token', () => {
+test('gli strumenti della chat stanno sotto gli 8.200 token', () => {
   const t = token(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()));
   assert.ok(t <= TETTO_STRUMENTI, `strumenti: circa ${t} token, il tetto è ${TETTO_STRUMENTI}`);
 });
