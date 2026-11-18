@@ -90,5 +90,6 @@ module.exports = {
   broadcastToFiloPages,
   ambitoDellaFinestra,
   annunciaCarteHome,
+  annunciaBarraSiti,
   annunciaIconaScheda,
 };
