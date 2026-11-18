@@ -54,11 +54,13 @@
     if (!e.isTrusted || e.isComposing || e.defaultPrevented || typeof e.key !== 'string') return;
     const campo = d.input;
     const nelCampo = e.target === campo;
+    // AltGr (Ctrl+Alt su Windows) scrive «@», «€», «[»: è una lettera, non una scorciatoia.
+    const mod = (e.ctrlKey || e.metaKey || e.altKey) && !(e.getModifierState && e.getModifierState('AltGraph'));
     if (!nelCampo) {
       const a = document.activeElement;
       const libero = !a || a === document.body || a === document.documentElement;
       if (!libero && !(d.dash.contains(a) && !scrivibile(a))) return;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+      if (mod || e.key.length !== 1) return;
       // Lo spazio su un pulsante lo preme: resta suo.
       if (e.key === ' ' && !libero) return;
       if (campo.disabled || !campo.isConnected || campo.offsetParent === null || sovrapposto()) return;
