@@ -472,6 +472,7 @@ test('le istruzioni: modello e sforzo li mette il gancio; i worker scelgono quel
   const contratto = readFileSync(join(RADICE, 'routines', 'roles', '_contratto-worker.md'), 'utf8');
   const sezione = (/^## Sotto-agenti\n([\s\S]*?)(?=^## )/m.exec(contratto) || [])[1] || '';
   assert.match(sezione, /parametro `model`/);
+  assert.match(sezione.replace(/\s+/g, ' '), /`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` acceso nell'ambiente il parametro sparisce/, 'con FORCE il parametro non c\'è (#2553)');
   assert.match(sezione.replace(/\s+/g, ' '), /tre livelli/);
   assert.doesNotMatch(sezione, /opus|sonnet|haiku|fable/i);
 });
