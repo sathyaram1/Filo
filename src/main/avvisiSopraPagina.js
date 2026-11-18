@@ -311,7 +311,7 @@ class AvvisiSopraPagina {
       const comando = /^@action:avvisi:([a-z-]+)$/.exec(s);
       if (comando) { this._pila(comando[1]); return; }
       if (s === '@action:avviso:apri') {
-        if (carta && carta.indirizzo) { try { this.win._filoTabs.openTab(carta.indirizzo); } catch (_) {} }
+        if (carta) this._apriSito(carta.indirizzo);
         this.restituisciTastiera();
         return;
       }
