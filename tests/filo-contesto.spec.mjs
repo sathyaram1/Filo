@@ -641,7 +641,7 @@ test('l\'esito di un comando dato in chat resta davanti alle altre schede col tr
 test('un messaggio lunghissimo incollato torna intero nei turni dopo e si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
-  // Circa 56.000 token per lato e lato: dentro il tetto di serie, ben oltre i 20.000 del tetto basso.
+  // Circa 56.000 token in tutto: dentro il tetto di serie, ben oltre i 20.000 del tetto basso.
   const lato = Math.round(28_000 * await app.evaluate(() => globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN));
   const lungo = 'a'.repeat(lato) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(lato);
   await preparaModello(app, [
