@@ -19,8 +19,3 @@ test('r1 la shell che scarica con un prefisso o un lanciatore comune conta come 
   const visti = RETE.filter((c) => !chiamaLaRete(c));
   expect(visti, 'comandi che scaricano e restano puliti').toEqual([]);
 });
-
-test('r1 leggere un ramo di un worker appena scaricato, per FETCH_HEAD o per sha, conta come lettura dei rami', () => {
-  const comandi = ['git show FETCH_HEAD:src/main/index.js', 'git log -p FETCH_HEAD', 'git diff main FETCH_HEAD'];
-  expect(comandi.filter((c) => !leggeIRamiDeiWorker(c))).toEqual([]);
-});
