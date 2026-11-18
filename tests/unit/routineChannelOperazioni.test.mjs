@@ -97,6 +97,16 @@ test('segnala e rapporto: il testo da stdin, la conferma in una riga; senza test
   });
 });
 
+test('il rapporto parziale (#2303.1): la riga dice che il compito resta aperto e che serve ancora il finale', async () => {
+  await conServer(() => [200, { ok: true, compito: 'C-4', parziale: true, chiuso: false, perIlRicorrente: true }], async ({ ricevuti, port }, casa) => {
+    const r = await esegui(['rapporto', '--parziale'], ambiente(port, casa), 'A metà: riparti da #900.\n');
+    assert.equal(r.code, 0, r.se);
+    assert.equal(r.so.trim(), 'OK: rapporto parziale salvato: se la corsa si ferma, chi riparte riceve questo. Il compito resta aperto: alla fine consegna il rapporto finale, senza --parziale.');
+    assert.deepEqual(ricevuti.map((x) => [x.body.op, x.body.dati]), [['rapporto', { testo: 'A metà: riparti da #900.', parziale: true }]]);
+    assert.doesNotMatch(r.se, /Spesa della corsa/, 'senza tetto nel marcatore la spesa non si dice');
+  });
+});
+
 test('segnala finita in nota su un rosso di main già aperto: la riga dice il numero e di non riprovare (#2226)', async () => {
   await conServer(() => [200, { ok: true, nota: true, id: 'f2168', num: '#2168' }], async ({ port }, casa) => {
     const s = await esegui(['segnala'], ambiente(port, casa), 'Rosso su main: tests/unit/novitaInCima.test.mjs\n');
