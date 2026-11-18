@@ -915,6 +915,12 @@ section:has(#rifiutateList) .sn-spell-add-row {
 .filo-md pre code { background: transparent; padding: 0; }
 .filo-md a.filo-md-link { color: var(--sn-accent); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
 .filo-md a.filo-md-link:hover { text-decoration: none; }
+/* La fonte di una frase (#2383): stesso disegno della chat della home, nel colore del testo secondario. */
+.filo-md .filo-fonte {
+  font-size: 0.8em; color: var(--sn-muted); white-space: nowrap; cursor: pointer;
+  padding: 0 3px; margin: 0 -1px; border-radius: 4px; text-decoration: none;
+}
+.filo-md .filo-fonte:hover, .filo-md .filo-fonte:focus-visible { background: var(--sn-border); outline: none; }
 
 /* Cronologia appunti in Sicurezza (#256): "Rimuovi" sempre visibile, discreto nel colore e non nella
    presenza, perché è una lista che si pota e un tasto nascosto fino all'hover era il problema segnalato. */
