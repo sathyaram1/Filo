@@ -138,7 +138,7 @@ async function chiediAllAiuto(app, shell, page, id, testo) {
   return aiuto;
 }
 
-fixture('la chat che legge la pagina di un video ne ha la trascrizione, presa appena la pagina era pronta', async ({ app, openTab, youtube }) => {
+test('la chat che legge la pagina di un video ne ha la trascrizione, presa appena la pagina era pronta', async ({ app, openTab, youtube }) => {
   test.setTimeout(90_000);
   const page = await openTab(NEWTAB);
   const url = youtube.url(`/watch?v=${CON}`);
