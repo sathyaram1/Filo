@@ -33,8 +33,6 @@ async function chatConFile(app) {
   return page;
 }
 
-const scorritore = () => 'document.querySelector(".dash-file-btn").closest(".dash-bubbles")';
-
 // Il riquadro della chat scorre di poco, e il tasto destro arriva nello stesso fotogramma: l'evento dello scorrimento
 // arriva dopo l'apertura, come quando la voce viene portata in vista appena prima del clic.
 async function scorriEApri(page) {
