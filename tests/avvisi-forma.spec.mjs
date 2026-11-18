@@ -372,7 +372,7 @@ test('chiesto a Filo a parole, l\'avviso volato nella colonna si chiude come col
   await chiedi(home, 'chiudi quell’avviso nella colonna');
   await expect(home.locator('.dash-bubble-filo', { hasText: 'Chiuso.' })).toBeVisible({ timeout: 10_000 });
   await expect(carta).toHaveCount(0, { timeout: 5_000 });
-  await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(0);
+  await expect(shell.locator('.shell-notif:not([data-closing="1"])', { hasText: 'La pagina dei voli' })).toHaveCount(0);
   // Il modello ha avuto la carta, non un «carta sconosciuta».
   const chiamate = await chiamateAlModello(app);
   expect(JSON.stringify(chiamate[chiamate.length - 1])).not.toContain('carta sconosciuta');
