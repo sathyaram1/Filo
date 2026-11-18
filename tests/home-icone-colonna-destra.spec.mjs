@@ -1,6 +1,6 @@
 // #1491, #2372: Impostazioni e Profilo sono tasti di «altro» nella colonna destra; le tre colonne partono dall'alto,
-// senza una fascia per le icone. Il menu di ciascuno si apre sotto il suo tasto, anche con la pagina ingrandita, anche
-// col Profilo nel «+», e anche dopo l'attesa che il menu dell'account fa prima di aprirsi.
+// senza una fascia per le icone. Il menu di ciascuno si apre sotto il suo tasto, anche con la pagina ingrandita e
+// anche dopo l'attesa che il menu dell'account fa prima di aprirsi.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { join, resolve, dirname } from 'node:path';
