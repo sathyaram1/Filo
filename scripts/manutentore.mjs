@@ -937,7 +937,7 @@ export function giornoDi(ms = Date.now()) {
 }
 
 // Dove e come l'indicazione entra nel taccuino lo decide solo il server, per l'owner e per la chiave (#2340.3).
-const indicazioneConChiave = (cred, testo) => chiama(cred, 'taccuino.indicazione', { testo: unaRiga(testo) });
+const indicazioneConChiave = (cred, testo) => chiama(cred, 'taccuino.indicazione', { testo });
 
 // ── Le novità (§ 8) ─────────────────────────────────────────────────────────
 
