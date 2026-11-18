@@ -357,9 +357,10 @@ export async function activeView(app, shell) {
 }
 
 // Gli interagibili visibili, anche negli shadow root chiusi di Filo (la sua conferma): visti, devono avere un segno.
+// Le schede della barra e la loro crocetta sono div e span: senza segno chi pilota non cambiava né chiudeva una scheda.
 // `soloFilo`: solo quelli nelle radici di Filo, per il mondo isolato dei siti.
 function COLLECT_FN(soloFilo = false) {
-  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
+  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [role="tab"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item, #tabs .tab, #tabs .tab > .close';
   const UI = globalThis.SN_FILO_UI;
   const radici = [];
   const giu = (radice, diFilo) => {
