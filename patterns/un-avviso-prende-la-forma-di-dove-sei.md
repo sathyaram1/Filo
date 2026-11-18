@@ -19,6 +19,9 @@ nati nella shell e quelli che il main manda come `shell:toast`.
   cima alla colonna di sinistra, dove resta finché lo si chiude. Il modello resta nella shell: la home disegna le
   carte che il main le gira (`AVVISI_COLONNA`) e ogni gesto torna alla shell. Il volo lo disegna la home (una copia
   della carta dall'angolo alla colonna); con la riduzione del movimento la carta compare subito nella colonna.
+  Fa eccezione un avviso a tempo la cui uscita fa partire qualcosa (`alChiudere`, come la segnalazione automatica
+  che «Annulla» trattiene): nella colonna non scadrebbe mai e quel qualcosa resterebbe appeso, quindi sta
+  nell'angolo e alla scadenza se ne va, come su una pagina (#2570).
 
 Perché la home e non l'angolo: nell'angolo l'avviso copriva il tasto Invio, e stringere il campo per lasciargli
 posto (#1551) lo riduceva a una fessura. Dove un avviso ha un posto fisso che è suo, lì va.
