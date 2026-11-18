@@ -182,20 +182,41 @@
     return frasiDi(text).some((f) => COMANDO_RE.test(f));
   }
 
+  // Una domanda di parere («non trovi strano…?», «secondo te…?», «…, no?») è discussione, non una richiesta (#2371).
+  const PARERE_RE = new RegExp('^(?:(?:e|ma|ok|allora|filo|scusa|pero)\\s+)*(?:secondo te|per te|tu che|che ne (?:pensi|dici)'
+    + '|cosa ne (?:pensi|dici)|che dici|pensi che|credi che|dici che|non (?:trovi|credi|pensi|ti sembra|ti pare|sei d\'accordo'
+    + '|e vero|e cosi|e strano)|trovi (?:che|anche|giusto|normale|strano)|ti sembra|ti pare|ti piace|sei d\'accordo|e normale'
+    + '|e strano|ha senso|avrebbe senso|giusto|vero|no|o no|dico bene|o sbaglio)(?![a-z])');
+  const PARERE_OVUNQUE_RE = /\b(?:secondo (?:te|me)|per te|che ne (?:pensi|dici)|cosa ne (?:pensi|dici))\b/;
+
+  function domandeDi(text) {
+    return (normalizzaDomanda(text).match(/[^.!?\n;]*\?/g) || []).map((s) => s.replace(/\?+$/, '').trim()).filter(Boolean);
+  }
+  const diParere = (q) => PARERE_OVUNQUE_RE.test(q) || q.split(/[,:]/).some((c) => PARERE_RE.test(c.trim()));
+
   // Una domanda che chiede un dato («quanti crediti ho?»): una richiesta anche lei, ma di sapere, non di fare.
   function chiedeInformazione(text) {
-    const t = String(text || '');
-    if (/\?/.test(t)) return true;
-    return frasiDi(t).some((f) => INTERROGATIVI_RE.test(f));
+    if (domandeDi(text).some((q) => !diParere(q))) return true;
+    return frasiDi(text).some((f) => INTERROGATIVI_RE.test(f));
   }
 
-  // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?»): un'azione secca non le
-  // risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
+  // Senza «?» una domanda si riconosce dalla parola che la apre; chiedere di spiegare, o dire di non aver capito, è una
+  // domanda anche quella (#2349: «ho letto quel feedback e non l'ho capito»).
+  const APRE_DOMANDA_RE = /^(?:(?:e|ma|ok|allora|filo|scusa|poi|invece|pero)\s+)*(?:perch|cos[aei']|che cos|come\b|dove\b|quando\b|chi\b|quant[aeio]|qual|mi dici|dimmi|elenca|spiega|mi spieg|raccontami)/;
+  const SPIEGAZIONE_RE = /\b(?:spiegami|spiegamel[aoie]|spiegaci|mi spieghi|me l[oa] spieghi|raccontami|mi racconti)\b|\bnon (?:l'|lo |la |li |le |ti |ci )?(?:ho (?:ben )?capit[oaie]|capisco)\b|\bnon (?:mi )?e chiar[oa]\b/;
+
+  // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?», «apri youtube, quanti video ho
+  // visto?»): un'azione secca non le risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
+  // Sbagliare per eccesso costa una chiamata al modello in più; per difetto, una domanda senza risposta.
   function domandaOltreAlComando(text) {
-    const periodi = String(text || '')
-      .split(/(?<=[.!?\n])\s*|\s+(?:e|ma|poi)\s+(?=(?:dimmi|mi dici|quant|qual|cos|come|perch|dove|chi\b|quando))/i)
-      .map((s) => (s || '').trim()).filter(Boolean);
-    return periodi.some((p) => chiedeInformazione(p) && !chiedeAzione(p));
+    const norm = normalizzaDomanda(text);
+    if (SPIEGAZIONE_RE.test(norm)) return true;
+    return norm.split(/(?<=[.!?\n;])\s*/).map((s) => s.trim()).filter(Boolean).some((f) => {
+      const corpo = f.replace(/[.!?;\s]+$/, '');
+      const parti = corpo.split(/[,:]|\s+(?:e|ma|poi)\s+/).map((s) => s.trim()).filter(Boolean);
+      if (!chiedeAzione(corpo)) return /\?\s*$/.test(f) || parti.some((p) => APRE_DOMANDA_RE.test(p));
+      return parti.slice(1).some((p) => APRE_DOMANDA_RE.test(p));
+    });
   }
 
   // La voce del manifesto ha uno strumento della chat che la comanda? (capabilities.js, mappa STRUMENTO: SOLO_A_MANO
