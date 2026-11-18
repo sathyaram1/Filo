@@ -3,7 +3,7 @@
 // Ogni prova asserisce il successo dal punto di vista dell'utente: senza il registro sono rosse.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
@@ -211,8 +211,14 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   const disco = readFileSync(join(userData, 'storage.json'), 'utf8');
   expect(disco).not.toContain('segreto incognito');
+  // Gli eventi del filo non stanno in storage.json: il file del filo va guardato a parte.
+  const fileFilo = join(userData, 'filo', 'eventi.jsonl');
+  expect(existsSync(fileFilo), 'il filo normale è su disco: configura() ha cambiato le impostazioni').toBe(true);
+  expect(readFileSync(fileFilo, 'utf8')).not.toContain('segreto incognito');
   const normale = await registro(app);
   expect(JSON.stringify(normale)).not.toContain('segreto incognito');
+  const dentro = await app.evaluate(() => globalThis.__filoStorage.runIncognito(() => globalThis.SN_REGISTRO_CAMBI.lista()));
+  expect(JSON.stringify(dentro)).toContain('segreto incognito');
   await ripristina(app);
 });
 
