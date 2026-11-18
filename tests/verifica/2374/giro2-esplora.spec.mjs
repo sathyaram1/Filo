@@ -139,6 +139,8 @@ test('esplora: scritta chiara su sfondo trasparente', async ({ app, openTab, tes
     return lum.filter((l) => Math.abs(l - med) > 60).length / lum.length;
   }, png);
   console.log('pixel della scritta:', staccati);
+  const fuoco = await app.evaluate(({ webContents }) => { const w = webContents.getFocusedWebContents(); return w ? w.getURL().slice(0, 80) : null; });
+  console.log('fuoco su:', fuoco, '| pagina:', page.url().slice(0, 80), '| strato:', strato.url().slice(0, 80));
   expect(staccati).toBeGreaterThan(0.01);
 });
 
