@@ -169,36 +169,51 @@ export async function avviaProvaRemota({ root, punta, spec = [], env = process.e
 
 const dormi = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
+/** Una lettura fallita va ripetuta? Sì per rete, tempo scaduto, 404, 429, 5xx e limite di richieste. PURA. */
+export function letturaRipetibile(e) {
+  const s = e && Number(e.status);
+  if (!Number.isInteger(s) || !RISPOSTE_DEFINITIVE.has(s)) return true;
+  return s === 403 && /rate limit/i.test(String(e.message || ''));
+}
+
 /**
  * Aspetta la corsa accesa da avviaProvaRemota e ne legge l'esito. → prova (vedi provaDalCampo), con `remota.url`.
  * Senza corsa, finita senza esito o oltre il tetto: { errore }, mai un esito inventato.
  */
-export async function attendiProvaRemota(avvio, { scrivi = (s) => console.log(s), ogni = OGNI_MS, tettoPartenza = TETTO_PARTENZA_MS, tettoCorsa = TETTO_CORSA_MS, adesso = () => Date.now(), aspetta = dormi } = {}) {
+export async function attendiProvaRemota(avvio, { scrivi = (s) => console.log(s), ogni = OGNI_MS, tettoPartenza = TETTO_PARTENZA_MS, tettoCorsa = TETTO_CORSA_MS, pause = PAUSE_RIPROVA_MS, adesso = () => Date.now(), aspetta = dormi } = {}) {
   if (!avvio || avvio.errore) return { errore: (avvio && avvio.errore) || 'corsa non accesa', mainSha: (avvio && avvio.main) || '' };
   const { repo, ramo, main, corsa, api } = avvio;
   const inizio = adesso();
   let corsaVista = null;
   let ultimoAvviso = inizio;
-  for (;;) {
-    let elenco = null;
-    try {
-      elenco = await api(`repos/${repo}/actions/workflows/${WORKFLOW}/runs?event=repository_dispatch&per_page=50`);
-    } catch (e) {
-      return { errore: `non riesco a leggere le corse su GitHub (${String((e && e.message) || e).slice(0, 300)})`, mainSha: main };
+  // Ogni pausa resta dentro il tetto che vale in quel momento: si arrende prima, non dopo.
+  const leggi = async (cosa, percorso, opzioni) => {
+    for (let i = 0; ; i++) {
+      try { return { valore: await api(percorso, opzioni) }; } catch (e) {
+        const msg = String((e && e.message) || e).slice(0, 300);
+        const pausa = pause[i];
+        const tetto = corsaVista ? tettoCorsa : Math.min(tettoPartenza, tettoCorsa);
+        if (pausa === undefined || !letturaRipetibile(e) || adesso() - inizio + pausa > tetto) {
+          return { errore: `non riesco a leggere ${cosa} (${msg})${i ? `, nemmeno dopo ${i + 1} tentativi` : ''}` };
+        }
+        scrivi(`  … GitHub non mi ha dato ${cosa} (${msg}): riprovo fra ${Math.round(pausa / 1000)} s, tentativo ${i + 2} di ${pause.length + 1}`);
+        await aspetta(pausa);
+      }
     }
-    corsaVista = corsaDallElenco(elenco && elenco.workflow_runs, corsa) || corsaVista;
+  };
+  for (;;) {
+    const elenco = await leggi('le corse su GitHub', `repos/${repo}/actions/workflows/${WORKFLOW}/runs?event=repository_dispatch&per_page=50`);
+    if (elenco.errore) return { errore: elenco.errore, mainSha: main, ...(corsaVista ? { remota: { corsa, url: corsaVista.html_url || '' } } : {}) };
+    corsaVista = corsaDallElenco(elenco.valore && elenco.valore.workflow_runs, corsa) || corsaVista;
     const remota = { corsa, url: (corsaVista && corsaVista.html_url) || '' };
     if (corsaVista && corsaVista.status === 'completed') {
-      let jobs;
-      try { jobs = await api(`repos/${repo}/actions/runs/${corsaVista.id}/jobs?per_page=100`); } catch (e) {
-        return { errore: `non riesco a leggere i lavori della corsa (${String((e && e.message) || e).slice(0, 300)})`, mainSha: main, remota };
-      }
-      const job = ((jobs && jobs.jobs) || []).find((j) => j && j.name === JOB_ESITO);
+      const jobs = await leggi('i lavori della corsa', `repos/${repo}/actions/runs/${corsaVista.id}/jobs?per_page=100`);
+      if (jobs.errore) return { errore: jobs.errore, mainSha: main, remota };
+      const job = ((jobs.valore && jobs.valore.jobs) || []).find((j) => j && j.name === JOB_ESITO);
       if (!job) return { errore: `la corsa è finita (${corsaVista.conclusion || 'senza conclusione'}) senza il lavoro che scrive l'esito`, mainSha: main, remota };
-      let registro;
-      try { registro = await api(`repos/${repo}/actions/jobs/${job.id}/logs`, { testo: true }); } catch (e) {
-        return { errore: `non riesco a leggere il registro della corsa (${String((e && e.message) || e).slice(0, 300)})`, mainSha: main, remota };
-      }
+      const letto = await leggi('il registro della corsa', `repos/${repo}/actions/jobs/${job.id}/logs`, { testo: true });
+      if (letto.errore) return { errore: letto.errore, mainSha: main, remota };
+      const registro = letto.valore;
       const c = campoDalRegistro(registro, { ramo, main });
       return conGliSpec(provaDalCampo(c.errore ? { ...c, main } : c, remota), avvio.spec);
     }
