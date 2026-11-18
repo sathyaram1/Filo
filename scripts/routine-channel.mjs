@@ -108,6 +108,7 @@
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo. La correzione di un riallineamento
 //         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
+//         `--prova <cartella>` su status, fixed e note: la prova da utente (esito e schermate) allegata al report (#2539).
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
 //         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione). Un doppione aggiunge
 //         `--doppione-di <num>`: la fusione è quella dell'originale, che il server vuole chiuso (#2046).
