@@ -567,6 +567,7 @@
   min-height: 34px;
   font-size: 13px;
   white-space: nowrap;
+  user-select: none;
 }
 .sn-tr-stato {
   display: flex;
