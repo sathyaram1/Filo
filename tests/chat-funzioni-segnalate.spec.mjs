@@ -199,7 +199,7 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
   expect(visto).toContain('Filo sa fare «Finestra in incognito», ma l\'assistente non ha uno strumento per farlo');
   expect(visto).toContain('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
 
-  // La stessa funzione non si ripropone: una volta per versione.
+  // La stessa funzione non si ripropone.
   await chiedi(chat, 'riaprimi una finestra in incognito');
   await expect(chat.locator('.dash-bubble-filo')).toHaveCount(3, { timeout: 15_000 });
   await chat.waitForTimeout(1_500);
