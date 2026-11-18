@@ -306,8 +306,7 @@ test('#1803.1 sul Mac un .app (una cartella) parte con l\'apertura del Finder, u
 
 test('#1803.1 la riga della conversazione riconosce i sinonimi che la barra accetta', () => {
   const R = globalThis.SN_RIGHE_ATTIVITA;
-  const riga = (a) => R.descrivi ? R.descrivi(a) : null;
-  assert.ok(riga, 'la riga si chiede a righeAttivita');
+  const riga = (a) => R.riga(a);
   const casi = [
     [{ type: 'BARRA_SITI', operazione: 'rimuovi', elemento: 'YouTube', _output: { voce: 'YouTube' } }, 'Tolto dalla barra dei siti · YouTube'],
     [{ type: 'BARRA_SITI', operazione: 'togli', elemento: 'YouTube', _output: { voce: 'YouTube' } }, 'Tolto dalla barra dei siti · YouTube'],
