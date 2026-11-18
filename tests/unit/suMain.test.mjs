@@ -179,6 +179,31 @@ test('i rami in corso dicono i loro file e i feedback citati, e si incrociano co
   assert.deepEqual(ramiInCorso(dir, { giorni: 1, adesso: Date.now() + 5 * 86400000 }), [], 'un ramo fermo da giorni non conta');
 });
 
+test('una correzione di main rifatta a mano nel ramo e poi fusa con main non è un file del ramo né un incrocio (#2340.3)', (t) => {
+  const dir = repo();
+  t.after(() => togliCartella(dir));
+  const inizio = git(dir, ['rev-parse', 'HEAD']);
+  const corretto = righe(40, { 7: 'corretto' });
+  commit(dir, 'merge-gate: #10 correzione su main', { 'a.js': corretto });
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  for (const [nome, proprio] of [['uno', 'x.js'], ['due', 'y.js']]) {
+    git(dir, ['checkout', '-qb', nome, inizio]);
+    commit(dir, `auto: ${proprio} #2${nome.length}`, { [proprio]: `${nome}\n` });
+    commit(dir, 'riallineamento a mano: la correzione di main', { 'a.js': corretto });
+    git(dir, ['merge', '-q', '--no-edit', 'origin/main']);
+    git(dir, ['update-ref', `refs/remotes/origin/claude/${nome}`, 'HEAD']);
+  }
+  git(dir, ['checkout', '-qb', 'tre', 'main']);
+  commit(dir, 'auto: a.js #30', { 'a.js': righe(40, { 7: 'corretto', 20: 'davvero' }) });
+  git(dir, ['update-ref', 'refs/remotes/origin/claude/tre', 'HEAD']);
+  git(dir, ['checkout', '-q', 'main']);
+  const rami = ramiInCorso(dir);
+  assert.deepEqual(rami.map((r) => r.fileNuovi || r.file).sort(), [['a.js'], ['x.js'], ['y.js']],
+    'ognuno con i soli file che cambia rispetto a main: a.js resta solo a chi lo cambia davvero');
+  assert.deepEqual(incrociFraRami(rami), [], 'due lavori su file diversi non si incrociano');
+  assert.deepEqual(incroci(rami, ['a.js']).length, 1);
+});
+
 test('un tentativo vecchio di un feedback il cui ultimo tentativo è su main non è in corso; chi resta fuori si conta', (t) => {
   const dir = repo();
   t.after(() => togliCartella(dir));
