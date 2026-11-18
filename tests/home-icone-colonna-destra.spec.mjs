@@ -63,11 +63,11 @@ test('i tasti stanno nella colonna destra e le tre colonne partono dall\'alto', 
 });
 
 // L'icona in px dello schermo: la vista della scheda davanti (la home) dentro la finestra, e il suo zoom.
-async function iconaSulloSchermo(app, page, comando) {
-  const r = await page.evaluate((c) => {
-    const b = document.querySelector(`#dashControls .dash-ctrl[data-command="${c}"]`).getBoundingClientRect();
+async function iconaSulloSchermo(app, page, id) {
+  const r = await page.evaluate((s) => {
+    const b = document.querySelector(s).getBoundingClientRect();
     return { top: b.top, bottom: b.bottom, left: b.left, right: b.right };
-  }, comando);
+  }, TASTO(id));
   const v = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
