@@ -79,6 +79,10 @@
     el.style.left = `${Math.max(4, Math.min(x, vw - el.offsetWidth - 4))}px`;
     el.style.top = `${Math.max(4, Math.min(y, vh - el.offsetHeight - 4))}px`;
     const fuori = (e) => { if (!el.contains(e.target)) chiudiMenu(); };
+    // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2453).
+    const foto = global.SN_MENU && global.SN_MENU.fotoDelloScorrimento;
+    const scorsoDopo = typeof foto === 'function' ? foto(x, y) : () => true;
+    const scorre = (e) => { if (scorsoDopo(e)) chiudiMenu(); };
     const tasto = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
@@ -94,7 +98,7 @@
         doc.removeEventListener('keydown', tasto, true);
         global.removeEventListener('blur', chiudiMenu);
         global.removeEventListener('resize', chiudiMenu);
-        doc.removeEventListener('scroll', chiudiMenu, true);
+        doc.removeEventListener('scroll', scorre, true);
       },
     };
     doc.addEventListener('keydown', tasto, true);
@@ -103,7 +107,7 @@
       doc.addEventListener('mousedown', fuori, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
-      doc.addEventListener('scroll', chiudiMenu, true);
+      doc.addEventListener('scroll', scorre, true);
     }, 0);
     const primo = el.querySelector('.sn-select-option');
     if (primo) try { primo.focus({ preventScroll: true }); } catch (_) {}

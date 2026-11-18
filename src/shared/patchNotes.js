@@ -16,6 +16,7 @@
       ],
       fixes: [
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, il tasto destro dato appena aperta la pagina apre il menu invece di andare perso.', segnalazione: 2444 },
+        { testo: 'Il menu di «Dai un nome sensato» aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.', segnalazione: 2453 },
       ],
     },
     {
