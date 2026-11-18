@@ -330,11 +330,15 @@ dall'owner e dal server. Campi:
   consiglio «applica il consiglio» non lo segna mai fatto, e un principio del
   registro non lo chiude (§ 3.5). Chiunque scopra un passo così lo apre come
   «da fare», non lo scrive nel testo o nelle note di un feedback.
-- Nelle azioni `feedbackId` può essere il numero col cancelletto (`#1736`,
-  `#831.2`): il server lo traduce nell'id all'ingresso
+- Nelle azioni `feedbackId`, e nei collegamenti di tipo `feedback` l'`id`, può
+  essere il numero col cancelletto (`#1736`, `#831.2`), nella forma che
+  leggono le attese (`SN_FB_ATTESE.normalizzaNumero`, l'unica: `#1736.0` vale
+  `#1736`): il server lo traduce nell'id all'ingresso
   (`SN_DOMANDE.traduciNumeri`), per i biglietti come per la chiave del
   manutentore e quella owner-non-fidato, e rifiuta col numero quello che non
-  esiste. Una domanda salvata porta sempre l'id.
+  esiste. Una domanda salvata porta sempre l'id. Ogni strada che apre domande
+  passa dalla stessa sequenza di nascita sul server (numeri, peso del blocco,
+  legame, `blocca`; dopo la scrittura riga provvisoria e smistamento).
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
