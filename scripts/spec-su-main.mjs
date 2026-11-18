@@ -127,19 +127,39 @@ export function portaSpecDelRamo({ root, shaRamo, shaMain, specs, dir }) {
   return { portati, mancaSulRamo };
 }
 
-function corri(albero, specs, etichetta) {
-  process.stdout.write(`\n▸ ${etichetta}: ${specs.join(' ')} (senza ripetizioni)\n`);
-  const nessuno = (motivo) => ({ esiti: Object.fromEntries(specs.map((s) => [s, 'non-corso'])), motivo });
-  if (!albero.moduli) { console.error(`✗ ${etichetta}: node_modules manca, lancia npm install.`); return nessuno('node_modules manca'); }
+/**
+ * Gli spec da rifare da soli dopo una corsa insieme: quelli non partiti, se nella stessa corsa ce n'erano altri. Uno
+ * spec che non si carica ferma tutta la corsa di Playwright, e non deve togliere il confronto agli altri (#2454). PURA.
+ */
+export function specDaRifareDaSoli(esiti, specs) {
+  if (specs.length < 2) return [];
+  return specs.filter((s) => esiti[s] && esiti[s].esito === 'non-corso');
+}
+
+function corriUnaVolta(albero, specs) {
+  const nessuno = (motivo) => ({ esiti: Object.fromEntries(specs.map((s) => [s, { esito: 'non-corso', rossi: [], motivo }])), lancioFallito: true });
+  if (!albero.moduli) { console.error('✗ node_modules manca, lancia npm install.'); return nessuno('node_modules manca'); }
   const cli = [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', '--retries=0', '--reporter=list,json', ...specs];
   const l = preparaLancioElectron(process.execPath, cli);
   if (!l.ok) { console.error(`✗ ${l.motivo}`); return nessuno(l.motivo); }
   // Il resoconto sta nella base della prova, fuori dal worktree: se ne va con lei.
   const resoconto = join(albero.base, 'resoconto.json');
+  rmSync(resoconto, { force: true });
   spawnSync(l.cmd, l.args, { cwd: albero.dir, stdio: 'inherit', env: { ...(l.env || process.env), PLAYWRIGHT_JSON_OUTPUT_FILE: resoconto } });
   let report = null;
   try { if (existsSync(resoconto)) report = JSON.parse(readFileSync(resoconto, 'utf8')); } catch (_) { /* senza resoconto nessuno spec risulta partito */ }
-  return { esiti: report ? esitiPerSpec(report, specs) : nessuno().esiti, motivo: motivoDelResoconto(report) };
+  return { esiti: esitiPerSpec(report, specs), lancioFallito: false };
+}
+
+function corri(albero, specs, etichetta) {
+  process.stdout.write(`\n▸ ${etichetta}: ${specs.join(' ')} (senza ripetizioni)\n`);
+  const prima = corriUnaVolta(albero, specs);
+  if (prima.lancioFallito) return prima;
+  for (const spec of specDaRifareDaSoli(prima.esiti, specs)) {
+    process.stdout.write(`\n▸ ${etichetta}: ${spec} non è partito insieme agli altri, lo rifaccio da solo\n`);
+    prima.esiti[spec] = corriUnaVolta(albero, [spec]).esiti[spec];
+  }
+  return prima;
 }
 
 function main() {
