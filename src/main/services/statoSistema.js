@@ -369,6 +369,36 @@ Add-Type -TypeDefinition @'
 __VOLUME__'@
 $conVolume = $true
 } catch {}
+function Scrivi($oggetto) {
+  $j = ConvertTo-Json -InputObject $oggetto -Compress -Depth 6
+  $j = [regex]::Replace($j, '[^ -~]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
+  [Console]::Out.WriteLine($j); [Console]::Out.Flush()
+  return $j
+}
+__ELENCO_BT__
+$global:retiPronte = $false
+function Rispondi([string]$cosa) {
+  if ($cosa -eq 'bluetooth') {
+    try { $e = ElencoBt } catch { $e = [ordered]@{ errore = 'eccezione' } }
+    $null = Scrivi ([ordered]@{ elenco = [ordered]@{ cosa = 'bluetooth'; acceso = $e.acceso; dispositivi = $e.dispositivi; errore = $e.errore } })
+  } elseif ($cosa -eq 'wifi') {
+    $r = [ordered]@{ cosa = 'wifi' }
+    try {
+      if (-not $global:retiPronte) {
+        Add-Type -TypeDefinition @'
+__WLAN__'@
+        $global:retiPronte = $true
+      }
+      $w = [FiloWlan.Wlan]::Elenco()
+      $r.codice = $w.Codice; $r.interfacce = $w.Interfacce; $r.reti = @($w.Reti); $r.attuale = $w.Attuale
+    } catch { if ($global:retiPronte) { $r.errore = 'eccezione' } else { $r.errore = 'compilazione' } }
+    $null = Scrivi ([ordered]@{ elenco = $r })
+  }
+}
+# Le richieste degli elenchi arrivano su stdin, una riga ciascuna; stdin chiuso vuol dire che Filo non c'è più.
+$ingresso = $null
+$richiesta = $null
+try { $ingresso = New-Object System.IO.StreamReader([Console]::OpenStandardInput()); $richiesta = $ingresso.ReadLineAsync() } catch { $richiesta = $null }
 $ultimo = ''
 $btPrima = $null
 $nomiPrima = $null
@@ -440,10 +470,13 @@ while ($true) {
       if ($null -ne $radios) {
         $letto = $true
         $wf = @($radios | Where-Object { [string]$_.Kind -eq 'WiFi' })
-        if ($wf.Count -gt 0) { $o.wifi = [ordered]@{ acceso = (@($wf | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) } }
+        if (@($wf | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $o.wifi = [ordered]@{ acceso = $true } }
+        elseif (@($wf | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $o.wifi = [ordered]@{ acceso = $false } }
         $bt = @($radios | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
         if ($bt.Count -gt 0) {
-          $acceso = @($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0
+          $acceso = $null
+          if (@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $acceso = $true }
+          elseif (@($bt | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $acceso = $false }
           $nomi = @()
           if ($acceso -and ($null -ne $nomiPrima) -and (($giri % 3) -ne 0)) {
             $nomi = $nomiPrima
@@ -458,6 +491,7 @@ while ($true) {
             } catch { $nomi = $null }
           }
           if ($acceso) { $nomiPrima = $nomi } else { $nomiPrima = $null }
+          if ($null -eq $acceso) { $nomi = $null }
           $o.bluetooth = [ordered]@{ acceso = $acceso; dispositivi = $nomi }
         }
       }
@@ -467,14 +501,25 @@ while ($true) {
   $json = ConvertTo-Json -InputObject $o -Compress -Depth 5
   $json = [regex]::Replace($json, '[^ -~]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
   if ($json -ne $ultimo) { [Console]::Out.WriteLine($json); [Console]::Out.Flush(); $ultimo = $json }
-  Start-Sleep -Milliseconds 2000
+  $fine = (Get-Date).AddMilliseconds(2000)
+  while ($null -ne $richiesta) {
+    $resta = [int](($fine - (Get-Date)).TotalMilliseconds)
+    if ($resta -le 0) { break }
+    try { if (-not $richiesta.Wait($resta)) { break } } catch { $richiesta = $null; break }
+    $riga = $richiesta.Result
+    if ($null -eq $riga) { exit }
+    Rispondi $riga.Trim()
+    $richiesta = $ingresso.ReadLineAsync()
+  }
+  if ($null -eq $richiesta) { Start-Sleep -Milliseconds 2000 }
 }
 `;
 
-// Il volume si legge con lo stesso C# con cui comandiSistema.js lo cambia: una copia sola.
+// Il volume, gli abbinati e le reti si leggono con lo stesso codice degli script di comandiSistema.js: una copia sola.
 function scriptWindows(pid) {
-  const volume = require('./comandiSistema')._interni.CS_VOLUME;
-  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0)).replace('__VOLUME__', () => volume);
+  const { CS_VOLUME, PS_ELENCO_BT, CS_WLAN } = require('./comandiSistema')._interni;
+  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0))
+    .replace('__VOLUME__', () => CS_VOLUME).replace('__ELENCO_BT__', () => PS_ELENCO_BT).replace('__WLAN__', () => CS_WLAN);
 }
 
 // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}.
@@ -558,6 +603,19 @@ function datiDaWindows(riga) {
   return { batteria: j.batteria || null, rete, bluetooth, volume: j.volume || null, wifi: j.wifi || null };
 }
 
+// Una riga del lettore che risponde a una richiesta d'elenco (bluetooth, wifi): non è una lettura dello stato.
+function elencoDaRiga(riga) {
+  let j;
+  try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
+  const e = j && typeof j === 'object' && !Array.isArray(j) ? j.elenco : null;
+  return e && typeof e === 'object' && (e.cosa === 'bluetooth' || e.cosa === 'wifi') ? e : null;
+}
+
+// Il tempo per la risposta a un elenco: col PowerShell già acceso bastano le attese dello script (al più 5 s per le
+// radio, 16 per le ricerche, 6 per i nomi), mentre uno che parte su un PC lento ci mette da solo decine di secondi (#2394).
+const ELENCO_ACCESO_MS = 40 * 1000;
+const ELENCO_A_FREDDO_MS = 60 * 1000;
+
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
   let figlio = null;
   let ultimo = null;
@@ -567,13 +625,25 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   let guasti = 0;
   let attese = [];
   const sveglia = () => { const a = attese; attese = []; for (const r of a) r(); };
+  // Le richieste d'elenco in volo, per cosa: due uguali sono una. Un PowerShell vivo che non risponde a stdin non
+  // risponderà mai: da lì gli elenchi tornano allo script (`muti`).
+  const richieste = new Map();
+  let muti = false;
+  const consegna = (cosa, valore) => {
+    const r = richieste.get(cosa);
+    if (!r) return;
+    richieste.delete(cosa);
+    clearTimeout(r.timer);
+    r.risolvi(valore);
+  };
+  const consegnaTutte = () => { for (const cosa of [...richieste.keys()]) consegna(cosa, null); };
 
   function assicura() {
     if (figlio || guasti >= 3) return;
     let buffer = '';
     try {
       figlio = avvia('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', scriptWindows(pid)],
-        { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+        { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
     } catch (_) {
       figlio = null;
       guasti = 3;
@@ -581,6 +651,7 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       return;
     }
     const questo = figlio;
+    if (questo.stdin) questo.stdin.on('error', () => {});
     questo.stdout.setEncoding('utf8');
     questo.stdout.on('data', (pezzo) => {
       if (figlio !== questo) return;
@@ -588,15 +659,18 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       if (buffer.length > 1024 * 1024) buffer = '';
       let a;
       while ((a = buffer.indexOf('\n')) >= 0) {
-        const d = datiDaWindows(buffer.slice(0, a));
+        const riga = buffer.slice(0, a);
         buffer = buffer.slice(a + 1);
+        const e = elencoDaRiga(riga);
+        if (e) { consegna(e.cosa, e); continue; }
+        const d = datiDaWindows(riga);
         if (d) { ultimo = d; quando = Date.now(); fresco = true; guasti = 0; sveglia(); quandoCambia(); }
       }
     });
     // Un'uscita che non abbiamo chiesto è un guasto: dopo tre di fila il lettore si arrende, senza ripartire in loop.
     const finito = () => {
       // Un processo vecchio che esce dopo la ripartenza non sveglia chi aspetta quello nuovo.
-      if (figlio === questo) { figlio = null; fresco = false; sveglia(); }
+      if (figlio === questo) { figlio = null; fresco = false; sveglia(); consegnaTutte(); }
       if (!questo.fermatoDaNoi && !questo.contato) { questo.contato = true; guasti += 1; }
     };
     questo.on('error', finito);
@@ -619,12 +693,33 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
     figlio = null;
     fresco = false;
     sveglia();
+    consegnaTutte();
+  }
+
+  // L'elenco (bluetooth o wifi) dal PowerShell acceso: l'oggetto della sua risposta; { tempo: true } se non arriva in
+  // tempo; null se il lettore non può (spento, arreso, muto) e chi chiede passa allo script.
+  function chiedi(cosa, ms) {
+    if (!figlio || muti || !figlio.stdin || (cosa !== 'bluetooth' && cosa !== 'wifi')) return Promise.resolve(null);
+    const c = richieste.get(cosa);
+    if (c) return c.p;
+    const acceso = fresco;
+    const voce = {};
+    voce.p = new Promise((risolvi) => {
+      voce.risolvi = risolvi;
+      voce.timer = setTimeout(() => {
+        if (acceso && figlio) muti = true;
+        consegna(cosa, acceso ? null : { tempo: true });
+      }, ms != null ? ms : (acceso ? ELENCO_ACCESO_MS : ELENCO_A_FREDDO_MS));
+    });
+    richieste.set(cosa, voce);
+    try { figlio.stdin.write(`${cosa}\n`); } catch (_) { consegna(cosa, null); }
+    return voce.p;
   }
 
   // `ultimo` è solo la riga del processo vivo; `ultimaRiga` resta a chi disegna mentre il lettore riparte.
   // Un lettore che si è arreso non ha più niente di vero da dire: meglio una voce che sparisce che una che mente.
   return {
-    assicura, pronto, ferma,
+    assicura, pronto, ferma, chiedi,
     ultimo: () => (fresco ? ultimo : null),
     ultimaRiga: () => (figlio ? ultimo : null),
     inAttesa: () => !!figlio && !fresco,
@@ -701,25 +796,56 @@ async function lettoreDiSistema() {
 function annuncia() {
   try {
     const { MSG } = globalThis.SN_MSG;
-    require('./handlers').broadcastToFiloPages({ type: MSG.SISTEMA_AGGIORNATO, stato });
+    require('./handlers').broadcastToFiloPages({ type: MSG.SISTEMA_AGGIORNATO, stato: statoDaDare() });
   } catch (_) {}
+}
+
+// #2394 — le radio lette più di due giri fa (il lettore dormiva, o il PowerShell sta ripartendo) non si danno per
+// accese o spente: chi riceve lo stato le trova in `vecchio` e dice «leggo». L'elenco dei dispositivi rinfresca il
+// Bluetooth (`radioLetta`), e fra due letture della stessa radio vale la più recente.
+const VECCHIO_MS = GIRO_MS * 2;
+const RADIO = ['bluetooth', 'wifi'];
+const letteRadio = { bluetooth: 0, wifi: 0 };
+const lettaAlle = (voce) => Math.max(stato ? stato.letto || 0 : 0, letteRadio[voce] || 0);
+const radioVecchie = (adesso = Date.now()) => (stato ? RADIO.filter((v) => adesso - lettaAlle(v) > VECCHIO_MS) : []);
+function statoDaDare() {
+  const vecchie = radioVecchie();
+  return stato && vecchie.length ? { ...stato, vecchio: vecchie } : stato;
 }
 
 // `letto` è l'ora della lettura vera: una riga di prima del sonno ridisegnata non la rinfresca.
 // Rete caduta o tornata, batteria sotto una soglia, Bluetooth collegato entrano nel filo da qui (#1561): ogni lettura
 // passa di qui, chiunque l'abbia chiesta. Senza una lettura prima non c'è niente da confrontare.
-function pubblica(grezzo, { fresco = true } = {}) {
-  const nuovo = S().normalizza(grezzo);
+function pubblica(grezzo, { fresco = true, radio = null } = {}) {
+  const daRileggere = radioVecchie();
+  if (radio) letteRadio[radio] = Date.now();
+  const tenute = {};
+  // Una riga di prima del sonno non smentisce la radio che l'elenco ha appena letto.
+  if (!fresco && stato) for (const v of RADIO) if (v !== radio && (letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
+  const nuovo = S().normalizza({ ...grezzo, ...tenute });
   const f = JSON.stringify(nuovo);
   stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
   const prima = ultimoPerFilo;
   ultimoPerFilo = nuovo;
-  if (f !== firma) {
+  // Uno stato uguale a quello di prima si annuncia lo stesso se chi l'ha ricevuto lo sapeva vecchio.
+  const rinfrescate = daRileggere.length > radioVecchie().length;
+  const cambiato = f !== firma;
+  if (cambiato || rinfrescate) {
     firma = f;
     annuncia();
-    if (prima) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
+    if (prima && cambiato) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
   }
   return stato;
+}
+
+// La radio letta da un elenco (comandiSistema.js): vale come una lettura del lettore, per quella radio sola.
+function radioLetta(voce, acceso) {
+  if (!stato || !RADIO.includes(voce) || typeof acceso !== 'boolean') return;
+  const prima = stato[voce];
+  const grezzo = { ...stato };
+  if (voce === 'wifi') grezzo.wifi = { acceso };
+  else grezzo.bluetooth = acceso ? { acceso: true, dispositivi: prima && prima.acceso === true ? prima.dispositivi : null } : { acceso: false, dispositivi: [] };
+  pubblica(grezzo, { fresco: false, radio: voce });
 }
 
 // Il lettore dorme quando nessuno guarda: la rete che cade, e su Linux la batteria che scende, si vedono senza
@@ -956,6 +1082,16 @@ async function statoPerChat() {
   return frescoPer(chiesto) ? stato : null;
 }
 
+// #2394 — su Windows gli elenchi di comandiSistema.js li legge il PowerShell di questo lettore, già acceso: si tiene
+// sveglio come per un turno di chat (il giro lo rispegne). null: il lettore non può, si passa allo script.
+async function elencoDalLettore(cosa) {
+  if (process.platform !== 'win32' || lettoreProve) return null;
+  richiedi({ unaVolta: true });
+  const w = lettoreDiWindows();
+  w.assicura();
+  return w.chiedi(cosa);
+}
+
 // Chi deve dire «sei offline» (gli errori della chat) chiede qui: la risposta non aspetta un giro. Col lettore sveglio
 // vale anche la piattaforma (nessuna strada fuori); addormentato, il suo stato è vecchio e resta Chromium.
 function offline() {
@@ -966,7 +1102,15 @@ function offline() {
 
 // Le prove staccano il caricatore e la rete di un computer finto: il giro, l'annuncio e la home restano quelli veri.
 const _perProve = {
-  usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; ultimoPerFilo = null; return leggiAdesso(); },
+  usaLettore(fn) {
+    lettoreProve = typeof fn === 'function' ? fn : null; firma = null; ultimoPerFilo = null; letteRadio.bluetooth = 0; letteRadio.wifi = 0;
+    return leggiAdesso();
+  },
+  // Lo stato come se l'ultima lettura fosse di `ms` fa: il lettore che ha dormito.
+  invecchia(ms) {
+    if (stato) stato = { ...stato, letto: (stato.letto || 0) - ms };
+    for (const v of RADIO) letteRadio[v] = Math.max(0, (letteRadio[v] || 0) - ms);
+  },
   leggiOra: () => leggiAdesso(),
   attivo: () => !!giro,
   veglia(ms) { vegliaMs = Number(ms) > 0 ? Number(ms) : VEGLIA_MS; },
@@ -980,8 +1124,10 @@ const api = {
   richiedi,
   sorveglia,
   schedaDavanti,
-  stato: () => stato,
+  stato: statoDaDare,
   statoPerChat,
+  radioLetta,
+  elencoDalLettore,
   leggiAdesso,
   leggiUnaVolta,
   offline,
@@ -994,7 +1140,9 @@ module.exports = {
   ...api,
   GIRO_MS,
   VEGLIA_MS,
+  VECCHIO_MS,
   RILETTURE_RETE,
+  elencoDaRiga,
   reteDaRileggere,
   componi,
   sintesiBatterie,

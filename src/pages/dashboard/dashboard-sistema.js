@@ -43,9 +43,9 @@
     for (const v of ORDINE) voci[v] = creaVoce(v);
     disegna();
     // La prima richiesta aspetta le impostazioni: chi ha nascosto le tre voci non sveglia il lettore a ogni scheda.
-    setTimeout(() => { if (!impostazioniLette) { impostazioniLette = true; chiedi(); } }, 2000);
+    setTimeout(() => { if (!impostazioniLette) { impostazioniLette = true; chiedi(); precaricaElenchi(); } }, 2000);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); }
+      if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); precaricaElenchi(); }
       programmaRichiamo();
     });
     // Il browser se ne accorge per primo: il main rilegge subito invece di aspettare il suo giro.
@@ -109,6 +109,7 @@
     visibili = nuove;
     impostazioniLette = true;
     disegna();
+    precaricaElenchi();
     if (prima === segue()) return;
     if (segue()) chiedi({ subito: true });
     else send({ type: MSG.SISTEMA_STATO, segue: false }).catch(() => {});
@@ -201,7 +202,7 @@
       voce.testo.hidden = !x.testo;
       voce.el.title = x.hover;
       voce.el.setAttribute('aria-label', x.dettaglio.join(', '));
-      voce.el.dataset.stato = x.offline ? 'offline' : x.bassa ? 'bassa' : x.spento ? 'spento' : '';
+      voce.el.dataset.stato = x.offline ? 'offline' : x.bassa ? 'bassa' : x.spento ? 'spento' : x.leggendo ? 'leggendo' : '';
     }
     host.hidden = !qualcuna;
     riga.hidden = !icone;
@@ -258,7 +259,6 @@
       righeInfo(box.info, x);
       box.info.dataset.testo = testo;
     }
-    box.copia = x.copia;
     aggiornaComandi(x);
   }
 
@@ -268,10 +268,12 @@
   let volumeVoluto = null;
   let volumeInVolo = false;
 
+  // Le frasi d'errore le scrive il main (comandiSistema.js); questa è solo per una risposta che non arriva.
+  const NON_RISPOSTO = 'Filo non ha risposto: riprova.';
   async function comanda(richiesta) {
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_COMANDA, richiesta }); } catch (_) {}
-    return r && typeof r === 'object' ? r : { ok: false, frase: 'Filo non ha risposto: riprova.' };
+    return r && typeof r === 'object' ? r : { ok: false, frase: NON_RISPOSTO };
   }
 
   function creaOpzione(testo, fn, cls = '') {
@@ -312,7 +314,7 @@
     if (!r) return;
     try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'comando_sistema_non_riuscito' })).catch(() => {}); } catch (_) {}
     const frase = document.createElement('div');
-    frase.textContent = r.frase || 'Il sistema non ha eseguito il comando.';
+    frase.textContent = r.frase || NON_RISPOSTO;
     dove.appendChild(frase);
     if (r.dove) {
       const come = document.createElement('div');
@@ -369,44 +371,100 @@
     return null;
   }
 
-  // L'elenco è una foto della radio: accesa o spenta da qui, dalla chat o dal sistema, si rilegge.
-  const firmaRadio = (voce, x) => (voce === 'bluetooth' ? String(!!(x && x.spento)) : String(x ? x.wifi : null));
+  // L'elenco è una foto della radio: accesa o spenta da qui, dalla chat o dal sistema, si rilegge. Una radio di cui
+  // il main non sa ancora lo stato (`ignoto`) non cambia la foto: la lettura dell'elenco è proprio quella che lo dice.
+  const firmaRadio = (voce, x) => (voce === 'bluetooth' ? (x && x.ignoto ? null : String(!!(x && x.spento))) : String(x ? x.wifi : null));
   const elencoDaLeggere = (voce, x) => voce === 'bluetooth' || !!etichettaRadioWifi(x);
 
-  // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
-  async function caricaElenco(questo) {
-    const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
-    questo.firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
-    // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
-    const giro = (questo.letture = (questo.letture || 0) + 1);
-    const lista = questo.elenco;
-    lista.replaceChildren();
+  // #2394 — l'ultimo elenco letto, per cosa: si mostra subito all'apertura del riquadro mentre arriva quello nuovo, e
+  // si legge già quando la home si apre, prima del clic.
+  const ultimiElenchi = { bluetooth: null, wifi: null };
+  const ELENCO_FRESCO_MS = 60 * 1000;
+  function leggiElenco(cosa, { precarica = false } = {}) {
+    const p = comanda({ cosa, elenca: true, ...(precarica ? { precarica: true } : {}) });
+    p.then((r) => { if (r && r.ok && Array.isArray(r.elenco)) ultimiElenchi[cosa] = { r, quando: Date.now() }; });
+    return p;
+  }
+  // Solo gli abbinati, e dove leggerli non chiede permessi (lo decide il main): le reti conosciute su Windows vogliono
+  // la posizione (patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md).
+  function precaricaElenchi() {
+    if (document.visibilityState === 'hidden' || visibili.bluetooth === false) return;
+    const u = ultimiElenchi.bluetooth;
+    if (!u || Date.now() - u.quando > ELENCO_FRESCO_MS) leggiElenco('bluetooth', { precarica: true }).catch(() => {});
+  }
+
+  function rigaAttesa(testo) {
     const attesa = document.createElement('div');
     attesa.className = 'dash-sis-attesa';
     const rot = document.createElement('span');
     rot.className = 'dash-sis-rotella';
     rot.setAttribute('aria-hidden', 'true');
-    attesa.append(rot, document.createTextNode(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
-    lista.appendChild(attesa);
-    const r = await comanda({ cosa, elenca: true });
+    attesa.append(rot, document.createTextNode(testo));
+    return attesa;
+  }
+
+  // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
+  // `daCapo`: la radio è cambiata, l'elenco mostrato non vale più (un «Scollega» con la radio spenta).
+  async function caricaElenco(questo, { daCapo = false } = {}) {
+    const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
+    const firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
+    if (firma !== null) questo.firma = firma;
+    if (daCapo) { questo.elencoMostrato = false; ultimiElenchi[cosa] = null; }
+    // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
+    const giro = (questo.letture = (questo.letture || 0) + 1);
+    const lista = questo.elenco;
+    const prima = ultimiElenchi[cosa];
+    if (prima && !questo.elencoMostrato) disegnaElenco(questo, cosa, prima.r, { aggiorno: true });
+    else if (!questo.elencoMostrato) lista.replaceChildren(rigaAttesa(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
+    else {
+      const segno = lista.querySelector('.dash-sis-aggiorno');
+      if (segno) segno.hidden = false;
+    }
+    const r = await leggiElenco(cosa);
     if (box !== questo || questo.letture !== giro) return;
-    if (r.ok && cosa === 'bluetooth' && Array.isArray(r.elenco)) r.elenco = inCimaIPreferiti(r.elenco);
-    lista.replaceChildren();
     if (!r.ok) {
+      questo.elencoMostrato = false;
+      lista.replaceChildren();
       const err = document.createElement('div');
       err.className = 'dash-sis-errore';
       lista.appendChild(err);
       mostraErrore(err, r);
+      lista.appendChild(creaOpzione('Rileggi l\'elenco', () => caricaElenco(questo)));
       return;
     }
-    const voci = Array.isArray(r.elenco) ? r.elenco : [];
+    disegnaElenco(questo, cosa, r);
+  }
+
+  // `aggiorno`: è l'elenco di prima, mostrato mentre arriva quello nuovo.
+  function disegnaElenco(questo, cosa, r, { aggiorno = false } = {}) {
+    const lista = questo.elenco;
+    let voci = Array.isArray(r.elenco) ? r.elenco : [];
+    if (cosa === 'bluetooth') voci = inCimaIPreferiti(voci);
+    lista.replaceChildren();
     const titolo = document.createElement('div');
     titolo.className = 'dash-sis-titolo';
     titolo.textContent = voci.length
       ? (cosa === 'wifi' ? 'Reti conosciute' : 'Dispositivi abbinati')
       : (cosa === 'wifi' ? 'Il computer non conosce nessuna rete Wi-Fi' : 'Nessun dispositivo abbinato');
+    const segno = document.createElement('span');
+    segno.className = 'dash-sis-rotella dash-sis-aggiorno';
+    segno.setAttribute('aria-hidden', 'true');
+    segno.title = 'Aggiorno';
+    segno.hidden = !aggiorno;
+    titolo.appendChild(segno);
     lista.appendChild(titolo);
     for (const v of voci) lista.appendChild(voceElenco(questo, cosa, v));
+    // Il sistema ha smesso di rispondere a metà: quello che c'è è vero, ma può mancare qualcosa.
+    if (r.parziale && !aggiorno) {
+      const nota = document.createElement('div');
+      nota.className = 'dash-sis-errore dash-sis-parziale';
+      nota.textContent = cosa === 'wifi'
+        ? 'Il sistema non ha finito di leggere le reti in tempo: ne può mancare qualcuna.'
+        : 'Il sistema non ha finito di leggere i dispositivi in tempo: ne può mancare qualcuno.';
+      lista.appendChild(nota);
+      lista.appendChild(creaOpzione('Rileggi l\'elenco', () => caricaElenco(questo)));
+    }
+    questo.elencoMostrato = true;
   }
 
   function voceElenco(questo, cosa, v) {
@@ -424,7 +482,7 @@
     }
     // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
     const collegato = v.collegato === true && !(questo.ultimo && questo.ultimo.spento);
-    const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
+    const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, indirizzo: v.indirizzo, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
     if (preferito(v)) opt.classList.add('dash-sis-preferito');
@@ -469,14 +527,14 @@
       okLabel: 'Dimentica',
     }) : false;
     if (!ok) return null;
-    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
+    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
   }
 
   function vociRiga(opt) {
     const { cosa, v, collegato } = opt._riga;
     const out = [];
     if (cosa === 'bluetooth') {
-      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, collega: !collegato })));
       const fra = preferito(v);
       out.push(voceMenu(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
         () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
@@ -575,7 +633,7 @@
     } else {
       const radio = creaOpzione('', (o) => {
         const x2 = questo.ultimo || {};
-        const acceso = v === 'rete' ? (o.dataset.accendi === '1') : !!x2.spento;
+        const acceso = v === 'rete' ? (o.dataset.accendi === '1') : !!(x2.spento || x2.ignoto);
         esegui(o, { cosa: v === 'rete' ? 'wifi' : 'bluetooth', acceso });
       });
       wrap.appendChild(radio);
@@ -605,10 +663,15 @@
       if (!box.muto.classList.contains('dash-sis-occupato')) box.muto.textContent = x.muto ? 'Togli il muto' : 'Metti muto';
       return;
     }
-    if (box.firma !== undefined && box.firma !== firmaRadio(box.voce, x) && elencoDaLeggere(box.voce, x)) caricaElenco(box);
+    const firma = firmaRadio(box.voce, x);
+    if (firma !== null && box.firma !== undefined && box.firma !== firma && elencoDaLeggere(box.voce, x)) caricaElenco(box, { daCapo: true });
+    else if (firma !== null && box.firma === undefined && box.letture) box.firma = firma;
     if (box.radio.classList.contains('dash-sis-occupato')) return;
     if (box.voce === 'bluetooth') {
-      box.radio.textContent = x.spento ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
+      // Mentre rilegge, nessun interruttore: quale dei due lo dice la lettura che arriva. Se il sistema non sa dire se è
+      // acceso, «Accendi» (su una radio già accesa non cambia niente).
+      box.radio.hidden = !!x.leggendo;
+      box.radio.textContent = x.spento || x.ignoto ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
       return;
     }
     const etichetta = etichettaRadioWifi(x);
@@ -622,12 +685,6 @@
   function imposta(voce, mostra) {
     cambiaVisibili({ ...visibili, [voce]: mostra });
     send({ type: MSG.UPDATE_SETTINGS, settings: { homeSistema: { [voce]: mostra } } }).catch(() => {});
-  }
-
-  async function copia(opt) {
-    try { await navigator.clipboard.writeText(box ? box.copia : ''); } catch (_) { chiudiBox(); return; }
-    opt.textContent = 'Copiato';
-    setTimeout(chiudiBox, 700);
   }
 
   function apriBox(v, ancora, punto) {
@@ -644,10 +701,11 @@
     righeInfo(info, x);
     info.dataset.testo = x.dettaglio.join('\n');
     el.appendChild(info);
-    const questo = { el, info, voce: v, ancora, punto, copia: x.copia };
+    const questo = { el, info, voce: v, ancora, punto };
     const comandi = creaComandi(questo, x);
     if (comandi) { el.appendChild(comandi); questo.comandi = comandi; }
-    const azioni = [['Copia', (opt) => copia(opt)], [`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
+    // #2394 — niente «Copia» del riquadro: la frase la porta chi trascina la voce in chat, il nome lo copia il tasto destro.
+    const azioni = [[`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
     for (const altra of ORDINE) {
       if (altra !== v && visibili[altra] === false && d[altra]) {
         azioni.push([`Mostra ${NOMI[altra]}`, () => { chiudiBox(); imposta(altra, true); }]);

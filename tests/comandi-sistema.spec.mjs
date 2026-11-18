@@ -93,7 +93,8 @@ test('«alza il volume al 40%» in chat: il volume del computer è al 40% e la v
   await expect.poll(async () => (await computer(app)).volume.livello).toBe(40);
   await expect(voce(page, 'volume')).toHaveText('40%', { timeout: 5_000 });
   await expect(page.locator('.dash-activity-row', { hasText: 'Volume al 40%' }).first()).toBeAttached();
-  expect(await chiamate(app)).toEqual([['volume', { livello: 40 }]]);
+  // Le letture degli elenchi (quella dei dispositivi parte all'apertura della home, #2394) non cambiano niente.
+  expect((await chiamate(app)).filter((c) => !/Elenco$/.test(c[0]))).toEqual([['volume', { livello: 40 }]]);
 });
 
 test('«spegni il Bluetooth» in chat e il tasto nel riquadro della home fanno la stessa cosa allo stesso computer', async ({ app }) => {
@@ -385,11 +386,11 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
   await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
   await expect(riquadro(page)).toHaveCount(0);
 
-  // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
+  // Dalla prima voce, freccia su gira in fondo (Nascondi, poi l'ultima rete), sotto il bordo del riquadro.
   await voce(page, 'rete').click();
   await expect(ultima).toBeAttached({ timeout: 5_000 });
   await riquadro(page).locator('.sn-select-option').first().focus();
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
   await expect(page.locator(':focus')).toHaveText('Collegati a Rete numero 40');
   await page.keyboard.press('Enter');

@@ -50,7 +50,9 @@
     return { online: true, tipo, nome: tipo === 'wifi' ? pulisciNome(r.nome) : null };
   }
 
+  // `acceso: null`: c'è un Bluetooth ma il sistema non dice se è acceso («Unknown» di Windows): non è spento.
   function normalizzaBluetooth(b) {
+    if (b && typeof b === 'object' && b.acceso === null) return { acceso: null, dispositivi: null };
     if (!b || typeof b !== 'object' || typeof b.acceso !== 'boolean') return null;
     if (!b.acceso) return { acceso: false, dispositivi: [] };
     let lista = b.dispositivi;
@@ -177,8 +179,13 @@
     };
   }
 
-  function descriviBluetooth(b) {
+  // `vecchio`: l'ultima lettura ha più di due giri e il lettore la sta rifacendo; né acceso né spento finché non arriva.
+  function descriviBluetooth(b, vecchio = false) {
     if (!b) return null;
+    if (vecchio || b.acceso === null) {
+      const riga = vecchio ? 'Leggo lo stato del Bluetooth…' : 'Il sistema non dice se il Bluetooth è acceso';
+      return { testo: '', hover: vecchio ? 'Bluetooth: leggo lo stato' : 'Bluetooth', icona: 'bluetooth', spento: false, ignoto: true, leggendo: vecchio, dettaglio: [riga], copia: riga };
+    }
     if (!b.acceso) {
       return { testo: '', hover: 'Bluetooth spento', icona: 'bluetoothOff', spento: true, dettaglio: ['Bluetooth spento'], copia: 'Bluetooth spento' };
     }
@@ -205,14 +212,18 @@
     };
   }
 
+  // Le radio che il main dà come lette più di due giri fa (`stato.vecchio`, statoSistema.js): non si dicono accese né spente.
+  const vecchie = (stato) => (stato && Array.isArray(stato.vecchio) ? stato.vecchio : []);
+
   // Le voci della home: null dove il dato manca, e la voce non compare.
   function descrivi(stato, adesso = new Date()) {
     const s = normalizza(stato);
+    const v = vecchie(stato);
     return {
       ora: descriviOra(adesso),
       batteria: descriviBatteria(s.batteria),
-      rete: descriviRete(s.rete, s.wifi),
-      bluetooth: descriviBluetooth(s.bluetooth),
+      rete: descriviRete(s.rete, v.includes('wifi') ? null : s.wifi),
+      bluetooth: descriviBluetooth(s.bluetooth, v.includes('bluetooth')),
       volume: descriviVolume(s.volume),
     };
   }
@@ -238,6 +249,7 @@
     else righe.push('Rete: collegato.');
     const bt = s.bluetooth;
     if (!bt) righe.push('Bluetooth: nessun adattatore (o il sistema non lo dice).');
+    else if (bt.acceso === null) righe.push('Bluetooth: c\'è, ma il sistema non dice se è acceso.');
     else if (!bt.acceso) righe.push('Bluetooth: spento.');
     else if (bt.dispositivi === null) righe.push('Bluetooth: acceso (quali dispositivi sono collegati il sistema non lo dice).');
     else if (!bt.dispositivi.length) righe.push('Bluetooth: acceso, nessun dispositivo collegato.');

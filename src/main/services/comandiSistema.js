@@ -41,6 +41,80 @@ $null = [Windows.Devices.Radios.RadioState,Windows.System.Devices,ContentType=Wi
 $null = [Windows.Devices.Radios.RadioAccessStatus,Windows.System.Devices,ContentType=WindowsRuntime]
 `;
 
+// I dispositivi abbinati in una ricerca sola, con indirizzo, collegamento e contenitore chiesti insieme (niente
+// FromIdAsync, che costava un'attesa per dispositivo): lo usano lo script dell'elenco e il lettore della home
+// (statoSistema.js), che lo tiene già caricato. Vuole `$asTask`. «Unknown» della radio resta null: non è spento.
+const PS_ELENCO_BT = String.raw`try {
+  $null = [Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceInformationKind,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+} catch {}
+function AttendiElenco($op, [Type]$tipo, [int]$ms) {
+  $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($op))
+  if ($t.Wait($ms)) { $t.Result } else { $null }
+}
+function ElencoBt {
+  $esito = [ordered]@{ acceso = $null; dispositivi = $null; errore = $null }
+  $tutte = AttendiElenco ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]]) 5000
+  if ($null -eq $tutte) { $esito.errore = 'tempo-comando'; return $esito }
+  $bt = @($tutte | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
+  if ($bt.Count -eq 0) { $esito.errore = 'nessuna-radio'; return $esito }
+  if (@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $esito.acceso = $true }
+  elseif (@($bt | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $esito.acceso = $false }
+  $classico = 'e0cbf06c-cd8b-4647-bb8a-263b43f0f974'
+  $basso = 'bb7bb05e-5972-42b5-94fc-76eaa7084d49'
+  $proprieta = [string[]]@('System.Devices.Aep.DeviceAddress', 'System.Devices.Aep.IsConnected', 'System.Devices.Aep.ContainerId', 'System.Devices.Aep.ProtocolId')
+  $tipo = [Windows.Devices.Enumeration.DeviceInformationKind]::AssociationEndpoint
+  $abbinati = 'System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True'
+  $q = [string][char]34
+  $protocollo = { param($id) 'System.Devices.Aep.ProtocolId:=' + $q + '{' + $id + '}' + $q }
+  $insieme = [Windows.Devices.Enumeration.DeviceInformationCollection]
+  $trovati = $null
+  try {
+    $filtro = '(' + (& $protocollo $classico) + ' OR ' + (& $protocollo $basso) + ') AND ' + $abbinati
+    $trovati = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync($filtro, $proprieta, $tipo)) $insieme 8000
+    if ($null -eq $trovati) { $esito.errore = 'tempo-comando'; return $esito }
+  } catch {
+    # Una ricerca per protocollo, se Windows non accetta l'OR.
+    $trovati = @()
+    foreach ($p in @($classico, $basso)) {
+      $parte = AttendiElenco ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync(((& $protocollo $p) + ' AND ' + $abbinati), $proprieta, $tipo)) $insieme 8000
+      if ($null -eq $parte) { $esito.errore = 'tempo-comando'; return $esito }
+      $trovati += @($parte)
+    }
+  }
+  $lista = New-Object System.Collections.ArrayList
+  $cercati = 0
+  foreach ($d in @($trovati)) {
+    $ind = ''
+    try { $ind = ([string]$d.Properties['System.Devices.Aep.DeviceAddress']) -replace '[^0-9A-Fa-f]', '' } catch {}
+    if ($ind.Length -ne 12) {
+      $m = [regex]::Match([string]$d.Id, '([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$')
+      if ($m.Success) { $ind = $m.Value -replace '[:-]', '' }
+    }
+    if ($ind.Length -ne 12) { continue }
+    $le = ([string]$d.Id) -like 'BluetoothLE#*'
+    try { if (([string]$d.Properties['System.Devices.Aep.ProtocolId']).Trim('{}').ToLower() -eq $basso) { $le = $true } } catch {}
+    $collegato = $null
+    try { $c = $d.Properties['System.Devices.Aep.IsConnected']; if ($null -ne $c) { $collegato = [bool]$c } } catch {}
+    $contenitore = ''
+    try { $contenitore = ([string]$d.Properties['System.Devices.Aep.ContainerId']).Trim('{}').ToLower() } catch {}
+    $nome = [string]$d.Name
+    if ((-not $nome.Trim()) -and $le -and $cercati -lt 3) {
+      $cercati += 1
+      try {
+        $dev = AttendiElenco ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) 2000
+        if ($null -ne $dev) { $nome = [string]$dev.Name }
+      } catch {}
+    }
+    $null = $lista.Add([ordered]@{ indirizzo = $ind.ToLower(); nome = $nome; collegato = $collegato; le = $le; contenitore = $contenitore })
+  }
+  $esito.dispositivi = @($lista)
+  return $esito
+}
+`;
+
 // Core Audio dell'uscita predefinita (C# 5: lo compila il PowerShell 5.1 di Windows). Lo legge anche statoSistema.js.
 const CS_VOLUME = String.raw`using System;
 using System.Runtime.InteropServices;
@@ -416,43 +490,14 @@ try {
   Dice 'acceso' ([int](@($dopo | Where-Object { $_ -eq 'On' }).Count -gt 0))
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
-    'bt-elenco': PS_INIZIO + String.raw`try {
-` + PS_ATTESA + PS_RADIO_TIPI + String.raw`  $null = [Windows.Devices.Bluetooth.BluetoothDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
-  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
-  $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
-} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+    // La strada di riserva: di solito l'elenco lo dà il lettore della home, già acceso (statoSistema.js).
+    'bt-elenco': PS_INIZIO + String.raw`try { Remove-TypeData System.Array } catch {}
 try {
-  $tutte = Attendi ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
-  $bt = @($tutte | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
-  if ($bt.Count -eq 0) { Dice 'errore' 'nessuna-radio'; exit 0 }
-  Dice 'acceso' ([int](@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0))
-  $visti = @{}
-  $classici = Attendi ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync([Windows.Devices.Bluetooth.BluetoothDevice]::GetDeviceSelectorFromPairingState($true))) ([Windows.Devices.Enumeration.DeviceInformationCollection])
-  foreach ($d in @($classici)) {
-    try {
-      $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothDevice])
-      if ($null -eq $dev) { continue }
-      $ind = '{0:x12}' -f $dev.BluetoothAddress
-      if ($visti.ContainsKey($ind)) { continue }
-      $visti[$ind] = 1
-      Dice 'dispositivo' $ind
-      Dice 'nome' ([string]$d.Name)
-      Dice 'collegato' ([int]([string]$dev.ConnectionStatus -eq 'Connected'))
-    } catch {}
-  }
-  $le = Attendi ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync([Windows.Devices.Bluetooth.BluetoothLEDevice]::GetDeviceSelectorFromPairingState($true))) ([Windows.Devices.Enumeration.DeviceInformationCollection])
-  foreach ($d in @($le)) {
-    try {
-      $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromIdAsync($d.Id)) ([Windows.Devices.Bluetooth.BluetoothLEDevice])
-      if ($null -eq $dev) { continue }
-      $ind = '{0:x12}' -f $dev.BluetoothAddress
-      if ($visti.ContainsKey($ind)) { continue }
-      $visti[$ind] = 1
-      Dice 'dispositivo' $ind
-      Dice 'nome' ([string]$d.Name)
-      Dice 'collegato' ([int]([string]$dev.ConnectionStatus -eq 'Connected'))
-    } catch {}
-  }
+` + PS_ATTESA + String.raw`} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+` + PS_ELENCO_BT + String.raw`try {
+  $e = ElencoBt
+  if ($e.errore) { Dice 'errore' $e.errore; exit 0 }
+  Dice 'elenco' (ConvertTo-Json -InputObject $e -Compress -Depth 5)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
     'bt-collega': PS_INIZIO + String.raw`$indirizzo = [string]$env:FILO_SIS_INDIRIZZO
@@ -480,6 +525,7 @@ try {
   Dice 'collegato' ([int]($stato -eq 'Connected'))
 } catch { Dice 'collegato' '' }
 `,
+    // La strada di riserva, come per il Bluetooth: di solito risponde il lettore della home.
     'wifi-elenco': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
   $e = [FiloWlan.Wlan]::Elenco()
   Dice 'codice' $e.Codice
@@ -961,18 +1007,90 @@ function dispositiviMac(righe) {
   }));
 }
 
+// `parziale`: lo script è stato fermato a tempo scaduto dopo aver già scritto qualche dispositivo (#2394).
 function interpretaBtElenco(u, piattaforma) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') return elencoBtWindows(jsonDi(u.primo('elenco')));
   let dispositivi;
   if (piattaforma === 'darwin') {
     if (intero(u.primo('uscita')) > 0) return { ok: false, errore: 'permesso-bluetooth' };
     dispositivi = dispositiviMac(u.blocco('dispositivi'));
     if (!dispositivi) return { ok: false, errore: 'sconosciuto' };
   } else dispositivi = dispositiviDaVoci(u, piattaforma);
-  const valide = dispositivi.filter((d) => d.indirizzo && INDIRIZZO[piattaforma].test(normalizzaIndirizzo(d.indirizzo, piattaforma)));
+  return validaElencoBt({ ok: true, acceso: bit(u.primo('acceso')), dispositivi, ...(u.tempoScaduto ? { parziale: true } : {}) }, piattaforma);
+}
+
+function validaElencoBt(r, piattaforma) {
+  const valide = r.dispositivi.filter((d) => d.indirizzo && INDIRIZZO[piattaforma].test(normalizzaIndirizzo(d.indirizzo, piattaforma)));
   for (const d of valide) d.indirizzo = normalizzaIndirizzo(d.indirizzo, piattaforma);
-  return { ok: true, acceso: bit(u.primo('acceso')), dispositivi: valide };
+  return { ...r, dispositivi: valide };
+}
+
+function jsonDi(v) {
+  try { return v == null ? null : JSON.parse(String(v)); } catch (_) { return null; }
+}
+// Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}; un elemento solo, senza le parentesi.
+function elencoPs(v) {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === 'object' && Array.isArray(v.value)) return v.value;
+  if (v && typeof v === 'object') return [v];
+  return v == null ? [] : null;
+}
+
+// L'elenco di ElencoBt (PS_ELENCO_BT), dallo script o dal lettore della home: una lettura sola per le due strade.
+function elencoBtWindows(o) {
+  if (!o || typeof o !== 'object') return { ok: false, errore: 'sconosciuto' };
+  if (o.errore) return { ok: false, errore: String(o.errore) };
+  const lista = elencoPs(o.dispositivi);
+  if (!lista) return { ok: false, errore: 'sconosciuto' };
+  const dispositivi = lista.filter((d) => d && typeof d === 'object').map((d) => ({
+    indirizzo: String(d.indirizzo || ''),
+    nome: typeof d.nome === 'string' ? d.nome : '',
+    collegato: typeof d.collegato === 'boolean' ? d.collegato : null,
+    le: d.le === true,
+    contenitore: typeof d.contenitore === 'string' && d.contenitore ? d.contenitore : null,
+  }));
+  return validaElencoBt({ ok: true, acceso: typeof o.acceso === 'boolean' ? o.acceso : null, dispositivi }, 'win32');
+}
+
+const indirizzoLeggibile = (ind) => {
+  const cifre = String(ind || '').replace(/[^0-9A-Fa-f]/g, '');
+  return cifre.length === 12 ? cifre.toUpperCase().match(/../g).join(':') : String(ind || '');
+};
+// Windows lascia senza nome molti dispositivi LE abbinati: si chiamano come li chiama lui, mai «».
+const nomeDiRiserva = (d) => `Dispositivo Bluetooth${d.le ? ' LE' : ''} ${indirizzoLeggibile(d.indirizzo)}`;
+// Contenitore tutto zeri: Windows non sa a quale apparecchio appartiene.
+const contenitoreVero = (c) => (typeof c === 'string' && /[1-9a-f]/i.test(c) ? c.toLowerCase() : null);
+
+// Le cuffie che parlano classico e LE sono due voci abbinate nello stesso contenitore di Windows: una sola riga,
+// con l'indirizzo classico (quello che collega l'audio), il nome di chi ce l'ha e il collegamento del classico.
+function unisciIdentita(a, b) {
+  const [base, altra] = a.le && !b.le ? [b, a] : [a, b];
+  return {
+    ...base,
+    nome: base.nome && base.nome.trim() ? base.nome : altra.nome,
+    collegato: typeof base.collegato === 'boolean' ? base.collegato : altra.collegato,
+  };
+}
+
+// Su ogni piattaforma e per ogni strada (computer vero o delle prove): nessuna riga senza nome, una per apparecchio.
+function rifinisciDispositivi(lista) {
+  const out = [];
+  const perContenitore = new Map();
+  for (const d of Array.isArray(lista) ? lista : []) {
+    if (!d || typeof d !== 'object') continue;
+    const c = contenitoreVero(d.contenitore);
+    const i = c && perContenitore.has(c) ? perContenitore.get(c) : -1;
+    if (i >= 0) { out[i] = unisciIdentita(out[i], d); continue; }
+    if (c) perContenitore.set(c, out.length);
+    out.push({ ...d });
+  }
+  return out.map((d) => {
+    const x = { ...d, nome: typeof d.nome === 'string' && d.nome.trim() ? d.nome : nomeDiRiserva(d) };
+    delete x.contenitore;
+    return x;
+  });
 }
 
 function interpretaBtCollega(u, piattaforma, collega) {
@@ -1032,12 +1150,12 @@ function interpretaWifiElenco(u, piattaforma) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
   if (piattaforma === 'win32') {
-    const codice = intero(u.primo('codice'));
-    if (codice) return { ok: false, errore: erroreWlan(codice) };
-    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
-    const attuale = u.primo('attuale');
-    const reti = u.voci.filter((v) => v.k === 'rete' && v.v).map((v) => ({ nome: v.v, attiva: v.v === attuale }));
-    return { ok: true, acceso: null, reti, attuale: attuale || null };
+    return elencoWifiWindows({
+      codice: intero(u.primo('codice')),
+      interfacce: intero(u.primo('interfacce')),
+      reti: u.voci.filter((v) => v.k === 'rete').map((v) => v.v),
+      attuale: u.primo('attuale'),
+    });
   }
   const righe = u.blocco('reti');
   let reti = [];
@@ -1052,7 +1170,19 @@ function interpretaWifiElenco(u, piattaforma) {
     reti = righe.filter((r) => /^\s/.test(r) && r.trim()).map((r) => ({ nome: r.replace(/^\t/, '').replace(/^\s+/, ''), attiva: false }));
   }
   const attiva = reti.find((r) => r.attiva);
-  return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null };
+  return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null, ...(u.tempoScaduto ? { parziale: true } : {}) };
+}
+
+// Wlan.Elenco() di CS_WLAN, dallo script o dal lettore della home (statoSistema.js).
+function elencoWifiWindows(o) {
+  if (!o || typeof o !== 'object') return { ok: false, errore: 'sconosciuto' };
+  if (o.errore) return { ok: false, errore: String(o.errore) };
+  const codice = Number(o.codice) || 0;
+  if (codice) return { ok: false, errore: erroreWlan(codice) };
+  if (o.interfacce != null && Number(o.interfacce) === 0) return { ok: false, errore: 'nessuna-radio' };
+  const attuale = typeof o.attuale === 'string' && o.attuale ? o.attuale : null;
+  const nomi = (elencoPs(o.reti) || []).filter((n) => typeof n === 'string' && n);
+  return { ok: true, acceso: null, reti: [...new Set(nomi)].map((nome) => ({ nome, attiva: nome === attuale })), attuale };
 }
 
 // I codici di wlanapi che l'utente può fare qualcosa per togliere.
@@ -1122,11 +1252,30 @@ function pannelliImpostazioni(piattaforma = piattaformaPannelli || process.platf
   return { ...(PANNELLI[piattaforma] || {}) };
 }
 
-function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
+// Solo per un codice che nessuno script scrive (un RadioAccessStatus nuovo di Windows, per esempio).
+const FRASE_RISERVA = 'Il sistema non ha eseguito il comando.';
+
+// Ogni codice d'errore ha la sua frase (cosa è successo, cosa può fare l'utente): la sentinella è in
+// tests/unit/comandiSistema.test.mjs. Il dettaglio tecnico va nel log (eseguiScript), non qui.
+function spiega(errore, { cosa, piattaforma = process.platform, nome = '', elenca = false } = {}) {
   const radio = cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth';
   const Radio = cosa === 'wifi' ? 'Il Wi-Fi' : 'Il Bluetooth';
+  const oggetto = cosa === 'volume' ? 'il volume' : radio;
   const chi = nome ? `«${nome}»` : 'il dispositivo';
+  const elenco = cosa === 'wifi' ? 'le reti conosciute' : 'i dispositivi abbinati';
+  const pannello = (PANNELLI[piattaforma] || {})[cosa === 'volume' ? 'audio' : cosa === 'wifi' ? 'wifi' : 'bluetooth'];
+  const dalSistema = pannello ? 'Riprova; se non va ancora, si fa dalle impostazioni del sistema.' : 'Riprova fra qualche secondo.';
   const T = {
+    'tempo-comando': elenca
+      ? { frase: `Il sistema non ha finito di leggere ${elenco} in tempo.`, dove: 'Di solito alla seconda prova risponde: riprova fra qualche secondo.' }
+      : { frase: `Il sistema non ha finito di cambiare ${oggetto} in tempo: può essere ancora occupato.`, dove: dalSistema, apri: pannello },
+    winrt: { frase: `Windows non ha dato a Filo i suoi strumenti per ${elenca ? `leggere ${elenco}` : `comandare ${oggetto}`}.`, dove: dalSistema, apri: pannello },
+    eccezione: { frase: `Windows ha interrotto ${elenca ? `la lettura di ${elenco}` : `il comando per ${oggetto}`} con un errore.`, dove: dalSistema, apri: pannello },
+    compilazione: { frase: `Windows non ha accettato il comando che Filo prepara per ${oggetto}.`, dove: dalSistema, apri: pannello },
+    sconosciuto: { frase: `Il sistema ha risposto in un modo che Filo non sa leggere${elenca ? `, e ${elenco} non sono arrivati` : ''}.`, dove: dalSistema, apri: pannello },
+    indirizzo: { frase: `Filo non ha capito l'indirizzo Bluetooth di ${chi}.`, dove: 'Si collega dalle impostazioni Bluetooth del sistema.', apri: pannello },
+    comando: { frase: 'Il sistema ha rifiutato il cambio del volume.', dove: 'Si cambia dal menu audio del desktop.' },
+    'elenco-parziale': { frase: `Il sistema non ha finito di leggere ${elenco}, e ${nome ? `«${nome}»` : 'quello chiesto'} non era fra quelli arrivati.`, dove: 'Riprova fra qualche secondo.' },
     'accesso-DeniedByUser': {
       frase: 'Windows non lascia a Filo accendere e spegnere le radio.',
       dove: 'Si concede in Impostazioni → Privacy e sicurezza → Radio, con «Consenti alle app di controllare le radio del dispositivo».',
@@ -1224,7 +1373,7 @@ function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}
     'non-supportato': { frase: 'Su questo sistema Filo non sa ancora comandarlo.' },
     prove: { frase: 'Durante le prove automatiche Filo non comanda il computer vero.' },
   };
-  const voce = T[errore] || { frase: 'Il sistema non ha eseguito il comando.' };
+  const voce = T[errore] || { frase: FRASE_RISERVA };
   const fuori = { errore, frase: voce.frase };
   if (voce.dove) fuori.dove = voce.dove;
   if (voce.apri && IMPOSTAZIONI[voce.apri]) fuori.apri = voce.apri;
@@ -1324,24 +1473,44 @@ async function eseguiScript(comando, p) {
   const { shell, script, env } = costruisci(comando, p, piattaforma);
   // Fuori da Windows i messaggi dei programmi si leggono in inglese; i nomi restano in UTF-8.
   const lingua = piattaforma === 'linux' ? { LC_ALL: 'C.UTF-8' } : {};
+  // Senza preludio UTF-8 (chcp costa un secondo): le righe «FILO:» sono tutte ASCII, gli script le scrivono già così.
   const r = await terminale.runCommand(script, {
     shell: terminale.resolveShell(shell),
     env: { ...process.env, ...lingua, ...env },
     timeoutMs: TEMPI_MS[comando],
+    preludio: false,
   });
   const u = leggiUscita(r.stdout);
-  if (r.timedOut && !u.voci.length) u.voci.push({ k: 'errore', v: 'tempo-comando', righe: [] });
+  if (r.timedOut) {
+    // Un elenco fermato a metà vale per quello che è arrivato, e lo dice; un comando a metà non è riuscito.
+    if (ELENCHI.has(comando) && u.voci.length && !u.primo('errore')) u.tempoScaduto = true;
+    else if (!u.primo('errore')) u.voci.unshift({ k: 'errore', v: 'tempo-comando', righe: [] });
+  }
   if (r.truncated) u.troncato = true;
+  const errore = u.primo('errore');
+  if (errore || u.tempoScaduto) {
+    const dettaglio = u.primo('dettaglio') || String(r.stderr || '').trim().slice(0, 500);
+    console.warn('[Filo] comando del sistema:', comando, errore || 'elenco a metà', dettaglio || '');
+  }
   return u;
 }
+const ELENCHI = new Set(['bt-elenco', 'wifi-elenco']);
 
 // Il computer vero, oppure quello delle prove: stessa forma, dati già interpretati.
 const COMPUTER = {
   async volume(p) { return interpretaVolume(await eseguiScript('volume', p)); },
   async radio(p) { return interpretaRadio(await eseguiScript('radio', p), process.platform, p.radio, p.acceso); },
-  async btElenco() { return interpretaBtElenco(await eseguiScript('bt-elenco', {}), process.platform); },
+  async btElenco() {
+    const o = await dalLettore('bluetooth');
+    if (o) return o.tempo ? { ok: false, errore: 'tempo-comando' } : elencoBtWindows(o);
+    return interpretaBtElenco(await eseguiScript('bt-elenco', {}), process.platform);
+  },
   async btCollega(p) { return interpretaBtCollega(await eseguiScript('bt-collega', p), process.platform, p.collega); },
-  async wifiElenco() { return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform); },
+  async wifiElenco() {
+    const o = await dalLettore('wifi');
+    if (o) return o.tempo ? { ok: false, errore: 'tempo-comando' } : elencoWifiWindows(o);
+    return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform);
+  },
   async wifiCollega(p) { return interpretaWifiCollega(await eseguiScript('wifi-collega', p), process.platform, p.rete); },
   async btDimentica(p) { return interpretaBtDimentica(await eseguiScript('bt-dimentica', p), process.platform); },
   async wifiDimentica(p) { return interpretaWifiDimentica(await eseguiScript('wifi-dimentica', p), process.platform); },
@@ -1349,6 +1518,20 @@ const COMPUTER = {
 const computer = () => computerFinto || COMPUTER;
 
 const sistemaMain = () => globalThis.SN_SISTEMA_MAIN || null;
+
+// Su Windows gli elenchi li legge il PowerShell del lettore della home, già acceso e con WinRT caricato: un PowerShell
+// nuovo costa da solo secondi (#2394). null: il lettore non può, e si passa allo script.
+async function dalLettore(cosa) {
+  const M = sistemaMain();
+  if (process.platform !== 'win32' || !M || typeof M.elencoDalLettore !== 'function') return null;
+  try { return await M.elencoDalLettore(cosa); } catch (_) { return null; }
+}
+
+// L'acceso letto con l'elenco è una lettura vera della radio: il lettore della home la usa (#2394).
+function radioLetta(voce, acceso) {
+  const M = sistemaMain();
+  try { if (M && typeof M.radioLetta === 'function') M.radioLetta(voce, acceso); } catch (_) {}
+}
 
 // Quello che il comando ha appena cambiato si vede subito nella home, senza aspettare il giro del lettore.
 function annunciaCambio(parziale) {
@@ -1398,20 +1581,24 @@ function normalizzaRichiesta(r) {
   }
   if (cosa === 'bluetooth' || cosa === 'wifi') {
     const out = { cosa };
-    if (vero(q.elenca)) { out.elenca = true; return out; }
+    if (vero(q.elenca)) { out.elenca = true; if (q.precarica === true) out.precarica = true; return out; }
     const nome = testo(cosa === 'wifi' ? (q.rete ?? q.nome ?? q.ssid) : (q.dispositivo ?? q.nome));
-    if (nome) {
-      const errore = nomeValido(nome);
-      if (errore) return { errore: `nome ${errore}` };
+    // Riquadro e tasto destro passano anche l'indirizzo: trova il dispositivo anche senza nome, e fra due nomi uguali.
+    const indirizzo = cosa === 'bluetooth' && normalizzaIndirizzo(q.indirizzo, 'win32') ? String(q.indirizzo).trim() : null;
+    if (nome || indirizzo) {
+      if (nome) {
+        const errore = nomeValido(nome);
+        if (errore) return { errore: `nome ${errore}` };
+      }
       out.nome = nome;
+      if (indirizzo) out.indirizzo = indirizzo;
       // #2096 — dimenticare il dispositivo abbinato o la rete conosciuta: chi la chiede la conferma prima.
       if (vero(q.dimentica)) { out.dimentica = true; return out; }
-      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori: l'indirizzo, se c'è, sceglie fra due nomi uguali.
+      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori.
       if (cosa === 'bluetooth' && q.preferito != null && q.preferito !== '') {
         const b = booleano(q.preferito);
         if (b === null) return { errore: 'preferito non capito: true o false' };
         out.preferito = b;
-        if (typeof q.indirizzo === 'string' && /^[0-9A-Fa-f:-]{12,17}$/.test(q.indirizzo)) out.indirizzo = q.indirizzo;
         return out;
       }
       if (cosa === 'bluetooth') {
@@ -1462,17 +1649,23 @@ async function segnaPreferito(d, si) {
 
 async function bluetooth(q) {
   if (q.acceso != null) return radio(q);
-  const elenco = await computer().btElenco();
-  if (!elenco.ok) return fallito(elenco.errore, q);
-  if (q.elenca) return { ok: true, cosa: 'bluetooth', elenco: elenco.dispositivi, acceso: elenco.acceso };
+  const letto = await computer().btElenco();
+  if (!letto.ok) return fallito(letto.errore, { ...q, elenca: true });
+  radioLetta('bluetooth', letto.acceso);
+  const elenco = { ...letto, dispositivi: rifinisciDispositivi(letto.dispositivi) };
+  const parziale = elenco.parziale ? { parziale: true } : {};
+  if (q.elenca) return { ok: true, cosa: 'bluetooth', elenco: elenco.dispositivi, acceso: elenco.acceso, ...parziale };
   const nomi = elenco.dispositivi.map((d) => d.nome);
-  const s = scegliNome(q.nome, nomi);
-  if (!s.scelto) {
-    const f = fallito(s.candidati ? 'ambiguo' : 'nessun-dispositivo', { ...q, nome: q.nome });
-    return { ...f, candidati: s.candidati || nomi };
+  const stesso = (a, b) => a === b || (!!normalizzaIndirizzo(a) && normalizzaIndirizzo(a) === normalizzaIndirizzo(b));
+  let d = q.indirizzo ? elenco.dispositivi.find((x) => stesso(x.indirizzo, q.indirizzo)) : null;
+  if (!d) {
+    const s = q.nome ? scegliNome(q.nome, nomi) : {};
+    if (!s.scelto) {
+      const errore = s.candidati ? 'ambiguo' : elenco.parziale ? 'elenco-parziale' : 'nessun-dispositivo';
+      return { ...fallito(errore, { ...q, nome: q.nome }), candidati: s.candidati || nomi };
+    }
+    d = elenco.dispositivi.find((x) => x.nome === s.scelto);
   }
-  const d = (q.indirizzo && elenco.dispositivi.find((x) => x.indirizzo === q.indirizzo && x.nome === s.scelto))
-    || elenco.dispositivi.find((x) => x.nome === s.scelto);
   if (q.preferito != null) {
     await segnaPreferito(d, q.preferito);
     return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, preferito: q.preferito };
@@ -1501,12 +1694,13 @@ async function bluetooth(q) {
 async function wifi(q) {
   if (q.acceso != null) return radio(q);
   const elenco = await computer().wifiElenco();
-  if (!elenco.ok) return fallito(elenco.errore, q);
-  if (q.elenca) return { ok: true, cosa: 'wifi', elenco: elenco.reti, acceso: elenco.acceso, attuale: elenco.attuale };
+  if (!elenco.ok) return fallito(elenco.errore, { ...q, elenca: true });
+  radioLetta('wifi', elenco.acceso);
+  if (q.elenca) return { ok: true, cosa: 'wifi', elenco: elenco.reti, acceso: elenco.acceso, attuale: elenco.attuale, ...(elenco.parziale ? { parziale: true } : {}) };
   const nomi = elenco.reti.map((x) => x.nome);
   const s = scegliNome(q.nome, nomi);
   if (!s.scelto) {
-    const f = fallito(s.candidati ? 'ambiguo' : 'nessuna-rete', q);
+    const f = fallito(s.candidati ? 'ambiguo' : elenco.parziale ? 'elenco-parziale' : 'nessuna-rete', q);
     return { ...f, candidati: s.candidati || nomi };
   }
   const rete = elenco.reti.find((x) => x.nome === s.scelto);
@@ -1547,9 +1741,14 @@ function nelFilo(richiesta, r) {
   return r;
 }
 
+// #2394 — dove la home legge gli abbinati prima del clic: solo dove leggerli non chiede un permesso (su Mac blueutil
+// passa dal permesso del Bluetooth, che si chiede solo a un gesto dell'utente).
+const PRECARICABILE = { bluetooth: ['win32', 'linux'] };
+
 function comanda(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore) return Promise.resolve(nelFilo(richiesta, { ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore }));
+  if (q.precarica && !(PRECARICABILE[q.cosa] || []).includes(process.platform)) return Promise.resolve({ ok: false, cosa: q.cosa, saltato: true });
   const esegui = async () => {
     try {
       // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
@@ -1573,7 +1772,7 @@ async function risolviNome(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore || !q.nome || (q.cosa !== 'wifi' && q.cosa !== 'bluetooth')) return {};
   const r = await comanda({ cosa: q.cosa, elenca: true });
-  if (!r.ok || !Array.isArray(r.elenco)) return {};
+  if (!r.ok || !Array.isArray(r.elenco) || r.parziale) return {};
   const nomi = r.elenco.map((x) => x.nome);
   const s = scegliNome(q.nome, nomi);
   if (s.scelto) {
@@ -1603,9 +1802,9 @@ globalThis.SN_COMANDI_SISTEMA = api;
 module.exports = {
   ...api,
   PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE, IMPOSTAZIONI, INDIRIZZO,
-  costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
+  costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega, FRASE_RISERVA,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
-  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI,
-  campiNmcli, erroreWlan,
-  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
+  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI, elencoBtWindows, elencoWifiWindows, rifinisciDispositivi,
+  campiNmcli, erroreWlan, eseguiScript,
+  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, PS_ELENCO_BT, SH_INIZIO, psCompila },
 };

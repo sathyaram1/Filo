@@ -290,8 +290,16 @@ test('Windows: senza posizione il Wi-Fi lo dice, e la radio spenta si riconosce'
 });
 
 test('Windows: i dispositivi abbinati con nome, indirizzo e stato; un dispositivo che non è audio lo dice', () => {
-  const u = C.leggiUscita('FILO:acceso=1\nFILO:dispositivo=001122aabbcc\nFILO:nome=WH-1000XM4\nFILO:collegato=0\nFILO:dispositivo=zz\nFILO:nome=strano\n');
-  assert.deepEqual(C.interpretaBtElenco(u, 'win32'), { ok: true, acceso: true, dispositivi: [{ indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false }] });
+  const elenco = { acceso: true, errore: null, dispositivi: [
+    { indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false, le: false, contenitore: 'c1' },
+    { indirizzo: 'zz', nome: 'strano', collegato: null, le: false, contenitore: '' },
+  ] };
+  const u = C.leggiUscita(`FILO:elenco=${JSON.stringify(elenco)}\n`);
+  assert.deepEqual(C.interpretaBtElenco(u, 'win32'), { ok: true, acceso: true, dispositivi: [{ indirizzo: '001122aabbcc', nome: 'WH-1000XM4', collegato: false, le: false, contenitore: 'c1' }] });
+  // Lo stesso elenco dal lettore della home: una lettura sola per le due strade.
+  assert.deepEqual(C.elencoBtWindows(elenco), C.interpretaBtElenco(u, 'win32'));
+  // PowerShell 5.1 scrive un elenco di un solo elemento senza le parentesi.
+  assert.equal(C.elencoBtWindows({ acceso: true, dispositivi: elenco.dispositivi[0] }).dispositivi.length, 1);
   const na = C.interpretaBtCollega(C.leggiUscita('FILO:errore=non-audio\n'), 'win32', true);
   assert.equal(na.errore, 'non-audio');
   assert.equal(C.IMPOSTAZIONI[C.spiega('non-audio', { piattaforma: 'win32' }).apri], 'ms-settings:bluetooth');
@@ -607,6 +615,139 @@ esac`,
   assert.deepEqual(w, { ok: true });
   assert.deepEqual(pc.chiamate('networksetup').filter((a) => a[0] === '-removepreferredwirelessnetwork'), [['-removepreferredwirelessnetwork', 'en0', nome]]);
   assert.deepEqual(readdirSync(pc.lavoro), [], 'un nome ha eseguito qualcosa');
+});
+
+// #2394 — ogni codice che uno script o un interprete può scrivere ha la sua frase, non quella di riserva: lo
+// sentinella legge i codici dal sorgente, così uno nuovo senza frase fa rosso qui.
+test('ogni codice d\'errore dei comandi e degli elenchi ha una frase propria, diversa da quella di riserva', () => {
+  const sorgenti = ['comandiSistema.js', 'statoSistema.js'].map((f) => readFileSync(join(ROOT, 'src', 'main', 'services', f), 'utf8')).join('\n');
+  const codici = new Set();
+  for (const re of [/Dice 'errore' '([a-z][a-z-]*)'/g, /dice errore ([a-z][a-z-]*)/g, /FILO:errore=([a-z][a-z-]*)/g,
+    /errore: '([a-z][a-z-]*)'/g, /errore = '([a-z][a-z-]*)'/g, /fallito\('([a-z][a-z-]*)'/g,
+    /errore[^\n]*?\? '([a-z][a-z-]*)' : '([a-z][a-z-]*)'/g]) {
+    for (const m of sorgenti.matchAll(re)) for (const c of m.slice(1)) if (c) codici.add(c);
+  }
+  for (const n of [5, 1062, 1168, 87, -2144067582, 5023, -1, 12345]) codici.add(C.erroreWlan(n));
+  for (const s of ['DeniedByUser', 'DeniedBySystem', 'Unspecified']) codici.add(`accesso-${s}`);
+  // Non sono errori: 'richiesta' porta già la sua frase; gli altri sono valori di erroreWlan/interpretazioni intermedie.
+  for (const non of ['richiesta', 'wifi', 'bluetooth']) codici.delete(non);
+  for (const c of ['tempo-comando', 'winrt', 'eccezione', 'compilazione', 'sconosciuto', 'indirizzo']) assert.ok(codici.has(c), `la sentinella non trova ${c}`);
+  for (const codice of codici) {
+    for (const cosa of ['bluetooth', 'wifi', 'volume']) {
+      for (const elenca of [false, true]) {
+        for (const piattaforma of ['win32', 'darwin', 'linux']) {
+          const s = C.spiega(codice, { cosa, elenca, piattaforma });
+          assert.notEqual(s.frase, C.FRASE_RISERVA, `${codice} (${cosa}, ${piattaforma}) usa la frase di riserva`);
+          if (s.apri) assert.ok(C.IMPOSTAZIONI[s.apri], `${codice}: «${s.apri}» non apre niente`);
+        }
+      }
+    }
+  }
+  // Leggere e comandare non si dicono allo stesso modo: l'utente deve sapere cosa non è finito.
+  assert.match(C.spiega('tempo-comando', { cosa: 'bluetooth', elenca: true }).frase, /dispositivi abbinati/);
+  assert.match(C.spiega('tempo-comando', { cosa: 'wifi', elenca: true }).frase, /reti conosciute/);
+  assert.match(C.spiega('tempo-comando', { cosa: 'bluetooth', elenca: false, piattaforma: 'win32' }).dove, /impostazioni del sistema/);
+  assert.equal(C.spiega('tempo-comando', { cosa: 'bluetooth', piattaforma: 'win32' }).apri, 'win-bluetooth');
+});
+
+test('un elenco fermato a metà per tempo scaduto vale per quello che è arrivato e lo dice; un comando a metà non è riuscito', async () => {
+  const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
+  const vero = T.runCommand;
+  const opzioni = [];
+  const avvisi = [];
+  const avviso = console.warn;
+  let uscita = '';
+  T.runCommand = async (_script, o) => { opzioni.push(o); return { stdout: uscita, stderr: 'dettaglio tecnico', timedOut: true }; };
+  console.warn = (...a) => avvisi.push(a.join(' '));
+  try {
+    uscita = 'FILO:acceso=1\nFILO:dispositivo=00:11:22:33:44:55\n| Name: Cuffie\n| Connected: yes\n';
+    const u = await C.eseguiScript('bt-elenco', {});
+    const r = C.interpretaBtElenco(u, 'linux');
+    assert.equal(r.ok, true);
+    assert.equal(r.parziale, true);
+    assert.deepEqual(r.dispositivi.map((d) => d.nome), ['Cuffie']);
+    uscita = 'FILO:prima=40\n';
+    const v = C.interpretaVolume(await C.eseguiScript('volume', { livello: 50 }));
+    assert.deepEqual(v, { ok: false, errore: 'tempo-comando' });
+    uscita = '';
+    assert.equal(C.interpretaBtElenco(await C.eseguiScript('bt-elenco', {}), 'linux').errore, 'tempo-comando');
+    // Il dettaglio tecnico va nel log, non nel riquadro; e niente chcp davanti a questi script.
+    assert.ok(avvisi.some((a) => /dettaglio tecnico/.test(a)));
+    assert.ok(opzioni.every((o) => o.preludio === false));
+  } finally {
+    T.runCommand = vero;
+    console.warn = avviso;
+  }
+});
+
+test('un dispositivo senza nome si chiama come lo chiama Windows, e le due identità delle stesse cuffie sono una riga', () => {
+  const r = C.rifinisciDispositivi([
+    { indirizzo: '001122334455', nome: 'PulseSound', collegato: true, le: false, contenitore: 'aaaa-1' },
+    { indirizzo: '66778899aabb', nome: '', collegato: false, le: true, contenitore: 'aaaa-1' },
+    { indirizzo: 'c0ffee000001', nome: '  ', collegato: false, le: true, contenitore: '00000000-0000-0000-0000-000000000000' },
+    { indirizzo: 'c0ffee000002', nome: '', collegato: null, le: false, contenitore: null },
+  ]);
+  assert.deepEqual(r, [
+    { indirizzo: '001122334455', nome: 'PulseSound', collegato: true, le: false },
+    { indirizzo: 'c0ffee000001', nome: 'Dispositivo Bluetooth LE C0:FF:EE:00:00:01', collegato: false, le: true },
+    { indirizzo: 'c0ffee000002', nome: 'Dispositivo Bluetooth C0:FF:EE:00:00:02', collegato: null, le: false },
+  ]);
+  // L'identità LE letta per prima non toglie l'indirizzo classico, che è quello che collega l'audio.
+  const prima = C.rifinisciDispositivi([
+    { indirizzo: '66778899aabb', nome: 'PulseSound', collegato: true, le: true, contenitore: 'c' },
+    { indirizzo: '001122334455', nome: '', collegato: null, le: false, contenitore: 'c' },
+  ]);
+  assert.deepEqual(prima, [{ indirizzo: '001122334455', nome: 'PulseSound', collegato: true, le: false }]);
+});
+
+test('dal riquadro un dispositivo si comanda col suo indirizzo, anche senza nome e fra due nomi uguali', async () => {
+  const pc = finto({ dispositivi: [
+    { indirizzo: '00:11:22:33:44:55', nome: '', collegato: false },
+    { indirizzo: '66:77:88:99:AA:BB', nome: 'Cuffie', collegato: false },
+    { indirizzo: '66:77:88:99:AA:BC', nome: 'Cuffie', collegato: false },
+  ] });
+  C._perProve.usaComputer(pc);
+  try {
+    const elenco = await C.comanda({ cosa: 'bluetooth', elenca: true });
+    assert.equal(elenco.elenco[0].nome, 'Dispositivo Bluetooth 00:11:22:33:44:55');
+    const r = await C.comanda({ cosa: 'bluetooth', dispositivo: elenco.elenco[0].nome, indirizzo: '00:11:22:33:44:55', collega: true });
+    assert.equal(r.ok, true, r.frase);
+    const senzaNome = await C.comanda({ cosa: 'bluetooth', indirizzo: '66:77:88:99:AA:BC', collega: true });
+    assert.equal(senzaNome.ok, true, senzaNome.frase);
+    assert.deepEqual(pc.s.chiamate.filter((c) => c[0] === 'btCollega').map((c) => c[1].indirizzo), ['00:11:22:33:44:55', '66:77:88:99:AA:BC']);
+    // Senza nome né indirizzo la frase per il modello resta quella di sempre.
+    assert.equal((await C.comanda({ cosa: 'bluetooth', dispositivo: '' })).errore, 'richiesta');
+  } finally { C._perProve.usaComputer(null); }
+});
+
+test('la home legge gli abbinati prima del clic su Windows e Linux, non su Mac dove chiederebbe il permesso del Bluetooth', async () => {
+  const pc = finto({ dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  C._perProve.usaComputer(pc);
+  const vera = Object.getOwnPropertyDescriptor(process, 'platform');
+  try {
+    for (const [piattaforma, letto] of [['linux', true], ['win32', true], ['darwin', false]]) {
+      Object.defineProperty(process, 'platform', { value: piattaforma });
+      pc.s.chiamate.length = 0;
+      const r = await C.comanda({ cosa: 'bluetooth', elenca: true, precarica: true });
+      assert.equal(r.ok, letto, piattaforma);
+      assert.equal(pc.s.chiamate.length, letto ? 1 : 0, piattaforma);
+      // Il clic sul riquadro legge sempre.
+      assert.equal((await C.comanda({ cosa: 'bluetooth', elenca: true })).ok, true);
+    }
+  } finally {
+    Object.defineProperty(process, 'platform', vera);
+    C._perProve.usaComputer(null);
+  }
+});
+
+test('Windows: le reti conosciute dal lettore della home si leggono come dallo script', () => {
+  const dalloScript = C.interpretaWifiElenco(C.leggiUscita('FILO:codice=0\nFILO:interfacce=1\nFILO:rete=Casa\nFILO:rete=Bar\nFILO:attuale=Casa\n'), 'win32');
+  const dalLettore = C.elencoWifiWindows({ cosa: 'wifi', codice: 0, interfacce: 1, reti: ['Casa', 'Bar'], attuale: 'Casa' });
+  assert.deepEqual(dalLettore, dalloScript);
+  assert.deepEqual(dalLettore.reti, [{ nome: 'Casa', attiva: true }, { nome: 'Bar', attiva: false }]);
+  assert.equal(C.elencoWifiWindows({ cosa: 'wifi', codice: 5, interfacce: 1 }).errore, 'posizione');
+  assert.equal(C.elencoWifiWindows({ cosa: 'wifi', errore: 'compilazione' }).errore, 'compilazione');
+  assert.equal(C.elencoBtWindows({ errore: 'tempo-comando' }).errore, 'tempo-comando');
 });
 
 test('i pannelli delle impostazioni del sistema: Bluetooth, Wi-Fi e audio su Windows e Mac, nessuno su Linux', () => {

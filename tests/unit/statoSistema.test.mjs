@@ -377,10 +377,105 @@ test('Windows: un PowerShell che muore subito si riprova tre volte, poi il letto
   assert.equal(senza.attivo(), false);
 });
 
+// #2394 — l'elenco degli abbinati lo legge il PowerShell già acceso: niente processo nuovo per ogni apertura.
+test('Windows: gli elenchi si chiedono al PowerShell del lettore su stdin, e la sua risposta non è una lettura dello stato', async () => {
+  const richieste = [];
+  let f = null;
+  const w = L.lettoreWindows({
+    avvia: (_file, _args, opzioni) => {
+      assert.deepEqual(opzioni.stdio, ['pipe', 'pipe', 'ignore']);
+      f = figlioFinto();
+      f.stdin = new PassThrough();
+      f.stdin.setEncoding('utf8');
+      f.stdin.on('data', (r) => {
+        richieste.push(r);
+        const elenco = { cosa: 'bluetooth', acceso: true, dispositivi: [{ indirizzo: '001122334455', nome: 'PulseSound', collegato: true, le: false, contenitore: 'c' }] };
+        setTimeout(() => f.stdout.write(`${JSON.stringify({ elenco })}\n`), 20);
+      });
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ batteria: { livello: 50, inCarica: false, collegata: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  const [a, b] = await Promise.all([w.chiedi('bluetooth'), w.chiedi('bluetooth')]);
+  assert.deepEqual(richieste, ['bluetooth\n'], 'due richieste uguali in volo sono una');
+  assert.equal(a, b);
+  assert.equal(a.dispositivi[0].nome, 'PulseSound');
+  assert.equal(w.ultimo().batteria.livello, 50, 'la risposta a un elenco non prende il posto dello stato');
+  assert.equal(L.elencoDaRiga(JSON.stringify({ batteria: {} })), null);
+  assert.equal(await w.chiedi('stampante'), null);
+  w.ferma();
+  assert.equal(await w.chiedi('bluetooth'), null, 'col lettore fermo si passa allo script');
+});
+
+test('Windows: un PowerShell vivo che non risponde agli elenchi li rimanda allo script; uno che sta partendo dice «tempo scaduto»', async () => {
+  const w = L.lettoreWindows({
+    avvia: () => {
+      const f = figlioFinto();
+      f.stdin = new PassThrough();
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ volume: { livello: 10, muto: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  assert.deepEqual(await w.chiedi('wifi', 30), { tempo: true }, 'prima della prima riga è ancora la partenza');
+  await w.pronto(2000);
+  assert.equal(await w.chiedi('wifi', 30), null);
+  assert.equal(await w.chiedi('bluetooth', 1000), null, 'da lì in poi senza aspettare');
+  w.ferma();
+  // Un processo che muore con una richiesta in volo la scioglie subito.
+  const m = L.lettoreWindows({ avvia: () => { const f = figlioFinto(); f.stdin = new PassThrough(); f.stdin.on('data', () => setImmediate(() => f.emit('exit', 1, null))); return f; } });
+  m.assicura();
+  assert.equal(await m.chiedi('bluetooth', 5000), null);
+});
+
+test('una radio letta più di due giri fa è «vecchia» per chi riceve lo stato, finché il lettore o un elenco non la rileggono', async () => {
+  const P = L._perProve;
+  let bt = { acceso: false, dispositivi: [] };
+  await P.usaLettore(async () => ({ bluetooth: bt, wifi: { acceso: true }, batteria: { livello: 50, inCarica: false, collegata: false } }));
+  try {
+    assert.equal(L.stato().vecchio, undefined);
+    P.invecchia(L.VECCHIO_MS + 1000);
+    assert.deepEqual(L.stato().vecchio, ['bluetooth', 'wifi']);
+    assert.equal(L.stato().bluetooth.acceso, false, 'il dato resta, ma chi lo mostra sa che è vecchio');
+    // L'elenco dei dispositivi ha letto la radio accesa: vale per il Bluetooth, non per il Wi-Fi.
+    L.radioLetta('bluetooth', true);
+    assert.deepEqual(L.stato().vecchio, ['wifi']);
+    assert.equal(L.stato().bluetooth.acceso, true);
+    // Una lettura nuova del lettore rinfresca tutto, e vale lei.
+    bt = { acceso: false, dispositivi: [] };
+    await P.leggiOra();
+    assert.equal(L.stato().vecchio, undefined);
+    assert.equal(L.stato().bluetooth.acceso, false);
+    L.radioLetta('wifi', 'forse');
+    assert.equal(L.stato().wifi.acceso, true, 'una lettura che non dice sì o no non cambia niente');
+    // Il lettore non si rende al computer vero: su Windows partirebbe un PowerShell che non esce e il file non finisce più.
+  } finally { await P.usaLettore(async () => ({ batteria: null, rete: null, bluetooth: null })).catch(() => {}); }
+});
+
+test('Windows: «Unknown» della radio non è spento', () => {
+  const d = L.datiDaWindows(JSON.stringify({ bluetooth: { acceso: null, dispositivi: null } }));
+  const x = SIS.descrivi(d).bluetooth;
+  assert.equal(x.spento, false);
+  assert.equal(x.ignoto, true);
+  assert.match(L.SCRIPT_WINDOWS, /@\('Off', 'Disabled'\) -contains \[string\]\$_\.State/, 'spento solo se Windows dice Off o Disabled');
+});
+
 test('Windows: lo script non chiede permessi e non usa le API del Wi-Fi, e scrive solo ASCII', () => {
   const s = L.SCRIPT_WINDOWS;
-  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s),
+  // Le reti conosciute (wlanapi, che da Windows 11 24H2 vuole la posizione) solo quando l'utente apre il riquadro del
+  // Wi-Fi e la pagina lo chiede (#2394): il giro delle letture non le tocca.
+  const giro = s.slice(s.indexOf('while ($true)'));
+  const risposte = /function Rispondi[\s\S]*?\n}\n/.exec(s)[0];
+  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s.replace(risposte, '')),
     'una lettura che vuole un permesso (radio, posizione) si omette, non si chiede');
+  assert.ok(!/Wlan|Rispondi \$|ElencoBt/.test(giro.replace(/Rispondi \$riga\.Trim\(\)/, '')), 'il giro risponde solo alle richieste, non legge elenchi da sé');
+  for (const parte of [L.scriptWindows(1)]) assert.ok(!/RequestAccessAsync|netsh|Geolocat|GetConnectedSsid/i.test(parte));
+  assert.ok(!/"/.test(require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'))._interni.PS_ELENCO_BT),
+    'niente virgolette doppie neanche nell\'elenco dei dispositivi, che il lettore incorpora');
+  // La riga di comando di Windows sta in 32.767 caratteri, virgolette protette comprese.
+  assert.ok(JSON.stringify(L.scriptWindows(123456)).length < 30000);
   assert.match(s, /GetProcessById\(\$genitore\)/);
   assert.match(s, /\[regex\]::Replace\(\$json, '\[\^ -~\]'/, 'l\'uscita è tutta ASCII: la console non può storpiare un nome');
   assert.match(s, /OutputEncoding/);
