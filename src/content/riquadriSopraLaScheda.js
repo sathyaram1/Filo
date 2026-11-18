@@ -28,6 +28,7 @@
         return;
       }
       if (r && r.error === 'troppo') {
+        if (typeof troppo === 'function') { troppo(Number(r.limite) || 0); return; }
         const mb = Math.round((Number(r.limite) || 0) / (1024 * 1024));
         global.SN_POPUP?.showToast?.(`Il testo è troppo lungo per aprirlo in un riquadro: il massimo è ${mb} MB.`);
         return;
