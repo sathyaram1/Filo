@@ -5,7 +5,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina } from './helpers/chatFinta.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
