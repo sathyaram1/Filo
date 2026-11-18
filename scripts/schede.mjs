@@ -145,6 +145,8 @@ export function riepilogo(indice, schede, nonFidati = []) {
   return {
     aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length,
     fuoriDalFeedback: fuori.length, valido: per('valido'), area: per('area'),
+    // Aperti anche loro, ma fuori dall'indice: chi conta gli aperti lo sa (#2337.3).
+    nonFidatiFuoriDallIndice: (nonFidati || []).length,
   };
 }
 
