@@ -629,6 +629,7 @@
     APRI_FILE: 'non ho preparato il collegamento',
     APRI_SALVATA: 'non ho aperto la pagina salvata',
     CERCA_DOCUMENTI: 'non ho cercato fra i documenti',
+    CERCA_IMMAGINE: 'non ho cercato l\'immagine',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
