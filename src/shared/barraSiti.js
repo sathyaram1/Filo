@@ -121,7 +121,7 @@
         nuova = voceValida({ id: nuovoId(), tipo: 'app', percorso, nome: m.nome, icona: m.icona });
       } else {
         const url = normalizzaIndirizzo(m.url);
-        if (!url) return errore(voci, testo(m.url) ? `«${testo(m.url).slice(0, 80)}» non è l'indirizzo di un sito` : 'manca l\'indirizzo del sito');
+        if (!url) return errore(voci, perchéNonEntra(m.url));
         const gia = voci.find((v) => v.tipo === 'sito' && stessoSito(v.url, url));
         if (gia) return esito(voci, false, { voce: gia, gia: true });
         nuova = voceValida({ id: nuovoId(), tipo: 'sito', url, nome: m.nome, icona: m.icona });
