@@ -149,7 +149,10 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
     + 'incognito nella barra laterale: lì quello che visiti non resta.';
   await modelloFinto(app, [{ text: SPIEGA }, { text: 'Quella proposta l\'ha scritta la segnalazione automatica.' }]);
   await chiedi(chat, 'aprimi una finestra in incognito');
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Finestra in incognito' })).toBeVisible({ timeout: 15_000 });
+  // La proposta si apre da sola col testo intero; l'utente non capisce e dice no, poi chiede.
+  await expect.poll(() => confirmText(chat), { timeout: 15_000 }).toContain('Finestra in incognito');
+  await clickConfirm(chat, 'cancel');
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   await chiedi(chat, 'chi ha scritto quella proposta?');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'segnalazione automatica.' })).toBeVisible({ timeout: 15_000 });
   const visto = JSON.stringify((await chiamateAlModello(app)).at(-1));
