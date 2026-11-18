@@ -79,6 +79,10 @@
     el.style.left = `${Math.max(4, Math.min(x, vw - el.offsetWidth - 4))}px`;
     el.style.top = `${Math.max(4, Math.min(y, vh - el.offsetHeight - 4))}px`;
     const fuori = (e) => { if (!el.contains(e.target)) chiudiMenu(); };
+    // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2453).
+    const foto = global.SN_MENU && global.SN_MENU.fotoDelloScorrimento;
+    const scorsoDopo = typeof foto === 'function' ? foto(x, y) : () => true;
+    const scorre = (e) => { if (scorsoDopo(e)) chiudiMenu(); };
     const tasto = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
