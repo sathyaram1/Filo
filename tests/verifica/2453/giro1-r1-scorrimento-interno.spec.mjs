@@ -38,9 +38,7 @@ async function chatConFile(app) {
 async function scorriEApri(page) {
   await page.evaluate(() => {
     const b = document.querySelector('.dash-file-btn');
-    let s = b.parentElement;
-    while (s && !/(auto|scroll)/.test(getComputedStyle(s).overflowY)) s = s.parentElement;
-    s.scrollTop += 40;
+    b.closest('.dash-bubbles').scrollTop += 40;
     const r = b.getBoundingClientRect();
     b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + r.height / 2, button: 2 }));
   });
