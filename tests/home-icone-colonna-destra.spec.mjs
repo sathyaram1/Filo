@@ -139,6 +139,12 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
   await entraFinto(app, shell);
   const page = await home(app, openTab);
+  // Senza le carte i tasti stanno in cima alla colonna, dove stavano le due icone: sotto c'è posto per il menu, che
+  // altrimenti la shell apre sopra il tasto.
+  for (const carta of ['editor', 'mazzi', 'suggerimenti', 'rapide']) {
+    await page.evaluate((c) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CARTE_HOME_MODIFICA, mossa: { tipo: 'togli', carta: c } }), carta);
+  }
+  await expect(page.locator('#tieni .dash-carta')).toHaveCount(0);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
