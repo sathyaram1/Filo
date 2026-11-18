@@ -96,6 +96,21 @@ function registraUsciteApp(app) {
   ].join('\n');
 }
 
+// L'ispettore consegna app.evaluate anche a metà di un lavoro della finestra incognito, e la chiamata ne ereditava il
+// contesto: una lettura della prova vedeva i dati dell'incognito (#2577). Chi vuole l'incognito lo chiede con runIncognito.
+// Sentinella: tests/fixture-evaluate-contesto.spec.mjs.
+function nelContestoNormale(app) {
+  const evaluate = app.evaluate.bind(app);
+  app.evaluate = (fn, arg) => {
+    if (typeof fn !== 'function') return evaluate(fn, arg);
+    return evaluate((moduli, [sorgente, a]) => {
+      const f = (0, eval)(`(${sorgente})`);
+      const S = globalThis.__filoStorage;
+      return S ? S.runNormale(() => f(moduli, a)) : f(moduli, a);
+    }, [String(fn), arg]);
+  };
+}
+
 // Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
 // dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
 // `argomentiInPiu` vanno dopo la manopola della scala: una prova che fissa il suo fattore lo tiene anche con FILO_TEST_SCALE.
