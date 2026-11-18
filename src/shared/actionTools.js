@@ -176,7 +176,7 @@
     },
     RIMUOVI_REGOLA_PROXY: {
       via: ['scheda', 'togli_regola_paese'],
-      description: 'toglie la regola del paese di un sito.',
+      description: 'toglie regola_paese.',
       properties: { sito: S() }, required: [],
     },
     TIENI_APERTA: {
