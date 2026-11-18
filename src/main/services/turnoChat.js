@@ -1370,7 +1370,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
   // #1373 — dopo l'OK il modello riprende sempre: a lavoro finito non ha niente da aggiungere, e il silenzio è la risposta.
   const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
-  textReply = String(textReply || '').trim() || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
+  // #2383 — i marcatori di fonte si controllano qui, prima che la risposta si salvi o si mostri: resta l'etichetta solo
+  // per un indirizzo letto in questo turno, con la frase cercata nella pagina intera.
+  const Fonti = globalThis.SN_FONTI_CITATE;
+  const citate = Fonti.controlla(textReply, Fonti.sorgenti(renderedActions));
+  const fonti = citate.fonti;
+  textReply = citate.text || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
+  if (notaRisposta) notaRisposta = Fonti.nascondi(notaRisposta).trim();
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
