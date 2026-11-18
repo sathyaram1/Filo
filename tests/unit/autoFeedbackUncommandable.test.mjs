@@ -165,9 +165,11 @@ test('la segnalazione anonima resta generica e distinta dai buchi "non esiste"',
   const auto = AF.compose(a);
   assert.ok(auto, 'nessun auto-feedback composto');
   // Nessun testo dell'utente nella segnalazione che parte senza chiedere.
-  assert.doesNotMatch(auto.text, /metti Filo/i);
-  assert.match(auto.clientId, /^auto:capability-gap:uncommandable-fullscreen$/);
-  assert.equal(auto.capabilityGapId, 'uncommandable-fullscreen');
+  assert.doesNotMatch(auto.text, /ricarica la pagina"/i);
+  assert.match(auto.clientId, /^auto:capability-gap:uncommandable-reload$/);
+  assert.equal(auto.capabilityGapId, 'uncommandable-reload');
+  // #2371: il titolo e la categoria della voce dal manifesto, così chi la legge capisce di cosa parla.
+  assert.match(auto.text, /«Ricarica la pagina» \(reload, Navigazione e schede\)/);
 });
 
 test('una parola sola in comune non basta a dire "è questa capacità"', () => {
