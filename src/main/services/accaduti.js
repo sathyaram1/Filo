@@ -120,11 +120,12 @@ function azioneFatta(nome, parametri, esito, { incognito } = {}) {
 // tasto, un avviso, Filo da sé. Dentro un'azione chiesta alla chat o all'Aiuto non scrive: la sua porta la scrive intera.
 // `daSola`: l'autore quando nessuno l'ha chiesta (il nome dato da sé a uno scaricamento), qualunque sia il contesto.
 // `chat`: la conversazione da cui è nata (se ne va con lei). `url`: il sito del file, se chi chiama l'ha chiesto prima.
-function azioneDalPunto(nome, parametri, esito, { incognito, daSola, chat, url } = {}) {
+// `via`: con `daSola`, la strada che il registro mostra (`segnalazione`: l'invio automatico F4, #2371).
+function azioneDalPunto(nome, parametri, esito, { incognito, daSola, via, chat, url } = {}) {
   let ctx = null;
   try { ctx = require('./registroCambi').corrente(); } catch (_) {}
   for (let c = ctx; c; c = c.padre) if (c.segnoAzione) return Promise.resolve(null);
-  const chi = daSola ? { via: null, autore: daSola } : {};
+  const chi = daSola ? { via: stringa(via) ? via : null, autore: daSola } : {};
   const sito = stringa(url) ? url : indirizzoDelFile(parametri);
   return annota(T().AZIONE, { nome, parametri: parametri || {}, esito, ...(stringa(chat) ? { chat } : {}), ...(sito ? { url: sito } : {}) },
     { incognito, ...chi });
