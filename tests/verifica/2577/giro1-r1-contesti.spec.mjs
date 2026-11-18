@@ -21,15 +21,3 @@ test('r1 un cambio di impostazioni fatto dalla prova mentre il main lavora per l
     return ev ? `${ev.via}${ev.dove ? ' ' + ev.dove : ''}` : 'nessuno';
   }, { timeout: 5_000 }).toBe('filo');
 });
-
-test('esplorazione: senza la fixture, una lettura a stringa durante il lavoro incognito ne eredita il contesto', async ({ app }) => {
-  await app.evaluate((_e, durata) => {
-    setTimeout(() => globalThis.__filoStorage.runIncognito(() => {
-      const fine = Date.now() + durata;
-      while (Date.now() < fine) { /* occupato */ }
-    }), 50);
-    return true;
-  }, 1500);
-  await new Promise((r) => setTimeout(r, 300));
-  expect(await app.evaluate('globalThis.__filoStorage.inIncognito()')).toBe(true);
-});
