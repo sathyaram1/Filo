@@ -1634,12 +1634,6 @@
         return t ? ['Far ripartire ', cit(t)] : 'Far ripartire la musica di prima';
       },
     },
-    // La porzione la sceglie l'utente col mouse: senza il suo gesto non succede niente.
-    TRASCRIVI: {
-      costo: 1,
-      campo: null,
-      describe: () => 'Trascrivere una porzione della pagina',
-    },
     // Si disfa con RIPRENDI_AUDIO.
     PAUSA_AUDIO: {
       costo: 1,
@@ -1722,7 +1716,6 @@
     VOLUME: senza('limitato'),
     RIPRENDI_AUDIO: senza('nonPartita'),
     PAUSA_AUDIO: senza('nessuna'),
-    TRASCRIVI: fatta,
     MOSTRA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
     WIFI: accesaOSpenta,

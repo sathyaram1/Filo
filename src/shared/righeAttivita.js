@@ -160,7 +160,6 @@
       const t = pulito(o.titolo || a._titolo);
       return { icon: '⏸', text: t ? `In pausa «${t}»` : 'Musica in pausa' };
     },
-    TRASCRIVI: () => ({ icon: '📄', text: 'Trascrivi: scegli la porzione' }),
     MOSTRA_SCHEDA: (a) => {
       const o = a._output || {};
       const t = pulito(o.titolo || a._titolo) || 'la scheda';
@@ -411,7 +410,7 @@
     APRI_SALVATA: 'Pagina salvata non aperta',
     SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
     RIPRENDI_AUDIO: 'Musica non ripartita',
-    PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata', TRASCRIVI: 'Trascrivi non partito',
+    PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',

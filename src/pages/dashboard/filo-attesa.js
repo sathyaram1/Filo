@@ -24,7 +24,6 @@
     RIAPRI_SCHEDA: ['Riaperta una scheda chiusa', (k) => `Riaperte ${n(k)} schede chiuse`, 'scheda chiusa'],
     RIPRENDI_AUDIO: ['Fatta ripartire la musica', (k) => `Fatta ripartire la musica ${n(k)} volte`, 'musica'],
     PAUSA_AUDIO: ['Messa in pausa la musica', (k) => `Messa in pausa la musica ${n(k)} volte`, 'musica'],
-    TRASCRIVI: ['Aperto Trascrivi', (k) => `Aperto Trascrivi ${n(k)} volte`, 'trascrizioni'],
     MOSTRA_SCHEDA: ['Portato su una scheda', (k) => `Portato su una scheda ${n(k)} volte`, 'scheda'],
     LEGGI_TRASPARENZA: ['Riletta la trasparenza', (k) => `Rilette ${n(k)} pagine di trasparenza`, 'trasparenza'],
     LEGGI_IMPOSTAZIONI: ['Lette le impostazioni', (k) => `Lette le impostazioni ${n(k)} volte`, 'impostazioni'],

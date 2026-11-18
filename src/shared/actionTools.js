@@ -135,11 +135,6 @@
       description: 'apre una pagina salvata e la toglie dalla lista (tieni: resta).',
       properties: { id: S(), tieni: B() }, required: ['id'],
     },
-    TRASCRIVI: {
-      via: ['scheda', 'trascrivi'],
-      description: 'l\'utente sceglie col mouse una porzione della scheda davanti e ne vede il testo, selezionabile sopra l\'immagine.',
-      properties: {}, required: [],
-    },
     ZOOM_PAGINA: {
       via: ['scheda', 'zoom'],
       description: 'zoom della pagina davanti: percentuale 25-500 o verso; finché Filo non si chiude.',
