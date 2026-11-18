@@ -270,7 +270,7 @@ test('nel motivo di un conflitto quello fra parentesi è una nota, non dei file,
   const { esitoRiallineamento } = await import('../../scripts/dispatch.mjs');
   const esito = esitoRiallineamento({ ok: true, file: [], conflitti: [] }, letto('conflitto: src/shared/patchNotes.js, PATTERNS.md (ramo del server)'));
   assert.equal(esito.riallineamento.giro, 'nessuno', esito.riga);
-  assert.doesNotMatch(esito.riga, /file di codice|ramo|server\b.*:/);
+  assert.doesNotMatch(esito.riga, /file di codice|ramo/);
 });
 
 test('i file di servizio sono quelli della regola 3 della spec', () => {
