@@ -163,7 +163,8 @@
       ...vis.filter((r) => !DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
     ].filter((v) => !nascoste.has(v.chiave));
     const perChiave = new Map(resto.map((v) => [v.chiave, v]));
-    return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    const voci = [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    return [...avvisiVolati(cornice, new Set(voci.map((v) => v.chiave))), ...voci];
   }
 
   // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
