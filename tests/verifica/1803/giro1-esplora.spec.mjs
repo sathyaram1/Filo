@@ -61,7 +61,7 @@ test('foto: vuota e piena, aperta e ripiegata, chiara e scura', async ({ app }) 
   await expect(p.locator('#threadView')).toBeHidden();
   await scatta(p, 'vuota-ripiegata');
   await p.locator('#ripiegaChat').click();
-  await app.evaluate(async (v) => { await chrome.storage.local.set({ filo_barra_siti: v }); }, CINQUE);
+  await app.evaluate(async (_e, v) => { await chrome.storage.local.set({ filo_barra_siti: v }); }, CINQUE);
   await p.reload();
   p = await home(app);
   await expect(p.locator('#barraSiti .dash-barra-voce[data-tipo]')).toHaveCount(5);
