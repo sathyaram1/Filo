@@ -118,7 +118,7 @@ const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice
  */
 export function ultimoPasso(righe) {
   const nomi = new Map();
-  const risposte = new Set();
+  const risposte = new Map();
   let strumento = null;
   let passo = null;
   let modello = '';
