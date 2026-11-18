@@ -151,7 +151,7 @@
     },
     RIPRISTINA_STILE_PAGINA: {
       via: ['scheda', 'stile_via'],
-      description: 'toglie lo stile messo con stile.',
+      description: 'toglie stile.',
       properties: {}, required: [],
     },
     PROXY_TAB: {
