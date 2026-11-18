@@ -205,7 +205,8 @@ const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
 const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
 const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
 // I prefissi che lasciano il programma dopo (#2337.3): anche «timeout 30», le variabili («LANG=C»), nice e simili.
-const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|setsid|unbuffer|chronic|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-\S+)*|stdbuf(?:\s+-\S+)*|timeout(?:\s+-\S+)*\s+\d\S*|env(?:\s+-\S+)*(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*|[A-Za-z_][A-Za-z0-9_]*=\S*)\s+)+/i;
+// Anche le parole dei cicli e delle condizioni («do curl …», «then wget …»).
+const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|setsid|unbuffer|chronic|do|then|else|elif|if|while|until|!|\{|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-\S+)*|stdbuf(?:\s+-\S+)*|timeout(?:\s+-[ks]\s+\S+|\s+--?\S+)*\s+\d\S*|env(?:\s+-\S+)*(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*|[A-Za-z_][A-Za-z0-9_]*=\S*)\s+)+/i;
 // Il comando passato a una shell figlia o a eval, fra virgolette o no: si guarda come un comando suo (#2337.3).
 const RE_SHELL_FIGLIA = /(?:^|[\s;&|(`])(?:(?:[^\s"']*[\\/])?(?:bash|sh|zsh|dash|ksh|fish)(?:\.exe)?(?:\s+-[A-Za-z]+)*\s+-[A-Za-z]*c|eval)\s+(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))/g;
 
