@@ -1426,7 +1426,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
-      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
+      indirizzi: [...renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])), ...fonti.map((f) => f.url)],
     });
   } catch (e) {
     senzaVerdetto = true;
