@@ -11,7 +11,7 @@ const etichette = async (page) => {
   await expect(menuDi(page).principale).toBeVisible({ timeout: 8_000 });
   return menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
 };
-// Il tasto destro arriva al menu solo a listener montati: una casella spenta lo è già nell'HTML, prima delle impostazioni.
+// Qui si prova la voce, a impostazioni lette: il clic dato prima, che si rigioca, ha le sue prove più sotto (#2444).
 const pronta = (page) => page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 10_000 });
 
 test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o si chiede all’Aiuto', async ({ app, openTab }) => {
