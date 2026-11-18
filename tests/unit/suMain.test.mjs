@@ -198,7 +198,7 @@ test('una correzione di main rifatta a mano nel ramo e poi fusa con main non è 
   git(dir, ['update-ref', 'refs/remotes/origin/claude/tre', 'HEAD']);
   git(dir, ['checkout', '-q', 'main']);
   const rami = ramiInCorso(dir);
-  assert.deepEqual(rami.map((r) => r.fileNuovi || r.file).sort(), [['a.js'], ['x.js'], ['y.js']],
+  assert.deepEqual(rami.map((r) => [...r.file, ...(r.fileNuovi || [])]).sort(), [['a.js'], ['x.js'], ['y.js']],
     'ognuno con i soli file che cambia rispetto a main: a.js resta solo a chi lo cambia davvero');
   assert.deepEqual(incrociFraRami(rami), [], 'due lavori su file diversi non si incrociano');
   assert.deepEqual(incroci(rami, ['a.js']).length, 1);
