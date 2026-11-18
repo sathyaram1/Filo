@@ -36,6 +36,29 @@ test('una pagina di Filo appena scorsa: il menu aperto resta, e si chiude allo s
   await expect(menu.principale).toHaveCount(0);
 });
 
+// #2453 — il menu di «Dai un nome sensato» (scaricamenti, chat) segue la stessa regola.
+test('il menu di Rinomina appena aperto su una pagina scorsa resta, e si chiude allo scorrimento dopo', async ({ openTab }) => {
+  const page = await openTab('filo://downloads/downloads.html');
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1' && !!window.SN_RINOMINA_UI && !!window.SN_MENU, null, { timeout: 10_000 });
+  await page.evaluate(() => {
+    const alto = document.createElement('div');
+    alto.style.height = '4000px';
+    document.body.appendChild(alto);
+  });
+  await inCima(page);
+  await page.evaluate((voce) => {
+    window.scrollTo({ top: 400, behavior: 'instant' });
+    window.SN_RINOMINA_UI.menu(300, 300, [[voce, () => {}]]);
+  }, VOCE);
+  await fotogrammi(page);
+  const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: VOCE });
+  await expect(voce).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
+  await page.evaluate(() => window.scrollBy({ top: 200, behavior: 'instant' }));
+  await expect(page.locator('.sn-rinomina-menu')).toHaveCount(0);
+});
+
 test.describe('nello strato', () => {
   test.use({ stratoDelMenu: true });
 
