@@ -260,16 +260,13 @@
     if (ev.autore === 'utente') return ev.via === 'conferma' ? 'l\'utente, col pulsante di conferma' : 'l\'utente';
     return ev.autore === 'automazione' ? 'Filo da sé' : 'l\'assistente';
   }
-  // Il testo di una segnalazione va intero: l'assistente deve poterla spiegare o correggere. Il tetto è largo e il
-  // taglio si dice.
-  const TETTO_TESTO_SEGNALAZIONE = 8000;
+  // Il testo di una segnalazione va intero: l'assistente deve poterla spiegare o correggere (tetto in esitoAzione.js).
   function testoSegnalazione(ev) {
     const t = ev.nome === 'INVIA_FEEDBACK' && ev.parametri && stringa(ev.parametri.testo) ? ev.parametri.testo : '';
     if (!t) return '';
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
     const n = E().neutralizza(t, { unaRiga: true });
-    const corpo = n.length > TETTO_TESTO_SEGNALAZIONE
-      ? `${n.slice(0, TETTO_TESTO_SEGNALAZIONE)}… [tagliato qui: ${n.length} caratteri in tutto]` : n;
-    return ` — testo intero: «${corpo}»`;
+    return ` — testo intero: «${global.SN_ESITO ? global.SN_ESITO.testoSegnalazione(n) : n}»`;
   }
 
   function rigaAzione(ev) {
