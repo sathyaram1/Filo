@@ -14,11 +14,14 @@ nati nella shell e quelli che il main manda come `shell:toast`.
   Filo torna davanti.
 - **Filo davanti su una pagina**: l'angolo in basso a destra, nella vista sopra la pagina
   (patterns/la-shell-non-disegna-sopra-la-pagina.md).
-- **Filo davanti nella home**: se la cosa ha già la sua carta (`carta: 'timer:<id>'`, `'download:<id>'`) la home fa
-  notare quella e l'avviso se ne va (`assorbi`); se no l'avviso sta nell'angolo il tempo di leggerlo e poi vola in
+- **Filo davanti nella home**: se la cosa ha già la sua carta (`carta`, la chiave chiesta a `SN_CARTE_HOME.chiaveTimer`
+  / `chiaveDownload`) la home fa notare quella e l'avviso se ne va (`assorbi`), anche quando era nato su una pagina e
+  l'utente torna nella home; se no l'avviso sta nell'angolo il tempo di leggerlo e poi vola in
   cima alla colonna di sinistra, dove resta finché lo si chiude. Il modello resta nella shell: la home disegna le
   carte che il main le gira (`AVVISI_COLONNA`) e ogni gesto torna alla shell. Il volo lo disegna la home (una copia
   della carta dall'angolo alla colonna); con la riduzione del movimento la carta compare subito nella colonna.
+  Le carte volate stanno nell'elenco unico della colonna (`SN_CARTE_HOME.sinistra`, campo `cornice`): la chat le
+  vede e le chiude come la home. Il tasto destro è uno, `SN_FORMA_AVVISO.menu()`, per l'angolo e per la carta.
   Fa eccezione un avviso a tempo la cui uscita fa partire qualcosa (`alChiudere`, come la segnalazione automatica
   che «Annulla» trattiene): nella colonna non scadrebbe mai e quel qualcosa resterebbe appeso, quindi sta
   nell'angolo e alla scadenza se ne va, come su una pagina (#2570).
