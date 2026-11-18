@@ -79,5 +79,5 @@
     return (Array.isArray(righe) ? righe : []).map((r) => r.testo).join('\n').trim();
   }
 
-  global.SN_TRASCRIZIONE_RIGHE = { leggi, scatole, testoIntero, SCALA };
+  global.SN_TRASCRIZIONE_RIGHE = { leggi, scatole, testoIntero, SCALA, IMMAGINE };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
