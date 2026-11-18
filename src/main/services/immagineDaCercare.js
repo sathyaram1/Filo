@@ -17,18 +17,11 @@ async function immaginiDellaChat(chatId) {
   return { immagini: inv.immagini, contate };
 }
 
-// La più grande in vista, dal mondo isolato: la pagina non può falsare document.images.
+// La stessa immagine che sceglie l'Aiuto sopra la pagina, dal mondo isolato: la pagina non può falsare document.images.
+if (!globalThis.SN_IMMAGINE_PRINCIPALE) require('../../shared/immaginePrincipale.js');
 const PIU_GRANDE = `(() => {
-  let best = '', area = 0;
-  for (const im of Array.from(document.images)) {
-    const s = im.currentSrc || im.src || '';
-    if (!/^https?:/i.test(s)) continue;
-    const r = im.getBoundingClientRect();
-    const w = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
-    const h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
-    if (w * h > area) { area = w * h; best = s; }
-  }
-  return best;
+  const im = (${globalThis.SN_IMMAGINE_PRINCIPALE.scegli.toString()})(Array.from(document.images));
+  return im ? (im.currentSrc || im.src || '') : '';
 })()`;
 
 async function immagineDellaPagina(tab) {
