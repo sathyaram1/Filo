@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   repoDaOrigin, modoWindows, nomeCorsa, richiestaDispatch, corsaDallElenco, campoDalRegistro, provaDalCampo,
-  avviaProvaRemota, attendiProvaRemota, tokenGitHub,
+  avviaProvaRemota, attendiProvaRemota, tokenGitHub, apiGitHub, letturaRipetibile, PAUSE_RIPROVA_MS,
 } from '../../scripts/lib/prova-remota.mjs';
 import { giudizioRemoto } from '../../scripts/finish-local.mjs';
 import { campoPerIlServer } from '../../scripts/lib/unit-sulla-fusione.mjs';
