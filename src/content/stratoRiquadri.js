@@ -46,6 +46,8 @@
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
         seguito: typeof dati.seguito === 'string' ? dati.seguito : '',
       });
+    } else if (d.tipo === 'trascrizione') {
+      if (dati.dataUrl) global.SN_TRASCRIZIONE?.apri({ dataUrl: dati.dataUrl, rect: dati.rect || null });
     } else if (d.tipo === 'aiuto') {
       const SB = global.SN_SIDEBAR;
       // Il campo da valutare resta nella pagina sotto: qui arriva il suo testo e il numero con cui chiederle il resto.
