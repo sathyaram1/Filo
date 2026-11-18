@@ -171,9 +171,10 @@
   }
 
   // `area`: l'elemento che prende il rilascio (il campo della chat o il suo modulo); `prendi(scheda)` lo riceve.
-  function registraChat(area, prendi) {
+  // `ogniScheda`: riceve anche le schede che non sono un sito (la barra dei siti accetta le pagine di Filo, #1803.1).
+  function registraChat(area, prendi, { ogniScheda = false } = {}) {
     if (!area || typeof prendi !== 'function') return () => {};
-    const voce = { area, prendi };
+    const voce = { area, prendi, ogniScheda: !!ogniScheda };
     chats.add(voce);
     ascolta();
     return () => chats.delete(voce);
