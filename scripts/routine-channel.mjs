@@ -477,7 +477,9 @@ export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFil
   const cg = memoriaContenitore(leggi);
   const upC = uptimeContenitore(Number(osImpl.uptime()), leggi);
   const usata = cg ? cg.usedMb : rssProcessi(leggi, elenca);
-  const libera = cg && cg.limitMb > 0 ? Math.max(0, cg.limitMb - cg.usedMb) : osImpl.freemem() / 1048576;
+  // Il tetto dei comandi sta su un cgroup figlio, e MemFree non conta la cache che si libera (#2571).
+  const vera = letturaMemoria(leggi).disponibileMb;
+  const libera = Number.isFinite(vera) ? vera : cg && cg.limitMb > 0 ? Math.max(0, cg.limitMb - cg.usedMb) : osImpl.freemem() / 1048576;
   return {
     uptimeS: num(Math.round(upC !== null ? upC : osImpl.uptime())),
     freeMb: num(Math.round(libera)),
