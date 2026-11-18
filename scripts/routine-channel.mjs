@@ -1231,6 +1231,29 @@ export function testoSegnalaRiuscita(body = {}) {
   return `OK: segnalazione ${dove} aperta (${body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`;
 }
 
+/** La riga di `rapporto` riuscito: un parziale (#2303.1) lascia il compito aperto, e chi lavora deve saperlo. PURA. */
+export function testoRapportoRiuscito(body = {}) {
+  if (body.parziale) {
+    return `OK: rapporto parziale salvato${body.perIlRicorrente ? ': se la corsa si ferma, chi riparte riceve questo' : ''}. Il compito resta aperto: alla fine consegna il rapporto finale, senza --parziale.`;
+  }
+  return `OK: rapporto consegnato${body.chiuso ? `, ${body.compito} chiuso` : ''}.`;
+}
+
+/**
+ * La spesa della corsa del compito del biglietto, misurata come la misura la veglia (#2303.1), su stderr o su stdout.
+ * Best-effort: una misura che non riesce non tocca l'esito del comando. → true se c'era un tetto da dire.
+ */
+async function stampaSpesa(biglietto, { suOut = false } = {}) {
+  try {
+    const { spesaDelCompito, testoSpesa } = await import('./lib/veglia-worker.mjs');
+    const riga = testoSpesa(await spesaDelCompito({ root: ROOT, ticket: biglietto }));
+    if (riga) (suOut ? console.log : console.error)(riga);
+    return !!riga;
+  } catch (_) {
+    return false;
+  }
+}
+
 /** I dati di un'operazione dalla riga (`'{"id":"…"}'`) o da stdin; '' → {}. PURA. → { dati } | { errore } */
 export function datiOperazione(grezzo) {
   const t = String(grezzo || '').trim();
