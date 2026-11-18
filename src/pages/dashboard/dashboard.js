@@ -1873,8 +1873,9 @@
       delete entry.interrotto;
       delete entry.fermato;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
       host.hidden = false;
-      setBubbleText(host, r.text, true);
+      setBubbleText(host, r.text, true, r.fonti);
       nota.remove();
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
