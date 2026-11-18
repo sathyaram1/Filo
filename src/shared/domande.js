@@ -502,38 +502,41 @@
     return `${nome}: ${detta.charAt(0).toLocaleLowerCase('it')}${detta.slice(1)}`;
   }
 
-  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id nelle azioni, senza doppioni. PURA. */
+  const numeroDiAzione = (o) => (isOggetto(o) && isOggetto(o.azione) ? numeroScritto(o.azione.feedbackId) : '');
+  const numeroDiCollegamento = (c) => (isOggetto(c) && c.tipo === 'feedback' ? numeroScritto(c.id) : '');
+  const elenco = (domanda, campo) => (isOggetto(domanda) && Array.isArray(domanda[campo]) ? domanda[campo] : []);
+
+  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id in azioni e collegamenti, senza doppioni. PURA. */
   function numeriDaTradurre(domanda) {
     const out = [];
-    for (const o of isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : []) {
-      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
-      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
-      const n = m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : '';
+    for (const n of [...elenco(domanda, 'opzioni').map(numeroDiAzione), ...elenco(domanda, 'collegamenti').map(numeroDiCollegamento)]) {
       if (n && !out.includes(n)) out.push(n);
     }
     return out;
   }
 
   /**
-   * La domanda coi numeri delle azioni tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server). Un numero
-   * che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
+   * La domanda coi numeri di azioni e collegamenti tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server).
+   * Un numero che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
    */
   function traduciNumeri(domanda, ids) {
     const mappa = isOggetto(ids) ? ids : {};
     const mancanti = numeriDaTradurre(domanda).filter((n) => !(ha(mappa, n) && FEEDBACK_ID_RE.test(String(mappa[n]))));
     if (mancanti.length) {
-      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni`,
-        { campo: 'opzioni', numeri: mancanti });
+      const inAzione = elenco(domanda, 'opzioni').some((o) => mancanti.includes(numeroDiAzione(o)));
+      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni e nei collegamenti`,
+        { campo: inAzione ? 'opzioni' : 'collegamenti', numeri: mancanti });
     }
-    if (!isOggetto(domanda) || !Array.isArray(domanda.opzioni)) return { ok: true, domanda };
-    const opzioni = domanda.opzioni.map((o) => {
-      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
-      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
-      if (!m) return o;
-      const n = m[2] ? `${m[1]}.${m[2]}` : m[1];
-      return Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) });
+    if (!numeriDaTradurre(domanda).length) return { ok: true, domanda };
+    const opzioni = elenco(domanda, 'opzioni').map((o) => {
+      const n = numeroDiAzione(o);
+      return n ? Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) }) : o;
     });
-    return { ok: true, domanda: Object.assign({}, domanda, { opzioni }) };
+    const collegamenti = elenco(domanda, 'collegamenti').map((c) => {
+      const n = numeroDiCollegamento(c);
+      return n ? Object.assign({}, c, { id: String(mappa[n]) }) : c;
+    });
+    return { ok: true, domanda: Object.assign({}, domanda, { opzioni, collegamenti }) };
   }
 
   function rangoPriorita(p) {
