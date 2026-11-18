@@ -1754,12 +1754,12 @@
   }
 
   // Una pratica chiusa col lavoro in main (#2193): le sue fusioni approvate e non avvenute sono superate, anche se il ramo
-  // fuso è un altro. Fusione registrata = la versione che la contiene, la chiusura «già su main», o una richiesta fusa.
+  // fuso è un altro. Il conto è SN_FB_ATTESE.lavoroSuMain (src/shared/feedbackAttese.js), lo stesso del server.
   function lavoroInMain(fb, recent) {
-    const { status, statusReason } = normalizeStatus(fb);
-    if (status !== 'done' && status !== 'archived') return false;
-    if (String((fb && fb.resolvedInVersion) || '').trim()) return true;
-    return status === 'done' && (statusReason === 'gia_risolto' || recent.some((r) => r && r.used === true && r.outcome === 'merged'));
+    if (!global.SN_FB_ATTESE && typeof require === 'function') require('./feedbackAttese.js');
+    const A = global.SN_FB_ATTESE;
+    if (!A) throw new Error('SN_FB_ATTESE mancante: carica shared/feedbackAttese.js prima di manageReview.js');
+    return A.lavoroSuMain(statusUnreadable(fb) ? fb : Object.assign({}, fb, normalizeStatus(fb)), recent);
   }
 
   // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
