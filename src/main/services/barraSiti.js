@@ -44,10 +44,10 @@ async function iconaDelProgramma(percorso) {
 // Due mosse quasi insieme (due home, la chat e un trascinamento) leggerebbero la stessa barra e la seconda
 // cancellerebbe la prima: si mettono in fila.
 let coda = Promise.resolve();
-async function modifica(mossa) {
+async function modifica(mossa, { piattaforma = process.platform } = {}) {
   const m = mossa && typeof mossa === 'object' ? { ...mossa } : {};
   if (m.tipo === 'aggiungi' && m.percorso) {
-    const c = controllaProgramma(m.percorso);
+    const c = controllaProgramma(m.percorso, piattaforma);
     if (c.errore) return { voci: await leggi(), cambiato: false, errore: c.errore };
     if (!m.icona) m.icona = await iconaDelProgramma(m.percorso);
   }
