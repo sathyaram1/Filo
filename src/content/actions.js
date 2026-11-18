@@ -1959,37 +1959,34 @@
     }
   }
 
+  // La porzione resta a schermo col suo testo selezionabile sopra (#2374): il riquadro è SN_TRASCRIZIONE.
   async function transcribeRegion() {
     try {
       const region = await selectScreenRegion();
-      // Com'è finita la trascrizione (#1465); un guasto del modello lo contano già gli errori.
-      const ocr = (esito) => contaRiquadro('ocr', { esito });
-      if (!region) { ocr('annullato'); Popup.showToast(I18n.t('toast_region_cancelled')); return; }
-      Popup.showToast(I18n.t('toast_transcribing'), { duration: 2500 });
-      const res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.TRANSCRIBE_IMAGE,
-        payload: { dataUrl: region.dataUrl },
-      });
-      if (!res?.ok) { Popup.avvisoErrore(res); return; }
-      const text = (res.text || '').trim();
-      if (!text) { ocr('vuoto'); Popup.toastErrore('toast_transcribe_empty'); return; }
-      try { await navigator.clipboard.writeText(text); } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed'; ta.style.left = '-9999px';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch (_) {}
-        ta.remove();
-      }
-      try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
-      // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
-      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
-      ocr(interrotta ? 'tagliato' : 'copiato');
-      Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
+      if (!region) { contaRiquadro('ocr', { esito: 'annullato' }); Popup.showToast(I18n.t('toast_region_cancelled')); return; }
+      await global.SN_TRASCRIZIONE.apri({ dataUrl: region.dataUrl, rect: soloNelFramePrincipale(region.rect) });
     } catch (_) {
       Popup.toastErrore('err_provider_failed');
     }
+  }
+
+  // Lo stesso riquadro su un'immagine della pagina o dell'Editor, aperto sopra di lei.
+  async function transcribeImage(imgEl) {
+    try {
+      const src = imgEl && (imgEl.currentSrc || imgEl.src);
+      if (!src) return;
+      const dataUrl = await scaricaImmagine(src, imgEl);
+      if (!dataUrl) { Popup.toastErrore('toast_image_unavailable'); return; }
+      const r = imgEl.getBoundingClientRect();
+      await global.SN_TRASCRIZIONE.apri({ dataUrl, rect: soloNelFramePrincipale({ x: r.left, y: r.top, w: r.width, h: r.height }) });
+    } catch (_) {
+      Popup.toastErrore('err_provider_failed');
+    }
+  }
+
+  // Lo strato è grande quanto la scheda: un punto di un riquadro incorporato lì non cade dove sta, e si va al centro.
+  function soloNelFramePrincipale(rect) {
+    try { return window.top === window ? rect : null; } catch (_) { return null; }
   }
 
   // La Clipboard API accetta solo image/png: il data URL (di solito JPEG) passa da canvas.
