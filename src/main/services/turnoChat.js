@@ -1542,8 +1542,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Note di lavoro e ragionamento strutturato dell'ultimo giro: la scheda li tiene con la
     // conversazione, e il ragionamento torna al modello al turno dopo.
-    notes, reasoningDetails,
+    notes: notes.map((n) => Fonti.nascondi(n).trim()).filter(Boolean), reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
+    ...(fonti.length ? { fonti } : {}),
     ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
