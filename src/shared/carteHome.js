@@ -339,5 +339,6 @@
     CARTE, APP, TASTI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
+    chiaveTimer, chiaveDownload, cartaDiAvviso,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
