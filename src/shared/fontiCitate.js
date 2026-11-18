@@ -193,7 +193,7 @@
 
   // Per chi mostra il testo mentre arriva (la bolla in diretta, le note di lavoro): niente marcatori a schermo.
   function nascondi(text) {
-    return testo(text).replace(MARCATORE, '').replace(A_META, '').replace(/[ \t]+(\n|$)/g, '$1');
+    return testo(text).replace(/[ \t]*\[\[\s*fonte\s*:((?:[^[\]]|\](?!\])|\[(?!\[)){0,6000}?)\]\]/gi, '').replace(A_META, '').replace(/[ \t]+(\n|$)/g, '$1');
   }
 
   // Quello che si conserva di una fonte: solo i campi del controllo, coi loro tetti, e mai il testo della pagina.
