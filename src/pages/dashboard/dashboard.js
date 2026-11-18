@@ -374,7 +374,8 @@
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
   });
-  self.SN_DASH_TASTIERA.init({
+  const Tastiera = self.SN_DASH_TASTIERA;
+  Tastiera.init({
     send, input: inputEl, dash: $('dash'),
     impostazioni: () => impostazioniHome,
     usa: (id) => Carte.usa(id),
