@@ -1254,21 +1254,60 @@
       e.preventDefault();
       apriMenu(e.clientX, e.clientY, [{ etichetta: 'Rimetti le carte com’erano', fai: () => muovi({ tipo: 'ripristina' }) }]);
     });
+    // Dove va quello che si lascia qui: sul «+» o fra quelli fuori vista lo si mette via; fra i tasti in vista un tasto
+    // prende il posto davanti a cui lo si lascia; una carta lasciata altrove in «altro» va nel «+» come prima.
+    const dove = (e) => {
+      if (!presa) return null;
+      const t = e.target && e.target.closest ? e.target : null;
+      const nelPiu = t && (t.closest('.dash-altro-piu') || t.closest('#altroFuori'));
+      if (nelPiu) return presa.colonna === 'destra' || presa.colonna === 'tasti' ? { via: true, el: altroEl.querySelector('#altroPiu') } : null;
+      const griglia = t && t.closest('.dash-altro-griglia.vista');
+      if (griglia && (presa.colonna === 'tasti' || (presa.colonna === 'altro' && presa.tasto))) return { tasti: griglia };
+      return presa.colonna === 'destra' ? { via: true, el: null } : null;
+    };
+    const pulisci = () => {
+      for (const n of altroEl.querySelectorAll('.sopra-prima, .sopra-dopo, .bersaglio')) n.classList.remove('sopra-prima', 'sopra-dopo', 'bersaglio');
+      altroEl.classList.remove('bersaglio');
+    };
     altroEl.addEventListener('dragover', (e) => {
-      if (!presa || presa.colonna !== 'destra') return;
+      const b = dove(e);
+      if (!b) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      altroEl.classList.add('bersaglio');
+      pulisci();
+      if (b.via) (b.el || altroEl).classList.add('bersaglio');
+      else {
+        const s = bersaglioTasti(b.tasti, e);
+        if (s.segno) s.segno.classList.add(s.dove === 'dopo' ? 'sopra-dopo' : 'sopra-prima');
+      }
     });
-    altroEl.addEventListener('dragleave', (e) => { if (!altroEl.contains(e.relatedTarget)) altroEl.classList.remove('bersaglio'); });
+    altroEl.addEventListener('dragleave', (e) => { if (!altroEl.contains(e.relatedTarget)) pulisci(); });
     altroEl.addEventListener('drop', (e) => {
-      if (!presa || presa.colonna !== 'destra') return;
+      const b = dove(e);
+      if (!b) return;
       e.preventDefault();
       contaRilascio(e, 'altro_home');
-      const chiave = presa.chiave;
+      const { chiave, colonna } = presa;
+      const s = b.tasti ? bersaglioTasti(b.tasti, e) : null;
       fineTrascinamento();
-      muovi({ tipo: 'togli', carta: chiave });
+      if (b.via) muovi({ tipo: 'togli', carta: chiave });
+      else if (colonna === 'tasti') muovi({ tipo: 'sposta', carta: chiave, prima: s.prima });
+      else muovi({ tipo: 'aggiungi', carta: chiave, prima: s.prima });
     });
+  }
+  // Fra i tasti in vista: lasciato sopra un tasto, chi va avanti gli passa dopo, chi torna indietro o arriva dal «+» gli
+  // passa davanti. Il «+» resta in fondo.
+  function bersaglioTasti(griglia, e) {
+    const tutti = [...griglia.querySelectorAll('.dash-altro-app[data-tasto="1"]')];
+    const altri = tutti.filter((n) => !presa || n !== presa.el);
+    const sotto = altri.find((n) => { const r = n.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+    if (sotto) {
+      const avanti = presa && tutti.includes(presa.el) && tutti.indexOf(presa.el) < tutti.indexOf(sotto);
+      if (avanti) { const dopo = altri[altri.indexOf(sotto) + 1]; return { prima: dopo ? dopo.dataset.id : null, segno: sotto, dove: 'dopo' }; }
+      return { prima: sotto.dataset.id, segno: sotto, dove: 'prima' };
+    }
+    const ultimo = altri[altri.length - 1] || null;
+    return { prima: null, segno: ultimo, dove: 'dopo' };
   }
 
   // Clic e Invio fanno la stessa cosa. A sinistra la carta è una conversazione che Filo ha cominciato: si apre nel
