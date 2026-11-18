@@ -3615,6 +3615,7 @@ class TabManager {
         Strade.misura('caricata', tab);
       }
       this.visite.caricata(wc);
+      TrascrizioneYoutube.precarica(wc, wc.getURL());
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
