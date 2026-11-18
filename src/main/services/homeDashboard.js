@@ -221,6 +221,7 @@ function ordinaCome(sx, layout) {
   const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
   return CH.sinistra({
     timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+    cornice: per('cornice'),
   }, layout);
 }
 
