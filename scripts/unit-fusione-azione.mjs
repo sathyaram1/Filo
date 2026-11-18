@@ -6,6 +6,7 @@ import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI, ESITI_CHE_PROSEGUONO } from './lib/unit-sulla-fusione.mjs';
+import { prendiComandiDiActions } from './lib/comandi-di-actions.mjs';
 
 // Il server cerca la riga che COMINCIA così, l'ultima del registro: l'uscita dei test provati è rientrata, mai in colonna.
 export const MARCA = 'FILO-UNIT-FUSIONE';
