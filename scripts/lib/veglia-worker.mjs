@@ -451,7 +451,7 @@ export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Ripar
  * @returns {Promise<{ uscita: number, testo: string, guasto?: string, oltreTetto?: object }>}
  */
 export async function veglia({
-  leggi, rilascia, costo = null, rilasciaOltre = null, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+  leggi, rilascia, costo = null, rilasciaOltre = null, autopsia = () => ({}), adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
   fetta = FETTA_MS, passo = PASSO_MS, soglia = SOGLIA_FERMO_MS,
 } = {}) {
   const fine = adesso() + fetta;
