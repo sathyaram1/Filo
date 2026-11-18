@@ -867,8 +867,7 @@ class BarraLaterale {
       this.chiudi();
       this._restituisciTastiera();
       const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
-      this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
-      this._consegnaInAttesa();
+      this._allaPagina(attiva, id, scelto);
       return;
     }
     const daTastiera = !dallaFila && this.motivo === 'tasto';
