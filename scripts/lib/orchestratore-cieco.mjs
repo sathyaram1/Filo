@@ -188,6 +188,14 @@ export function impronta(biglietto) {
   return createHash('sha256').update(String(biglietto ?? '').trim()).digest('hex');
 }
 
+/** La decisione del server per un biglietto ({ model, effort, ruolo }), come la legge il gancio; null se non c'è. */
+export function decisioneDelBiglietto(ticket, { dir = dirImpostazioniUtente(), adesso = Date.now() } = {}) {
+  if (!String(ticket ?? '').trim()) return null;
+  try {
+    return vocePer(JSON.parse(readFileSync(join(dir, FILE_REGISTRO), 'utf8')).voci, impronta(ticket), adesso);
+  } catch (_) { return null; }
+}
+
 /**
  * La decisione del server per un biglietto, dove la legge il gancio: l'impronta, mai il biglietto in chiaro. Le voci
  * scadute si buttano; un registro rotto si riparte da vuoto (lo riscrive solo questo comando).
