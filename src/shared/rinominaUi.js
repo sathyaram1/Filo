@@ -98,7 +98,7 @@
         doc.removeEventListener('keydown', tasto, true);
         global.removeEventListener('blur', chiudiMenu);
         global.removeEventListener('resize', chiudiMenu);
-        doc.removeEventListener('scroll', chiudiMenu, true);
+        doc.removeEventListener('scroll', scorre, true);
       },
     };
     doc.addEventListener('keydown', tasto, true);
