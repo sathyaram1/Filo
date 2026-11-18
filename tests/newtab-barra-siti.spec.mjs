@@ -318,4 +318,115 @@ test('#1657 un programma del computer lasciato sulla barra dal desktop parte al 
   const no = await page.evaluate((percorso) => new Promise((ok) => chrome.runtime.sendMessage(
     { type: window.SN_MSG.MSG.BARRA_SITI_AVVIA, id: percorso }, ok)), gioco);
   expect(no.ok).toBe(false);
+  // Un file che non è un programma resta fuori, e lo dice.
+  const nota = path.join(dir, 'nota.txt');
+  fs.writeFileSync(nota, 'ciao');
+  await lasciaFileSullaBarra(page, nota);
+  await expect(page.locator('#dashFlash')).toContainText('programma');
+  expect((await salvate(app)).length).toBe(1);
+});
+
+test('#1803.1 un collegamento lasciato da un\'altra finestra diventa una voce', async ({ app, testServer }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  const url = testServer.html('<title>Da fuori</title><p>x</p>');
+  await lasciaCollegamento(page, url);
+  await expect(page.locator(`#barraSiti .dash-barra-voce[title$="${url}"]`)).toHaveCount(1);
+  expect((await salvate(app)).map((v) => v.url)).toEqual([url]);
+});
+
+test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si illumina e lo dice; un file aperto in una scheda resta fuori e lo dice', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await openTab('filo://history/history.html');
+  const cron = (await schede(shell)).find((t) => String(t.url).startsWith('filo://history'));
+  const casa = (await schede(shell)).find((t) => String(t.url).startsWith('filo://newtab'));
+  await attiva(shell, casa.id);
+  const page = await home(app);
+
+  await lasciaSullaBarra(app, shell, page, cron.id);
+  const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
+  await expect(voce).toHaveCount(1, { timeout: 5000 });
+  await expect(voce).toHaveAttribute('aria-label', /Cronologia/);
+  expect((await salvate(app)).map((v) => v.url)).toEqual(['filo://history/history.html']);
+
+  // Di nuovo la stessa: nessuna voce in più, quella che c'è si fa vedere e l'avviso lo dice.
+  await lasciaSullaBarra(app, shell, page, cron.id);
+  await expect(page.locator('#dashFlash')).toContainText('è già nella barra');
+  await expect(voce).toHaveClass(/dash-trovato/);
+  await expect(voce).toHaveCount(1);
+
+  // Il clic apre la Cronologia in una scheda.
+  const quante = async () => (await schede(shell)).filter((t) => String(t.url).startsWith('filo://history')).length;
+  const prima = await quante();
+  await voce.click();
+  await expect.poll(quante, { timeout: 8000 }).toBe(prima + 1);
+
+  // Un file aperto in una scheda.
+  const dir = cartellaTemporanea('barra-siti-file');
+  const file = path.join(dir, 'appunti.txt');
+  fs.writeFileSync(file, 'appunti');
+  await openTab(pathToFileURL(file).href);
+  const scheda = (await schede(shell)).find((t) => String(t.url).startsWith('file:'));
+  expect(scheda, 'la scheda del file').toBeTruthy();
+  await attiva(shell, casa.id);
+  const p = await home(app);
+  await lasciaSullaBarra(app, shell, p, scheda.id);
+  await expect(p.locator('#dashFlash')).toContainText('un file aperto in una scheda non va nella barra');
+  expect((await salvate(app)).length).toBe(1);
+});
+
+test('#1803.1 un server locale scritto nel «+» si apre in http, come dalla navigazione', async ({ app, shell, testServer }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  const url = testServer.html('<title>Server di sviluppo</title><p>in locale</p>');
+  const scritto = url.replace(/^http:\/\//, '');
+  await page.locator('#barraSiti .dash-barra-piu').click();
+  await page.locator('.dash-barra-campo input').fill(scritto);
+  await page.keyboard.press('Enter');
+  const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
+  await expect(voce).toHaveAttribute('title', `127.0.0.1\n${url}`);
+  const aperte = async () => (await schede(shell)).filter((t) => t.url === url).length;
+  await voce.click();
+  await expect.poll(aperte, { timeout: 8000 }).toBe(1);
+});
+
+test('#1803.1 arrivare nella home per leggere una conversazione riapre la chat ripiegata: chat riaperta, punto del filo, intervista', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'La carbonara vuole guanciale e pecorino.' }]);
+  try {
+    await page.locator('#input').fill('come si fa la carbonara?');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'guanciale' })).toBeVisible({ timeout: 10_000 });
+  } finally { await ripristina(app); }
+  const id = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).find((c) => JSON.stringify(c.messages || []).includes('carbonara')).id);
+  const evento = await app.evaluate(async (_e, c) => globalThis.SN_IL_FILO.ultimaDomanda(c), id);
+  expect(evento).toBeTruthy();
+  const ripiegata = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).chatRipiegata);
+  const ripiega = async () => {
+    await imposta(page, { chatRipiegata: true });
+    await expect.poll(ripiegata).toBe(true);
+  };
+
+  // Una chat riaperta dall'archivio: la conversazione si vede, e la chat resta aperta anche nelle altre home.
+  await ripiega();
+  const riaperta = await openTab(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'guanciale' })).toBeVisible({ timeout: 15_000 });
+  await expect(riaperta.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
+
+  // Un punto del filo (dal quaderno delle memorie): il messaggio si illumina dove lo si vede.
+  await ripiega();
+  const punto = await openTab(`filo://newtab/?evento=${encodeURIComponent(evento)}`);
+  await expect(punto.locator('.dash-trovato')).toContainText('carbonara', { timeout: 15_000 });
+  await expect(punto.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
+
+  // L'intervista di benvenuto rifatta dalle Preferenze.
+  await ripiega();
+  await page.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RESTART_ONBOARDING }, ok)));
+  const intervista = await openTab('filo://newtab/?accoglienza=1');
+  await expect(intervista.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  await expect(intervista.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
 });
