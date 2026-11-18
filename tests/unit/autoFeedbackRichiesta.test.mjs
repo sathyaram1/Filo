@@ -62,10 +62,10 @@ test('domandaOltreAlComando: una domanda accanto al comando sì, il comando dett
 
 // #2364: «Salva la pagina per dopo» esiste; citata dopo un «non posso» non diventa mai una funzione mancante.
 test('#2364: una voce del manifesto citata dopo «non posso» non è mai «non disponibile»', () => {
-  const reply = 'Non posso farlo io da qui: «Salva la pagina per dopo» lo trovi nella barra laterale, è l\'icona col segnalibro.';
+  const reply = 'Non posso fare questa cosa da qui: «Salva la pagina per dopo» lo trovi nella barra laterale, è l\'icona col segnalibro.';
   const a = AF.analyzeReply(reply, [], 'salvala per dopo', CAPS);
-  assert.notEqual(a.kind, 'capability-gap');
-  if (a.genericDesc) assert.doesNotMatch(a.genericDesc, /non disponibile/);
+  assert.equal(a.capabilityId, null);
+  assert.doesNotMatch(AF.compose(a).text, /save-for-later/);
 });
 
 test('le voci segnalate l\'8 novembre che hanno uno strumento non diventano «non sa azionare»', () => {
