@@ -198,8 +198,8 @@
     const nome = r.filename || 'download';
     const pct = percento(r);
     const base = {
-      chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
-      togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
+      chiave: C.chiaveDownload(r.id), tipo: 'download', icona: 'download', titolo: nome,
+      togli: () => muovi({ tipo: 'nascondi', chiave: C.chiaveDownload(r.id) }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
       altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
