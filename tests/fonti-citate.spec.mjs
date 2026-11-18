@@ -9,7 +9,7 @@ const NEWTAB = 'filo://newtab/';
 const FRASE = 'Il ponte di Calatrava fu inaugurato il 16 giugno 2015 dopo sei anni di lavori.';
 const PAGINA = `<!doctype html><html lang="it"><head><title>Storia del ponte</title></head><body><main><article>
 <h1>Storia del ponte</h1>
-${'<p>Una lunga premessa sul quartiere, sulle sue strade e sulle piazze che lo attraversano da secoli.</p>\n'.repeat(120)}
+${'<p>Una lunga premessa sul quartiere, sulle sue strade e sulle piazze che lo attraversano da secoli.</p>\n'.repeat(400)}
 <p>${FRASE}</p>
 <p>Oggi lo attraversano ogni giorno migliaia di persone.</p>
 </article></main></body></html>`;
