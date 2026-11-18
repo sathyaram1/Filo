@@ -187,7 +187,9 @@ diviso in sezioni, ognuna sotto un'intestazione `## <nome>`, in quest'ordine:
   grafica», 31/10): la decisione del mattino le legge, il recap dice come le
   ha applicate; le toglie l'owner o il manutentore quando sono esaurite. È
   l'ultima perché l'indicazione dell'owner si aggiunge in coda al taccuino, e
-  così cade dentro di lei.
+  così cade dentro di lei. La accoda solo il server, su una riga, sia quando la
+  scrive l'owner sia quando il manutentore la riporta con la sua chiave
+  (`taccuino.indicazione`, `testo`, senza versione: accoda e non riscrive).
 
 **Aggiornare a sezioni** (08/11/2026, #2340). L'operazione `taccuino.sezione`
 (`sezione`, `testo`, `versione`) riscrive il corpo di una sola sezione e lascia

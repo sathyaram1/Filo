@@ -931,30 +931,13 @@ async function prioritaAttuali(cred, ...nums) {
   });
 }
 
-/** Il giorno in Italia (YYYY-MM-DD), quello che il server scrive accanto a un'indicazione. PURA. */
+/** Il giorno in Italia (YYYY-MM-DD), come lo scrive il server. PURA. */
 export function giornoDi(ms = Date.now()) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 }
 
-/** Il taccuino con l'indicazione dell'owner in coda, datata come la scrive il server (ownerManutentore). PURA. */
-export function conIndicazione(taccuino, testo, giorno) {
-  const t = unaRiga(testo);
-  if (!t) return { ok: false, motivo: 'l\'indicazione è un testo non vuoto' };
-  return { ok: true, testo: `${String(taccuino || '').replace(/\s+$/, '')}\n\nIndicazione dell'owner (${giorno}): ${t}\n`.replace(/^\n+/, '') };
-}
-
-/** Indicazione con la chiave: rilettura e riscrittura, di nuovo se nel frattempo il taccuino è cambiato. */
-async function indicazioneConChiave(cred, testo) {
-  for (let i = 0; i < 3; i++) {
-    const t = await chiama(cred, 'taccuino');
-    if (t.ok === false) return t;
-    const n = conIndicazione(t.testo, testo, giornoDi());
-    if (!n.ok) return { ok: false, reason: 'malformed', detail: n.motivo };
-    const w = await chiama(cred, 'taccuino.scrivi', { testo: n.testo, versione: Number(t.versione) || 0 });
-    if (w.ok !== false || w.reason !== 'taccuino_cambiato') return w;
-  }
-  return { ok: false, reason: 'taccuino_cambiato', detail: 'il taccuino è cambiato tre volte mentre lo riscrivevo: riprova' };
-}
+// Dove e come l'indicazione entra nel taccuino lo decide solo il server, per l'owner e per la chiave (#2340.3).
+const indicazioneConChiave = (cred, testo) => chiama(cred, 'taccuino.indicazione', { testo });
 
 // ── Le novità (§ 8) ─────────────────────────────────────────────────────────
 

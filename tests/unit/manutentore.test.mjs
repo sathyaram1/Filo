@@ -730,28 +730,16 @@ test('senza chiave né biglietto del manutentore non si chiama il server, e si d
   assert.equal(s.corpi.length, 0);
 });
 
-test('l\'indicazione dell\'owner va in coda al taccuino con la data, senza perdere il resto', () => {
-  const r = M.conIndicazione('stato: N 4\n\nproblemi: nessuno\n\n', '  priorità a ciò che\ncambia la grafica ', '2026-10-31');
-  assert.equal(r.testo, 'stato: N 4\n\nproblemi: nessuno\n\nIndicazione dell\'owner (2026-10-31): priorità a ciò che cambia la grafica\n');
-  assert.equal(M.conIndicazione('', 'prima', '2026-10-31').testo, 'Indicazione dell\'owner (2026-10-31): prima\n');
-  assert.equal(M.conIndicazione('x', '   ').ok, false);
-  assert.match(M.giornoDi(Date.parse('2026-10-31T23:30:00Z')), /^2026-11-01$/, 'il giorno è quello italiano');
+test('il giorno del contesto è quello italiano', () => {
+  assert.match(M.giornoDi(Date.parse('2026-10-31T23:30:00Z')), /^2026-11-01$/);
 });
 
-test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e riscrive, con la versione letta', async (t) => {
-  let versione = 3;
-  const s = serverFinto(t, {
-    taccuino: () => [200, { ok: true, testo: `voce ${versione}`, versione }],
-    'taccuino.scrivi': (b) => {
-      if (b.dati.versione === 3) { versione = 4; return [409, { ok: false, reason: 'taccuino_cambiato', detail: 'alla 4' }]; }
-      return [200, { ok: true, versione: 5 }];
-    },
-  });
+test('indicazione con la chiave: la manda al server, che la accoda come quella dell\'owner, senza riscrivere il taccuino (#2340.3)', async (t) => {
+  const s = serverFinto(t, { 'taccuino.indicazione': () => [200, { ok: true, versione: 5 }] });
   assert.equal(await M.main(['indicazione', 'meno', 'riallineamenti'], CHIAVE), 0);
-  const scritture = s.corpi.filter((c) => c.op === 'taccuino.scrivi');
-  assert.equal(scritture.length, 2);
-  assert.equal(scritture[1].dati.versione, 4);
-  assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [['taccuino.indicazione', { testo: 'meno riallineamenti' }]]);
+  assert.match(s.out.join('\n'), /versione 5/);
+  assert.equal('conIndicazione' in M, false, 'il formato dell\'indicazione non ha una copia nello strumento');
 });
 
 test('il redattore: una promessa su un lavoro che non è nell\'ordine né a 3 si rifiuta, come un link nuovo (#2269)', () => {
