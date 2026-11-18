@@ -2229,45 +2229,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   50% { opacity: 1; }
 }
 
-/* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
-   pagina e non una barra a sé. Stanno in cima alla colonna destra e non le scorrono via. */
-.dash-controls {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-  /* In riga con «Cerca nel filo»: il disegno parte all'altezza delle carte di sinistra. */
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.dash-ctrl {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--dash-ink-soft);
-  cursor: pointer;
-  transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
-  -webkit-app-region: no-drag;
-}
-.dash-ctrl:hover {
-  background: var(--dash-card);
-  color: var(--dash-ink);
-}
-.dash-ctrl:active { transform: translateY(0.5px); }
-.dash-ctrl svg { display: block; }
-.dash-ctrl .account-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
-}
 
 /* Recap dopo un aggiornamento. Vive nella pagina home perché lì non c'è la WebContentsView, che
    copre l'area pagina solo sui siti. */
