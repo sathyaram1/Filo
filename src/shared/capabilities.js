@@ -273,7 +273,7 @@
       id: 'search-image', title: 'Cerca un’immagine sul web', category: 'media',
       desc: 'Cerca sul web a partire da un’immagine (ricerca per immagine con Google Lens, in una scheda nuova): un’immagine della pagina, o una che hai mandato nella chat di Filo.',
       invoke: 'Clic destro su un’immagine → cerca immagine. Oppure chiedilo a Filo in chat («cerca questa immagine»): cerca l’ultima immagine che gli hai mandato, quella che indichi col suo numero, o la più grande in vista nella pagina.',
-      doesNot: 'Dalla chat sceglie Filo quale immagine della pagina cercare (la più grande in vista): per un’altra usa il tasto destro su quella. Un’immagine mandata in chat parte verso Google solo dopo la tua conferma.',
+      doesNot: 'Dalla chat sceglie Filo quale immagine della pagina cercare (la più grande in vista): per un’altra usa il tasto destro su quella. Dalla chat l’immagine parte verso Google con l’OK che chiede il tuo livello di autonomia, come le altre azioni che portano fuori un tuo dato.',
     },
     {
       id: 'video-audio-controls', title: 'Comanda un video o un audio della pagina', category: 'media',
