@@ -446,6 +446,20 @@
       <span id="menuDelSitoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
+    <!-- #2372 — le lettere del doppio tocco: le righe e l'aggiunta le scrive preferences.js. -->
+    <section id="sec-doppio-tocco">
+      <h2>Lettere della home</h2>
+      <p class="sn-muted">Due volte la stessa lettera, come prime battute nel campo della home, aprono quello che le hai dato.</p>
+      <div id="doppioToccoLettere" class="mem-box"></div>
+      <div class="sn-row" style="margin-top:8px;">
+        <input type="text" id="doppioToccoNuova" maxlength="1" placeholder="y" aria-label="Lettera" style="width:48px;text-align:center;" />
+        <input type="text" id="doppioToccoDove" list="doppioToccoTasti" placeholder="youtube.com, Editor, Cerca nel filo…" aria-label="Cosa apre" style="flex:1;min-width:160px;" />
+        <datalist id="doppioToccoTasti"></datalist>
+        <button class="sn-btn sn-btn-secondary" id="doppioToccoAggiungi" type="button">Aggiungi</button>
+        <span id="doppioToccoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+      </div>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
