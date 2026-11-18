@@ -185,11 +185,12 @@ Gestione → Automazioni.
    (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
    correggere un hover.
 
-L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé, davanti all'ordine. Un numero chiuso o non aperto il server lo salta.
-Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi
-i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella
-sessione che il pacemaker accende per lei.
+L'ordine decide i primi lavori: verifica, correzione, controllo e risposte dell'owner li accende il server da sé,
+davanti all'ordine. Un feedback già consegnato nell'ordine dice solo quale dei lavori già iniziati parte prima: fra
+loro quelli dell'ordine vanno nella sua sequenza, a qualunque priorità, e gli altri dopo, per urgenza. Un numero chiuso
+o non aperto il server lo salta. Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine
+come il pacemaker: prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine
+parte a ogni priorità anche nella sessione che il pacemaker accende per lei, e anche fra i lavori del server.
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
