@@ -332,8 +332,9 @@
       e.stopPropagation();
       apriEtichetta(el);
     };
-    root.addEventListener('click', alClic);
-    root.addEventListener('keydown', alClic);
+    // In cattura: il clic sull'etichetta è suo, non della bolla che la contiene (che riapre o cita la conversazione).
+    root.addEventListener('click', alClic, true);
+    root.addEventListener('keydown', alClic, true);
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     return () => {
