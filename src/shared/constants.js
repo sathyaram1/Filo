@@ -3438,6 +3438,8 @@
     opzioniPannelloDestro,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
+    RICERCA_FILO_LIMITI,
+    opzioniRicercaFilo,
     FILO_PARLA_DOWNLOAD_MIN,
     minutiFraDownload,
     nomeRitmoDownload,
