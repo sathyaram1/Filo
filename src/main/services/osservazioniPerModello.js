@@ -1737,6 +1737,7 @@ module.exports = {
   voceChiusa,
   schedeNumerate,
   schedaPerNumero,
+  schedaDaMostrare,
   bersaglioPausa,
   bersaglioAudio,
   salvatePerChat,
