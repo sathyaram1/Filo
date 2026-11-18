@@ -1585,6 +1585,59 @@
     }
   }
 
+  // ── Le lettere del doppio tocco nella home (#2372) ───────────────────────
+  // Si danno dal tasto destro di un tasto della home, chiedendolo a Filo o da qui; qui si vedono tutte e si tolgono.
+  let lettereSalvate = [];
+  function disegnaLettere(cfg) {
+    const D = window.SN_DOPPIO_TOCCO;
+    const box = $('doppioToccoLettere');
+    if (!box || !D) return;
+    lettereSalvate = D.normalizza(cfg).lettere;
+    righeConCrocetta(box, lettereSalvate.map((v) => v.lettera), {
+      vuoto: 'Nessuna lettera: di serie il doppio tocco non fa niente.',
+      chiave: 'lettera',
+      testo: (l) => D.etichetta(lettereSalvate.find((v) => v.lettera === l)),
+      titolo: 'Togli la lettera',
+      aria: (t) => `Togli ${t}`,
+      togli: (l) => salvaLettere(D.togli({ lettere: lettereSalvate }, l).lettere),
+    });
+    const lista = $('doppioToccoTasti');
+    if (lista && !lista.childElementCount && window.SN_CARTE_HOME) {
+      const H = window.SN_CARTE_HOME;
+      for (const t of [...H.TASTI, ...H.CARTE.filter((c) => c.url)]) {
+        const o = document.createElement('option');
+        o.value = t.titolo;
+        lista.appendChild(o);
+      }
+    }
+  }
+  async function salvaLettere(lettere) {
+    disegnaLettere({ lettere });
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { doppioTocco: { lettere } } });
+    flashSaved('doppioToccoHint');
+  }
+  // Un titolo dell'elenco («Cerca nel filo») vale come il nome del tasto; il resto è un indirizzo.
+  async function aggiungiLettera() {
+    const D = window.SN_DOPPIO_TOCCO;
+    const l = D.lettera($('doppioToccoNuova').value);
+    const dove = $('doppioToccoDove').value.trim();
+    const H = window.SN_CARTE_HOME;
+    const perTitolo = H && [...H.TASTI, ...H.CARTE].find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
+    const r = l && dove ? (perTitolo ? D.assegna({ lettere: lettereSalvate }, l, { tasto: perTitolo.id }) : D.daTesto(`${l} ${dove}`, { doppioTocco: { lettere: lettereSalvate } })) : null;
+    const hint = $('doppioToccoHint');
+    if (!r || r.rifiuto) {
+      if (hint) {
+        hint.textContent = !l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre';
+        hint.classList.add('show');
+        setTimeout(() => { hint.classList.remove('show'); hint.textContent = 'Salvato'; }, 2400);
+      }
+      return;
+    }
+    $('doppioToccoNuova').value = '';
+    $('doppioToccoDove').value = '';
+    await salvaLettere(r.lettere);
+  }
+
   async function salvaSitiMenu(nuovo) {
     const elenco = Array.from(new Set(nuovo));
     disegnaSitiMenu(elenco);
