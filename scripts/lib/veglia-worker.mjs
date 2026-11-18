@@ -480,8 +480,10 @@ export async function veglia({
     if (g.stato === 'fermo' || g.stato === 'chiuso') {
       const chiuso = g.stato === 'chiuso';
       const quadro = quadroDelFermo(s);
+      const a = (!chiuso && autopsia(s)) || {};
       const guasto = testoGuasto({
         fermoMs: g.fermoMs, attesa: chiuso ? null : s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro, chiusoMs: chiuso ? s.chiusoMs : NaN,
+        ultimo: ultimoStrumento(s.tracce), corsa: a.corsa || null, memoria: a.memoria || null,
       });
       const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok
