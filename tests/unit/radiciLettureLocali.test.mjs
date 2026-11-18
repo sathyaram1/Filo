@@ -137,12 +137,11 @@ test('mille domande lette in una volta partono a pezzi sotto il tetto del server
   assert.deepEqual(r.errori, []);
 });
 
-test('le domande fidate per timbri si nominano anche loro: il timbro tolto dopo raggiunge la sessione che le ha lette', () => {
-  const domande = [
-    { id: 'D-1', fiducia: 'fidato', radici: ['legacy'] },
-    { id: 'D-2', fiducia: 'fidato', radici: [] },
-    { id: 'D-3', fiducia: 'fidato', radici: ['feedback:40'], fidataDallOwner: { il: 1 } },
-    { id: 'D-4', fiducia: 'non_fidato', radici: ['feedback:41'] },
-  ];
-  assert.deepEqual(fidatePerTimbri(domande), ['D-1']);
+test('anche un elenco di sole domande fidate si nomina al server: il timbro tolto dopo raggiunge la sessione che le ha lette', async () => {
+  const { esegui } = await import('../../scripts/domanda.mjs');
+  const s = spia();
+  const domande = [{ id: 'D-1', titolo: 't', stato: 'aperta', fiducia: 'fidato', radici: ['legacy'] }, { id: 'D-3', titolo: 't', stato: 'aperta', fiducia: 'fidato', radici: [], fidataDallOwner: { il: 1 } }];
+  const base = { biglietto: async () => '', bigliettoLocale: async () => '', credenziale: async () => ({ tipo: 'admin' }), scrivi: () => {}, errore: () => {} };
+  assert.equal(await esegui(['elenco'], Object.assign({}, base, { chiama: async () => ({ ok: true, domande }), sporca: s.sporca })), 0);
+  assert.deepEqual(s.sporcate.map((x) => x.letti), [lettiDi(['D-1', 'D-3'])]);
 });
