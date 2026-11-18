@@ -102,17 +102,17 @@
     },
     MOSTRA_SCHEDA: {
       via: ['scheda', 'mostra'],
-      description: 'porta l\'utente su una scheda già aperta, senza ricaricarla: scheda col suo numero, o verso la scheda dopo o prima di quella davanti, come Ctrl+Tab.',
+      description: 'porta l\'utente su una scheda aperta, o su quella dopo/prima (verso), senza ricaricarla.',
       properties: { scheda: I(), verso: S({ enum: ['dopo', 'prima'] }) }, required: [],
     },
     SALVA_PER_DOPO: {
-      via: ['scheda', 'salva_per_dopo'],
-      description: 'salva per dopo una pagina web e ne chiude la scheda, come Alt+S: scheda col suo numero, senza la pagina web davanti.',
+      via: ['scheda', 'salva'],
+      description: 'salva per dopo una pagina (senza scheda: la web davanti) e la chiude.',
       properties: { scheda: I() }, required: [],
     },
     CERCA_IMMAGINE: {
-      via: ['scheda', 'cerca_immagine'],
-      description: 'ricerca per immagine con Google Lens, in una scheda nuova: immagine il numero di una mandata in questa chat (dalla prima, 1), o scheda per la più grande in vista in quella pagina; senza, l\'ultima mandata in chat o la più grande della pagina davanti.',
+      via: ['scheda', 'lens'],
+      description: 'Google Lens su un\'immagine: immagine N della chat, o la più grande della pagina (scheda); senza, l\'ultima della chat.',
       properties: { immagine: I(), scheda: I() }, required: [],
     },
     CHIUDI_SCHEDE: {
