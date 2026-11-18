@@ -10,7 +10,7 @@ const frasi = (f) => fs.readFileSync(path.join(radice, 'routines', 'roles', f), 
 
 for (const ruolo of ['resolver.md', 'resolver-ripresa.md']) {
   test(`r1 ${ruolo}: un rifiuto del doppione che nomina solo il ramo dell'originale porta a una riconsegna`, () => {
-    const regola = frasi(ruolo).filter((s) => /riconsegna/.test(s) && /\bramo\b/.test(s));
+    const regola = frasi(ruolo).filter((s) => /riconsegn/.test(s) && /\bramo\b/.test(s) && /originale|doppione/.test(s));
     expect(regola, 'una frase che dica cosa fare quando il rifiuto nomina il ramo dell\'originale').not.toEqual([]);
   });
 }
