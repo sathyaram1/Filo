@@ -340,9 +340,9 @@
     if (hasNotCapable) {
       const capabilityId = guessCapabilityId(replyNorm, capabilities);
       const cap = capabilityId ? voceDi(capabilityId, capabilities) : null;
-      // La voce c'è nel manifesto: non è una funzione mancante (#2364). Con uno strumento l'assistente poteva farla, e
-      // non c'è niente da segnalare; senza, è una funzione che non sa azionare, se l'utente gli aveva chiesto di farla.
-      if (cap) return !haStrumento(cap) && azione ? nonAzionabile(cap) : { kind: null };
+      // La voce citata c'è nel manifesto: non è lei la funzione mancante (#2364). Senza strumento, ed era una richiesta
+      // di farla, è una funzione che l'assistente non sa azionare; se no resta la mancanza detta, senza dare un nome.
+      if (cap && !haStrumento(cap) && azione) return nonAzionabile(cap);
       return { kind: 'capability-gap', capabilityId: null, genericDesc: 'Richiesta di funzione non disponibile in Filo' };
     }
 
