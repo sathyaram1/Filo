@@ -2,7 +2,7 @@
 // come appena installato. Ogni prova guarda le pagine dove l'utente vede i suoi dati e i file della cartella dei dati.
 // Senza il tasto e la cancellazione all'avvio è rossa: memoria, chat, editor, salvati e archivio tornavano tutti.
 
-import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
+import { test, expect, chiudiApp, argomentiScala, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
