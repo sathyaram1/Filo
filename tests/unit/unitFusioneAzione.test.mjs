@@ -341,3 +341,35 @@ test('ramo che contiene già main: Linux risponde «main contenuto», Windows pr
     togliCartella(r.casa);
   }
 });
+
+// Un filtro di git scritto dall'installazione del ramo gira in checkout e fusione della prova, fuori dai test (#2558).
+test('checkout e fusione della prova non passano al codice del ramo i file dei comandi, ed esito e riassunto arrivano', () => {
+  const r = repoFinto();
+  try {
+    const spia = join(r.casa, 'spia.txt').replace(/\\/g, '/');
+    writeFileSync(spia, '', 'utf8');
+    r.git(['config', 'filter.spia.smudge', `echo "\${GITHUB_OUTPUT:-vuoto} \${GITHUB_ENV:-vuoto} \${GITHUB_STEP_SUMMARY:-vuoto}" >> '${spia}'; cat`]);
+    writeFileSync(join(r.lavoro, '.gitattributes'), '*.txt filter=spia\n', 'utf8');
+    const base = r.commit('main: filtro');
+    writeFileSync(join(r.lavoro, 'altro.txt'), 'x\n', 'utf8');
+    const m1 = r.commit('main: altro');
+    r.git(['push', '-q', 'origin', 'main']);
+    r.git(['checkout', '-q', '-b', 'claude/filtro', base]);
+    writeFileSync(join(r.lavoro, 'ramo.txt'), 'ramo\n', 'utf8');
+    const ramo = r.commit('ramo: un file');
+    const file = { GITHUB_OUTPUT: join(r.casa, 'uscita.txt'), GITHUB_ENV: join(r.casa, 'env.txt'), GITHUB_STEP_SUMMARY: join(r.casa, 'riassunto.txt') };
+    for (const f of Object.values(file)) writeFileSync(f, '', 'utf8');
+    writeFileSync(spia, '', 'utf8');
+    const p = azione(r, ramo, m1, { args: ['--root', r.lavoro, '--parte', 'linux', '--unit', 'tutti'], extra: file });
+    assert.equal(p.codice, 0, p.uscita);
+    const visti = readFileSync(spia, 'utf8').split('\n').filter(Boolean);
+    assert.ok(visti.length > 0, `il filtro del ramo non è nemmeno girato: la prova non prova niente\n${p.uscita}`);
+    assert.deepEqual([...new Set(visti)], ['vuoto vuoto vuoto'], 'il codice del ramo ha visto i file dei comandi');
+    const righe = readFileSync(file.GITHUB_OUTPUT, 'utf8').split('\n').filter(Boolean);
+    assert.equal(righe.length, 1, righe.join('\n'));
+    assert.equal(JSON.parse(righe[0].slice('campo='.length)).esito, 'verde', p.uscita);
+    assert.match(readFileSync(file.GITHUB_STEP_SUMMARY, 'utf8'), /Unit sulla fusione \(linux, tutti\)/);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
