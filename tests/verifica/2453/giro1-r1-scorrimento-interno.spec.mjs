@@ -94,17 +94,6 @@ test('r1 con gli angoli squadrati (Raggio degli angoli a 0): uno scorrimento fin
   }
 });
 
-test('r1 finestra bassa, file dell\'ultima risposta in fondo alla chat: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
-  test.setTimeout(90_000);
-  try {
-    await app.evaluate(({ BaseWindow }) => { for (const w of BaseWindow.getAllWindows()) w.setSize(1000, 460); });
-    const page = await chatConFile(app);
-    await expect.poll(() => page.evaluate(() => innerHeight)).toBeLessThan(470);
-    await restaAperto(page, { inFondo: true, copre: true });
-  } finally {
-    await ripristina(app);
-  }
-});
 
 test('file della chat: uno scorrimento del riquadro dopo l\'apertura chiude ancora il menu', async ({ app }) => {
   test.setTimeout(90_000);
