@@ -179,7 +179,7 @@ test('l\'Aiuto su un video risponde dalla trascrizione', async ({ app, shell, op
   await expect.poll(() => tracce(youtube).some((r) => r.includes('v=secondoVid1')), { timeout: 15_000 }).toBe(true);
 });
 
-fixture('su un video senza trascrizione l\'Aiuto lo dice invece di rispondere dal titolo', async ({ app, shell, openTab, youtube }) => {
+test('su un video senza trascrizione l\'Aiuto lo dice invece di rispondere dal titolo', async ({ app, shell, openTab, youtube }) => {
   test.setTimeout(90_000);
   const page = await openTab(youtube.url(`/watch?v=${SENZA}`));
   await modelli(app);
