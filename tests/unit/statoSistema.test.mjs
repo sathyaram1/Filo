@@ -754,6 +754,43 @@ const S = require(MODULO);
   assert.deepEqual(mac, [false, false, false, false, false, false]);
 });
 
+// #2394.1 — il volume cambiato da Filo e l'avviso del caricatore ritoccano lo stato senza rileggere le radio: mentre il
+// lettore riparte, il Bluetooth di prima della pausa resta «vecchio» finché non lo rilegge una lettura vera o un comando.
+test('il volume cambiato da Filo e il caricatore non fanno passare per letta la radio di prima della pausa', () => {
+  const esito = simula(`
+const S = require(MODULO);
+const pc = (bt) => ({ batteria: { livello: 50, inCarica: false, collegata: false }, rete: null, bluetooth: { acceso: bt, dispositivi: [] }, wifi: { acceso: true }, volume: { livello: 20, muto: false } });
+(async () => {
+  await S._perProve.usaLettore(async () => pc(false));
+  S.richiedi();
+  await attesa(50);
+  // Il lettore ha dormito e riparte lento: la sua lettura resta in volo finché la prova non la libera.
+  let libera = null;
+  S._perProve.usaLettore(() => new Promise((r) => { libera = r; }));
+  S._perProve.invecchia(5 * 60 * 1000);
+  const vecchie = () => (S.stato().vecchio || []).join(',');
+  const prima = vecchie();
+  S.dopoComando({ volume: { livello: 40, muto: false } });
+  const volume = [vecchie(), S.stato().volume.livello];
+  pm.emit('on-ac');
+  const caricatore = [vecchie(), S.stato().batteria.collegata, S.stato().bluetooth.acceso];
+  S.dopoComando({ bluetooth: { acceso: true } });
+  const comandoBt = vecchie();
+  libera(pc(true));
+  await attesa(50);
+  const letto = vecchie();
+  S.ferma();
+  console.log(JSON.stringify({ prima, volume, caricatore, comandoBt, letto })); process.exit(0);
+})();`);
+  assert.deepEqual(esito, {
+    prima: 'bluetooth,wifi',
+    volume: ['bluetooth,wifi', 40],
+    caricatore: ['bluetooth,wifi', true, false],
+    comandoBt: 'wifi',
+    letto: '',
+  });
+});
+
 test('con un adattatore virtuale Chromium dice online a rete giù: la sorveglianza rilegge poche volte, non ogni 30 secondi', () => {
   const g = { visto: null, riletture: 0 };
   const giri = Array.from({ length: 120 }, () => L.reteDaRileggere(g, true, false));
