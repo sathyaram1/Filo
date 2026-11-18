@@ -43,8 +43,37 @@ export const AMBIENTE = Object.freeze({
   CLAUDE_CODE_FORK_SUBAGENT: '0',
   CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '3',
 });
-// Con FORCE acceso Claude Code ignora il modello del lancio e della definizione: un'installazione vecchia la lascerebbe.
-export const AMBIENTE_TOLTO = Object.freeze(['CLAUDE_CODE_SUBAGENT_MODEL_FORCE']);
+// Con FORCE acceso Claude Code ignora il modello del lancio e della definizione. Dalle impostazioni si toglie; dall'ambiente
+// del processo (le variabili dell'ambiente cloud) no, nemmeno con un "0" nei settings: lì lo dice modelloForzato (#2553).
+export const FORZA = 'CLAUDE_CODE_SUBAGENT_MODEL_FORCE';
+export const AMBIENTE_TOLTO = Object.freeze([FORZA]);
+
+/** Il modello che l'ambiente impone a ogni sotto-agente, o ''. Accesa come la legge Claude Code (1, true, yes, on). PURA. */
+export function modelloForzato(env = process.env) {
+  const acceso = ['1', 'true', 'yes', 'on'].includes(String((env && env[FORZA]) ?? '').trim().toLowerCase());
+  return acceso ? String(env.CLAUDE_CODE_SUBAGENT_MODEL || '').trim() : '';
+}
+
+/**
+ * Le note del rapporto di fine sessione sul modello e sullo sforzo: la forzatura dell'ambiente, e i turni del worker
+ * (`modelli`, `sforzi` { high: 40 }) che non seguono la decisione del server (`voce` del registro). PURA.
+ */
+export function confrontoDecisione({ voce = null, modelli = [], sforzi = {}, forzato = '' } = {}) {
+  const note = [];
+  if (forzato) note.push(`modello dei sotto-agenti forzato a ${forzato} dall'ambiente del processo (${FORZA}): definizioni e modello deciso dal server non contano`);
+  if (!voce) return note;
+  const usati = [...new Set((Array.isArray(modelli) ? modelli : []).map(String).filter(Boolean))];
+  if (voce.model && usati.length && !usati.every((m) => m.toLowerCase().includes(voce.model))) {
+    note.push(`modello deciso dal server ${voce.model}, turni del worker su ${usati.join(', ')}`);
+  }
+  const turni = Object.entries(sforzi || {}).filter(([, n]) => Number(n) > 0);
+  if (voce.effort && turni.some(([k]) => k !== voce.effort)) {
+    note.push(`sforzo deciso dal server ${voce.effort}, turni del worker ${turni.map(([k, n]) => `${k} ${n}`).join(', ')}`);
+  } else if (voce.effort && !turni.length && usati.length) {
+    note.push(`sforzo deciso dal server ${voce.effort}, il transcript del worker non dichiara lo sforzo dei turni`);
+  }
+  return note;
+}
 // Le stesse di .claude/settings.json: lì le perde ogni ramo nato prima, qui reggono al cambio di ramo. Una regola a
 // prefisso non vede `git -C`, quindi il clone del server ha le sue, col percorso vero.
 export const REGOLE_GIT = Object.freeze(['Bash(git fetch:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)']);
