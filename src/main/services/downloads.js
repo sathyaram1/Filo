@@ -719,7 +719,7 @@ function annunciaPartenza(rec, webContents) {
       if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
       win.webContents.send('shell:toast', {
         text: `Scaricamento avviato: ${shortName(rec.filename)}`,
-        opts: { ...chiaveAvviso(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
+        opts: { ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
       });
     } catch (_) {}
   }, ANNUNCIO_MS);
