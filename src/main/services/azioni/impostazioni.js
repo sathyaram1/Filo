@@ -371,6 +371,14 @@ async function azioneCartaHome(action, { sender, chatId }) {
   return { executed: true, kept: true, output: dove };
 }
 
+// #1803 — la barra dei siti: la stessa mossa dei gesti della home, dallo stesso servizio.
+async function azioneBarraSiti(action, { sender }) {
+  const { cambiate, impostazioni, ...esito } = await require('../barraSiti').daChat(action);
+  if (cambiate) annunciaBarraSiti(cambiate, sender);
+  if (impostazioni) await applySettingsUpdate(impostazioni);
+  return esito;
+}
+
 async function azionePulsantePreferenze(action, { sender }) {
   // #1619 — i pulsanti delle Preferenze con le loro stesse funzioni: la chat li preme invece di spiegarli.
   const P = globalThis.SN_PULSANTI_PREFERENZE;
