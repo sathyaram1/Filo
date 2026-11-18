@@ -721,7 +721,7 @@ function annunciaPartenza(rec, webContents) {
       let url = '';
       try { url = (attiva && (attiva.view.webContents.getURL() || attiva.url)) || ''; } catch (_) { url = (attiva && attiva.url) || ''; }
       if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
-      win.webContents.send('shell:toast', {
+      require('./avvisoFinestra').allaCornice(win.webContents, {
         text: `Scaricamento avviato: ${shortName(rec.filename)}`,
         opts: { ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
       });
