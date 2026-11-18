@@ -234,7 +234,8 @@ test('un messaggio già mandato torna com\'era: la riga dell\'Editor che continu
   const due = await turno({ testo: 'secondo', minutiFa: -5 });
   await App.annota({ app: 'editor', rif: 'doc1', soggetto: 'Tesi', messaggi: [{ role: 'user', text: 'accorcia' }, { role: 'filo', text: 'fatto' }] });
   await App.rinomina({ app: 'editor', rif: 'doc1', soggetto: 'Tesi finale' });
-  const lungo = `${'parola '.repeat(20000)}fine`;
+  // Circa 40.000 token: oltre il quarto del tetto che un messaggio tiene da solo, dentro la finestra.
+  const lungo = `${'parola '.repeat(Math.ceil((40000 * FC.CARATTERI_PER_TOKEN) / 7))}fine`;
   const tre = await turno({ testo: lungo, minutiFa: -10 });
   assert.equal(json(tre.messages.slice(0, due.messages.length)), json(due.messages), 'la riga dell\'Editor ha riscritto il tratto');
   assert.ok(testoDi(tre.messages.at(-1)).endsWith(lungo));

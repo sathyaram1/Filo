@@ -607,10 +607,10 @@ test('riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio comp
   }
 });
 
-// Turni pesanti (un capitolo incollato a ogni messaggio, circa 5.000 token, più i ricordi ripescati): sopra la parte
-// fissa resta spazio per il grezzo e altri turni, così la chat non compatta ogni due messaggi e la risposta non la
-// aspetta (giri 4 e 9 di #1563).
-test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
+// Turni pesanti (un capitolo incollato a ogni messaggio, circa 9.000 token per Anthropic, più i ricordi ripescati):
+// sopra la parte fissa resta spazio per il grezzo e altri turni, così la chat non compatta ogni due messaggi e la
+// risposta non la aspetta (giri 4 e 9 di #1563; coi ricordi i turni cambiano peso, #2473).
+test('turni da circa 9.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
   test.setTimeout(300000);
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Letto, ecco il punto.' }]);
