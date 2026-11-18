@@ -279,10 +279,12 @@
       const o = a._output || {};
       const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
       const nome = corto(o.voce || a.elemento || a.voce || a.nome || a.indirizzo);
-      const op = String(a.operazione || '').toLowerCase();
+      // L'operazione e i suoi sinonimi li riconosce solo src/shared/barraSiti.js, caricato anche nella home.
+      if (!global.SN_BARRA_SITI && typeof require === 'function') { try { require('./barraSiti.js'); } catch (_) {} }
+      const op = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.operazione(a) : '';
       if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
       if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
-      const cosa = { aggiungi: 'Messo nella barra dei siti', metti: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
+      const cosa = { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
       return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}` };
     },
     CANCELLA_PAGINE: (a) => {
