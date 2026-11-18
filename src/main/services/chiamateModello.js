@@ -158,6 +158,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
       : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
+    if (video) parts.push({ type: 'text', text: video });
     // #2085 — le schede lasciate nel messaggio, lette come LEGGI_PAGINA.
     const G = globalThis.SN_SCHEDE_IN_CHAT;
     if (G && payload.userMessage && Array.isArray(payload.schede) && payload.schede.length) {
