@@ -14,6 +14,7 @@ const {
   decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, AL_POSTO_VIVO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
   AMBIENTE_TOLTO, ETICHETTA, FILE_REGISTRO, MODELLI, SFORZI, MOTIVO_SOTTOFONDO, MOTIVO_SENZA_BIGLIETTO, MOTIVO_DUE_BIGLIETTI,
   MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA, REGOLE_GIT, regoleGit,
+  modelloForzato, avvisoForzatura, confrontoDecisione, decisioneDelBiglietto,
 } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
