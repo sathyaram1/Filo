@@ -11,6 +11,7 @@ import {
   TETTO_PASSI, TETTO_MINUTI, leggiArgomenti, leggiMossa, servitoDa, esitoFinale, resoconto, argomentiModello, sistema,
   messaggioPasso,
 } from '../agent/provaRegole.mjs';
+import { leggiTasto } from '../agent/combinazioni.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (p) => readFileSync(resolve(ROOT, p), 'utf8');
