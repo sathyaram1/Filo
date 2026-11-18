@@ -98,14 +98,20 @@
         correttoreAnnulli: 'correttore.annulliPerImparare',
         correttoreRiscritte: 'correttore.riscrittePerImparare',
         categorieAutomatiche: 'featureFlags.categorize',
+        doppioToccoSoglia: 'doppioTocco.sogliaMs',
+        ricercaFiloPausa: 'ricercaFilo.pausaMs',
       },
       gruppi: {
         tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti',
         bluetoothPreferiti: 'bluetoothPreferiti',
         scorciatoieFilo: 'scorciatoie.*',
+        doppioToccoLettere: 'doppioTocco.lettere',
       },
       altrove: { documentiCercate: 'cartelleCercate' },
-      fuori: {},
+      fuori: {
+        doppioToccoNuova: 'la lettera di una nuova assegnazione: si salva con «Aggiungi» insieme a dove porta, in doppioTocco.lettere',
+        doppioToccoDove: 'dove porta la nuova lettera: si salva con «Aggiungi» insieme alla lettera, in doppioTocco.lettere',
+      },
       messaggi: {
         DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
         DOCUMENTI_DIMENTICA: 'IMPOSTA_PREFERENZA',
