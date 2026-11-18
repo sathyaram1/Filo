@@ -52,7 +52,7 @@
   function perchéNonEntra(raw) {
     const t = testo(raw);
     if (!t) return 'manca l\'indirizzo del sito';
-    if (indirizzoNavigato(t).tipo === 'file') return 'un file aperto in una scheda non va nella barra: ci vanno siti, pagine di Filo e programmi';
+    if (indirizzoNavigato(t).tipo === 'file') return 'un file non entra come sito: nella barra vanno siti, pagine di Filo e programmi, e un programma ci si trascina dalla sua cartella';
     return `«${t.slice(0, 80)}» non è l'indirizzo di un sito`;
   }
   // Il nome di partenza: il sito, o per una pagina di Filo la sua cartella («history»).
