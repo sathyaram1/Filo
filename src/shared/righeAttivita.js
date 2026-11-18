@@ -165,6 +165,15 @@
       const t = pulito(o.titolo || a._titolo) || 'la scheda';
       return { icon: '↗', text: `Ti ho portato su «${t}»` };
     },
+    SALVA_PER_DOPO: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo) || 'la pagina';
+      return { icon: '🔖', text: `Salvata per dopo «${t}»` };
+    },
+    CERCA_IMMAGINE: (a) => {
+      const o = a._output || {};
+      return { icon: '🔎', text: o.numero ? `Cercata con Google Lens l'immagine ${o.numero}` : 'Cercata con Google Lens l\'immagine della pagina' };
+    },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
