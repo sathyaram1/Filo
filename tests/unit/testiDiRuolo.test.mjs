@@ -189,7 +189,7 @@ test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', (
 test('la chiusura «già risolto» sta in un pezzo solo, e la ricevono primo lavoro e ripresa', () => {
   const COMANDO = /--reason gia_risolto/g;
   const dove = readdirSync(RUOLI).filter((n) => n.endsWith('.md'))
-    .filter((n) => COMANDO.test(readFileSync(join(RUOLI, n), 'utf8').replace(/\r/g, '')));
+    .filter((n) => readFileSync(join(RUOLI, n), 'utf8').includes('--reason gia_risolto'));
   assert.deepEqual(dove, ['_chiudi-gia-risolto.md']);
   for (const [chi, testo] of [['primo lavoro', readRoleInstructions('new-work')], ['ripresa', readRoleInstructions('fixer', { caso: 'ripresa' })]]) {
     const t = testo.replace(/\s+/g, ' ');
