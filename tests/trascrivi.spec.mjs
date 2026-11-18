@@ -59,8 +59,8 @@ async function apri(app, openTab, testServer, opz) {
     x1: Math.round((r.x / 600) * 1000), y1: Math.round(((r.y - 28) / 160) * 1000),
     x2: Math.round(((r.x + r.w) / 600) * 1000), y2: Math.round(((r.y + 8) / 160) * 1000),
   }));
-  await lettoreFinto(app, righe);
-  return { page, m };
+  await lettoreFinto(app, righe, opz);
+  return { page, m, righe };
 }
 
 const appunti = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
