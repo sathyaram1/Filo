@@ -64,6 +64,17 @@ test('#1642 nel campo della chat della home il valore trovato mostra il fumetto 
   const b = await riquadroDelSegno(v);
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
   const tip = page.locator('[data-sn-fumetto] .tip');
+  await page.waitForTimeout(1500);
+  console.log('DEBUG', JSON.stringify(await page.evaluate(({ x, y }) => {
+    const giu = document.elementFromPoint(x, y);
+    const v = document.querySelector('.sn-spell-valori .sn-spell-valore') || null;
+    const tutti = [...document.querySelectorAll('*')].filter((e) => e.shadowRoot).map((e) => e.tagName + '.' + e.className);
+    return {
+      giu: giu && (giu.tagName + '.' + giu.className + ' tip=' + (giu.dataset && giu.dataset.tip)),
+      v: v && v.dataset.tip, sugg: !!window.SN_SUGGERIMENTO, aperto: window.SN_SUGGERIMENTO && window.SN_SUGGERIMENTO.aperto(),
+      fumetti: document.querySelectorAll('[data-sn-fumetto]').length, ombre: tutti.slice(0, 10),
+    };
+  }, { x: b.x + b.width / 2, y: b.y + b.height / 2 })));
   await expect(tip).toBeVisible({ timeout: 3000 });
   await expect(tip).toContainText('Rapporto prezzo/utili di Alphabet');
   await expect(tip).toContainText('Fonte: borsa.example');
