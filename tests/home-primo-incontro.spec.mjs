@@ -125,7 +125,7 @@ test.describe('chi è già stato accolto', () => {
     await expect(crediti(page)).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible();
     await expect(page.locator('#altro')).toBeVisible();
-    // In incognito il segno dell'accoglienza non si legge dal disco: la home deve saperlo lo stesso.
+    // In incognito del disco si legge solo il segno dell'accoglienza: la home deve saperlo lo stesso.
     await shell.evaluate(() => window.filoShell.openIncognito());
     const inc = await home(app, page);
     await expect(inc.locator('#accade .dash-carta[data-chiave="crediti"]')).toBeVisible({ timeout: 15_000 });
