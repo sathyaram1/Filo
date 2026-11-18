@@ -599,6 +599,8 @@ export function runSpecsALotti(specs, label, albero, memoria = null, fase = () =
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
+    fase(`${label}${suffisso}`);
+    console.log(`\n▸ ${testoMemoria(letturaMemoria())}`);
     const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...reporter, ...lotto]);
     if (!l.ok || !run(l.cmd, l.args, label + suffisso, env(l.env), albero.dir)) ok = false;
   });
