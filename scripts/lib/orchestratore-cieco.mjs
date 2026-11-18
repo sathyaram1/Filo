@@ -120,8 +120,7 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
     let voci = null;
     try { voci = JSON.parse(letto.testo).voci; } catch (_) { voci = null; }
     if (!Array.isArray(voci)) return nega(MOTIVO_REGISTRO + " Dettaglio: " + (letto.errore || "contenuto non valido") + ".");
-    const mia = typeof impronta === "function" ? impronta(visti[0]) : "";
-    const voce = voci.find((v) => v && mia && v.impronta === mia && adesso - Date.parse(v.ora) < DURATA_VOCE_MS);
+    const voce = vocePer(voci, typeof impronta === "function" ? impronta(visti[0]) : "", adesso);
     if (!voce) return nega(MOTIVO_SCONOSCIUTO);
     if ((voce.model && !MODELLI.includes(voce.model)) || (voce.effort && !SFORZI.includes(voce.effort))) return nega(MOTIVO_IGNOTO);
     const nuovo = { ...ti, run_in_background: false };
