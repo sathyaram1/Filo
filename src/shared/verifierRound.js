@@ -889,7 +889,7 @@
   function testoMotivo(m) {
     if (!m || !m.tipo) return '';
     const nome = m.tipo === 'prove-rosse' ? 'prove rosse' : m.tipo;
-    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}`;
+    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}${m.testo ? ` (${m.testo})` : ''}`;
     if (Array.isArray(m.prove)) return `${nome}: ${m.prove.join(', ')}`;
     return m.testo ? `${nome}: ${m.testo}` : nome;
   }
