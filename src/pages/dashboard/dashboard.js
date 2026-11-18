@@ -200,7 +200,13 @@
     conversa: () => body.dataset.state === 'thread',
   });
   const Cerca = self.SN_DASH_CERCA;
-  Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
+  // La ricerca prende la colonna destra dal suo tasto (#2372): chiusa, il fuoco torna nel campo della chat.
+  Cerca.init({
+    send, coda: Coda, host: $('cercaFilo'), colonna: $('right'), chat: inputEl, bubblesEl,
+    pausaMs: () => self.SN_CONST.opzioniRicercaFilo(impostazioniHome && impostazioniHome.ricercaFilo).pausaMs,
+    // A chat ripiegata il risultato non si vedrebbe: la chat si riapre.
+    mostraFilo: () => self.SN_DASH_BARRA_SITI?.perInvio?.(),
+  });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
