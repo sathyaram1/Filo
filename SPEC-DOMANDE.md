@@ -71,9 +71,10 @@ Il biglietto nasce con le radici del lavoro da cui nasce (nessuna se è
 fidato) e **accumula** le radici di quello che il server gli consegna:
 
 - il testo di un feedback, di una domanda o di una nota: le loro radici (il
-  server li decifra: sa cosa consegna). Una nota porta le radici del biglietto
-  che l'ha scritta, quindi una conversazione scritta da biglietti puliti non
-  aggiunge niente. Vale per tutto ciò che il fascicolo porta insieme al lavoro:
+  server li decifra: sa cosa consegna). Una nota scritta da un biglietto sporco
+  porta le radici di quel biglietto (qui sotto), quindi una conversazione
+  scritta da biglietti puliti non aggiunge niente. Vale per tutto ciò che il
+  fascicolo porta insieme al lavoro:
   le domande del feedback (note per gli agenti, provvisorie), le istruzioni di
   un compito, il rapporto dell'istanza prima di un ricorrente (che porta le
   radici di chi l'ha scritto);
@@ -108,11 +109,15 @@ delle note, non il segno `scrittoSporco` (#1919.3). Una nota scritta da una
 sessione segna il feedback solo se entra davvero: un passaggio respinto o un
 testo già presente non lo segnano. La nota del manutentore nasce fidata (D-297);
 quella della chiave owner-non-fidato no.
-Le routine, a cui la conversazione la consegna il server, restano per ora sul
-segno `scrittoSporco`, anche quando leggono i testi dal cloud (compito di
-gestione del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
-note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco.
-Passano alla regola delle note col timbro delle note di prima (#1918).
+Le routine, a cui la conversazione la consegna il server, restano sul segno
+`scrittoSporco`, anche quando leggono i testi dal cloud (compito di gestione
+del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
+note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco. Ogni
+voce del segno porta le radici di chi l'ha scritta (#1918; senza, `legacy` se
+scritta prima della migrazione, `ignota` dopo), e il segno cade quando sono
+tutte timbrate (§ 1.8). Una sessione che legge note non fidate per impronta non
+sa da dove vengono: ne prende la radice del solo biglietto, che il cartellino
+mostra coi numeri delle note.
 
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
@@ -357,9 +362,12 @@ Chi scrive con un biglietto ne prende fiducia e radici con una regola sola
 più pulito ma tiene le sue radici; uno sparito, o non fidato senza radici, vale
 `ignota` (un feedback nuovo in quel caso è radice di sé). Ciò che il server
 scrive da solo a partire da un feedback (le domande di servizio, quella dopo
-tre guasti uguali) porta le radici di quel feedback; senza biglietto (il
-manutentore) una domanda, un compito o una nota su un feedback porta una radice
-sua, che l'owner timbra dopo averla letta.
+tre guasti uguali) porta le radici di quel feedback. Il manutentore scrive da
+fidato (D-297); da sporco, o dalla chiave owner-non-fidato, una domanda o un
+compito porta una radice sua, che l'owner timbra dopo averla letta, e una nota
+le radici del biglietto (quella della chiave, una sua). Quando il suo biglietto
+si sporca, ciò che aveva scritto da fidato torna non fidato con le radici del
+biglietto (#2337): un timbro su un'altra radice non lo rifà fidato.
 
 ## 2. Gestione: un posto solo per tutto Filo
 
