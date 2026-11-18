@@ -84,6 +84,12 @@ export function regoleGit(clone = '') {
   return [...REGOLE_GIT, ...conClone];
 }
 
+// La voce viva del registro per un biglietto, dal gancio e dal rapporto di fine sessione. Finisce nel corpo del gancio come
+// decidi, con le sue stesse regole qui sotto.
+export function vocePer(voci, mia, adesso) {
+  return (Array.isArray(voci) ? voci : []).find((v) => v && mia && v.impronta === mia && adesso - Date.parse(v.ora) < DURATA_VOCE_MS) || null;
+}
+
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
 // Si ferma ogni fonte di configurazione, anche ignota: il progetto vince sull'utente, e un disableAllHooks scritto lì
