@@ -78,7 +78,7 @@ test('#1642 nel campo della chat della home il valore trovato mostra il fumetto 
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 10_000 });
   await page.mouse.move(5, 5);
   await expect(tip).toBeHidden({ timeout: 3000 });
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
+  await viaLeX();
   await expect(tip).toBeVisible({ timeout: 3000 });
   await page.screenshot({ path: 'tests/.shots/1704-home-valore-scuro.png' });
 });
