@@ -1196,7 +1196,8 @@
       keys: ['doppio_tocco', 'doppio tocco', 'lettera doppia', 'doppia lettera', 'scorciatoia lettera', 'scorciatoia della home',
         'lettere della home', 'assegna lettera', 'assegna una lettera'],
       build(v, attuali) {
-        const r = global.SN_DOPPIO_TOCCO && global.SN_DOPPIO_TOCCO.daTesto(v, attuali);
+        const D = doppioTocco();
+        const r = D && D.daTesto(v, attuali);
         if (!r) return null;
         if (r.rifiuto) return { rifiuto: r.rifiuto };
         return { partial: { doppioTocco: { lettere: r.lettere } }, label: r.label };
