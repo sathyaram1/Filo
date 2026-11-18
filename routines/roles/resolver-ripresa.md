@@ -84,7 +84,7 @@ registrata alla chiusura dell'originale, riconsegna una volta con quella.
 <!-- includi: _motivo-correttore.md -->
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>] [--prova <cartella della prova>]
 ```
 
 Il lavoro torna in verifica sul commit nuovo. Infine rilascia il biglietto:

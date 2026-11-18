@@ -174,7 +174,7 @@ I tre testi (report, frase, changelog) li scrivi tu.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" [--domanda <file.json>]
+  --notes "[il tuo report]" --frase "[la frase]" [--domanda <file.json>] [--prova <cartella della prova>]
 ```
 
 Infine rilascia il biglietto:

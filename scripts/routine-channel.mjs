@@ -108,6 +108,7 @@
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo. La correzione di un riallineamento
 //         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
+//         `--prova <cartella>` su status, fixed e note: la prova da utente (esito e schermate) allegata al report (#2539).
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
 //         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione). Un doppione aggiunge
 //         `--doppione-di <num>`: la fusione è quella dell'originale, che il server vuole chiuso (#2046).
@@ -1186,6 +1187,7 @@ export async function deliver(t, intent, data, opts) {
     id: body && body.id,
     num: body && body.num,
     reply: body && typeof body.reply === 'object' ? body.reply : undefined,
+    prova: body && body.prova && typeof body.prova === 'object' ? body.prova : undefined,
   };
 }
 
@@ -1641,9 +1643,12 @@ export const CAMPI_DELLA_RIGA = Object.freeze([
   'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
   'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto',
+  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', 'prova',
   ...CAMPI_PERIZIA,
 ]);
+
+// Le consegne che scrivono il report sul feedback, le sole a cui la prova da utente si allega (#2539; il server ha lo stesso elenco).
+export const INTENTI_CON_PROVA = Object.freeze(['status', 'fixed', 'note']);
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
@@ -1683,7 +1688,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', ...CAMPI_PERIZIA,
+    'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', 'prova', ...CAMPI_PERIZIA,
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1741,7 +1746,8 @@ if (isMain) {
         // `--piano` vuole un FILE, non un testo: dirgli «un testo» lo mandava a passarlo sulla riga di comando.
         console.error(key === 'segnala' ? SEGNALA_TOLTA : key === 'piano'
           ? `--${key} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`
-          : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+          : key === 'prova' ? '--prova vuole la cartella della prova da utente subito dopo di sé (tests/agent/.out/prova-…): non ho consegnato niente.'
+            : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
       data[key] = true;
@@ -1809,7 +1815,8 @@ if (isMain) {
       : data.piano !== undefined && !(cmd === 'deliver' && intentoDi() === 'piano') ? '--piano vale solo con deliver piano'
         : data.fusione !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--fusione vale solo con deliver status --status done --reason gia_risolto'
           : data['doppione-di'] !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--doppione-di vale solo con deliver status --status done --reason gia_risolto --fusione <sha>'
-            : '';
+            : data.prova !== undefined && !(cmd === 'deliver' && INTENTI_CON_PROVA.includes(intentoDi())) ? `--prova vale solo con deliver ${INTENTI_CON_PROVA.join(', ')}`
+              : '';
     if (fuori) { console.error(`${fuori}: non ho fatto niente.`); process.exit(1); }
   }
 
@@ -2405,6 +2412,13 @@ if (isMain) {
         process.exit(1);
       }
     }
+    // Per ultima, a consegna già controllata qui: le schermate salgono nel deposito solo per una consegna che parte.
+    if (data.prova !== undefined) {
+      const { provaDaAllegare } = await import('./lib/prova-allegata.mjs');
+      const p = await provaDaAllegare(data.prova);
+      if (!p.ok) { console.error(p.errore); process.exit(1); }
+      data.prova = p.prova;
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
@@ -2438,6 +2452,10 @@ if (isMain) {
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
+      if (data.prova) {
+        const { testoProvaConsegnata } = await import('./lib/prova-allegata.mjs');
+        console.log(testoProvaConsegnata(data.prova, r.prova));
+      }
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
