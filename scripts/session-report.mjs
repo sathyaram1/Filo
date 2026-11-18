@@ -204,11 +204,20 @@ const RE_PROGRAMMA_RETE = /^(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restme
 const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
 const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
 const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
-const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|env(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*)\s+)+/i;
+// I prefissi che lasciano il programma dopo (#2337.3): anche «timeout 30», le variabili («LANG=C»), nice e simili.
+const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|setsid|unbuffer|chronic|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-\S+)*|stdbuf(?:\s+-\S+)*|timeout(?:\s+-\S+)*\s+\d\S*|env(?:\s+-\S+)*(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*|[A-Za-z_][A-Za-z0-9_]*=\S*)\s+)+/i;
+// Il comando passato a una shell figlia o a eval, fra virgolette o no: si guarda come un comando suo (#2337.3).
+const RE_SHELL_FIGLIA = /(?:^|[\s;&|(`])(?:(?:[^\s"']*[\\/])?(?:bash|sh|zsh|dash|ksh|fish)(?:\.exe)?(?:\s+-[A-Za-z]+)*\s+-[A-Za-z]*c|eval)\s+(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))/g;
 
 /** Il comando chiama la rete? Ogni pezzo in posizione di comando, anche col percorso intero del programma. PURA. */
-export function chiamaLaRete(comando) {
+export function chiamaLaRete(comando, profondita = 0) {
   const tutto = String(comando || '');
+  if (profondita < 4) {
+    for (const m of tutto.matchAll(RE_SHELL_FIGLIA)) {
+      const dentro = m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : (m[2] !== undefined ? m[2] : m[3]);
+      if (dentro && chiamaLaRete(dentro, profondita + 1)) return true;
+    }
+  }
   for (const pezzo of tutto.split(/[;&|\n`()]|\$\(/)) {
     const s = pezzo.trim().replace(RE_PREFISSI, '').replace(/^["']?(?:[^\s"']*[\\/])?/, '');
     const m = RE_PROGRAMMA_RETE.exec(s);
