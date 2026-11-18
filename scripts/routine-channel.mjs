@@ -461,8 +461,8 @@ export function rssProcessi(leggi = leggiFileDiSistema, elenca = elencaCartella)
  * basta). Quattro numeri, gli stessi che il server salva:
  *   uptimeS  da quanto vive il contenitore (l'età del suo processo 1; fuori
  *            da un contenitore, l'uptime del sistema);
- *   freeMb   quanto manca al tetto di memoria del cgroup; senza tetto, la
- *            memoria libera del sistema;
+ *   freeMb   la memoria che resta ai comandi (lib/memoria-contenitore.mjs);
+ *            dove non si legge, quanto manca al tetto del cgroup o MemFree;
  *   rssMb    la memoria usata dal contenitore (cgroup), o la somma di tutti i
  *            processi (Linux senza cgroup), o quella di questo processo (dove
  *            /proc non c'è);
