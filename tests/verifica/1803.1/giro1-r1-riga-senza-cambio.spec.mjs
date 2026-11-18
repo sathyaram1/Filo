@@ -1,9 +1,6 @@
 // #1803.1 giro 1 — la riga della conversazione dice cosa è successo alla barra: un sito che c'era già non è «Messo».
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 require('../../../src/shared/urlNav.js');
