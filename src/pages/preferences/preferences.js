@@ -1173,6 +1173,8 @@
     if (vuole('pannelloDestro.attesaMs')) $('pannelloAttesa').value = String(pannello.attesaMs);
     if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
+    if (vuole('doppioTocco.sogliaMs')) $('doppioToccoSoglia').value = String(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).sogliaMs);
+    if (vuole('ricercaFilo.pausaMs')) $('ricercaFiloPausa').value = String(window.SN_CONST.opzioniRicercaFilo(settings.ricercaFilo).pausaMs);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
