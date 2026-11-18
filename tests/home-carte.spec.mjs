@@ -189,6 +189,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
     await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
     await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
     const icona = page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]');
+    await fuoriVista(page);
     await expect(icona).toBeVisible();
 
     // Dal «+» si rimettono, in fondo.
