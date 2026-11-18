@@ -28,6 +28,8 @@
     RIPRENDI_AUDIO: 'volume',
     PAUSA_AUDIO: 'volume',
     MOSTRA_SCHEDA: 'openTab',
+    SALVA_PER_DOPO: 'saveForLater',
+    CERCA_IMMAGINE: 'search',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
