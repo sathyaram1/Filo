@@ -40,7 +40,7 @@ test('una voce con lo strumento della chat non diventa mai «non sa azionare»',
   const casi = [
     ['metti Filo a schermo intero', 'Per andare a schermo intero clicca l\'icona con le due frecce in alto a destra '
       + 'nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo e la barra si riduce.'],
-    ['ingrandisci la pagina', 'Per ingrandire la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
+    ['ingrandisci la pagina', 'Per tradurre la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
       + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.'],
   ];
   for (const [u, r] of casi) assert.equal(AF.analyzeReply(r, [], u, CAPS).kind, null, u);
@@ -87,28 +87,28 @@ test('a chi chiede istruzioni le istruzioni si danno: nessuna segnalazione', () 
 
 // #474 — sulla risposta vera (lo zoom spiegato a parole) la proposta c'è solo se
 // l'utente voleva che la cosa si facesse, non se chiedeva.
-const ZOOM_A_PAROLE = 'Per ingrandire la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
+const ZOOM_A_PAROLE = 'Per tradurre la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
   + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.';
 
 test('#474: le domande comuni, con ogni grafia, non fanno partire la proposta', () => {
   const domande = [
-    'è possibile ingrandire la pagina?',
-    'c\'è un modo per ingrandire la pagina?',
-    'qual è il modo per ingrandire la pagina?',
-    'sai ingrandire la pagina?',
-    'puoi dirmi come ingrandire la pagina?',
-    'dimmi come ingrandire la pagina',
+    'è possibile tradurre la pagina?',
+    'c\'è un modo per tradurre la pagina?',
+    'qual è il modo per tradurre la pagina?',
+    'sai tradurre la pagina?',
+    'puoi dirmi come tradurre la pagina?',
+    'dimmi come tradurre la pagina',
     // le tre già riconosciute e la variante con l'apostrofo
-    'come faccio a ingrandire la pagina?',
+    'come faccio a tradurre la pagina?',
     'dove si trova lo zoom della pagina?',
     'cosa sai fare?',
-    'e\' possibile ingrandire la pagina?',
+    'e\' possibile tradurre la pagina?',
     // grafie equivalenti: apostrofo tipografico, maiuscole, «qual'è», accento acuto
-    'C’è un modo per ingrandire la pagina?',
-    'E’ POSSIBILE ingrandire la pagina?',
-    'qual\'è il modo per ingrandire la pagina?',
-    'é possibile ingrandire la pagina?',
-    'c\'e\' un modo per ingrandire la pagina?',
+    'C’è un modo per tradurre la pagina?',
+    'E’ POSSIBILE tradurre la pagina?',
+    'qual\'è il modo per tradurre la pagina?',
+    'é possibile tradurre la pagina?',
+    'c\'e\' un modo per tradurre la pagina?',
   ];
   for (const q of domande) {
     assert.equal(AF.analyzeReply(ZOOM_A_PAROLE, [], q, CAPS).kind, null, q);
@@ -119,10 +119,10 @@ test('#474: chi segnala un guasto vero riceve ancora la proposta', () => {
   const guasti = [
     'non funziona lo zoom',
     'la pagina non si ingrandisce',
-    'non riesco a ingrandire la pagina',
-    'non è possibile ingrandire la pagina',
-    'non si può ingrandire la pagina',
-    'non sai ingrandire la pagina',
+    'non riesco a tradurre la pagina',
+    'non è possibile tradurre la pagina',
+    'non si può tradurre la pagina',
+    'non sai tradurre la pagina',
     'ingrandisci la pagina',
   ];
   for (const u of guasti) {
