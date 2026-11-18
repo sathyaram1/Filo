@@ -1,0 +1,10 @@
+Si chiude senza aprire il lavoro, e poi si rilascia il biglietto:
+
+```bash
+node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
+  --notes "[cosa hai controllato, e dove]" --frase "[cosa trova adesso chi ha segnalato]"
+```
+
+Un doppione aggiunge `--doppione-di <numero dell'originale>`, con la fusione dell'originale: il server vuole che sia
+sua (lo cita, o è quella del suo ramo) e che l'originale sia chiuso. Il server ricontrolla la fusione e il ramo,
+nell'app e sul server: se rifiuta (exit 4), lavora il feedback come sempre e scrivi il motivo del rifiuto nel report.
