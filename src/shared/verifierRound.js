@@ -867,9 +867,17 @@
       if (lunga) return { ok: false, errore: `Una voce del motivo supera i 300 caratteri: "${lunga.slice(0, 40)}…".` };
       return { ok: true, motivo: { tipo, [campo]: voci } };
     };
-    const pezzi = (sep) => resto.split(sep).map((s) => s.trim()).filter(Boolean);
+    const pezzi = (sep, da = resto) => da.split(sep).map((s) => s.trim()).filter(Boolean);
     if (MOTIVI_CORRETTORE[tipo] === 'file') {
-      return /^nessuno$/i.test(resto) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/));
+      // Fra parentesi c'è una nota, non dei file: «a, b (ramo del server)» contava tre file di codice in più, e un giro
+      // di verifica che non serviva (#2498). La nota resta nel motivo.
+      const note = [];
+      const nomi = resto.replace(/\(([^()]*)(?:\)|$)/g, (_, n) => { if (n.trim()) note.push(n.trim()); return ' '; }).trim();
+      const nota = note.join('; ');
+      if (nota.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `La nota del motivo è lunga ${nota.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
+      const r = /^nessuno$/i.test(nomi) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/, nomi));
+      if (r.ok && nota) r.motivo.testo = nota;
+      return r;
     }
     if (MOTIVI_CORRETTORE[tipo] === 'prove') return elenco('prove', pezzi(/\s*,\s*/));
     if (resto.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `Il motivo è lungo ${resto.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
