@@ -603,6 +603,7 @@ test('uno scaricamento tolto dalla home torna chiesto a parole, e la disposizion
     await carta.hover();
     await carta.locator('.dash-carta-togli').click();
     await expect(carta).toHaveCount(0);
+    await fuoriVista(page);
     await expect(page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'bolletta-luce.bin' })).toBeVisible();
 
     await modelloFinto(app, [
