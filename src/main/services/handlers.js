@@ -183,7 +183,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   // #884 — una scheda chiusa si riapre con l'indirizzo dell'archivio, mai con uno scritto dal modello: il popup la nomina.
-  if (type === 'RIAPRI_SCHEDA') {
+  // Senza id è l'ultima chiusa, la stessa di Ctrl+Shift+T (#2371).
+  if (type === 'RIAPRI_SCHEDA' && String(action.id ?? '').trim()) {
     const v = await voceChiusa(action.id);
     if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
     action._titolo = v.perModello.titolo;
