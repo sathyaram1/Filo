@@ -3,7 +3,7 @@
 // Ogni prova asserisce il successo dal punto di vista dell'utente: senza il registro sono rosse.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
