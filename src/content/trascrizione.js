@@ -100,9 +100,18 @@
     radice.append(scena, barra);
 
     const a = { radice, scena, img, testo, barra, stato, rect, righe: [], copiato: false, nat: null };
-    // Col menu del tasto destro aperto sopra, l'Esc è suo: chiude prima lui.
+    // Col menu del tasto destro aperto sopra, l'Esc è suo: chiude prima lui. «Seleziona tutto» qui è il testo
+    // dell'immagine, non la pagina sotto né le scritte dei tasti.
     a.suTasto = (e) => {
-      if (aperto !== a || e.key !== 'Escape' || global.SN_MENU?.isOpen?.()) return;
+      if (aperto !== a || global.SN_MENU?.isOpen?.()) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'a') {
+        if (!a.righe.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try { document.getSelection().selectAllChildren(a.testo); } catch (_) {}
+        return;
+      }
+      if (e.key !== 'Escape') return;
       e.preventDefault();
       e.stopPropagation();
       chiudi();
