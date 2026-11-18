@@ -44,10 +44,10 @@ async function iconaDelProgramma(percorso) {
 // Due mosse quasi insieme (due home, la chat e un trascinamento) leggerebbero la stessa barra e la seconda
 // cancellerebbe la prima: si mettono in fila.
 let coda = Promise.resolve();
-async function modifica(mossa) {
+async function modifica(mossa, { piattaforma = process.platform } = {}) {
   const m = mossa && typeof mossa === 'object' ? { ...mossa } : {};
   if (m.tipo === 'aggiungi' && m.percorso) {
-    const c = controllaProgramma(m.percorso);
+    const c = controllaProgramma(m.percorso, piattaforma);
     if (c.errore) return { voci: await leggi(), cambiato: false, errore: c.errore };
     if (!m.icona) m.icona = await iconaDelProgramma(m.percorso);
   }
@@ -84,9 +84,11 @@ async function daChat(action) {
   };
 }
 
-function lancia(percorso, piattaforma = process.platform) {
-  const { shell } = require('electron');
-  const { spawn, execFile } = require('child_process');
+// `dip` (shell di Electron, spawn, execFile) lo passano solo le prove, per vedere il ramo di un'altra piattaforma.
+function lancia(percorso, piattaforma = process.platform, dip = {}) {
+  const shell = dip.shell || require('electron').shell;
+  const spawn = dip.spawn || require('child_process').spawn;
+  const execFile = dip.execFile || require('child_process').execFile;
   const staccato = (cmd, args) => new Promise((resolve) => {
     try {
       const figlio = spawn(cmd, args, { detached: true, stdio: 'ignore', cwd: path.dirname(percorso) });
@@ -112,16 +114,16 @@ function lancia(percorso, piattaforma = process.platform) {
 }
 
 // Il clic su una voce-programma: il percorso viene dalla barra salvata, l'id dalla pagina.
-async function avvia(id, { lanciatore = lancia } = {}) {
+async function avvia(id, { lanciatore = lancia, piattaforma = process.platform } = {}) {
   const voce = (await leggi()).find((v) => v.id === String(id || ''));
   if (!voce || voce.tipo !== 'app') return { ok: false, error: 'questa voce non è un programma della barra' };
-  const c = controllaProgramma(voce.percorso);
+  const c = controllaProgramma(voce.percorso, piattaforma);
   if (c.errore) return { ok: false, error: c.errore };
-  const e = await lanciatore(voce.percorso);
+  const e = await lanciatore(voce.percorso, piattaforma);
   const r = e ? { ok: false, error: `${voce.nome} non è partito: ${e}` } : { ok: true, nome: voce.nome };
   // Come ogni file aperto col sistema, l'avvio entra nel filo (#1561).
   try { require('./accaduti').fileAperto({ percorso: voce.percorso }, r, { incognito: require('../shim/storage').inIncognito() }); } catch (_) {}
   return r;
 }
 
-module.exports = { leggi, modifica, daChat, avvia, controllaProgramma };
+module.exports = { leggi, modifica, daChat, avvia, controllaProgramma, lancia };

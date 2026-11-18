@@ -30,8 +30,22 @@
     return d.send({ type: MSG.BARRA_SITI_MODIFICA, mossa }).then((r) => {
       if (r && Array.isArray(r.voci)) disegna(r.voci);
       if (r && r.ok === false && r.error) avviso(maiuscola(r.error));
+      if (r && r.ok && r.gia && r.voce) giaQui(r.voce);
       return r || { ok: false };
     });
+  }
+  // Lasciata di nuovo una voce che c'è già: quella voce si fa vedere, o il gesto sembra non riuscito.
+  function giaQui(v) {
+    const n = nodi.get(v.id);
+    if (n) {
+      // La stessa luce del punto del filo ritrovato.
+      n.classList.remove('dash-trovato');
+      void n.offsetWidth;
+      n.classList.add('dash-trovato');
+      try { n.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+      n.addEventListener('animationend', () => n.classList.remove('dash-trovato'), { once: true });
+    }
+    avviso(`${v.nome} è già nella barra`);
   }
   const maiuscola = (t) => String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1);
 
@@ -61,7 +75,7 @@
     };
     if (v.icona) { metti(v.icona); return; }
     lettera();
-    if (v.tipo !== 'sito' || !d.iconaDelSito) return;
+    if (v.tipo !== 'sito' || !/^https?:/i.test(v.url) || !d.iconaDelSito) return;
     d.iconaDelSito(v.url).then((dato) => {
       if (!dato || !posto.isConnected || posto.dataset.per !== v.id) return;
       metti(dato);
@@ -367,11 +381,13 @@
     document.addEventListener('drop', lasciaSullaPagina);
     // Una scheda portata giù dalla fila (#2084) arriva dal main come per la chat: qui diventa una voce.
     if (global.SN_SCHEDA_TRASCINATA) {
+      // Anche una pagina di Filo: quello che non entra lo dice il main, con l'avviso. Le pagine di Filo hanno tutte
+      // l'icona di Filo: la lettera del nome le distingue.
       global.SN_SCHEDA_TRASCINATA.registraChat(d.riga, (s) => {
         if (!s || !s.url) return false;
-        muovi({ tipo: 'aggiungi', url: s.url, nome: s.titolo, icona: s.icona });
+        muovi({ tipo: 'aggiungi', url: s.url, nome: s.titolo, icona: /^filo:/i.test(s.url) ? '' : s.icona });
         return true;
-      });
+      }, { ogniScheda: true });
     }
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.BARRA_SITI_CAMBIATA && Array.isArray(msg.voci)) disegna(msg.voci);

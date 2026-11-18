@@ -141,7 +141,7 @@ const DOCUMENTO = new Set((
 ).split(' '));
 
 function doppiaEstensione(nome) {
-  const pulito = ESE.nomeVisibile(nome).replace(/[.\s\u00a0]+$/, '');
+  const pulito = ESE.nomeVero(nome);
   if (!ESE.eEseguibile(pulito)) return false;
   // Spazi e punti in più prima dell'estensione vera (fattura.pdf      .exe, fattura.pdf..exe) non la nascondono qui.
   const parti = pulito.split('.').map((p) => p.replace(/[\s\u00a0]+/g, ''));
