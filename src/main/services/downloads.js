@@ -609,7 +609,7 @@ function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
       if (!win._filoTabs) continue;
-      try { win.webContents.send('shell:toast', { text, opts }); } catch (_) {}
+      try { require('./avvisoFinestra').allaCornice(win.webContents, { text, opts }); } catch (_) {}
     }
   } catch (_) {}
 }
