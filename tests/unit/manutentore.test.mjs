@@ -132,6 +132,10 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
   assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
   assert.match(err.join('\n'), /Nessuna scheda né perizia per #99/);
+  // Un non fidato aperto non ha la scheda: i file probabili sono quelli della perizia (#2337.3).
+  writeFileSync(join(dir, 'non-fidati.json'), JSON.stringify([{ num: '99', perizia: { classe: 4, file: ['src/a.js'] } }]));
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
+  assert.match(out.join('\n'), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#44\): src\/a\.js$/m);
   assert.equal(await M.main(['boh']), 1);
 });
 
