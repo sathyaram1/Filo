@@ -30,29 +30,18 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
 - una fusione segnata `propria` è il lavoro di questo stesso feedback: se è di
   nuovo qui l'owner l'ha riaperto perché mancava qualcosa, e non è chiuso;
 - per le altre leggi il commit (`git show --stat <sha>`) e il punto del codice
-  che il feedback nomina. Se la cosa chiesta adesso c'è, intera, chiudi senza
-  aprire il lavoro e poi rilascia il biglietto:
-
-  ```bash
-  node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
-    --notes "[cosa hai controllato, e dove]" --frase "[cosa trova adesso chi ha segnalato]"
-  ```
-
-  Il server ricontrolla la fusione: se rifiuta (exit 4), lavora il feedback
-  come sempre e scrivi il motivo del rifiuto nel report;
+  che il feedback nomina. Se la cosa chiesta adesso c'è, intera, chiudi come
+  qui sotto;
 - se la fusione ne copre solo una parte, lavori il resto e lo dici nel report;
 - un **doppione** (la stessa cosa chiesta e già risolta sotto un altro numero)
-  non ha fusioni che lo citino: si chiude allo stesso modo con la fusione che
-  ha chiuso l'originale, aggiungendo `--doppione-di <numero dell'originale>`.
-  Il server vuole che la fusione sia dell'originale (lo cita, o è quella del
-  suo ramo), che l'originale sia chiuso e che la fusione venga dopo l'ultima
-  riapertura di tutti e due. Se rifiuta e nomina la fusione registrata alla
-  chiusura dell'originale come buona, riconsegna una volta con quella; se dice
-  di lavorare il feedback, lavoralo;
+  non ha fusioni che lo citino: si chiude come qui sotto, con la fusione che
+  ha chiuso l'originale;
 - un rosso su main già corretto dalla fusione di un altro feedback (senza
   `payload.commitProvato`) si chiude col doppione di quel feedback,
   `--doppione-di <il suo numero>` con la sua fusione: il «già risolto» semplice
   vuole una fusione che citi questo numero, arrivata dopo la sua nascita.
+
+<!-- includi: _chiudi-gia-risolto.md -->
 
 `payload.commitProvato`, se c'è, dice che il feedback è un allarme della
 suite e porta il commit su cui la suite ha dato il rosso. Qui il rosso può
