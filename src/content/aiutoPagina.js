@@ -307,6 +307,9 @@
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
         case 'transcribe_image': await Actions?.transcribeImage(imgEl); break;
+        case 'transcribe_region':
+          Actions?.transcribeRegion();
+          return { ok: true, riga: `${label}: l'utente sceglie la porzione col mouse` };
         case 'search_image': return { filo: {
           action: { type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine' },
           etichetta: label,
