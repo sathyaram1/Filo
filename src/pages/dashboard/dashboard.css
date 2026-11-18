@@ -395,6 +395,17 @@ html, body {
 .dash-altro-cella:hover .dash-altro-rimetti,
 .dash-altro-cella:focus-within .dash-altro-rimetti { opacity: 1; }
 .dash-altro-rimetti:hover { transform: scale(1.1); }
+.dash-altro-app.presa { opacity: 0.4; }
+/* La linea dove andrà il tasto lasciato: i tasti stanno in fila, quindi è verticale. */
+.dash-altro-app.sopra-prima { box-shadow: inset 2px 0 0 var(--dash-accent); }
+.dash-altro-app.sopra-dopo { box-shadow: inset -2px 0 0 var(--dash-accent); }
+.dash-altro-app .account-avatar { display: block; width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+/* Il «+» (#2372): fisso in fondo ai tasti, apre quelli fuori vista; il numero dice quanti sono. */
+.dash-altro-piu { color: var(--dash-ink-mute); }
+.dash-altro-piu[aria-expanded="true"] { background: var(--dash-line); color: var(--dash-ink); }
+.dash-altro-piu.bersaglio { background: var(--dash-line-strong); color: var(--dash-accent); }
+.dash-altro-fuori { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--dash-line); }
+.dash-altro-vuoto { padding: 6px 4px; font-size: 11.5px; font-style: italic; color: var(--dash-ink-mute); }
 
 /* Menu del tasto destro sulle carte: stesse voci, stessa animazione al passaggio del puntatore. */
 .dash-menu {
