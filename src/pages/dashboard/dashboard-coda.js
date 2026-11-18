@@ -618,6 +618,38 @@
     return true;
   }
 
+  // Una pagina trovata dalla ricerca (#2372): la sua riga di pagine al centro, aperta sull'elenco. Quella aperta così
+  // prima si richiude: passare sui risultati non lascia il filo pieno di elenchi aperti.
+  let apertaDaRicerca = null;
+  async function vaiAPagina({ url, ts = null }) {
+    fineRisali();
+    const trova = () => {
+      const righe = [...d.bubblesEl.querySelectorAll('.dash-pagine')].filter((n) => n._gruppo && n._gruppo.pagine.some((p) => p.url === url));
+      if (!righe.length) return null;
+      const t = ms(ts);
+      return Number.isFinite(t) ? righe.reduce((a, b) => (Math.abs(ms(b.dataset.ts) - t) < Math.abs(ms(a.dataset.ts) - t) ? b : a)) : righe[righe.length - 1];
+    };
+    let n = trova();
+    if (!n && ts && !finito) {
+      await sali({ fino: ts });
+      n = trova();
+    }
+    if (!n) return false;
+    if (apertaDaRicerca && apertaDaRicerca !== n && apertaDaRicerca.isConnected) apriGruppo(apertaDaRicerca, false);
+    apertaDaRicerca = n.classList.contains('dash-pagine-aperte') && apertaDaRicerca !== n ? null : n;
+    apriGruppo(n, true);
+    fissa = false;
+    n.scrollIntoView({ block: 'center' });
+    n.classList.remove('dash-trovato');
+    void n.offsetWidth;
+    n.classList.add('dash-trovato');
+    return true;
+  }
+  function richiudiPagine() {
+    if (apertaDaRicerca && apertaDaRicerca.isConnected) apriGruppo(apertaDaRicerca, false);
+    apertaDaRicerca = null;
+  }
+
   function togliChat(id) {
     for (const n of [...d.bubblesEl.querySelectorAll('[data-chat]')]) if (n.dataset.chat === id && !n.classList.contains('dash-riga-app')) n.remove();
     segnaGiorni();
