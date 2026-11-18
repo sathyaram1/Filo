@@ -555,7 +555,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-cerca-risultati[hidden] { display: none; }
 .dash-cerca-voce {
-  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; flex-wrap: wrap;
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left;
   padding: 6px 8px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
   font: inherit; cursor: pointer;
   transition: background calc(0.14s * var(--sn-motion, 1)) ease;
