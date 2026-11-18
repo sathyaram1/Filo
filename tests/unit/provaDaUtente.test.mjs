@@ -114,7 +114,7 @@ test('una combinazione scritta come la scrive una persona diventa il tasto di Pl
   assert.deepEqual(w.input, { key: 'w', code: 'KeyW', control: true, shift: false, alt: false, meta: false });
   assert.equal(leggiTasto('Control+t', 'win32').playwright, 'Control+t');
   assert.deepEqual(leggiTasto('cmd + shift + t', 'darwin').input, { key: 'T', code: 'KeyT', control: false, shift: true, alt: false, meta: true });
-  assert.equal(leggiTasto('Cmd+Shift+T', 'darwin').playwright, 'Shift+Meta+T');
+  assert.equal(leggiTasto('Cmd+Shift+T', 'darwin').playwright, 'Meta+Shift+T');
   assert.equal(leggiTasto('CmdOrCtrl+L', 'darwin').input.meta, true);
   assert.equal(leggiTasto('CmdOrCtrl+L', 'linux').input.control, true);
   assert.deepEqual(leggiTasto('Alt+1', 'linux').input, { key: '1', code: 'Digit1', control: false, shift: false, alt: true, meta: false });
