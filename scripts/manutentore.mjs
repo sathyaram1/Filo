@@ -1270,12 +1270,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return 0;
     }
     const num = String(arg).replace(/^#/, '');
-    const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
-    if (!s) { console.error(`Nessuna scheda per #${num} in ${cartella}: npm run feedback:schede -- scrivi --solo ${num}.`); return 1; }
-    const comuni = incroci(r.lista, s.file_probabili);
+    // Di un fidato dalla scheda, di un non fidato dalla perizia (#2337.3).
+    const fp = fileProbabiliDi(cartella, num);
+    if (!fp) { console.error(`Nessuna scheda né perizia per #${num} in ${cartella}: un fidato la scrive con npm run feedback:schede -- scrivi --solo ${num}; un non fidato la riceve dalla perizia, dopo npm run feedback:schede -- elenca.`); return 1; }
+    const comuni = incroci(r.lista, fp.file);
     console.log([comuni.length
       ? comuni.map((c) => `${rigaLavoro(c)}: ${c.comuni.map((f) => fileConRepo(c, f)).join(', ')}`).join('\n')
-      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
+      : `Nessun ramo in corso tocca i file probabili di #${num}${fp.da === 'perizia' ? ' (dalla perizia)' : ''} (${fp.file.join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
     return 0;
   }
   // Il controllo sui numeri prima della credenziale: un comando storto si dice anche senza chiave.
