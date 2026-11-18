@@ -43,8 +43,43 @@ export const AMBIENTE = Object.freeze({
   CLAUDE_CODE_FORK_SUBAGENT: '0',
   CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '3',
 });
-// Con FORCE acceso Claude Code ignora il modello del lancio e della definizione: un'installazione vecchia la lascerebbe.
-export const AMBIENTE_TOLTO = Object.freeze(['CLAUDE_CODE_SUBAGENT_MODEL_FORCE']);
+// Con FORCE acceso Claude Code ignora il modello del lancio e della definizione. Dalle impostazioni si toglie; dall'ambiente
+// del processo (le variabili dell'ambiente cloud) no, nemmeno con un "0" nei settings: lì lo dice modelloForzato (#2553).
+export const FORZA = 'CLAUDE_CODE_SUBAGENT_MODEL_FORCE';
+export const AMBIENTE_TOLTO = Object.freeze([FORZA]);
+
+/** Il modello che l'ambiente impone a ogni sotto-agente, o ''. Accesa come la legge Claude Code (1, true, yes, on). PURA. */
+export function modelloForzato(env = process.env) {
+  const acceso = ['1', 'true', 'yes', 'on'].includes(String((env && env[FORZA]) ?? '').trim().toLowerCase());
+  return acceso ? String(env.CLAUDE_CODE_SUBAGENT_MODEL || '').trim() : '';
+}
+
+/** La riga del preflight quando l'ambiente forza il modello, o ''. PURA. */
+export function avvisoForzatura(env = process.env) {
+  const m = modelloForzato(env);
+  return m ? `${FORZA} è acceso nell'ambiente del processo: ogni sotto-agente gira su ${m}, worker e lettore compresi, e il modello per fase deciso dal server non si applica (lo sforzo sì). Dalle impostazioni non si spegne: va tolta dalle variabili dell'ambiente cloud, un passo dell'owner. I rapporti di fine sessione lo scrivono nelle note.` : '';
+}
+
+/**
+ * Le note del rapporto di fine sessione sul modello e sullo sforzo: la forzatura dell'ambiente, e i turni del worker
+ * (`modelli`, `sforzi` { high: 40 }) che non seguono la decisione del server (`voce` del registro). PURA.
+ */
+export function confrontoDecisione({ voce = null, modelli = [], sforzi = {}, forzato = '' } = {}) {
+  const note = [];
+  if (forzato) note.push(`modello dei sotto-agenti forzato a ${forzato} dall'ambiente del processo (${FORZA}): definizioni e modello deciso dal server non contano`);
+  if (!voce) return note;
+  const usati = [...new Set((Array.isArray(modelli) ? modelli : []).map(String).filter(Boolean))];
+  if (voce.model && usati.length && !usati.every((m) => m.toLowerCase().includes(voce.model))) {
+    note.push(`modello deciso dal server ${voce.model}, turni del worker su ${usati.join(', ')}`);
+  }
+  const turni = Object.entries(sforzi || {}).filter(([, n]) => Number(n) > 0);
+  if (voce.effort && turni.some(([k]) => k !== voce.effort)) {
+    note.push(`sforzo deciso dal server ${voce.effort}, turni del worker ${turni.map(([k, n]) => `${k} ${n}`).join(', ')}`);
+  } else if (voce.effort && !turni.length && usati.length) {
+    note.push(`sforzo deciso dal server ${voce.effort}, il transcript del worker non dichiara lo sforzo dei turni`);
+  }
+  return note;
+}
 // Le stesse di .claude/settings.json: lì le perde ogni ramo nato prima, qui reggono al cambio di ramo. Una regola a
 // prefisso non vede `git -C`, quindi il clone del server ha le sue, col percorso vero.
 export const REGOLE_GIT = Object.freeze(['Bash(git fetch:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)']);
@@ -53,6 +88,12 @@ export function regoleGit(clone = '') {
   if (!p) return [...REGOLE_GIT];
   const conClone = ['fetch', 'rebase', 'merge'].flatMap((v) => [`Bash(git -C "${p}" ${v}:*)`, `Bash(git -C ${p} ${v}:*)`]);
   return [...REGOLE_GIT, ...conClone];
+}
+
+// La voce viva del registro per un biglietto, dal gancio e dal rapporto di fine sessione. Finisce nel corpo del gancio come
+// decidi, con le sue stesse regole qui sotto.
+export function vocePer(voci, mia, adesso) {
+  return (Array.isArray(voci) ? voci : []).find((v) => v && mia && v.impronta === mia && adesso - Date.parse(v.ora) < DURATA_VOCE_MS) || null;
 }
 
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
@@ -91,8 +132,7 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
     let voci = null;
     try { voci = JSON.parse(letto.testo).voci; } catch (_) { voci = null; }
     if (!Array.isArray(voci)) return nega(MOTIVO_REGISTRO + " Dettaglio: " + (letto.errore || "contenuto non valido") + ".");
-    const mia = typeof impronta === "function" ? impronta(visti[0]) : "";
-    const voce = voci.find((v) => v && mia && v.impronta === mia && adesso - Date.parse(v.ora) < DURATA_VOCE_MS);
+    const voce = vocePer(voci, typeof impronta === "function" ? impronta(visti[0]) : "", adesso);
     if (!voce) return nega(MOTIVO_SCONOSCIUTO);
     if ((voce.model && !MODELLI.includes(voce.model)) || (voce.effort && !SFORZI.includes(voce.effort))) return nega(MOTIVO_IGNOTO);
     const nuovo = { ...ti, run_in_background: false };
@@ -143,7 +183,7 @@ export function comando({ sessione = '', creato, registro = '', strumenti = '' }
     + `const k=${opz};let r;try{r={testo:require("fs").readFileSync(k.fileRegistro,"utf8")}}catch(e){r={errore:String((e&&e.code)||e)}}`
     + 'const imp=(t)=>require("crypto").createHash("sha256").update(t).digest("hex");'
     + 'const o=decidi(i,{...k,registro:r,impronta:imp});if(o)process.stdout.write(JSON.stringify(o))});';
-  return `node -e '${PRELUDIO}const decidi=${decidi};${avvio}'`;
+  return `node -e '${PRELUDIO}const vocePer=${vocePer};const decidi=${decidi};${avvio}'`;
 }
 
 export function dirImpostazioniUtente(env = process.env) {
@@ -152,6 +192,14 @@ export function dirImpostazioniUtente(env = process.env) {
 
 export function impronta(biglietto) {
   return createHash('sha256').update(String(biglietto ?? '').trim()).digest('hex');
+}
+
+/** La decisione del server per un biglietto ({ model, effort, ruolo }), come la legge il gancio; null se non c'è. */
+export function decisioneDelBiglietto(ticket, { dir = dirImpostazioniUtente(), adesso = Date.now() } = {}) {
+  if (!String(ticket ?? '').trim()) return null;
+  try {
+    return vocePer(JSON.parse(readFileSync(join(dir, FILE_REGISTRO), 'utf8')).voci, impronta(ticket), adesso);
+  } catch (_) { return null; }
 }
 
 /**

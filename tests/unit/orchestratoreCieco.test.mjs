@@ -14,6 +14,7 @@ const {
   decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, AL_POSTO_VIVO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
   AMBIENTE_TOLTO, ETICHETTA, FILE_REGISTRO, MODELLI, SFORZI, MOTIVO_SOTTOFONDO, MOTIVO_SENZA_BIGLIETTO, MOTIVO_DUE_BIGLIETTI,
   MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA, REGOLE_GIT, regoleGit,
+  modelloForzato, avvisoForzatura, confrontoDecisione, decisioneDelBiglietto,
 } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
@@ -390,6 +391,51 @@ test('variabili: niente FORCE, opus solo come default di chi lancia senza dirlo,
   assert.deepEqual([...AMBIENTE_TOLTO], ['CLAUDE_CODE_SUBAGENT_MODEL_FORCE']);
 });
 
+// #2553: nel contenitore cloud FORCE arriva dalle variabili dell'ambiente, dove le impostazioni non lo spengono.
+test('FORCE nell\'ambiente del processo: si riconosce come lo legge Claude Code, e il preflight lo dice', () => {
+  const env = (v, m = 'opus') => ({ CLAUDE_CODE_SUBAGENT_MODEL_FORCE: v, CLAUDE_CODE_SUBAGENT_MODEL: m });
+  for (const v of ['1', 'true', ' YES ', 'on']) assert.equal(modelloForzato(env(v)), 'opus', v);
+  for (const v of [undefined, '', '0', 'false', 'no', 'off', 'boh']) assert.equal(modelloForzato(env(v)), '', String(v));
+  assert.equal(modelloForzato(env('1', '')), '', 'senza modello da imporre non c\'è niente di forzato');
+  assert.equal(modelloForzato({}), '');
+  assert.match(avvisoForzatura(env('1', 'sonnet')), /ogni sotto-agente gira su sonnet.*non si applica \(lo sforzo sì\).*variabili dell'ambiente cloud/);
+  assert.equal(avvisoForzatura(env('0')), '');
+  const dispatch = readFileSync(join(RADICE, 'scripts', 'dispatch.mjs'), 'utf8');
+  const stampa = dispatch.indexOf('avvisoForzatura()');
+  assert.ok(stampa > 0 && stampa < dispatch.indexOf("console.log('Le tue istruzioni:"), 'il preflight lo stampa prima delle istruzioni');
+});
+
+test('confronto con la decisione del server: dice la forzatura e i turni del worker fuori decisione, tace quando torna', () => {
+  const v = { model: 'haiku', effort: 'medium' };
+  assert.deepEqual(confrontoDecisione({ voce: v, modelli: ['claude-haiku-5-5'], sforzi: { medium: 12 } }), []);
+  assert.deepEqual(confrontoDecisione({}), []);
+  const forzato = confrontoDecisione({ voce: v, modelli: ['claude-opus-5-5'], sforzi: { medium: 12 }, forzato: 'opus' });
+  assert.equal(forzato.length, 2);
+  assert.match(forzato[0], /forzato a opus .*CLAUDE_CODE_SUBAGENT_MODEL_FORCE/);
+  assert.equal(forzato[1], 'modello deciso dal server haiku, turni del worker su claude-opus-5-5');
+  assert.deepEqual(confrontoDecisione({ voce: v, modelli: ['claude-haiku-5-5'], sforzi: { medium: 3, high: 9 } }),
+    ['sforzo deciso dal server medium, turni del worker medium 3, high 9']);
+  assert.deepEqual(confrontoDecisione({ voce: v, modelli: ['claude-haiku-5-5'], sforzi: {} }),
+    ['sforzo deciso dal server medium, il transcript del worker non dichiara lo sforzo dei turni']);
+  assert.deepEqual(confrontoDecisione({ voce: {}, modelli: ['claude-opus-5-5'], sforzi: { max: 1 } }), [], 'il server non ha deciso niente: niente da confrontare');
+  assert.deepEqual(confrontoDecisione({ voce: v, modelli: [], sforzi: {} }), [], 'nessun turno: niente da confrontare');
+  assert.deepEqual(confrontoDecisione({ forzato: 'opus' }).length, 1, 'la forzatura si dice anche senza decisione');
+});
+
+test('la decisione del biglietto si legge dal registro come la legge il gancio', () => {
+  const dir = cartellaTemporanea('filo-cieco-decisione-');
+  try {
+    assert.equal(decisioneDelBiglietto(B, { dir }), null, 'senza registro');
+    assert.equal(registraDecisione({ ticket: B, role: 'fixer', model: 'sonnet', effort: 'low' }, { dir, adesso: ADESSO }).ok, true);
+    assert.deepEqual(decisioneDelBiglietto(B, { dir, adesso: ADESSO + 1000 }), { impronta: impronta(B), ruolo: 'fixer', ora: new Date(ADESSO).toISOString(), model: 'sonnet', effort: 'low' });
+    assert.equal(decisioneDelBiglietto(ALTRO, { dir, adesso: ADESSO }), null);
+    assert.equal(decisioneDelBiglietto(B, { dir, adesso: ADESSO + DURATA_VOCE_MS }), null, 'scaduta');
+    assert.equal(decisioneDelBiglietto('', { dir, adesso: ADESSO }), null);
+    writeFileSync(join(dir, FILE_REGISTRO), '{rotto');
+    assert.equal(decisioneDelBiglietto(B, { dir, adesso: ADESSO }), null);
+  } finally { togliCartella(dir); }
+});
+
 test('cablaggio: il preflight installa prima di consegnare le istruzioni; nel progetto niente gancio, le stesse variabili', () => {
   const s = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.local.json'), 'utf8'));
   // Si riconosce dal comando, non dal matcher: il gancio delle letture esterne nomina Task* fra gli strumenti puliti.
@@ -426,6 +472,7 @@ test('le istruzioni: modello e sforzo li mette il gancio; i worker scelgono quel
   const contratto = readFileSync(join(RADICE, 'routines', 'roles', '_contratto-worker.md'), 'utf8');
   const sezione = (/^## Sotto-agenti\n([\s\S]*?)(?=^## )/m.exec(contratto) || [])[1] || '';
   assert.match(sezione, /parametro `model`/);
+  assert.match(sezione.replace(/\s+/g, ' '), /`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` acceso nell'ambiente il parametro sparisce/, 'con FORCE il parametro non c\'è (#2553)');
   assert.match(sezione.replace(/\s+/g, ' '), /tre livelli/);
   assert.doesNotMatch(sezione, /opus|sonnet|haiku|fable/i);
 });
