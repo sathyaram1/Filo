@@ -1399,7 +1399,7 @@
     const mossa = MOSSE_DI_TIPO[m.tipo];
     if (mossa === 'ripristina') return { carta: TUTTE_LE_CARTE, mossa };
     const sinistra = ['nascondi', 'mostra', 'ordina-sinistra'].includes(m.tipo);
-    const carta = sinistra ? cartaDi(m.chiave) : (H.IDS.includes(m.carta) ? m.carta : H.risolvi(m.carta));
+    const carta = sinistra ? cartaDi(m.chiave) : ([...H.IDS, ...(H.ID_TASTI || [])].includes(m.carta) ? m.carta : H.risolvi(m.carta));
     return carta ? { carta, mossa } : null;
   }
   function nomiToken() { const T = global.SN_THEME_TOKENS; return T && typeof T.names === 'function' ? T.names() : []; }
