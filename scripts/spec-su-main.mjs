@@ -154,12 +154,12 @@ function main() {
   const leggibile = (e) => (e === 'non-corso' ? 'non partito' : e);
   console.log(`\n▸ Ramo ${shaRamo.slice(0, 8)}, main ${shaMain.slice(0, 8)}:`);
   for (const spec of scelta.specs) {
-    const ramo = corse.ramo.esiti[spec];
-    const main = corse.main.esiti[spec];
+    const suRamo = corse.ramo.esiti[spec];
+    const suMain = corse.main.esiti[spec];
     const perche = (lato, e) => (e === 'non-corso' && corse[lato].motivo ? ` (${corse[lato].motivo})` : '');
-    console.log(`  ${spec}: ramo ${leggibile(ramo)}${perche('ramo', ramo)}, main ${leggibile(main)}${perche('main', main)}.`);
+    console.log(`  ${spec}: ramo ${leggibile(suRamo)}${perche('ramo', suRamo)}, main ${leggibile(suMain)}${perche('main', suMain)}.`);
     const copia = (copie.portati.find((p) => p.spec === spec) || {}).motivo || '';
-    console.log(`    ${verdettoAffiancato({ ramo, main, copia })}`);
+    console.log(`    ${verdettoAffiancato({ ramo: suRamo, main: suMain, copia })}`);
     if (copie.mancaSulRamo.includes(spec)) console.log('    Il commit del ramo non ha questo spec: un file non ancora salvato non si corre.');
   }
   console.log('  Main corre coi pacchetti di questa cartella: se il suo package-lock è diverso, un rosso lì può venire da quello.');
