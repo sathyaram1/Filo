@@ -52,10 +52,10 @@ async function scorriEApri(page) {
 
 // L'evento arriva un fotogramma dopo, e non sempre dopo che il menu ascolta: tre aperture di fila, ognuna deve reggere.
 // `copre`: il caso provato è quello col menu disegnato sopra il punto del clic.
-async function restaAperto(page, { copre = false, ...opzioni } = {}) {
+async function restaAperto(page, { copre = false } = {}) {
   const menu = page.locator('.sn-rinomina-menu');
   for (let giro = 0; giro < 3; giro++) {
-    const punto = await scorriEApri(page, opzioni);
+    const punto = await scorriEApri(page);
     await expect(menu).toBeVisible();
     const esito = await page.evaluate(({ x, y }) => {
       const m = document.querySelector('.sn-rinomina-menu');
