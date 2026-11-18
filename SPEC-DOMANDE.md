@@ -295,7 +295,7 @@ Una **radice** è un testo esterno, scritto con tipo e valore:
 
 | radice | cosa |
 |---|---|
-| `feedback:<seq>` | il testo di un utente (il numero intero, senza la parte dopo il punto) |
+| `feedback:<id>` | il testo di un feedback, per l'id del documento: mai il numero (#N), che lo sceglie il client che lo manda, e due testi con lo stesso numero sarebbero una radice sola (D-317, D-324). Il cartellino mostra il numero accanto |
 | `web:<indirizzo>` | una pagina o una ricerca web |
 | `posta:<id>` | un messaggio di posta |
 | `file:<percorso>` | un file fuori dal repo |
