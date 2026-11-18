@@ -67,10 +67,11 @@
   }
 
   // La frase com'è scritta nella pagina, se c'è: tutti i pezzi, nell'ordine. Altrimenti ''.
-  function trova(citazione, testoPagina) {
+  // `norm`: la pagina già normalizzata, per non rifarlo a ogni marcatore.
+  function trova(citazione, testoPagina, norm = null) {
     const p = pezzi(citazione);
     if (!p.length) return '';
-    const { n, mappa } = normalizzaConMappa(testoPagina);
+    const { n, mappa } = norm || normalizzaConMappa(testoPagina);
     let da = 0;
     let inizio = -1;
     let fine = -1;
