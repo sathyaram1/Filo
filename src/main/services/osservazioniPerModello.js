@@ -1616,7 +1616,8 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     if (!analysis || !analysis.kind) return null;
     const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
     // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
-    return proposta ? { ...proposta, _proposta: true } : null;
+    // `_unaVolta`: la funzione per nome si propone una volta per versione (#2371); senza nome ogni richiesta è diversa.
+    return proposta ? { ...proposta, _proposta: true, ...(analysis.capabilityId ? { _unaVolta: `proposta:${AF.chiaveInvio(analysis)}` } : {}) } : null;
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
