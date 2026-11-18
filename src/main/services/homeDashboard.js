@@ -193,8 +193,8 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   }
   // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
   const v = voci[0];
-  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
-  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const fissa = (x) => `la carta «${x.titolo}» sta in cima finché ${x.tipo === 'cornice' ? 'non la chiudi' : 'suona'}: non si sposta e non si scavalca`;
+  if (v.fissa) return no(fissa(v));
   const mobili = sx.filter((x) => !x.fissa);
   const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
   const at = mobili.findIndex((x) => x.chiave === v.chiave);
