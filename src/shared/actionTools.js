@@ -132,8 +132,8 @@
     },
     RIAPRI_SCHEDA: {
       via: ['scheda', 'riapri'], risultato: true,
-      description: 'riapre com\'era una scheda trovata con chiuse.',
-      properties: { id: S() }, required: ['id'],
+      description: 'riapre com\'era una scheda trovata con chiuse (id); senza id l\'ultima chiusa, come Ctrl+Shift+T.',
+      properties: { id: S() }, required: [],
     },
     CERCA_SALVATE: {
       via: ['scheda', 'salvate'], risultato: true,
