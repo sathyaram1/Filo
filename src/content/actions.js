@@ -2301,6 +2301,7 @@
     takeScreenshot,
     takePartialScreenshot,
     transcribeRegion,
+    transcribeImage,
     pickColor,
     showPageQrCode,
   };
