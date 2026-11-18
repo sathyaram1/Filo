@@ -66,7 +66,7 @@
           const g = c.getContext('2d');
           g.fillStyle = '#fff';
           g.fillRect(0, 0, c.width, c.height);
-          g.drawImage(img, 0, 0);
+          g.drawImage(img, 0, 0, c.width, c.height);
           fatto(c.toDataURL('image/jpeg', 0.9));
         } catch (_) { fatto(dataUrl); }
       };
