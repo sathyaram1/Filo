@@ -96,11 +96,11 @@ test('una sessione al lavoro nel suo clone di filo-security non fa rosso chi pro
   const suite = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd: clone, detached: true, stdio: 'ignore' });
   suite.unref();
   try {
-    assert.notEqual(ambientePerITest({ FILO_SERVER_CLONE: clone }, casa).FILO_SERVER_CLONE, clone, 'il lanciatore non passa il clone vero');
-    assert.ok(ambientePerITest({}, casa).FILO_SERVER_CLONE.startsWith(casa), 'nemmeno quello di ripiego, nella casa');
     const r = await daSoli(conAspetta.map((f) => join(QUI, f)), { FILO_SERVER_CLONE: clone }, { casa });
     assert.equal(r.fermo, null, r.fermo);
     assert.deepEqual(nomiRossi(r.stdout), [], String(r.stderr || '').slice(-4000));
+    assert.notEqual(ambientePerITest({ FILO_SERVER_CLONE: clone }, casa).FILO_SERVER_CLONE, clone, 'il lanciatore non passa il clone vero');
+    assert.ok(ambientePerITest({}, casa).FILO_SERVER_CLONE.startsWith(casa), 'nemmeno quello di ripiego, sotto la sua cartella');
   } finally {
     try { process.kill(suite.pid); } catch (_) { /* già uscito */ }
     togliCartella(casa);
