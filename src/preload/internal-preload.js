@@ -158,6 +158,8 @@ function loadContentScripts() {
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
+  safe(path.join(SHARED, 'trascrizioneRighe.js'), 'SN_TRASCRIZIONE_RIGHE');
+  safe(path.join(CONTENT, 'trascrizione.js'));
   safe(path.join(CONTENT, 'actions.js'));
   safe(path.join(CONTENT, 'menuIcons.js'));
   safe(path.join(CONTENT, 'content.js'));
