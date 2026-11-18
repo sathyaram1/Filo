@@ -102,9 +102,65 @@ test('le azioni accettano il numero col cancelletto; il server lo traduce, un nu
   assert.match(manca.dettaglio, /#831\.2/);
   // Un id resta un id; un numero storto non passa la validazione.
   assert.deepEqual(D.traduciNumeri({ opzioni: [FATTO] }, {}).domanda.opzioni[0].azione.feedbackId, 'f1');
-  for (const storto of ['#0', '#12a', '#1.0', '##3', '#']) {
+  for (const storto of ['#0', '#12a', '##3', '#', '#1.']) {
     assert.equal(D.validaAzione({ tipo: 'riprendi', feedbackId: storto }).ok, false, storto);
   }
+});
+
+test('il numero nelle azioni ha la forma delle attese: «#1736.0» vale #1736, come quando un feedback ne aspetta un altro (#2229.3)', () => {
+  const A = globalThis.SN_FB_ATTESE;
+  for (const scritto of ['#1736', '#1736.0', '#01736', '#831.2', '#9999999', '#12.123456']) {
+    const r = D.validaDomanda(daFare({ opzioni: [{ testo: 'Fatto', azione: { tipo: 'riprendi', feedbackId: scritto } }] }));
+    assert.equal(r.ok, true, `${scritto}: ${r.dettaglio}`);
+    assert.deepEqual(D.numeriDaTradurre(r.domanda), [A.normalizzaNumero(scritto)], scritto);
+    assert.equal(A.leggiNumeri(scritto).ok, true, `${scritto} vale anche nelle attese`);
+  }
+  for (const fuori of ['#12345678', '#1.1234567']) {
+    assert.equal(D.validaAzione({ tipo: 'riprendi', feedbackId: fuori }).ok, false, fuori);
+    assert.equal(A.normalizzaNumero(fuori), '', `${fuori} è fuori anche per le attese`);
+  }
+  const t = D.traduciNumeri(D.validaDomanda(daFare({ opzioni: [{ testo: 'Fatto', azione: { tipo: 'riprendi', feedbackId: '#1736.0' } }] })).domanda,
+    { 1736: 'E5JpkNp9q3adMJb1zikU' });
+  assert.equal(t.domanda.opzioni[0].azione.feedbackId, 'E5JpkNp9q3adMJb1zikU');
+});
+
+test('un «da fare» senza i passi, o coi soli spazi, si rifiuta col campo «problema» (#2229.3)', () => {
+  for (const problema of [undefined, '', '   \n\t ']) {
+    const r = D.validaDomanda(daFare({ problema }));
+    assert.equal(r.ok, false, JSON.stringify(problema));
+    assert.equal(r.errore, 'problema_mancante');
+    assert.equal(r.campo, 'problema');
+  }
+  // Anche la domanda che il server apre per il compito, e quella riscritta dallo smistamento, passano da qui.
+  assert.equal(D.validaDomanda(daFare({ problema: ' ' }), { conOrigine: false, perOwner: false }).errore, 'problema_mancante');
+  // Una domanda da decidere senza problema resta com'era.
+  const vera = D.validaDomanda({ titolo: 'Che fare', priorita: 'importante', consiglio: { opzione: 0, perche: 'x' },
+    opzioni: [{ testo: 'a', pro: 'p', contro: 'c', azione: { tipo: 'archivia', feedbackId: 'f1' } }, { testo: 'b', pro: 'p', contro: 'c', azione: { tipo: 'riprendi', feedbackId: 'f1' } }], blocca: true });
+  assert.equal(vera.ok, true, vera.dettaglio);
+});
+
+test('un feedback nei collegamenti si nomina anche per numero: tradotto nell\'id, o rifiutato col numero (#2229.1)', () => {
+  const r = D.validaDomanda(daFare({ opzioni: [{ testo: 'Fatto', azione: { tipo: 'nessuna' } }], blocca: undefined,
+    collegamenti: [{ tipo: 'feedback', id: '#1736' }, { tipo: 'feedback', id: 'abc_DEF-1' }, { tipo: 'ramo', id: 'claude/x' }] }));
+  assert.equal(r.ok, true, r.dettaglio);
+  assert.deepEqual(D.numeriDaTradurre(r.domanda), ['1736']);
+  const t = D.traduciNumeri(r.domanda, { 1736: 'E5JpkNp9q3adMJb1zikU' });
+  assert.equal(t.ok, true, t.dettaglio);
+  assert.deepEqual(t.domanda.collegamenti, [{ tipo: 'feedback', id: 'E5JpkNp9q3adMJb1zikU' }, { tipo: 'feedback', id: 'abc_DEF-1' }, { tipo: 'ramo', id: 'claude/x' }]);
+  assert.equal(r.domanda.collegamenti[0].id, '#1736', 'la domanda in ingresso non si tocca');
+
+  const manca = D.traduciNumeri(r.domanda, {});
+  assert.equal(manca.errore, 'feedback_inesistente');
+  assert.equal(manca.campo, 'collegamenti');
+  assert.deepEqual(manca.numeri, ['1736']);
+  // Un feedback che non è né un id né un numero non nasce muto: si rifiuta col campo.
+  for (const id of ['#abc', '#0', 'feed.back', 'a/b']) {
+    const storto = D.validaDomanda(daFare({ collegamenti: [{ tipo: 'feedback', id }] }));
+    assert.equal(storto.ok, false, id);
+    assert.equal(storto.campo, 'collegamenti[0].id', id);
+  }
+  // Un ramo o una domanda tengono la forma di prima.
+  assert.equal(D.validaDomanda(daFare({ collegamenti: [{ tipo: 'ramo', id: 'claude/a.b#c' }] })).ok, true);
 });
 
 test('dal terminale un «da fare» si riconosce, e il pulsante si legge come in Gestione', async () => {
