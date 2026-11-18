@@ -85,10 +85,10 @@ test('a chi chiede istruzioni le istruzioni si danno: nessuna segnalazione', () 
   }
 });
 
-// #474 — sulla risposta vera (lo zoom spiegato a parole) la proposta c'è solo se
-// l'utente voleva che la cosa si facesse, non se chiedeva.
-const ZOOM_A_PAROLE = 'Per tradurre la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
-  + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.';
+// #474 — sulla risposta vera (una funzione spiegata a parole) la proposta c'è solo se l'utente voleva che la cosa si
+// facesse, non se chiedeva. Lo zoom di allora oggi ha il suo strumento: il caso usa la traduzione, che non ce l'ha.
+const ZOOM_A_PAROLE = 'Per tradurre la pagina apri il menu del tasto destro e scegli "Traduci pagina": '
+  + 'la traduzione prende il posto del testo originale e puoi tornare indietro quando vuoi.';
 
 test('#474: le domande comuni, con ogni grafia, non fanno partire la proposta', () => {
   const domande = [
