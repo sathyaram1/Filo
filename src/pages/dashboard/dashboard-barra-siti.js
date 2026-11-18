@@ -74,7 +74,7 @@
     };
     if (v.icona) { metti(v.icona); return; }
     lettera();
-    if (v.tipo !== 'sito' || !d.iconaDelSito) return;
+    if (v.tipo !== 'sito' || !/^https?:/i.test(v.url) || !d.iconaDelSito) return;
     d.iconaDelSito(v.url).then((dato) => {
       if (!dato || !posto.isConnected || posto.dataset.per !== v.id) return;
       metti(dato);
