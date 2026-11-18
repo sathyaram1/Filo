@@ -9,7 +9,7 @@ const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
 const { contaZoomDallaChat, contaPaginaDallaChat } = require('../autonomiaFonti');
 const {
-  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, bersaglioPausa, bersaglioAudio, salvatePerChat,
+  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, salvatePerChat,
   apriPaginaSalvata, leggiPaginaDa, contoRestano,
 } = require('../osservazioniPerModello');
 
