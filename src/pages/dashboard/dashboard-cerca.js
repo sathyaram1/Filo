@@ -440,5 +440,5 @@
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
   }
 
-  global.SN_DASH_CERCA = { init };
+  global.SN_DASH_CERCA = { init, apri, chiudi, aperta: () => aperta };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
