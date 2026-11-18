@@ -3112,7 +3112,7 @@
   }
 
   (async function init() {
-    renderControls();
+    refreshAccountControl();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
