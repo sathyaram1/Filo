@@ -61,6 +61,13 @@ Le due operazioni che ha ogni compito:
   FINE
   ```
 
+  Con `--parziale` (`rapporto --parziale <<'FINE'`) è il punto a cui sei
+  arrivato, e il compito resta aperto: se la corsa si ferma prima del rapporto
+  finale (tetto, guasto, sessione morta), chi riparte riceve questo. Ognuno
+  sostituisce il precedente, quindi scrivilo intero, come un rapporto finale.
+  Un `rapportoPrecedente` con `parziale: true` viene da una corsa fermata a
+  metà: riparti dal punto che dice, senza rifare quello che dice già fatto.
+
 Feedback e domande per l'owner si aprono come negli altri ruoli
 (`routine-channel.mjs deliver <biglietto> feedback --name … --text …`,
 `domanda.mjs chiedi <file.json>`), solo se il tuo ambito ha `feedback.apri` o
