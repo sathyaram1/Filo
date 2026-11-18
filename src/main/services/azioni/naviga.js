@@ -187,11 +187,61 @@ async function azionePausaAudio(action, { sender, schedeViste }) {
 async function azioneMostraScheda(action, { sender, schedeViste }) {
   const tm = winOf(sender)?._filoTabs;
   if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
-  const b = await schedaPerNumero(tm, action, schedeViste);
-  if (!b) return { executed: false, kept: true, output: { error: 'manca il numero della scheda' } };
+  const b = await schedaDaMostrare(tm, action, schedeViste);
+  if (!b) return { executed: false, kept: true, output: { error: 'manca il numero della scheda, o il verso (dopo o prima)' } };
   if (b.errore) return { executed: false, kept: true, output: { error: b.errore } };
   tm.activate(b.tab.id);
   return { executed: true, kept: true, output: { titolo: (await nomeDellaScheda())(b.tab) } };
+}
+
+// «Riapri l'ultima scheda chiusa» (#2371): la stessa pila di Ctrl+Shift+T, in un passo.
+async function riapriUltima(tm) {
+  if (typeof tm.ciSonoChiuse === 'function' && !(await tm.ciSonoChiuse())) {
+    return { executed: false, kept: true, output: { riaperta: false, nessuna: true, error: 'nessuna scheda chiusa da riaprire' } };
+  }
+  const id = await tm.riapriChiusa();
+  const tab = id ? tm.tabs.find((t) => t.id === id) : null;
+  if (!tab) return { executed: false, kept: true, output: { riaperta: false } };
+  return { executed: true, kept: true, output: { riaperta: true, ultima: true, titolo: (await nomeDellaScheda())(tab), url: tab.url || '' } };
+}
+
+// «Salvala per dopo» (#2371): la stessa strada di Alt+S, sulla scheda col numero o su quella web davanti.
+async function azioneSalvaPerDopo(action, { sender, schedeViste }) {
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+  let tab = null;
+  if (action.scheda != null) {
+    const b = await schedaPerNumero(tm, action, schedeViste);
+    if (!b || b.errore) return { executed: false, kept: true, output: { error: (b && b.errore) || 'numero di scheda non valido' } };
+    tab = b.tab;
+  } else tab = targetWebTab(sender).tab;
+  if (!tab || tab.isInternal || !/^https?:\/\//i.test(tab.url || '')) {
+    return { executed: false, kept: true, output: { error: 'nessuna pagina web da salvare: le schermate di Filo non si salvano per dopo' } };
+  }
+  const titolo = (await nomeDellaScheda())(tab);
+  const r = await require('../../shortcuts').saveForLater(win, tab);
+  if (!r) return { executed: false, kept: true, output: { error: 'salvataggio già in corso per questa scheda' } };
+  return { executed: true, kept: true, output: { salvata: true, titolo } };
+}
+
+// «Cerca questa immagine» (#2371): la ricerca per immagine dell'Aiuto (Google Lens). L'immagine l'ha già scelta
+// handlers.js (`_immagine`): un indirizzo web della pagina o dell'utente, o i byte di una mandata in chat.
+async function azioneCercaImmagine(action, { sender }) {
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  const im = action._immagine;
+  if (!tm || !im) return { executed: false, kept: true, output: { error: (action._immagineMancante) || 'nessuna immagine da cercare' } };
+  const L = globalThis.SN_URL_NAV;
+  let id = null;
+  if (im.url) id = tm.openTab(L.indirizzoRicercaImmagine(im.url), { activate: true, origine: { tipo: 'filo', gesto: true } });
+  else {
+    const invio = L.invioRicercaImmagine(im.dataUrl);
+    if (!invio) return { executed: false, kept: true, output: { error: 'l\'immagine non si legge' } };
+    id = tm.openTab(invio.url, { activate: true, invio, origine: { tipo: 'filo', gesto: true } });
+  }
+  if (!id) return { executed: false, kept: true, output: { error: 'la scheda della ricerca non si è aperta' } };
+  return { executed: true, kept: true, output: { cercata: true, di: im.url ? 'indirizzo' : 'immagine', ...(im.numero ? { numero: im.numero } : {}) } };
 }
 
 async function azioneApriSalvata(action, { sender }) {
