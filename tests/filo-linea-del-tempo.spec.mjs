@@ -2,7 +2,7 @@
 // tetti, cancellabili davvero, esportabili, e mai su disco dall'incognito. Ogni prova guarda il FILE, non solo l'app.
 // Senza il filo ogni prova è rossa: le chat stavano in storage.json e le pagine visitate non si registravano.
 
-import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
+import { test, expect, chiudiApp, argomentiScala, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
@@ -34,9 +34,7 @@ async function avvia(userData) {
 async function paginaInterna(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }),
-    { timeout: 10_000 }).toBe(true);
-  const page = app.windows().find((w) => new URL(w.url()).hostname === host);
+  const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === host, `nessuna finestra su ${host}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }

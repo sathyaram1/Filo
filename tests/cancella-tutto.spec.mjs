@@ -2,7 +2,7 @@
 // come appena installato. Ogni prova guarda le pagine dove l'utente vede i suoi dati e i file della cartella dei dati.
 // Senza il tasto e la cancellazione all'avvio è rossa: memoria, chat, editor, salvati e archivio tornavano tutti.
 
-import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
+import { test, expect, chiudiApp, argomentiScala, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
@@ -29,9 +29,7 @@ async function avvia(userData) {
 async function pagina(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }),
-    { timeout: 15_000 }).toBe(true);
-  const page = app.windows().find((w) => new URL(w.url()).hostname === host);
+  const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === host, `nessuna finestra su ${host}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }

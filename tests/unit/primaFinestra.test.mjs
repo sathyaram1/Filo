@@ -1,6 +1,6 @@
-// Sentinella: sotto tests/ una finestra di Filo non si prende mai appena annunciata (`firstWindow()` nudo,
-// `waitForEvent('window')`): da Electron 44 arriva vuota e naviga subito dopo, e lo spec cade con «Execution context
-// was destroyed». Le prove dei giri (tests/verifica/) restano com'erano: le scrive e le corre chi verifica.
+// Sentinella: sotto tests/ una finestra di Filo non si prende appena annunciata (`firstWindow()`, `waitForEvent('window')`:
+// arriva vuota, «Execution context was destroyed»), né cercandola in `app.windows()` con `new URL()` senza try (#2579).
+// Le prove dei giri (tests/verifica/) restano com'erano: le scrive e le corre chi verifica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +28,8 @@ function righeDiCodice(testo) {
 
 const FIRST_WINDOW = /\.firstWindow\s*\(/;
 const ATTESA_WINDOW = /\.waitForEvent\s*\(\s*['"`]window['"`]/;
+// Fra le finestre ce n'è sempre qualcuna con l'indirizzo ancora vuoto: un `new URL()` nudo nella ricerca la fa esplodere.
+const URL_NUDO = /\.windows\(\)\s*\.(?:find|findIndex|findLast|some|every|filter)\(\s*\(?\s*\w+\s*\)?\s*=>\s*new URL\(/;
 
 function chiChiama(re) {
   return fileDiTest()
@@ -36,12 +38,21 @@ function chiChiama(re) {
     .map((p) => relative(TESTS, p).replace(/\\/g, '/'));
 }
 
-test('i due riconoscitori prendono le chiamate e lasciano stare i commenti', () => {
+test('i riconoscitori prendono le chiamate e lasciano stare i commenti', () => {
   assert.ok(FIRST_WINDOW.test(righeDiCodice('const s = await app.firstWindow({ timeout: 5000 });')));
   assert.ok(ATTESA_WINDOW.test(righeDiCodice("const p = await app.waitForEvent('window');")));
   assert.ok(ATTESA_WINDOW.test(righeDiCodice('const p = await app.waitForEvent( "window", { timeout: 1 });')));
   assert.ok(!ATTESA_WINDOW.test(righeDiCodice("  // app.waitForEvent('window') può risolvere con la newtab")));
   assert.ok(!ATTESA_WINDOW.test(righeDiCodice("await page.waitForEvent('popup');")));
+  assert.ok(URL_NUDO.test(righeDiCodice('const p = app.windows().find((w) => new URL(w.url()).hostname === host);')));
+  assert.ok(URL_NUDO.test(righeDiCodice('app.windows()\n    .some(p => new URL(p.url()).host === h)')));
+  assert.ok(!URL_NUDO.test(righeDiCodice('app.windows().find((w) => { try { return new URL(w.url()).hostname === h; } catch (_) { return false; } })')));
+  assert.ok(!URL_NUDO.test(righeDiCodice("app.windows().find((w) => w.url().startsWith('filo://newtab'))")));
+});
+
+test('una finestra cercata per indirizzo non fa esplodere la ricerca con un indirizzo vuoto', () => {
+  assert.deepEqual(chiChiama(URL_NUDO), [],
+    "`aspettaFinestra(app, trova, perche)` della fixture, che salta le finestre il cui indirizzo non si legge, o `new URL()` dentro un try");
 });
 
 test('la prima finestra di Filo si aspetta col suo documento, non con firstWindow() nudo', () => {
