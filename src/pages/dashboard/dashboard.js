@@ -927,10 +927,11 @@
 
   // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
   // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
-  function setBubbleText(el, text, markdown) {
+  // `fonti`: le etichette che il main ha controllato per questa risposta (#2383); dal solo testo non ne nasce nessuna.
+  function setBubbleText(el, text, markdown, fonti = null) {
     Rispondi.ricorda(el, text);
     if (markdown && text && self.SN_MARKDOWN) {
-      el.innerHTML = self.SN_MARKDOWN.render(text);
+      el.innerHTML = self.SN_MARKDOWN.render(text, { fonti });
       el.classList.add('dash-bubble-md');
       // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
       const ultimo = el.lastElementChild;
