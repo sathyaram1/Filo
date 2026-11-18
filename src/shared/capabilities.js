@@ -76,7 +76,7 @@
     {
       id: 'switch-tab-next-prev', title: 'Passa alla scheda dopo o a quella prima', category: 'navigation',
       desc: 'Porta in primo piano la scheda a destra di quella attiva, o quella a sinistra. Dall’ultima si torna alla prima, e dalla prima all’ultima.',
-      invoke: 'Ctrl+Tab per la scheda dopo, Ctrl+Shift+Tab per quella prima, anche su Mac (col tasto Control, perché Cmd+Tab lì cambia applicazione). Funziona anche mentre stai guardando un sito o scrivi in un campo di testo.',
+      invoke: 'Ctrl+Tab per la scheda dopo, Ctrl+Shift+Tab per quella prima, anche su Mac (col tasto Control, perché Cmd+Tab lì cambia applicazione). Funziona anche mentre stai guardando un sito o scrivi in un campo di testo. Oppure chiedilo a Filo in chat («passa alla scheda dopo»).',
       doesNot: 'Con una scheda sola non succede niente.',
     },
     {
