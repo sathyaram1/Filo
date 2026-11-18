@@ -528,17 +528,20 @@ html, body {
 body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
 
 /* ── La coda del filo (#869) ── */
-/* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
-.dash-cerca { flex: none; display: flex; justify-content: center; padding: 10px 8px 0; position: relative; z-index: 6; }
+/* Cercare nel filo (#2372): la colonna destra intera, il campo in cima e i risultati riassunti sotto. */
+.dash-cerca { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+.dash-cerca[hidden] { display: none; }
 .dash-cerca-campo {
-  display: flex; align-items: center; gap: 8px; width: min(320px, 100%);
-  padding: 5px 12px; border: 1px solid transparent; border-radius: var(--dash-radius-pill);
-  color: var(--dash-ink-mute); cursor: text;
-  transition: border-color calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, width calc(0.2s * var(--sn-motion, 1)) ease;
+  flex: none; display: flex; align-items: center; gap: 4px;
+  padding: 3px 12px 3px 4px; border: 1px solid var(--dash-line-strong); border-radius: var(--dash-radius-pill);
+  background: var(--dash-card); color: var(--dash-ink-soft); cursor: text;
 }
-.dash-cerca-campo:hover { background: var(--dash-line); }
-.dash-cerca-campo:focus-within { width: min(460px, 100%); background: var(--dash-card); border-color: var(--dash-line-strong); color: var(--dash-ink-soft); }
-.dash-cerca-lente { display: inline-flex; flex: none; }
+.dash-cerca-lente {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: none; border-radius: 50%; background: transparent; color: var(--dash-accent); cursor: pointer;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-lente:hover, .dash-cerca-lente:focus-visible { background: var(--dash-line); outline: none; }
 .dash-cerca-input {
   flex: 1; min-width: 0; border: none; outline: none; background: transparent;
   font: inherit; font-size: 13px; color: var(--dash-ink);
@@ -546,16 +549,14 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-cerca-input::placeholder { color: var(--dash-ink-mute); }
 .dash-cerca-input::-webkit-search-cancel-button { display: none; }
 .dash-cerca-risultati {
-  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-  width: min(560px, calc(100% - 16px)); max-height: min(60vh, 520px); overflow-y: auto;
-  display: flex; flex-direction: column; gap: 1px; padding: 6px;
-  background: var(--dash-card); border: 1px solid var(--dash-line-strong); border-radius: 14px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 16% * var(--sn-ombra, 1)), transparent);
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
   scrollbar-width: thin;
 }
+.dash-cerca-risultati[hidden] { display: none; }
 .dash-cerca-voce {
-  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; flex-wrap: wrap;
+  padding: 6px 8px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
   font: inherit; cursor: pointer;
   transition: background calc(0.14s * var(--sn-motion, 1)) ease;
 }
