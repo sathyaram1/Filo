@@ -594,6 +594,7 @@
     RIAPRI_SCHEDA: (n) => (n > 1 ? `riaperto ${n} schede chiuse` : 'riaperto una scheda chiusa'),
     RIPRENDI_AUDIO: () => 'fatto ripartire la musica',
     PAUSA_AUDIO: () => 'messo in pausa la musica',
+    TRASCRIVI: (n) => (n > 1 ? `aperto Trascrivi ${n} volte` : 'aperto Trascrivi'),
     MOSTRA_SCHEDA: () => 'portato su una scheda',
     RINOMINA_FILE: () => 'dato un nome ai file',
     ELIMINA_FILE: () => 'tolto dei file',
