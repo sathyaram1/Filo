@@ -26,7 +26,7 @@
 
   // Le app che una carta non ce l'hanno: in «altro» restano un tasto.
   const APP = [
-    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html', nomi: ['aperti per dopo', 'per dopo', 'salvati per dopo'] },
+    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html', nomi: ['aperti per dopo', 'per dopo', 'perdopo', 'salvati per dopo'] },
     // Niente «download» fra i nomi: a parole quello è lo scaricamento a sinistra.
     { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html', nomi: ['tasto dei download', 'tasto download', 'pagina dei download', 'app dei download'] },
     // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
