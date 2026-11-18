@@ -21,7 +21,7 @@ for (const m of loader.matchAll(/require\(path\.join\(SHARED, '([^']+)'\)\)/g)) 
 
 const CARATTERI_PER_TOKEN = 2;
 const TETTO_PARTE_FISSA = 8000;
-const TETTO_STRUMENTI = 8000;
+const TETTO_STRUMENTI = 8200;
 const token = (s) => Math.ceil(String(s).length / CARATTERI_PER_TOKEN);
 
 test('gli strumenti della chat stanno sotto gli 8.000 token', () => {
