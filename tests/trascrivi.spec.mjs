@@ -104,8 +104,8 @@ test('Trascrivi dalla barra: la porzione resta a schermo, una parola selezionata
   await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
 });
 
-test('tasto destro su un\'immagine: «Trascrivi» apre lo stesso riquadro sopra di lei', async ({ app, openTab, testServer }) => {
-  const { page } = await apri(app, openTab, testServer);
+test('tasto destro su un\'immagine: «Trascrivi» apre lo stesso riquadro sopra di lei, e mentre legge lo dice', async ({ app, openTab, testServer }) => {
+  const { page } = await apri(app, openTab, testServer, { attesaMs: 2500, tema: 'dark' });
   const box = await page.locator('#foto').boundingBox();
   await page.locator('#foto').click({ button: 'right', position: { x: 300, y: 80 } });
   const menu = menuDi(page).locator('.sn-menu');
@@ -113,7 +113,11 @@ test('tasto destro su un\'immagine: «Trascrivi» apre lo stesso riquadro sopra 
   await menu.locator('button', { hasText: 'Trascrivi' }).first().click();
 
   const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-stato')).toContainText('Leggo il testo', { timeout: 5000 });
+  await expect(strato.locator('.sn-tr-stato .sn-rinomina-rotella')).toBeVisible();
+  await strato.screenshot({ path: 'tests/.shots/trascrivi-attesa-scuro.png' }).catch(() => {});
   await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await strato.screenshot({ path: 'tests/.shots/trascrivi-pronto-scuro.png' }).catch(() => {});
   await expect(strato.locator('.sn-tr-riga')).toHaveText(['Fattura numero 4821', 'Totale 1250 euro']);
   const scena = await strato.locator('.sn-tr-scena').boundingBox();
   expect(Math.abs(scena.x - box.x)).toBeLessThan(2);
