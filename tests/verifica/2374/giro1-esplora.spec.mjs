@@ -119,6 +119,19 @@ test('esplora: trascinamento su due parole, Ctrl+A, menu della selezione', async
   console.log('CTRL+A:', JSON.stringify(await appunti(app)));
 });
 
+test('esplora: tema scuro, attesa e pronto', async ({ app, openTab, testServer }) => {
+  const righeImg = [['Fattura numero 4821', 20, 50], ['Totale 1250 euro', 20, 100]];
+  const { page } = await prepara(app, openTab, testServer, righeImg, '32px sans-serif', 2500);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  await page.waitForTimeout(500);
+  const strato = await apriSuImmagine(app, page);
+  await expect(strato.locator('.sn-tr-stato')).toBeVisible({ timeout: 5000 });
+  await strato.screenshot({ path: 'tests/.shots/v2374-scuro-attesa.png' });
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await strato.locator('.sn-tr-copia').hover();
+  await strato.screenshot({ path: 'tests/.shots/v2374-scuro-pronto.png' });
+});
+
 test('esplora: Esc mentre legge, poi la risposta arriva', async ({ app, openTab, testServer }) => {
   const righeImg = [['Fattura numero 4821', 20, 50]];
   const { page } = await prepara(app, openTab, testServer, righeImg, '32px sans-serif', 2500);
