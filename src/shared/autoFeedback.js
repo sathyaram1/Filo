@@ -391,7 +391,7 @@
         .replace(/[^a-z0-9-]/g, '-');
       return {
         text: String(analysis.genericDesc || 'Funzione esistente che l\'assistente non sa azionare').slice(0, 500),
-        name: `Non azionabile dall'assistente: ${analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
+        name: `Non azionabile dall'assistente: ${analysis.capabilityTitle || analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
         clientId: `auto:capability-gap:${capId}`,
         capabilityGapId: capId,
         source: 'auto:capability-uncommandable',
