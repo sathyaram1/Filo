@@ -16,6 +16,11 @@ export const OGNI_MS = 30 * 1000;
 // La corsa compare in Actions dopo qualche secondo, a volte minuti; poi due lavori da 90 minuti al massimo più l'unione.
 export const TETTO_PARTENZA_MS = 15 * 60 * 1000;
 export const TETTO_CORSA_MS = 200 * 60 * 1000;
+// Una lettura fallita durante l'attesa si ripete con queste pause prima di arrendersi: un 502, la rete che cade un
+// attimo o il registro di un lavoro appena finito che GitHub dà per qualche secondo come non trovato (#1737.1).
+export const PAUSE_RIPROVA_MS = Object.freeze([10, 30, 60, 120].map((s) => s * 1000));
+// La stessa richiesta riceverebbe la stessa risposta; un 403 lo è solo se non è il limite di richieste.
+const RISPOSTE_DEFINITIVE = new Set([400, 401, 403, 410, 422]);
 const SHA = /^[0-9a-f]{40}$/;
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
