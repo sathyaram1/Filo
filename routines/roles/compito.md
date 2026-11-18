@@ -88,7 +88,7 @@ Un compito ricorrente ha un tetto di costo per corsa (`payload.compito.tettoUsd`
 chi guida il giro misura la spesa del tuo lavoro e, oltre il tetto, rilascia
 il biglietto con l'esito «oltre il tetto». L'istanza si chiude e non riparte,
 e l'istanza dopo riceve il tuo ultimo rapporto, parziale o finale. Quanto hai
-speso te lo dice ogni comando del canale, in fondo, e
+speso te lo dicono `operazione`, `segnala` e `rapporto`, in fondo, e
 `node scripts/routine-channel.mjs spesa`; passata la metà del tetto la riga ti
 chiede il rapporto parziale. Su un compito lungo consegnalo prima, a ogni
 passo grosso. La corsa conta per il tetto automatico delle istanze dopo
