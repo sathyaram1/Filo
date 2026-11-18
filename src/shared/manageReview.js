@@ -600,7 +600,7 @@
     // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
     // Chi aspetta un feedback non ancora fuso (#903), o una domanda aperta che lo ferma (#1577), la coda non lo dà a
     // nessuno: sta fra quelli che aspettano.
-    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
+    if (tab === 'queue' && statoCheAspetta(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
     return tab;
   }
 
