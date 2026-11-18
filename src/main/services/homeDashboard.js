@@ -202,7 +202,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (action.prima_di != null) {
     const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
     if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
-    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    if (rif.fissa) return no(fissa(rif));
     dove = ordine.indexOf(rif.chiave);
   } else if (verso === 'cima') dove = 0;
   else if (verso === 'fondo') dove = ordine.length;
