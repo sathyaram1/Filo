@@ -27,7 +27,8 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
       const z = document.createElement('div'); z.style.cssText = 'height:3000px;flex:none'; s.appendChild(z);
       b.scrollIntoView({ block: 'center' });
     });
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
+      await window.SN_RINOMINA_UI.disponibile();
       const b = document.querySelector('.dash-file-btn');
       b.closest('.dash-bubbles').scrollTop += 40;
       const r = b.getBoundingClientRect();
