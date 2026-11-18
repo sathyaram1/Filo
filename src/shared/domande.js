@@ -678,7 +678,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeriDaTradurre, traduciNumeri,
+    TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeroScritto, numeriDaTradurre, traduciNumeri,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
     STATI_CHE_ASPETTANO, ATTESE_CON_DOMANDA, domandeBloccantiDi, domandaCheAspetta,
