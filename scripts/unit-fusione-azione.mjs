@@ -141,6 +141,8 @@ function riassunto(file, titolo, testo, riga) {
 }
 
 function main() {
+  // Prima di qualunque figlio: anche fusioni e checkout della prova eseguono codice del ramo (hook e filtri di git) (#2558).
+  const { GITHUB_OUTPUT: uscita, GITHUB_STEP_SUMMARY: sommario } = prendiComandiDiActions();
   const a = leggiArgomenti(process.argv.slice(2));
   if (a.errori.length) {
     console.error(`unit-fusione-azione: ${a.errori.join('; ')}`);
@@ -149,7 +151,7 @@ function main() {
   if (a.unisci.length) {
     const campo = unisciParti({ ramo: a.ramo, main: a.main, parti: partiDaAmbiente(a.unisci, process.env) });
     const riga = rigaEsito(campo);
-    riassunto('Unit sulla fusione: esito per il server', a.unisci.join(' + '), riga);
+    riassunto(sommario, 'Unit sulla fusione: esito per il server', a.unisci.join(' + '), riga);
     console.log(riga);
     process.exit(codiceUscita(campo));
   }
