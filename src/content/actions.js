@@ -1975,8 +1975,8 @@
     try {
       const src = imgEl && (imgEl.currentSrc || imgEl.src);
       if (!src) return;
-      const dataUrl = await scaricaImmagine(src, imgEl);
-      if (!dataUrl) { Popup.toastErrore('toast_image_unavailable'); return; }
+      const dataUrl = await scaricaImmagine(src, imgEl).catch(() => null);
+      if (!dataUrl) { Popup.toastErrore('trascrivi_immagine_illeggibile'); return; }
       const r = imgEl.getBoundingClientRect();
       await global.SN_TRASCRIZIONE.apri({ dataUrl, rect: soloNelFramePrincipale({ x: r.left, y: r.top, w: r.width, h: r.height }) });
     } catch (_) {
