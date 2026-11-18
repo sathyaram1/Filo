@@ -83,10 +83,10 @@ export function letturaMemoria(leggi = leggiFile) {
     if (!Number.isFinite(tetto) || tetto >= SENZA_TETTO) continue;
     const usata = vera(d);
     if (!Number.isFinite(usata)) continue;
-    if ((tetto - vera) / MB < margine) {
-      margine = (tetto - vera) / MB;
+    if ((tetto - usata) / MB < margine) {
+      margine = (tetto - usata) / MB;
       out.tettoMb = tetto / MB;
-      out.usataMb = vera / MB;
+      out.usataMb = usata / MB;
     }
   }
   if (Number.isFinite(margine)) out.disponibileMb = Number.isFinite(sistemaMb) ? Math.min(sistemaMb, margine) : margine;
