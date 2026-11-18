@@ -124,6 +124,7 @@ const IMMAGINI_DAI_DATI = [
 const NOMI_NON_CONTATTATI = [
   { file: 'src/main/services/adblock.js', costante: 'BASE_WHITELIST', perche: 'i siti che il blocco della pubblicità non blocca mai' },
   { file: 'src/shared/feedback.js', costante: 'BUCKET', perche: 'il nome del deposito degli allegati, che sta nel percorso dell’indirizzo' },
+  { file: 'src/main/services/trascrizioneYoutube.js', costante: 'HOST_BREVE', perche: 'riconosce l’indirizzo breve di un video; la trascrizione si chiede a www.youtube.com' },
   { file: 'src/shared/feedback.js', costante: 'PREFISSI_ALLEGATO', perche: 'riconosce un allegato di Filo anche nella forma storage.googleapis.com; Filo li scrive tutti sotto firebasestorage' },
 ];
 // Un nome di file ha la stessa forma di un dominio: queste estensioni non sono domini di primo livello.
