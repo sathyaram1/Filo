@@ -26,7 +26,7 @@ const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
 const {
   broadcastLiveUpdate, broadcastToTabs, broadcastToFiloPages, ambitoDellaFinestra, annunciaCarteHome,
-  annunciaIconaScheda,
+  annunciaBarraSiti, annunciaIconaScheda,
 } = require('./broadcast');
 const {
   Schermo, contaSe, filoWin, winOf, targetWebTab, nomeDellaScheda, refreshProxyRulesAllWindows,
@@ -674,6 +674,7 @@ const handlerCtx = {
   broadcastToTabs,
   broadcastToFiloPages,
   annunciaCarteHome,
+  annunciaBarraSiti,
   ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,

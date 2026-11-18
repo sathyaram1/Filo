@@ -573,6 +573,7 @@ const REGOLE_IMPORT = {
   FILO_TIMERS: 'sveglie',
   FILO_NOTIFICATIONS: 'stato',
   FILO_CARTE_HOME: 'contenuto',
+  FILO_BARRA_SITI: 'contenuto',
   FILO_SESSION: 'stato',
   FILO_WELCOMED: 'stato',
   FILO_ONBOARDING: 'stato',

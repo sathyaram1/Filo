@@ -196,6 +196,21 @@
       dashCss: ['--dash-filo-gomitolo'],
       default: '850ms',
     },
+    // La barra dei siti della nuova scheda (#1803): le gemelle --dash-* hanno il predefinito in dashboard.css.
+    'barraSiti.fondo': {
+      label: 'Sfondo della barra dei siti',
+      type: 'color',
+      css: '--sn-barra-siti-fondo',
+      dashCss: ['--dash-barra-fondo'],
+      default: { light: '#f7f2e8', dark: '#25211c' },
+    },
+    'barraSiti.icona': {
+      label: 'Misura delle icone della barra dei siti',
+      type: 'size',
+      css: '--sn-barra-siti-icona',
+      dashCss: ['--dash-barra-icona'],
+      default: '20px',
+    },
     // I due segni del correttore (#1446): l'errore, di cui Filo è sicuro, e il suggerimento, che decide l'utente; il
     // dubbio è lo stesso segno sbiadito. Le gemelle letterali stanno in spellcheck.css e menu.css (tests/unit/correttoreSegni.test.mjs).
     'correttore.errori.color': {

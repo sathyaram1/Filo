@@ -1150,6 +1150,12 @@
     CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }
     CARTE_HOME_MODIFICA: 'carte_home_modifica',   // { mossa } → { ok, layout } | { ok:false, error, layout }
     CARTE_HOME_CAMBIATE: 'carte_home_cambiate',   // broadcast { layout }
+    // La barra dei siti della nuova scheda (#1803), solo pagine filo://. La mossa è quella di SN_BARRA_SITI.applica;
+    // AVVIA prende l'id di una voce-programma, mai un percorso.
+    BARRA_SITI_GET: 'barra_siti_get',             // {} → { ok, voci }
+    BARRA_SITI_MODIFICA: 'barra_siti_modifica',   // { mossa } → { ok, voci, voce? } | { ok:false, error, voci }
+    BARRA_SITI_AVVIA: 'barra_siti_avvia',         // { id } → { ok } | { ok:false, error }
+    BARRA_SITI_CAMBIATA: 'barra_siti_cambiata',   // broadcast { voci }
     // I lavori lunghi in corso (una risposta di Filo, un comando del terminale): la home li mostra a sinistra.
     LAVORI_IN_CORSO: 'lavori_in_corso',           // {} → { ok, lavori: [{ id, tipo, chat, testo, iniziato }] }
     LAVORI_CAMBIATI: 'lavori_cambiati',           // broadcast { lavori }

@@ -278,6 +278,42 @@
     return fatto ? frase('Carta', ' spostata nella home') : frase('Spostare la carta', ' nella home');
   }
 
+  // L'operazione la riconosce src/shared/barraSiti.js; dove non è caricato (una pagina) resta la parola detta.
+  function barraSiti() {
+    if (!global.SN_BARRA_SITI && typeof require === 'function') { try { require('./barraSiti.js'); } catch (_) {} }
+    return global.SN_BARRA_SITI || null;
+  }
+  function opBarraSiti(a) {
+    const B = barraSiti();
+    return B ? B.operazione(a) : String((a && (a.operazione ?? a.op)) || '').trim().toLowerCase();
+  }
+  // Il percorso del programma che la mossa metterebbe nella barra, o ''. Senza il modulo vale il solo `percorso`.
+  function programmaDellaBarra(a) {
+    const B = barraSiti();
+    if (!B) return String((a && a.percorso) || '').trim();
+    const m = B.mossaDaChat(a);
+    return m.tipo === 'aggiungi' && m.percorso ? m.percorso : '';
+  }
+  // Il programma si mostra col percorso intero: è quello che partirà al clic.
+  function descriviBarraSiti(a, fatto) {
+    const op = opBarraSiti(a);
+    const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 80 ? `${x.slice(0, 79)}…` : x; };
+    const percorso = programmaDellaBarra(a);
+    const detto = a && (a.elemento ?? a.voce);
+    const sito = corto(a && (a.indirizzo ?? a.url ?? detto));
+    const voce = corto(detto ?? (a && a.indirizzo));
+    const frase = (parti) => (fatto ? piatto(parti) : parti);
+    if (op === 'elenca') return fatto ? 'Letta la barra dei siti' : 'Leggere la barra dei siti';
+    if (op === 'ripiega') return fatto ? 'Chat della home ripiegata' : 'Ripiegare la chat della home';
+    if (op === 'riapri') return fatto ? 'Chat della home riaperta' : 'Riaprire la chat della home';
+    if (op === 'aggiungi' && percorso) return frase([fatto ? 'Messo nella barra dei siti il programma ' : 'Mettere nella barra dei siti il programma ', cit(percorso, true)]);
+    if (op === 'aggiungi') return frase([fatto ? 'Messo nella barra dei siti ' : 'Mettere nella barra dei siti ', ...(sito ? [cit(sito)] : ['un sito'])]);
+    const chi = voce ? [cit(voce)] : ['una voce'];
+    if (op === 'togli') return frase([fatto ? 'Tolto dalla barra dei siti ' : 'Togliere dalla barra dei siti ', ...chi]);
+    if (op === 'rinomina') return frase([fatto ? 'Rinominato nella barra dei siti ' : 'Rinominare nella barra dei siti ', ...chi, ...(a && a.nome ? [' in ', cit(corto(a.nome))] : [])]);
+    return frase([fatto ? 'Spostato nella barra dei siti ' : 'Spostare nella barra dei siti ', ...chi]);
+  }
+
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
   // Si misura la cartella che la ricerca leggerà: `_cartella` la risolve il main come la risolve l'indice ('' = una di
   // serie o nessuna); senza, il nome pulito come lo pulisce lui (#1499).
@@ -1297,6 +1333,17 @@
       campo: null,
       describe: (a) => descriviCarta(a, false),
       describeDone: (a) => descriviCarta(a, true),
+    },
+    // #1803 — la barra dei siti della nuova scheda. Un sito si toglie con un gesto: costo 1. Un programma messo dalla
+    // chat parte poi a un clic: costo 3, così lo conferma chi l'ha chiesto e mai solo un testo letto in una pagina.
+    BARRA_SITI: {
+      costo: (a) => {
+        if (opBarraSiti(a) === 'elenca') return 0;
+        return programmaDellaBarra(a) ? 3 : 1;
+      },
+      campo: (a) => (programmaDellaBarra(a) ? 'file' : null),
+      describe: (a) => descriviBarraSiti(a, false),
+      describeDone: (a) => descriviBarraSiti(a, true),
     },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando

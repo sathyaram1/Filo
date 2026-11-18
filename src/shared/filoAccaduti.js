@@ -188,6 +188,19 @@
     remove_archived_tab: { azione: () => ({ type: 'CANCELLA_ARCHIVIO', quante: 1 }), riuscita: riuscito },
     clear_archived_tabs: { azione: () => ({ type: 'CANCELLA_ARCHIVIO', tutte: true }), riuscita: riuscito },
     carte_home_modifica: { azione: (m) => (oggetto(m.mossa) ? { ...m.mossa, type: 'CARTA_HOME' } : null), riuscita: riuscito },
+    // La barra dei siti (#1803): l'icona trovata e salvata da sé non è un gesto. `cosa`: il nome della voce toccata.
+    barra_siti_modifica: {
+      azione: (m) => {
+        const x = oggetto(m.mossa) ? m.mossa : null;
+        if (!x || !['aggiungi', 'togli', 'rinomina', 'sposta'].includes(x.tipo)) return null;
+        const a = { type: 'BARRA_SITI', operazione: x.tipo };
+        const cosa = x.tipo === 'aggiungi' ? (x.percorso || x.url) : x.cosa;
+        if (stringa(cosa)) a.elemento = cosa;
+        if (stringa(x.nome)) a.nome = x.nome;
+        return a;
+      },
+      riuscita: riuscito,
+    },
     calendar_add: { azione: (m) => (oggetto(m.evento) ? { ...m.evento, type: 'EVENTO_CALENDARIO' } : null), riuscita: riuscito },
     submit_feedback: {
       azione: (m) => {

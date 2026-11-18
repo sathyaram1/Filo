@@ -7,7 +7,7 @@ const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const Onboarding = globalThis.SN_ONBOARDING;
-const { cancelliAperti, broadcastToFiloPages, annunciaCarteHome } = require('../broadcast');
+const { cancelliAperti, broadcastToFiloPages, annunciaCarteHome, annunciaBarraSiti } = require('../broadcast');
 const { winOf, bannerDellaScheda } = require('../handlersComuni');
 const { getEffectiveSettings, applySettingsUpdate, resolveTheme } = require('../impostazioniEffettive');
 const { idDelCambio } = require('../porteUscita');
@@ -371,6 +371,14 @@ async function azioneCartaHome(action, { sender, chatId }) {
   return { executed: true, kept: true, output: dove };
 }
 
+// #1803 — la barra dei siti: la stessa mossa dei gesti della home, dallo stesso servizio.
+async function azioneBarraSiti(action, { sender }) {
+  const { cambiate, impostazioni, ...esito } = await require('../barraSiti').daChat(action);
+  if (cambiate) annunciaBarraSiti(cambiate, sender);
+  if (impostazioni) await applySettingsUpdate(impostazioni);
+  return esito;
+}
+
 async function azionePulsantePreferenze(action, { sender }) {
   // #1619 — i pulsanti delle Preferenze con le loro stesse funzioni: la chat li preme invece di spiegarli.
   const P = globalThis.SN_PULSANTI_PREFERENZE;
@@ -445,6 +453,7 @@ module.exports = {
   SPOSTA_ICONA: azioneSpostaIcona,
   PANNELLO_APP: azionePannelloApp,
   CARTA_HOME: azioneCartaHome,
+  BARRA_SITI: azioneBarraSiti,
   PULSANTE_PREFERENZE: azionePulsantePreferenze,
   ACCOUNT: azioneAccount,
 };

@@ -62,6 +62,7 @@
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
     showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
+    'barraSiti.visibile': { nome: 'barra dei siti nella nuova scheda', valore: sino('mostrata', 'nascosta'), livello: 1 },
     'filoParla.downloadOgniMin': { nome: 'ritmo dei messaggi sui download', valore: (v) => global.SN_CONST.nomeRitmoDownload(v), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
@@ -246,6 +247,7 @@
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
     'zoom:propria': 'una pagina che scala da sé il suo contenuto (l\'editor) tiene lei il suo zoom',
+    chatRipiegata: 'ripiegare la chat della home è il gesto della sua freccia, che la riapre: una riga nel filo a ogni clic sarebbe rumore',
     'autonomia.*': 'quanto Filo fa da solo si alza solo con la parola «conferma» (#1312): un «annulla» lo rialzerebbe con un clic',
   };
 

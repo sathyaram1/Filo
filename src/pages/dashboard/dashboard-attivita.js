@@ -637,6 +637,7 @@
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
     PULSANTE_PREFERENZE: () => 'usato un pulsante delle Preferenze',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
+    BARRA_SITI: () => 'sistemato la barra dei siti',
     CANCELLA_PAGINE: () => 'cancellato pagine visitate',
     ZOOM_PAGINA: () => 'cambiato lo zoom',
     VOLUME: () => 'cambiato il volume',

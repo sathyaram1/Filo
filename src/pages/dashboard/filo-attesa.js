@@ -65,6 +65,7 @@
     COMANDO_FINESTRA: ['Azionata la finestra', (k) => `Azionata la finestra ${n(k)} volte`, 'finestra'],
     ACCOUNT: ['Sistemato l\'accesso', (k) => `Sistemato l'accesso ${n(k)} volte`, 'accesso'],
     CARTA_HOME: ['Sistemata una carta della home', (k) => `Sistemate ${n(k)} carte della home`, 'carta'],
+    BARRA_SITI: ['Sistemata la barra dei siti', (k) => `Sistemata la barra dei siti ${n(k)} volte`, 'barra dei siti'],
     SPOSTA_ICONA: ['Spostata un\'icona', (k) => `Spostate ${n(k)} icone`, 'icona'],
     PANNELLO_APP: ['Sistemato il pannello degli strumenti', (k) => `Sistemato il pannello degli strumenti ${n(k)} volte`, 'pannello'],
     STILE_PAGINA: ['Cambiato l\'aspetto della pagina', (k) => `Cambiato l'aspetto della pagina ${n(k)} volte`, 'aspetto della pagina'],

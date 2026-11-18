@@ -950,6 +950,18 @@
         return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
+    // #1803 — la barra dei siti nella nuova scheda. La chat ripiegata la scrive l'azione BARRA_SITI, come la freccia.
+    {
+      scrive: ['barraSiti.visibile'],
+      aiuto: 'true | false (la barra dei siti e dei programmi nella nuova scheda)',
+      costo: 1,
+      keys: ['barra_siti', 'barra dei siti', 'barra siti', 'barra dei preferiti', 'preferiti nella home', 'barrasiti.visibile'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraSiti: { visibile: b } }, label: `Barra dei siti → ${b ? 'mostrata' : 'nascosta'}` };
+      },
+    },
     // #2294 — i minuti fra due messaggi sui download finiti a utente assente: un numero diventa la scelta più vicina.
     {
       scrive: ['filoParla.downloadOgniMin'],

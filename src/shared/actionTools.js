@@ -137,7 +137,7 @@
     },
     ZOOM_PAGINA: {
       via: ['scheda', 'zoom'],
-      description: 'lo zoom della pagina davanti: percentuale 25-500 o verso; dura finché Filo non si chiude.',
+      description: 'zoom della pagina davanti: percentuale 25-500 o verso; finché Filo non si chiude.',
       properties: { percentuale: I(), verso: S({ enum: ['in', 'out', 'reset'] }) }, required: [],
     },
     STILE_PAGINA: {
@@ -151,7 +151,7 @@
     },
     RIPRISTINA_STILE_PAGINA: {
       via: ['scheda', 'stile_via'],
-      description: 'toglie lo stile messo con stile.',
+      description: 'toglie stile.',
       properties: {}, required: [],
     },
     PROXY_TAB: {
@@ -171,22 +171,22 @@
     },
     REGOLA_PROXY_DOMINIO: {
       via: ['scheda', 'regola_paese'],
-      description: 'un sito si apre sempre da un paese (senza sito: quello della scheda davanti).',
+      description: 'un sito si apre sempre da un paese (senza sito: quello davanti).',
       properties: { country: S(), sito: S() }, required: ['country'],
     },
     RIMUOVI_REGOLA_PROXY: {
       via: ['scheda', 'togli_regola_paese'],
-      description: 'toglie la regola del paese di un sito.',
+      description: 'toglie regola_paese.',
       properties: { sito: S() }, required: [],
     },
     TIENI_APERTA: {
       via: ['scheda', 'tieni_aperta'],
-      description: 'la pulizia non archivia mai questo sito (senza sito: quello della scheda davanti).',
+      description: 'la pulizia non archivia mai il sito (senza sito: quello davanti).',
       properties: { sito: S() }, required: [],
     },
     NON_TENERE_APERTA: {
       via: ['scheda', 'non_tenere_aperta'],
-      description: 'toglie la regola di tieni_aperta.',
+      description: 'toglie tieni_aperta.',
       properties: { sito: S() }, required: [],
     },
     RIPRENDI_AUDIO: {
@@ -209,15 +209,22 @@
     // ── home ──
     CARTA_HOME: {
       via: ['home', 'carta'],
-      description: 'operazione togli, rimetti, sposta (verso su|giu|cima|fondo, o prima_di), ripristina. A destra editor, suggerimenti, rapide; a sinistra timer, avvisi, scaricamenti…, detti a parole.',
+      description: 'togli|rimetti|sposta (verso su|giu|cima|fondo, o prima_di)|ripristina. Destra: editor, suggerimenti, rapide; sinistra: timer, avvisi, scaricamenti… detti a parole.',
       properties: { operazione: S(), carta: S(), verso: S(), prima_di: S() }, required: ['operazione'],
+    },
+    BARRA_SITI: {
+      via: ['home', 'barra_siti'],
+      description: 'elenca|aggiungi (sito|programma)|togli|rinomina|sposta (verso|prima_di)|ripiega|riapri la chat',
+      properties: { operazione: S(), elemento: S(), nome: S() },
+      required: ['operazione'],
+      risultato: true,
     },
     SPOSTA_ICONA: {
       via: ['home', 'icona'],
       description: () => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const contesti = D && D.CONTESTI ? Object.keys(D.CONTESTI).join(', ') : '';
-        return 'sposta un\'icona detta col nome del menu o con l\'id (una che non conosco torna con l\'elenco degli id): dove barra o altro della barra laterale, fila o altro_fila del tasto destro col contesto'
+        return 'sposta un\'icona (nome del menu o id; se sconosciuta torna l\'elenco degli id): dove barra|altro della barra laterale, fila|altro_fila del tasto destro col contesto'
           + (contesti ? ` (${contesti})` : '') + '.';
       },
       properties: { icona: S(), dove: S(), contesto: S(), prima_di: S() },
@@ -229,7 +236,7 @@
         const P = global.SN_PANNELLI_APP;
         const cat = P ? P.catalogo('editor') : null;
         const ids = cat ? cat.elementi.map((e) => e.id).join(', ') : '';
-        return 'il pannello sul bordo destro dell\'Editor: operazione apri, chiudi, blocca, sblocca, aggiungi o togli un elemento' + (ids ? ` (${ids})` : '') + '.';
+        return 'il pannello a destra dell\'Editor: apri|chiudi|blocca|sblocca|aggiungi|togli un elemento' + (ids ? ` (${ids})` : '') + '.';
       },
       properties: { operazione: S(), elemento: S() }, required: ['operazione'],
     },

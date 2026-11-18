@@ -830,6 +830,7 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'barraSiti.visibile': return $('barraSitiVisibile').checked;
       case 'homeSistema.ora': return $('homeSisOra').checked;
       case 'homeSistema.batteria': return $('homeSisBatteria').checked;
       case 'homeSistema.rete': return $('homeSisRete').checked;
@@ -935,6 +936,7 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'barraSiti.visibile': return !(s.barraSiti && s.barraSiti.visibile === false);
       case 'homeSistema.ora': return !(s.homeSistema && s.homeSistema.ora === false);
       case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
       case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
@@ -1129,6 +1131,7 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    if (vuole('barraSiti.visibile')) $('barraSitiVisibile').checked = !(settings.barraSiti && settings.barraSiti.visibile === false);
     const sis = settings.homeSistema || {};
     if (vuole('homeSistema.ora')) $('homeSisOra').checked = sis.ora !== false;
     if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
@@ -1972,6 +1975,7 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('barraSitiVisibile').addEventListener('change', persist);
     for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;

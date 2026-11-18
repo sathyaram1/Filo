@@ -31,6 +31,7 @@ const DOMINI = [
   () => require('./misc'),
   () => require('./file'), // #950 — nome sensato ai file dell'utente
   () => require('./trascini'), // #2300 — il contenuto dei trascinamenti interni, dietro un gettone
+  () => require('./barraSiti'), // #1803 — la barra dei siti della nuova scheda
 ];
 
 module.exports = function registraDomini(on, handlerCtx) {

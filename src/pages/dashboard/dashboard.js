@@ -104,6 +104,7 @@
   //   SN_DASH_COMANDI     i comandi con lo slash e la colorazione dell'input
   //   SN_DASH_TERMINALE   cartella corrente, colori ANSI, comandi di shell
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
+  //   SN_DASH_BARRA_SITI  la barra dei siti e la chat ripiegata (#1803)
   //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
@@ -361,6 +362,18 @@
     // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
+  });
+  // La barra dei siti e la freccia che ripiega la chat (#1803).
+  const BarraSiti = self.SN_DASH_BARRA_SITI;
+  BarraSiti.init({
+    send,
+    dash: $('dash'),
+    riga: $('barraRiga'),
+    barra: $('barraSiti'),
+    freccia: $('ripiegaChat'),
+    bubbles: $('bubbles'),
+    inputForm,
+    iconaDelSito: (url) => iconaDelSito(url),
   });
   // ===== Helpers messaggi =====
   function send(msg) {
@@ -995,6 +1008,7 @@
     RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
     ELIMINA_FILE: 'Guardo i file da togliere…',
     CARTA_HOME: 'Sistemo le carte della home…',
+    BARRA_SITI: 'Sistemo la barra dei siti…',
     VOLUME: 'Cambio il volume…',
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
@@ -1479,6 +1493,7 @@
   async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
     sending = true;
     scrittoQui = true;
+    BarraSiti.perInvio();
     Comandi.lasciaNonRisolto();
     Coda.fineRisali();
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
@@ -2433,6 +2448,7 @@
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
+      if (msg.settings) BarraSiti.applicaImpostazioni(msg.settings);
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
       if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
@@ -3098,6 +3114,7 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       Sistema.applicaImpostazioni(settings);
+      BarraSiti.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
     } catch (_) {}
@@ -3115,6 +3132,8 @@
     const reopenId = onbState ? null : chatIdFromUrl();
     const eventoId = onbState ? null : eventoFromUrl();
     if (!onbState) contaQuandoVista();
+    // Si arriva per leggere una conversazione (l'intervista, una chat riaperta, un punto del filo): la chat si riapre.
+    if (onbState || reopenId || eventoId) BarraSiti.ripiega(false);
     // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
       onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
@@ -3128,6 +3147,7 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
+    BarraSiti.pronta();
     richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
     riprendiSeguitiOrfani().catch((e) => console.warn('[Filo] seguiti della pagina di prima', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap

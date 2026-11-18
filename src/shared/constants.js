@@ -105,6 +105,8 @@
     // Disposizione delle carte della home (#870): { versione, destra, tolte, sinistra, nascoste }.
     // La forma e le mosse stanno in src/shared/carteHome.js; la scrive solo src/main/services/carteHome.js.
     FILO_CARTE_HOME: 'filo_carte_home',
+    // La barra dei siti della nuova scheda (#1803): array di voci; forma e mosse in src/shared/barraSiti.js.
+    FILO_BARRA_SITI: 'filo_barra_siti',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
     // True quando la micro-intervista di benvenuto è FINITA (#524), non quando è cominciata:
@@ -2657,6 +2659,10 @@
     textScale: 1,
     // Il commento proattivo al centro della home, per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // La barra dei siti della nuova scheda (#1803): si nasconde da Preferenze → Avanzate o dalla chat. `chatRipiegata`:
+    // la freccia ha nascosto la conversazione al centro e la barra ne ha preso il posto; resta al riavvio.
+    barraSiti: { visibile: true },
+    chatRipiegata: false,
     // Una pagina può far partire un download al secondo mentre l'utente non c'è (#2294): Filo ne scrive al più ogni
     // `downloadOgniMin` minuti (valori in FILO_PARLA_DOWNLOAD_MIN). Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     filoParla: { downloadOgniMin: 10 },

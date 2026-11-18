@@ -274,6 +274,17 @@
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
       return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
     },
+    // Il nome è quello della voce toccata davvero, che dice l'esito: il modello può averla chiamata in un altro modo.
+    BARRA_SITI: (a) => {
+      const o = a._output || {};
+      const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
+      const nome = corto(o.voce || a.elemento || a.voce || a.nome || a.indirizzo);
+      const op = String(a.operazione || '').toLowerCase();
+      if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
+      if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
+      const cosa = { aggiungi: 'Messo nella barra dei siti', metti: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
+      return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}` };
+    },
     CANCELLA_PAGINE: (a) => {
       const n = Number(a._output && a._output.cancellate) || 0;
       return { icon: '🗑', text: n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}` : 'Nessuna pagina visitata da cancellare' };
@@ -415,6 +426,7 @@
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
     PULSANTE_PREFERENZE: 'Pulsante delle Preferenze non premuto',
     CARTA_HOME: 'Carta della home non cambiata',
+    BARRA_SITI: 'Barra dei siti non cambiata',
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
