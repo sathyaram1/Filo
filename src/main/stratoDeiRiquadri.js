@@ -150,6 +150,8 @@ class StratoDeiRiquadri {
     const dati = d && d.dati && typeof d.dati === 'object' && !Array.isArray(d.dati) ? d.dati : {};
     if (!TIPI.has(tipo)) return { ok: false, error: 'tipo' };
     if (pesa(dati) > DATI_MAX_BYTE) return { ok: false, error: 'troppo', limite: DATI_MAX_BYTE };
+    // Un'immagine che lo strato non disegnerebbe si dice, invece di aprire un riquadro vuoto.
+    if (tipo === 'trascrizione' && !IMMAGINE.test(String(dati.dataUrl || ''))) return { ok: false, error: 'immagine' };
     const s = this._strato(wc);
     if (!s) return { ok: false };
     clearTimeout(s.timerVuoto);
