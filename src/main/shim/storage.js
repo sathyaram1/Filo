@@ -251,13 +251,12 @@ function resetIncognito() {
 }
 
 // In incognito una chiave si legge dall'overlay, o è mascherata da un tombstone; dal disco
-// arrivano solo le chiavi di configurazione in allowlist, il resto è invisibile.
+// arrivano solo le chiavi di configurazione in allowlist e i segni, il resto è invisibile.
 function incognitoReadKey(k) {
   if (INCOGNITO_SHARED.has(k)) return STATE.data[k];
   if (k in INCOGNITO.data) return INCOGNITO.data[k];
   if (INCOGNITO.tombstones.has(k)) return undefined;
-  if (INCOGNITO_READABLE.has(k)) return STATE.data[k];
-  return undefined;
+  return dalDiscoInIncognito(k);
 }
 
 function filePath() {
