@@ -110,7 +110,9 @@
     a.suMisura = () => { if (aperto === a) posa(a); };
     aperto = a;
 
-    radice.addEventListener('mousedown', (e) => { if (e.target === radice && e.button === 0) chiudi(); });
+    radice.addEventListener('mousedown', (e) => {
+      if (e.target === radice && e.button === 0 && !global.SN_MENU?.isOpen?.()) chiudi();
+    });
     radice.addEventListener('keydown', a.suTasto);
     radice.addEventListener('copy', (e) => copiaSelezione(a, e));
     document.addEventListener('keydown', a.suTasto, true);
