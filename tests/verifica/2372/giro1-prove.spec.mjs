@@ -48,11 +48,16 @@ test('fuoco perso: Backspace e Ctrl+V finiscono nel campo della chat come le let
   // Un clic su un punto vuoto del centro: il fuoco lascia il campo.
   await page.mouse.click(640, 300);
   await page.keyboard.press('Backspace');
-  await expect(page.locator('#input')).toHaveValue('cia');
+  await expect.soft(page.locator('#input')).toHaveValue('cia');
+  await page.locator('#input').fill('cia');
   await app.evaluate(({ clipboard }) => clipboard.writeText(' incollato'));
   await page.mouse.click(640, 300);
   await page.keyboard.press('Control+V');
-  await expect(page.locator('#input')).toHaveValue('cia incollato');
+  await expect.soft(page.locator('#input')).toHaveValue('cia incollato');
+  await page.locator('#input').fill('cia');
+  await page.mouse.click(640, 300);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'cia' })).toBeVisible();
 });
 
 test('«yy» col fuoco su un punto vuoto, e «yo» battuto in fretta resta «yo»', async ({ app, testServer }) => {
