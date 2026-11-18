@@ -133,7 +133,9 @@
     clearTimeout(seguiTimer);
     if (manuale || !voci.length) return;
     const pausa = d.pausaMs ? d.pausaMs() : 500;
-    seguiTimer = setTimeout(() => { if (aperta && !manuale && scelta < 0) mostra(voci[0]); }, Math.max(0, ultimaBattuta + pausa - Date.now()));
+    const primo = voci.find((b) => b._risultato && !['significato', 'nascosta'].includes(b._risultato.k));
+    if (!primo) return;
+    seguiTimer = setTimeout(() => { if (aperta && !manuale && scelta < 0) mostra(primo); }, Math.max(0, ultimaBattuta + pausa - Date.now()));
   }
 
   function voce(r) {
