@@ -2,7 +2,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from '../../helpers/chatFinta.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
-import { clickConfirm, CONFIRM_HOST } from '../../helpers/confirm.mjs';
+import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, CONFIRM_HOST } from '../../helpers/confirm.mjs';
 import { riquadroDelSegno, segniDi } from '../../helpers/segniDelCorrettore.mjs';
 
 async function correttoreFinto(app, opz) {
