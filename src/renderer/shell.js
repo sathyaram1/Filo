@@ -1908,7 +1908,9 @@
       disponi();
     }
     function colloca(card, forzaDavanti = false) {
-      const f = FORMA.forma({ davanti: forzaDavanti || davanti, home: inHome(), haCarta: !!card.dataset.carta, riduciMovimento: riduci() });
+      const f = FORMA.forma({
+        davanti: forzaDavanti || davanti, home: inHome(), haCarta: !!card.dataset.carta, riduciMovimento: riduci(), scadenzaAttesa: scadenzaAttesa(card),
+      });
       if (f === 'angolo' || f === 'sistema') {
         card.dataset.luogo = f === 'sistema' ? 'fuori' : 'angolo';
         avviaTempo(card, card._durata);
