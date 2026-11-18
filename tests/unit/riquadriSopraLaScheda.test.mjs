@@ -20,6 +20,7 @@ const APERTURE = [
   ['src/content/editBox.js', 'function openEditBox(', 'modifica'],
   ['src/content/popup.js', 'function openStreaming(', 'risposta'],
   ['src/content/sidebar.js', 'function open(', 'aiuto'],
+  ['src/content/trascrizione.js', 'async function apri(', 'trascrizione'],
 ];
 
 test('ogni riquadro, aperto su un sito, lo chiede prima allo strato', () => {
