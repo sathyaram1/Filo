@@ -168,6 +168,7 @@
     save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
     copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
     search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web', viaFilo: true },
+    transcribe_image: { target: 'image', costo: 1, label: 'trascrivi immagine' },
     // `viaFilo`: passa da NAVIGA, che il dispatch decide da sé (una ricerca porta `cerca` e costa 2 anche lì).
     // Chiedere anche qui farebbe due domande per la stessa uscita.
     open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
