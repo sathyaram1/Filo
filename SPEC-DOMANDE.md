@@ -1077,7 +1077,10 @@ dicono gli esperimenti (§ 4.6).
   l'agente, per regola: un ramo fuso in `main` (nessun commit fuori da `main`),
   fermo da più di 24 ore, che nessun feedback aperto nomina e che è un
   tentativo `worker/*` di un feedback chiuso nato prima della chiusura, oppure
-  un `claude/*` di una sessione locale. Prima di cancellarlo ne salva nome e
+  un `claude/*` di una sessione locale. Toglie anche i tentativi superati: non
+  fusi, di un feedback chiuso, nati prima che il suo lavoro arrivasse su `main`
+  più di 24 ore fa (nessuno li fonderà più; dispatch dalla cloud non può
+  cancellarli, #2518). Prima di cancellarlo ne salva nome e
   sha, così si può ricreare. Per non bloccare la credenziale del cancello
   ne toglie al più 400 a giro (100 al primo), distanziati, e al primo rifiuto
   di GitHub per troppe richieste si ferma: il resto lo conta come rimandato al
