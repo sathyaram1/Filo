@@ -268,6 +268,7 @@ test('hover e tasto destro su ogni carta; la stessa mossa si chiede a Filo a par
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Tolta' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  await fuoriVista(page);
   await expect(page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
 });
 
