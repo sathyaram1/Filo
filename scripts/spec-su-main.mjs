@@ -188,13 +188,12 @@ function main() {
       if (!c.ok) console.error(`(${c.motivo}: la cartella di prova resta, la toglie il prossimo giro)`);
     }
   }
-  const leggibile = (e) => (e === 'non-corso' ? 'non partito' : e);
+  const leggibile = (e) => (e.esito === 'non-corso' ? `non partito${e.motivo ? ` (${e.motivo})` : ''}` : e.esito);
   console.log(`\n▸ Ramo ${shaRamo.slice(0, 8)}, main ${shaMain.slice(0, 8)}:`);
   for (const spec of scelta.specs) {
     const suRamo = corse.ramo.esiti[spec];
     const suMain = corse.main.esiti[spec];
-    const perche = (lato, e) => (e === 'non-corso' && corse[lato].motivo ? ` (${corse[lato].motivo})` : '');
-    console.log(`  ${spec}: ramo ${leggibile(suRamo)}${perche('ramo', suRamo)}, main ${leggibile(suMain)}${perche('main', suMain)}.`);
+    console.log(`  ${spec}: ramo ${leggibile(suRamo)}, main ${leggibile(suMain)}.`);
     const copia = (copie.portati.find((p) => p.spec === spec) || {}).motivo || '';
     console.log(`    ${verdettoAffiancato({ ramo: suRamo, main: suMain, copia })}`);
     if (copie.mancaSulRamo.includes(spec)) console.log('    Il commit del ramo non ha questo spec: un file non ancora salvato non si corre.');
