@@ -148,10 +148,14 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  /** Il tetto automatico: `perMediana` volte la mediana delle ultime corse, arrotondato al dollaro sopra; 0 senza corse. */
+  /**
+   * Il tetto automatico: `perMediana` volte la mediana delle ultime corse, mai sotto la più cara di loro né sotto
+   * `minimo`, arrotondato al dollaro sopra; 0 senza corse. Una settimana pesante già finita resta passabile.
+   */
   function tettoAutomatico(costi) {
     const xs = corseValide(costi);
-    return xs.length ? Math.ceil(mediana(xs) * TETTO_COSTO.perMediana) : 0;
+    if (!xs.length) return 0;
+    return Math.ceil(Math.max(mediana(xs) * TETTO_COSTO.perMediana, Math.max(...xs), TETTO_COSTO.minimo));
   }
 
   /**
