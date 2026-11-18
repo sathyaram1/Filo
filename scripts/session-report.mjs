@@ -228,6 +228,16 @@ export function chiamaLaRete(comando, profondita = 0) {
   return false;
 }
 
+// Le letture a mano dei rami dei worker (commit, file, differenze), che il ruolo vieta al manutentore (#2337.5): il
+// server le conta come uno strumento fuori dall'elenco pulito. Elencare i rami (branch, ls-remote, fetch) non legge.
+export const STRUMENTO_RAMI = 'Bash_rami';
+const RE_LETTURA_RAMO = /\bgit\b(?:\s+-[Cc]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+(?:show|log|diff|cat-file|grep|blame|archive|checkout|switch|restore|merge|cherry-pick|rebase|worktree|format-patch|whatchanged|ls-tree|shortlog|range-diff)\b[^;&|\n]*\bworker\//i;
+
+/** Il comando legge il contenuto di un ramo di un worker? PURA. */
+export function leggeIRamiDeiWorker(comando) {
+  return RE_LETTURA_RAMO.test(String(comando || ''));
+}
+
 /** Una chiave ammessa da Firestore: solo [A-Za-z0-9_-], il resto diventa `_`. PURA. */
 export function chiaveSicura(nome) {
   const s = String(nome || '').replace(/[^A-Za-z0-9_-]/g, '_');
