@@ -26,6 +26,9 @@
         { testo: 'Se insieme a un comando fai anche una domanda («metti il tema scuro, e cos\'era quel messaggio?»), Filo esegue il comando e risponde alla domanda.', segnalazione: 2371 },
         { testo: 'In una finestra in incognito Filo non ti ripropone più l\'intervista di benvenuto se l\'hai già fatta: la chat ti risponde subito.', segnalazione: 2578 },
         { testo: 'Con i modelli Claude la chat compatta la conversazione in tempo: le richieste restano sotto i 100.000 token, oltre i quali costano cinque volte tanto. Anche la stima di costo accanto alla soglia di compattazione è più fedele.', segnalazione: 2473 },
+        { testo: 'Tornando nella home, l\'avviso di un timer o di uno scaricamento lascia subito il posto alla sua carta, senza restare nell\'angolo o diventare una carta doppia.', segnalazione: 2390 },
+        { testo: 'Un avviso volato nella colonna della home ha lo stesso tasto destro che aveva in basso a destra, compreso «Apri» del sito da cui è nato, e lo puoi chiudere anche chiedendolo a Filo.', segnalazione: 2390 },
+        { testo: 'Un timer che scade mentre Filo sta riaprendo o ricaricando la finestra ti avvisa lo stesso.', segnalazione: 2390 },
       ],
     },
     {
