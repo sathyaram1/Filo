@@ -89,10 +89,17 @@ test('una scheda di Filo trascinata sulla barra', async ({ app, shell, openTab }
   const casa = (await schede(shell)).find((x) => String(x.url).startsWith('filo://newtab'));
   await attiva(shell, casa.id);
   const page = await home(app);
+  await page.evaluate(() => {
+    window.__flash = [];
+    const f = document.getElementById('dashFlash');
+    new MutationObserver(() => window.__flash.push(f.textContent)).observe(f, { childList: true, characterData: true, subtree: true, attributes: true });
+  });
+  console.log('FILO-TAB url', t.url);
   await lasciaSullaBarra(app, shell, page, t.id);
-  await page.waitForTimeout(1500);
-  console.log('FILO-TAB voci', JSON.stringify(await salvate(app)), 'flash', await page.locator('#dashFlash').textContent().catch(() => ''));
+  await page.waitForTimeout(400);
   await scatta(page, 'scheda-filo');
+  await page.waitForTimeout(1100);
+  console.log('FILO-TAB voci', JSON.stringify(await salvate(app)), 'flash', JSON.stringify(await page.evaluate(() => window.__flash)), 'gettoni', await page.locator('.sn-gettoni-fondo .sn-gettone').count());
 });
 
 test('lo stesso sito due volte, e un indirizzo scritto male', async ({ app, shell, openTab, testServer }) => {
