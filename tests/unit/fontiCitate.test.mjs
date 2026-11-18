@@ -122,7 +122,7 @@ test('più marcatori, uno su una riga sua e uno in un elenco: le etichette vanno
   const url = 'https://example.com/c';
   const s = F.sorgenti([lettura(url, 'Primo dato vero. Secondo dato vero.')]);
   const r = F.controlla(`Intro:\n- Primo. [[fonte: ${url} | Primo dato vero]]\n- Secondo.\n[[fonte: ${url} | Secondo dato vero]]`, s);
-  assert.equal(r.text, 'Intro:\n- Primo.\n- Secondo.\n');
+  assert.equal(r.text, 'Intro:\n- Primo.\n- Secondo.');
   assert.deepEqual(r.fonti.map((f) => r.text.slice(0, f.pos).split('\n').pop()), ['- Primo.', '- Secondo.']);
   const html = MD.render(r.text, { fonti: r.fonti });
   assert.equal((html.match(/<li>[^<]*<span class="filo-fonte"/g) || []).length, 2, html);
