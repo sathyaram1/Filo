@@ -982,6 +982,8 @@
       case 'pannelloDestro.attesaMs': return opzioniPannelloDestro(s.pannelloDestro).attesaMs;
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
+      case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.normalizza(s.doppioTocco).sogliaMs;
+      case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo(s.ricercaFilo).pausaMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
