@@ -1894,6 +1894,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaLettere(settings.doppioTocco);
     disegnaPreferitiBt(settings.bluetoothPreferiti);
     disegnaScorciatoie(settings.scorciatoie);
 
