@@ -22,7 +22,7 @@ const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)
 const icona = (v) => (ICONA.test(testo(v)) ? testo(v) : '');
 const sito = (v) => (/^https?:\/\//i.test(testo(v)) ? testo(v) : '');
 function condiviso(nome, file) {
-  if (!globalThis[nome]) require(path.join('..', 'shared', file));
+  if (!globalThis[nome]) require(path.join(__dirname, '..', 'shared', file));
   return globalThis[nome];
 }
 
