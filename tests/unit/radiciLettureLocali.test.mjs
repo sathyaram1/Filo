@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { motiviDiLettura, sporca, rigaSporco, cartellaSporchi, ENV_FILE, LETTI_PER_CHIAMATA } from '../../scripts/lib/biglietto-locale.mjs';
 import { radiceLettura } from '../../scripts/lib/letture-esterne.mjs';
-import { lettiDi, fidatePerTimbri } from '../../scripts/domanda.mjs';
+import { lettiDi } from '../../scripts/domanda.mjs';
 
 const TURNO_ROUTINE = "--- Aggiornamento dell'agente del 1/11/2026 ---\nReport del lavoro.";
 
