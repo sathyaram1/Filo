@@ -2297,7 +2297,7 @@
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + (onboardingRifatta
-          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la MEMORIA (profilo e preferenze) e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato. Finché dura l'intervista, quello che sai solo dalla MEMORIA o dalle conversazioni passate (il lavoro, le persone, gli animali, i viaggi, i gusti, come vuole le risposte) non lo nomini, non glielo attribuisci («mi hai detto», «so che») e non lo metti in un'impostazione o in memoria(impara): conta solo quello che ti dice qui. `
+          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la MEMORIA (profilo e preferenze) e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato. Finché dura l'intervista, quello che sai solo dalla MEMORIA o dalle conversazioni passate (il lavoro, le persone, gli animali, i viaggi, i gusti, come vuole le risposte) non lo nomini, non glielo attribuisci («mi hai detto», «so che») e non lo metti in un'impostazione o in memoria(impara): conta solo quello che ti dice qui, e se risponde a metà la parte che manca non la riempi con la MEMORIA. `
           : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
         + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
