@@ -22,7 +22,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi, tastoSullaScheda, paginaDellAiuto } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, tastoSullaScheda, paginaDellAiuto, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 
