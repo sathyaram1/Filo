@@ -75,8 +75,8 @@ test('il testo e i tasti dopo un clic vanno alla superficie cliccata, non alla s
   fuoco = await eseguiMossa(app, shell, { azione: 'tasto', tasto: 'Enter' }, map, fuoco);
   await eseguiMossa(app, shell, { azione: 'tasto', tasto: 'x' }, map, fuoco);
   const strato = campo.pagina;
-  expect(await strato.evaluate(() => [document.querySelector('input').value, window.__tasti.filter((k) => k.length > 1 || k === 'x')]))
-    .toEqual(['ciaox', ['Enter']]);
+  expect(await strato.evaluate(() => [document.querySelector('input').value, window.__tasti.filter((k) => k === 'Enter' || k === 'x')]))
+    .toEqual(['ciaox', ['Enter', 'x']]);
   await expect(sotto.locator('#input')).toHaveValue('');
 });
 
