@@ -453,6 +453,7 @@ module.exports = {
   SPOSTA_ICONA: azioneSpostaIcona,
   PANNELLO_APP: azionePannelloApp,
   CARTA_HOME: azioneCartaHome,
+  BARRA_SITI: azioneBarraSiti,
   PULSANTE_PREFERENZE: azionePulsantePreferenze,
   ACCOUNT: azioneAccount,
 };
