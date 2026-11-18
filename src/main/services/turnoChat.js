@@ -1394,6 +1394,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
+  if (proposal && proposal._unaVolta) {
+    let versione = '';
+    try { versione = require('electron').app.getVersion(); } catch (_) {}
+    if (!(await require('./autoFeedbackInviati').prenota(versione, proposal._unaVolta))) proposal = null;
+  }
   if (proposal) {
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
