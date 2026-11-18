@@ -407,7 +407,9 @@ chiusura di M o nomina il suo ramo: l'approvazione dell'owner fonde «finish: <r
 senza numero), che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
 dell'ultima riapertura del doppione e di quella di M (riaperto dopo, vuol dire non risolto; #2046.1). Un
 rifiuto nomina la fusione registrata alla chiusura di M, già provata con le stesse regole, o il suo ramo. Il report
-porta in testa anche la riga «doppione di #M».
+porta in testa anche la riga «doppione di #M». Al contrario, il rifiuto di un «già risolto» semplice con una fusione
+che non cita il feedback o che precede la sua nascita, quando l'oggetto nomina un altro feedback chiuso
+(«merge-gate: #M» o il suo ramo), indica `--doppione-di M` con la stessa fusione (#2583).
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
