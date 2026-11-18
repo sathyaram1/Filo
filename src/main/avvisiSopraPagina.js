@@ -288,23 +288,21 @@ class AvvisiSopraPagina {
     const quante = this.stato.carte.filter((c) => !c.chiusa).length + this.stato.altre;
     if (pila ? quante < 2 : !carta) return;
     this._nascondiSuggerimento();
-    const voci = [];
+    let voci;
     if (pila) {
-      voci.push(this.stato.aperta
+      voci = [this.stato.aperta
         ? { label: 'Riduci', action: 'avvisi:riduci' }
-        : { label: 'Mostra tutti', action: 'avvisi:apri' });
+        : { label: 'Mostra tutti', action: 'avvisi:apri' }];
+      if (quante > 1) voci.push({ label: 'Chiudi tutti', action: 'avvisi:chiudi-tutti' });
     } else {
-      voci.push(...carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label));
-      // #2390 — «apri»: il sito da cui l'avviso è nato, in una scheda.
-      if (carta.indirizzo) {
-        let host = '';
-        try { host = new URL(carta.indirizzo).hostname.replace(/^www\./, ''); } catch (_) { host = ''; }
-        if (host) voci.push({ label: `Apri ${host}`, action: 'avviso:apri' });
-      }
-      if (voci.length) voci.push({ type: 'separator' });
-      voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
+      // #2390 — le stesse voci della carta volata nella home: le decide il modulo condiviso.
+      voci = condiviso('SN_FORMA_AVVISO', 'formaAvviso.js').menu({ azioni: carta.azioni, indirizzo: carta.indirizzo, quante })
+        .map((v) => {
+          if (!v) return { type: 'separator' };
+          const action = v.azione === 'chiudi-tutti' ? 'avvisi:chiudi-tutti' : `avviso:${v.azione}`;
+          return v.icona ? { label: v.etichetta, icon: v.icona, action } : { label: v.etichetta, action };
+        });
     }
-    if (quante > 1) voci.push({ label: 'Chiudi tutti', action: 'avvisi:chiudi-tutti' });
     const b = this.vista.getBounds();
     const { showPopupMenu } = require('./popup-menu');
     showPopupMenu(this.win, voci, b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
