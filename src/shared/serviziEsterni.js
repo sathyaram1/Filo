@@ -322,7 +322,8 @@
     },
     {
       id: 'trascrizione-youtube', nome: 'YouTube, per la trascrizione di un video',
-      base: ['https://www.youtube.com/watch', 'https://www.youtube.com/api/timedtext', 'https://www.youtube.com/youtubei/v1/get_transcript'],
+      // Dalla pagina la richiesta va all'origine del video (anche youtube.com o m.youtube.com): pagina, traccia e pannello.
+      base: ['https://www.youtube.com', 'https://youtube.com', 'https://m.youtube.com'],
       quando: 'pagina',
       occasione: 'quando apri un video di YouTube, dalla pagina del video coi suoi cookie; senza cookie quando la chat legge un video che non hai aperto',
       riceve: 'la richiesta della trascrizione del video che stai guardando',
