@@ -183,6 +183,22 @@ test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', (
   assert.deepEqual(doppie, [], 'la spiegazione sta nel pezzo condiviso, e il ruolo lo richiama');
 });
 
+// La chiusura «già risolto» la consegnano il primo lavoro e la ripresa. Con due copie, un cambio del comando o della
+// regola dei doppioni in una sola faceva consegnare la ripresa nella forma vecchia, e il server la rifiutava (#2427.1).
+// La rete delle frasi identiche non la vede: comincia con un blocco di codice.
+test('la chiusura «già risolto» sta in un pezzo solo, e la ricevono primo lavoro e ripresa', () => {
+  const COMANDO = /--reason gia_risolto/g;
+  const dove = readdirSync(RUOLI).filter((n) => n.endsWith('.md'))
+    .filter((n) => COMANDO.test(readFileSync(join(RUOLI, n), 'utf8').replace(/\r/g, '')));
+  assert.deepEqual(dove, ['_chiudi-gia-risolto.md']);
+  for (const [chi, testo] of [['primo lavoro', readRoleInstructions('new-work')], ['ripresa', readRoleInstructions('fixer', { caso: 'ripresa' })]]) {
+    const t = testo.replace(/\s+/g, ' ');
+    assert.equal((t.match(COMANDO) || []).length, 1, `${chi}: il comando una volta sola`);
+    assert.match(t, /--doppione-di <numero dell'originale>/, `${chi}: la forma del doppione`);
+    assert.match(t, /se rifiuta \(exit 4\), lavora il feedback come sempre/, `${chi}: cosa fare se il server rifiuta`);
+  }
+});
+
 test('i criteri di consegna sono gli stessi in locale e nelle routine', () => {
   const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
   assert.ok(comune.includes('_criteri-verifica.md'),
