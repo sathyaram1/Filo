@@ -75,9 +75,9 @@ test('se nel turno l\'assistente ha AGITO non c\'è nessun buco', () => {
 
 test('a chi chiede istruzioni le istruzioni si danno: nessuna segnalazione', () => {
   const domande = [
-    'come faccio a ricaricare la pagina?',
-    'dove si trova il pulsante per ricaricare la pagina?',
-    'si può ricaricare la pagina?',
+    'come faccio ad aprire una finestra in incognito?',
+    'dove si trova il pulsante per aprire una finestra in incognito?',
+    'si può aprire una finestra in incognito?',
     'cosa sai fare?',
   ];
   for (const q of domande) {
