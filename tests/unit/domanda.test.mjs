@@ -255,7 +255,7 @@ test('chiedi da una sessione porta il segreto del biglietto locale: la fiducia l
   assert.equal(routine.chiamate.length, 0, 'col biglietto delle routine si passa dal canale, non da ownerDomande');
 });
 
-test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima; le fidate no', async () => {
+test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima; le fidate si nominano senza motivo di sporco', async () => {
   const sporca = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA, fiducia: 'non_fidato' } } });
   assert.equal(await esegui(['mostra', 'D-3'], sporca.io), 0);
   assert.equal(sporca.sporcate.length, 1);
