@@ -126,4 +126,4 @@ async function avvia(id, { lanciatore = lancia, piattaforma = process.platform }
   return r;
 }
 
-module.exports = { leggi, modifica, daChat, avvia, controllaProgramma };
+module.exports = { leggi, modifica, daChat, avvia, controllaProgramma, lancia };
