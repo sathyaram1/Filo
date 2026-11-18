@@ -50,6 +50,6 @@ export function leggiTasto(testo, piattaforma = process.platform) {
   const cifra = /^[0-9]$/.test(nome);
   const key = lettera ? (mod.shift ? nome.toUpperCase() : nome.toLowerCase()) : nome === 'Space' ? ' ' : nome;
   const code = lettera ? `Key${nome.toUpperCase()}` : cifra ? `Digit${nome}` : CODICI_SEGNI[nome] || nome;
-  const playwright = [...Object.keys(NOMI_PLAYWRIGHT).filter((m) => mod[m]).map((m) => NOMI_PLAYWRIGHT[m]), nome].join('+');
+  const playwright = [...Object.keys(NOMI_PLAYWRIGHT).filter((m) => mod[m]).map((m) => NOMI_PLAYWRIGHT[m]), lettera ? key : nome].join('+');
   return { ok: true, playwright, input: { key, code, ...mod } };
 }
