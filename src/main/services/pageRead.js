@@ -597,8 +597,9 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
         const r = await leggiDallaScheda(scheda.wc);
         if (r) {
           const e = await estraiInDisparte(r.html, r.url || url);
-          const letto = { ok: true, url: r.url || url, titolo: e.titolo, testo: e.testo, soloJavaScript: false, lettaInParte: !!r.tagliata };
+          let letto = { ok: true, url: r.url || url, titolo: e.titolo, testo: e.testo, soloJavaScript: false, lettaInParte: !!r.tagliata };
           if (e.testo.trim()) {
+            letto = await conTrascrizione(letto, scheda.wc);
             esito = letto;
             fonte = 'scheda';
             schedeLette.set(chiave, { t: Date.now(), esito: letto });
