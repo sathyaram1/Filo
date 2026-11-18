@@ -323,7 +323,7 @@ test('gli avvisi volati stanno in cima all\'elenco unico, fissi; quello di una c
     ],
   }, null);
   assert.deepEqual(sx.map((v) => [v.chiave, v.tipo, !!v.fissa]), [
-    ['cornice:7', 'cornice', true], ['cornice:5', 'cornice', true], ['timer:t2', 'sveglia' === 'x' ? '' : 'timer', true],
+    ['cornice:7', 'cornice', true], ['cornice:5', 'cornice', true], ['timer:t2', 'timer', true],
   ]);
   assert.equal(sx[0].titolo, 'Errore: la pagina non si apre');
   // «chiudi quell'avviso»: lo trova la chat col nome che usa l'utente.
