@@ -177,7 +177,7 @@ export function comando({ sessione = '', creato, registro = '', strumenti = '' }
     + `const k=${opz};let r;try{r={testo:require("fs").readFileSync(k.fileRegistro,"utf8")}}catch(e){r={errore:String((e&&e.code)||e)}}`
     + 'const imp=(t)=>require("crypto").createHash("sha256").update(t).digest("hex");'
     + 'const o=decidi(i,{...k,registro:r,impronta:imp});if(o)process.stdout.write(JSON.stringify(o))});';
-  return `node -e '${PRELUDIO}const decidi=${decidi};${avvio}'`;
+  return `node -e '${PRELUDIO}const vocePer=${vocePer};const decidi=${decidi};${avvio}'`;
 }
 
 export function dirImpostazioniUtente(env = process.env) {
