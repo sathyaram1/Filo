@@ -34,6 +34,14 @@ test('nella home senza carta: angolo e poi volo, o subito nella colonna col movi
   assert.equal(F.allaScadenza({ home: false }), 'chiudi');
 });
 
+// #2570: la segnalazione automatica parte quando il suo avviso se ne va; nella colonna non se ne andrebbe mai.
+test('nella home un avviso a tempo la cui uscita è attesa resta nell\'angolo e alla scadenza se ne va', () => {
+  assert.equal(F.forma({ davanti: true, home: true, scadenzaAttesa: true }), 'angolo');
+  assert.equal(F.forma({ davanti: true, home: true, riduciMovimento: true, scadenzaAttesa: true }), 'angolo');
+  assert.equal(F.allaScadenza({ home: true, scadenzaAttesa: true }), 'chiudi');
+  assert.equal(F.forma({ davanti: false, home: true, scadenzaAttesa: true }), 'sistema');
+});
+
 test('nella home nessun avviso resta nell\'angolo: anche quelli senza durata ci stanno il tempo di leggerli', () => {
   assert.equal(F.tempoNellAngolo(0, { home: true, letturaMs: 7000 }), 7000);
   assert.equal(F.tempoNellAngolo(0, { home: true, letturaMs: 0 }), 5000);
