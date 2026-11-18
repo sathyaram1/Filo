@@ -227,20 +227,9 @@ test('le immagini di una prova restano dopo che il worktree è stato tolto', () 
   assert.ok(!existsSync(join(dest, 'vecchia.png')), 'un\'immagine di una corsa vecchia non passa per nuova');
 });
 
-test('uno spec che main ha già resta quello di main: il confronto dei rossi non cambia', () => {
-  const root = cartellaTemporanea('filo-specsumain-');
-  const dir = cartellaTemporanea('filo-specsumain-albero-');
-  for (const [d, testo] of [[root, 'ramo'], [dir, 'main']]) {
-    mkdirSync(join(d, 'tests'), { recursive: true });
-    writeFileSync(join(d, 'tests', 'x.spec.mjs'), testo);
-  }
-  assert.deepEqual(portaSpecMancanti({ dir, root, specs: ['tests/x.spec.mjs'] }), { portati: [], assenti: [] });
-  assert.equal(readFileSync(join(dir, 'tests', 'x.spec.mjs'), 'utf8'), 'main');
-});
-
-test('lo strumento porta le prove mancanti prima di correre e tiene le immagini prima di togliere il worktree', () => {
+test('lo strumento porta le prove del ramo prima di correre e tiene le immagini prima di togliere il worktree', () => {
   const src = readFileSync(SCRIPT, 'utf8');
-  const porta = src.indexOf('portaSpecMancanti({ dir: albero.dir');
+  const porta = src.indexOf('portaSpecDelRamo({ root: ROOT');
   const corre = src.indexOf('corri(albero, scelta.specs');
   const tiene = src.indexOf('tieniImmagini({ dir: albero.dir');
   const chiude = src.indexOf('albero.chiudi()');
