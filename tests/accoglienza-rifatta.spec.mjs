@@ -177,6 +177,39 @@ test.describe('utente già accolto', () => {
     expect(JSON.stringify((await onbState(app)).thread)).toContain('sono Anna');
   });
 
+  // #2536 — col profilo davanti il modello lo citava («Bene Luca, geometra») o lo ricopiava nel profilo, divieto o no.
+  test('nell’intervista rifatta il modello non vede la memoria; la chat della carbonara sì, prima e dopo', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Fa il geometra in uno studio tecnico. Ha un gatto, Pepe.', PREFERENZE: 'Preferisce risposte brevi.' });
+      await globalThis.SN_FILO_MEMORY.appendLesson('Ha prenotato un volo per Lisbona.');
+    });
+    const carb = await carbonara(app, shell);
+    const ultimo = () => app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
+    expect(await ultimo(), 'fuori dall’intervista la memoria c’è').toContain('geometra');
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+
+    await queueChat(app, { text: 'Piacere Luca. Come vuoi che ti scriva?', actions: [] });
+    await scrivi(intervista, 'mi chiamo luca, uso il pc x lavoro sopratutto mail e excel');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Piacere Luca' })).toBeVisible({ timeout: 30_000 });
+    const nellIntervista = await ultimo();
+    expect(nellIntervista).toContain('DA SCOPRIRE');
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(nellIntervista, fatto).not.toContain(fatto);
+    await queueChat(app, { text: 'Va bene, ti do del tu.', actions: [] });
+    await scrivi(intervista, 'dammi del tu ovvio');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'ti do del tu' })).toBeVisible({ timeout: 30_000 });
+    expect(await ultimo(), 'anche al secondo turno').not.toContain('geometra');
+
+    // Nell'altra scheda, a intervista ancora aperta, la memoria torna.
+    await shell.locator('.tab').first().click();
+    await queueChat(app, { text: 'Per quattro: 400 g di spaghetti.', actions: [] });
+    await carb.locator('#sendBtn').click();
+    await expect(carb.locator('.dash-bubble-filo', { hasText: 'Per quattro' })).toBeVisible({ timeout: 30_000 });
+    const dopo = await ultimo();
+    expect(dopo).not.toContain('DA SCOPRIRE');
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(dopo, fatto).toContain(fatto);
+  });
+
   test('con l’intervista rifatta aperta altrove, «stop» nella chat della carbonara va al modello e non chiude l’intervista', async ({ app, shell, openTab }) => {
     test.setTimeout(150_000);
     const carb = await carbonara(app, shell);

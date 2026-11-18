@@ -608,10 +608,22 @@ test('#1398 — rifatta o ripresa, il prompt non dice al modello che l’utente 
   const rifatta = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5, onboardingRifatta: true });
   assert.doesNotMatch(rifatta, /appena arrivato|prima conversazione/, 'con memoria e filo davanti, «appena arrivato» è falso');
   assert.match(rifatta, /Non è il primo avvio/);
-  assert.match(rifatta, /non tirare in ballo cose delle conversazioni passate/);
   assert.ok(rifatta.includes(checklist), 'l’elenco arriva lo stesso');
   const intero = C.PROMPTS.filoChat({ capacita: 'x', onboarding: checklist, onboardingRifatta: true });
   assert.match(intero, /Non è il primo avvio/, 'anche dal prompt in un pezzo solo');
+});
+
+test('#2536 — intervista rifatta: il divieto di citare copre la memoria, non solo le conversazioni passate', () => {
+  const checklist = O.renderChecklistForPrompt(O.emptyState());
+  const rifatta = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5, onboardingRifatta: true });
+  // Detto solo delle conversazioni passate, il modello leggeva il profilo come permesso («Bene Luca, geometra»).
+  const divieto = rifatta.match(/Finché dura l'intervista,[^\n]*?conta solo quello che ti dice qui/)?.[0] || '';
+  assert.match(divieto, /dalla MEMORIA o dalle conversazioni passate/, 'il divieto nomina la memoria');
+  assert.match(divieto, /non lo nomini, non glielo attribuisci/, 'né citato né attribuito a lui');
+  assert.match(divieto, /impostazione o in memoria\(impara\)/, 'né riscritto come se l’avesse detto oggi');
+  assert.match(rifatta, /MEMORIA \(profilo e preferenze\)/, 'la memoria è detta con le sue parti, come le vede nel CONTESTO');
+  const primo = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
+  assert.doesNotMatch(primo, /Finché dura l'intervista/, 'al primo avvio la memoria è vuota: niente divieto');
 });
 
 test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {

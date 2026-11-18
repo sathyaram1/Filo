@@ -17,6 +17,7 @@
       fixes: [
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, il tasto destro dato appena aperta la pagina apre il menu invece di andare perso.', segnalazione: 2444 },
         { testo: 'Il menu di «Dai un nome sensato» aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.', segnalazione: 2453 },
+        { testo: 'Quando rifai l\'intervista di benvenuto, Filo parte da quello che gli dici lì: non tira fuori di sua iniziativa quello che ricorda di te e non ti fa dire cose che non hai detto.', segnalazione: 2536 },
       ],
     },
     {

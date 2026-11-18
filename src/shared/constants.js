@@ -2301,11 +2301,13 @@
     // ripaga a ogni messaggio. Anche l'onboarding (#524) sta qui: vale solo nei primi minuti.
     // #1398: rifatta o ripresa, l'intervista ha davanti memoria e filo di un utente noto; dirgli «è appena arrivato»
     // lasciava al modello indovinare perché fosse lì (un «test» che nessuno aveva nominato).
+    // #2536: nell'intervista rifatta la MEMORIA non entra nel CONTESTO (turnoChat); il divieto resta per le conversazioni
+    // passate e per i modelli che la ricordano da un messaggio di prima.
     filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + (onboardingRifatta
-          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la memoria e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato, e non tirare in ballo cose delle conversazioni passate che qui non ha nominato. `
+          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui. Finché dura, la sua MEMORIA (profilo e preferenze) non ce l'hai davanti apposta, e le conversazioni passate qui intorno parlano ancora di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato. Finché dura l'intervista, quello che sai solo dalla MEMORIA o dalle conversazioni passate (il lavoro, le persone, gli animali, i viaggi, i gusti, come vuole le risposte) non lo nomini, non glielo attribuisci («mi hai detto», «so che») e non lo metti in un'impostazione o in memoria(impara): conta solo quello che ti dice qui, e se risponde a metà la parte che manca non la riempi con quello che sai di lui. Il profilo che salvi con memoria(impara) porta solo le sue parole di oggi (se ti ha detto nome e uso del computer, nome e uso del computer e basta). `
           : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
         + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
