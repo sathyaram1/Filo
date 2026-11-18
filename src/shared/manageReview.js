@@ -604,35 +604,33 @@
     return tab;
   }
 
-  // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
-  const ATTESE_CON_DOMANDA = {
-    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto'],
-    aligned: ['origine_chiusa', 'origine_mancante'],
-  };
-  const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
+  // «Aspetta una domanda» è SN_DOMANDE.domandaCheAspetta (src/shared/domande.js): lo stesso conto del server (#2193.1).
+  function DOM() {
+    if (!global.SN_DOMANDE && typeof require === 'function') require('./domande.js');
+    const m = global.SN_DOMANDE;
+    if (!m) throw new Error('SN_DOMANDE mancante: carica shared/domande.js prima di manageReview.js');
+    return m;
+  }
 
   /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
   function domandeBloccantiDi(fb) {
-    const l = fb && fb.domandeBloccanti;
-    return Array.isArray(l) ? l.map(String).filter((id) => DOMANDA_ID_RE.test(id)) : [];
+    return DOM().domandeBloccantiDi(fb);
   }
   function fermoSuDomanda(fb) {
-    return !!fb && !statusUnreadable(fb) && STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status) && domandeBloccantiDi(fb).length > 0;
+    return !!fb && statoCheAspetta(normalizeStatus(fb).status) && !!aspettaDomanda(fb);
   }
 
   /** L'id della domanda che questo feedback aspetta (`D-12`), o '': quella della sua attesa, o la prima che lo ferma in coda. PURA. */
   function aspettaDomanda(fb) {
     if (!fb || statusUnreadable(fb)) return '';
-    if (fermoSuDomanda(fb)) return domandeBloccantiDi(fb)[0];
-    const id = String(fb.domandaId || '');
-    if (!DOMANDA_ID_RE.test(id)) return '';
     const { status, statusReason } = normalizeStatus(fb);
-    const motivi = ATTESE_CON_DOMANDA[status];
-    return motivi && motivi.includes(String(statusReason || '')) ? id : '';
+    return DOM().domandaCheAspetta({ status, statusReason, domandaId: fb.domandaId, domandeBloccanti: fb.domandeBloccanti });
   }
 
   // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
-  const STATI_CHE_ASPETTANO = ['todo', 'revision_capability', 'revision_security'];
+  function statoCheAspetta(status) {
+    return DOM().STATI_CHE_ASPETTANO.includes(status);
+  }
   // `opts.trovaAtteso(id)` → il documento dell'aspettato, se la pagina lo conosce. Senza il modulo nessuna attesa.
   function aspettaAncora(fb, opts) {
     const A = global.SN_FB_ATTESE;
