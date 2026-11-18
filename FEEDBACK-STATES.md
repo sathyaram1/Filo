@@ -394,11 +394,12 @@ senza chiedere la citazione, e mai la propria.
 
 Un **doppione** di un feedback già risolto non ha fusioni che lo citino (#2046): la
 sessione aggiunge `--doppione-di <M>` e il server riceve `doppioneDi`. Lo strumento
-rifiuta solo un numero storto; il server, al posto della citazione del feedback e della
+rifiuta solo un numero storto, con la stessa forma del server (#2046.2); il server, al posto della citazione del feedback e della
 nascita, vuole che la fusione sia di M (cita `#M`, oppure è lo sha registrato alla
 chiusura di M o nomina il suo ramo: l'approvazione dell'owner fonde «finish: <ramo>»
 senza numero), che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
-dell'ultima riapertura del doppione (riaperto dopo, vuol dire non risolto). Il report
+dell'ultima riapertura del doppione e di quella di M (riaperto dopo, vuol dire non risolto; #2046.1). Un
+rifiuto nomina la fusione registrata alla chiusura di M, già provata con le stesse regole, o il suo ramo. Il report
 porta in testa anche la riga «doppione di #M».
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
