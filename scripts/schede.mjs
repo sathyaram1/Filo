@@ -590,7 +590,7 @@ export async function main(argv) {
     const fermo = censimentoMancante({ via: giro.via, indice, schede: leggiSchede(cartella) });
     if (fermo) { console.error(fermo); return 1; }
   }
-  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
+  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella), leggiNonFidati(cartella)), null, 1)); return 0; }
   let restano = 0;
   if (!dryRun) {
     const r = await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
