@@ -22,6 +22,7 @@ import { mkdirSync, rmSync, statSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
