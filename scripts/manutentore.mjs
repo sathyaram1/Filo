@@ -131,6 +131,18 @@ export function senzaChiusi(rami, indice, fuori = {}) {
   });
 }
 
+/**
+ * L'indice locale coi non fidati aperti, che l'elenca tiene fuori (#2337.3): senza, senzaChiusi conterebbe i loro rami
+ * fra i chiusi. Un indice vuoto resta vuoto: senza indice non si sa, e i rami restano tutti. PURA.
+ */
+export function conNonFidati(indice, nonFidati) {
+  const l = Array.isArray(indice) ? indice : [];
+  if (!l.length) return l;
+  const ci = new Set(l.map((f) => String(f.num)));
+  const altri = (nonFidati || []).map((x) => String((x && x.num) || '').replace(/^#/, '')).filter((n) => n && !ci.has(n));
+  return l.concat(altri.map((num) => ({ num })));
+}
+
 /** Un ramo in corso in una riga; uno di filo-security lo dice, e i suoi file portano il prefisso. PURA. */
 export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
