@@ -1186,6 +1186,7 @@ export async function deliver(t, intent, data, opts) {
     id: body && body.id,
     num: body && body.num,
     reply: body && typeof body.reply === 'object' ? body.reply : undefined,
+    prova: body && body.prova && typeof body.prova === 'object' ? body.prova : undefined,
   };
 }
 
