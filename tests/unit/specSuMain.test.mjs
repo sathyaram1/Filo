@@ -62,7 +62,8 @@ const caso = (file, ...stati) => ({ title: 'x', file, tests: stati.map((status) 
 
 test('#2454: uno spec che non è partito non è un rosso, e il verdetto non dice che c\'era già su main', () => {
   const spec = 'tests/verifica/1697.2/giro3-r1-codice.spec.mjs';
-  assert.deepEqual(esitiPerSpec(NESSUN_TEST, [spec]), { [spec]: 'non-corso' });
+  assert.deepEqual(esitiPerSpec(NESSUN_TEST, [spec]), { [spec]: { esito: 'non-corso', rossi: [], motivo: 'Error: No tests found.' } });
+  assert.equal(esitiPerSpec(null, [spec])[spec].esito, 'non-corso');
   assert.equal(motivoDelResoconto(NESSUN_TEST), 'Error: No tests found.');
   assert.equal(motivoDelResoconto(null), 'Playwright non ha lasciato il resoconto');
   const v = verdettoAffiancato({ ramo: 'rosso', main: 'non-corso' });
