@@ -1223,10 +1223,12 @@ export async function operazione(t, op, dati, opts) {
 
 /**
  * La riga di `segnala` riuscita. Un rosso su main già aperto il server lo fa nota (#2226, risposta `nota: true` col
- * numero del feedback che lo copre): la riga lo dice, perché chi l'ha scritta non riprovi né cerchi altrove.
+ * numero del feedback che lo copre): la riga lo dice, perché chi l'ha scritta non riprovi né cerchi altrove. Con
+ * `fusioneAMeta` la nota è sulla pratica fusa a metà, i cui due main non si accordano ancora (#2584).
  */
 export function testoSegnalaRiuscita(body = {}) {
   const dove = body.num || body.id;
+  if (body.nota && body.fusioneAMeta) return `OK: aggiunta come nota a ${dove}, fuso a metà (l'app su main di Filo, il server non ancora): il rosso del server può venire da lì. Non riprovare: se resta dopo la fusione intera lo dice la pubblicazione del server.`;
   if (body.nota) return `OK: aggiunta come nota a ${dove}, che segue già lo stesso rosso su main: non riprovare.`;
   return `OK: segnalazione ${dove} aperta (${body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`;
 }
