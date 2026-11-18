@@ -97,6 +97,16 @@ test('Trascrivi dalla barra: la porzione resta a schermo, una parola selezionata
   await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('4821');
   await strato.screenshot({ path: 'tests/.shots/trascrivi-selezione.png' }).catch(() => {});
 
+  // Il tasto destro sulla selezione ha le azioni del testo, e «Copia» copia la parola.
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await strato.mouse.click(box.x + r0.x + r0.parola + r0.quattro / 2, box.y + r0.y - 12, { button: 'right' });
+  const menu = menuDi(strato).locator('.sn-menu').first();
+  await expect(menu).toBeVisible({ timeout: 5000 });
+  await expect(menu.getByText('Cerca', { exact: false }).first()).toBeVisible();
+  await strato.screenshot({ path: 'tests/.shots/trascrivi-tasto-destro.png' }).catch(() => {});
+  await menu.locator('button', { hasText: /^Copia$/ }).first().click();
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('4821');
+
   await strato.locator('.sn-tr-copia').click();
   await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('Fattura numero 4821\nTotale 1250 euro');
 
