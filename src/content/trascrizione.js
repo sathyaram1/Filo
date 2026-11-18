@@ -100,8 +100,9 @@
     radice.append(scena, barra);
 
     const a = { radice, scena, img, testo, barra, stato, rect, righe: [], copiato: false, nat: null };
+    // Col menu del tasto destro aperto sopra, l'Esc è suo: chiude prima lui.
     a.suTasto = (e) => {
-      if (aperto !== a || e.key !== 'Escape') return;
+      if (aperto !== a || e.key !== 'Escape' || global.SN_MENU?.isOpen?.()) return;
       e.preventDefault();
       e.stopPropagation();
       chiudi();
