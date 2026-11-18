@@ -357,6 +357,8 @@
     onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
+    apriRicerca: () => Cerca.apri(),
+    decoraProfilo: (btn, ic) => decoraProfilo(btn, ic),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
