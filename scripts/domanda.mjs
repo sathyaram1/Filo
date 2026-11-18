@@ -631,13 +631,14 @@ export function lettiDi(ids) {
 }
 
 /**
- * Gli id delle domande fidate per timbri (con radici, senza il sì dell'owner sul testo): non sporcano, ma il server
- * lascia le loro radici alla sessione, perché un timbro tolto la raggiunga (#1918). PURA.
+ * Le domande stampate si nominano tutte: quali radici restano alla sessione (anche da una fidata per timbri, perché un
+ * timbro tolto la raggiunga) lo decide il server, con la sua regola sola (#1918). → la riga da stampare, o ''.
  */
-export function fidatePerTimbri(domande) {
-  return (Array.isArray(domande) ? domande : [])
-    .filter((d) => d && d.fiducia === 'fidato' && Array.isArray(d.radici) && d.radici.length && !(d.fidataDallOwner && typeof d.fidataDallOwner === 'object'))
-    .map((d) => String(d.id || '?'));
+async function sporcaPerLeDomande(sporca, cosa, domande) {
+  const ids = (Array.isArray(domande) ? domande : []).filter(Boolean).map((d) => String(d.id || '?'));
+  if (!ids.length) return '';
+  const nf = nonFidate(domande);
+  return sporca(cosa, [nf.length ? motivoNonFidate(nf) : 'domande lette'], { letti: lettiDi(ids) });
 }
 
 /** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
