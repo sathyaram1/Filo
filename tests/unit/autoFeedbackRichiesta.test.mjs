@@ -84,8 +84,8 @@ test('una domanda di parere è discussione: nessuna segnalazione; una che chiede
     ['mi piacerebbe un mondo senza pubblicità, tu che dici?', 'Sarebbe bello. Non è previsto che Filo blocchi tutto.'],
   ];
   for (const [u, r] of casi) assert.equal(AF.analyzeReply(r, [], u, CAPS).kind, null, u);
-  assert.equal(AF.analyzeReply('Non ho accesso al saldo dei crediti da qui, mi dispiace.', [], 'quanti crediti ho?', CAPS).kind,
-    'capability-gap');
+  assert.equal(AF.analyzeReply('Non ho accesso ai passi che fai durante il giorno: Filo non legge il contapassi del telefono.',
+    [], 'quanti passi ho fatto oggi?', CAPS).kind, 'capability-gap');
 });
 
 // #2364: «Salva la pagina per dopo» esiste e ha il suo strumento: dopo un «non posso» non diventa mai una funzione mancante.
