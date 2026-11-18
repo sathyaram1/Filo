@@ -364,17 +364,14 @@ test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si i
   await voce.click();
   await expect.poll(davanti, { timeout: 8000 }).toBe(cron.id);
 
-  // Un file aperto in una scheda.
-  const dir = cartellaTemporanea('barra-siti-file');
-  const file = path.join(dir, 'appunti.txt');
-  fs.writeFileSync(file, 'appunti');
-  await openTab(pathToFileURL(file).href);
-  const scheda = (await schede(shell)).find((t) => String(t.url).startsWith('file:'));
-  expect(scheda, 'la scheda del file').toBeTruthy();
+  // Una scheda che non è né un sito né una pagina di Filo (qui una vuota, come la consegna il main): resta fuori e lo dice.
   await attiva(shell, casa.id);
   const p = await home(app);
-  await lasciaSullaBarra(app, shell, p, scheda.id);
-  await expect(p.locator('#dashFlash')).toContainText('un file aperto in una scheda non va nella barra');
+  await p.evaluate(() => {
+    const r = document.getElementById('barraRiga').getBoundingClientRect();
+    window.SN_SCHEDA_TRASCINATA.ricevi({ fase: 'lascia', x: r.left + 40, y: r.top + r.height / 2, scheda: { id: 'x', titolo: 'Vuota', url: 'about:blank', icona: '' } });
+  });
+  await expect(p.locator('#dashFlash')).toContainText('«about:blank» non è l\'indirizzo di un sito');
   expect((await salvate(app)).length).toBe(1);
 });
 
