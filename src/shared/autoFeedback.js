@@ -528,6 +528,8 @@
     _isHowtoQuestion: isHowtoQuestion,
     chiedeAzione,
     chiedeInformazione,
+    chiaveInvio,
+    primoInvio,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
