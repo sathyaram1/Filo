@@ -175,7 +175,6 @@ export function ultimoPasso(righe) {
 // Oltre, il guasto diventa un muro: le tracce e i processi in più si contano invece di elencarli.
 export const TRACCE_MOSTRATE = 6;
 export const PROCESSI_MOSTRATI = 3;
-const ora = (ms) => (Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(11, 19)} UTC` : 'ora ignota');
 
 /** Lo strumento chiamato per ultimo fra tutte le tracce, o null. PURA. */
 export function ultimoStrumento(tracce) {
