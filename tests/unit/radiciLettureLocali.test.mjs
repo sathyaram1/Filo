@@ -99,7 +99,8 @@ test('elenco, stampa e registro delle domande nominano al server tutte quelle ch
   for (const [argv, risposta] of casi) {
     const s = spia();
     assert.equal(await esegui(argv, Object.assign({}, base, { chiama: async () => Object.assign({ ok: true }, risposta), sporca: s.sporca })), 0, argv[0]);
-    assert.deepEqual(s.sporcate.map((x) => x.letti), [[{ tipo: 'domanda', id: 'D-2' }]], argv[0]);
+    const attese = argv[0] === 'mostra' ? [{ tipo: 'domanda', id: 'D-2' }] : [{ tipo: 'domanda', id: 'D-1' }, { tipo: 'domanda', id: 'D-2' }];
+    assert.deepEqual(s.sporcate.map((x) => x.letti), [attese], argv[0]);
   }
 });
 
