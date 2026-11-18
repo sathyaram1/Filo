@@ -183,7 +183,7 @@ test('la segnalazione automatica: una sola per voce, e il turno dopo l\'assisten
   expect(visto).toContain(JSON.stringify(voce.text).slice(1, -1));
 });
 
-test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scritta lui (#2348)', async ({ app }) => {
+test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scritta lui (#2348)', async ({ app, avvisi }) => {
   test.setTimeout(60_000);
   const chat = await home(app);
   await spiaSegnalazioni(app);
