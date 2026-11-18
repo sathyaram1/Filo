@@ -344,6 +344,7 @@ module.exports = {
   RIAPRI_SCHEDA: azioneRiapriScheda,
   RIPRENDI_AUDIO: azioneRiprendiAudio,
   PAUSA_AUDIO: azionePausaAudio,
+  TRASCRIVI: azioneTrascrivi,
   MOSTRA_SCHEDA: azioneMostraScheda,
   APRI_SALVATA: azioneApriSalvata,
   LEGGI_PAGINA: azioneLeggiPagina,
