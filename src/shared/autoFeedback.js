@@ -155,16 +155,20 @@
     'riprendi', 'alza', 'abbassa', 'silenzia', 'condividi', 'rinomina', 'sostituisci', 'correggi', 'controlla',
     'calcola', 'converti', 'genera', 'seleziona', 'evidenzia', 'collega', 'scollega', 'accedi', 'esci', 'entra',
     'carica', 'allega', 'usa', 'tieni', 'lascia', 'avvisa', 'sveglia', 'programma', 'svuota', 'pulisci', 'nascondi',
-    'fissa', 'sgancia', 'duplica', 'esporta', 'importa', 'installa', 'disinstalla', 'ascolta', 'guarda',
+    'fissa', 'sgancia', 'duplica', 'esporta', 'importa', 'installa', 'disinstalla', 'ascolta',
   ];
   const ENCLITICHE = '(?:mi|ti|ci|vi|si|lo|la|li|le|ne|gli|glie(?:lo|la|li|le|ne)|me(?:lo|la|li|le|ne)|te(?:lo|la|li|le|ne)|ce(?:lo|la|li|le|ne))?';
-  const RIEMPITIVI = '(?:(?:ok|okay|dai|allora|ora|adesso|poi|e|ma|ecco|filo|bene|perfetto|grazie|ciao|scusa|ehi|hey|si|no|per favore|perfavore|per piacere|ti prego|subito|anche|invece|pure|mi|ci|me lo|me la|ce lo|ce la)\\s+)*';
-  // «fammi», «dammi», «fallo»: imperativi tronchi col raddoppio.
-  const COMANDO_RE = new RegExp(`^${RIEMPITIVI}(?:${VERBI_DI_COMANDO.join('|')})(?:m|l|n|c)?${ENCLITICHE}(?![a-z])`);
-  // Un infinito che non sia «dire» o «spiegare»: chi chiede di spiegare vuole parole, non un'azione.
-  const RICHIESTA_CORTESE_RE = /\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di|devi|dovresti)\s+(?:\S+\s+){0,2}?(?!(?:dir|spiegar|raccontar|descriver|chiarir)(?:e|mi|ti|ci|lo|la|ne|melo|cela)?\b)[a-z]{2,}(?:are|ere|ire|arl[aoie]|erl[aoie]|irl[aoie]|armi|ermi|irmi|arci|erci|irci|arne|erne|irne|armel[aoie]|ercel[aoie])(?![a-z])/;
+  // Niente «sì», «no» né «si»: un «si passa» impersonale non è un comando.
+  const RIEMPITIVI = '(?:(?:ok|okay|dai|allora|ora|adesso|poi|e|ma|ecco|filo|bene|perfetto|grazie|ciao|scusa|ehi|hey|per favore|perfavore|per piacere|ti prego|subito|anche|invece|pure|mi|ci|me lo|me la|ce lo|ce la)\\s+)*';
+  const COMANDO_RE = new RegExp(`^${RIEMPITIVI}(?:${VERBI_DI_COMANDO.join('|')})${ENCLITICHE}(?![a-z])`);
+  // Un infinito di fare, non di dire o di capire: chi chiede di spiegare vuole parole, non un'azione.
+  const INFINITO_DI_FARE = '(?!(?:dir|spiegar|raccontar|descriver|chiarir|capir|saper|conoscer|pensar|parlar|discuter|rifletter|ragionar|creder|esser|aver)[a-z]*(?![a-z]))'
+    + '[a-z]{2,}(?:are|ere|ire|(?:ar|er|ir)(?:mi|ti|ci|vi|lo|la|li|le|ne|gli|melo|mela|meli|mele|celo|cela|glielo|gliela))(?![a-z])';
+  const RICHIESTA_CORTESE_RE = new RegExp('\\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di)\\s+(?:[a-z\']+\\s+){0,2}?'
+    + INFINITO_DI_FARE);
   const RICHIESTA_CHE_RE = /\b(?:vorrei|voglio|mi piacerebbe|ho bisogno|mi serve) che\b/;
-  const INTERROGATIVI_RE = /^(?:(?:e|ma|ok|allora|filo|scusa)\s+)*(?:quant[aeio]|qual[ei]?|chi|cosa|che cosa|quando|dove|perche|come|hai|ho|sai|c'e|ci sono|esiste|esistono|mi dici|dimmi|elenca|elencami)\b/;
+  // Senza punto di domanda valgono solo gli attacchi che non aprono mai una riflessione.
+  const INTERROGATIVI_RE = /^(?:(?:e|ma|ok|allora|filo|scusa)\s+)*(?:quant[aeio]|qual[ei]|mi dici|dimmi|elenca|elencami)(?![a-z])/;
 
   function frasiDi(text) {
     return normalizzaDomanda(text).split(/[\n.!;:,]+|\?+/).map((s) => s.trim()).filter(Boolean);
