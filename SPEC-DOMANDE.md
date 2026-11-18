@@ -335,9 +335,10 @@ Le regole del calcolo, tutte sul server:
 
 Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
 `segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.
-«Segna fidato» su un feedback timbra il suo testo (`feedback:<seq>`) e le radici
-solo sue. Un derivato (#N.k) non ha un testo d'utente suo: `feedback:N` è il
-testo di #N, e il sì sul derivato non lo timbra. Se ne restano altre (non `ignota`), il sì dell'owner fa fidato quel
+«Segna fidato» su un feedback timbra il suo testo (`feedback:<id>`) e le radici
+solo sue. Un derivato (#N.k) che porta la radice di #N non la timbra: è il
+testo di #N. Una sessione che dichiara di aver letto «#N» prende le radici di
+tutti i feedback con quel numero. Se ne restano altre (non `ignota`), il sì dell'owner fa fidato quel
 feedback e le lascia scritte in `radiciSuperate`, senza timbrarle per gli altri.
 Una radice senza un ricalcolo che la trovi non esiste: chi abbassa la fiducia di
 un documento che ha radici gliene aggiunge una.
