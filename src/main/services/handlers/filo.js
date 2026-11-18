@@ -105,7 +105,7 @@ module.exports = function register(on, ctx) {
     if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a)) {
       azione = { ...AS.soloQuesti(a, isFilo(origin) && Array.isArray(msg.allegatiScelti) ? msg.allegatiScelti : []), _allegatiIndicati: true };
     }
-    const r = await executeFiloAction(azione, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId });
+    const r = await executeFiloAction(azione, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId, nelFilo: 'conferma' });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
