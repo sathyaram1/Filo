@@ -106,14 +106,13 @@ export async function confermaSopraPagina(app, { timeout = 10_000 } = {}) {
 // Codice nel mondo isolato del preload di una scheda web, dove vivono i content script di Filo:
 // page.evaluate gira nel mondo della pagina e non ci arriva. `host` è l'hostname della scheda.
 export function nelMondoDiFilo(app, host, code) {
-  return app.evaluate(async ({ BrowserWindow }, { host, code }) => {
+  return app.evaluate(async ({ BrowserWindow }, { host, code, mondo }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const t = (w._filoTabs?.tabs || []).find((x) => {
         try { return new URL(x.view.webContents.getURL()).hostname === host; } catch (_) { return false; }
       });
-      // 999 è il mondo isolato dei preload di Electron.
-      if (t) return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+      if (t) return t.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [{ code }]);
     }
     throw new Error(`nelMondoDiFilo: nessuna scheda su ${host}`);
-  }, { host, code });
+  }, { host, code, mondo: MONDO_CONTENT_SCRIPT });
 }
