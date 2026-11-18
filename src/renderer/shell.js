@@ -1893,8 +1893,10 @@
       const t = qui === 'fuori' ? ms : FORMA.tempoNellAngolo(ms, { home: inHome(), letturaMs: lettura() });
       card._tempo = tempi.avvia(t, () => scaduta(card));
     }
+    // A tempo, e qualcuno aspetta che se ne vada (#2570): la sua scadenza è la sua chiusura, anche nella home.
+    const scadenzaAttesa = (card) => typeof card._alChiudere === 'function' && card._durata > 0;
     function scaduta(card) {
-      if (luogo(card) === 'angolo' && FORMA.allaScadenza({ home: inHome() }) === 'vola') vola(card);
+      if (luogo(card) === 'angolo' && FORMA.allaScadenza({ home: inHome(), scadenzaAttesa: scadenzaAttesa(card) }) === 'vola') vola(card);
       else dismiss(card, 'scaduta');
     }
     // Il volo lo disegna la home (dall'angolo alla cima della colonna): qui l'avviso cambia solo posto.
