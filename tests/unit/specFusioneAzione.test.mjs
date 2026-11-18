@@ -14,6 +14,7 @@ import { unisciParti } from '../../scripts/unit-fusione-azione.mjs';
 import { conGliSpec, richiestaDispatch } from '../../scripts/lib/prova-remota.mjs';
 import { COMANDI_DI_ACTIONS } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
 
