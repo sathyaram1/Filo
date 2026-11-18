@@ -12,6 +12,8 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaCartella, testoAttesa, FETTA_MS, USCITA_LIBERA } from '../../scripts/lib/aspetta-cartella.mjs';
 import { USCITA_LAVORO_VIVO } from '../../scripts/lib/branch-integrity.mjs';
 import { FETTA_MS as FETTA_VEGLIA_MS } from '../../scripts/lib/veglia-worker.mjs';
+import { ambientePerITest } from '../../scripts/run-unit-tests.mjs';
+import { cartellaCloneServer } from '../../scripts/lib/git-server.mjs';
 
 const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CANALE = join(RADICE, 'scripts', 'routine-channel.mjs');
