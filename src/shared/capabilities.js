@@ -304,9 +304,10 @@
       doesNot: 'Il nome automatico vale per le catture fatte in Filo; per i file che hai già sul computer c’è «Dai un nome sensato». Si spegne in Preferenze, «Dai un nome a screenshot e immagini copiate guardandole» (sezione «Nomi dei file scaricati»), o chiedendolo a Filo: da spento l’immagine non va a nessun modello.',
     },
     {
-      id: 'ocr', title: 'Trascrivi testo da una porzione', category: 'media',
-      desc: 'Selezioni un’area dello schermo e ne estrae il testo, copiandolo negli appunti.',
-      invoke: 'Icona «Trascrivi» in «Altro…» della barra laterale.',
+      id: 'ocr', title: 'Trascrivi il testo di una porzione o di un’immagine', category: 'media',
+      desc: 'Selezioni un’area della pagina, o scegli un’immagine, e resta a schermo com’era con sopra il suo testo, trasparente e selezionabile parola per parola come in un PDF: selezioni col mouse solo il pezzo che ti serve e Ctrl+C (Cmd+C su Mac) lo copia; «Copia tutto» copia il testo intero; il tasto destro sulla selezione ha le azioni del testo (copia, traduci, cerca, leggi, spiega); Esc o un clic fuori chiude. Mentre legge, sotto l’immagine gira la rotella. Dove sta ogni riga lo dice il modello che legge il testo; dentro la riga le parole si allineano da sole. Il modello si cambia nei modelli predefiniti, alla voce «Trascrivi immagine (OCR)».',
+      invoke: 'Icona «Trascrivi» in «Altro…» della barra laterale, o voce «Trascrivi» del tasto destro su un’immagine di una pagina o dell’Editor. A parole: chiedi a Filo di trascrivere una porzione, o nell’Aiuto di trascrivere un’immagine della pagina.',
+      doesNot: 'Non trascrive video, audio o file sul computer: per un file, aprilo in Filo e trascrivi da lì. Se il modello scelto non dice dove sta il testo, le righe si mettono una sotto l’altra sull’immagine: si selezionano e si copiano lo stesso.',
     },
     {
       id: 'color-picker', title: 'Contagocce colore', category: 'media',
