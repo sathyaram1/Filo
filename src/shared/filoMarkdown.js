@@ -164,15 +164,19 @@
 
   // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
   // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
-  function render(text) {
+  function render(text, { fonti = null } = {}) {
+    const F = global.SN_FONTI_CITATE;
+    const conFonti = F && Array.isArray(fonti) && fonti.length ? F.conPosti(text, fonti) : null;
+    const etichette = conFonti ? conFonti.fonti : null;
+    const riga = (s) => inlineMd(s, etichette);
     const out = [];
-    for (const b of blocchi(text)) {
-      if (b.k === 'p') out.push('<p>' + b.righe.map(inlineMd).join('<br>') + '</p>');
-      else if (b.k === 'h') out.push('<h' + b.livello + '>' + inlineMd(b.riga) + '</h' + b.livello + '>');
-      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n') + '</code></pre>');
+    for (const b of blocchi(conFonti ? conFonti.text : text)) {
+      if (b.k === 'p') out.push('<p>' + b.righe.map(riga).join('<br>') + '</p>');
+      else if (b.k === 'h') out.push('<h' + b.livello + '>' + riga(b.riga) + '</h' + b.livello + '>');
+      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n').replace(POSTO_FONTE, '') + '</code></pre>');
       else {
         out.push(b.k === 'ol' && b.da !== 1 ? '<ol start="' + b.da + '">' : '<' + b.k + '>');
-        for (const v of b.voci) out.push('<li>' + inlineMd(v) + '</li>');
+        for (const v of b.voci) out.push('<li>' + riga(v) + '</li>');
         out.push('</' + b.k + '>');
       }
     }
