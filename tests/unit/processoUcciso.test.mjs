@@ -240,7 +240,7 @@ describe('il guasto di un processo ucciso', () => {
   test('per il worker: cosa è morto, dove, la memoria, e il --guasto già scritto da copiare', () => {
     const adesso = letturaMemoria(leggiDa(contenitore({ oomCmd: 2, oomSis: 2 })));
     const g = guastoDellaCorsa(segno, adesso);
-    assert.match(g, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01 UTC, partito alle 18:40 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
+    assert.match(g, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
     assert.match(g, /da allora: 2 nella macchina, 2 fra i comandi\.$/);
     const t = testoPerIlWorker(segno, adesso);
     assert.match(t, /^La corsa di finish:check è morta senza finire: processo ucciso \(137\)/);
