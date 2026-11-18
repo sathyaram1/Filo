@@ -20,7 +20,7 @@ const SENZA = 'senzaSottot';
 const lettore = (id) => ({
   playabilityStatus: { status: 'OK' },
   videoDetails: { videoId: id, title: id === CON ? 'Il pane in casa' : 'Un video muto' },
-  ...(id === CON ? { captions: { playerCaptionsTracklistRenderer: { captionTracks: [
+  ...(id !== SENZA ? { captions: { playerCaptionsTracklistRenderer: { captionTracks: [
     { baseUrl: `/api/timedtext?v=${id}&lang=it&kind=asr`, languageCode: 'it', kind: 'asr', name: { simpleText: 'Italiano (generati automaticamente)' } },
   ] } } } : {}),
 });
