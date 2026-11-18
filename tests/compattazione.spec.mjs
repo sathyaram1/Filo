@@ -626,6 +626,11 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
       // La compattazione in anticipo parte dopo la risposta: le si dà il tempo di finire.
       await page.waitForTimeout(1500);
       perMessaggio.push((await app.evaluate(() => globalThis.__compattazioni)).map((c) => c.motivo));
+      console.log('DEBUG lim', i, JSON.stringify(await app.evaluate(async () => {
+        const C = globalThis.SN_COMPATTAZIONE; const l = await C.limiti(false);
+        const lista = await C._daCompattare?.(false, {});
+        return { ...l, n: lista ? lista.length : null };
+      })));
     }
   } finally {
     await rimettiCompattatore(app);
