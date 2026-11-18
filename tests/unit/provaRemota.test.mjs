@@ -185,7 +185,7 @@ test('le pause dei tentativi restano dentro i tetti di tempo dell\'attesa', asyn
     throw errore(500);
   };
   const p = await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api }, { ...o, tettoCorsa: 45000, scrivi: () => {} });
-  assert.match(p.errore, /non riesco a leggere il registro della corsa \(GitHub risponde 500\), nemmeno dopo 2 tentativi/);
+  assert.match(p.errore, /non riesco a leggere il registro della corsa \(GitHub risponde 500\), nemmeno dopo 3 tentativi/);
   assert.equal(p.remota.url, 'https://g/1');
   assert.ok(o.adesso() <= 45000, `ha aspettato ${o.adesso()} ms oltre il tetto`);
 
