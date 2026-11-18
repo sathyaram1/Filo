@@ -213,7 +213,8 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   expect(disco).not.toContain('segreto incognito');
   // Gli eventi del filo non stanno in storage.json: il file del filo va guardato a parte.
   const fileFilo = join(userData, 'filo', 'eventi.jsonl');
-  expect(existsSync(fileFilo) ? readFileSync(fileFilo, 'utf8') : '').not.toContain('segreto incognito');
+  expect(existsSync(fileFilo), 'il filo normale è su disco: configura() ha cambiato le impostazioni').toBe(true);
+  expect(readFileSync(fileFilo, 'utf8')).not.toContain('segreto incognito');
   const normale = await registro(app);
   expect(JSON.stringify(normale)).not.toContain('segreto incognito');
   const dentro = await app.evaluate(() => globalThis.__filoStorage.runIncognito(() => globalThis.SN_REGISTRO_CAMBI.lista()));
