@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
 const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria } = await import('../../scripts/lib/memoria-contenitore.mjs');
