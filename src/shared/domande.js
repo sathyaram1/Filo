@@ -624,6 +624,32 @@
     return m ? Number(m[1]) : null;
   }
 
+  // «La pratica aspetta una domanda», un conto solo per la Gestione e per il server (#2193.1). Fermano un lavoro in
+  // coda le domande in `domandeBloccanti` (#1577); una fermata la sua `domandaId`, se è un'attesa che ne apre una.
+  const STATI_CHE_ASPETTANO = Object.freeze(['todo', 'revision_capability', 'revision_security']);
+  const ATTESE_CON_DOMANDA = Object.freeze({
+    design: Object.freeze(['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto']),
+    aligned: Object.freeze(['origine_chiusa', 'origine_mancante']),
+  });
+  /** Le domande aperte che il server ha scritto come fermo del lavoro (`domandeBloccanti`), solo id validi. PURA. */
+  function domandeBloccantiDi(fb) {
+    const l = fb && fb.domandeBloccanti;
+    return Array.isArray(l) ? l.map(String).filter((id) => ID_RE.test(id)) : [];
+  }
+  /**
+   * L'id della domanda che la pratica aspetta (`D-12`), o ''. `fb.status` e `fb.statusReason` già in chiaro e
+   * canonici: chi ha lo stato illeggibile non chiede. PURA.
+   */
+  function domandaCheAspetta(fb) {
+    if (!fb) return '';
+    const status = String(fb.status || '');
+    const bloccanti = domandeBloccantiDi(fb);
+    if (bloccanti.length && STATI_CHE_ASPETTANO.includes(status)) return bloccanti[0];
+    const id = String(fb.domandaId || '');
+    const motivi = ATTESE_CON_DOMANDA[status];
+    return ID_RE.test(id) && motivi && motivi.includes(String(fb.statusReason || '')) ? id : '';
+  }
+
   // «Discutiamone» (SPEC-SEDI §4.5): con la parola d'ordine «owner non fidato» davanti, una sola incollata apre la
   // sessione cloud con tutto quello che serve; senza, resta la riga per una sessione locale.
   function rigaDiscuti(id) { return `Discutiamo la domanda ${id}`; }
