@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { esitiPerSpec, motivoDelResoconto, portaSpecDelRamo, specDaArgomenti, verdettoAffiancato } from '../../scripts/spec-su-main.mjs';
+import { esitiPerSpec, motivoDelResoconto, portaSpecDelRamo, specDaArgomenti, specDaRifareDaSoli, verdettoAffiancato } from '../../scripts/spec-su-main.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
