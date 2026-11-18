@@ -10,7 +10,10 @@
 //   page.evaluate. Sulle pagine web esterne gli hook vivono nel mondo isolato
 //   del preload e NON sono raggiungibili dalla pagina.
 
+import { createRequire } from 'node:module';
 import { expect } from '../fixtures/electron.mjs';
+
+const { MONDO: MONDO_CONTENT_SCRIPT } = createRequire(import.meta.url)('../../src/preload/mondo-esente.js');
 
 export const CONFIRM_HOST = '.sn-confirm-host';
 
