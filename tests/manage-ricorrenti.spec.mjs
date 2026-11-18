@@ -215,6 +215,28 @@ test('il tetto di costo per corsa: automatico dalla mediana, scritto dall\'owner
   expect((await inviati(page, 'ricorrente_salva')).pop().ricorrente.tettoUsd).toBeNull();
 });
 
+// #2303.1: la corsa fermata oltre il tetto lascia il suo rapporto parziale, e la scheda lo dice; il tetto automatico
+// conta solo le corse finite col rapporto.
+test('il rapporto parziale di una corsa fermata si legge come tale, e la regola del tetto lo dice', async ({ openTab }) => {
+  const parziale = Object.assign({}, REVISIONE, {
+    tetto: { usd: 0, da: '', mediana: 0, corse: 0 },
+    istanza: { id: 'C-13', stato: 'fatto', esito: 'oltre il tetto: 121,50 $ su 120,00 $', creatoIl: ORA - 300 * MIN, nonPrimaDi: ORA - 300 * MIN, chiusoIl: ORA - 250 * MIN },
+    rapporto: { testo: 'A metà: 25 di 50, riparti da #900.', fiducia: 'fidato', scrittoIl: LUNEDI_6 - 24 * 60 * MIN + 41 * MIN, compitoId: 'C-13', parziale: true },
+  });
+  const page = await apri(openTab, { ricorrenti: [parziale, POTATURA] });
+  const r = riga(page, 'rev-domande');
+  await expect(r).toContainText('ultima istanza C-13, fatto: oltre il tetto: 121,50 $ su 120,00 $');
+  const b = r.locator('.mg-rc-rapporto-apri');
+  await expect(b).toHaveText(/^Rapporto parziale di C-13 · dom 25\/10 06:41/);
+  await expect(b).toHaveAttribute('title', 'Dove era arrivata l’ultima istanza: la prossima riparte da qui');
+  await b.click();
+  await expect(r.locator('.mg-rc-rapporto-testo')).toHaveText('A metà: 25 di 50, riparti da #900.');
+  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /la prossima riparte dal suo rapporto parziale\. Vuoto: il doppio della mediana delle ultime corse finite col rapporto\. Nessuna corsa finita col rapporto ancora/);
+  await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-rapporto-parziale.png', fullPage: true });
+  // Un rapporto finale resta «Rapporto», senza la parola in più.
+  await expect(riga(page, 'potatura').locator('.mg-rc-rapporto')).toHaveCount(0);
+});
+
 test('un rifiuto del server si legge accanto al modulo col suo dettaglio, e quello scritto resta', async ({ openTab }) => {
   const page = await apri(openTab, { rifiuta: 'il nome «Potatura dei rami» è già di un altro ricorrente' });
   const r = riga(page, 'rev-domande');
