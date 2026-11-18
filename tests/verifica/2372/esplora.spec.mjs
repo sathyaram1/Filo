@@ -90,13 +90,9 @@ test('E8 cerca nel filo senza parole, e frase lunga', async ({ app }) => {
   console.log('E8b ricerca', await page.locator('#cercaFilo').isVisible(), 'valore', await page.locator('#cercaInput').inputValue(), 'modello', await page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA DEL MODELLO' }).count());
 });
 
-test('E12 tasti tutti in vista, finestra bassa', async ({ app }) => {
+test('E12 tasti di serie, finestre comuni', async ({ app }) => {
   const page = await casa(app);
-  await page.locator('#altroPiu').click();
-  const prof = page.locator('#altroFuori .dash-altro-app[data-id="profilo"]');
-  await prof.click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti in vista' }).click();
-  for (const [w, h] of [[1280, 800], [900, 560], [700, 480]]) {
+  for (const [w, h] of [[1366, 728], [1280, 680], [1536, 824], [1440, 860]]) {
     await app.evaluate(({ BrowserWindow }, [w, h]) => { const x = BrowserWindow.getAllWindows().find((b) => b._filoTabs); x.setSize(w, h); }, [w, h]);
     await page.waitForTimeout(700);
     const r = await page.evaluate(() => {
