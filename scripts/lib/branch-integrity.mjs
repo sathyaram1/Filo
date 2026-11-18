@@ -33,7 +33,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync, readlinkSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
-import { ensureCommentChar } from './carattere-commento.mjs';
+import { preparaCopia } from './prepara-copia.mjs';
 import { senzaToken, cartellaCloneServer } from './git-server.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
@@ -672,7 +672,7 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   ensureSessionExcludes(root);
   // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
-  ensureCommentChar(root);
+  preparaCopia(root);
 
   // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
   // rinascerebbe da main accanto al lavoro già spinto (#1632).

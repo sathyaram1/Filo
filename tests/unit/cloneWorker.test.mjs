@@ -19,6 +19,7 @@ import { fileBlocco } from '../../scripts/lib/pacchetti.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
 import { carattereSicuro } from '../../scripts/lib/carattere-commento.mjs';
+import { COMANDO as COMANDO_DRIVER, NOME as NOME_DRIVER } from '../../scripts/lib/driver-novita.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -76,6 +77,7 @@ test('il clone nasce con l\'origin VERO del principale, node_modules collegato, 
     assert.deepEqual(datiWorker({ env: {}, root: dest }), { indice: 1, paralleli: 3 });
     assert.equal(git(dest, ['status', '--porcelain']), '', 'ne\' il marcatore ne\' il collegamento finiscono in un commit');
     assert.ok(carattereSicuro(git(dest, ['config', '--get', 'core.commentChar'])), 'i titoli `#n` sopravvivono a un rebase nel clone (#762)');
+    assert.equal(git(dest, ['config', '--get', `merge.${NOME_DRIVER}.driver`]), COMANDO_DRIVER, 'nel rebase il registro delle novità si unisce da sé (#2224)');
     assert.deepEqual(elencoCloni(s.principale).map((c) => [c.indice, resolve(c.cartella)]), [[1, dest]], 'il registro lo conosce');
     assert.ok(cartellaRegistro(s.principale).startsWith(resolve(s.principale, '.git')), 'e sta dentro la .git del principale');
     assert.equal(r.strumenti, pinnedDirWorker(1, s.basePin));

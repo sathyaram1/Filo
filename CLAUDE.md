@@ -239,7 +239,8 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
   versione uscita non la vede chi aggiorna. Se esce su main mentre il ramo
   aspetta, le righe le sposta da sé la fusione con main, e un conflitto sul
   solo registro lo risolve lei tenendo le righe dei due lati
-  (`src/shared/novitaFusione.js`; dopo un rebase `scripts/novita-in-cima.mjs`):
+  (`src/shared/novitaFusione.js`; nel rebase il driver di git
+  `scripts/novita-driver.mjs`, dopo un rebase `scripts/novita-in-cima.mjs`):
   non si rincorre. Sentinella:
   `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità

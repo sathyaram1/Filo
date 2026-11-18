@@ -8,7 +8,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSy
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
-import { ensureCommentChar } from './carattere-commento.mjs';
+import { preparaCopia } from './prepara-copia.mjs';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
 import {
@@ -336,7 +336,7 @@ export function preparaClone(principale, n, {
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
   try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
-  ensureCommentChar(dir);
+  preparaCopia(dir);
 
   const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
   if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
