@@ -59,9 +59,10 @@ async function apriEMisura(app, pagina, clic, testo, arg = null) {
   return { ms, ...(await infoMenu(app)) };
 }
 
+// I comandi della shell sono tasti di «altro» (#2372): Impostazioni in vista, il Profilo nel «+».
 const clicSullaHome = (comando) => {
   const t = Date.now();
-  document.querySelector(`#dashControls .dash-ctrl[data-command="${comando}"]`).click();
+  document.querySelector(`#altro .dash-altro-app[data-id="${comando === 'account' ? 'profilo' : 'impostazioni'}"]`).click();
   return t;
 };
 
