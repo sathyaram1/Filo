@@ -169,7 +169,7 @@
       const citazione = togliVirgolette(campi[1]);
       const traduzione = togliVirgolette(campi.slice(2).join('|'));
       let frase = '';
-      for (const s of [pagina, ...viste.filter((x) => x !== pagina)]) { frase = trova(citazione, s.testo); if (frase) break; }
+      for (const s of [pagina, ...viste.filter((x) => x !== pagina)]) { frase = trova(citazione, s.testo, normaleDi(s)); if (frase) break; }
       const pos = /\n$/.test(out) ? out.replace(/\s+$/, '').length : out.length;
       fonti.push({
         pos, url: pagina.url, tipo: pagina.tipo, sito: nomeSito(pagina.url),
