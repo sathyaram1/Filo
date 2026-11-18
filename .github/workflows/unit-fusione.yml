@@ -166,7 +166,7 @@ jobs:
 
       - name: Binario di Electron
         working-directory: prova
-        run: node scripts/ensure-electron.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs scripts/ensure-electron.mjs
 
       - name: Schermo virtuale (xvfb)
         run: |
