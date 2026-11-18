@@ -7,7 +7,8 @@
   function etichetta(x) {
     if (x.tipo === 'legacy') return 'nato prima';
     if (x.tipo === 'ignota') return 'provenienza ignota';
-    if (x.tipo === 'feedback') return `#${x.valore}`;
+    // La radice è l'id del documento (il numero lo sceglie chi manda); il server affianca il numero, che l'owner riconosce.
+    if (x.tipo === 'feedback') return `#${x.numero || x.valore}`;
     // Quello che una sessione dichiara arriva come segno (#…), col nome a parte: sul cartellino il nome.
     const valore = x.nome ? String(x.nome).slice(String(x.nome).indexOf(':') + 1) : x.valore;
     if (x.tipo === 'web') {
