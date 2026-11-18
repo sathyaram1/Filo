@@ -276,7 +276,8 @@ for (const fine of ['finito', 'non riuscito']) {
       await expect(carta).not.toHaveClass(/dash-notare/);
 
       if (fine === 'finito') s.finisci(); else s.rompi();
-      await expect.poll(() => statoScaricamento(shell, nome), { timeout: 20_000 }).toBe(fine === 'finito' ? 'completed' : 'interrupted');
+      // Un fallimento aspetta la finestra di grazia della ripresa automatica (20 secondi, services/downloads.js).
+      await expect.poll(() => statoScaricamento(shell, nome), { timeout: 45_000 }).toBe(fine === 'finito' ? 'completed' : 'interrupted');
       await expect(carta).toHaveClass(/dash-notare/, { timeout: 5_000 });
       await expect(home.locator('#accade > .dash-carta[data-tipo="cornice"]')).toHaveCount(0);
       await expect(nellAngolo(shell)).toHaveCount(0);
