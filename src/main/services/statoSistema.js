@@ -659,7 +659,7 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
         const riga = buffer.slice(0, a);
         buffer = buffer.slice(a + 1);
         const e = elencoDaRiga(riga);
-        if (e) { consegna(e.cosa, e); continue; }
+        if (e) { questo.muto = false; consegna(e.cosa, e); continue; }
         const d = datiDaWindows(riga);
         if (d) { ultimo = d; quando = Date.now(); fresco = true; guasti = 0; sveglia(); quandoCambia(); }
       }
