@@ -66,9 +66,6 @@
   // Il nome come lo apre il sistema, a cui si guarda l'estensione: senza segni invisibili, punti e spazi in coda.
   function nomeVero(nome) {
     return nomeVisibile(nome).replace(/[.\s ]+$/, '');
-    const i = s.lastIndexOf('.');
-    if (i <= 0) return '';
-    return s.slice(i + 1).toLowerCase();
   }
 
   // Conta l'ULTIMA estensione: `foto.jpg.exe` è un programma, non una foto.
