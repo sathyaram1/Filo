@@ -12,6 +12,7 @@ const CACHE_MAX = 30;
 const MONDO_ISOLATO = 1837;
 const HOST_VIDEO = new Set(['www.youtube.com', 'youtube.com', 'm.youtube.com']);
 const ORIGINE = 'https://www.youtube.com';
+const HOST_BREVE = 'youtu.be';
 
 function idVideo(indirizzo) {
   let u;
