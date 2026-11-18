@@ -96,9 +96,10 @@ test('esplora: trascinamento su due parole, Ctrl+A, menu della selezione', async
   const a = await page.evaluate(() => window.prima('Fattura numero 4821', 'numero'));
   const strato = await apriSuImmagine(app, page);
   await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  // Da «numero» della prima riga a metà di «Totale» della seconda.
   await strato.mouse.move(box.x + 20 + a.a + 1, box.y + 40);
   await strato.mouse.down();
-  await strato.mouse.move(box.x + 20 + a.a + a.w + 60, box.y + 40, { steps: 6 });
+  await strato.mouse.move(box.x + 20 + 200, box.y + 90, { steps: 6 });
   await strato.mouse.up();
   await strato.keyboard.press('ControlOrMeta+c');
   await page.waitForTimeout(400);
