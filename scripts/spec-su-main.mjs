@@ -1,8 +1,8 @@
 // Uno o più spec sul ramo e su origin/main appena scaricata, uno accanto all'altro e senza ripetizioni: dice se un
-// rosso è del ramo o c'era già (#1290, #1985, #2237.6). Non tocca la cartella: due worktree staccati, tolti alla fine.
-// Prove: tests/unit/specSuMain.test.mjs.
+// rosso è del ramo o c'era già, e dà il prima e il dopo di una schermata (#1290, #1985, #2237.6, #2384.1). Non tocca la
+// cartella: due worktree staccati, tolti alla fine; le immagini restano. Prove: tests/unit/specSuMain.test.mjs.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aggiornaMain, testoBaseMain } from './finish-local.mjs';
@@ -13,6 +13,9 @@ import { FUORI_DAI_CASI, normalizzaSpec, primaRiga, raccogliCasi, verdetto } fro
 
 // Dalla copia fissata degli strumenti il progetto vero lo dice la copia, come per gli altri strumenti dei ruoli.
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+
+// Sotto tests/.shots/, che git ignora: il prima e il dopo restano da guardare dopo che i worktree se ne sono andati.
+export const CARTELLA_CONFRONTO = join('tests', '.shots', 'confronto');
 
 /** Gli spec chiesti, nella forma `tests/<nome>.spec.mjs`; `errore` se uno non ha quella forma. PURA. */
 export function specDaArgomenti(args) {
@@ -151,6 +154,34 @@ function corriUnaVolta(albero, specs) {
   return { esiti: esitiPerSpec(report, specs), lancioFallito: false };
 }
 
+function contaFile(dir) {
+  let n = 0;
+  for (const v of readdirSync(dir, { withFileTypes: true })) n += v.isDirectory() ? contaFile(join(dir, v.name)) : 1;
+  return n;
+}
+
+/**
+ * Copia in `dest` ogni cartella `.shots` sotto tests/ dell'albero (tests/.shots e quelle accanto agli spec, come
+ * tests/verifica/<n>/.shots), con il percorso che avevano. `dest` si svuota prima: un'immagine vecchia non passa per
+ * nuova. Mai un throw. @returns {number} i file copiati
+ */
+export function tieniImmagini({ dir, dest }) {
+  try { rmSync(dest, { recursive: true, force: true }); } catch (_) { /* resta il vecchio: lo copre la copia sotto */ }
+  let n = 0;
+  const visita = (d, rel) => {
+    let voci;
+    try { voci = readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+    for (const v of voci) {
+      if (!v.isDirectory() || v.name === 'node_modules') continue;
+      const sotto = join(d, v.name);
+      if (v.name !== '.shots') { visita(sotto, join(rel, v.name)); continue; }
+      try { cpSync(sotto, join(dest, rel), { recursive: true }); n += contaFile(sotto); } catch (_) { /* le altre si tengono lo stesso */ }
+    }
+  };
+  visita(join(dir, 'tests'), '');
+  return n;
+}
+
 function corri(albero, specs, etichetta) {
   process.stdout.write(`\n▸ ${etichetta}: ${specs.join(' ')} (senza ripetizioni)\n`);
   const prima = corriUnaVolta(albero, specs);
@@ -174,15 +205,18 @@ function main() {
   console.log(testoBaseMain({ base: 'origin/main', sha: shaMain, fetchOk }));
   const corse = {};
   let copie = { portati: [], mancaSulRamo: [] };
+  const immagini = {};
   for (const [chi, sha] of [['ramo', shaRamo], ['main', shaMain]]) {
     const albero = apriProvaSulCommit({ root: ROOT, sha });
     if (albero.errore) { console.error(`✗ ${albero.errore}`); process.exit(1); }
+    const etichetta = `${chi === 'ramo' ? 'Sul ramo' : 'Su origin/main'} ${sha.slice(0, 8)}`;
     try {
       if (chi === 'main') {
         copie = portaSpecDelRamo({ root: ROOT, shaRamo, shaMain, specs: scelta.specs, dir: albero.dir });
         for (const p of copie.portati) console.log(`  ${p.spec}: su main ${p.motivo === 'manca' ? 'non c\'è' : 'è diverso'}, corro quello del ramo.`);
       }
-      corse[chi] = corri(albero, scelta.specs, `${chi === 'ramo' ? 'Sul ramo' : 'Su origin/main'} ${sha.slice(0, 8)}`);
+      corse[chi] = corri(albero, scelta.specs, etichetta);
+      immagini[chi] = tieniImmagini({ dir: albero.dir, dest: join(ROOT, CARTELLA_CONFRONTO, chi) });
     } finally {
       const c = albero.chiudi();
       if (!c.ok) console.error(`(${c.motivo}: la cartella di prova resta, la toglie il prossimo giro)`);
@@ -197,6 +231,12 @@ function main() {
     const copia = (copie.portati.find((p) => p.spec === spec) || {}).motivo || '';
     console.log(`    ${verdettoAffiancato({ ramo: suRamo, main: suMain, copia })}`);
     if (copie.mancaSulRamo.includes(spec)) console.log('    Il commit del ramo non ha questo spec: un file non ancora salvato non si corre.');
+  }
+  for (const chi of ['main', 'ramo']) {
+    const dove = join(ROOT, CARTELLA_CONFRONTO, chi);
+    console.log(immagini[chi]
+      ? `  Immagini ${chi === 'main' ? 'di main (il prima)' : 'del ramo (il dopo)'}: ${dove} (${immagini[chi]} file)`
+      : `  Nessuna immagine ${chi === 'main' ? 'da main' : 'dal ramo'}: la prova non ne ha salvate in una cartella .shots sotto tests/.`);
   }
   console.log('  Main corre coi pacchetti di questa cartella: se il suo package-lock è diverso, un rosso lì può venire da quello.');
   process.exit(scelta.specs.every((s) => corse.ramo.esiti[s].esito === 'verde') ? 0 : 1);
