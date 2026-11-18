@@ -47,19 +47,21 @@ function pulisci(stato) {
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
-      indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
+      indirizzo: sito(c.indirizzo),
       trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
       icona: icona(c.icona),
     }));
+  const CH = condiviso('SN_CARTE_HOME', 'carteHome.js');
   const colonna = (Array.isArray(stato && stato.colonna) ? stato.colonna : [])
     .filter((c) => c && typeof c === 'object' && c.id)
     .map((c) => ({
       id: testo(c.id),
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
+      indirizzo: sito(c.indirizzo),
       icona: icona(c.icona),
       titolo: testo(c.titolo).slice(0, 80),
-      carta: CARTA.test(testo(c.carta)) ? testo(c.carta) : '',
+      carta: CH.cartaDiAvviso(testo(c.carta)),
       vola: Math.max(0, Math.round(Number(c.vola) || 0)),
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
