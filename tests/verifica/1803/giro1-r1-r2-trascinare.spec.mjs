@@ -35,11 +35,16 @@ async function lasciaSullaBarra(app, shell, page, idScheda) {
   await shell.mouse.move(verso.x, verso.y, { steps: 8 });
   await shell.mouse.up();
 }
-// Ogni cambiamento visibile nella barra o un avviso della home, da quando si chiama.
+// Un avviso della home, o un cambio d'aspetto della voce che c'è già (non della riga, che s'illumina a ogni passaggio).
 const ascoltaSegnali = (page) => page.evaluate(() => {
   window.__segnali = 0;
   new MutationObserver((cambi) => {
-    if (cambi.some((c) => (c.target.closest && (c.target.closest('#barraRiga') || c.target.closest('#dashFlash'))) || [...c.addedNodes].some((n) => n.id === 'dashFlash'))) window.__segnali++;
+    const segno = (c) => {
+      const e = c.target.nodeType === 1 ? c.target : c.target.parentElement;
+      if (e && (e.closest('#dashFlash') || (e.closest('.dash-barra-voce[data-tipo]') && c.type === 'attributes'))) return true;
+      return [...c.addedNodes].some((n) => n.id === 'dashFlash' || (n.closest && n.closest('.dash-barra-voce[data-tipo]')));
+    };
+    if (cambi.some(segno)) window.__segnali++;
   }).observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true });
 });
 
