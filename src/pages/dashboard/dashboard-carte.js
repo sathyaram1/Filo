@@ -949,8 +949,8 @@
   function vociLettera(id, titolo) {
     if (!Tocco() || !(C.tasto(id) || (C.carta(id) && C.carta(id).url))) return [];
     const l = letteraDi(id);
-    if (!l) return [null, { etichetta: 'Assegna una lettera', fai: () => aspettaLettera(id, titolo) }];
-    return [null,
+    if (!l) return [{ etichetta: 'Assegna una lettera', fai: () => aspettaLettera(id, titolo) }];
+    return [
       { etichetta: `Cambia lettera (${l.lettera}${l.lettera})`, fai: () => aspettaLettera(id, titolo) },
       { etichetta: 'Togli la lettera', fai: () => scriviImpostazione({ doppioTocco: { lettere: Tocco().togli(dati.impostazioni && dati.impostazioni.doppioTocco, l.lettera).lettere } }) },
     ];
