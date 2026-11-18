@@ -60,7 +60,7 @@
     },
     IMPOSTA_ESTETICA: {
       via: ['impostazioni', 'aspetto'],
-      description: 'un token dell\'aspetto di Filo (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Scegli tu un valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
+      description: 'un token dell\'aspetto (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
       properties: { token: S(), valore: S() }, required: ['token', 'valore'],
     },
     PULSANTE_PREFERENZE: {
