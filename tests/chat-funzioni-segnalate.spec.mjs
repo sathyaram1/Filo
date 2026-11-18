@@ -63,7 +63,10 @@ test('«salvala per dopo» e «cerca questa immagine» li fa la chat sulla pagin
   const homeId = (await attiva(app)).id;
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
   const img = testServer.asset(png, 'image/png');
-  const pagina = testServer.html(`<title>Ricetta del pane</title><img src="${img}" style="width:400px;height:300px">`);
+  // La più grande è fuori vista: la chat cerca quella che cercherebbe l'Aiuto, non quella che si vede.
+  const grande = testServer.asset(png, 'image/png');
+  const pagina = testServer.html(`<title>Ricetta del pane</title><img src="${img}" style="width:400px;height:300px">`
+    + `<div style="height:3000px"></div><img src="${grande}" style="width:600px;height:500px">`);
   await openTab(pagina);
   await portaDavanti(shell, homeId);
   await spiaSegnalazioni(app);
