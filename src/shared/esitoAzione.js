@@ -191,7 +191,14 @@
     if (v.no) out.no = true;
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     if (v.autore === 'segnalazione') out.autore = 'segnalazione';
+    if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
     return out;
+  }
+  // Il testo di una segnalazione resta con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente deve
+  // poterla spiegare anche dopo un no.
+  function segnalazioneDi(type, x) {
+    if (type !== 'INVIA_FEEDBACK' || !x) return '';
+    return typeof x.segnalazione === 'string' ? x.segnalazione : (typeof x.testo === 'string' ? x.testo : '');
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
   // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
