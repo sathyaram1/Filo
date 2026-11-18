@@ -71,6 +71,10 @@ async function passata(incognito) {
 }
 
 const chiaveAvviso = (id) => `timer:${id}`;
+function cartaDelTimer(id) {
+  if (!globalThis.SN_CARTE_HOME) require('../../shared/carteHome.js');
+  return globalThis.SN_CARTE_HOME.chiaveTimer(id);
+}
 function ritiraAvviso(chiave) {
   try { require('./avvisoFinestra').ritiraAvviso(chiave); } catch (_) {}
 }
