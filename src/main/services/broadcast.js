@@ -71,6 +71,11 @@ function annunciaCarteHome(layout, sender) {
   const ambito = ambitoDellaFinestra(sender && sender.win);
   broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
+// La barra dei siti (#1803) come le carte: in incognito vive in memoria e la finestra normale non la vede cambiare.
+function annunciaBarraSiti(voci, sender) {
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.BARRA_SITI_CAMBIATA, voci } : null));
+}
 // La prima icona trovata da una scheda, per le righe della chat disegnate prima (#848): solo al suo ambito, così
 // l'incognito non dice alla finestra normale quali siti apre.
 function annunciaIconaScheda(win, sito, dato) {
