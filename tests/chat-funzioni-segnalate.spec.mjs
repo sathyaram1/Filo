@@ -226,8 +226,9 @@ test('la proposta confermata: l\'assistente legge che l\'ha mandata l\'utente co
   await expect.poll(() => inviate(app), { timeout: 10_000 }).toHaveLength(1);
   await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
+  const bolle = await chat.locator('.dash-bubble-filo').count();
   await chiedi(chat, 'aprimi una finestra in incognito');
-  await expect(chat.locator('.dash-bubble-filo')).toHaveCount(2, { timeout: 15_000 });
+  await expect(chat.locator('.dash-bubble-filo')).toHaveCount(bolle + 1, { timeout: 15_000 });
   await chat.waitForTimeout(3_000);
   await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'segnalato a chi sviluppa Filo' })).toHaveCount(0);
   expect(await inviate(app)).toHaveLength(1);
