@@ -185,3 +185,69 @@ test('#2454: su main corre lo spec del ramo, copiato se lì manca o è diverso',
   assert.equal(readFileSync(join(albero, 'tests', 'uguale.spec.mjs'), 'utf8'), 'uguale\n');
   assert.equal(existsSync(join(albero, 'tests', 'assente.spec.mjs')), false);
 });
+
+// #2384.1: il prima di una schermata è main, fotografato da una prova scritta adesso; le immagini sopravvivono al worktree.
+function gitIn(dir, args) {
+  const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+test('una prova scritta adesso gira su main e le sue immagini restano dopo che il worktree è stato tolto', () => {
+  const root = cartellaTemporanea('filo-specsumain-');
+  gitIn(root, ['init', '-q']);
+  writeFileSync(join(root, 'README'), 'main\n');
+  gitIn(root, ['add', '.']);
+  gitIn(root, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'main']);
+  const sha = gitIn(root, ['rev-parse', 'HEAD']);
+  const spec = 'tests/verifica/2384/giro1-prima.spec.mjs';
+  mkdirSync(join(root, dirname(spec)), { recursive: true });
+  writeFileSync(join(root, spec), '// la prova scritta adesso\n');
+
+  const albero = apriProvaSulCommit({ root, sha });
+  assert.ok(!albero.errore, albero.errore);
+  let n;
+  const dest = join(root, CARTELLA_CONFRONTO, 'main');
+  mkdirSync(dest, { recursive: true });
+  writeFileSync(join(dest, 'vecchia.png'), 'x');
+  try {
+    const p = portaSpecMancanti({ dir: albero.dir, root, specs: [spec, 'tests/che-non-esiste.spec.mjs'] });
+    assert.deepEqual(p, { portati: [spec], assenti: ['tests/che-non-esiste.spec.mjs'] });
+    assert.equal(readFileSync(join(albero.dir, spec), 'utf8'), '// la prova scritta adesso\n');
+    // Quello che una prova salva: in tests/.shots dalla cartella di lancio, o accanto allo spec.
+    mkdirSync(join(albero.dir, 'tests', '.shots'), { recursive: true });
+    writeFileSync(join(albero.dir, 'tests', '.shots', 'prima-chiaro.png'), 'png');
+    mkdirSync(join(albero.dir, dirname(spec), '.shots'), { recursive: true });
+    writeFileSync(join(albero.dir, dirname(spec), '.shots', 'prima-scuro.png'), 'png');
+    n = tieniImmagini({ dir: albero.dir, dest });
+  } finally {
+    assert.ok(albero.chiudi().ok);
+  }
+  assert.ok(!existsSync(albero.dir), 'il worktree è stato tolto');
+  assert.equal(n, 2);
+  assert.equal(readFileSync(join(dest, 'prima-chiaro.png'), 'utf8'), 'png');
+  assert.equal(readFileSync(join(dest, 'verifica', '2384', 'prima-scuro.png'), 'utf8'), 'png');
+  assert.ok(!existsSync(join(dest, 'vecchia.png')), 'un\'immagine di una corsa vecchia non passa per nuova');
+});
+
+test('uno spec che main ha già resta quello di main: il confronto dei rossi non cambia', () => {
+  const root = cartellaTemporanea('filo-specsumain-');
+  const dir = cartellaTemporanea('filo-specsumain-albero-');
+  for (const [d, testo] of [[root, 'ramo'], [dir, 'main']]) {
+    mkdirSync(join(d, 'tests'), { recursive: true });
+    writeFileSync(join(d, 'tests', 'x.spec.mjs'), testo);
+  }
+  assert.deepEqual(portaSpecMancanti({ dir, root, specs: ['tests/x.spec.mjs'] }), { portati: [], assenti: [] });
+  assert.equal(readFileSync(join(dir, 'tests', 'x.spec.mjs'), 'utf8'), 'main');
+});
+
+test('lo strumento porta le prove mancanti prima di correre e tiene le immagini prima di togliere il worktree', () => {
+  const src = readFileSync(SCRIPT, 'utf8');
+  const porta = src.indexOf('portaSpecMancanti({ dir: albero.dir');
+  const corre = src.indexOf('corri(albero, scelta.specs');
+  const tiene = src.indexOf('tieniImmagini({ dir: albero.dir');
+  const chiude = src.indexOf('albero.chiudi()');
+  assert.ok(porta > 0 && porta < corre, 'la prova va portata prima della corsa');
+  assert.ok(tiene > corre && tiene < chiude, 'le immagini vanno prese prima che il worktree se ne vada');
+  assert.ok(readFileSync(join(ROOT, '.gitignore'), 'utf8').split('\n').includes('tests/.shots/'), 'le immagini tenute non devono finire nei commit');
+});
