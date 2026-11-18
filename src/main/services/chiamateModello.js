@@ -7,6 +7,7 @@ const ContatoriServizio = require('./contatoriServizio');
 const ContestoFilo = require('./contestoFilo');
 const Compattazione = require('./compattazioneFilo');
 const Foto = require('./fotoDellaPagina');
+const Trascrizione = require('./trascrizioneYoutube');
 const { SN_CONST } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const Storage = globalThis.SN_STORAGE;
