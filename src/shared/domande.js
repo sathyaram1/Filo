@@ -666,6 +666,7 @@
     TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeriDaTradurre, traduciNumeri,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
+    STATI_CHE_ASPETTANO, ATTESE_CON_DOMANDA, domandeBloccantiDi, domandaCheAspetta,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
