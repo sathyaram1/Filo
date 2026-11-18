@@ -5,6 +5,7 @@
 // Un video di tre ore (~30.000 parole, coi tempi ~200.000 caratteri) sta intero; oltre si tengono testa e coda.
 const TETTO_CARATTERI = 300000;
 const TEMPO_RICHIESTA_MS = 15000;
+// Al più tre richieste in fila (pagina, traccia, pannello): l'Aiuto non aspetta oltre per una pagina che non risponde.
 const TEMPO_TOTALE_MS = 40000;
 const MAX_RISPOSTA = 30 * 1024 * 1024;
 const CACHE_TTL_MS = 60 * 60 * 1000;
