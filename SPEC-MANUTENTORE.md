@@ -60,9 +60,15 @@ scriveva tre volte (classe nel taccuino, priorità 2, ordine), e un primo
 lavoro a 1 nell'ordine non partiva. I compiti senza feedback stanno nell'ordine
 col loro id (`C-12`) accanto ai numeri, e un feedback può aspettare un compito:
 l'attesa si scioglie quando il compito chiude. Le sessioni libere (compiti,
-sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi i
-lavori già iniziati (finiscono da soli, dentro o fuori dall'ordine), poi
-l'ordine, poi il resto per urgenza.
+sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi
+l'ordine nella sua sequenza, primi lavori e lavori già iniziati insieme, a
+qualunque priorità; poi i lavori già iniziati fuori dall'ordine, poi il resto
+per urgenza (#2411: un primo lavoro al 5° posto restava dietro ogni verifica
+più in basso). La stessa sequenza, senza i feedback che hanno già una
+sessione in viaggio, divide i posti fra la voce normale e quella del server, e
+decide quando una sessione lascia il posto all'altra voce. Un primo lavoro
+dell'ordine fermo da ore porta il perché sulla scheda, come un lavoro in
+revisione.
 
 La soglia fra i livelli si muove con la maturità di Filo e con i token
 disponibili. Lo decide il manutentore, e lo scrive nel taccuino quando cambia
@@ -153,7 +159,7 @@ non svuotando l'ordine. Non in una giornata a secco. La classe è il primo
 criterio, non un filtro: un lavoro che tocca i file di un ramo vivo aspetta, e
 intanto entra uno di classe più bassa in un'area libera; un compito può stare
 davanti a un feedback; un lavoro già iniziato non si mette in attesa di uno
-non iniziato. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
+non iniziato: resta nell'ordine sopra di lui. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
 nessun battito l'ha riempita e le quote sono rimaste ferme per quattordici ore
 circa.
 

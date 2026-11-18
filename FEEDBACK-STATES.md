@@ -324,8 +324,15 @@ riallineamento e risposte dell'owner li assegna il server come sempre, anche per
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
 semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
-dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i lavori
-già iniziati, i feedback dell'ordine, il resto nell'ordine della coda; e
+dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i feedback
+dell'ordine nella sua sequenza (primo lavoro o già iniziati che siano), i lavori già
+iniziati fuori dall'ordine, il resto nell'ordine della coda. Con un ordine né la priorità
+né l'essere già iniziato scavalcano questa sequenza (#2411): la voce server accende i suoi
+lavori dell'ordine anche quando un lavoro server più urgente li supererebbe, i posti liberi
+fra le due voci vanno a chi viene prima nella sequenza comune (senza i lavori che il server
+fa da sé e senza i feedback con una sessione già in viaggio), e una sessione lascia il posto
+all'altra voce solo per un lavoro che le sta davanti nella stessa sequenza. Le accensioni di
+una voce nello stesso giro occupano un posto di N anche per le voci dopo di lei. Le voci
 accendono una sessione per ciascuno fino ai posti liberi, e per ogni routine non più di
 quanti biglietti al minuto il server dà alla sua chiave, meno uno per il manutentore: le
 altre vanno all'altro account o al giro dopo (#2343). Una priorità 3 già in viaggio non

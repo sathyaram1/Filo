@@ -165,7 +165,7 @@ Gestione → Automazioni.
    entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
    clone, che aggiornano da sé in sola lettura; se il clone manca o non si aggiorna lo dicono: allora i lavori del
    server li decidi alla cieca. Un compito può stare davanti a un feedback. **Un lavoro già iniziato non si mette in
-   attesa di un lavoro non iniziato**: finisce da solo.
+   attesa di un lavoro non iniziato**: lo tieni nell'ordine, sopra i primi lavori che deve precedere.
 5. **Insieme.** Lavori che non toccano gli stessi file vanno in parallelo, anche sul server: quanti lavori del server
    tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami (`incroci` senza
    numero). Nell'ordine metti solo ciò che può girare insieme adesso.
@@ -185,11 +185,14 @@ Gestione → Automazioni.
    (`attesa <N> C-12`): l'attesa si scioglie quando il compito chiude. Uso tipico: una revisione degli hover prima di
    correggere un hover.
 
-L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé, davanti all'ordine. Un numero chiuso o non aperto il server lo salta.
-Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi
-i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella
-sessione che il pacemaker accende per lei.
+L'ordine decide cosa parte: i lavori dell'ordine, primi lavori o già iniziati (verifica, correzione, controllo), vanno
+nella sua sequenza, a qualunque priorità; i lavori già iniziati fuori dall'ordine vengono dopo l'ordine, per urgenza. Un
+feedback consegnato che vuoi finito presto lo lasci nell'ordine, o ce lo rimetti al posto che gli spetta; uno fuori
+dall'ordine fermo da ore porta il perché sulla scheda («lavori davanti nella sequenza dell'ordine»). Un numero chiuso
+o non aperto il server lo salta. Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine
+come il pacemaker: prima le 3 e le risposte dell'owner, poi l'ordine, poi i lavori già iniziati fuori dall'ordine, poi
+il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella sessione che il pacemaker accende per lei,
+e anche fra i lavori del server.
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
