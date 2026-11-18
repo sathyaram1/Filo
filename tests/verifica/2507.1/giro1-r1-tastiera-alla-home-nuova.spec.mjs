@@ -7,7 +7,6 @@ import * as d from '../../agent/driver.mjs';
 import { apriFiloPerLaProva } from '../../agent/provaPreparazione.mjs';
 import { eseguiMossa } from '../../agent/provaMosse.mjs';
 
-test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
 let server;
