@@ -599,7 +599,11 @@ function avvisaNonRiuscito(rec) {
 }
 
 // #2390 — la carta della home che racconta lo stesso scaricamento: lì la home fa notare lei invece dell'avviso.
-const cartaDi = (rec) => (rec && rec.id ? { carta: globalThis.SN_CARTE_HOME.chiaveDownload(rec.id) } : {});
+function cartaDi(rec) {
+  if (!rec || !rec.id) return {};
+  if (!globalThis.SN_CARTE_HOME) require('../../shared/carteHome.js');
+  return { carta: globalThis.SN_CARTE_HOME.chiaveDownload(rec.id) };
+}
 
 function shellToast(text, opts, scope = '') {
   try {
