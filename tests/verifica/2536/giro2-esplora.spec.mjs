@@ -115,7 +115,10 @@ for (const { n: giro, modello, conChatPassata = false } of GIRI) {
     const righe = (await intervista.locator('body').innerText()).split('\n').filter((l) => /Memorizzato|Ricorder/i.test(l)).join(' / ');
     console.log(`\n=== giro ${giro} ${modello} ===\nBOLLE:\n| ${bolle}\nRIGHE: ${righe}\nLEZIONI: ${lezioni}\nMEMORIA: ${memoria}\nPROMPT CHAT CON PROFILO: ${promptChat.filter((r) => /geometr|lisbon/i.test(r.messaggi)).length}/${promptChat.length}`);
     expect(promptChat.length, 'la chat è andata al modello').toBeGreaterThan(0);
-    if (!conChatPassata) for (const r of promptChat) expect(r.messaggi.match(/geometr|\bpepe\b|lisbon/i), 'nel prompt dell’intervista').toBeNull();
+    // Con una chat passata «geometra» l'ha detto lui altrove; gatto, volo e lo studio tecnico stanno solo in memoria.
+    const soloMemoria = conChatPassata ? /studio tecnico|\bpepe\b|lisbon|Preferisce risposte brevi/i : /geometr|\bpepe\b|lisbon|Preferisce risposte brevi/i;
+    console.log(`PROMPT CHAT CON LA MEMORIA: ${promptChat.filter((r) => soloMemoria.test(r.messaggi)).length}/${promptChat.length} ${(promptChat.map((r) => r.messaggi.match(new RegExp(`.{0,200}(${soloMemoria.source}).{0,100}`, 'i'))).find(Boolean) || [''])[0]}`);
+    for (const r of promptChat) expect(r.messaggi.match(soloMemoria), 'nel prompt dell’intervista').toBeNull();
     expect(pagina.match(FUGA), `nell’intervista: ${pagina}`).toBeNull();
     expect(onb.match(FUGA), 'nel filo dell’intervista').toBeNull();
     const nuove = JSON.parse(lezioni).map((l) => l.text).join('\n');
