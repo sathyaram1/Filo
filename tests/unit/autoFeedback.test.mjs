@@ -63,8 +63,8 @@ test('analyzeReply → kind:capability-gap quando la risposta dice "non posso fa
 });
 
 test('analyzeReply → kind:capability-gap con frase "non sono in grado di"', () => {
-  const reply = 'Non sono in grado di aprire un lettore RSS integrato, questa funzione non fa parte delle capacità attuali di Filo.';
-  const result = AF.analyzeReply(reply, [], 'apri un lettore rss', FAKE_CAPS);
+  const reply = 'Non sono in grado di mostrarti i feed delle notizie, questa funzione non fa parte delle capacità attuali di Filo.';
+  const result = AF.analyzeReply(reply, [], 'mostrami i feed delle notizie', FAKE_CAPS);
   assert.equal(result.kind, 'capability-gap');
 });
 
