@@ -623,10 +623,9 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   let guasti = 0;
   let attese = [];
   const sveglia = () => { const a = attese; attese = []; for (const r of a) r(); };
-  // Le richieste d'elenco in volo, per cosa: due uguali sono una. Un PowerShell vivo che non risponde a stdin non
-  // risponderà mai: da lì gli elenchi tornano allo script (`muti`).
+  // Le richieste d'elenco in volo, per cosa: due uguali sono una. Un PowerShell che non risponde in tempo è `muto`, lui
+  // solo: gli elenchi vanno allo script finché non arriva una sua risposta, o un processo nuovo prende il suo posto.
   const richieste = new Map();
-  let muti = false;
   const consegna = (cosa, valore) => {
     const r = richieste.get(cosa);
     if (!r) return;
