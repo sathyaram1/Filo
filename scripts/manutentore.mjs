@@ -1253,6 +1253,10 @@ export function righeL4(x) {
     if (b.motivo) righe.push(...String(b.motivo).split('\n').map((l) => `    ${l}`));
   }
   if (!righe.length) righe.push('Nessun controllo bocciato su lavori fidati a catena pulita.');
+  // La nota l'ha scritta un controllo non fidato: il server manda solo il fatto, e su quei lavori decide l'owner.
+  for (const b of (x && x.soloFatti) || []) {
+    righe.push(`#${String(b.num || '').replace(/^#/, '')}${b.branch ? ` ${b.branch}` : ''}: bocciato, nota scritta da un controllo non fidato, decide l'owner`);
+  }
   if (x && x.nonFidate) righe.push(`(${x.nonFidate} su lavori non fidati o a catena sporca: restano all'owner)`);
   return righe;
 }
