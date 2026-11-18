@@ -173,7 +173,10 @@ fixture('l\'Aiuto su un video risponde dalla trascrizione', async ({ app, shell,
   const primo = JSON.stringify((await app.evaluate(() => globalThis.__visti))[0]);
   expect(primo).toContain('qui sotto c\'è la trascrizione del video (italiano, sottotitoli generati da YouTube)');
   expect(primo).toContain('[1:35] la biga riposa diciotto ore');
-  await page.screenshot({ path: 'tests/.shots/trascrizione-youtube-aiuto.png' });
+
+  // YouTube passa al video dopo senza ricaricare la pagina: anche la sua trascrizione si prende subito.
+  await page.evaluate(() => history.pushState({}, '', '/watch?v=secondoVid1'));
+  await expect.poll(() => tracce(youtube).some((r) => r.includes('v=secondoVid1')), { timeout: 15_000 }).toBe(true);
 });
 
 fixture('su un video senza trascrizione l\'Aiuto lo dice invece di rispondere dal titolo', async ({ app, shell, openTab, youtube }) => {
