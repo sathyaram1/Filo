@@ -322,9 +322,10 @@ test('la ricerca sul web e il comando della barra che l\'Aiuto fa da sé lascian
 
     // Le icone della home passano dalla stessa porta per un clic dell'utente: non sono azioni di Filo.
     const casa = await homeDi(app);
-    await casa.locator('.dash-ctrl[data-command="settings"]').click();
+    // Sono tasti di «altro» (#2372); il Profilo sta nel «+».
+    await casa.locator('#altro .dash-altro-app[data-id="impostazioni"]').dispatchEvent('click');
     await casa.keyboard.press('Escape');
-    await casa.locator('.dash-ctrl[data-command="account"]').click();
+    await casa.locator('#altro .dash-altro-app[data-id="profilo"]').dispatchEvent('click');
     await new Promise((r) => setTimeout(r, 1000));
     expect((await azioni('COMANDO_BARRA')).map((e) => [e.parametri.comando, e.via])).toEqual([['account', 'assistente']]);
     // Il riordino chiesto da un tasto della home passa dalla porta dell'Aiuto: resta un gesto dell'utente.
