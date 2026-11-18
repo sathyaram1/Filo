@@ -339,8 +339,8 @@
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     return () => {
       apritori.delete(root);
-      root.removeEventListener('click', alClic);
-      root.removeEventListener('keydown', alClic);
+      root.removeEventListener('click', alClic, true);
+      root.removeEventListener('keydown', alClic, true);
     };
   }
 
