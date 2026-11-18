@@ -387,6 +387,8 @@ module.exports = {
   RIPRENDI_AUDIO: azioneRiprendiAudio,
   PAUSA_AUDIO: azionePausaAudio,
   MOSTRA_SCHEDA: azioneMostraScheda,
+  SALVA_PER_DOPO: azioneSalvaPerDopo,
+  CERCA_IMMAGINE: azioneCercaImmagine,
   APRI_SALVATA: azioneApriSalvata,
   LEGGI_PAGINA: azioneLeggiPagina,
   PULISCI_TAB: azionePulisciTab,
