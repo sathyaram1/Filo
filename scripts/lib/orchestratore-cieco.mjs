@@ -54,6 +54,12 @@ export function modelloForzato(env = process.env) {
   return acceso ? String(env.CLAUDE_CODE_SUBAGENT_MODEL || '').trim() : '';
 }
 
+/** La riga del preflight quando l'ambiente forza il modello, o ''. PURA. */
+export function avvisoForzatura(env = process.env) {
+  const m = modelloForzato(env);
+  return m ? `${FORZA} è acceso nell'ambiente del processo: ogni sotto-agente gira su ${m}, worker e lettore compresi, e il modello per fase deciso dal server non si applica (lo sforzo sì). Dalle impostazioni non si spegne: va tolta dalle variabili dell'ambiente cloud, un passo dell'owner. I rapporti di fine sessione lo scrivono nelle note.` : '';
+}
+
 /**
  * Le note del rapporto di fine sessione sul modello e sullo sforzo: la forzatura dell'ambiente, e i turni del worker
  * (`modelli`, `sforzi` { high: 40 }) che non seguono la decisione del server (`voce` del registro). PURA.
