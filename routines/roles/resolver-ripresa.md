@@ -66,7 +66,8 @@ node scripts/routine-channel.mjs deliver status --status done --reason gia_risol
 Un doppione aggiunge `--doppione-di <numero dell'originale>`, con la fusione
 dell'originale. Il server ricontrolla la fusione e il ramo, nell'app e sul
 server: se rifiuta (exit 4), lavora il feedback come sempre e scrivi il motivo
-nel report.
+nel report. Se il rifiuto di un doppione nomina come buona la fusione
+registrata alla chiusura dell'originale, riconsegna una volta con quella.
 
 <!-- includi: _criteri-verifica.md -->
 
