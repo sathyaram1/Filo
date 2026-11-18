@@ -8,7 +8,9 @@ import { join } from 'node:path';
 import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
-import { attesaDichiarata, leggiMeta, rigaSintetica } from '../session-report.mjs';
+import { attesaDichiarata, codiceUscita, leggiMeta, rigaSintetica } from '../session-report.mjs';
+import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, pulito, testoUcciso } from './corsa-controlli.mjs';
+import { letturaMemoria } from './memoria-contenitore.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
@@ -107,8 +109,6 @@ export function programmaDi(comando) {
   return '';
 }
 
-// Il guasto finisce in un argomento e nelle note del feedback: una riga, senza virgolette, apici inversi, dollari.
-const pulito = (t) => String(t || '').replace(/\\/g, '/').replace(/["`$]/g, "'");
 
 const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 60);
 
@@ -118,7 +118,7 @@ const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice
  */
 export function ultimoPasso(righe) {
   const nomi = new Map();
-  const risposte = new Set();
+  const risposte = new Map();
   let strumento = null;
   let passo = null;
   let modello = '';
@@ -140,7 +140,7 @@ export function ultimoPasso(righe) {
         if (x && x.type === 'tool_use' && x.id) {
           const nome = nomeSicuro(x.name) || 'strumento';
           nomi.set(x.id, nome);
-          strumento = { id: x.id, nome, ms };
+          strumento = { id: x.id, nome, ms, comando: x.input && typeof x.input.command === 'string' ? x.input.command : '' };
           cosa = `chiamata a ${nome}`;
         } else if (x && x.type === 'thinking' && !cosa) cosa = 'ragionamento';
         else if (x && x.type === 'text' && !cosa) cosa = 'testo del modello';
@@ -148,7 +148,7 @@ export function ultimoPasso(righe) {
     } else if (o.type === 'user') {
       for (const x of c) {
         if (x && x.type === 'tool_result') {
-          risposte.add(x.tool_use_id);
+          risposte.set(x.tool_use_id, codiceUscita(x.content));
           cosa = `risposta a ${nomi.get(x.tool_use_id) || 'uno strumento'}`;
         }
       }
@@ -159,7 +159,13 @@ export function ultimoPasso(righe) {
     if (cosa) passo = { cosa, ms };
   }
   return {
-    strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
+    strumento: strumento ? {
+      nome: strumento.nome,
+      ms: strumento.ms,
+      risposta: risposte.has(strumento.id),
+      // Del comando solo il programma: il testo del worker non arriva a chi guida il giro.
+      ...(Number.isFinite(risposte.get(strumento.id)) ? { uscita: risposte.get(strumento.id), programma: programmaDi(strumento.comando) || nomeSicuro(strumento.nome).toLowerCase() } : {}),
+    } : null,
     passo,
     modello,
     attesa,
@@ -169,7 +175,15 @@ export function ultimoPasso(righe) {
 // Oltre, il guasto diventa un muro: le tracce e i processi in più si contano invece di elencarli.
 export const TRACCE_MOSTRATE = 6;
 export const PROCESSI_MOSTRATI = 3;
-const ora = (ms) => (Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(11, 19)} UTC` : 'ora ignota');
+
+/** Lo strumento chiamato per ultimo fra tutte le tracce, o null. PURA. */
+export function ultimoStrumento(tracce) {
+  const elenco = tracce && tracce.viste && Array.isArray(tracce.elenco) ? tracce.elenco : [];
+  return elenco.map((e) => e.strumento).filter(Boolean).reduce((a, b) => (!a || (b.ms || 0) >= (a.ms || 0) ? b : a), null);
+}
+
+// Oltre 128 l'uscita è un segnale: 137 è SIGKILL, che il processo non può intercettare.
+const UCCISO_DA = 128;
 
 /**
  * Il quadro di un worker fermo (#2182), dai segni già letti: ultimo strumento con ora e risposta, ultimo passo di ogni
@@ -182,9 +196,10 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
   if (!elenco.length) {
     parti.push('Transcript del worker non visto: niente strumenti, tracce o modello.');
   } else {
-    const ultimo = elenco.map((e) => e.strumento).filter(Boolean).reduce((a, b) => (!a || (b.ms || 0) >= (a.ms || 0) ? b : a), null);
+    const ultimo = ultimoStrumento(t);
+    const uscita = ultimo && Number.isFinite(ultimo.uscita) ? `, uscita ${ultimo.uscita}` : '';
     parti.push(ultimo
-      ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? 'con risposta' : 'senza risposta'}.`
+      ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? `con risposta${uscita}` : 'senza risposta'}.`
       : 'Ultimo strumento: nessuno nel transcript.');
     const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
     const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
@@ -212,12 +227,22 @@ export const NOTA_FERMO = 'fermo dalla veglia:';
 export const notaDelFermo = (quadro) => (String(quadro || '').trim() ? `${NOTA_FERMO} ${pulito(quadro).trim()}` : '');
 
 /** Il guasto da dichiarare per un worker fermo, col gruppo davanti e il quadro prima della coda. PURA. */
-export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '', chiusoMs = NaN } = {}) {
+export function testoGuasto({
+  fermoMs = 0, attesa = null, tracceViste = true, quadro = '', chiusoMs = NaN, ultimo = null, corsa = null, memoria = null,
+} = {}) {
   const minuti = Math.round(fermoMs / 60000);
   const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
   const coda = `${String(quadro || '').trim() ? `${String(quadro).trim()} ` : ''}Rilasciato dalla veglia di chi guida il giro.`;
   if (Number.isFinite(chiusoMs)) {
     return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
+  }
+  // #2571: un worker vivo risponde a un'uscita 137; tacere dopo vuol dire che è morta anche la sua sessione.
+  const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
+  if (!attesa && (corsa || ucciso)) {
+    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}), segno che col comando è morta anche la sua sessione. ${coda}`;
+    return corsa
+      ? guastoDellaCorsa(corsa, memoria, dopo)
+      : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, daMs: ultimo.ms, coda: dopo });
   }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
@@ -411,6 +436,11 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   return out;
 }
 
+/** Cosa è morto con un worker fermo: la sua corsa di finish:check rimasta a metà e la memoria di adesso. */
+export function autopsiaDelWorker(root, segni, { memoria = letturaMemoria } = {}) {
+  return { corsa: segni && segni.mio ? corsaInterrotta(root) : null, memoria: memoria() };
+}
+
 export const FERMA_IL_WORKER = 'Il worker però è ancora acceso e spende: fermalo adesso con lo strumento TaskStop (se non lo vedi, caricalo con ToolSearch «select:TaskStop»), passandogli l’id che ti ha dato il suo lancio.';
 
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
@@ -423,7 +453,7 @@ export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Ripar
  * @returns {Promise<{ uscita: number, testo: string, guasto?: string, oltreTetto?: object }>}
  */
 export async function veglia({
-  leggi, rilascia, costo = null, rilasciaOltre = null, adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+  leggi, rilascia, costo = null, rilasciaOltre = null, autopsia = () => ({}), adesso = () => Date.now(), dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)),
   fetta = FETTA_MS, passo = PASSO_MS, soglia = SOGLIA_FERMO_MS,
 } = {}) {
   const fine = adesso() + fetta;
@@ -452,8 +482,10 @@ export async function veglia({
     if (g.stato === 'fermo' || g.stato === 'chiuso') {
       const chiuso = g.stato === 'chiuso';
       const quadro = quadroDelFermo(s);
+      const a = (!chiuso && autopsia(s)) || {};
       const guasto = testoGuasto({
         fermoMs: g.fermoMs, attesa: chiuso ? null : s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro, chiusoMs: chiuso ? s.chiusoMs : NaN,
+        ultimo: ultimoStrumento(s.tracce), corsa: a.corsa || null, memoria: a.memoria || null,
       });
       const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok

@@ -82,6 +82,8 @@ import { unitLontane, VAR_LONTANE, specSulPc, cambiatiDelRamo } from './lib/unit
 import { avviaProvaRemota, attendiProvaRemota, provaRemota } from './lib/prova-remota.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { apriCorsa, corsaInterrotta, guastoDellaCorsa } from './lib/corsa-controlli.mjs';
+import { letturaMemoria, testoMemoria } from './lib/memoria-contenitore.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -631,7 +633,7 @@ const REPORTER_VERDI = join(ROOT, 'scripts', 'lib', 'reporter-spec-verdi.mjs');
  * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe. Con la memoria, ogni
  * spec si segna verde appena passa (reporter-spec-verdi): un lotto rosso o ucciso a metà tiene i suoi verdi.
  */
-export function runSpecsALotti(specs, label, albero, memoria = null) {
+export function runSpecsALotti(specs, label, albero, memoria = null, fase = () => {}) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
   const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
   if (saltati.length) {
@@ -645,6 +647,8 @@ export function runSpecsALotti(specs, label, albero, memoria = null) {
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
+    fase(`${label}${suffisso}`);
+    console.log(`\n▸ ${testoMemoria(letturaMemoria())}`);
     const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...reporter, ...lotto]);
     if (!l.ok || !run(l.cmd, l.args, label + suffisso, env(l.env), albero.dir)) ok = false;
   });
@@ -945,6 +949,12 @@ async function main() {
   // Lo sha si fissa adesso e i controlli girano in una cartella staccata su di lui: se intanto questa cartella cambia
   // ramo (un altro worker, un checkout), l'esito resta di questo commit (#1480, D-91).
   const shaProvato = git(['rev-parse', 'HEAD']).out;
+  // #2571: un lancio ucciso (137) non lascia processi né righe; il suo segno dice a chi viene dopo cosa è morto e dove.
+  const morta = corsaInterrotta(ROOT);
+  if (morta) console.log(`\n▸ ${guastoDellaCorsa(morta, letturaMemoria()).replace(/^guasto: strumento finish-check: /, 'Il lancio precedente: ')}`);
+  const corsa = apriCorsa(ROOT, { sha: shaProvato });
+  // Ogni corsa arrivata in fondo è la misura che un ramo largo non va oltre il tetto dei comandi (#2571).
+  process.on('exit', () => console.log(`\n▸ Memoria della corsa: ${corsa.bilancio().replace(/^memoria: /, '')}`));
   const albero = apriProvaSulCommit({ root: ROOT, sha: shaProvato });
   if (albero.errore) { console.error(`\n✗ ${albero.errore}`); process.exit(1); }
   process.on('exit', () => { const c = albero.chiudi(); if (!c.ok) console.error(`[finish] ${c.motivo}: la cartella di prova resta, la toglie il prossimo giro`); });
@@ -1020,6 +1030,8 @@ async function main() {
       if (schermo.nota) console.log(`\n${schermo.nota}`);
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
+    corsa.fase('controlli di logica');
+    console.log(`\n▸ ${testoMemoria(letturaMemoria())}`);
     if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir)) {
       if (lontane) {
         rossiQui = true;
@@ -1039,7 +1051,7 @@ async function main() {
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     const memoria = memoriaSpecVerdi(ROOT, shaProvato);
     if (blocking.length) {
-      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria, corsa.fase)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
@@ -1048,7 +1060,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero, memoria);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero, memoria, corsa.fase);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');

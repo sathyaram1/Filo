@@ -69,7 +69,7 @@
 //   node scripts/routine-channel.mjs aspetta <biglietto>
 //       → il worker che ha solo da aspettare i suoi comandi e sotto-agenti in sottofondo (#2185, #2304), al massimo una
 //         fetta (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella né sotto-agente al lavoro,
-//         5 = lavorano ancora (si rilancia).
+//         5 = lavorano ancora (si rilancia). Con 0 dice anche se finish:check è morto a metà (lib/corsa-controlli.mjs).
 //
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
@@ -174,6 +174,7 @@ import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 import { leaseAtteso } from './lib/lease-atteso.mjs';
+import { letturaMemoria } from './lib/memoria-contenitore.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -396,28 +397,14 @@ function elencaCartella(p) {
  * { usedMb, limitMb }, con limitMb 0 se non c'è un tetto; null fuori da un
  * cgroup. In un contenitore la memoria «libera» del kernel è quella della
  * macchina che lo ospita, non la sua: un worker ucciso per aver superato il
- * tetto del cgroup lasciava un battito con venti giga liberi. PURA (legge con
- * `leggi`).
+ * tetto del cgroup lasciava un battito con venti giga liberi. Una lettura
+ * sola, quella dei comandi (#2571): usata e tetto dello stesso cgroup. PURA
+ * (legge con `leggi`).
  */
 export function memoriaContenitore(leggi = leggiFileDiSistema) {
-  const mb = (s) => { const n = Number(String(s == null ? '' : s).trim()); return Number.isFinite(n) ? n / 1048576 : NaN; };
-  const v2 = leggi('/sys/fs/cgroup/memory.current');
-  if (v2 !== null) {
-    const used = mb(v2);
-    if (!Number.isFinite(used)) return null;
-    const max = String(leggi('/sys/fs/cgroup/memory.max') || '').trim();
-    const limit = max && max !== 'max' ? mb(max) : 0;
-    return { usedMb: used, limitMb: Number.isFinite(limit) ? limit : 0 };
-  }
-  const v1 = leggi('/sys/fs/cgroup/memory/memory.usage_in_bytes');
-  if (v1 !== null) {
-    const used = mb(v1);
-    if (!Number.isFinite(used)) return null;
-    const limit = mb(leggi('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
-    // In v1 «senza tetto» è un numero enorme (circa 2^63): non è un limite.
-    return { usedMb: used, limitMb: Number.isFinite(limit) && limit < 1024 * 1024 * 1024 ? limit : 0 };
-  }
-  return null;
+  const m = letturaMemoria(leggi);
+  if (!Number.isFinite(m.usataMb)) return null;
+  return { usedMb: m.usataMb, limitMb: Number.isFinite(m.tettoMb) ? m.tettoMb : 0 };
 }
 
 /**
@@ -460,8 +447,8 @@ export function rssProcessi(leggi = leggiFileDiSistema, elenca = elencaCartella)
  * basta). Quattro numeri, gli stessi che il server salva:
  *   uptimeS  da quanto vive il contenitore (l'età del suo processo 1; fuori
  *            da un contenitore, l'uptime del sistema);
- *   freeMb   quanto manca al tetto di memoria del cgroup; senza tetto, la
- *            memoria libera del sistema;
+ *   freeMb   la memoria che resta ai comandi (lib/memoria-contenitore.mjs);
+ *            dove non si legge, quanto manca al tetto del cgroup o MemFree;
  *   rssMb    la memoria usata dal contenitore (cgroup), o la somma di tutti i
  *            processi (Linux senza cgroup), o quella di questo processo (dove
  *            /proc non c'è);
@@ -473,10 +460,12 @@ export function rssProcessi(leggi = leggiFileDiSistema, elenca = elencaCartella)
 export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFileDiSistema, elenca = elencaCartella } = {}) {
   const num = (v) => (Number.isFinite(v) ? v : undefined);
   const carico = osImpl.loadavg();
-  const cg = memoriaContenitore(leggi);
+  // Usata e libera dalla stessa lettura, quella dei comandi: il tetto sta su un cgroup figlio, e MemFree non conta la
+  // cache che si libera (#2571).
+  const m = letturaMemoria(leggi);
   const upC = uptimeContenitore(Number(osImpl.uptime()), leggi);
-  const usata = cg ? cg.usedMb : rssProcessi(leggi, elenca);
-  const libera = cg && cg.limitMb > 0 ? Math.max(0, cg.limitMb - cg.usedMb) : osImpl.freemem() / 1048576;
+  const usata = Number.isFinite(m.usataMb) ? m.usataMb : rssProcessi(leggi, elenca);
+  const libera = Number.isFinite(m.disponibileMb) ? m.disponibileMb : osImpl.freemem() / 1048576;
   return {
     uptimeS: num(Math.round(upC !== null ? upC : osImpl.uptime())),
     freeMb: num(Math.round(libera)),
@@ -2001,7 +1990,7 @@ if (isMain) {
     }
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
-    const { veglia, segniDiVita, FETTA_MS } = await import('./lib/veglia-worker.mjs');
+    const { veglia, segniDiVita, autopsiaDelWorker, FETTA_MS } = await import('./lib/veglia-worker.mjs');
     const { stopBeat } = await import('./lib/routine-beat.mjs');
     const ticket = args[0];
     const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
@@ -2017,6 +2006,7 @@ if (isMain) {
     const esito = await veglia({
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
+      autopsia: (s) => autopsiaDelWorker(ROOT, s),
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
       rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
       // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
@@ -2043,6 +2033,12 @@ if (isMain) {
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
     console.log(esito.testo);
+    // Un finish:check ucciso (137) non lascia processi: senza questa riga l'attesa direbbe solo «finito» (#2571).
+    if (esito.uscita === 0) {
+      const { corsaInterrotta, testoPerIlWorker } = await import('./lib/corsa-controlli.mjs');
+      const morta = corsaInterrotta(ROOT);
+      if (morta) console.log(`\n${testoPerIlWorker(morta, letturaMemoria())}`);
+    }
     process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a

@@ -352,12 +352,21 @@ const RIGA_DI_ERRORE = /\b(error|errore|fatal|failed|failure|rejected|refused|de
 const RIGA_DI_CONTORNO = /^(>\s|To\s\S+$|npm (notice|warn)\b|\$\s)/i;
 const RIGA_PASSATA = /^(#\s*Subtest:|ok\s+\d+\b|[✔✓]\s)/;
 
+const righeDelRisultato = (content) => testoDi(content).split('\n').map((r) => r.replace(/<\/?tool_use_error>/g, '').trim()).filter(Boolean);
+
+/** L'uscita che Claude Code scrive in testa al risultato di un comando fallito («Exit code 137»), o NaN. PURA. */
+export function codiceUscita(content) {
+  const prima = righeDelRisultato(content)[0];
+  const m = prima ? /^Exit code (\d+)$/i.exec(prima) : null;
+  return m ? Number(m[1]) : NaN;
+}
+
 /** La riga che dice perché uno strumento è fallito: «exit 1: <la riga d'errore, o la prima utile>». PURA. */
 export function rigaErrore(content) {
-  const righe = testoDi(content).split('\n').map((r) => r.replace(/<\/?tool_use_error>/g, '').trim()).filter(Boolean);
+  const righe = righeDelRisultato(content);
   let codice = '';
-  const m = righe.length ? /^Exit code (\d+)$/i.exec(righe[0]) : null;
-  if (m) { codice = `exit ${m[1]}`; righe.shift(); }
+  const n = codiceUscita(content);
+  if (Number.isFinite(n)) { codice = `exit ${n}`; righe.shift(); }
   const utili = righe.filter((r) => !RIGA_DI_CONTORNO.test(r) && !RIGA_PASSATA.test(r));
   const scelta = utili.find((r) => RIGA_DI_FALLIMENTO.test(r)) || utili.find((r) => RIGA_DI_ERRORE.test(r)) || utili[0] || righe[0] || '';
   return rigaPulita([codice, scelta].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
