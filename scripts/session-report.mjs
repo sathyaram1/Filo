@@ -204,11 +204,21 @@ const RE_PROGRAMMA_RETE = /^(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restme
 const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
 const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
 const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
-const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|env(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*)\s+)+/i;
+// I prefissi che lasciano il programma dopo (#2337.3): anche «timeout 30», le variabili («LANG=C»), nice e simili.
+// Anche le parole dei cicli e delle condizioni («do curl …», «then wget …»).
+const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|setsid|unbuffer|chronic|do|then|else|elif|if|while|until|!|\{|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-\S+)*|stdbuf(?:\s+-\S+)*|timeout(?:\s+-[ks]\s+\S+|\s+--?\S+)*\s+\d\S*|env(?:\s+-\S+)*(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*|[A-Za-z_][A-Za-z0-9_]*=\S*)\s+)+/i;
+// Il comando passato a una shell figlia o a eval, fra virgolette o no: si guarda come un comando suo (#2337.3).
+const RE_SHELL_FIGLIA = /(?:^|[\s;&|(`])(?:(?:[^\s"']*[\\/])?(?:bash|sh|zsh|dash|ksh|fish)(?:\.exe)?(?:\s+-[A-Za-z]+)*\s+-[A-Za-z]*c|eval)\s+(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))/g;
 
 /** Il comando chiama la rete? Ogni pezzo in posizione di comando, anche col percorso intero del programma. PURA. */
-export function chiamaLaRete(comando) {
+export function chiamaLaRete(comando, profondita = 0) {
   const tutto = String(comando || '');
+  if (profondita < 4) {
+    for (const m of tutto.matchAll(RE_SHELL_FIGLIA)) {
+      const dentro = m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : (m[2] !== undefined ? m[2] : m[3]);
+      if (dentro && chiamaLaRete(dentro, profondita + 1)) return true;
+    }
+  }
   for (const pezzo of tutto.split(/[;&|\n`()]|\$\(/)) {
     const s = pezzo.trim().replace(RE_PREFISSI, '').replace(/^["']?(?:[^\s"']*[\\/])?/, '');
     const m = RE_PROGRAMMA_RETE.exec(s);
@@ -217,6 +227,16 @@ export function chiamaLaRete(comando) {
     if (RE_SOLO_QUI.test(s) || (RE_INTERPRETE.test(s) && RE_INDIRIZZO.test(tutto))) return true;
   }
   return false;
+}
+
+// Le letture a mano dei rami dei worker (commit, file, differenze), che il ruolo vieta al manutentore (#2337.5): il
+// server le conta come uno strumento fuori dall'elenco pulito. Elencare i rami (branch, ls-remote, fetch) non legge.
+export const STRUMENTO_RAMI = 'Bash_rami';
+const RE_LETTURA_RAMO = /\bgit\b(?:\s+-[Cc]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+(?:show|log|diff|cat-file|grep|blame|archive|checkout|switch|restore|merge|cherry-pick|rebase|worktree|format-patch|whatchanged|ls-tree|shortlog|range-diff)\b[^;&|\n]*\bworker\//i;
+
+/** Il comando legge il contenuto di un ramo di un worker? PURA. */
+export function leggeIRamiDeiWorker(comando) {
+  return RE_LETTURA_RAMO.test(String(comando || ''));
 }
 
 /** Una chiave ammessa da Firestore: solo [A-Za-z0-9_-], il resto diventa `_`. PURA. */
@@ -735,12 +755,16 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
         const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
         const ordine = rep.tools.total;
-        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') {
+        const conta = (n) => { rep.tools.byName[n] = (rep.tools.byName[n] || 0) + 1; };
+        // Monitor lancia un comando come la shell, o apre un indirizzo da sé (#2337.1).
+        if ((b.name === 'Bash' || b.name === 'PowerShell' || b.name === 'Monitor') && typeof input.command === 'string') {
           comandi.push(input.command);
           ultimaShell = ordine;
           // Il server ritira la fiducia del manutentore a ogni strumento fuori dall'elenco pulito (#2337): la rete della shell conta a parte.
-          if (chiamaLaRete(input.command)) rep.tools.byName[STRUMENTO_RETE] = (rep.tools.byName[STRUMENTO_RETE] || 0) + 1;
+          if (chiamaLaRete(input.command)) conta(STRUMENTO_RETE);
+          if (leggeIRamiDeiWorker(input.command)) conta(STRUMENTO_RAMI);
         }
+        if (b.name === 'Monitor' && input.ws && typeof input.ws === 'object' && input.ws.url) conta(STRUMENTO_RETE);
         const file = percorsoNorma(typeof input.file_path === 'string' ? input.file_path : input.notebook_path).join('/');
         if (file && (b.name === 'Read' || STRUMENTI_SCRITTURA.includes(b.name))) {
           Object.assign(info, { file, ordine });

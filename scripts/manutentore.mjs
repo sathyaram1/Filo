@@ -12,7 +12,7 @@ import { cartellaDelServer } from './lib/ramo-server.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { fileConRepo, incroci, incrociFraRami, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
-import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
+import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, leggiNonFidati, fileProbabiliDi, validaScheda } from './schede.mjs';
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
@@ -129,6 +129,18 @@ export function senzaChiusi(rami, indice, fuori = {}) {
     fuori.chiusi.push(r.ramo);
     return false;
   });
+}
+
+/**
+ * L'indice locale coi non fidati aperti, che l'elenca tiene fuori (#2337.3): senza, senzaChiusi conterebbe i loro rami
+ * fra i chiusi. Un indice vuoto resta vuoto: senza indice non si sa, e i rami restano tutti. PURA.
+ */
+export function conNonFidati(indice, nonFidati) {
+  const l = Array.isArray(indice) ? indice : [];
+  if (!l.length) return l;
+  const ci = new Set(l.map((f) => String(f.num)));
+  const altri = (nonFidati || []).filter((x) => x && x.num).map((x) => ({ num: String(x.num).replace(/^#/, ''), ...(x.id ? { id: String(x.id) } : {}) }));
+  return l.concat(altri.filter((x) => !ci.has(x.num)));
 }
 
 /** Un ramo in corso in una riga; uno di filo-security lo dice, e i suoi file portano il prefisso. PURA. */
@@ -718,7 +730,18 @@ export function rigaSchedaServer(s, locale = null) {
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
   const loc = locale ? ` [${unaRiga(locale.area) || '?'}/${unaRiga(locale.tipo) || '?'}] ${unaRiga(locale.riassunto)}${
     Array.isArray(locale.file_probabili) && locale.file_probabili.length ? ` | file: ${locale.file_probabili.map(unaRiga).join(', ')}` : ''}` : '';
-  return `${pezzi}${titolo ? ` — ${titolo}` : ''}${loc}`;
+  return `${pezzi}${titolo ? ` — ${titolo}` : ''}${loc || rigaPerizia(s)}`;
+}
+
+/** La perizia di un feedback senza scheda locale (un non fidato, #2337.2): classe, area, unioni, file. PURA. */
+export function rigaPerizia(s) {
+  const pezzi = [
+    Number.isInteger(s && s.classe) ? `classe ${s.classe}/10` : '',
+    s && s.area ? `area ${unaRiga(s.area)}` : '',
+    s && Array.isArray(s.unioni) && s.unioni.length ? `da unire a ${s.unioni.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
+    s && Array.isArray(s.file) && s.file.length ? `file: ${s.file.map(unaRiga).join(', ')}` : '',
+  ].filter(Boolean);
+  return pezzi.length ? ` [perizia: ${pezzi.join(' · ')}]` : '';
 }
 
 /** L'indice per le funzioni sulle schede locali (rigaOrdine, conNumeri, senzaChiusi) dalle schede del server. PURA. */
@@ -1257,7 +1280,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   if (cmd === 'rami' || cmd === 'incroci') {
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const r = await leggiRami(indice);
+    const r = await leggiRami(conNonFidati(indice, leggiNonFidati(cartella)));
     if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean).join('\n')); return 0; }
     const coda = [r.server.avviso].filter(Boolean);
     if (!arg || String(arg).startsWith('--')) {
@@ -1268,12 +1291,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return 0;
     }
     const num = String(arg).replace(/^#/, '');
-    const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
-    if (!s) { console.error(`Nessuna scheda per #${num} in ${cartella}: npm run feedback:schede -- scrivi --solo ${num}.`); return 1; }
-    const comuni = incroci(r.lista, s.file_probabili);
+    // Di un fidato dalla scheda, di un non fidato dalla perizia (#2337.3).
+    const fp = fileProbabiliDi(cartella, num);
+    if (!fp) { console.error(`Nessuna scheda né perizia per #${num} in ${cartella}: un fidato la scrive con npm run feedback:schede -- scrivi --solo ${num}; un non fidato la riceve dalla perizia, dopo npm run feedback:schede -- elenca.`); return 1; }
+    const comuni = incroci(r.lista, fp.file);
     console.log([comuni.length
       ? comuni.map((c) => `${rigaLavoro(c)}: ${c.comuni.map((f) => fileConRepo(c, f)).join(', ')}`).join('\n')
-      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
+      : `Nessun ramo in corso tocca i file probabili di #${num}${fp.da === 'perizia' ? ' (dalla perizia)' : ''} (${fp.file.join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
     return 0;
   }
   // Il controllo sui numeri prima della credenziale: un comando storto si dice anche senza chiave.

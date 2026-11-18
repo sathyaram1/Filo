@@ -16,6 +16,8 @@ const SS = globalThis.SN_SCHEDE;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CARTELLA_PREDEFINITA = resolve(ROOT, '..', 'filo-schede');
 export const INDICE = 'indice.json';
+// I non fidati aperti, fuori dall'indice, con la loro perizia: li scrive elenca, li leggono rami e incroci (#2337.3).
+export const NON_FIDATI = 'non-fidati.json';
 
 export const { STATI_CHIUSI, VALIDI, TIPI, AREE, validaScheda } = SS;
 export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt', 'waitsFor', 'unisce'];
@@ -130,6 +132,25 @@ function leggiJson(f) {
 }
 const fileScheda = (cartella, num) => join(cartella, `${num}.json`);
 
+/** I non fidati aperti dell'ultimo elenca: [{ num, perizia }]; [] senza file. */
+export function leggiNonFidati(cartella) {
+  const l = leggiJson(join(cartella, NON_FIDATI));
+  return Array.isArray(l) ? l.filter((x) => x && x.num) : [];
+}
+
+/**
+ * I file probabili di un feedback, da dove stanno: la scheda locale per un fidato, la perizia per un non fidato
+ * (#2337.3). → { file, da } o null se non ci sono né l'una né l'altra.
+ */
+export function fileProbabiliDi(cartella, numero) {
+  const num = String(numero).replace(/^#/, '');
+  const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
+  if (s) return { file: Array.isArray(s.file_probabili) ? s.file_probabili : [], da: 'scheda' };
+  const p = leggiNonFidati(cartella).find((x) => String(x.num).replace(/^#/, '') === num);
+  if (p) return { file: p.perizia && Array.isArray(p.perizia.file) ? p.perizia.file : [], da: 'perizia' };
+  return null;
+}
+
 /** Le schede che ci sono nella cartella, lette. */
 export function leggiSchede(cartella) {
   if (!existsSync(cartella)) return [];
@@ -137,7 +158,7 @@ export function leggiSchede(cartella) {
 }
 
 /** Riassunto per `stato`. PURA. */
-export function riepilogo(indice, schede) {
+export function riepilogo(indice, schede, nonFidati = []) {
   const per = (k) => schede.reduce((m, s) => ({ ...m, [s[k] ?? '?']: (m[s[k] ?? '?'] || 0) + 1 }), {});
   const mappa = new Map(schede.map((s) => [numeroDi(s), s]));
   const daFare = (indice || []).filter((f) => daScrivere(f, mappa.get(f.num)));
@@ -145,6 +166,8 @@ export function riepilogo(indice, schede) {
   return {
     aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length,
     fuoriDalFeedback: fuori.length, valido: per('valido'), area: per('area'),
+    // Aperti anche loro, ma fuori dall'indice: chi conta gli aperti lo sa (#2337.3).
+    nonFidatiFuoriDallIndice: (nonFidati || []).length,
   };
 }
 
@@ -309,10 +332,13 @@ export async function letturaCloud(ticket, opz = {}) {
   if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
   // Al manutentore fidato un non fidato arriva senza scheda né testi (#2337): fuori dal censimento, ne decide la perizia.
   const voci = r.voci.filter((v) => !v.nonFidato);
+  const fuori = r.voci.filter((v) => v.nonFidato && v.num);
   return {
     ok: true, righe: voci.filter((v) => v.riga).map((v) => v.riga), schede: voci.filter((v) => v.scheda).map((v) => v.scheda),
     segnalati: new Map(voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
     nonFidati: r.voci.length - voci.length,
+    // I non fidati aperti con la loro perizia (dati validati dal server): restano aperti per rami e incroci (#2337.3).
+    periziati: fuori.map((v) => ({ num: String(v.num), ...(v.id ? { id: String(v.id) } : {}), perizia: v.perizia && typeof v.perizia === 'object' ? v.perizia : null })),
     // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita. Una
     // scheda non fidata data al fidato senza contenuto c'è, e non si riscrive.
     illeggibili: voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato && !v.schedaNonFidata)).length,
@@ -347,6 +373,7 @@ async function allineaAlFeedback(cartella, giro, { lettura = null, dryRun = fals
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede, indice);
     scriviSegnalati(cartella, indice);
+    writeFileSync(join(cartella, NON_FIDATI), `${JSON.stringify(r.periziati || [], null, 1)}\n`);
   }
   return { r, indice, scritte };
 }
@@ -361,7 +388,8 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   const m = dryRun ? null : await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
   const nonSiAprono = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
   const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
-  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
+  const fuori = r.nonFidati ? `; ${r.nonFidati} non fidati aperti fuori dall'indice${dryRun ? '' : ` (con la perizia in ${join(cartella, NON_FIDATI)})`}` : '';
+  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}${fuori}; ${salvate}.`);
   if (m) diMandate(m);
   // Le schede appena mandate ora il feedback le ha: senza, l'avviso direbbe che mancano proprio quelle.
   const c = copertura({ indice, schede: [...r.schede, ...[...((m && m.aggiornati) || new Map()).keys()].map((numero) => ({ numero }))] });
@@ -562,7 +590,7 @@ export async function main(argv) {
     const fermo = censimentoMancante({ via: giro.via, indice, schede: leggiSchede(cartella) });
     if (fermo) { console.error(fermo); return 1; }
   }
-  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
+  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella), leggiNonFidati(cartella)), null, 1)); return 0; }
   let restano = 0;
   if (!dryRun) {
     const r = await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });

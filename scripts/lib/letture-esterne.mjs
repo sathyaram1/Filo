@@ -148,6 +148,12 @@ export function motivoLettura(input, ctx = {}) {
     const dove = String(dati.isolation || '');
     return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
   }
+  // Monitor col suo comando è la shell; con `ws` apre da sé un indirizzo e ne porta dentro il testo (#2337.1).
+  if (nome === 'Monitor' && dati.ws && typeof dati.ws === 'object') {
+    let host = '';
+    try { host = new URL(String(dati.ws.url || '')).hostname; } catch (_) { /* resta senza */ }
+    return host ? `Monitor (${pulisci(host, 120)})` : 'Monitor';
+  }
   if (nome === 'Skill' || nome === 'SlashCommand') return richiamoDaEstensione(nome, dati);
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
