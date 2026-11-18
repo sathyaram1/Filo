@@ -814,12 +814,13 @@ function statoDaDare() {
 // `letto` è l'ora della lettura vera: una riga di prima del sonno ridisegnata non la rinfresca.
 // Rete caduta o tornata, batteria sotto una soglia, Bluetooth collegato entrano nel filo da qui (#1561): ogni lettura
 // passa di qui, chiunque l'abbia chiesta. Senza una lettura prima non c'è niente da confrontare.
-function pubblica(grezzo, { fresco = true, radio = null } = {}) {
+function pubblica(grezzo, { fresco = true, radio = [] } = {}) {
   const daRileggere = radioVecchie();
-  if (radio) letteRadio[radio] = Date.now();
+  const lette = [].concat(radio || []).filter((v) => RADIO.includes(v));
+  for (const v of lette) letteRadio[v] = Date.now();
   const tenute = {};
   // Una riga di prima del sonno non smentisce la radio che l'elenco ha appena letto.
-  if (!fresco && stato) for (const v of RADIO) if (v !== radio && (letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
+  if (!fresco && stato) for (const v of RADIO) if (!lette.includes(v) && (letteRadio[v] || 0) > (stato.letto || 0)) tenute[v] = stato[v];
   const nuovo = S().normalizza({ ...grezzo, ...tenute });
   const f = JSON.stringify(nuovo);
   stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
