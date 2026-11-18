@@ -162,7 +162,7 @@ test('la chat che legge la pagina di un video ne ha la trascrizione, presa appen
   expect(tracce(youtube).length, 'la lettura usa quella già presa').toBe(1);
 });
 
-fixture('l\'Aiuto su un video risponde dalla trascrizione', async ({ app, shell, openTab, youtube }) => {
+test('l\'Aiuto su un video risponde dalla trascrizione', async ({ app, shell, openTab, youtube }) => {
   test.setTimeout(90_000);
   const page = await openTab(youtube.url(`/watch?v=${CON}`));
   await expect.poll(() => tracce(youtube).length, { timeout: 15_000 }).toBe(1);
