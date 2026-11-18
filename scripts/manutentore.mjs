@@ -139,8 +139,8 @@ export function conNonFidati(indice, nonFidati) {
   const l = Array.isArray(indice) ? indice : [];
   if (!l.length) return l;
   const ci = new Set(l.map((f) => String(f.num)));
-  const altri = (nonFidati || []).map((x) => String((x && x.num) || '').replace(/^#/, '')).filter((n) => n && !ci.has(n));
-  return l.concat(altri.map((num) => ({ num })));
+  const altri = (nonFidati || []).filter((x) => x && x.num).map((x) => ({ num: String(x.num).replace(/^#/, ''), ...(x.id ? { id: String(x.id) } : {}) }));
+  return l.concat(altri.filter((x) => !ci.has(x.num)));
 }
 
 /** Un ramo in corso in una riga; uno di filo-security lo dice, e i suoi file portano il prefisso. PURA. */
