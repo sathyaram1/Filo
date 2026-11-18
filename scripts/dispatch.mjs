@@ -3007,7 +3007,7 @@ if (isMainModule) {
       // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
       const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --domanda <file.json> e --ferma; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --domanda <file.json>, --prova <cartella> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
