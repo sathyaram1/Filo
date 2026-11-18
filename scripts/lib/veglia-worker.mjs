@@ -160,7 +160,11 @@ export function ultimoPasso(righe) {
   }
   return {
     strumento: strumento ? {
-      nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id), uscita: risposte.has(strumento.id) ? risposte.get(strumento.id) : NaN, comando: strumento.comando,
+      nome: strumento.nome,
+      ms: strumento.ms,
+      risposta: risposte.has(strumento.id),
+      // Del comando solo il programma: il testo del worker non arriva a chi guida il giro.
+      ...(Number.isFinite(risposte.get(strumento.id)) ? { uscita: risposte.get(strumento.id), programma: programmaDi(strumento.comando) || nomeSicuro(strumento.nome).toLowerCase() } : {}),
     } : null,
     passo,
     modello,
