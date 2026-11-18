@@ -2438,17 +2438,7 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
-  if (precedenti.superati && precedenti.superati.length) {
-    const c = chiudiTentativi({ root: ROOT, rami: precedenti.superati });
-    process.stderr.write(c.ok
-      ? `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${c.chiusi.join(', ')}\n`
-      : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
-  }
-  if (isNew) {
-    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH, num: bucket.num, id: bucket.id });
-    if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
-    if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
-  }
+  // I superati restano su origin: dalla cloud una cancellazione prende 403, li toglie la potatura del server (#2518).
   const ripartito = !!sorgente && res.base === `origin/${sorgente.ramo}`;
   if (ripartito) {
     const scelto = sorgente;
