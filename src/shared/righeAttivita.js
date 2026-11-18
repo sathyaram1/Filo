@@ -160,6 +160,7 @@
       const t = pulito(o.titolo || a._titolo);
       return { icon: '⏸', text: t ? `In pausa «${t}»` : 'Musica in pausa' };
     },
+    TRASCRIVI: () => ({ icon: '📄', text: 'Trascrivi: scegli la porzione' }),
     MOSTRA_SCHEDA: (a) => {
       const o = a._output || {};
       const t = pulito(o.titolo || a._titolo) || 'la scheda';
