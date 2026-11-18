@@ -267,8 +267,40 @@ test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo s
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).barraSiti.visibile)).toBe(false);
 });
 
-test('#1657 un programma del computer nella barra parte al clic', async ({ app }) => {
-  test.skip(process.platform === 'win32', 'il programma di prova è uno script di shell');
+// Un file vero del disco, lasciato sulla barra come lo lascia il desktop: il File arriva da un campo di scelta (lo
+// stesso oggetto col suo percorso che dà il sistema), il rilascio passa dal gestore della pagina.
+async function lasciaFileSullaBarra(page, percorso) {
+  await page.evaluate(() => {
+    const i = Object.assign(document.createElement('input'), { type: 'file', id: '__fileDelDesktop' });
+    i.style.display = 'none';
+    document.body.appendChild(i);
+  });
+  await page.setInputFiles('#__fileDelDesktop', percorso);
+  await page.evaluate(() => {
+    const campo = document.getElementById('__fileDelDesktop');
+    const dt = new DataTransfer();
+    dt.items.add(campo.files[0]);
+    campo.remove();
+    const riga = document.getElementById('barraRiga');
+    const r = riga.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 40, clientY: r.top + r.height / 2 };
+    riga.dispatchEvent(new DragEvent('dragover', o));
+    riga.dispatchEvent(new DragEvent('drop', o));
+  });
+}
+// Un collegamento trascinato da un'altra finestra (un altro browser, un documento): arriva come text/uri-list.
+const lasciaCollegamento = (page, url) => page.evaluate((u) => {
+  const dt = new DataTransfer();
+  dt.setData('text/uri-list', `# commento\n${u}`);
+  const riga = document.getElementById('barraRiga');
+  const r = riga.getBoundingClientRect();
+  const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 40, clientY: r.top + r.height / 2 };
+  riga.dispatchEvent(new DragEvent('dragover', o));
+  riga.dispatchEvent(new DragEvent('drop', o));
+}, url);
+
+test('#1657 un programma del computer lasciato sulla barra dal desktop parte al clic', async ({ app }) => {
+  test.skip(process.platform === 'win32', 'il programma di prova è uno script di shell: Windows e Mac li provano gli unit');
   test.setTimeout(60_000);
   const dir = cartellaTemporanea('barra-siti-app');
   const segno = path.join(dir, 'partito.txt');
@@ -276,10 +308,8 @@ test('#1657 un programma del computer nella barra parte al clic', async ({ app }
   fs.writeFileSync(gioco, `#!/bin/sh\necho ok > "${segno}"\n`);
   fs.chmodSync(gioco, 0o755);
   const page = await home(app);
-  // Il rilascio di un file vero dal desktop arriva alla pagina come percorso: qui la stessa mossa che manda la barra.
-  const r = await page.evaluate((percorso) => new Promise((ok) => chrome.runtime.sendMessage(
-    { type: window.SN_MSG.MSG.BARRA_SITI_MODIFICA, mossa: { tipo: 'aggiungi', percorso } }, ok)), gioco);
-  expect(r.ok, r.error).toBe(true);
+  await lasciaFileSullaBarra(page, gioco);
+  await expect.poll(async () => (await salvate(app)).map((v) => v.percorso)).toEqual([gioco]);
   const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="app"]');
   await expect(voce).toHaveAttribute('aria-label', 'Gioco');
   await voce.click();
