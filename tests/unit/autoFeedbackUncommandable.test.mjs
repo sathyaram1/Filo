@@ -23,16 +23,16 @@ const AF = globalThis.SN_AUTO_FEEDBACK;
 const CAPS = globalThis.SN_CAPABILITIES.all();
 
 // Una voce che nessuno strumento della chat comanda (capabilities.js, STRUMENTO: SOLO_A_MANO).
-const CHIESTO = 'ricarica la pagina';
+const CHIESTO = 'apri una finestra in incognito';
 const SPIEGAZIONE_MANUALE =
-  'Per ricaricare la pagina clicca il pulsante Ricarica nella barra laterale, oppure '
-  + 'premi Ctrl+R: la pagina si carica di nuovo con quello che il sito mostra adesso.';
+  'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l\'icona Nuova finestra '
+  + 'incognito nella barra laterale: lì quello che visiti non resta.';
 
 test('spiegazione manuale di una capacità esistente = buco muto riconosciuto', () => {
   const a = AF.analyzeReply(SPIEGAZIONE_MANUALE, [], CHIESTO, CAPS);
   assert.equal(a.kind, 'capability-uncommandable');
-  assert.equal(a.capabilityId, 'reload');
-  assert.equal(a.capabilityTitle, 'Ricarica la pagina');
+  assert.equal(a.capabilityId, 'incognito');
+  assert.equal(a.capabilityTitle, 'Finestra in incognito');
 });
 
 // #2371: le voci che hanno uno strumento non sono «non sa azionare» (lì è il modello che doveva usarlo).
