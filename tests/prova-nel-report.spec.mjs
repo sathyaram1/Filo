@@ -65,7 +65,7 @@ test('l\'owner trova sotto il report l\'esito della prova e le sue schermate, ap
   const imgs = bolla.locator('.mg-bubble-imgs img');
   await expect(imgs).toHaveCount(3);
   for (let i = 0; i < 3; i++) await expect(imgs.nth(i)).toHaveJSProperty('src', PNG);
-  expect(await page.evaluate(() => window.__chieste)).toEqual([url(1), url(2), url(3)]);
+  expect(await imgs.evaluateAll((els) => els.map((e) => e.dataset.url))).toEqual([url(1), url(2), url(3)]);
 
   const dir = join('tests', '.shots');
   mkdirSync(dir, { recursive: true });
