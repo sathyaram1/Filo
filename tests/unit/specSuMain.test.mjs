@@ -92,7 +92,8 @@ test('#2454: l\'esito è di ogni spec, dai suoi casi, anche dentro i describe', 
       { message: 'SyntaxError', location: { file: 'C:\\x\\ramo\\tests\\f.spec.mjs', line: 1 } },
     ],
   };
-  assert.deepEqual(esitiPerSpec(report, specs), {
+  const esiti = esitiPerSpec(report, specs);
+  assert.deepEqual(Object.fromEntries(specs.map((s) => [s, esiti[s].esito])), {
     'tests/a.spec.mjs': 'verde',
     'tests/verifica/9/b.spec.mjs': 'rosso',
     'tests/c.spec.mjs': 'non-corso',
@@ -100,6 +101,47 @@ test('#2454: l\'esito è di ogni spec, dai suoi casi, anche dentro i describe', 
     'tests/e.spec.mjs': 'rosso',
     'tests/f.spec.mjs': 'non-corso',
   });
+  assert.equal(esiti['tests/f.spec.mjs'].motivo, 'SyntaxError', 'il motivo di chi non parte è il suo errore, non quello di un altro spec');
+});
+
+// Un resoconto con i casi `titoli` di uno spec, ognuno col suo stato.
+const resocontoDi = (file, casi, errors = []) => ({
+  suites: [{ file, specs: Object.entries(casi).map(([title, status]) => ({ title, file, tests: [{ status }] })), suites: [] }],
+  errors,
+});
+
+test('#2454 giro 1: il confronto è caso per caso, un caso rosso solo sul ramo resta del ramo', () => {
+  const spec = 'tests/verifica/1697.2/giro3-r1-codice.spec.mjs';
+  const file = 'verifica/1697.2/giro3-r1-codice.spec.mjs';
+  const ramo = esitiPerSpec(resocontoDi(file, { 'r1 vecchio': 'unexpected', 'r1 nuovo': 'unexpected' }), [spec])[spec];
+  const main = esitiPerSpec(resocontoDi(file, { 'r1 vecchio': 'unexpected', 'r1 nuovo': 'expected' }), [spec])[spec];
+  assert.deepEqual(ramo.rossi, ['r1 vecchio', 'r1 nuovo']);
+  const v = verdettoAffiancato({ ramo, main, copia: 'manca' });
+  assert.doesNotMatch(v, /c'era già su main, non è del ramo/);
+  assert.match(v, /un caso è rosso solo sul ramo, e quello è del ramo: «r1 nuovo»/);
+  assert.match(v, /Gli altri rossi del ramo \(1\) c'erano già su main/);
+  const tuttiGia = esitiPerSpec(resocontoDi(file, { 'r1 vecchio': 'unexpected', 'r1 nuovo': 'unexpected' }), [spec])[spec];
+  assert.match(verdettoAffiancato({ ramo, main: tuttiGia }), /Rosso su tutti e due: c'era già su main/);
+});
+
+test('#2454 giro 1: gli errori fuori dai casi si leggono come nel verdetto della suite', () => {
+  const spec = 'tests/a.spec.mjs';
+  // Un worker che non chiude, senza posizione nel file: in GitHub è rosso, qui anche.
+  const senzaFile = esitiPerSpec(resocontoDi('a.spec.mjs', { uno: 'expected' }, [{ message: 'Error: worker process exited unexpectedly' }]), [spec])[spec];
+  assert.equal(senzaFile.esito, 'rosso');
+  // Un teardown scaduto senza altri rossi è un avviso per la suite, e qui non fa rosso.
+  const teardown = esitiPerSpec(resocontoDi('a.spec.mjs', { uno: 'expected' }, [{ message: 'Worker teardown timeout of 30000ms exceeded.' }]), [spec])[spec];
+  assert.equal(teardown.esito, 'verde');
+  const ramo = esitiPerSpec(resocontoDi('a.spec.mjs', { uno: 'unexpected' }, [{ message: 'boom', location: { file: '/x/ramo/tests/a.spec.mjs' } }]), [spec])[spec];
+  const main = esitiPerSpec(resocontoDi('a.spec.mjs', { uno: 'unexpected' }), [spec])[spec];
+  assert.match(verdettoAffiancato({ ramo, main }), /solo sul ramo/, 'un errore fuori dai casi solo sul ramo è del ramo');
+});
+
+test('#2454 giro 1: uno spec che non parte insieme agli altri si rifà da solo', () => {
+  const nc = { esito: 'non-corso', rossi: [], motivo: '' };
+  const ok = { esito: 'verde', rossi: [], motivo: '' };
+  assert.deepEqual(specDaRifareDaSoli({ 'tests/a.spec.mjs': nc, 'tests/b.spec.mjs': nc, 'tests/c.spec.mjs': ok }, ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs']), ['tests/a.spec.mjs', 'tests/b.spec.mjs']);
+  assert.deepEqual(specDaRifareDaSoli({ 'tests/a.spec.mjs': nc }, ['tests/a.spec.mjs']), [], 'da solo non si rifà: sarebbe la stessa corsa');
 });
 
 test('#2454: su main corre lo spec del ramo, copiato se lì manca o è diverso', () => {
