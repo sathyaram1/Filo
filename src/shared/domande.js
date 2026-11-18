@@ -282,6 +282,10 @@
       if (!r.ok) return r;
       testi[campo] = campo === 'gruppo' ? r.valore.trim() : r.valore;
     }
+    // Il titolo (dieci parole) non dice dove e come: senza i passi l'owner trova una cosa da fare che non sa fare (#2229.3).
+    if (fare && !testi.problema.trim()) {
+      return no('problema_mancante', 'un «da fare» porta in «problema» i passi concreti e dove farli: il titolo dice solo di cosa si parla', { campo: 'problema' });
+    }
     const grezze = input.opzioni == null ? [] : input.opzioni;
     if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco', { campo: 'opzioni' });
     if (grezze.length > TETTI.opzioni) {
