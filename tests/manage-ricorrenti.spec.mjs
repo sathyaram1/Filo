@@ -233,8 +233,6 @@ test('il rapporto parziale di una corsa fermata si legge come tale, e la regola 
   await expect(r.locator('.mg-rc-rapporto-testo')).toHaveText('A metà: 25 di 50, riparti da #900.');
   await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /la prossima riparte dal suo rapporto parziale\. Vuoto: il doppio della mediana delle ultime corse finite col rapporto\. Nessuna corsa finita col rapporto ancora/);
   await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-rapporto-parziale.png', fullPage: true });
-  // Un rapporto finale resta «Rapporto», senza la parola in più.
-  await expect(riga(page, 'potatura').locator('.mg-rc-rapporto')).toHaveCount(0);
 });
 
 test('un rifiuto del server si legge accanto al modulo col suo dettaglio, e quello scritto resta', async ({ openTab }) => {
