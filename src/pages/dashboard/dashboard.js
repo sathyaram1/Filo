@@ -108,6 +108,7 @@
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
   //   SN_DASH_BARRA_SITI  la barra dei siti e la chat ripiegata (#1803)
   //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
+  //   SN_DASH_TASTIERA    un campo solo che prende la battitura, e il doppio tocco di una lettera (#2372)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
   // possiede — la cartella del terminale al terminale, "sto inviando" a questo
