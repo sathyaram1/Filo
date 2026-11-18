@@ -9,9 +9,13 @@ const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepa
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
 });
 
-/** «1680», «#1680», «1680.2» → «1680» / «1680.2»; altrimenti ''. PURA. */
+/**
+ * «1680», «#1680», «1680.2» → «1680» / «1680.2»; altrimenti ''. Niente zeri davanti né figlio «.0»: la forma che il
+ * server accetta, e una prova del server confronta le due (#2046.2). PURA.
+ */
 export function numeroFeedback(raw) {
-  const m = /^#?(\d{1,7}(?:\.\d{1,4})?)$/.exec(String(raw == null ? '' : raw).trim());
+  const s = String(raw == null ? '' : raw);
+  const m = s.length <= 20 ? /^#?([1-9]\d{0,6}(?:\.[1-9]\d{0,3})?)$/.exec(s.trim()) : null;
   return m ? m[1] : '';
 }
 
