@@ -365,7 +365,8 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   const m = dryRun ? null : await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
   const nonSiAprono = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
   const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
-  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
+  const fuori = r.nonFidati ? `; ${r.nonFidati} non fidati aperti fuori dall'indice${dryRun ? '' : ` (con la perizia in ${join(cartella, NON_FIDATI)})`}` : '';
+  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}${fuori}; ${salvate}.`);
   if (m) diMandate(m);
   // Le schede appena mandate ora il feedback le ha: senza, l'avviso direbbe che mancano proprio quelle.
   const c = copertura({ indice, schede: [...r.schede, ...[...((m && m.aggiornati) || new Map()).keys()].map((numero) => ({ numero }))] });
