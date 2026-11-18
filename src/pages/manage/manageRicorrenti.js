@@ -182,7 +182,10 @@
     const box = nodo('div', 'mg-rc-rapporto');
     const aperto = stato.rapporti.has(r.id);
     const chi = p.compitoId ? ` di ${p.compitoId}` : '';
-    const b = nodo('button', 'mg-rc-rapporto-apri', `Rapporto${chi}${p.scrittoIl ? ` · ${R.quandoTesto(p.scrittoIl)}` : ''}`, 'Cosa ha fatto l’ultima istanza e da dove riparte la prossima');
+    // Un parziale (#2303.1) è il punto di una corsa ancora al lavoro o fermata a metà, non il suo esito.
+    const nome = p.parziale === true ? 'Rapporto parziale' : 'Rapporto';
+    const b = nodo('button', 'mg-rc-rapporto-apri', `${nome}${chi}${p.scrittoIl ? ` · ${R.quandoTesto(p.scrittoIl)}` : ''}`,
+      p.parziale === true ? 'Dove era arrivata l’ultima istanza: la prossima riparte da qui' : 'Cosa ha fatto l’ultima istanza e da dove riparte la prossima');
     b.type = 'button';
     b.dataset.azione = 'rapporto';
     b.setAttribute('aria-expanded', aperto ? 'true' : 'false');
