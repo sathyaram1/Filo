@@ -1,6 +1,6 @@
 // La memoria che resta ai comandi (#2571): in cloud il tetto vero è il cgroup dei comandi (13,4 GB su 16), non la RAM, e
 // MemFree non conta la cache che si libera. La leggono il battito, i controlli prima di partire e la veglia per dire cosa è
-// morto. Solo letture. Regole: tests/unit/memoriaContenitore.test.mjs.
+// morto. Solo letture. Regole: tests/unit/processoUcciso.test.mjs.
 
 import { readFileSync } from 'node:fs';
 
