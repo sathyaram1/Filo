@@ -2471,6 +2471,7 @@
       save: () => Actions.downloadImage(imgEl),
       copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
       search: () => Actions.searchImageOnWeb(imgEl),
+      transcribe: () => Actions.transcribeImage(imgEl),
       ask: () => chiediDellImmagine(imgEl),
     };
   }
