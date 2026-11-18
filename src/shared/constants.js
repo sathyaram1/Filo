@@ -2687,6 +2687,10 @@
     // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
     // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     avvisoSchermoPieno: { durataMs: 3000 },
+    // La home (#2372): le lettere che col doppio tocco lanciano un'azione (di serie nessuna, src/shared/doppioTocco.js)
+    // e la pausa nello scrivere prima che la ricerca nella colonna porti il filo sul risultato più probabile.
+    doppioTocco: { sogliaMs: 350, lettere: [] },
+    ricercaFilo: { pausaMs: 500 },
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
     homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true, volume: true },
