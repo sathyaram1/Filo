@@ -135,8 +135,7 @@ export function partiDaAmbiente(nomi, env) {
   return nomi.map((nome) => ({ nome, campo: env[`CAMPO_${nome.toUpperCase()}`] || '', risultato: env[`RISULTATO_${nome.toUpperCase()}`] || '' }));
 }
 
-function riassunto(titolo, testo, riga) {
-  const file = process.env.GITHUB_STEP_SUMMARY;
+function riassunto(file, titolo, testo, riga) {
   if (!file) return;
   try { appendFileSync(file, `## ${titolo}\n\n\`\`\`\n${testo}\n\`\`\`\n\n\`${riga}\`\n`, 'utf8'); } catch (_) { /* il riassunto è per chi guarda, l'esito è nel registro */ }
 }
