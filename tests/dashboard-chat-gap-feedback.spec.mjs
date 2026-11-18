@@ -145,7 +145,7 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
     };
   });
 
-  await page.locator('#input').fill('quanti crediti ho?');
+  await page.locator('#input').fill('quanti passi ho fatto oggi?');
   await page.locator('#sendBtn').click();
 
   // ── L'assert centrale: la segnalazione è già lì, pronta da confermare ──────
