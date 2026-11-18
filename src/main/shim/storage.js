@@ -667,7 +667,10 @@ async function get(keysOrNull) {
       // Vista incognito di "tutto": solo le chiavi config dal disco (meno quelle
       // tombstoned) + ciò che l'incognito ha scritto nell'overlay.
       for (const k of Object.keys(STATE.data)) {
-        if ((INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) || INCOGNITO_SHARED.has(k)) out[k] = STATE.data[k];
+        if (INCOGNITO_SHARED.has(k)) { out[k] = STATE.data[k]; continue; }
+        if (INCOGNITO.tombstones.has(k)) continue;
+        const v = dalDiscoInIncognito(k);
+        if (v !== undefined) out[k] = v;
       }
       for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
     }
