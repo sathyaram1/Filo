@@ -32,7 +32,7 @@ test('r1 una correzione di main rifatta a mano, identica a main, non crea un inc
   // Il file del ramo è uguale a quello di main: fuso adesso non cambierebbe niente.
   expect(g(w, 'diff', '--name-only', 'origin/main', `origin/${A}`, '--', 'regole.js').trim()).toBe('');
   const rami = ramiInCorso(w, { giorni: 0 });
-  expect(rami.map((r) => r.file)).toEqual([['b.js'], ['a.js']].sort((x, y) => (x[0] < y[0] ? 1 : -1)).length ? expect.anything() : []);
+  expect(rami.length).toBe(2);
   for (const r of rami) expect(r.file, r.ramo).not.toContain('regole.js');
   expect(incrociFraRami(rami)).toEqual([]);
 });
