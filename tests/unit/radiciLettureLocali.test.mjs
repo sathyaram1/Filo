@@ -87,7 +87,7 @@ function spia() {
 const D_NF = { id: 'D-2', numero: 2, titolo: 'Nata da un utente', priorita: 'importante', stato: 'aperta', fiducia: 'non_fidato', opzioni: [], conversazione: [] };
 const D_F = { id: 'D-1', numero: 1, titolo: 'Fidata', priorita: 'importante', stato: 'aperta', fiducia: 'fidato', opzioni: [], conversazione: [] };
 
-test('elenco, stampa e registro delle domande nominano al server le sole non fidate che stampano', async () => {
+test('elenco, stampa e registro delle domande nominano al server tutte quelle che stampano: le radici le decide lui', async () => {
   const { esegui } = await import('../../scripts/domanda.mjs');
   // La credenziale si dà alla prova: quella della macchina c'è solo da chi ha il token dell'owner.
   const base = { biglietto: async () => '', bigliettoLocale: async () => '', credenziale: async () => ({ tipo: 'admin' }), scrivi: () => {}, errore: () => {} };
