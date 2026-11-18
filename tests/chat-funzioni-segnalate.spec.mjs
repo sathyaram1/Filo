@@ -3,7 +3,7 @@
 // la segnalazione automatica partita a nome dell'utente, intera e col suo autore, e ne parte una sola per voce.
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
-import { clickConfirm, confirmText } from './helpers/confirm.mjs';
+import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w.isDestroyed())._filoTabs;
