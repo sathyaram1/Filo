@@ -1809,7 +1809,8 @@ if (isMain) {
       : data.piano !== undefined && !(cmd === 'deliver' && intentoDi() === 'piano') ? '--piano vale solo con deliver piano'
         : data.fusione !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--fusione vale solo con deliver status --status done --reason gia_risolto'
           : data['doppione-di'] !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--doppione-di vale solo con deliver status --status done --reason gia_risolto --fusione <sha>'
-            : '';
+            : data.parziale !== undefined && cmd !== 'rapporto' ? '--parziale vale solo con rapporto'
+              : '';
     if (fuori) { console.error(`${fuori}: non ho fatto niente.`); process.exit(1); }
   }
 
