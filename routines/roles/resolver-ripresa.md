@@ -55,19 +55,9 @@ porta solo l'ultima.
 
 Se la risposta dice che la richiesta è già coperta su `main`, o lo trovi tu, e
 il ramo non porta niente rispetto a main (`git diff --quiet origin/main...HEAD`
-esce 0), non c'è niente da mandare in verifica: chiudi come il primo lavoro, e
-poi rilascia il biglietto.
+esce 0), non c'è niente da mandare in verifica.
 
-```bash
-node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
-  --notes "[cosa hai controllato, e dove]" --frase "[cosa trova adesso chi ha segnalato]"
-```
-
-Un doppione aggiunge `--doppione-di <numero dell'originale>`, con la fusione
-dell'originale. Il server ricontrolla la fusione e il ramo, nell'app e sul
-server: se rifiuta (exit 4), lavora il feedback come sempre e scrivi il motivo
-nel report. Se il rifiuto di un doppione nomina come buona la fusione
-registrata alla chiusura dell'originale, riconsegna una volta con quella.
+<!-- includi: _chiudi-gia-risolto.md -->
 
 <!-- includi: _criteri-verifica.md -->
 
