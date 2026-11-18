@@ -179,6 +179,15 @@ export const TRACCE_MOSTRATE = 6;
 export const PROCESSI_MOSTRATI = 3;
 const ora = (ms) => (Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(11, 19)} UTC` : 'ora ignota');
 
+/** Lo strumento chiamato per ultimo fra tutte le tracce, o null. PURA. */
+export function ultimoStrumento(tracce) {
+  const elenco = tracce && tracce.viste && Array.isArray(tracce.elenco) ? tracce.elenco : [];
+  return elenco.map((e) => e.strumento).filter(Boolean).reduce((a, b) => (!a || (b.ms || 0) >= (a.ms || 0) ? b : a), null);
+}
+
+// Oltre 128 l'uscita è un segnale: 137 è SIGKILL, che il processo non può intercettare.
+const UCCISO_DA = 128;
+
 /**
  * Il quadro di un worker fermo (#2182), dai segni già letti: ultimo strumento con ora e risposta, ultimo passo di ogni
  * traccia, processi nella cartella, modello. Solo nomi, orari e conteggi: nessun testo del worker. PURA.
