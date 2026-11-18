@@ -36,15 +36,12 @@ async function chatConFile(app) {
 
 // Il riquadro della chat scorre di poco, e il tasto destro arriva nello stesso fotogramma: l'evento dello scorrimento
 // arriva dopo l'apertura, come quando la voce viene portata in vista appena prima del clic.
-// `inFondo`: il file finisce in fondo al riquadro della chat, dove sta il file dell'ultima risposta.
-async function scorriEApri(page, { inFondo = false } = {}) {
-  return page.evaluate(async (inFondo) => {
+async function scorriEApri(page) {
+  return page.evaluate(async () => {
     // La disponibilità del modello è già nota (tasto destro di pochi secondi prima): il menu si apre nello stesso giro.
     await window.SN_RINOMINA_UI.disponibile();
     const b = document.querySelector('.dash-file-btn');
-    const s = b.closest('.dash-bubbles');
-    if (inFondo) s.scrollTop += (b.getBoundingClientRect().bottom - s.getBoundingClientRect().bottom) + 30;
-    s.scrollTop += 40;
+    b.closest('.dash-bubbles').scrollTop += 40;
     const r = b.getBoundingClientRect();
     const x = Math.round(r.left + 10);
     const y = Math.round(r.top + r.height / 2);
