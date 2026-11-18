@@ -127,3 +127,37 @@ test('#1635 una segnalazione con markup nel titolo e nel testo si legge come tes
     await ripristina(app);
   }
 });
+
+test('#1635 riaperta la home, la riga della segnalazione inviata dice ancora cosa è partito', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await app.evaluate(() => {
+    globalThis.__submitVero = globalThis.SN_FEEDBACK.submit;
+    globalThis.SN_FEEDBACK.submit = async () => ({ id: 'fb-1704' });
+  });
+  try {
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo: 'Il timer non suona mai.', titolo: 'Timer muto' }) }] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'segnala il timer');
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+    if (await page.locator(`${CONFIRM_HOST} input`).count()) await fillConfirmInput(page, 'conferma');
+    await scrollConfirmToEnd(page);
+    await clickConfirm(page, 'ok');
+    await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: '✓' }).first()).toBeVisible({ timeout: 10_000 });
+    await page.reload();
+    const di = await home(app);
+    const testa = di.getByRole('button', { name: /segnalazione/i }).first();
+    if (await testa.count()) await testa.click().catch(() => {});
+    const blocco = di.locator('.dash-activity-seg-head', { hasText: /segnalazione/i }).first();
+    if (await blocco.count()) await blocco.click().catch(() => {});
+    const riga = di.getByText('Segnalazione inviata · Timer muto').first();
+    await expect(riga).toBeVisible({ timeout: 10_000 });
+    console.log('DEBUG-INVIATA', await riga.evaluate((el) => el.parentElement.outerHTML.slice(0, 400)));
+    const c = await riga.boundingBox();
+    await di.mouse.move(c.x + c.width / 2, c.y + c.height / 2, { steps: 3 });
+    await expect(di.locator('[data-sn-fumetto] .tip')).toContainText('Il timer non suona mai.', { timeout: 3000 });
+  } finally {
+    await app.evaluate(() => { if (globalThis.__submitVero) globalThis.SN_FEEDBACK.submit = globalThis.__submitVero; });
+    await ripristina(app);
+  }
+});
