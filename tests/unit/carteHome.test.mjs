@@ -54,7 +54,11 @@ test('togliere manda la carta in «altro», rimetterla la riporta (in fondo, in 
   const tolta = C.applica(C.predefinita(), { tipo: 'togli', carta: 'mazzi' }).layout;
   assert.equal(ordine(tolta), 'editor,suggerimenti,rapide');
   assert.deepEqual(tolta.tolte, ['mazzi']);
-  assert.deepEqual(C.descrivi(tolta), { destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'], altro: ['Mazzi'] });
+  assert.deepEqual(C.descrivi(tolta), {
+    destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'],
+    tasti: ['Cerca nel filo', 'Aperti per dopo', 'Download', 'Memorie', 'Bacheca', 'Impostazioni'],
+    altro: ['Mazzi', 'Profilo'],
+  });
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi' }).layout), 'editor,suggerimenti,rapide,mazzi');
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', verso: 'cima' }).layout), 'mazzi,editor,suggerimenti,rapide');
   const davanti = C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', prima: 'rapide' }).layout;
