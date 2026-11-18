@@ -127,7 +127,11 @@ export function apiGitHub({ token, base = process.env.FILO_GITHUB_API || API, fe
       signal: AbortSignal.timeout(60000),
     });
     const t = await r.text();
-    if (!r.ok) throw new Error(`GitHub risponde ${r.status} a ${metodo} ${percorso.split('?')[0]}${t ? `: ${primaRiga(t).slice(0, 200)}` : ''}`);
+    if (!r.ok) {
+      const e = new Error(`GitHub risponde ${r.status} a ${metodo} ${percorso.split('?')[0]}${t ? `: ${primaRiga(t).slice(0, 200)}` : ''}`);
+      e.status = r.status;
+      throw e;
+    }
     if (testo) return t;
     return t ? JSON.parse(t) : {};
   };
