@@ -73,7 +73,7 @@ test('ripresa: il controllo di fine lavoro passa la memoria dei verdi a ogni suo
     .split('\n').filter((r) => !/^\s*(\/\/|\*|\/\*)/.test(r)).join('\n');
   const chiamate = sorgente.split('\n').filter((r) => r.includes('runSpecsALotti(') && !/function runSpecsALotti\(/.test(r));
   assert.ok(chiamate.length >= 2, 'gli spec bloccanti e quelli fra i rossi noti');
-  for (const c of chiamate) assert.match(c, /, albero, memoria\)/, `lancio senza memoria: ${c.trim()}`);
+  for (const c of chiamate) assert.match(c, /, albero, memoria[,)]/, `lancio senza memoria: ${c.trim()}`);
   assert.match(sorgente, /const memoria = memoriaSpecVerdi\(ROOT, shaProvato\);/);
 });
 
