@@ -144,6 +144,34 @@ describe('il segno della corsa di finish:check', () => {
     assert.equal(corsaInterrotta(pulito), null);
   });
 
+  test('aspetta, a cartella quieta, dice al worker che finish:check è morto e gli dà il guasto', { skip: process.platform !== 'linux' && 'i processi si leggono da /proc' }, async () => {
+    const root = repo();
+    apriCorsa(root, { sha: 'abcdef1234567890', proc: { pid: 2 ** 22 + 11, on: () => {} } });
+    const r = await new Promise((ok) => {
+      const p = spawn(process.execPath, [join(REPO, 'scripts', 'routine-channel.mjs'), 'aspetta', 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde'], {
+        cwd: root, env: { ...process.env, FILO_REPO_ROOT: root, FILO_NO_BEAT: '1', FILO_ASPETTA_FETTA_MS: '0' },
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => ok({ code, so, se }));
+    });
+    assert.equal(r.code, 0, r.so + r.se);
+    assert.match(r.so, /Finito: nessun tuo processo/);
+    assert.match(r.so, /La corsa di finish:check è morta senza finire: processo ucciso \(137\) durante finish:check \(fase avvio/);
+    assert.match(r.so, /--guasto "guasto: strumento finish-check: processo ucciso \(137\)/);
+  });
+
+  test('finish:check apre il segno prima dei controlli e lo aggiorna a ogni lotto di spec', () => {
+    const sorgente = readFileSync(join(REPO, 'scripts', 'finish-local.mjs'), 'utf8').split('\n').filter((r) => !/^\s*(\/\/|\*|\/\*)/.test(r)).join('\n');
+    const apre = sorgente.indexOf('const corsa = apriCorsa(ROOT, { sha: shaProvato });');
+    assert.ok(apre > 0 && apre < sorgente.indexOf("corsa.fase('controlli di logica')"), 'il segno nasce prima degli unit');
+    assert.ok(sorgente.indexOf('corsaInterrotta(ROOT)') < apre, 'il lancio precedente si legge prima di essere sovrascritto');
+    const lanci = sorgente.split('\n').filter((r) => r.includes('runSpecsALotti(') && !/function runSpecsALotti\(/.test(r));
+    assert.ok(lanci.length >= 2);
+    for (const l of lanci) assert.match(l, /, corsa\.fase\)/, `lotto senza fase: ${l.trim()}`);
+  });
+
   test('il segno sta nella cartella git, fuori dall\'albero: niente da committare', () => {
     const root = repo();
     const c = apriCorsa(root, { proc: { pid: 4242, on: () => {} }, memoria: () => ({}) });
