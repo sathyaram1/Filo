@@ -1836,7 +1836,7 @@ if (isMain) {
 
   // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
   // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
-  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta', 'segnala', 'rapporto'].includes(cmd))) usage();
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta', 'segnala', 'rapporto', 'spesa'].includes(cmd))) usage();
 
   if (cmd === 'domanda' || cmd === 'risposta') {
     const a = argomentiChiusura(cmd, args, data);
