@@ -67,9 +67,7 @@ test('file della chat: uno scorrimento del riquadro dopo l\'apertura chiude anco
     await expect(menu).toBeVisible();
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 100)))));
     await page.evaluate(() => {
-      let s = document.querySelector('.dash-file-btn').parentElement;
-      while (s && !/(auto|scroll)/.test(getComputedStyle(s).overflowY)) s = s.parentElement;
-      s.scrollTop += 60;
+      document.querySelector('.dash-file-btn').closest('.dash-bubbles').scrollTop += 60;
     });
     await expect(menu).toHaveCount(0);
   } finally {
