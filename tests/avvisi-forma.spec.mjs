@@ -224,7 +224,7 @@ async function scaricamentoComandato(nome) {
   return {
     url: `http://127.0.0.1:${srv.address().port}/${nome}`,
     finisci() { res.end(Buffer.alloc(TOT - PRIMO, 1)); },
-    rompi() { res.destroy(); },
+    rompi() { rotto = true; res.destroy(); },
     async chiudi() {
       try { res && !res.destroyed && res.destroy(); } catch (_) {}
       try { srv.closeAllConnections?.(); } catch (_) {}
