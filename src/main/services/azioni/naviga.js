@@ -226,13 +226,15 @@ async function azioneSalvaPerDopo(action, { sender, schedeViste }) {
   return { executed: true, kept: true, output: { salvata: true, titolo } };
 }
 
-// «Cerca questa immagine» (#2371): la ricerca per immagine dell'Aiuto (Google Lens). L'immagine l'ha già scelta
-// handlers.js (`_immagine`): un indirizzo web della pagina o dell'utente, o i byte di una mandata in chat.
-async function azioneCercaImmagine(action, { sender }) {
+// «Cerca questa immagine» (#2371): la ricerca per immagine dell'Aiuto (Google Lens), su un'immagine scelta da Filo.
+async function azioneCercaImmagine(action, { sender, chatId, schedeViste }) {
   const win = winOf(sender);
   const tm = win && win._filoTabs;
-  const im = action._immagine;
-  if (!tm || !im) return { executed: false, kept: true, output: { error: (action._immagineMancante) || 'nessuna immagine da cercare' } };
+  if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+  let chat = chatId || '';
+  try { chat = chat || require('../registroCambi').corrente()?.chat || ''; } catch (_) {}
+  const im = await require('../immagineDaCercare').scegli(action, { sender, chatId: chat, schedeViste });
+  if (im.errore) return { executed: false, kept: true, output: { error: im.errore } };
   const L = globalThis.SN_URL_NAV;
   let id = null;
   if (im.url) id = tm.openTab(L.indirizzoRicercaImmagine(im.url), { activate: true, origine: { tipo: 'filo', gesto: true } });
