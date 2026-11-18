@@ -373,9 +373,9 @@
       const cosa = campo(v.riga) || v.type;
       if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
       if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}${segnalazione(v)}`;
-      if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}`;
-      if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}`;
-      return `- fatta: ${cosa}`;
+      if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}${segnalazione(v)}`;
+      if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}${segnalazione(v)}`;
+      return `- fatta: ${cosa}${segnalazione(v)}`;
     }).filter(Boolean);
     if (!righe.length) return '';
     const corpo = righe.join('\n');
