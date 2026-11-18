@@ -1803,6 +1803,7 @@
         id: c.dataset.nid || '',
         testo: testoDi(c),
         azioni: azioniDi(c),
+        indirizzo: c.dataset.indirizzo || '',
         icona: c.dataset.icona || '',
         titolo: c.dataset.titolo || '',
         carta: c.dataset.carta || '',
