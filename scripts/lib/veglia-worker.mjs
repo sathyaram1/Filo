@@ -140,7 +140,7 @@ export function ultimoPasso(righe) {
         if (x && x.type === 'tool_use' && x.id) {
           const nome = nomeSicuro(x.name) || 'strumento';
           nomi.set(x.id, nome);
-          strumento = { id: x.id, nome, ms };
+          strumento = { id: x.id, nome, ms, comando: x.input && typeof x.input.command === 'string' ? x.input.command : '' };
           cosa = `chiamata a ${nome}`;
         } else if (x && x.type === 'thinking' && !cosa) cosa = 'ragionamento';
         else if (x && x.type === 'text' && !cosa) cosa = 'testo del modello';
