@@ -76,7 +76,9 @@ test('#1803.1 le pagine di Filo entrano nella barra; un file aperto in una sched
   r = B.applica(r.voci, { tipo: 'aggiungi', url: 'filo://editor/editor.html' });
   assert.equal(r.voci[1].nome, 'editor', 'senza titolo vale il nome della pagina');
   assert.equal(B.normalizza(r.voci).length, 2, 'restano al riavvio');
-  assert.match(B.applica([], { tipo: 'aggiungi', url: 'file:///home/a/fattura.pdf' }).errore, /un file aperto in una scheda non va nella barra: ci vanno siti, pagine di Filo e programmi/);
+  for (const file of ['file:///home/a/fattura.pdf', 'C:\\Users\\a\\fattura.pdf', '/home/a/fattura.pdf']) {
+    assert.match(B.applica([], { tipo: 'aggiungi', url: file }).errore, /un file non entra come sito: nella barra vanno siti, pagine di Filo e programmi/, file);
+  }
   assert.match(B.applica([], { tipo: 'aggiungi', url: 'chrome://settings' }).errore, /non è l'indirizzo di un sito/);
 });
 
