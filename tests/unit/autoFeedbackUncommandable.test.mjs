@@ -22,16 +22,28 @@ const AF = globalThis.SN_AUTO_FEEDBACK;
 // un elenco finto costruito attorno al test.
 const CAPS = globalThis.SN_CAPABILITIES.all();
 
-const CHIESTO = 'metti Filo a schermo intero';
+// Una voce che nessuno strumento della chat comanda (capabilities.js, STRUMENTO: SOLO_A_MANO).
+const CHIESTO = 'ricarica la pagina';
 const SPIEGAZIONE_MANUALE =
-  'Per andare a schermo intero clicca l\'icona con le due frecce in alto a destra '
-  + 'nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo e la '
-  + 'barra si riduce.';
+  'Per ricaricare la pagina clicca il pulsante Ricarica nella barra laterale, oppure '
+  + 'premi Ctrl+R: la pagina si carica di nuovo con quello che il sito mostra adesso.';
 
 test('spiegazione manuale di una capacità esistente = buco muto riconosciuto', () => {
   const a = AF.analyzeReply(SPIEGAZIONE_MANUALE, [], CHIESTO, CAPS);
   assert.equal(a.kind, 'capability-uncommandable');
-  assert.equal(a.capabilityId, 'fullscreen');
+  assert.equal(a.capabilityId, 'reload');
+  assert.equal(a.capabilityTitle, 'Ricarica la pagina');
+});
+
+// #2371: le voci che hanno uno strumento non sono «non sa azionare» (lì è il modello che doveva usarlo).
+test('una voce con lo strumento della chat non diventa mai «non sa azionare»', () => {
+  const casi = [
+    ['metti Filo a schermo intero', 'Per andare a schermo intero clicca l\'icona con le due frecce in alto a destra '
+      + 'nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo e la barra si riduce.'],
+    ['ingrandisci la pagina', 'Per ingrandire la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
+      + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.'],
+  ];
+  for (const [u, r] of casi) assert.equal(AF.analyzeReply(r, [], u, CAPS).kind, null, u);
 });
 
 test('vale anche per altre capacità del manifesto', () => {
