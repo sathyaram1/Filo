@@ -615,7 +615,10 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     esito = Number(da) > 0 ? daCache(url) : null;
     if (!esito) {
       esito = await scaricaPagina(url);
-      if (esito.ok) inCache(url, esito);
+      if (esito.ok) {
+        esito = await conTrascrizione(esito, null);
+        inCache(url, esito);
+      }
     }
     if (schedaVuota && (!esito.ok || !String(esito.testo || '').trim())) { esito = schedaVuota; fonte = 'scheda'; }
   }
