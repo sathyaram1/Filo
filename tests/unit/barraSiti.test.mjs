@@ -66,7 +66,7 @@ test('#1803.1 un indirizzo scritto si apre come lo apre la navigazione: http all
   assert.equal(r.voci[0].nome, 'nas');
 });
 
-test('#1803.1 le pagine di Filo entrano nella barra; un file aperto in una scheda no, e lo dice', () => {
+test('#1803.1 le pagine di Filo entrano nella barra; un file come sito no, e lo dice', () => {
   let r = B.applica([], { tipo: 'aggiungi', url: 'filo://history/history.html', nome: 'Cronologia' });
   assert.equal(r.cambiato, true, r.errore);
   assert.deepEqual([r.voci[0].tipo, r.voci[0].url, r.voci[0].nome], ['sito', 'filo://history/history.html', 'Cronologia']);
