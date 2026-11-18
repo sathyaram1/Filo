@@ -106,6 +106,27 @@ test('nel modo chat il compito si chiede a Filo, non si fa a mano', () => {
   assert.match(messaggioPasso({ compito: 'c', passo: 1, passi: 20, secondiRestanti: 200, map: [{ i: 1, page: 'shell', tag: 'button', label: 'Home' }] }), /#1 \[shell\] button "Home"/);
 });
 
+// Le scorciatoie della finestra Filo le ascolta in before-input-event, coi campi di Electron: «Ctrl+W» scritto da Haiku
+// diventava un tasto sconosciuto per Playwright, e la scorciatoia era data per rotta (#2507.1).
+test('una combinazione scritta come la scrive una persona diventa il tasto di Playwright e quello che vede Filo', () => {
+  const w = leggiTasto('Ctrl+W', 'linux');
+  assert.equal(w.playwright, 'Control+w');
+  assert.deepEqual(w.input, { key: 'w', code: 'KeyW', control: true, shift: false, alt: false, meta: false });
+  assert.equal(leggiTasto('Control+t', 'win32').playwright, 'Control+t');
+  assert.deepEqual(leggiTasto('cmd + shift + t', 'darwin').input, { key: 'T', code: 'KeyT', control: false, shift: true, alt: false, meta: true });
+  assert.equal(leggiTasto('Cmd+Shift+T', 'darwin').playwright, 'Shift+Meta+T');
+  assert.equal(leggiTasto('CmdOrCtrl+L', 'darwin').input.meta, true);
+  assert.equal(leggiTasto('CmdOrCtrl+L', 'linux').input.control, true);
+  assert.deepEqual(leggiTasto('Alt+1', 'linux').input, { key: '1', code: 'Digit1', control: false, shift: false, alt: true, meta: false });
+  assert.deepEqual([leggiTasto('Esc').playwright, leggiTasto('invio').playwright, leggiTasto('Ctrl+Tab').input.code], ['Escape', 'Enter', 'Tab']);
+  assert.deepEqual([leggiTasto('f11').input.key, leggiTasto('Control++').input.key, leggiTasto('Control+-').input.code], ['F11', '+', 'Minus']);
+  assert.equal(leggiTasto('Space').input.key, ' ');
+  assert.equal(leggiTasto('MediaPlayPause').playwright, 'MediaPlayPause');
+  assert.match(leggiTasto('').errore, /vuoto/);
+  assert.match(leggiTasto('Ctrl+').errore, /manca il tasto/);
+  assert.match(leggiTasto('Hyper+a').errore, /non è un modificatore/);
+});
+
 test('la cartella delle prove non finisce nel repo', () => {
   // check-ignore esce 1 (e execFileSync lancia) se il file non è ignorato.
   execFileSync('git', ['check-ignore', '-q', '--no-index', 'tests/agent/.out/prova-x/passo-01.png'], { cwd: ROOT, stdio: 'pipe' });
