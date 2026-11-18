@@ -72,7 +72,9 @@ Quando se ne apre una che è tua, il server ti sveglia col segnale `approvazione
 sicurezza bocciati, col perché. Leggi la richiesta, il feedback (`leggi <N>`) e il perché, e decidi tu: il giudizio è
 tuo, non una lista di file. `l5 approva <id>` e `l4 salta <N> <sha>` fanno quello che farebbe il sì dell'owner. Il
 server li accetta solo dal tuo biglietto pulito, su un feedback fidato con la catena del ramo pulita; un rifiuto dice il
-perché e non si aggira. Restano all'owner, e il server li rifiuta: le automazioni di filo-security (`.github/`), i
+perché e non si aggira. Lo stesso per gli elenchi, `passa` e la scrittura dei bilanci: un biglietto sporco o una chiave
+non li hanno. Una bocciatura con la nota scritta da un controllo non fidato ti arriva senza testo (numero e ramo): la
+decide l'owner. Restano all'owner, e il server li rifiuta: le automazioni di filo-security (`.github/`), i
 segreti e le regole dei rami su GitHub, l'ambiente e i prompt delle sessioni, le chiavi, i lavori a catena sporca. Se
 un sì tocca una scelta importante (sicurezza dei dati degli utenti, direzione del prodotto), chiedila all'owner con
 una domanda: poche a settimana.
