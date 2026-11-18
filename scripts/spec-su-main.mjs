@@ -199,7 +199,7 @@ function main() {
     if (copie.mancaSulRamo.includes(spec)) console.log('    Il commit del ramo non ha questo spec: un file non ancora salvato non si corre.');
   }
   console.log('  Main corre coi pacchetti di questa cartella: se il suo package-lock è diverso, un rosso lì può venire da quello.');
-  process.exit(scelta.specs.every((s) => corse.ramo.esiti[s] === 'verde') ? 0 : 1);
+  process.exit(scelta.specs.every((s) => corse.ramo.esiti[s].esito === 'verde') ? 0 : 1);
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) main();
