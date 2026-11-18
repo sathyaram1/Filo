@@ -70,14 +70,18 @@ async function scrivi(page, testo) {
   await page.locator('#sendBtn').click();
 }
 
-for (const giro of [1, 2, 3, 4, 5, 6]) {
-  const conChatPassata = giro % 2 === 0;
-  test(`giro ${giro}${conChatPassata ? ' con una chat passata' : ''}: l’intervista rifatta non tira in ballo la memoria`, async ({ app, shell, openTab }) => {
+const GIRI = [
+  ...[1, 2, 3, 4, 5, 6].map((n) => ({ n, modello: 'deepseek/deepseek-v4-flash', conChatPassata: n > 4 })),
+  { n: 7, modello: 'deepseek/deepseek-v4.1-flash' }, { n: 8, modello: 'deepseek/deepseek-v4.1-flash' },
+  { n: 9, modello: 'anthropic/claude-haiku-5.5' }, { n: 10, modello: 'anthropic/claude-haiku-5.5' },
+];
+for (const { n: giro, modello, conChatPassata = false } of GIRI) {
+  test(`giro ${giro} ${modello}${conChatPassata ? ' con una chat passata' : ''}: l’intervista rifatta non tira in ballo la memoria`, async ({ app, shell, openTab }) => {
     test.skip(!KEY, 'serve una chiave OpenRouter');
     test.setTimeout(420_000);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 15_000 });
     const home = await newtabPage(app);
-    await chiaveVera(app);
+    await chiaveVera(app, modello);
     await home.reload();
     await home.waitForLoadState('domcontentloaded');
     if (conChatPassata) {
