@@ -2102,7 +2102,7 @@
     // `carta`: la carta della home che racconta già la stessa cosa (timer:<id>, download:<id>); `icona` e `titolo`
     // per la carta e la notifica del sistema; `uid`: lo stesso avviso mandato dal main a più finestre.
     function segni(card, opts) {
-      const carta = typeof opts.carta === 'string' && /^(timer|download):[A-Za-z0-9_-]{1,80}$/.test(opts.carta) ? opts.carta : '';
+      const carta = window.SN_CARTE_HOME.cartaDiAvviso(opts.carta);
       if (carta) card.dataset.carta = carta; else delete card.dataset.carta;
       card.dataset.icona = FORMA.icona({ icona: opts.icona, carta, errore: !!opts.errore });
       if (typeof opts.titolo === 'string' && opts.titolo.trim()) card.dataset.titolo = opts.titolo.trim().slice(0, 80);
