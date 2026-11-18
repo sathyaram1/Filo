@@ -148,7 +148,7 @@ export function ultimoPasso(righe) {
     } else if (o.type === 'user') {
       for (const x of c) {
         if (x && x.type === 'tool_result') {
-          risposte.add(x.tool_use_id);
+          risposte.set(x.tool_use_id, codiceUscita(x.content));
           cosa = `risposta a ${nomi.get(x.tool_use_id) || 'uno strumento'}`;
         }
       }
