@@ -7,7 +7,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { certificato } from './helpers/immagineFirmata.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
-test.use({
+base.use({
   hostInPiu: ['www.youtube.com'],
   // In https Chromium passerebbe dal proxy dell'ambiente, che il server locale non lo raggiunge.
   argomentiInPiu: ['--ignore-certificate-errors', '--no-proxy-server'],
