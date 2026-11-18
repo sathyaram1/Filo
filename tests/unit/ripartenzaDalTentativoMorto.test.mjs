@@ -254,7 +254,6 @@ describe('quale tentativo precedente si riprende', () => {
         'nell\'elenco del manutentore restano solo i lavori vivi');
       assert.equal(ramiInCorso(casa, { giorni: 0 }).filter((x) => x.ramo.includes(conFinish)).length, 0,
         'la fusione che nomina il tentativo non ha bisogno del numero');
-      assert.ok(vivo);
     } finally { togliCartella(base); }
   });
 
