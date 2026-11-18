@@ -409,8 +409,12 @@ test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazi
   expect(await corpo.locator('.mg-liv-testo ul li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
   await expect(corpo).not.toContainText('**');
   await expect(corpo.locator('.mg-liv-testo p strong')).toHaveText('A.');
-  await expect(corpo.locator('.mg-liv-testo em')).toHaveText('meno');
+  // Il corsivo di Filo è solo delle spiegazioni al passaggio (#2388): l'enfasi del modello si legge dritta.
+  const riga = corpo.locator('.mg-liv-testo p', { hasText: 'invasiva' });
+  await expect(riga).toContainText('la meno invasiva');
   await expect(corpo).not.toContainText('*meno*');
+  expect(await corpo.locator('.mg-liv-testo em, .mg-liv-testo i').count()).toBe(0);
+  expect(await riga.evaluate((p) => getComputedStyle(p).fontStyle)).toBe('normal');
   // Un elenco numerato tiene i numeri: una scelta citata per numero si ritrova.
   await expect(corpo.locator('.mg-liv-testo ol li')).toHaveText(['Primo passo.', 'Secondo passo.']);
   await expect(corpo).toContainText('<b>finto</b> <img src=x');
