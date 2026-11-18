@@ -31,7 +31,7 @@
     immagine: Object.freeze({
       su: 'su un\'immagine',
       fila: Object.freeze(['save', 'copy', 'ask', 'openTab']),
-      altro: Object.freeze(['copyLink', 'search', 'linkCopy']),
+      altro: Object.freeze(['copyLink', 'search', 'transcribe', 'linkCopy']),
     }),
     link: Object.freeze({
       su: 'su un collegamento',
