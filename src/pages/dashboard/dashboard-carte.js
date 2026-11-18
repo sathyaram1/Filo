@@ -1174,8 +1174,9 @@
   function fineTrascinamento() {
     if (presa && presa.el) presa.el.classList.remove('presa');
     presa = null;
-    for (const n of document.querySelectorAll('.dash-carta.sopra-prima, .dash-carta.sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
+    for (const n of document.querySelectorAll('.sopra-prima, .sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
     if (altroEl) altroEl.classList.remove('bersaglio');
+    for (const n of document.querySelectorAll('.dash-altro-piu.bersaglio')) n.classList.remove('bersaglio');
     trascinando = false;
     if (daRidisegnare) { daRidisegnare = false; disegna(); }
   }
