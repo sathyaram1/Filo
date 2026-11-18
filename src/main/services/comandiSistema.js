@@ -66,8 +66,7 @@ function ElencoBt {
   if ($null -eq $tutte) { $esito.errore = 'tempo-comando'; return $esito }
   $bt = @($tutte | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
   if ($bt.Count -eq 0) { $esito.errore = 'nessuna-radio'; return $esito }
-  if (@($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { $esito.acceso = $true }
-  elseif (@($bt | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { $esito.acceso = $false }
+  $esito.acceso = AccesoRadio $bt
   $classico = 'e0cbf06c-cd8b-4647-bb8a-263b43f0f974'
   $basso = 'bb7bb05e-5972-42b5-94fc-76eaa7084d49'
   $proprieta = [string[]]@('System.Devices.Aep.DeviceAddress', 'System.Devices.Aep.IsConnected', 'System.Devices.Aep.ContainerId', 'System.Devices.Aep.ProtocolId')
