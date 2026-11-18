@@ -26,30 +26,31 @@ const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Fattura<
 </script></body></html>`;
 
 // Il lettore finto risponde come quello vero: le righe col riquadro in 0..1000 dell'immagine.
-async function lettoreFinto(app, righe) {
-  await app.evaluate(async (_e, righe) => {
+async function lettoreFinto(app, righe, { attesaMs = 0, tema = 'light' } = {}) {
+  await app.evaluate(async (_e, { righe, attesaMs, tema }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.TRANSCRIBE_IMAGE]: 'gemma' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      theme: tema,
     });
     globalThis.__letture = [];
-    const P = globalThis.SN_PROVIDERS;
-    const veri = { c: P.completeWithFallback, s: P.streamCompleteWithFallback };
+    const P = globalThis.__veri || (globalThis.__veri = { c: globalThis.SN_PROVIDERS.completeWithFallback, s: globalThis.SN_PROVIDERS.streamCompleteWithFallback });
     const finto = (vero) => async (opts) => {
       const t = JSON.stringify(opts.messages || '');
       if (!t.includes('Trascrivi ESATTAMENTE il testo')) return vero(opts);
       globalThis.__letture.push({ immagine: /data:image\/(png|jpeg)/.test(t) });
+      if (attesaMs) await new Promise((r) => setTimeout(r, attesaMs));
       return { text: JSON.stringify({ righe }), model: 'finto', provider: 'finto', costEur: 0, usage: {} };
     };
-    P.completeWithFallback = finto(veri.c);
-    P.streamCompleteWithFallback = finto(veri.s);
-  }, righe);
+    globalThis.SN_PROVIDERS.completeWithFallback = finto(P.c);
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto(P.s);
+  }, { righe, attesaMs, tema });
 }
 
-async function apri(app, openTab, testServer) {
+async function apri(app, openTab, testServer, opz) {
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForFunction(() => document.getElementById('foto').complete && window.misure);
   const m = await page.evaluate(() => window.misure);
