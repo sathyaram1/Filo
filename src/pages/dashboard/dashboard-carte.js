@@ -1218,7 +1218,7 @@
   function ammessa(host) {
     if (!presa) return false;
     const daAltro = presa.colonna === 'altro';
-    if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra);
+    if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra && !presa.tasto);
     return host === accadeEl && ((presa.colonna === 'sinistra' && !presa.fissa) || (daAltro && presa.sinistra));
   }
   function agganciaColonna(host) {
