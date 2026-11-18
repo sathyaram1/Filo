@@ -79,7 +79,7 @@ test('r1 file dell\'ultima risposta, in fondo alla chat: uno scorrimento finito 
   test.setTimeout(90_000);
   try {
     const esito = await restaAperto(await chatConFile(app), { inFondo: true });
-    expect(esito.copreIlPunto, 'il caso provato è quello col menu sopra il punto del clic').toBe(true);
+    expect(esito.copreIlPunto, `il caso provato è quello col menu sopra il punto del clic: ${JSON.stringify(esito)}`).toBe(true);
   } finally {
     await ripristina(app);
   }
