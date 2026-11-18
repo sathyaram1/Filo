@@ -2920,7 +2920,9 @@
       const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
       if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
-      const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
+      // Il profilo nel «+» chiuso non si vede: i crediti volano lì.
+      const visibile = (n) => { const r = n && n.isConnected ? n.getBoundingClientRect() : null; return r && r.width ? r : null; };
+      const target = visibile(accountCtrlBtn) || visibile($('altroPiu'));
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
       const ty = target ? target.top + target.height / 2 : 26;
       const ox = window.innerWidth / 2;
