@@ -136,8 +136,8 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
 });
 
 // #2340: i lavori del server si aprono in parallelo se i loro rami non si toccano, quindi rami e incroci li vedono.
-function repoConRami(rami) {
-  const repo = cartellaTemporanea('manutentore-rami');
+function repoConRami(rami, repo = cartellaTemporanea('manutentore-rami')) {
+  mkdirSync(repo, { recursive: true });
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
   g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
   // I file dei rami ci sono già su main: un file nuovo non si mostra (#2337), e qui si provano i file in chiaro.
