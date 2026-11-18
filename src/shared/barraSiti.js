@@ -62,7 +62,7 @@
 
   function voceValida(v) {
     if (!v || typeof v !== 'object' || typeof v.id !== 'string' || !v.id) return null;
-    const nome = testo(v.nome).slice(0, MAX_NOME);
+    const nome = nomeLeggibile(v.nome).slice(0, MAX_NOME);
     if (v.tipo === 'app') {
       const percorso = String(v.percorso || '');
       if (!percorso || !assoluto(percorso)) return null;
@@ -70,7 +70,7 @@
     }
     const url = normalizzaIndirizzo(v.url);
     if (!url) return null;
-    return { id: v.id, tipo: 'sito', url, nome: nome || new URL(url).hostname.replace(/^www\./, ''), icona: icona(v.icona) };
+    return { id: v.id, tipo: 'sito', url, nome: nome || nomeDelSito(url), icona: icona(v.icona) };
   }
 
   function normalizza(raw) {
