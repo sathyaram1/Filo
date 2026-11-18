@@ -9,6 +9,7 @@ import { aggiornaMain, testoBaseMain } from './finish-local.mjs';
 import { apriProvaSulCommit } from './lib/unit-sulla-fusione.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { absolutizeOutput, pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { FUORI_DAI_CASI, normalizzaSpec, primaRiga, raccogliCasi, verdetto } from './suite-verdict.mjs';
 
 // Dalla copia fissata degli strumenti il progetto vero lo dice la copia, come per gli altri strumenti dei ruoli.
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
