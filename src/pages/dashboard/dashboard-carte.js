@@ -1058,6 +1058,8 @@
   // ===== Menu del tasto destro =====
   function vociMenu(art) {
     const c = art._carta;
+    // Un avviso volato ha il menu che aveva nell'angolo; in più solo quello che ogni carta della home sa fare.
+    if (c.menu) return [...c.menu, null, { etichetta: 'Apri nel filo', fai: () => apriNelFilo(art) }];
     const voci = [];
     if (c.principale) voci.push({ etichetta: c.principale.etichetta, fai: () => c.principale.fai() });
     if (c.secondaria) voci.push({ etichetta: c.secondaria.etichetta, fai: () => c.secondaria.fai() });
