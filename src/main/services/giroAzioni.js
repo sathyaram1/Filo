@@ -33,9 +33,12 @@ async function eseguiGiro(azioni, { contesto, fonti, avvia, dopo, fermo = () => 
 //   esiti     → [{ action, res, rendered }] nell'ordine del giro
 //   daLeggere → vero se l'esito porta al modello qualcosa da leggere
 //   testo     → quello che il modello ha scritto insieme alle azioni
-function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '' } = {}) {
+//   messaggio → quello che ha scritto l'utente: se c'è anche una domanda, l'azione secca non le risponde (#2349)
+function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '', messaggio = '' } = {}) {
   const L = globalThis.SN_ACTION_LEVELS;
   if (!L || !Array.isArray(esiti) || !esiti.length) return false;
+  const AF = globalThis.SN_AUTO_FEEDBACK;
+  if (AF && AF.chiedeInformazione(messaggio)) return false;
   if (String(testo || '').trim() && esiti.some((e) => e && e.res && e.res.needsConfirm)) return false;
   return esiti.every((e) => {
     const res = e && e.res;
