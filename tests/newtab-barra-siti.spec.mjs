@@ -353,6 +353,7 @@ test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si i
   await lasciaSullaBarra(app, shell, page, cron.id);
   await expect(page.locator('#dashFlash')).toContainText('è già nella barra');
   await expect(voce).toHaveClass(/dash-trovato/);
+  await scatta(page, 'gia-nella-barra');
   await expect(voce).toHaveCount(1);
 
   // Il clic porta alla Cronologia (una sola scheda per pagina di Filo: torna davanti quella aperta).
