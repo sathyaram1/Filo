@@ -61,8 +61,11 @@ lavoro a 1 nell'ordine non partiva. I compiti senza feedback stanno nell'ordine
 col loro id (`C-12`) accanto ai numeri, e un feedback può aspettare un compito:
 l'attesa si scioglie quando il compito chiude. Le sessioni libere (compiti,
 sessioni accese a mano) seguono la stessa sequenza del pacemaker: le 3, poi i
-lavori già iniziati (finiscono da soli, dentro o fuori dall'ordine), poi
-l'ordine, poi il resto per urgenza.
+lavori già iniziati (finiscono da soli, dentro o fuori dall'ordine; prima
+quelli dell'ordine nella sua sequenza, a qualunque priorità, #2411), poi
+l'ordine, poi il resto per urgenza. La stessa sequenza divide i posti fra la
+voce normale e quella del server, e decide quando una sessione lascia il posto
+all'altra voce.
 
 La soglia fra i livelli si muove con la maturità di Filo e con i token
 disponibili. Lo decide il manutentore, e lo scrive nel taccuino quando cambia
