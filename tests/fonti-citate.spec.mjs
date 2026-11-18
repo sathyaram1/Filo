@@ -43,6 +43,7 @@ async function stubModello(app, finale) {
         try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {}
         return { ...base, text: '', toolCalls: [c], finishReason: 'tool_calls' };
       }
+      globalThis.__vistoDalModello = esiti;
       const text = finale.split('$URL').join(url);
       // In diretta arriva a pezzi, marcatori compresi: a schermo non devono mai vedersi.
       for (let i = 0; i < text.length; i += 7) { try { onDelta && onDelta(text.slice(i, i + 7)); } catch (_) {} }
