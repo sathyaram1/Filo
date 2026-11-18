@@ -162,11 +162,14 @@
     b.append(ic, corpo, el('span', 'dash-cerca-quando', quando(r.ts)));
     b._risultato = r;
     b.addEventListener('mousedown', (e) => e.preventDefault());
-    b.addEventListener('click', () => { apri(r).catch(() => {}); });
+    b.addEventListener('click', () => { usa(r).catch(() => {}); });
+    // Un passaggio veloce sopra l'elenco non trascina il centro avanti e indietro.
+    b.addEventListener('mouseenter', () => { clearTimeout(passaggio); passaggio = setTimeout(() => mostra(b), 90); });
+    b.addEventListener('mouseleave', () => clearTimeout(passaggio));
     return b;
   }
 
-  async function apri(r) {
+  async function usa(r) {
     if (r.k === 'significato') return significato(r);
     const i = voci.findIndex((v) => v._risultato === r);
     if (sessione) {
