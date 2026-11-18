@@ -387,8 +387,7 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   const fd = openSync(log, 'w');
   // Lanciata da dentro un `node --test`, questa variabile farebbe dei test provati dei figli suoi: niente rapporti.
   // I file dei comandi di Actions no: il codice provato scriverebbe l'esito della propria prova (#2225).
-  const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
-  for (const k of COMANDI_DI_ACTIONS) delete env[k];
+  const { NODE_TEST_CONTEXT: _figlio, ...env } = senzaComandiDiActions(process.env);
   // I file li sceglie la prova (tutti, o `file`): la regola del PC dell'owner non li riduce (unit-sul-pc.mjs).
   env.FILO_UNIT_LONTANE = '0';
   let r;
