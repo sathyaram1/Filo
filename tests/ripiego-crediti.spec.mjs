@@ -835,9 +835,14 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   await page.mouse.move(300, 140, { steps: 5 });
   await page.mouse.move(500, 180, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(avvisi, { timeout: 30_000 }).toContain('Testo trascritto e copiato');
+  // Il testo letto sta nel riquadro di Trascrivi, nello strato sopra la scheda (#2374): letto, si chiude.
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-overlay')).toBeVisible({ timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-overlay .sn-rinomina-rotella')).toHaveCount(0, { timeout: 30_000 });
   await expect.poll(avvisi, { timeout: 10_000 }).toContain(RIGA);
   expect(seen.completions.slice(prima).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
+  await strato.keyboard.press('Escape');
+  await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
 
   // «spiega» dopo: la riga sta nel riquadro, e la frase non torna in un secondo avviso.
   await page.evaluate(() => {
