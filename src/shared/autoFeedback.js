@@ -144,7 +144,8 @@
   // cortese seguita da un infinito. Sentinella: tests/unit/autoFeedbackRichiesta.test.mjs.
   const VERBI_DI_COMANDO = [
     'apri', 'riapri', 'chiudi', 'richiudi', 'metti', 'rimetti', 'togli', 'leva', 'passa', 'passi', 'vai', 'torna', 'torni',
-    'salva', 'salvi', 'cerca', 'cerchi', 'trova', 'trovi', 'mostra', 'mostri', 'fai', 'fa', 'fam', 'dam', 'cambia', 'cambi',
+    'salva', 'salvi', 'cerca', 'cerchi', 'trova', 'trovi', 'mostra', 'mostri', 'fai', 'fammi', 'fammelo', 'fammela', 'fallo',
+    'falla', 'dammi', 'dammelo', 'dammela', 'cambia', 'cambi',
     'imposta', 'imposti', 'attiva', 'attivi', 'disattiva', 'disattivi', 'accendi', 'spegni', 'sposta', 'sposti', 'aggiungi',
     'rimuovi', 'cancella', 'cancelli', 'elimina', 'elimini', 'scrivi', 'riscrivi', 'manda', 'mandi', 'invia', 'invii',
     'porta', 'porti', 'riporta', 'ingrandisci', 'rimpicciolisci', 'zooma', 'traduci', 'copia', 'copi', 'incolla',
