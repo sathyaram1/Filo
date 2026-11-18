@@ -1,4 +1,4 @@
-Si chiude senza aprire il lavoro, e poi si rilascia il biglietto:
+Si chiude così, e poi si rilascia il biglietto:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
