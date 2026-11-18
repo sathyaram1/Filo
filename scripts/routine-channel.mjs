@@ -2010,10 +2010,7 @@ if (isMain) {
       // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
       rilascia: (guasto, mio, quadro) => rilascioForzato(['--guasto', guasto], mio, { [ENV_QUADRO_FERMO]: String(quadro || '') }),
       // Il tetto di costo di un compito (#2303): i dollari dei transcript del worker dal biglietto, col listino del rapporto.
-      costo: async (s) => {
-        const { costoDeiFile } = await import('./session-report.mjs');
-        return costoDeiFile((s.tracce && s.tracce.file) || [], { since: Number.isFinite(s.dalMs) ? new Date(s.dalMs).toISOString() : '' });
-      },
+      costo: misuraDelTetto,
       rilasciaOltre: (oltre, mio) => rilascioForzato(['--oltre-tetto', `${oltre.usd}:${oltre.tettoUsd}`], mio),
     });
     console.log(esito.testo);
