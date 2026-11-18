@@ -90,8 +90,11 @@ ore prima: riaperta la home, il Bluetooth acceso da Windows nel frattempo
 risultava «spento». Adesso il main dà Bluetooth e Wi-Fi letti più di due giri
 fa in `vecchio`, e la home li dice «Leggo lo stato…» senza interruttore finché
 la lettura nuova arriva (annunciata anche se uguale a quella di prima).
-«Unknown» di Windows vale «non so», non spento. L'acceso letto con l'elenco dei
-dispositivi è una lettura vera della radio e rinfresca il main.
+«Unknown» di Windows vale «non so», non spento, e la regola sta solo in
+`AccesoRadio`, che usano il giro e l'elenco. L'acceso letto con l'elenco dei
+dispositivi è una lettura vera della radio e rinfresca il main. Il volume
+cambiato da Filo e l'avviso del caricatore invece sono ritocchi: non contano
+come lettura delle radio (#2394.1).
 
 ## Su Windows gli elenchi li legge il lettore già acceso (#2394)
 
