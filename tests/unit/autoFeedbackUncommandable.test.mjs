@@ -100,7 +100,7 @@ test('#474: le domande comuni, con ogni grafia, non fanno partire la proposta', 
     'dimmi come tradurre la pagina',
     // le tre già riconosciute e la variante con l'apostrofo
     'come faccio a tradurre la pagina?',
-    'dove si trova lo zoom della pagina?',
+    'dove si trova la traduzione della pagina?',
     'cosa sai fare?',
     'e\' possibile tradurre la pagina?',
     // grafie equivalenti: apostrofo tipografico, maiuscole, «qual'è», accento acuto
