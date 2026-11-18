@@ -89,4 +89,4 @@ function ritiraAvviso(chiave) {
   } catch (_) {}
 }
 
-module.exports = { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso };
+module.exports = { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso, allaCornice };
