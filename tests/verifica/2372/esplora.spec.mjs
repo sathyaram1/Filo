@@ -25,6 +25,11 @@ for (const caso of ['diretto', 'dopo-clic', 'dopo-fill', 'dopo-fill-clic']) {
     if (caso.startsWith('dopo-fill')) { await page.keyboard.type('yo', { delay: 30 }); await page.locator('#input').fill(''); }
     if (caso.endsWith('clic')) await page.mouse.click(640, 300);
     console.log(caso, 'prima', JSON.stringify(await info(page)));
+    console.log(caso, 'cfg', JSON.stringify(await page.evaluate(async () => {
+      const s = await self.SN_STORAGE.getSettings();
+      return { raw: s.doppioTocco, norm: self.SN_DOPPIO_TOCCO.normalizza(s.doppioTocco) };
+    })));
+    await page.evaluate(() => { window.__tasti = []; document.addEventListener('keydown', (e) => window.__tasti.push([e.key, e.repeat, Math.round(e.timeStamp), e.isTrusted, e.defaultPrevented]), true); });
     await page.keyboard.type('yy', { delay: 40 });
     await page.waitForTimeout(800);
     console.log(caso, 'dopo', JSON.stringify(await info(page)), 'aperte', await aperte(app, url));
