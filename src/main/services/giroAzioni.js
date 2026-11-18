@@ -38,7 +38,7 @@ function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '', messaggio =
   const L = globalThis.SN_ACTION_LEVELS;
   if (!L || !Array.isArray(esiti) || !esiti.length) return false;
   const AF = globalThis.SN_AUTO_FEEDBACK;
-  if (AF && AF.chiedeInformazione(messaggio)) return false;
+  if (AF && AF.domandaOltreAlComando(messaggio)) return false;
   if (String(testo || '').trim() && esiti.some((e) => e && e.res && e.res.needsConfirm)) return false;
   return esiti.every((e) => {
     const res = e && e.res;
