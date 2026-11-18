@@ -1722,6 +1722,7 @@
     VOLUME: senza('limitato'),
     RIPRENDI_AUDIO: senza('nonPartita'),
     PAUSA_AUDIO: senza('nessuna'),
+    TRASCRIVI: fatta,
     MOSTRA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
     WIFI: accesaOSpenta,
