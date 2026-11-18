@@ -967,7 +967,7 @@
     'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
     'email-nei-siti': 'impostazioni(imposta)', 'testo-dei-campi': 'impostazioni(imposta)', 'spellcheck-manage': 'scheda(apri)',
     editor: 'file(leggi_editor)', 'translate-page': SOLO_A_MANO, 'explain-image': SOLO_A_MANO,
-    'copy-download-image': SOLO_A_MANO, 'search-image': 'scheda(cerca_immagine)', 'video-audio-controls': 'scheda(pausa_audio)',
+    'copy-download-image': SOLO_A_MANO, 'search-image': 'scheda(lens)', 'video-audio-controls': 'scheda(pausa_audio)',
     'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
     ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
     'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': 'scheda(salva_per_dopo)',
