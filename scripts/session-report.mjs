@@ -1261,6 +1261,11 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
     if (finestra.senzaBiglietto) rep.notes.push('momento del biglietto non trovato: contato dalla fine dell\'ultimo worker');
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
+    // Modello e sforzo dei turni del worker contro la decisione del server, prima di sommare i figli, che hanno i loro (#2553).
+    if (sottoAgente) {
+      const voce = decisioneDelBiglietto(ticket, { dir: configDir || dirImpostazioniUtente(env) });
+      rep.notes.push(...confrontoDecisione({ voce, modelli: rep.models, sforzi: rep.effort, forzato: modelloForzato(env) }));
+    }
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
     // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
     // mancanza, dal tempo, e allora il rapporto lo dice).
