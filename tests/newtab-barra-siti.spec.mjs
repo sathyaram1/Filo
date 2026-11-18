@@ -355,11 +355,13 @@ test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si i
   await expect(voce).toHaveClass(/dash-trovato/);
   await expect(voce).toHaveCount(1);
 
-  // Il clic apre la Cronologia in una scheda.
-  const quante = async () => (await schede(shell)).filter((t) => String(t.url).startsWith('filo://history')).length;
-  const prima = await quante();
+  // Il clic porta alla Cronologia (una sola scheda per pagina di Filo: torna davanti quella aperta).
+  const davanti = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+    return w._filoTabs.activeId;
+  });
   await voce.click();
-  await expect.poll(quante, { timeout: 8000 }).toBe(prima + 1);
+  await expect.poll(davanti, { timeout: 8000 }).toBe(cron.id);
 
   // Un file aperto in una scheda.
   const dir = cartellaTemporanea('barra-siti-file');
