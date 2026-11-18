@@ -452,11 +452,13 @@
     }
 
     if (analysis.kind === 'capability-uncommandable') {
+      // La funzione per nome (#2348): una proposta che non la nomina non si capisce.
+      const funzione = analysis.capabilityTitle ? `«${analysis.capabilityTitle}»` : 'questa cosa';
       const parts = [`Ho chiesto a Filo: "${asked}"`];
       parts.push(admitted
-        ? `Filo sa fare questa cosa, ma l'assistente non l'ha fatta: mi ha spiegato come farla a mano ("${admitted}")`
-        : 'Filo sa fare questa cosa, ma l\'assistente non l\'ha fatta: mi ha spiegato come farla a mano.');
-      parts.push('Mi piacerebbe poterla chiedere all\'assistente e basta.');
+        ? `Filo sa fare ${funzione}, ma l'assistente non ha uno strumento per farlo e mi ha spiegato come farlo a mano ("${admitted}")`
+        : `Filo sa fare ${funzione}, ma l'assistente non ha uno strumento per farlo e mi ha spiegato come farlo a mano.`);
+      parts.push('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
       return {
         type: 'INVIA_FEEDBACK',
         testo: parts.join('\n').slice(0, 1500),
