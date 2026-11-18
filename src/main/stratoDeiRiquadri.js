@@ -11,7 +11,8 @@ const { zoomDaTasto, rotellaZoom } = require('./tabs/tabZoom');
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto', 'trascrizione']);
-const IMMAGINE = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+require('../shared/trascrizioneRighe.js');
+const { IMMAGINE } = globalThis.SN_TRASCRIZIONE_RIGHE;
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
 // può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
 const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
