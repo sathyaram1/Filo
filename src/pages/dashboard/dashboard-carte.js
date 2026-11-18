@@ -1435,6 +1435,15 @@
     apriMenu,
     avviso,
     aperta: (nome) => dati.aperte[nome] === true,
+    // Il doppio tocco (#2372): un tasto fa quello che fa il suo clic, una carta apre la sua app.
+    usa(id) {
+      if (C.tasto(id)) { usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`)); return true; }
+      const c = C.carta(id);
+      if (c && c.url) { apri(c.url); return true; }
+      return false;
+    },
+    // Mentre la ricerca tiene la colonna, carte, «altro» e il sistema non si vedono.
+    nascondiColonna(si) { for (const n of [tieniEl, altroEl]) if (n) n.classList.toggle('dietro-ricerca', !!si); },
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
