@@ -304,6 +304,7 @@
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
+        case 'transcribe_image': await Actions?.transcribeImage(imgEl); break;
         case 'search_image': return { filo: {
           action: { type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine' },
           etichetta: label,
