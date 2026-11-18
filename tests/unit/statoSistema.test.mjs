@@ -430,6 +430,47 @@ test('Windows: un PowerShell vivo che non risponde agli elenchi li rimanda allo 
   assert.equal(await m.chiedi('bluetooth', 5000), null);
 });
 
+// #2394.1 — una risposta lenta (PC occupato, ripresa dalla sospensione) segna muto quel PowerShell, non il lettore: la
+// sua risposta, arrivata tardi, lo toglie; e il processo nuovo che riparte con la home non lo eredita.
+test('Windows: il PowerShell che ha risposto tardi torna a dare gli elenchi, e quello nuovo non nasce muto', async () => {
+  let lento = true;
+  let figli = 0;
+  const w = L.lettoreWindows({
+    avvia: () => {
+      figli += 1;
+      const f = figlioFinto();
+      f.stdin = new PassThrough();
+      f.stdin.setEncoding('utf8');
+      f.stdin.on('data', (r) => {
+        const cosa = String(r).trim();
+        setTimeout(() => f.stdout.write(`${JSON.stringify({ elenco: { cosa, acceso: true, dispositivi: [] } })}\n`), lento ? 120 : 5);
+      });
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ volume: { livello: 10, muto: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  assert.equal(await w.chiedi('bluetooth', 30), null, 'la risposta non arriva in tempo: si passa allo script');
+  assert.equal(await w.chiedi('wifi', 1000), null, 'finché quel PowerShell tace, senza aspettarlo');
+  // La risposta di prima arriva: il PowerShell c'è, e gli elenchi tornano a lui.
+  await new Promise((r) => setTimeout(r, 200));
+  lento = false;
+  const r = await w.chiedi('wifi', 1000);
+  assert.equal(r && r.cosa, 'wifi');
+  // Muto di nuovo, poi la home si chiude e il lettore riparte con un processo nuovo che risponde subito.
+  lento = true;
+  assert.equal(await w.chiedi('bluetooth', 30), null);
+  w.ferma();
+  lento = false;
+  w.assicura();
+  await w.pronto(2000);
+  assert.equal(figli, 2);
+  const nuovo = await w.chiedi('bluetooth', 1000);
+  w.ferma();
+  assert.equal(nuovo && nuovo.cosa, 'bluetooth');
+});
+
 test('una radio letta più di due giri fa è «vecchia» per chi riceve lo stato, finché il lettore o un elenco non la rileggono', async () => {
   const P = L._perProve;
   let bt = { acceso: false, dispositivi: [] };
