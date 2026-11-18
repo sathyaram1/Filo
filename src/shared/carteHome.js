@@ -220,7 +220,7 @@
     const tit = (v) => senzaAccenti(v.titolo);
     const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2);
     const tipo = (Object.entries(TIPI_SINISTRA).find(([, nomi]) => nomi.some((n) => parole.includes(n) || s.includes(`${n} `))) || [null])[0];
-    const candidate = tipo ? tutte.filter((v) => v.tipo === tipo) : tutte;
+    const candidate = tipo ? tutte.filter(diTipo(tipo)) : tutte;
     let trovate = candidate.filter((v) => tit(v) === s);
     if (!trovate.length) trovate = candidate.filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
     if (!trovate.length) {
