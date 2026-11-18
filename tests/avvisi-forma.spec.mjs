@@ -167,6 +167,24 @@ test('con la riduzione del movimento la carta compare subito nella colonna, senz
   await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(0);
 });
 
+// #2570 — la segnalazione automatica parte quando il suo avviso se ne va: nella colonna non se ne andrebbe mai.
+for (const ridotto of [false, true]) {
+  test(`nella home un avviso a tempo di cui si aspetta l'uscita resta nell'angolo e alla scadenza se ne va${ridotto ? ' (movimento ridotto)' : ''}`, async ({ app, shell, avvisi }) => {
+    const home = await homePage(app);
+    if (ridotto) { await shell.emulateMedia({ reducedMotion: 'reduce' }); await home.emulateMedia({ reducedMotion: 'reduce' }); }
+    await shell.evaluate(() => {
+      window.__uscite = 0;
+      window.filoNotify('L\'ho segnalato a chi sviluppa Filo', { durationSec: 1, alChiudere() { window.__uscite += 1; } });
+    });
+    await expect(shell.locator('.shell-notif', { hasText: 'L\'ho segnalato' })).toHaveAttribute('data-luogo', 'angolo');
+    const vista = await avvisi();
+    await expect(vista.locator('.shell-notif.show', { hasText: 'L\'ho segnalato' })).toBeVisible();
+    await expect.poll(() => shell.evaluate(() => window.__uscite), { timeout: 6_000 }).toBe(1);
+    await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(0);
+    await expect(home.locator('#accade > .dash-carta[data-tipo="cornice"]')).toHaveCount(0);
+  });
+}
+
 test('su un sito l\'avviso resta nell\'angolo e se ne va: non diventa una carta; tornando alla home non resta nell\'angolo', async ({ app, shell, avvisi, openTab, testServer }) => {
   await testServer.openReady(openTab, '<h1>Un sito</h1>');
   await shell.evaluate(() => window.filoNotify('Breve, su un sito', { durationSec: 1 }));
