@@ -88,15 +88,19 @@
     return senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli|l')\s*/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
   }
 
-  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor») → id del catalogo, o null.
-  // `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor», «il tasto delle impostazioni») → id del catalogo
+  // delle carte o dei tasti, o null. `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Un tasto si riconosce solo dai suoi nomi: il titolo «Download» a parole è lo scaricamento a sinistra.
   function risolvi(nome, { esatto = false } = {}) {
-    const s = pulisciNome(nome);
+    const s = pulisciNome(nome).replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
     if (!s) return null;
-    if (IDS.includes(s)) return s;
+    const id = [...IDS, ...ID_TASTI].find((x) => senzaAccenti(x) === s);
+    if (id) return id;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
+    for (const t of TASTI) if (t.nomi.includes(s)) return t.id;
     if (esatto) return null;
     for (const c of CARTE) if (c.nomi.some((n) => s.includes(n))) return c.id;
+    for (const t of TASTI) if (t.nomi.some((n) => s.includes(n))) return t.id;
     return null;
   }
 
