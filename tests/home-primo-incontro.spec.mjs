@@ -69,6 +69,8 @@ test('tolta la carta dei Crediti torna la home intera, e da «altro» la si rime
   await expect(crediti(page)).toHaveCount(0);
   await expect(page.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible();
   const rimetti = page.locator('#altro .dash-altro-app[data-id="crediti"][data-tolta="1"] + .dash-altro-rimetti');
+  // Quello che è fuori vista sta nel «+» (#2372).
+  await page.locator('#altroPiu').click();
   await expect(rimetti).toBeVisible();
   await rimetti.click();
   await expect(crediti(page)).toBeVisible();
