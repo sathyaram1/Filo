@@ -116,8 +116,8 @@ function main() {
     : provaSpec({ root: resolve(a.root), ramo: a.ramo, main: a.main, spec: a.spec, noti: leggiNoti(resolve(fileURLToPath(import.meta.url), '..', '..')) });
   const json = JSON.stringify(campo);
   console.log(`${MARCA_PARTE} spec ${json}`);
-  if (process.env.GITHUB_OUTPUT) {
-    try { appendFileSync(process.env.GITHUB_OUTPUT, `campo=${json}\n`, 'utf8'); } catch (e) {
+  if (uscita) {
+    try { appendFileSync(uscita, `campo=${json}\n`, 'utf8'); } catch (e) {
       console.error(`spec-fusione-azione: non riesco a scrivere l'esito della parte (${e.message})`);
       process.exit(2);
     }
