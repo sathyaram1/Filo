@@ -1648,7 +1648,39 @@
       campo: null,
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-        return t ? ['Portarti su ', cit(t)] : 'Portarti su una scheda aperta';
+        if (t) return ['Portarti su ', cit(t)];
+        if (a && a.verso === 'dopo') return 'Portarti sulla scheda dopo';
+        return a && a.verso === 'prima' ? 'Portarti sulla scheda prima' : 'Portarti su una scheda aperta';
+      },
+    },
+    // Come Alt+S: la pagina resta in «Aperti per dopo», da dove si riapre con un clic. Costo 1.
+    SALVA_PER_DOPO: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Salvare per dopo ', cit(t), ' e chiuderne la scheda'] : 'Salvare per dopo la pagina e chiuderne la scheda';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const t = String(o.titolo || (a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return o.salvata ? `Salvata per dopo «${t || 'la pagina'}»` : 'Pagina non salvata';
+      },
+    },
+    // Un'immagine dell'utente va a Google: costo 2, come la ricerca dell'Aiuto che porta fuori testo della pagina.
+    CERCA_IMMAGINE: {
+      costo: 2,
+      campo: 'web',
+      describe: (a) => {
+        const n = Number(a && a.immagine);
+        if (Number.isInteger(n) && n > 0) return `Cercare con Google Lens l'immagine ${n} di questa chat`;
+        return a && a.scheda != null ? 'Cercare con Google Lens l\'immagine più grande della pagina'
+          : 'Cercare con Google Lens l\'immagine (l\'ultima mandata in chat, o la più grande della pagina)';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        if (!o.cercata) return 'Immagine non cercata';
+        return o.numero ? `Cercata con Google Lens l'immagine ${o.numero} di questa chat` : 'Cercata con Google Lens l\'immagine della pagina';
       },
     },
   };
