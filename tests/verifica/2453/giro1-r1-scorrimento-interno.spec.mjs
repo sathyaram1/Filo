@@ -25,6 +25,7 @@ async function chatConFile(app) {
     const zavorra = document.createElement('div');
     zavorra.style.cssText = 'height:3000px;flex:none';
     s.appendChild(zavorra);
+    s.prepend(zavorra.cloneNode());
     b.scrollIntoView({ block: 'center' });
     return { scrollHeight: s.scrollHeight, clientHeight: s.clientHeight, top: s.scrollTop, pagina: document.scrollingElement.scrollHeight > innerHeight };
   });
