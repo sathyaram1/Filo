@@ -240,9 +240,14 @@
   function indiceSchedaVicina(ev, attiva, quante) {
     if (!ev || !(String(ev.code || '') === 'Tab' || String(ev.key || '') === 'Tab')) return null;
     if (!modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return null;
+    return schedaNelVerso(modificatore(ev, 'shift') ? 'prima' : 'dopo', attiva, quante);
+  }
+
+  // La stessa regola per «passa alla scheda dopo» chiesto in chat (#2371): `verso` è 'dopo' o 'prima'.
+  function schedaNelVerso(verso, attiva, quante) {
     const n = Number(quante);
     if (!Number.isInteger(n) || n < 1) return null;
-    const indietro = modificatore(ev, 'shift');
+    const indietro = verso === 'prima';
     const i = Number(attiva);
     if (!Number.isInteger(i) || i < 0 || i >= n) return indietro ? n - 1 : 0;
     return (i + (indietro ? n - 1 : 1)) % n;
