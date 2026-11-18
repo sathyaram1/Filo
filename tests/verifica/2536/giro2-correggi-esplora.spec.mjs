@@ -54,7 +54,7 @@ for (const { giro, chiede, toglie } of CASI) {
     const intervista = await newtabPage(app, 1);
     await expect(intervista.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
     const n = await intervista.locator('.dash-bubble-filo').count();
-    await intervista.locator('#input').fill('sono luca. ah il mio gatto pepe purtroppo non c\'è più, toglilo dalla memoria');
+    await intervista.locator('#input').fill(chiede);
     await intervista.locator('#sendBtn').click();
     await attendiRisposta(intervista, n + 1);
     await intervista.waitForTimeout(5_000);
