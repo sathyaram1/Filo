@@ -1084,7 +1084,9 @@
     let rispostaPrima = '';
     let giroIniziato = false;
     const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-    const testoDelGiro = () => (globalThis.SN_CALC
+    // I marcatori delle fonti non si vedono mentre arrivano: l'etichetta la mette la risposta finale, controllata (#2383).
+    const senzaMarcatori = (t) => (globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || ''));
+    const testoDelGiro = () => senzaMarcatori(globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
     const bollaDellaRisposta = () => {
