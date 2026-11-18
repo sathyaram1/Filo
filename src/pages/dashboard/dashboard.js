@@ -2245,6 +2245,15 @@
   async function comandoLocale(text, { incollato = false } = {}) {
     Comandi.lasciaNonRisolto();
     Coda.fineRisali();
+    // «cerca nel filo X» apre la stessa ricerca del suo tasto (#2372), con X già scritto.
+    const cerca = !incollato && text.match(/^(?:cerca|cercami|trova|trovami|ricerca)\s+(?:nel\s+filo\b[\s:,]*(.*)|(.+?)\s+nel\s+filo[.!?]*)$/i);
+    if (cerca) {
+      inputEl.value = '';
+      autoGrowInput();
+      Comandi.updateInputClass();
+      Cerca.apri((cerca[1] || cerca[2] || '').trim());
+      return true;
+    }
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
