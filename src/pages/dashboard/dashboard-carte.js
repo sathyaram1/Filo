@@ -862,7 +862,9 @@
     if (t.url) { apri(t.url); return; }
     if (t.comando) {
       // Il menu della shell si apre sotto il tasto, ovunque l'utente l'abbia messo (#1491).
-      const r = ancora && ancora.isConnected ? ancora.getBoundingClientRect() : null;
+      // Dal «+» chiuso o dal doppio tocco il tasto non si vede: il menu si apre sotto il «+».
+      const visto = (n) => { const r = n && n.isConnected ? n.getBoundingClientRect() : null; return r && r.width ? r : null; };
+      const r = visto(ancora) || visto(altroEl && altroEl.querySelector('#altroPiu'));
       d.send({ type: MSG.SHELL_ACTION, command: t.comando, ...(r ? { anchor: { x: r.left, y: r.bottom } } : {}) });
     }
   }
