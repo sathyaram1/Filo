@@ -80,6 +80,15 @@ test('#1803.1 le pagine di Filo entrano nella barra; un file aperto in una sched
   assert.match(B.applica([], { tipo: 'aggiungi', url: 'chrome://settings' }).errore, /non è l'indirizzo di un sito/);
 });
 
+test('#1803.1 a parole: Filo mette una pagina di Filo nella barra come un sito', async () => {
+  storageFinto();
+  const S = Servizio();
+  const r = await S.daChat({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'filo://editor/editor.html', nome: 'Editor' });
+  assert.equal(r.executed, true, r.output.error);
+  assert.deepEqual(r.output.voci, [{ nome: 'Editor', indirizzo: 'filo://editor/editor.html' }]);
+  assert.equal(globalThis.SN_ACTION_LEVELS.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'filo://editor/editor.html' }), 1);
+});
+
 test('#1803.1 l\'estensione di un programma la riconosce la regola dei file che eseguono: punti, spazi e segni invisibili in coda', () => {
   const E = globalThis.SN_ESEGUIBILI;
   for (const p of ['C:\\Giochi\\Gioco.exe.', 'C:\\Giochi\\Gioco.exe  ', 'C:\\Giochi\\Gioco.EXE', '/Applications/Gioco.app/']) {
