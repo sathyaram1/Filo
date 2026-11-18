@@ -32,6 +32,6 @@ for (const caso of ['diretto', 'dopo-clic', 'dopo-fill', 'dopo-fill-clic']) {
     await page.evaluate(() => { window.__tasti = []; document.addEventListener('keydown', (e) => window.__tasti.push([e.key, e.repeat, Math.round(e.timeStamp), e.isTrusted, e.defaultPrevented]), true); });
     await page.keyboard.type('yy', { delay: 40 });
     await page.waitForTimeout(800);
-    console.log(caso, 'dopo', JSON.stringify(await info(page)), 'aperte', await aperte(app, url));
+    console.log(caso, 'dopo', JSON.stringify(await info(page)), 'aperte', await aperte(app, url), JSON.stringify(await page.evaluate(() => window.__tasti)));
   });
 }
