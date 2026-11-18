@@ -11,8 +11,9 @@
   const TETTI = Object.freeze({ nome: 120, testo: 40000, domandaFineTurno: 4000 });
   const ORA_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
   // Il tetto di costo di una corsa (#2303): scritto dall'owner, o `perMediana` volte la mediana delle ultime `corse`.
-  // Largo apposta: ferma una corsa impazzita, non una che costa un po' più del solito.
-  const TETTO_COSTO = Object.freeze({ max: 10000, corse: 10, perMediana: 2 });
+  // Largo apposta: ferma una corsa impazzita, non una che costa un po' più del solito. `minimo`: le corse fermate non
+  // contano, quindi una settimana da 0,40 $ lascerebbe un tetto da 1 $ che nessuna corsa vera passa più (#2303.1).
+  const TETTO_COSTO = Object.freeze({ max: 10000, corse: 10, perMediana: 2, minimo: 5 });
 
   const no = (errore, dettaglio) => ({ ok: false, errore, dettaglio });
   const testo = (v) => (typeof v === 'string' ? v : '');
