@@ -36,7 +36,7 @@ const TRACCIA = JSON.stringify({ events: [
   { tStartMs: 95000, segs: [{ utf8: 'la biga riposa diciotto ore' }] },
 ] });
 
-const fixture = test.extend({
+const test = base.extend({
   // Il finto www.youtube.com: /watch è la pagina del video, /api/timedtext la traccia. Tiene il conto delle richieste.
   youtube: async ({}, use) => {
     const { der, privateKey } = certificato({ organizzazione: 'Filo test', nomeComune: 'www.youtube.com', usi: [] });
