@@ -72,7 +72,7 @@ export function testoUcciso({ programma = 'worker', cosa = '', codice = NaN, mem
   const nome = String(programma || 'worker').toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker';
   const perMemoria = uccisiPerMemoria(memoria, prima);
   const causa = perMemoria === true ? 'il kernel ha ucciso processi per memoria'
-    : perMemoria === false ? 'nessun processo ucciso per memoria: un riavvio del contenitore o un tetto dell\'harness'
+    : perMemoria === false ? 'nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi (la sessione, l\'harness o un riavvio del contenitore)'
       : 'causa non leggibile';
   const parti = [
     `guasto: strumento ${nome}: processo ucciso${Number.isFinite(codice) ? ` (${codice})` : ''}${cosa ? ` durante ${pulito(cosa)}` : ''}`,
