@@ -68,13 +68,11 @@
     const tolte = unici(lista(r.tolte).filter((id) => IDS.includes(id)));
     const destra = unici(lista(r.destra).filter((id) => IDS.includes(id) && !tolte.includes(id)));
     for (const id of IDS) if (!destra.includes(id) && !tolte.includes(id)) destra.push(id);
-    const conTasti = Array.isArray(r.tasti) || Array.isArray(r.riposti);
     const riposti = unici(lista(r.riposti).filter((id) => ID_TASTI.includes(id)));
     const tasti = unici(lista(r.tasti).filter((id) => ID_TASTI.includes(id) && !riposti.includes(id)));
     for (const t of TASTI) {
       if (tasti.includes(t.id) || riposti.includes(t.id)) continue;
-      // Chi ha salvato prima dei tasti (#2372) ha le app in vista: le ritrova lì, e il resto va dove sta di serie.
-      if (t.fuori && !(conTasti === false && APP.some((a) => a.id === t.id))) riposti.push(t.id);
+      if (t.fuori) riposti.push(t.id);
       else tasti.push(t.id);
     }
     const sinistra = unici(lista(r.sinistra).filter(chiaveValida)).slice(0, TETTO_ORDINE);
