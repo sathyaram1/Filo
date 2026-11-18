@@ -1396,7 +1396,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
     // La segnalazione la propone Filo, non l'ha chiesta l'utente: è fuori dal perimetro del compito (#530).
-    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false, chiesta: false };
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false, chiesta: false, nelFilo: 'segnalazione' };
     let res = await executeFiloAction(proposal, conContesto);
     if (res.output && res.output.blocked === 'segreto') {
       proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
