@@ -50,6 +50,7 @@ test('le corse sono senza ripetizioni e partono dal lancio preparato, come finis
   // #2454: l'esito si legge dal resoconto, caso per caso, non dall'uscita di Playwright; su main corre lo spec del ramo.
   assert.match(src, /PLAYWRIGHT_JSON_OUTPUT_FILE: resoconto/);
   assert.match(src, /esitiPerSpec\(report, specs\)/);
+  assert.match(src, /for \(const spec of specDaRifareDaSoli\(prima\.esiti, specs\)\)/, 'chi non parte insieme agli altri si rifà da solo, su tutti e due i lati');
   assert.match(src, /portaSpecDelRamo\(\{ root: ROOT, shaRamo, shaMain, specs: scelta\.specs, dir: albero\.dir \}\)/);
 });
 
