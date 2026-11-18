@@ -167,6 +167,13 @@ toccate, più qualche minuto di unit: un ramo largo passa l'ora; la durata
 prevista la stampa prima di partire, e in sottofondo gli dai il tetto più
 largo), l'installazione di Electron.
 
+**Un'uscita 137 è un processo ucciso** (SIGKILL); il tetto dell'harness su un
+comando in sottofondo si legge diverso («killed», «time limit»). Dopo un 137 di
+`finish:check` o della sua attesa lancia `aspetta`: se la corsa è morta senza
+finire te lo dice, con la fase, la memoria e il guasto già scritto. Rilanciala
+una volta: gli spec già verdi su quel contenuto non si rifanno. Se muore di
+nuovo, rilascia con quel `--guasto`, senza ritentare (#2571).
+
 **Mai un'attesa scritta da te nella shell**: `sleep`, un ciclo `until` o
 `while` che dorme, `tail --pid`, `timeout N bash -c …`. In cloud l'harness
 blocca `sleep` in primo piano e chiede un permesso che nessuno approva: il
