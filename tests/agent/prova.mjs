@@ -88,8 +88,7 @@ async function run() {
   let finale = '';
   let app = null;
   try {
-    // Node nel main di Filo non segue il proxy da solo: senza, nel contenitore la chat non arriva al fornitore.
-    const aperta = await d.launchFilo({ userDataPrefix: 'filo-prova-', extraEnv: { NODE_USE_ENV_PROXY: '1' } });
+    const aperta = await apriFiloPerLaProva();
     app = aperta.app;
     const { shell } = aperta;
     if (chiave) await preparaFilo(app, shell, chiave);
