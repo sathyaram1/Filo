@@ -1,4 +1,4 @@
-// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.000 per gli
+// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.200 per gli
 // strumenti, perché il prompt non ricresca in silenzio (+11.000 token fra il 25/09 e il 07/10).
 // Stima dichiarata: caratteri / 2. Tarata sulle misure del 07/10 col contatore di Anthropic su claude-haiku-5-5: gli
 // strumenti di allora (45.460 caratteri) contavano 21.700 token, «CLASSIFICAZIONE INTENTO» (18.521) 8.700: 2,1
