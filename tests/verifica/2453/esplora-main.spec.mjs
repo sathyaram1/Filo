@@ -18,9 +18,10 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
       { text: 'Eccolo.' },
     ]);
     const page = await home(app);
+    if (process.env.RINOMINA_MAIN_ATTIVO) await page.evaluate((src) => { (0, eval)(src); }, MAIN);
     await chiedi(page, 'trova la scansione');
     await expect(page.locator('.dash-file-btn').first()).toBeVisible({ timeout: 15000 });
-    await page.evaluate((src) => { (0, eval)(src); }, MAIN);
+    expect(await page.evaluate(() => /scorsoDopo/.test(window.SN_RINOMINA_UI.menu.toString()))).toBe(!process.env.RINOMINA_MAIN_ATTIVO);
     await page.evaluate(() => {
       const b = document.querySelector('.dash-file-btn');
       const s = b.closest('.dash-bubbles');
