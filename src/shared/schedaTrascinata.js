@@ -156,7 +156,7 @@
     illumina(doc, null);
     ora = null;
     if (msg.fase !== 'lascia' || !b) return false;
-    if (b.chat) { try { return b.chat.prendi(scheda) !== false; } catch (_) { return false; } }
+    if (b.chat) { try { return b.chat.prendi(scheda || grezza) !== false; } catch (_) { return false; } }
     return scriviNelCampo(doc, b.campo, x, y, scheda);
   }
 
