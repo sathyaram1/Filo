@@ -131,7 +131,7 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
   assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
-  assert.match(err.join('\n'), /Nessuna scheda per #99/);
+  assert.match(err.join('\n'), /Nessuna scheda né perizia per #99/);
   assert.equal(await M.main(['boh']), 1);
 });
 
