@@ -23,11 +23,26 @@
   async function apri(opz = {}) {
     let dataUrl = String(opz.dataUrl || '');
     if (!/^data:image\//i.test(dataUrl)) return false;
-    if (dataUrl.length > DATI_MAX) dataUrl = await inJpeg(dataUrl);
+    const { IMMAGINE } = global.SN_TRASCRIZIONE_RIGHE;
+    if (!IMMAGINE.test(dataUrl)) dataUrl = await inJpeg(dataUrl);
+    if (!IMMAGINE.test(dataUrl)) {
+      global.SN_POPUP?.showToast?.(t('menu_image_unreadable'));
+      return false;
+    }
     const rect = rettangolo(opz.rect);
-    if (global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, () => disegna({ dataUrl, rect }))) return true;
+    if (sopra(dataUrl, rect, RIDUZIONI)) return true;
     disegna({ dataUrl, rect });
     return true;
+  }
+
+  // Il limite dello strato lo dice lo strato quando rifiuta: l'immagine si rimpicciolisce sotto quello e si riprova.
+  function sopra(dataUrl, rect, restano) {
+    const nelDocumento = () => disegna({ dataUrl, rect });
+    return global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, nelDocumento, async (limite) => {
+      const ridotta = restano > 0 && limite > 0 ? await inJpeg(dataUrl, limite) : '';
+      if (ridotta && ridotta.length < dataUrl.length && sopra(ridotta, rect, restano - 1)) return;
+      global.SN_POPUP?.showToast?.(t('trascrivi_troppo_grande'));
+    });
   }
 
   function rettangolo(r) {
