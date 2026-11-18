@@ -410,9 +410,9 @@
     },
     {
       id: 'google-lens', nome: 'Google Lens',
-      base: ['https://lens.google.com/uploadbyurl'],
-      occasione: 'quando cerchi un’immagine dal tasto destro',
-      riceve: 'l’indirizzo dell’immagine',
+      base: ['https://lens.google.com/uploadbyurl', 'https://lens.google.com/v3/upload'],
+      occasione: 'quando cerchi un’immagine dal tasto destro, o chiedi a Filo in chat di cercarla',
+      riceve: 'l’indirizzo dell’immagine; per un’immagine mandata in chat, l’immagine stessa',
       frase: 'apre Google Lens',
       dove: ['src/shared/urlNav.js'],
     },
