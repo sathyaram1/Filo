@@ -348,6 +348,8 @@
         if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
+      const datoPrima = self.__snTastoDestroInAttesa?.();
+      if (datoPrima && !isBlocked()) onContextMenu(datoPrima);
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
