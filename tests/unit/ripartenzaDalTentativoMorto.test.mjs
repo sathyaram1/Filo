@@ -510,8 +510,8 @@ test('giro vero: un lavoro nuovo non tocca su origin i superati degli altri feed
     git(casa, 'push', '-q', 'origin', 'main', `:refs/heads/${ramo('20261014T000000Z', altro)}`);
     const r = await giro(casa, port);
     assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
-    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/worker/${altro}-*`), '', 'il tentativo superato dell\'altro feedback è chiuso');
-    assert.match(r.se, /tentativi di altri feedback superati .*tolti da origin: worker\/fid-1140-20261012T000000Z/);
+    assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261012T000000Z', altro)}`), '', 'il superato dell\'altro feedback resta alla potatura del server');
+    assert.doesNotMatch(r.se, /tolti da origin|restano su origin/);
   } finally {
     srv.close();
     togliCartella(base);
