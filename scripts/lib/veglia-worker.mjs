@@ -241,8 +241,8 @@ export function testoGuasto({
   }
   // #2571: un worker vivo risponde a un'uscita 137; tacere dopo vuol dire che è morta anche la sua sessione.
   const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
-  if (corsa || ucciso) {
-    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}): è morta anche la sua sessione. ${coda}`;
+  if (!attesa && (corsa || ucciso)) {
+    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}), segno che col comando è morta anche la sua sessione. ${coda}`;
     return corsa
       ? guastoDellaCorsa(corsa, memoria, dopo)
       : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, coda: dopo });
