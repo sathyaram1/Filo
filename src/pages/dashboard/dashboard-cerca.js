@@ -398,16 +398,26 @@
     pannello.hidden = true;
     host.append(box, pannello);
     campo.addEventListener('input', () => {
+      ultimaBattuta = Date.now();
+      clearTimeout(seguiTimer);
       clearTimeout(attesa);
       attesa = setTimeout(() => { cerca().catch(() => {}); }, 180);
     });
     // Col pannello ancora aperto (il fuoco torna da un menu) la scelta fatta con le frecce resta dov'era.
     campo.addEventListener('focus', () => { if (pannello.hidden && campo.value.trim().length >= 2) cerca().catch(() => {}); });
-    // Il menu di un risultato aperto da tastiera tiene il pannello: chiuso lui, il fuoco torna nel campo.
-    campo.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== campo && !document.activeElement?.closest?.('.sn-menu')) chiudi(); }, 150); });
+    // Esc chiude anche col fuoco su un risultato o sulla lente.
+    host.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !aperta) return;
+      e.preventDefault();
+      e.stopPropagation();
+      chiudi();
+    });
+    // Lo scorrimento a mano del centro ferma il centro che segue la battitura.
+    for (const n of [d.bubblesEl].filter(Boolean)) {
+      for (const ev of ['wheel', 'touchstart', 'pointerdown']) n.addEventListener(ev, () => { if (aperta) { manuale = true; clearTimeout(seguiTimer); } }, { passive: true });
+    }
     campo.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); chiudi({ svuota: true }); campo.blur(); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); evidenzia(scelta + 1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); evidenzia(scelta + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); evidenzia(scelta - 1); }
       else if (e.key === 'Enter') {
         e.preventDefault();
