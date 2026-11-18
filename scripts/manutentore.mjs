@@ -730,7 +730,18 @@ export function rigaSchedaServer(s, locale = null) {
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
   const loc = locale ? ` [${unaRiga(locale.area) || '?'}/${unaRiga(locale.tipo) || '?'}] ${unaRiga(locale.riassunto)}${
     Array.isArray(locale.file_probabili) && locale.file_probabili.length ? ` | file: ${locale.file_probabili.map(unaRiga).join(', ')}` : ''}` : '';
-  return `${pezzi}${titolo ? ` — ${titolo}` : ''}${loc}`;
+  return `${pezzi}${titolo ? ` — ${titolo}` : ''}${loc || rigaPerizia(s)}`;
+}
+
+/** La perizia di un feedback senza scheda locale (un non fidato, #2337.2): classe, area, unioni, file. PURA. */
+export function rigaPerizia(s) {
+  const pezzi = [
+    Number.isInteger(s && s.classe) ? `classe ${s.classe}/10` : '',
+    s && s.area ? `area ${unaRiga(s.area)}` : '',
+    s && Array.isArray(s.unioni) && s.unioni.length ? `da unire a ${s.unioni.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
+    s && Array.isArray(s.file) && s.file.length ? `file: ${s.file.map(unaRiga).join(', ')}` : '',
+  ].filter(Boolean);
+  return pezzi.length ? ` [perizia: ${pezzi.join(' · ')}]` : '';
 }
 
 /** L'indice per le funzioni sulle schede locali (rigaOrdine, conNumeri, senzaChiusi) dalle schede del server. PURA. */
