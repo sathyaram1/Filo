@@ -174,6 +174,7 @@ import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 import { leaseAtteso } from './lib/lease-atteso.mjs';
+import { letturaMemoria } from './lib/memoria-contenitore.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
