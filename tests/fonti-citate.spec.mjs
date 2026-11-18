@@ -52,11 +52,11 @@ async function stubModello(app, finale) {
 }
 
 async function preparaRete(app, risultati) {
-  await app.evaluate((_e, results) => {
+  await app.evaluate(({ net }, results) => {
     globalThis.SN_WEB_SEARCH.search = async () => ({ ok: true, provider: 'stub', results });
     globalThis.SN_LETTURA_PAGINE._cache.clear();
-    // Lo scaricatore vero rifiuta gli indirizzi locali: qui il server di prova passa.
-    globalThis.SN_LETTURA_PAGINE._dip.scarica = (u, opts) => fetch(u.replace('sito-pubblico.test', '127.0.0.1'), opts);
+    // Lo scaricatore vero rifiuta il server di prova, che risponde dalla rete di casa: qui passa, col suo nome.
+    globalThis.SN_LETTURA_PAGINE._dip.scarica = (u, opts) => net.fetch(u, opts);
   }, risultati);
 }
 
