@@ -145,6 +145,22 @@ test('il clic apre la pagina sulla frase col frammento di testo, e la non trovat
   assert.equal(F.indirizzoConFrase('javascript:alert(1)', 'ciao'), '');
 });
 
+test('il prompt della chat chiede il marcatore nella forma che il controllo riconosce, e non più il link alla fonte', () => {
+  const prompt = globalThis.SN_CONST.PROMPTS.filoChatStatic();
+  const riga = prompt.split('\n').find((r) => r.startsWith('Fonti:'));
+  assert.ok(riga, 'manca la regola delle fonti');
+  const forma = /\[\[fonte: <[^>]+> \| <[^>]+>\]\]/.exec(riga);
+  assert.ok(forma, riga);
+  // Riempita come la riempirebbe il modello, la forma del prompt diventa un'etichetta.
+  const url = 'https://example.com/e';
+  const esempio = forma[0].replace(/<[^>]+>/, url).replace(/<[^>]+>/, 'una frase vera');
+  const r = F.controlla(`Dato. ${esempio}`, F.sorgenti([lettura(url, 'Qui c\'è una frase vera.')]));
+  assert.equal(r.text, 'Dato.');
+  assert.equal(r.fonti[0]?.esito, 'verificata');
+  assert.match(riga, /traduzione/);
+  assert.doesNotMatch(prompt, /cita da quale pagina viene ogni dato, con il link/);
+});
+
 test('una citazione con i puntini salta una parte, ma l\'ordine conta', () => {
   const url = 'https://example.com/d';
   const s = F.sorgenti([lettura(url, 'Il treno parte alle 8, con fermate intermedie, e arriva alle 11.')]);
