@@ -498,7 +498,7 @@ test('giro vero, il main di adesso va in conflitto col tentativo morto: non si f
   }
 });
 
-test('giro vero: a ogni lavoro nuovo se ne vanno da origin i superati degli altri feedback, anche col ramo fuso già potato', async () => {
+test('giro vero: un lavoro nuovo non tocca su origin i superati degli altri feedback', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, port } = await fintoServer();
   try {
