@@ -85,7 +85,8 @@
   }
 
   function pulisciNome(nome) {
-    return senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli|l')\s*/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
+    // L'articolo vuole lo spazio dopo (o l'apostrofo): «impostazioni» non comincia con «i».
+    return senzaAccenti(nome).replace(/^(?:(?:la|il|lo|le|i|gli)\s+|l'\s*)/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
   }
 
   // Il nome come lo dice l'utente («la carta dei mazzi», «Editor», «il tasto delle impostazioni») → id del catalogo
