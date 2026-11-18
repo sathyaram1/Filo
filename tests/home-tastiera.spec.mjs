@@ -74,14 +74,15 @@ test('«yy» dato dalle Preferenze apre la pagina; «ayy», la y tenuta premuta,
   await expect(campo).toHaveValue(/^y{2,}$/);
   expect(await aperte(app, url)).toBe(0);
 
-  // Con la conferma che chiede una parola sopra la home, la doppia finisce nel suo campo.
+  // Con la conferma che chiede una parola sopra la home la doppia resta testo: nel campo del riquadro, o in quello
+  // della chat se il riquadro gli rimanda i tasti di chi stava scrivendo (#592). Mai un comando.
   await campo.fill('');
-  await page.evaluate(() => { window.__conferma = window.SN_CONFIRM_UI.confirmTyped({ title: 'Prova', message: 'Scrivi conferma', word: 'conferma' }); });
+  await page.evaluate(() => { window.__conferma = window.SN_CONFIRM_UI.confirmTyped({ title: 'Prova', text: 'Scrivi conferma', word: 'conferma' }); });
   await page.waitForTimeout(400);
   await page.keyboard.type('yy', { delay: 40 });
   await page.waitForTimeout(600);
   expect(await aperte(app, url)).toBe(0);
-  await expect(campo).toHaveValue('');
+  await expect(campo).toHaveValue(/^(yy)?$/);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
