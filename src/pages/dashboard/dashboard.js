@@ -1010,6 +1010,8 @@
     RIPRENDI_AUDIO: 'Faccio ripartire la musica…',
     PAUSA_AUDIO: 'Metto in pausa…',
     MOSTRA_SCHEDA: 'Ti porto sulla scheda…',
+    SALVA_PER_DOPO: 'Salvo la pagina per dopo…',
+    CERCA_IMMAGINE: 'Cerco l\'immagine…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
