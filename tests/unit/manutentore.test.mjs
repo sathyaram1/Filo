@@ -701,7 +701,7 @@ test('#2338: l5, l4, bilanci e passa chiamano le operazioni del server coi campi
   const s = serverFinto(t, {
     'l5.elenco': [200, { ok: true, richieste: [{ id: 'r1', numero: '#900', repo: 'server', ramo: 'worker/x', sha: 'a'.repeat(40), controlli: ['guard_the_guards'], file: ['functions/src/routine/deliver.js'], allOwner: ['.github/workflows/deploy.yml (le automazioni di filo-security)'] }], nonFidate: 2 }],
     'l5.approva': [200, { ok: true, numero: '#900', repo: 'app', result: 'merged' }],
-    'l4.elenco': [200, { ok: true, bocciature: [{ num: '#901', sha: 'b'.repeat(40), titolo: 'Un titolo', motivo: 'Riga uno.\nRiga due.' }] }],
+    'l4.elenco': [200, { ok: true, bocciature: [{ num: '#901', sha: 'b'.repeat(40), titolo: 'Un titolo', motivo: 'Riga uno.\nRiga due.' }], soloFatti: [{ num: '#903', branch: 'worker/y', nonFidato: true }] }],
     'l4.salta': [200, { ok: true, numero: '901', esito: 'attesa_unit' }],
     bilanci: (b) => [200, { ok: true, bilanci: Object.assign({ cap3: 3, cap2: 1, cap1: 0, tettoVerifiche: 6 }, b.dati), ...(Object.keys(b.dati || {}).length ? { cambi: Object.keys(b.dati) } : {}) }],
     passa: [200, { ok: true, numero: '902', figli: ['#902.1'] }],
