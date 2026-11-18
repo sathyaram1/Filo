@@ -25,7 +25,9 @@
   // ma dentro il tetto in token: al più un quarto, e la finestra si stringe di quanto prendono.
   const MESSAGGI_DELLA_CHAT = 20;
   const QUOTA_RIPRESI = 0.25;
-  const CARATTERI_PER_TOKEN = 3.5;
+  // Tarata sul contatore di Anthropic, il fornitore il cui listino cambia a 100.000 token: le misure stanno nella
+  // sentinella tests/unit/tettiDelContesto.test.mjs (#2473). Un modello che conta meno token finisce solo un po' prima.
+  const CARATTERI_PER_TOKEN = 2;
   // Oltre il tetto il taglio scende un quarto sotto: i turni dopo trovano lo stesso inizio, e la cache lo riusa.
   const RIENTRO = 0.75;
   // Le immagini mandate in chat tornano col loro messaggio finché vive come una lettura (#1166). Una foto pesa per i
