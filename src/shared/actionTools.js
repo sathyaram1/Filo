@@ -107,7 +107,7 @@
     },
     SALVA_PER_DOPO: {
       via: ['scheda', 'salva'],
-      description: 'salva per dopo una pagina (senza scheda: la web davanti) e la chiude.',
+      description: 'salva per dopo e chiude una pagina (senza scheda: la web davanti).',
       properties: { scheda: I() }, required: [],
     },
     CERCA_IMMAGINE: {
