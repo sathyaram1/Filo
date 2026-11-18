@@ -30,7 +30,10 @@ async function chiaveVera(app, modello) {
         [C.ACTIONS.FILO_COMPATTAZIONE]: 'deepseek-flash',
         [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
       },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      modelRegistry: {
+        ...globalThis.SN_TEST_MODELS.registry,
+        prova: { label: modello, provider: 'openrouter', model: modello, weights: 'open', inputs: ['text'], outputs: ['text'] },
+      },
     });
     // Ogni richiesta ai modelli resta da guardare: chi la manda e con quali messaggi.
     const P = globalThis.SN_PROVIDERS;
