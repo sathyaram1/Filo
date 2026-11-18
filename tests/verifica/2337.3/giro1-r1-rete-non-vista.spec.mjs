@@ -1,5 +1,5 @@
 // Verifica #2337.3, giro 1, rilievo 1: il rapporto del manutentore non vede la rete chiamata dalla shell in forme
-// comuni oltre a quelle del feedback, né la lettura di un ramo di un worker per sha o FETCH_HEAD dopo averlo scaricato.
+// comuni oltre a quelle del feedback (un lanciatore, un percorso intero, una variabile fra virgolette).
 import '../../helpers/senzaSessione.mjs';
 import { test, expect } from '@playwright/test';
 import { chiamaLaRete } from '../../../scripts/session-report.mjs';
