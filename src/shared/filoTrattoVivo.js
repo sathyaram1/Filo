@@ -286,7 +286,7 @@
     else if (stringa(e.fermata)) esito = `fermata (${e.fermata})`;
     else esito = stringa(e.errore) ? `non riuscita: ${e.errore}` : 'non fatta';
     const cambi = Array.isArray(e.cambi) && e.cambi.length ? ` (cambio ${e.cambi.join(', ')})` : '';
-    return `${chi}: ${campo(ev.nome, 60)}${campo(par)} → ${campo(esito)}${cambi}`;
+    return `${chi}: ${campo(ev.nome, 60)}${campo(par)} → ${campo(esito)}${cambi}${testo}`;
   }
 
   function rigaCambio(e) {
