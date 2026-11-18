@@ -46,8 +46,8 @@ async function scorriEApri(page) {
     const x = Math.round(r.left + 10);
     const y = Math.round(r.top + r.height / 2);
     b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
-    return { x, y, vw: innerWidth, vh: innerHeight };
-  }, inFondo);
+    return { x, y };
+  });
 }
 
 // L'evento arriva un fotogramma dopo, e non sempre dopo che il menu ascolta: tre aperture di fila, ognuna deve reggere.
