@@ -128,6 +128,8 @@ test('un tasto si mette nel «+», si rimette dove lo si lascia, si sposta; il �
 
 test('i tasti si nominano a parole; «impostazioni» è il tasto, le rapide sono la carta, «download» resta a sinistra', () => {
   assert.equal(C.risolvi('le impostazioni'), 'impostazioni');
+  assert.equal(C.risolvi('impostazioni', { esatto: true }), 'impostazioni', 'la «i» iniziale non è un articolo');
+  assert.equal(C.risolvi('Impostazioni rapide', { esatto: true }), 'rapide');
   assert.equal(C.risolvi('il tasto delle impostazioni'), 'impostazioni');
   assert.equal(C.risolvi('impostazioni rapide'), 'rapide');
   assert.equal(C.risolvi('la ricerca', { esatto: true }), 'cerca');
