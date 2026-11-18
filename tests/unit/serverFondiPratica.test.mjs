@@ -554,8 +554,12 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.equal(nonPartita.suite, 'non_partita');
   const riga = messageForServerMerge(nonPartita, 'worker/x');
   assert.match(riga, /senza avviarla \(https:\/\/github\.com\/x\/actions\/runs\/43709496611\): non è un rosso del ramo/);
-  assert.match(riga, /limite di spesa di Actions.*Run workflow sul ramo worker\/x/);
+  assert.match(riga, /limite di spesa di Actions\. Sistemati quelli, apri quella corsa e rifalla con «Re-run jobs», poi rilancia lo stesso comando\./);
   assert.doesNotMatch(riga, /correggi/);
+  // «Suite del server» parte solo dalle spinte (#2540.1): il pulsante «Run workflow» lì non c'è.
+  assert.doesNotMatch(riga, /Run workflow/);
+  const senzaIndirizzo = messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'non_partita' }), 'worker/x');
+  assert.match(senzaIndirizzo, /apri l’ultima corsa di «Suite del server» sul ramo worker\/x in Actions di filo-security e rifalla con «Re-run jobs»/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
   // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
