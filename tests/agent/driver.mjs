@@ -524,10 +524,31 @@ export async function typeText(app, shell, text, dove = null) {
   await sleep(200);
 }
 
+// I tasti di Playwright arrivano alla pagina saltando il browser, e before-input-event non li vede: le scorciatoie della
+// finestra (Ctrl+T, Ctrl+W, Alt+cifra…) restavano morte per chi pilota. Passano prima da lì, come quelli di una
+// persona, e la pagina li riceve solo se Filo non li prende. Ritorna true se li ha presi Filo.
 export async function pressKey(app, shell, key, dove = null) {
   const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
-  await page.keyboard.press(key);
+  const t = leggiTasto(key);
+  if (!t.ok) throw new Error(t.errore);
+  const preso = await primaAlBrowser(app, page, { ...t.input, type: 'keyDown' });
+  if (!preso) await page.keyboard.press(t.playwright);
+  await primaAlBrowser(app, page, { ...t.input, type: 'keyUp' });
   await sleep(200);
+  return preso;
+}
+
+// Lo stesso evento che riceve la vista di `page` quando una persona preme il tasto; true se un ascoltatore l'ha fermato.
+async function primaAlBrowser(app, page, input) {
+  const bersaglio = await bersaglioDi(page);
+  if (!bersaglio) return false;
+  return app.evaluate(({ webContents }, { bersaglio, input }) => {
+    const wc = webContents.getAllWebContents().find((w) => !w.isDestroyed() && w.getOrCreateDevToolsTargetId() === bersaglio);
+    if (!wc) return false;
+    let fermato = false;
+    wc.emit('before-input-event', { sender: wc, preventDefault() { fermato = true; } }, { isAutoRepeat: false, isComposing: false, location: 0, ...input });
+    return fermato;
+  }, { bersaglio, input });
 }
 
 export async function scrollBy(app, shell, dy) {
