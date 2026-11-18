@@ -138,7 +138,7 @@ export function stampoDelTentativo(ramo, id) {
  * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
  * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
  * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
- * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
+ * regola dei tentativi dà per morti, che non si riprendono. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
  * `num`, se c'è, aggiunge alla regola la fusione del feedback letta su main.
  */
 export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', escludi = '' }) {
@@ -220,44 +220,8 @@ function fusioniLette(root, main, numeri) {
   try { return fusioniSuMain(root, { ref: main, numeri }); } catch (_) { return {}; }
 }
 
-/**
- * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: un feedback chiuso non
- * riparte più (#2152). La fusione letta su main conta anche qui, così regge dopo la potatura del ramo fuso; `num` e
- * `id`, il feedback che riparte, traducono anche la sua fusione dal numero. Best-effort.
- */
-export function chiudiSuperatiOvunque({ root, mainBranch = 'main', num = '', id = '' }) {
-  const elenco = tentativiSuOrigin(root, 'refs/heads/worker/*');
-  if (!elenco.ok) return { ok: false, chiusi: [], errore: elenco.errore };
-  const g = gitIn(root);
-  const main = `origin/${mainBranch}`;
-  const m = scaricaTentativi(g, mainBranch, []);
-  if (!m.ok) return { ok: false, chiusi: [], errore: m.errore };
-  const fusioni = fusioniLette(root, main, numeriDi(num, id));
-  const perId = new Map();
-  for (const t of elenco.rami) {
-    const l = leggiTentativo(t.ramo);
-    if (l) perId.set(l.id, [...(perId.get(l.id) || []), t]);
-  }
-  // Un tentativo solo può essere superato solo da una fusione letta su main: il fratello fuso non c'è più.
-  const candidati = [...perId].filter(([i, v]) => v.length > 1 || fusioni[i]).flatMap(([, v]) => v);
-  if (!candidati.length) return { ok: true, chiusi: [] };
-  const f = scaricaTentativi(g, mainBranch, candidati);
-  if (!f.ok) return { ok: false, chiusi: [], errore: f.errore };
-  const superati = tentativiSuperati(statoDeiTentativi(root, g, main, candidati), { fusioni });
-  return chiudiTentativi({ root, rami: [...superati] });
-}
-
-/**
- * Toglie da origin i tentativi superati: lasciati lì nessuno li fonde, e la potatura dei fusi non li vede mai (#2152).
- * Best-effort: un no di origin lascia i rami come sono, e lo dice. La negoziazione non serve a una cancellazione, e
- * su HTTP la sua riga «fatal» copriva il vero motivo del no.
- */
-export function chiudiTentativi({ root, rami }) {
-  const elenco = (Array.isArray(rami) ? rami : []).filter((r) => leggiTentativo(r));
-  if (!elenco.length) return { ok: true, chiusi: [] };
-  const p = gitIn(root)(['-c', 'push.negotiate=false', 'push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
-  return p.ok ? { ok: true, chiusi: elenco } : { ok: false, chiusi: [], errore: rigaDiErrore(p.out, 'push fallito') };
-}
+// I tentativi superati non si tolgono da qui: dalla cloud la cancellazione su origin prende 403. Li toglie la potatura
+// del server, che ha la credenziale (#2518). Sentinella: tests/unit/ripartenzaDalTentativoMorto.test.mjs.
 
 /**
  * Porta dentro il ramo ripartito il main di adesso: nato dalla punta di un tentativo morto, lavorerebbe sul codice di

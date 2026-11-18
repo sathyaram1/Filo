@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
-import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, chiudiTentativi, chiudiSuperatiOvunque, rigaDiErrore } from '../../scripts/lib/branch-integrity.mjs';
+import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, rigaDiErrore } from '../../scripts/lib/branch-integrity.mjs';
 import { leggiTentativo, tentativiSuperati } from '../../scripts/lib/tentativi.mjs';
 import { fusionePropria, fusioniSuMain, ramiInCorso } from '../../scripts/lib/su-main.mjs';
 import { conNumeri, numeriDellIndice } from '../../scripts/manutentore.mjs';
@@ -193,11 +193,6 @@ describe('quale tentativo precedente si riprende', () => {
       assert.equal(dopo.scelto.ramo, ramo('20261103T000000Z'), 'morto dopo la riapertura: è il lavoro da riprendere');
       assert.deepEqual(dopo.altri, []);
       assert.deepEqual(dopo.superati, [ramo('20261101T000000Z')]);
-
-      const c = chiudiTentativi({ root: casa, rami: dopo.superati });
-      assert.equal(c.ok, true, c.errore);
-      assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il ramo superato non resta su origin');
-      assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261103T000000Z')}`), '');
     } finally { togliCartella(base); }
   });
 
@@ -234,30 +229,7 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
-  test('i tentativi superati di ogni feedback si chiudono, anche di quelli che non ripartono più', () => {
-    const base = cartellaTemporanea('filo-ripartenza-');
-    try {
-      const { casa, main } = scena(base);
-      const altro = 'fid-1170';
-      tentativo(casa, ramo('20261012T000000Z', altro), main, 17);
-      tentativo(casa, ramo('20261014T000000Z', altro), main, 15);
-      const terzo = tentativo(casa, ramo('20261015T000000Z', altro), main, 21);
-      const quarto = tentativo(casa, ramo('20261018T000000Z', altro), terzo, 2);
-      git(casa, 'merge', '-q', '--no-ff', '--no-edit', quarto);
-      git(casa, 'push', '-q', 'origin', 'main');
-      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
-      tentativo(casa, ramo('20261102T000000Z'), 'main', 0);
-      const c = chiudiSuperatiOvunque({ root: casa });
-      assert.equal(c.ok, true, c.errore);
-      assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', altro), ramo('20261014T000000Z', altro)]);
-      const restano = git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*').split('\n').map((r) => r.split('\t')[1].replace('refs/heads/', '')).sort();
-      assert.deepEqual(restano, [ramo('20261015T000000Z', altro), ramo('20261018T000000Z', altro), ramo('20261101T000000Z'), ramo('20261102T000000Z')].sort(),
-        'i fusi li toglie la potatura; il lavoro mai fuso di un feedback senza fusioni resta');
-      assert.equal(git(casa, 'rev-parse', `origin/${ramo('20261101T000000Z')}`), vivo);
-    } finally { togliCartella(base); }
-  });
-
-  test('feedback chiuso, ramo fuso già potato: la pulizia generale e l\'elenco del manutentore leggono la fusione su main (#2152.1)', () => {
+  test('feedback chiuso, ramo fuso già potato: l\'elenco del manutentore legge la fusione su main (#2152.1)', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
       const { casa, main } = scena(base);
@@ -273,7 +245,7 @@ describe('quale tentativo precedente si riprende', () => {
       git(casa, 'merge', '-q', '--no-ff', '-m', 'merge-gate: #1141 via server', fusoC);
       git(casa, 'push', '-q', 'origin', 'main');
       git(casa, 'push', '-q', 'origin', `:refs/heads/${ramo('20261014T000000Z', conFinish)}`, `:refs/heads/${ramo('20261014T000000Z', conCancello)}`);
-      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
+      tentativo(casa, ramo('20261101T000000Z'), main, 1);
       git(casa, 'fetch', '-q', '--prune', 'origin');
 
       // Come lo chiama il manutentore: i numeri dall'indice dei feedback.
@@ -282,11 +254,6 @@ describe('quale tentativo precedente si riprende', () => {
         'nell\'elenco del manutentore restano solo i lavori vivi');
       assert.equal(ramiInCorso(casa, { giorni: 0 }).filter((x) => x.ramo.includes(conFinish)).length, 0,
         'la fusione che nomina il tentativo non ha bisogno del numero');
-
-      const c = chiudiSuperatiOvunque({ root: casa, num: '#1141', id: conCancello });
-      assert.equal(c.ok, true, c.errore);
-      assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', conFinish), ramo('20261012T000000Z', conCancello), ramo('20261013T000000Z', conCancello)].sort());
-      assert.equal(git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*'), `${vivo}\trefs/heads/${ramo('20261101T000000Z')}`, 'resta solo il lavoro vivo');
     } finally { togliCartella(base); }
   });
 
@@ -485,7 +452,8 @@ test('giro vero, tentativi nati tutti da main: la busta nomina quelli che il ram
   }
 });
 
-test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è la base e se ne va da origin', async () => {
+// #2518: dalla cloud la cancellazione su origin prende 403 a ogni partenza; i superati li toglie la potatura del server.
+test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è la base, e dispatch non lo cancella', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, port } = await fintoServer();
   try {
@@ -498,7 +466,8 @@ test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è l
     assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
     assert.equal(r.json.payload.ripartenza, undefined, 'niente da riprendere: il lavoro vivo è già su main');
     assert.equal(git(casa, 'rev-parse', 'HEAD'), git(casa, 'rev-parse', 'origin/main'));
-    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il superato è chiuso');
+    assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il superato resta alla potatura del server');
+    assert.doesNotMatch(r.se, /tolti da origin|restano su origin/);
   } finally {
     srv.close();
     togliCartella(base);
@@ -529,7 +498,7 @@ test('giro vero, il main di adesso va in conflitto col tentativo morto: non si f
   }
 });
 
-test('giro vero: a ogni lavoro nuovo se ne vanno da origin i superati degli altri feedback, anche col ramo fuso già potato', async () => {
+test('giro vero: un lavoro nuovo non tocca su origin i superati degli altri feedback', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, port } = await fintoServer();
   try {
@@ -541,8 +510,8 @@ test('giro vero: a ogni lavoro nuovo se ne vanno da origin i superati degli altr
     git(casa, 'push', '-q', 'origin', 'main', `:refs/heads/${ramo('20261014T000000Z', altro)}`);
     const r = await giro(casa, port);
     assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
-    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/worker/${altro}-*`), '', 'il tentativo superato dell\'altro feedback è chiuso');
-    assert.match(r.se, /tentativi di altri feedback superati .*tolti da origin: worker\/fid-1140-20261012T000000Z/);
+    assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261012T000000Z', altro)}`), '', 'il superato dell\'altro feedback resta alla potatura del server');
+    assert.doesNotMatch(r.se, /tolti da origin|restano su origin/);
   } finally {
     srv.close();
     togliCartella(base);
