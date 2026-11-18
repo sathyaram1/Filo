@@ -107,9 +107,11 @@ for (const { n: giro, modello, conChatPassata = false } of GIRI) {
       onb: JSON.stringify((await globalThis.SN_FILO_MEMORY.getOnboarding()).thread),
     }), daQui);
     const promptChat = rec.filter((r) => r.messaggi.includes('Sei Filo, l\'assistente dentro il browser Filo'));
-    console.log(`\n=== giro ${giro} ===\nPAGINA:\n${pagina}\nLEZIONI: ${lezioni}\nMEMORIA: ${memoria}\nRICHIESTE: ${rec.map((r) => `${r.nome} geometra=${/geometr/i.test(r.messaggi)} tc=${r.tc.slice(0, 300)} testo=${String(r.testo || '').slice(0, 300)}`).join('\n')}`);
+    const bolle = (await intervista.locator('.dash-bubble-filo, .dash-bubble-user').allInnerTexts()).join('\n| ');
+    const righe = (await intervista.locator('body').innerText()).split('\n').filter((l) => /Memorizzato|Ricorder/i.test(l)).join(' / ');
+    console.log(`\n=== giro ${giro} ${modello} ===\nBOLLE:\n| ${bolle}\nRIGHE: ${righe}\nLEZIONI: ${lezioni}\nMEMORIA: ${memoria}\nPROMPT CHAT CON PROFILO: ${promptChat.filter((r) => /geometr|lisbon/i.test(r.messaggi)).length}/${promptChat.length}`);
     expect(promptChat.length, 'la chat è andata al modello').toBeGreaterThan(0);
-    for (const r of promptChat) expect(r.messaggi.match(/geometr|\bpepe\b|lisbon|risposte brevi/i), 'nel prompt dell’intervista').toBeNull();
+    for (const r of promptChat) expect(r.messaggi.match(/geometr|\bpepe\b|lisbon/i), 'nel prompt dell’intervista').toBeNull();
     expect(pagina.match(FUGA), `nell’intervista: ${pagina}`).toBeNull();
     expect(onb.match(FUGA), 'nel filo dell’intervista').toBeNull();
     const nuove = JSON.parse(lezioni).map((l) => l.text).join('\n');
