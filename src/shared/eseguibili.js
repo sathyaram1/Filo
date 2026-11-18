@@ -58,7 +58,14 @@
   // quindi vanno tolti PRIMA di guardare l'estensione, o il controllo si salta
   // con un carattere.
   function estensione(nome) {
-    const s = nomeVisibile(nome).replace(/[.\s ]+$/, '');
+    const s = nomeVero(nome);
+    const i = s.lastIndexOf('.');
+    if (i <= 0) return '';
+    return s.slice(i + 1).toLowerCase();
+  }
+  // Il nome come lo apre il sistema, a cui si guarda l'estensione: senza segni invisibili, punti e spazi in coda.
+  function nomeVero(nome) {
+    return nomeVisibile(nome).replace(/[.\s ]+$/, '');
     const i = s.lastIndexOf('.');
     if (i <= 0) return '';
     return s.slice(i + 1).toLowerCase();
