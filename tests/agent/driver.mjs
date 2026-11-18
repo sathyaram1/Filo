@@ -27,7 +27,9 @@ import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
 import { paginaDellaScheda, bersaglioDi } from '../helpers/schede.mjs';
+import { leggiTasto } from './combinazioni.mjs';
 
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
 export const SHELL_HEIGHT = 88;
