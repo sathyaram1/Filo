@@ -28,9 +28,7 @@ async function avvia(userData) {
 async function pagina(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }),
-    { timeout: 15_000 }).toBe(true);
-  const page = app.windows().find((w) => new URL(w.url()).hostname === host);
+  const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === host, `nessuna finestra su ${host}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
