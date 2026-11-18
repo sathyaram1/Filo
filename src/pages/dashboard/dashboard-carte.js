@@ -140,7 +140,7 @@
     // Una sveglia che si ripete: «Ferma» la zittisce per oggi, togliere la carta la toglie del tutto.
     const togli = timerMsg(rep || !t.ringing ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, t.id);
     const base = {
-      chiave: `timer:${t.id}`, tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
+      chiave: C.chiaveTimer(t.id), tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
       titolo: nome, togli, chat: t.chat || null, suona: !!t.ringing,
       etichettaTogli: sveglia ? 'Togli la sveglia' : 'Togli il timer',
     };
