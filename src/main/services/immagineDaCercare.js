@@ -1,5 +1,5 @@
-// Quale immagine cerca «cerca questa immagine» dalla chat (#2371): una mandata in questa chat, o la più grande in vista
-// nella pagina. La sceglie Filo, mai un indirizzo scritto dal modello: Google Lens scarica quello che riceve, e un
+// Quale immagine cerca «cerca questa immagine» dalla chat (#2371): una mandata in questa chat, o quella della pagina
+// che sceglierebbe l'Aiuto. La sceglie Filo, mai un indirizzo scritto dal modello: Google Lens scarica quello che riceve, e un
 // indirizzo scritto dal modello porterebbe fuori quello che c'è dentro. Prove: tests/chat-funzioni-segnalate.spec.mjs.
 'use strict';
 
