@@ -49,6 +49,3 @@ test('r1 una mossa che lascia la barra com\'era non si racconta come fatta: stes
     expect(R.riga({ ...a, _output: r.output }).text, JSON.stringify(a)).not.toMatch(/^(Rinominato|Spostato) nella barra/);
   }
 });
-
-// Non serve fuori dalla prova: il main la cerca nel percorso dei dati.
-void fs; void os; void path;
