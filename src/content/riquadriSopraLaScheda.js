@@ -13,8 +13,9 @@
 
   // `apri(tipo, dati, ripiego)`: false sulle pagine di Filo, dove il riquadro resta nel documento. Se lo strato non si
   // può fare (una finestra che non ne ha), il riquadro si apre col ripiego, nel documento come prima; una richiesta
-  // troppo grossa per lo strato lo dice col numero, invece di aprirsi dove il sito la legge.
-  function apri(tipo, dati, ripiego) {
+  // troppo grossa per lo strato lo dice col numero, invece di aprirsi dove il sito la legge; chi sa ridurla passa
+  // `troppo(limite)` e ci riprova lui.
+  function apri(tipo, dati, ripiego, troppo) {
     if (inPaginaDiFilo || !MSG.RIQUADRO_APRI || !global.chrome?.runtime?.sendMessage) return false;
     const conSostituzione = tipo === 'modifica' && dati && dati.contesto;
     const richiesta = { type: MSG.RIQUADRO_APRI, tipo, dati: { ...dati, contesto: undefined } };
