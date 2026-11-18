@@ -1641,9 +1641,12 @@ export const CAMPI_DELLA_RIGA = Object.freeze([
   'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
   'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto',
+  'feedback', 'piano', 'fusione', 'doppione-di', 'motivo', 'processo', 'oltre-tetto', 'prova',
   ...CAMPI_PERIZIA,
 ]);
+
+// Le consegne che scrivono il report sul feedback, le sole a cui la prova da utente si allega (#2539; il server ha lo stesso elenco).
+export const INTENTI_CON_PROVA = Object.freeze(['status', 'fixed', 'note']);
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
