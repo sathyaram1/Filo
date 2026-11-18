@@ -22,6 +22,7 @@
         { testo: 'Filo propone una segnalazione solo quando gli hai chiesto una cosa che non è riuscito a fare, mai su un messaggio in cui stai solo ragionando, e la proposta dice quale funzione manca. La segnalazione automatica parte una volta sola per ogni funzione.', segnalazione: 2371 },
         { testo: 'Se insieme a un comando fai anche una domanda («metti il tema scuro, e cos\'era quel messaggio?»), Filo esegue il comando e risponde alla domanda.', segnalazione: 2371 },
         { testo: 'In una finestra in incognito Filo non ti ripropone più l\'intervista di benvenuto se l\'hai già fatta: la chat ti risponde subito.', segnalazione: 2578 },
+        { testo: 'Con i modelli Claude la chat compatta la conversazione in tempo: le richieste restano sotto i 100.000 token, oltre i quali costano cinque volte tanto. Anche la stima di costo accanto alla soglia di compattazione è più fedele.', segnalazione: 2473 },
       ],
     },
     {
