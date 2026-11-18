@@ -1933,6 +1933,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).lettere) !== JSON.stringify(lettereSalvate)) disegnaLettere(settings.doppioTocco);
     if (JSON.stringify(settings.bluetoothPreferiti || []) !== JSON.stringify(preferitiBtSalvati || [])) disegnaPreferitiBt(settings.bluetoothPreferiti);
     if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
@@ -2077,7 +2078,7 @@
     });
     for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
       $(id).addEventListener('change', persist);
-      $(id).addEventListener('blur', () => { $(id).value = String(valoreDalCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
     }
     $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
     for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {
