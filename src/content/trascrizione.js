@@ -179,10 +179,10 @@
     const R = global.SN_TRASCRIZIONE_RIGHE;
     a.testo.textContent = '';
     const scatole = R.scatole(a.righe, a.box.w, a.box.h);
-    // Le righe stanno fuori dal flusso, e una selezione che ne attraversa due le incollerebbe: un a capo vero fra
-    // l'una e l'altra lo mette in ogni copia (Ctrl+C, il tasto destro, Traduci, Cerca).
+    // Le righe stanno fuori dal flusso, e una selezione che ne attraversa due le incollerebbe: un a capo nel testo fra
+    // l'una e l'altra lo mette in ogni copia (Ctrl+C, il tasto destro, Traduci, Cerca), che legga la selezione o il range.
     const nodi = scatole.map((s, i) => {
-      if (i) a.testo.appendChild(document.createElement('br'));
+      if (i) a.testo.appendChild(document.createTextNode('\n'));
       const n = el('div', 'sn-tr-riga', s.testo);
       const alta = s.stimata ? Math.min(s.h, 22) : s.h;
       Object.assign(n.style, {
