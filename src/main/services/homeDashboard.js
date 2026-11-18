@@ -182,6 +182,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
     let avvisi = 0;
     for (const v of voci) {
       if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else if (v.tipo === 'cornice') { const a = avvisiVolati(sender); if (a) a.azioneDallaHome(v.ref.id, 'chiudi'); }
       else {
         const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
