@@ -330,10 +330,8 @@
     };
     root.addEventListener('click', alClic);
     root.addEventListener('keydown', alClic);
-    if (Array.isArray(global.SN_VOCI_PAGINA) || typeof document !== 'undefined') {
-      global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
-      if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
-    }
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     return () => {
       apritori.delete(root);
       root.removeEventListener('click', alClic);
