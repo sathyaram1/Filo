@@ -129,6 +129,60 @@ test('tasto destro su un\'immagine: «Trascrivi» apre lo stesso riquadro sopra 
   await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
 });
 
+// Nelle pagine di Filo il riquadro sta nel documento: lo stesso doppio clic e lo stesso Ctrl+C.
+async function immagineNelDocumento(page, dove) {
+  return page.evaluate(({ dove, W, H, RIGHE, FONT }) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#222'; g.font = FONT;
+    for (const [t, x, y] of RIGHE) g.fillText(t, x, y);
+    const img = document.createElement('img');
+    img.id = 'foto'; img.width = W; img.height = H; img.src = c.toDataURL('image/png');
+    img.style.cssText = 'display:block;margin:20px';
+    document.querySelector(dove).appendChild(img);
+    const r0 = RIGHE[0];
+    return { x: r0[1] + g.measureText('Fattura numero ').width + g.measureText('4821').width / 2, y: r0[2] - 12 };
+  }, { dove, W, H, RIGHE, FONT });
+}
+
+test('nell\'Editor: tasto destro su un\'immagine, «Trascrivi», e una parola sola negli appunti', async ({ app, openTab, testServer }) => {
+  const { righe } = await apri(app, openTab, testServer);
+  const editor = await openTab('filo://editor/editor.html');
+  await editor.waitForFunction(() => !!document.querySelector('#doc') && !!window.SN_TRASCRIZIONE);
+  const parola = await immagineNelDocumento(editor, '#doc');
+  await lettoreFinto(app, righe);
+  await editor.waitForFunction(() => document.getElementById('foto').complete);
+  const box = await editor.locator('#foto').boundingBox();
+  await editor.locator('#foto').click({ button: 'right', position: { x: 300, y: 80 } });
+  await menuDi(editor).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  await expect(editor.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await editor.mouse.dblclick(box.x + parola.x, box.y + parola.y);
+  await editor.keyboard.press('ControlOrMeta+c');
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('4821');
+  await editor.screenshot({ path: 'tests/.shots/trascrivi-editor.png' }).catch(() => {});
+  await editor.keyboard.press('Escape');
+  await expect(editor.locator('.sn-tr-overlay')).toHaveCount(0);
+});
+
+test('l\'Aiuto trascrive l\'immagine indicata, e una porzione la fa scegliere all\'utente', async ({ app, openTab, testServer }) => {
+  const { righe } = await apri(app, openTab, testServer);
+  const nuova = await openTab('filo://newtab/');
+  await nuova.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 8000 });
+  await immagineNelDocumento(nuova, 'body');
+  await lettoreFinto(app, righe);
+  await nuova.waitForFunction(() => document.getElementById('foto').complete);
+  expect(await nuova.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'transcribe_image', selector: '#foto' }))).toBe(true);
+  await expect(nuova.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await expect(nuova.locator('.sn-tr-riga')).toHaveText(['Fattura numero 4821', 'Totale 1250 euro']);
+  await nuova.keyboard.press('Escape');
+  await expect(nuova.locator('.sn-tr-overlay')).toHaveCount(0);
+
+  expect(await nuova.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'transcribe_region' }))).toBe(true);
+  await expect(nuova.locator('.sn-region-overlay')).toBeVisible({ timeout: 5000 });
+  await nuova.keyboard.press('Escape');
+  await expect(nuova.locator('.sn-region-overlay')).toHaveCount(0);
+});
+
 test('nessun testo nell\'immagine: il riquadro lo dice e non offre niente da copiare', async ({ app, openTab, testServer }) => {
   const { page } = await apri(app, openTab, testServer);
   await lettoreFinto(app, []);
