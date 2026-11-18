@@ -17,14 +17,14 @@ async function newtabPage(app, index = 0) {
   return win;
 }
 
-async function chiaveVera(app) {
-  await app.evaluate(async (_e, key) => {
+async function chiaveVera(app, modello) {
+  await app.evaluate(async (_e, [key, modello]) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: key },
       models: {
-        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_CHAT]: 'prova',
         [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
         [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
         [C.ACTIONS.FILO_COMPATTAZIONE]: 'deepseek-flash',
