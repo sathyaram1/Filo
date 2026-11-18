@@ -227,7 +227,7 @@
     b.title = 'Trova anche le pagine che parlano di questo con altre parole';
     b._risultato = { k: 'significato', q, el: b };
     b.addEventListener('mousedown', (e) => e.preventDefault());
-    b.addEventListener('click', () => { apri(b._risultato).catch(() => {}); });
+    b.addEventListener('click', () => { usa(b._risultato).catch(() => {}); });
     return b;
   }
 
@@ -296,12 +296,14 @@
       sessione = { t0: Date.now(), scelto: false };
       contaRicerca({ esito: 'aperta' });
     }
+    mostrato = null;
+    seguiDopoLaPausa();
   }
 
   async function cerca() {
     const q = campo.value.trim();
     const mio = ++giro;
-    if (q.length < 2) { chiudi(); return; }
+    if (q.length < 2) { svuotaRisultati(); return; }
     const res = await d.send({ type: MSG.FILO_CERCA, q });
     if (mio !== giro || !res || !res.ok) return;
     disegna(res, q);
@@ -347,20 +349,20 @@
     const r = b._risultato;
     if (r.k === 'nascosta') {
       return [
-        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
       ];
     }
     if (r.k === 'pagina') {
       const dove = global.SN_FILO_CODA.daAprire(r);
       return [
-        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
+        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { usa(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: dove && dove.sito ? 'Copia l’indirizzo del sito' : 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(dove && dove.sito ? dove.url : r.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togli(r).catch(() => {}); } },
       ];
     }
     return [
-      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
+      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
       { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
     ];
   }
@@ -401,7 +403,7 @@
       else if (e.key === 'Enter') {
         e.preventDefault();
         const b = voci[scelta >= 0 ? scelta : 0];
-        if (b) apri(b._risultato).catch(() => {});
+        if (b) usa(b._risultato).catch(() => {});
       }
     });
     // Il risultato scelto con le frecce ha il suo menu anche da tastiera (#1295): Shift+F10 nel campo apre quello, non
