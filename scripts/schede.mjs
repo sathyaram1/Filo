@@ -132,6 +132,25 @@ function leggiJson(f) {
 }
 const fileScheda = (cartella, num) => join(cartella, `${num}.json`);
 
+/** I non fidati aperti dell'ultimo elenca: [{ num, perizia }]; [] senza file. */
+export function leggiNonFidati(cartella) {
+  const l = leggiJson(join(cartella, NON_FIDATI));
+  return Array.isArray(l) ? l.filter((x) => x && x.num) : [];
+}
+
+/**
+ * I file probabili di un feedback, da dove stanno: la scheda locale per un fidato, la perizia per un non fidato
+ * (#2337.3). → { file, da } o null se non ci sono né l'una né l'altra.
+ */
+export function fileProbabiliDi(cartella, numero) {
+  const num = String(numero).replace(/^#/, '');
+  const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
+  if (s) return { file: Array.isArray(s.file_probabili) ? s.file_probabili : [], da: 'scheda' };
+  const p = leggiNonFidati(cartella).find((x) => String(x.num).replace(/^#/, '') === num);
+  if (p) return { file: p.perizia && Array.isArray(p.perizia.file) ? p.perizia.file : [], da: 'perizia' };
+  return null;
+}
+
 /** Le schede che ci sono nella cartella, lette. */
 export function leggiSchede(cartella) {
   if (!existsSync(cartella)) return [];
