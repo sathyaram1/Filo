@@ -190,9 +190,10 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
   if (!elenco.length) {
     parti.push('Transcript del worker non visto: niente strumenti, tracce o modello.');
   } else {
-    const ultimo = elenco.map((e) => e.strumento).filter(Boolean).reduce((a, b) => (!a || (b.ms || 0) >= (a.ms || 0) ? b : a), null);
+    const ultimo = ultimoStrumento(t);
+    const uscita = ultimo && Number.isFinite(ultimo.uscita) ? ` uscita ${ultimo.uscita}` : '';
     parti.push(ultimo
-      ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? 'con risposta' : 'senza risposta'}.`
+      ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? `con risposta${uscita}` : 'senza risposta'}.`
       : 'Ultimo strumento: nessuno nel transcript.');
     const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
     const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
