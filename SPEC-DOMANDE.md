@@ -550,7 +550,10 @@ rispondere.
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
-  d'origine con conversazione e note; `vive`, le altre domande vive
+  d'origine con conversazione e note (di uno riservato il testo arriva solo
+  nell'ambiente dei riservati, e segna il biglietto; fuori ne escono numero,
+  stato, motivo, priorità e fiducia, col segno `riservato`: § 5.1, #1928.5);
+  `vive`, le altre domande vive
   (`in_smistamento`, `aperta`, `in_lavorazione`) sullo stesso feedback
   d'origine, provvisorie comprese (#1928): dalla più recente, al più 20, con
   `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
@@ -1149,7 +1152,10 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
     registro delle decisioni (§ 3.6), che è testo di altre domande, o il
-    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2);
+    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2)
+    o di un feedback d'origine riservato (§ 3.5, #1928.5). La domanda del
+    terzo guasto (§ 3.8) la compone il server: nasce riservata se lo è il
+    feedback su cui nasce o il biglietto che ha scritto il guasto;
     l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
     riservato, cosa che il server sa già quando li crea. Le eccezioni sono
     due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,

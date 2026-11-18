@@ -402,6 +402,8 @@ export function formattaFeedbackOrigine(fb, { quando = dataOra } = {}) {
   const x = fb || {};
   if (!x.num && !x.id) return 'Feedback d\'origine: nessuno (la domanda non viene da un lavoro).';
   const righe = [`Feedback d'origine: ${visibile(x.num || x.id)} · ${visibile(x.stato || '?')}${x.motivo ? ` (${visibile(x.motivo)})` : ''}${Number.isInteger(x.priorita) ? ` · priorità ${x.priorita}` : ''}`];
+  // Senza testo perché riservato (#1928.5): chi smista deve sapere che non l'ha letto, non che è vuoto.
+  if (x.riservato) righe.push('  Riservato: testo e note arrivano solo a chi gira nei riservati, non sai cosa chiede.');
   if (x.nome) righe.push(rientro(`Titolo: ${x.nome}`));
   if (x.testo) righe.push('  Testo:', rientro(x.testo, '    '));
   if (x.note) righe.push('  Note:', rientro(x.note, '    '));
