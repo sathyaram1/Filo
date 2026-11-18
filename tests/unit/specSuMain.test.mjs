@@ -193,7 +193,7 @@ function gitIn(dir, args) {
   return r.stdout.trim();
 }
 
-test('una prova scritta adesso gira su main e le sue immagini restano dopo che il worktree è stato tolto', () => {
+test('le immagini di una prova restano dopo che il worktree è stato tolto', () => {
   const root = cartellaTemporanea('filo-specsumain-');
   gitIn(root, ['init', '-q']);
   writeFileSync(join(root, 'README'), 'main\n');
