@@ -78,7 +78,7 @@ const tastoDestroSullaScheda = () => {
 
 async function homeAperta(openTab) {
   const home = await openTab('filo://newtab/');
-  await home.waitForSelector('#dashControls .dash-ctrl[data-command="settings"]', { timeout: 8000 });
+  await home.waitForSelector('#altro .dash-altro-app[data-id="impostazioni"]', { timeout: 8000, state: 'attached' });
   return home;
 }
 
