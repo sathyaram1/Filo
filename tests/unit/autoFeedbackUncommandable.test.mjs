@@ -75,9 +75,9 @@ test('se nel turno l\'assistente ha AGITO non c\'è nessun buco', () => {
 
 test('a chi chiede istruzioni le istruzioni si danno: nessuna segnalazione', () => {
   const domande = [
-    'come faccio a mettere Filo a schermo intero?',
-    'dove si trova il pulsante per andare a schermo intero?',
-    'si può mettere Filo a schermo intero?',
+    'come faccio a ricaricare la pagina?',
+    'dove si trova il pulsante per ricaricare la pagina?',
+    'si può ricaricare la pagina?',
     'cosa sai fare?',
   ];
   for (const q of domande) {
