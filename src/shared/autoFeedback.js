@@ -535,6 +535,7 @@
     _isHowtoQuestion: isHowtoQuestion,
     chiedeAzione,
     chiedeInformazione,
+    domandaOltreAlComando,
     chiaveInvio,
     primoInvio,
   };
