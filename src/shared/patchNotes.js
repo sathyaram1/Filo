@@ -13,6 +13,9 @@
       features: [
         { testo: 'Su un video di YouTube l\'Aiuto e la chat leggono la trascrizione del video: a «di cosa parla?» rispondono da quello che si dice, e se il video non ha trascrizione te lo dicono.', segnalazione: 1977 },
         { testo: 'Nelle risposte di Filo le parole in corsivo hanno una spiegazione: passaci sopra col mouse e la leggi, a volte con un disegno, senza che la risposta si allunghi. Filo sceglie cosa spiegarti in base a quello che sa di te; col tasto destro sulla parola chiedi di più o copi la spiegazione.', segnalazione: 2388 },
+        { testo: 'La home ha un campo solo, quello della chat: quello che scrivi ci finisce anche se non ci hai cliccato. La ricerca nel filo è diventata un tasto della colonna di destra: passando sui risultati, o scorrendoli con le frecce, il filo al centro ti porta lì, ed Esc la chiude. Puoi anche scrivere «cerca nel filo» seguito da quello che cerchi.', segnalazione: 2372 },
+        { testo: 'I tasti della colonna di destra, comprese Impostazioni e Profilo, si spostano trascinandoli; quelli che non ti servono li metti nel «+», che li tiene a un clic.', segnalazione: 2372 },
+        { testo: 'Puoi dare una lettera a un tasto della home o a un sito: battila due volte all\'inizio del campo e si apre. La assegni dal tasto destro del tasto, dalle Preferenze o chiedendolo a Filo; di serie nessuna lettera fa niente.', segnalazione: 2372 },
       ],
       fixes: [
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, il tasto destro dato appena aperta la pagina apre il menu invece di andare perso.', segnalazione: 2444 },
@@ -22,9 +25,6 @@
     {
       version: '0.2.291', date: '2026-11-18',
       features: [
-        { testo: 'La home ha un campo solo, quello della chat: quello che scrivi ci finisce anche se non ci hai cliccato. La ricerca nel filo è diventata un tasto della colonna di destra: passando sui risultati, o scorrendoli con le frecce, il filo al centro ti porta lì, ed Esc la chiude. Puoi anche scrivere «cerca nel filo» seguito da quello che cerchi.', segnalazione: 2372 },
-        { testo: 'I tasti della colonna di destra, comprese Impostazioni e Profilo, si spostano trascinandoli; quelli che non ti servono li metti nel «+», che li tiene a un clic.', segnalazione: 2372 },
-        { testo: 'Puoi dare una lettera a un tasto della home o a un sito: battila due volte all\'inizio del campo e si apre. La assegni dal tasto destro del tasto, dalle Preferenze o chiedendolo a Filo; di serie nessuna lettera fa niente.', segnalazione: 2372 },
         { testo: 'Nella nuova scheda c\'è una barra per i tuoi siti e programmi: ci trascini una scheda, un collegamento o un gioco dal desktop e lo riapri con un clic. Con la freccia accanto ripieghi la chat e la barra va al centro, con le icone grandi. Puoi anche chiedere a Filo di metterci o toglierci un sito.', segnalazione: 1803 },
         { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
