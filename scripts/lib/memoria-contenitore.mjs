@@ -72,14 +72,17 @@ export function letturaMemoria(leggi = leggiFile) {
   const visti = livelli(base, cg.rel).filter((d) => leggi(`${d}/${f.uso}`) !== null);
   if (!visti.length) return arrotonda(out);
   const mio = visti[0];
+  const vera = (d) => {
+    const cache = chiave(leggi(`${d}/memory.stat`), f.cache);
+    return numero(leggi(`${d}/${f.uso}`)) - (Number.isFinite(cache) ? cache : 0);
+  };
+  out.usataMb = vera(mio) / MB;
   let margine = Infinity;
   for (const d of visti) {
     const tetto = numero(leggi(`${d}/${f.tetto}`));
     if (!Number.isFinite(tetto) || tetto >= SENZA_TETTO) continue;
-    const uso = numero(leggi(`${d}/${f.uso}`));
-    const cache = chiave(leggi(`${d}/memory.stat`), f.cache);
-    const vera = uso - (Number.isFinite(cache) ? cache : 0);
-    if (!Number.isFinite(vera)) continue;
+    const usata = vera(d);
+    if (!Number.isFinite(usata)) continue;
     if ((tetto - vera) / MB < margine) {
       margine = (tetto - vera) / MB;
       out.tettoMb = tetto / MB;
