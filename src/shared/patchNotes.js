@@ -15,7 +15,7 @@
         { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
-        { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C, o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
+        { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
       ],
     },
     {
