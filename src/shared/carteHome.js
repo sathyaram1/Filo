@@ -200,6 +200,9 @@
     timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
   };
+  // Per chi parla, un avviso volato nella colonna è un avviso come gli altri.
+  const STESSO_NOME = { avviso: ['avviso', 'cornice'] };
+  const diTipo = (tipo) => (v) => (STESSO_NOME[tipo] || [tipo]).includes(v.tipo);
   // Le carte di sinistra che l'utente intende con un nome («l'avviso del backup», «gli avvisi», la chiave della
   // carta). `perTipo`: il nome era solo il tipo, quindi valgono tutte quelle di quel tipo. `tipo`: il nome ne
   // nomina uno, quindi la carta cercata è di sinistra anche se non si trova.
