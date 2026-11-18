@@ -84,12 +84,11 @@ test('analyzeReply → la voce citata dopo «non posso» esiste: non azionabile,
   assert.doesNotMatch(result.genericDesc, /non disponibile/);
 });
 
-test('analyzeReply → la voce citata ha uno strumento: resta la mancanza detta, mai col suo nome', () => {
+test('analyzeReply → la voce citata ha uno strumento: nessuna segnalazione, né mancante né non azionabile', () => {
   const caps = FAKE_CAPS.map((c) => (c.id === 'traduzione' ? { ...c, strumento: 'scheda(apri)' } : c));
   const reply = 'Filo non può fare la traduzione di questa pagina in questo modo, al momento non è tra le mie capacità.';
   const a = AF.analyzeReply(reply, [], 'traduci questa pagina', caps);
-  assert.equal(a.kind, 'capability-gap');
-  assert.equal(a.capabilityId, null);
+  assert.equal(a.kind, null);
 });
 
 test('analyzeReply → capabilityId=null se nessun titolo corrisponde', () => {
