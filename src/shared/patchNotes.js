@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.292', date: '2026-11-18',
+      fixes: [
+        { testo: 'Il menu di «Dai un nome sensato» aperto subito dopo aver fatto scorrere la pagina resta aperto, invece di sparire appena compare.', segnalazione: 2453 },
+      ],
+    },
+    {
       version: '0.2.291', date: '2026-11-18',
       features: [
         { testo: 'Nella nuova scheda c\'è una barra per i tuoi siti e programmi: ci trascini una scheda, un collegamento o un gioco dal desktop e lo riapri con un clic. Con la freccia accanto ripieghi la chat e la barra va al centro, con le icone grandi. Puoi anche chiedere a Filo di metterci o toglierci un sito.', segnalazione: 1803 },
