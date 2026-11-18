@@ -299,8 +299,8 @@
 
   /** La stima accanto al tetto: quanto costa di solito una corsa, e al mese con la cadenza scelta. */
   function stimaTesto(t, giorni) {
-    const regola = 'Oltre il tetto la corsa si ferma e non riparte. Vuoto: il doppio della mediana delle ultime corse.';
-    if (!t || !(Number(t.corse) > 0)) return `${regola} Nessuna corsa finita ancora: finché non ne finisce una, il tetto automatico non c’è.`;
+    const regola = 'Oltre il tetto la corsa si ferma e la prossima riparte dal suo rapporto parziale. Vuoto: il doppio della mediana delle ultime corse finite col rapporto.';
+    if (!t || !(Number(t.corse) > 0)) return `${regola} Nessuna corsa finita col rapporto ancora: finché non ne finisce una, il tetto automatico non c’è.`;
     return `${regola} Una corsa costa di solito ${dollari(t.mediana)} (mediana di ${t.corse}), circa ${dollari(Math.round(alMese(t, giorni)))} al mese.`;
   }
 
