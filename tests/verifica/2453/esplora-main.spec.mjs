@@ -30,10 +30,9 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
     await page.evaluate(async () => {
       await window.SN_RINOMINA_UI.disponibile();
       const b = document.querySelector('.dash-file-btn');
-      b.closest('.dash-bubbles').scrollTop += 40;
-      const r = b.getBoundingClientRect();
-      b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + r.height / 2, button: 2 }));
+      b.closest('.dash-bubbles').scrollTop += 1500;
     });
+    await page.locator('.dash-file-btn').first().click({ button: 'right' });
     const menu = page.locator('.sn-rinomina-menu');
     await expect(menu).toBeVisible();
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
