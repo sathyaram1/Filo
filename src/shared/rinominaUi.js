@@ -107,7 +107,7 @@
       doc.addEventListener('mousedown', fuori, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
-      doc.addEventListener('scroll', chiudiMenu, true);
+      doc.addEventListener('scroll', scorre, true);
     }, 0);
     const primo = el.querySelector('.sn-select-option');
     if (primo) try { primo.focus({ preventScroll: true }); } catch (_) {}
