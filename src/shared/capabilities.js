@@ -990,7 +990,7 @@
     'filo-notes': 'file(appunto)', 'filo-timers': 'promemoria(timer)', 'filo-alarms': 'promemoria(sveglia)',
     'filo-calendar-event': 'promemoria(evento)', 'filo-notifications': 'home(carta)', 'system-status': 'computer(volume)',
     'system-control': 'computer(volume)', 'desktop-icons': 'computer(ordina_desktop)', 'home-page': 'scheda(finestra)',
-    'home-filo': 'filo(cerca)', 'home-cards': 'home(carta)', 'home-barra-siti': 'home(barra_siti)', 'patch-notes': 'scheda(apri)', 'segnalazioni-mie': 'scheda(apri)',
+    'home-filo': 'filo(cerca)', 'home-cards': 'home(carta)', 'home-doppio-tocco': 'impostazioni(imposta)', 'home-barra-siti': 'home(barra_siti)', 'patch-notes': 'scheda(apri)', 'segnalazioni-mie': 'scheda(apri)',
     'auto-update': 'impostazioni(aggiorna)', 'options-models': 'impostazioni(imposta)', 'model-cost-estimate': SOLO_A_MANO,
     'open-weights-only': 'impostazioni(imposta)', 'own-key-all-providers': 'impostazioni(imposta)',
     'host-order': 'impostazioni(imposta)', 'model-usage-census': SOLO_A_MANO, preferences: 'impostazioni(pulsante)',
