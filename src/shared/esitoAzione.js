@@ -348,6 +348,14 @@
     return { icona: '✓', testo: riga, fallita: false };
   }
 
+  // Il testo di una segnalazione partita o proposta a nome dell'utente, come lo legge il modello (#2371): intero fino a un
+  // tetto largo, e oltre il taglio si dice. Lo usano anche le righe del filo (filoTrattoVivo.js).
+  const TETTO_SEGNALAZIONE = 8000;
+  function testoSegnalazione(n) {
+    const s = String(n || '');
+    return s.length > TETTO_SEGNALAZIONE ? `${s.slice(0, TETTO_SEGNALAZIONE)}… [tagliato qui: ${s.length} caratteri in tutto]` : s;
+  }
+
   // Le voci di un turno come le legge il modello nei turni dopo. Le righe possono ripetere testi scritti da un sito o da
   // un modello (#592.4): una riga sola ciascuna, ripulite, dentro il recinto dei testi salvati.
   function perModello(voci) {
