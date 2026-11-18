@@ -903,6 +903,26 @@ class BarraLaterale {
     if (daTastiera) this.chiudi();
   }
 
+  _allaPagina(attiva, id, colore) {
+    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(colore ? { colore } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+    this._consegnaInAttesa();
+  }
+
+  // Un'azione sulla pagina davanti chiesta dalla chat (#2374): la stessa consegna e le stesse regole dell'icona, senza i
+  // conti della barra. '' se è partita, altrimenti il perché.
+  azioneSullaPagina(id) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const d = D && D.noto(id) ? D.ICONE[id] : null;
+    if (!d || d.tipo !== 'pagina') return 'azione sconosciuta';
+    const attiva = this._attiva();
+    const nav = this._nav();
+    if (!attiva || !nav.pagina) return 'nessuna pagina davanti';
+    const motivo = this._motivoAzione(id, nav);
+    if (motivo) return motivo;
+    this._allaPagina(attiva, id);
+    return '';
+  }
+
   // Un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: mandata prima nessuno l'ascolterebbe.
   // Vale per la scheda e l'indirizzo su cui si è premuto, finché restano davanti.
   _consegnaInAttesa() {
