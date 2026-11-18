@@ -2450,6 +2450,10 @@ if (isMain) {
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
+      if (data.prova) {
+        const { testoProvaConsegnata } = await import('./lib/prova-allegata.mjs');
+        console.log(testoProvaConsegnata(data.prova, r.prova));
+      }
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
