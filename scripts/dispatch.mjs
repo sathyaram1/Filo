@@ -1902,9 +1902,15 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
     for (const riga of sped.righe || []) process.stderr.write(`${riga}\n`);
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
+  // Per ultima, come sul canale: le schermate salgono nel deposito solo per una consegna che parte.
+  const pa = cartellaProva ? await import('./lib/prova-allegata.mjs') : null;
+  const prova = pa ? await pa.provaDaAllegare(cartellaProva) : null;
+  if (prova && !prova.ok) return { rejected: true, formatRejected: true, message: prova.errore };
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
+    prova: prova && prova.prova,
   }));
+  if (prova && sent.outcome === 'ok') process.stderr.write(`${pa.testoProvaConsegnata(prova.prova, sent.prova)}\n`);
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
