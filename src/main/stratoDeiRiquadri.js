@@ -195,6 +195,15 @@ class StratoDeiRiquadri {
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     let principale = true;
     try { principale = !sender.frame || !sender.frame.parent; } catch (_) { principale = true; }
+    // Trascrivi (#2374): solo un'immagine, e il punto da cui viene in px della vista; da un riquadro incorporato nessuno.
+    if (tipo === 'trascrizione') {
+      const dataUrl = IMMAGINE.test(testo(dati.dataUrl)) ? testo(dati.dataUrl) : '';
+      const r = principale && dati.rect && typeof dati.rect === 'object' ? dati.rect : null;
+      const v = r ? ['x', 'y', 'w', 'h'].map((k) => numero(r[k])) : [];
+      const rect = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
+        ? { x: v[0] * zoom, y: v[1] * zoom, w: v[2] * zoom, h: v[3] * zoom } : null;
+      return { dataUrl, rect };
+    }
     // Un riquadro incorporato conosce solo la sua finestra: l'ancora è l'ultimo punto del puntatore sulla scheda.
     let ancora = principale ? ancoraNellaVista(dati.anchor, zoom) : null;
     if (!principale) {
