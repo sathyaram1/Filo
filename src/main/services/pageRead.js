@@ -640,6 +640,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     schedaNonRisponde,
     soloJavaScript: !!esito.soloJavaScript,
     sospetto: v && v.livello === 'sospetto' ? (v.messaggio || 'sito sospetto') : '',
+    video: esito.video || null,
     ...p,
   };
   // La citazione di una risposta si controlla sulla pagina intera, anche sulla parte che la finestra non ha (#2383).
@@ -647,6 +648,21 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   Object.defineProperty(letta, 'testoIntero', { value: String(esito.testo || ''), enumerable: false });
   Object.defineProperty(letta, 'lettaIl', { value: new Date().toISOString(), enumerable: false });
   return letta;
+}
+
+// #1977 — della pagina di un video di YouTube si legge anche la trascrizione: dalla scheda coi suoi accessi, o dalla rete.
+async function conTrascrizione(letto, wc) {
+  if (!letto || !letto.ok || !Trascrizione.idVideo(letto.url)) return letto;
+  const scaricaRete = async (u) => {
+    const res = await dip.scarica(u, { headers: intestazioni(), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const { testo } = await leggiTesto(res, 30 * 1024 * 1024);
+    return { ok: res.ok, stato: res.status, testo };
+  };
+  let e = null;
+  try {
+    e = wc ? await Trascrizione.perScheda(wc, letto.url, { scaricaRete }) : await Trascrizione.dallaRete(letto.url, scaricaRete);
+  } catch (_) { e = null; }
+  return Trascrizione.unisciAllaPagina(letto, e);
 }
 
 // Estrazione in un thread a parte, col suo tetto di tempo: una pagina scritta male o apposta non ferma le finestre
