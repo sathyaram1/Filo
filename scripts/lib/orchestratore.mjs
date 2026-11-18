@@ -251,7 +251,8 @@ export function derivatiDaAprire(p, derived) {
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');
-    return { chiave, chiavi, titolo, testo, priorita: g.priority };
+    // Un interno verte sul codice del ramo: aspetta che il lavoro arrivi su main, come sul server (#2554).
+    return { chiave, chiavi, titolo, testo, priorita: g.priority, aspetta: g.tipo === 'esterno' ? null : p.num };
   });
 }
 
