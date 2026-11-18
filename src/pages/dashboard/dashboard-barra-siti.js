@@ -38,11 +38,12 @@
   function giaQui(v) {
     const n = nodi.get(v.id);
     if (n) {
-      n.classList.remove('dash-barra-gia');
+      // La stessa luce del punto del filo ritrovato.
+      n.classList.remove('dash-trovato');
       void n.offsetWidth;
-      n.classList.add('dash-barra-gia');
+      n.classList.add('dash-trovato');
       try { n.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
-      n.addEventListener('animationend', () => n.classList.remove('dash-barra-gia'), { once: true });
+      n.addEventListener('animationend', () => n.classList.remove('dash-trovato'), { once: true });
     }
     avviso(`${v.nome} è già nella barra`);
   }
