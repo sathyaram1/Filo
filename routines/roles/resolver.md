@@ -30,8 +30,8 @@ feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
 - una fusione segnata `propria` è il lavoro di questo stesso feedback: se è di
   nuovo qui l'owner l'ha riaperto perché mancava qualcosa, e non è chiuso;
 - per le altre leggi il commit (`git show --stat <sha>`) e il punto del codice
-  che il feedback nomina. Se la cosa chiesta adesso c'è, intera, chiudi come
-  qui sotto;
+  che il feedback nomina. Se la cosa chiesta adesso c'è, intera, chiudi senza
+  aprire il lavoro, come qui sotto;
 - se la fusione ne copre solo una parte, lavori il resto e lo dici nel report;
 - un **doppione** (la stessa cosa chiesta e già risolta sotto un altro numero)
   non ha fusioni che lo citino: si chiude come qui sotto, con la fusione che
