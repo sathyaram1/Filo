@@ -118,7 +118,8 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       const text = JSON.stringify({
-        text: 'Non ho accesso al saldo dei crediti: puoi vederlo in Opzioni, alla voce Crediti e consumi.',
+        // Un dato che nessuna voce del manifesto dà: i crediti li legge uno strumento, e lì non c'è niente da segnalare (#2371).
+        text: 'Non ho accesso ai passi che fai durante il giorno: Filo non legge il contapassi del telefono.',
         actions: [],
       });
       try { onDelta && onDelta(text); } catch (_) {}
