@@ -459,7 +459,26 @@ test('Windows: «Unknown» della radio non è spento', () => {
   const x = SIS.descrivi(d).bluetooth;
   assert.equal(x.spento, false);
   assert.equal(x.ignoto, true);
-  assert.match(L.SCRIPT_WINDOWS, /@\('Off', 'Disabled'\) -contains \[string\]\$_\.State/, 'spento solo se Windows dice Off o Disabled');
+});
+
+// #2394.1 — acceso solo se Windows dice On, spento solo se dice Off o Disabled: una funzione sola, che usano il giro
+// del lettore (Bluetooth e Wi-Fi) e l'elenco dei dispositivi, nello script e nel lettore. Una copia a parte tornerebbe
+// a scrivere «spento» sopra il «non so».
+test('Windows: la regola di acceso e spento delle radio sta in AccesoRadio, e la usano tutte le letture', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  const elenco = C._interni.PS_ELENCO_BT;
+  const regola = /function AccesoRadio\(\$radio\) \{\n  if \(@\(\$radio \| Where-Object \{ \[string\]\$_\.State -eq 'On' \}\)\.Count -gt 0\) \{ return \$true \}\n  if \(@\(\$radio \| Where-Object \{ @\('Off', 'Disabled'\) -contains \[string\]\$_\.State \}\)\.Count -gt 0\) \{ return \$false \}\n  return \$null\n\}/;
+  assert.match(elenco, regola);
+  const fuori = (s) => s.replace(regola, '');
+  for (const [dove, s] of [['lettore', L.scriptWindows(1)], ['elenco', elenco], ['sorgenti', SORGENTE + readFileSync(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'), 'utf8')]]) {
+    assert.ok(!/'Disabled'\)? -contains|-contains \[string\]\$_\.State|\.State -eq 'On'/.test(fuori(s)), `${dove}: una copia della regola fuori da AccesoRadio`);
+  }
+  assert.match(elenco, /\$esito\.acceso = AccesoRadio \$bt\n/);
+  const giro = L.scriptWindows(1).slice(L.scriptWindows(1).indexOf('while ($true)'));
+  assert.match(giro, /\$wfAcceso = AccesoRadio \$wf\n\s*if \(\$null -ne \$wfAcceso\) \{ \$o\.wifi = \[ordered\]@\{ acceso = \$wfAcceso \} \}/);
+  assert.match(giro, /\$acceso = AccesoRadio \$bt\n/);
+  // La funzione è definita prima del giro che la chiama.
+  assert.ok(L.scriptWindows(1).indexOf('function AccesoRadio') < L.scriptWindows(1).indexOf('while ($true)'));
 });
 
 test('Windows: lo script non chiede permessi e non usa le API del Wi-Fi, e scrive solo ASCII', () => {
