@@ -1953,15 +1953,19 @@
       }
       if (mosse) disponi();
     }
-    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono.
+    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono;
+    // quello di una cosa che lì ha la sua carta lascia subito l'angolo, come se fosse nato nella home (#2390.1).
     function cambiaLuogo() {
       const ora = inHome();
       if (ora === eraHome) return;
       eraHome = ora;
+      let mosse = false;
       for (const c of vive()) {
+        if (ora && c.dataset.carta) { if (colloca(c) !== 'angolo') mosse = true; continue; }
         if (c.dataset.attesa === '1' || c._durata > 0) continue;
         avviaTempo(c, c._durata);
       }
+      if (mosse) disponi();
     }
     // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
     function contaUscita(card, esito) {
