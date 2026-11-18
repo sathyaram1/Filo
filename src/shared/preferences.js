@@ -1187,7 +1187,7 @@
       aiuto: 'una lettera e cosa apre: «y youtube.com» (un indirizzo) o «e editor» (un tasto o una carta della home: cerca, impostazioni, profilo, memorie, editor…); «togli y» la libera. Due «y» come prime battute nel campo della home lo lanciano; di serie nessuna lettera fa niente',
       keys: ['doppio_tocco', 'doppio tocco', 'lettera doppia', 'doppia lettera', 'scorciatoia lettera', 'scorciatoia della home',
         'lettere della home', 'assegna lettera', 'assegna una lettera'],
-      build(v, { attuali } = {}) {
+      build(v, attuali) {
         const r = global.SN_DOPPIO_TOCCO && global.SN_DOPPIO_TOCCO.daTesto(v, attuali);
         if (!r) return null;
         if (r.rifiuto) return { rifiuto: r.rifiuto };
