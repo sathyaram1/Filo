@@ -29,14 +29,20 @@ export function specDaArgomenti(args) {
 }
 
 const comeEsito = (v) => (v === true ? 'verde' : v === false ? 'rosso' : v);
+// Un lato è 'verde'/'rosso'/'non-corso' (o true/false), oppure l'esito di esitiPerSpec, che porta i casi rossi.
+const comeLato = (x) => (x && typeof x === 'object' ? { esito: x.esito, rossi: Array.isArray(x.rossi) ? x.rossi : null } : { esito: comeEsito(x), rossi: null });
+const elenco = (titoli) => titoli.slice(0, 5).map((t) => `«${t}»`).join(', ') + (titoli.length > 5 ? ` e altri ${titoli.length - 5}` : '');
 
 /**
- * Il verdetto su un solo spec: `ramo` e `main` sono 'verde', 'rosso' o 'non-corso' (true/false per verde/rosso).
- * Uno spec che da una parte non è partito non dà verdetto: «No tests found» non è un rosso (#2454). PURA.
+ * Il verdetto su un solo spec, caso per caso quando i lati portano i loro rossi: un caso rosso sul ramo che su main non
+ * lo è è del ramo, anche se un altro caso dello stesso file è rosso su tutti e due (#2454). Uno spec che da una parte
+ * non è partito non dà verdetto: «No tests found» non è un rosso. PURA.
  */
 export function verdettoAffiancato({ ramo, main, copia = '' }) {
-  const r = comeEsito(ramo);
-  const m = comeEsito(main);
+  const R = comeLato(ramo);
+  const M = comeLato(main);
+  const r = R.esito;
+  const m = M.esito;
   const nota = !copia ? ''
     : m === 'rosso' ? ' Su main ho corso lo spec del ramo: se il ramo cambia anche gli aiuti che usa, il rosso di main può venire da quelli.'
       : m === 'non-corso' ? ' Su main ho corso lo spec del ramo e non è partito: forse usa aiuti che il ramo aggiunge.' : '';
@@ -46,34 +52,44 @@ export function verdettoAffiancato({ ramo, main, copia = '' }) {
   if (r === 'verde' && m === 'verde') return 'Verde su tutti e due.';
   if (r === 'rosso' && m === 'verde') return 'Rosso solo sul ramo: lo ha rotto il ramo.';
   if (r === 'verde') return `Rosso solo su main: il ramo lo corregge, o su main dipende da altro.${nota}`;
+  if (R.rossi && M.rossi) {
+    const soloRamo = R.rossi.filter((t) => !M.rossi.includes(t));
+    const giaSuMain = R.rossi.length - soloRamo.length;
+    if (soloRamo.length) {
+      const quanti = soloRamo.length === 1 ? 'un caso è rosso' : `${soloRamo.length} casi sono rossi`;
+      const resto = giaSuMain ? ` Gli altri rossi del ramo (${giaSuMain}) c'erano già su main.${nota}` : '';
+      return `Rosso su tutti e due, ma ${quanti} solo sul ramo, e quello è del ramo: ${elenco(soloRamo)}.${resto}`;
+    }
+  }
   return `Rosso su tutti e due: c'era già su main, non è del ramo.${nota}`;
 }
 
 /**
- * Dal resoconto JSON di Playwright, per ogni spec chiesto: 'rosso' se un caso è fallito, 'verde' se almeno uno è
- * passato e nessuno è fallito, 'non-corso' se non ne è partito nessuno (spec assente, import rotto, schermo che manca).
- * PURA.
+ * Dal resoconto JSON di Playwright, per ogni spec chiesto: { esito, rossi, motivo }. La lettura è quella del verdetto
+ * della suite (casi ed errori fuori dai casi), così uno spec rosso in GitHub è rosso anche qui. `esito`: 'rosso' se un
+ * caso o un errore del file è rosso, 'verde' se almeno un caso è passato, 'non-corso' se non ne è partito nessuno
+ * (spec assente, import rotto, schermo che manca). `rossi`: i titoli dei casi rossi, più FUORI_DAI_CASI. PURA.
  */
 export function esitiPerSpec(report, specs) {
-  const relativo = (s) => s.replace(/^tests\//, '');
-  const perFile = new Map(specs.map((s) => [relativo(s), { stati: [], errori: 0 }]));
-  const visita = (suite) => {
-    for (const sp of suite.specs || []) {
-      const v = perFile.get(String(sp.file || suite.file || '').replace(/\\/g, '/'));
-      if (v) for (const t of sp.tests || []) v.stati.push(t.status);
-    }
-    for (const s of suite.suites || []) visita(s);
-  };
-  for (const s of (report && report.suites) || []) visita(s);
-  for (const e of (report && report.errors) || []) {
-    const f = String((e.location && e.location.file) || '').replace(/\\/g, '/');
-    for (const [rel, v] of perFile) if (f && f.endsWith(`/${rel}`)) v.errori++;
-  }
+  const casi = raccogliCasi(report);
+  const v = verdetto(report || {}, []);
+  const fuori = v.nuovi.filter((c) => c.spec === FUORI_DAI_CASI && !c.strascicoDi);
+  const partiti = (n) => casi.some((c) => c.spec === n && c.stato !== 'skipped');
   const esiti = {};
   for (const s of specs) {
-    const v = perFile.get(relativo(s));
-    const partiti = v.stati.filter((x) => x !== 'skipped');
-    esiti[s] = !partiti.length ? 'non-corso' : (v.stati.includes('unexpected') || v.errori) ? 'rosso' : 'verde';
+    const n = normalizzaSpec(s);
+    const suoi = fuori.filter((c) => c.file && normalizzaSpec(c.file) === n);
+    if (!partiti(n)) {
+      const motivo = suoi.length ? suoi[0].titolo : motivoDelResoconto(report);
+      esiti[s] = { esito: 'non-corso', rossi: [], motivo };
+      continue;
+    }
+    const rossi = v.nuovi.filter((c) => c.spec === n).map((c) => c.titoloCompleto);
+    // Un errore che non nomina un file sta nella corsa e non si sa di chi è: come nel verdetto della suite, fa rosso.
+    if (suoi.length || fuori.some((c) => !c.file && !c.tetto)) rossi.push(FUORI_DAI_CASI);
+    if (v.nuovi.some((c) => c.tetto) && casi.some((c) => c.spec === n && c.nonGirato)) rossi.push(FUORI_DAI_CASI);
+    const unici = [...new Set(rossi)];
+    esiti[s] = { esito: unici.length ? 'rosso' : 'verde', rossi: unici, motivo: '' };
   }
   return esiti;
 }
