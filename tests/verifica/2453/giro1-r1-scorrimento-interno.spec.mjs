@@ -35,24 +35,46 @@ async function chatConFile(app) {
 
 // Il riquadro della chat scorre di poco, e il tasto destro arriva nello stesso fotogramma: l'evento dello scorrimento
 // arriva dopo l'apertura, come quando la voce viene portata in vista appena prima del clic.
-async function scorriEApri(page) {
-  await page.evaluate(() => {
+// `inFondo`: il file finisce in fondo al riquadro della chat, appena sopra la barra di scrittura, dove sta il file
+// dell'ultima risposta; lì il menu non ci sta sotto il puntatore e sale a coprire il punto del clic.
+async function scorriEApri(page, { inFondo = false } = {}) {
+  return page.evaluate((inFondo) => {
     const b = document.querySelector('.dash-file-btn');
-    b.closest('.dash-bubbles').scrollTop += 40;
+    const s = b.closest('.dash-bubbles');
+    if (inFondo) s.scrollTop += (b.getBoundingClientRect().bottom - s.getBoundingClientRect().bottom) + 30;
+    s.scrollTop += 40;
     const r = b.getBoundingClientRect();
-    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + r.height / 2, button: 2 }));
-  });
+    const x = r.left + 10;
+    const y = r.top + r.height / 2;
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
+    const m = document.querySelector('.sn-rinomina-menu');
+    return { copreIlPunto: !!(m && m.contains(document.elementFromPoint(x, y))), y: Math.round(y), alta: innerHeight };
+  }, inFondo);
 }
 
-test('r1 file della chat: uno scorrimento del riquadro finito prima del tasto destro non chiude il menu', async ({ app }) => {
+async function restaAperto(page, opzioni) {
+  const esito = await scorriEApri(page, opzioni);
+  const menu = page.locator('.sn-rinomina-menu');
+  await expect(menu).toBeVisible();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
+  await expect(menu, JSON.stringify(esito)).toBeVisible();
+  return esito;
+}
+
+test('file della chat a metà riquadro: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
   test.setTimeout(90_000);
   try {
-    const page = await chatConFile(app);
-    await scorriEApri(page);
-    const menu = page.locator('.sn-rinomina-menu');
-    await expect(menu).toBeVisible();
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
-    await expect(menu).toBeVisible();
+    await restaAperto(await chatConFile(app));
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('r1 file dell\'ultima risposta, in fondo alla chat: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
+  test.setTimeout(90_000);
+  try {
+    const esito = await restaAperto(await chatConFile(app), { inFondo: true });
+    expect(esito.copreIlPunto, 'il caso provato è quello col menu sopra il punto del clic').toBe(true);
   } finally {
     await ripristina(app);
   }
