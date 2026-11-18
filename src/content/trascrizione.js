@@ -8,8 +8,8 @@
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
   const ACTIONS = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
   const t = (k) => (global.SN_I18N ? global.SN_I18N.t(k) : k);
-  // Il tetto dello strato è 8 MB: un ritaglio PNG grande quanto uno schermo 4K ci arriva vicino, e si rifà in JPEG.
-  const DATI_MAX = 7 * 1024 * 1024;
+  // Quante volte si rimpicciolisce un'immagine che lo strato rifiuta col suo limite, prima di dirlo.
+  const RIDUZIONI = 3;
   // Più piccola di così una porzione non si legge dove sta: si ingrandisce al centro.
   const MINIMO = { w: 160, h: 40 };
   const MARGINE = 16;
