@@ -721,6 +721,8 @@ test('#2338: l5, l4, bilanci e passa chiamano le operazioni del server coi campi
   assert.match(out, /r1 {2}#900 \(server\) aaaaaaaaaaaa worker\/x: guard_the_guards\n {4}functions\/src\/routine\/deliver\.js\n {4}resta all'owner: \.github/);
   assert.match(out, /\(2 su lavori non fidati o a catena sporca: restano all'owner\)/);
   assert.match(out, /#901 b{40} «Un titolo»\n {4}Riga uno\.\n {4}Riga due\./);
+  // Una bocciatura con la nota di un controllo non fidato: il fatto soltanto, e decide l'owner.
+  assert.match(out, /#903 worker\/y: bocciato, nota scritta da un controllo non fidato, decide l'owner/);
   assert.match(out, /Bilanci: 3 → 4, 2 → 1, 1 → 0; tetto totale delle verifiche 8\. Cambiati: cap3, tettoVerifiche \(scritto nel recap\)\./);
   assert.match(out, /#902 passa al controllo di sicurezza; quello che resta va in #902\.1\./);
   const n = s.corpi.length;
