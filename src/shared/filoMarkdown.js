@@ -77,11 +77,15 @@
   // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
   // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo
   // di un link ha la sua enfasi e il suo codice, rimessi dentro l'<a> (#853).
-  function inlineMd(escaped) {
+  // `fonti`: le etichette delle fonti controllate dal main (src/shared/fontiCitate.js), una per posto; il testo da
+  // solo non ne disegna nessuna, qualunque cosa contenga.
+  function inlineMd(escaped, fonti = null) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
     let t = String(escaped).replace(SENTINELLE, '');
+    const F = global.SN_FONTI_CITATE;
+    t = t.replace(POSTO_FONTE, (m, i) => (F && fonti && fonti[Number(i)] ? stash(F.html(fonti[Number(i)])) : ''));
 
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
