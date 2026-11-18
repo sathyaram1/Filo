@@ -161,7 +161,6 @@ test('riaperta, la conversazione ridisegna le etichette dall\'archivio, e il tes
     });
     return salvata && salvata.text;
   }, { timeout: 10_000 }).toBe('Inaugurato nel 2015.');
-  expect(salvata && salvata.text).toBe('Inaugurato nel 2015.');
   expect(salvata.fonti).toHaveLength(1);
   expect(salvata.fonti[0]).toMatchObject({ esito: 'verificata', sito: 'sito-pubblico.test', titolo: 'Storia del ponte' });
   expect(JSON.stringify(salvata.fonti)).not.toContain('premessa sul quartiere');
