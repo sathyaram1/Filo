@@ -54,7 +54,11 @@ test('togliere manda la carta in «altro», rimetterla la riporta (in fondo, in 
   const tolta = C.applica(C.predefinita(), { tipo: 'togli', carta: 'mazzi' }).layout;
   assert.equal(ordine(tolta), 'editor,suggerimenti,rapide');
   assert.deepEqual(tolta.tolte, ['mazzi']);
-  assert.deepEqual(C.descrivi(tolta), { destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'], altro: ['Mazzi'] });
+  assert.deepEqual(C.descrivi(tolta), {
+    destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'],
+    tasti: ['Cerca nel filo', 'Aperti per dopo', 'Download', 'Memorie', 'Bacheca', 'Impostazioni'],
+    altro: ['Mazzi', 'Profilo'],
+  });
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi' }).layout), 'editor,suggerimenti,rapide,mazzi');
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', verso: 'cima' }).layout), 'mazzi,editor,suggerimenti,rapide');
   const davanti = C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', prima: 'rapide' }).layout;
@@ -85,6 +89,56 @@ test('il nome come lo dice l’utente porta alla carta giusta', () => {
   assert.equal(C.risolvi('la posta'), null);
   assert.equal(C.risolvi(''), null);
   assert.equal(ordine(C.applica(C.predefinita(), { tipo: 'togli', carta: 'i suggerimenti' }).layout), 'editor,mazzi,rapide');
+});
+
+// #2372 — i tasti di «altro»: la ricerca, le app, le impostazioni e il profilo si spostano e vanno nel «+».
+test('di serie in vista ci sono la ricerca e le impostazioni, il profilo sta nel «+»; chi aveva salvato prima ritrova le app', () => {
+  const l = C.predefinita();
+  assert.deepEqual(l.tasti, ['cerca', 'perDopo', 'scaricamenti', 'cronologia', 'bacheca', 'impostazioni']);
+  assert.deepEqual(l.riposti, ['profilo']);
+  const vecchia = C.normalizza({ destra: ['editor'], tolte: ['mazzi'] });
+  assert.deepEqual(vecchia.tasti, l.tasti);
+  assert.deepEqual(vecchia.riposti, ['profilo']);
+  // Un tasto che il catalogo non conosce sparisce; uno che c'è in tutte e due le liste resta dove l'utente l'ha messo via.
+  const strana = C.normalizza({ tasti: ['impostazioni', 'boh', 'cerca'], riposti: ['cerca'] });
+  assert.deepEqual(strana.tasti.slice(0, 1), ['impostazioni']);
+  assert.ok(strana.riposti.includes('cerca') && !strana.tasti.includes('cerca'));
+});
+
+test('un tasto si mette nel «+», si rimette dove lo si lascia, si sposta; il «+» non è un tasto', () => {
+  const via = C.applica(C.predefinita(), { tipo: 'togli', carta: 'impostazioni' });
+  assert.equal(via.cambiato, true);
+  assert.ok(!via.layout.tasti.includes('impostazioni'));
+  assert.deepEqual(via.layout.riposti, ['profilo', 'impostazioni']);
+  const torna = C.applica(via.layout, { tipo: 'aggiungi', carta: 'impostazioni', prima: 'cerca' }).layout;
+  assert.deepEqual(torna.tasti.slice(0, 2), ['impostazioni', 'cerca']);
+  assert.deepEqual(torna.riposti, ['profilo']);
+  const profilo = C.applica(torna, { tipo: 'aggiungi', carta: 'profilo' }).layout;
+  assert.equal(profilo.tasti[profilo.tasti.length - 1], 'profilo');
+  assert.deepEqual(profilo.riposti, []);
+  assert.deepEqual(C.applica(C.predefinita(), { tipo: 'sposta', carta: 'impostazioni', verso: 'cima' }).layout.tasti[0], 'impostazioni');
+  assert.match(C.applica(C.predefinita(), { tipo: 'sposta', carta: 'profilo', verso: 'su' }).errore, /rimesso/);
+  for (const nome of ['+', 'piu', 'altro']) assert.ok(C.applica(C.predefinita(), { tipo: 'togli', carta: nome }).errore, nome);
+  // Le carte restano dove sono: un tasto non le scavalca e una carta non finisce fra i tasti.
+  assert.equal(ordine(via.layout), 'editor,mazzi,suggerimenti,rapide');
+  assert.deepEqual(C.applica(C.predefinita(), { tipo: 'aggiungi', carta: 'mazzi', prima: 'cerca' }).layout.tasti, C.predefinita().tasti);
+  // «Come all'inizio» rimette anche i tasti.
+  assert.deepEqual(C.applica(via.layout, { tipo: 'ripristina' }).layout, C.predefinita());
+});
+
+test('i tasti si nominano a parole; «impostazioni» è il tasto, le rapide sono la carta, «download» resta a sinistra', () => {
+  assert.equal(C.risolvi('le impostazioni'), 'impostazioni');
+  assert.equal(C.risolvi('impostazioni', { esatto: true }), 'impostazioni', 'la «i» iniziale non è un articolo');
+  assert.equal(C.risolvi('Impostazioni rapide', { esatto: true }), 'rapide');
+  assert.equal(C.risolvi('il tasto delle impostazioni'), 'impostazioni');
+  assert.equal(C.risolvi('impostazioni rapide'), 'rapide');
+  assert.equal(C.risolvi('la ricerca', { esatto: true }), 'cerca');
+  assert.equal(C.risolvi('il profilo', { esatto: true }), 'profilo');
+  assert.equal(C.risolvi('le memorie', { esatto: true }), 'cronologia');
+  assert.equal(C.risolvi('download', { esatto: true }), null);
+  assert.equal(C.risolvi('scaricamenti', { esatto: true }), null);
+  assert.equal(C.risolvi('il tasto dei download', { esatto: true }), 'scaricamenti');
+  assert.ok(!C.applica(C.predefinita(), { tipo: 'togli', carta: 'le memorie' }).layout.tasti.includes('cronologia'));
 });
 
 test('a sinistra: le carte nuove vengono prima, quelle già disposte tengono il posto che ha dato l’utente', () => {

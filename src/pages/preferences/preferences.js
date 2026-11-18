@@ -874,6 +874,8 @@
       case 'pannelloDestro.attesaMs': return opzioniPannelloDestro({ attesaMs: $('pannelloAttesa').value }).attesaMs;
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
+      case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.sogliaMs($('doppioToccoSoglia').value);
+      case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo({ pausaMs: $('ricercaFiloPausa').value }).pausaMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
@@ -980,6 +982,8 @@
       case 'pannelloDestro.attesaMs': return opzioniPannelloDestro(s.pannelloDestro).attesaMs;
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
+      case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.normalizza(s.doppioTocco).sogliaMs;
+      case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo(s.ricercaFilo).pausaMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
@@ -1169,6 +1173,8 @@
     if (vuole('pannelloDestro.attesaMs')) $('pannelloAttesa').value = String(pannello.attesaMs);
     if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
+    if (vuole('doppioTocco.sogliaMs')) $('doppioToccoSoglia').value = String(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).sogliaMs);
+    if (vuole('ricercaFilo.pausaMs')) $('ricercaFiloPausa').value = String(window.SN_CONST.opzioniRicercaFilo(settings.ricercaFilo).pausaMs);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
@@ -1579,6 +1585,59 @@
     }
   }
 
+  // ── Le lettere del doppio tocco nella home (#2372) ───────────────────────
+  // Si danno dal tasto destro di un tasto della home, chiedendolo a Filo o da qui; qui si vedono tutte e si tolgono.
+  let lettereSalvate = [];
+  function disegnaLettere(cfg) {
+    const D = window.SN_DOPPIO_TOCCO;
+    const box = $('doppioToccoLettere');
+    if (!box || !D) return;
+    lettereSalvate = D.normalizza(cfg).lettere;
+    righeConCrocetta(box, lettereSalvate.map((v) => v.lettera), {
+      vuoto: 'Nessuna lettera: di serie il doppio tocco non fa niente.',
+      chiave: 'lettera',
+      testo: (l) => D.etichetta(lettereSalvate.find((v) => v.lettera === l)),
+      titolo: 'Togli la lettera',
+      aria: (t) => `Togli ${t}`,
+      togli: (l) => salvaLettere(D.togli({ lettere: lettereSalvate }, l).lettere),
+    });
+    const lista = $('doppioToccoTasti');
+    if (lista && !lista.childElementCount && window.SN_CARTE_HOME) {
+      const H = window.SN_CARTE_HOME;
+      for (const t of [...H.TASTI, ...H.CARTE.filter((c) => c.url)]) {
+        const o = document.createElement('option');
+        o.value = t.titolo;
+        lista.appendChild(o);
+      }
+    }
+  }
+  async function salvaLettere(lettere) {
+    disegnaLettere({ lettere });
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { doppioTocco: { lettere } } });
+    flashSaved('doppioToccoHint');
+  }
+  // Un titolo dell'elenco («Cerca nel filo») vale come il nome del tasto; il resto è un indirizzo.
+  async function aggiungiLettera() {
+    const D = window.SN_DOPPIO_TOCCO;
+    const l = D.lettera($('doppioToccoNuova').value);
+    const dove = $('doppioToccoDove').value.trim();
+    const H = window.SN_CARTE_HOME;
+    const perTitolo = H && [...H.TASTI, ...H.CARTE].find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
+    const r = l && dove ? (perTitolo ? D.assegna({ lettere: lettereSalvate }, l, { tasto: perTitolo.id }) : D.daTesto(`${l} ${dove}`, { doppioTocco: { lettere: lettereSalvate } })) : null;
+    const hint = $('doppioToccoHint');
+    if (!r || r.rifiuto) {
+      if (hint) {
+        hint.textContent = !l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre';
+        hint.classList.add('sn-show');
+        setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, 2400);
+      }
+      return;
+    }
+    $('doppioToccoNuova').value = '';
+    $('doppioToccoDove').value = '';
+    await salvaLettere(r.lettere);
+  }
+
   async function salvaSitiMenu(nuovo) {
     const elenco = Array.from(new Set(nuovo));
     disegnaSitiMenu(elenco);
@@ -1888,6 +1947,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaLettere(settings.doppioTocco);
     disegnaPreferitiBt(settings.bluetoothPreferiti);
     disegnaScorciatoie(settings.scorciatoie);
 
@@ -1926,6 +1986,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).lettere) !== JSON.stringify(lettereSalvate)) disegnaLettere(settings.doppioTocco);
     if (JSON.stringify(settings.bluetoothPreferiti || []) !== JSON.stringify(preferitiBtSalvati || [])) disegnaPreferitiBt(settings.bluetoothPreferiti);
     if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
@@ -2068,6 +2129,14 @@
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
+    for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+    }
+    $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
+    for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {
+      $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiLettera().catch(() => {}); } });
+    }
     $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.

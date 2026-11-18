@@ -83,6 +83,8 @@
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
   // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
   let pendingFiles = [];
+  // Le impostazioni come le ha la home: la pausa della ricerca e le lettere del doppio tocco le leggono da qui.
+  let impostazioniHome = null;
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
   // #892.5 — svuotato e riportato con Annulla, un testo incollato lo resta: la regola è dell'Aiuto e della home insieme.
@@ -106,6 +108,7 @@
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
   //   SN_DASH_BARRA_SITI  la barra dei siti e la chat ripiegata (#1803)
   //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
+  //   SN_DASH_TASTIERA    un campo solo che prende la battitura, e il doppio tocco di una lettera (#2372)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
   // possiede — la cartella del terminale al terminale, "sto inviando" a questo
@@ -200,7 +203,13 @@
     conversa: () => body.dataset.state === 'thread',
   });
   const Cerca = self.SN_DASH_CERCA;
-  Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
+  // La ricerca prende la colonna destra dal suo tasto (#2372): chiusa, il fuoco torna nel campo della chat.
+  Cerca.init({
+    send, coda: Coda, host: $('cercaFilo'), colonna: $('right'), chat: inputEl, bubblesEl,
+    pausaMs: () => self.SN_CONST.opzioniRicercaFilo(impostazioniHome && impostazioniHome.ricercaFilo).pausaMs,
+    // A chat ripiegata il risultato non si vedrebbe: la chat si riapre.
+    mostraFilo: () => self.SN_DASH_BARRA_SITI?.perInvio?.(),
+  });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -357,11 +366,19 @@
     onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
+    apriRicerca: () => Cerca.apri(),
+    decoraProfilo: (btn, ic) => decoraProfilo(btn, ic),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
+  });
+  const Tastiera = self.SN_DASH_TASTIERA;
+  Tastiera.init({
+    send, input: inputEl, dash: $('dash'),
+    impostazioni: () => impostazioniHome,
+    usa: (id) => Carte.usa(id),
   });
   // La barra dei siti e la freccia che ripiega la chat (#1803).
   const BarraSiti = self.SN_DASH_BARRA_SITI;
@@ -2237,6 +2254,15 @@
   async function comandoLocale(text, { incollato = false } = {}) {
     Comandi.lasciaNonRisolto();
     Coda.fineRisali();
+    // «cerca nel filo X» apre la stessa ricerca del suo tasto (#2372), con X già scritto.
+    const cerca = !incollato && text.match(/^(?:cerca|cercami|trova|trovami|ricerca)\s+(?:nel\s+filo\b[\s:,]*(.*)|(.+?)\s+nel\s+filo[.!?]*)$/i);
+    if (cerca) {
+      inputEl.value = '';
+      autoGrowInput();
+      Comandi.updateInputClass();
+      Cerca.apri((cerca[1] || cerca[2] || '').trim());
+      return true;
+    }
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -2474,6 +2500,7 @@
       // che lo aspettava parte qui, non alla prossima scheda.
       Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
+      if (msg.settings) impostazioniHome = msg.settings;
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings) BarraSiti.applicaImpostazioni(msg.settings);
@@ -2515,51 +2542,27 @@
 
 
   // ===== Bootstrap =====
-  // ===== Profilo e impostazioni in alto a destra =====
-  // Dove ogni app li mette (SPEC home). Red-team, Home, Cronologia e App stanno solo nella barra laterale (#871).
-  // Ogni click aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
-  let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  function renderControls() {
-    const host = $('dashControls');
-    if (!host) return;
-    const ICONS = self.SN_ICONS || {};
-    const items = [
-      { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'account', icon: 'user', label: 'Profilo' },
-    ];
-    host.replaceChildren();
-    accountCtrlBtn = null;
-    for (const it of items.filter(Boolean)) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dash-ctrl';
-      btn.dataset.command = it.command;
-      btn.setAttribute('aria-label', it.label);
-      btn.title = it.label;
-      const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
-      btn.innerHTML = svg || it.label.charAt(0);
-      btn.addEventListener('click', () => {
-        if (typeof it.action === 'function') it.action();
-        else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else {
-          // Il menu della shell si apre sotto l'icona, ovunque la metta la colonna destra (#1491).
-          const r = btn.getBoundingClientRect();
-          send({ type: MSG.SHELL_ACTION, command: it.command, anchor: { x: r.left, y: r.bottom } });
-        }
-      });
-      host.appendChild(btn);
-      if (it.command === 'account') accountCtrlBtn = btn;
-    }
-    refreshAccountControl();
+  // ===== Il tasto del Profilo =====
+  // È un tasto di «altro» come gli altri (#2372): lo disegna dashboard-carte.js, qui gli si mette la foto. Il clic
+  // aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
+  let accountCtrlBtn = null; // il tasto del profilo, se è disegnato (anche nel «+»)
+  let accountIco = null;
+  let ultimoProfilo;
+  function decoraProfilo(btn, ic) {
+    accountCtrlBtn = btn;
+    accountIco = ic;
+    if (ultimoProfilo !== undefined) applyAccountProfile(ultimoProfilo);
   }
 
   // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
   // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
-    if (!accountCtrlBtn) return;
+    ultimoProfilo = profile || null;
+    if (!accountCtrlBtn || !accountIco || !accountCtrlBtn.isConnected) return;
+    const btn = accountCtrlBtn;
+    const ico = accountIco;
     const ICONS = self.SN_ICONS || {};
-    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
+    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(20) : '';
     // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
     if (profile && /^filo:\/\/icone\//.test(profile.picture || '')) {
       const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
@@ -2568,17 +2571,17 @@
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
       // Se la copia non si legge ripieghiamo sull'icona utente.
-      img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
+      img.onerror = () => { ico.innerHTML = userIcon; };
       img.src = profile.picture;
-      accountCtrlBtn.replaceChildren(img);
-      accountCtrlBtn.classList.add('signed-in');
-      accountCtrlBtn.title = profile.email ? `${name} — ${profile.email}` : name;
-      accountCtrlBtn.setAttribute('aria-label', `Account: ${name}`);
+      ico.replaceChildren(img);
+      btn.classList.add('signed-in');
+      btn.title = profile.email ? `${name} — ${profile.email}` : name;
+      btn.setAttribute('aria-label', `Profilo: ${name}`);
     } else {
-      accountCtrlBtn.innerHTML = userIcon;
-      accountCtrlBtn.classList.remove('signed-in');
-      accountCtrlBtn.title = profile ? 'Profilo' : 'Accedi';
-      accountCtrlBtn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
+      ico.innerHTML = userIcon;
+      btn.classList.remove('signed-in');
+      btn.title = profile ? 'Profilo' : 'Accedi';
+      btn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
     }
   }
 
@@ -2586,6 +2589,7 @@
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
+      if (r && r.signedIn && r.profile) applyAccountProfile(r.profile);
     } catch (_) {
       Comandi.setOwner(false);
     }
@@ -2943,7 +2947,9 @@
       const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
       if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
-      const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
+      // Il profilo nel «+» chiuso non si vede: i crediti volano lì.
+      const visibile = (n) => { const r = n && n.isConnected ? n.getBoundingClientRect() : null; return r && r.width ? r : null; };
+      const target = visibile(accountCtrlBtn) || visibile($('altroPiu'));
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
       const ty = target ? target.top + target.height / 2 : 26;
       const ox = window.innerWidth / 2;
@@ -3137,10 +3143,11 @@
   }
 
   (async function init() {
-    renderControls();
+    refreshAccountControl();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
+      impostazioniHome = settings || null;
       Sistema.applicaImpostazioni(settings);
       BarraSiti.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);

@@ -25,6 +25,11 @@
   const CATEGORIE_PRIVACY = { posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'enti pubblici', campi: 'pagine con una password' };
   const nomeCategoria = (c) => CATEGORIE_PRIVACY[c] || String(c);
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
+  const lettereDoppie = (l) => {
+    const D = global.SN_DOPPIO_TOCCO;
+    const voci = Array.isArray(l) ? l.filter((x) => x && x.lettera) : [];
+    return voci.length ? voci.map((x) => (D ? D.etichetta(x) : `${x.lettera}${x.lettera}`)).join(', ') : 'nessuna';
+  };
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
@@ -136,6 +141,9 @@
     'pannelloDestro.uscitaMs': { nome: 'tempo prima che il pannello degli strumenti si chiuda', valore: millisecondi, livello: 1 },
     'pannelloDestro.bloccato': { nome: 'pannello degli strumenti bloccato aperto', valore: sino('bloccato', 'sopra la pagina'), livello: 1 },
     'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
+    'doppioTocco.sogliaMs': { nome: 'tempo per il doppio tocco di una lettera', valore: millisecondi, livello: 1 },
+    'doppioTocco.lettere': { nome: 'lettere col doppio tocco nella home', valore: lettereDoppie, livello: 1 },
+    'ricercaFilo.pausaMs': { nome: 'pausa prima che la ricerca nel filo porti al risultato', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
     'feedbackRilettura.enabled': { nome: 'rilettura del feedback prima dell\'invio', valore: ATTIVA, livello: 1 },

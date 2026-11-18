@@ -2,6 +2,7 @@
 // com'era appena aperta prima di ogni prova (tests/helpers/appCondivisa.mjs); un describe per ogni gruppo di prove.
 
 import { appCondivisa } from './helpers/appCondivisa.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -29,7 +30,7 @@ test.describe('tab-archive', () => {
     const home = await openTab('filo://newtab/');
     // Le pagine interne filo:// non entrano nell'archivio.
     expect((await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.list())).some((t) => /^filo:/.test(t.url))).toBe(false);
-    await home.locator('#cercaInput').fill('Sito Archivio');
+    await (await campoRicerca(home)).fill('Sito Archivio');
     const voce = home.locator('.dash-cerca-pagina', { hasText: 'Sito Archivio' });
     await expect(voce).toBeVisible({ timeout: 8_000 });
     await voce.click();

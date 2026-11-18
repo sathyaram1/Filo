@@ -8,6 +8,7 @@ import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFin
 import { readFileSync, mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { mezzanotte, oggiFa } from './helpers/istanti.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
@@ -305,7 +306,7 @@ test('cerco «orche» nel campo: trovo lo scambio e la pagina senza che la chat 
   const page = await openTab('filo://newtab/');
   await modelloFinto(app, [{ text: 'NON DOVEVO RISPONDERE' }]);
   await expect(page.locator('.dash-bubble-user', { hasText: 'come cacciano le orche?' })).toHaveCount(0);
-  await page.locator('#cercaInput').fill('orche');
+  await (await campoRicerca(page)).fill('orche');
   const risultati = page.locator('#cercaRisultati');
   await expect(risultati.locator('.dash-cerca-msg', { hasText: 'come cacciano le orche?' })).toBeVisible();
   await expect(risultati.locator('.dash-cerca-pagina', { hasText: 'YouTube: orche' })).toBeVisible();
@@ -443,7 +444,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   await orche.click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(orche).toHaveCount(0);
-  const cerca = page.locator('#cercaInput');
+  const cerca = (await campoRicerca(page));
   await cerca.fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
   const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'ultima_ora' }));
@@ -518,7 +519,7 @@ test('una pagina tolta dal filo mentre la sua scheda è aperta non torna nella r
     await window.filoShell.tabs.close(s.tabs.find((x) => x.url === u).id);
   }, dopo);
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title))).toEqual(['delfini']);
-  await page.locator('#cercaInput').fill('orche');
+  await (await campoRicerca(page)).fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
 });
 
@@ -530,7 +531,7 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
   await app.evaluate((_e, u) => globalThis.SN_ARCHIVED_TABS.archive({ url: u, title: 'YouTube: orche', closedAt: new Date().toISOString() }), url);
   const page = await openTab('filo://newtab/');
   await expect(page.locator('.dash-pagine-testo').last()).toHaveText('2 pagine, fra cui YouTube: orche');
-  await page.locator('#cercaInput').fill('orche');
+  await (await campoRicerca(page)).fill('orche');
   const voce = page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'YouTube: orche' });
   await expect(voce).toHaveCount(1);
   await voce.click({ button: 'right' });
@@ -538,8 +539,8 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(0);
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
-  await page.locator('#cercaInput').fill('');
-  await page.locator('#cercaInput').fill('orche');
+  await (await campoRicerca(page)).fill('');
+  await (await campoRicerca(page)).fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
 });
 
@@ -577,7 +578,7 @@ test('tolta la prima pagina del gruppo in corso, la riga resta una sola, aperta,
   await tornaAllaHome(shell, page);
   await expect(righePagine(page)).toHaveText(['3 pagine, fra cui delta']);
   // Dalla ricerca, la prima del gruppo: stessa cosa.
-  await page.locator('#cercaInput').fill('beta');
+  await (await campoRicerca(page)).fill('beta');
   await page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'beta' }).click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(righePagine(page)).toHaveText(['2 pagine, fra cui delta']);
@@ -622,7 +623,7 @@ test('una scheda chiusa eliminata dall’archivio esce dal filo: niente riga nel
   expect(r.ok).toBe(true);
   // La home già aperta lo vede subito; la pagina visitata in un'altra scheda resta.
   await expect(righePagine(page)).toHaveText(['1 pagina: delfini']);
-  await page.locator('#cercaInput').fill('orche');
+  await (await campoRicerca(page)).fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
   // «Svuota archivio»: anche le visite delle altre schede chiuse.
   await shell.evaluate(async (u) => {

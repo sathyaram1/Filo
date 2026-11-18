@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const QUADERNO = 'filo://quaderno/quaderno.html';
 
@@ -309,7 +310,7 @@ test('una scheda chiusa un mese fa, prima del filo, si ritrova cercandola nel fi
   expect(migrata.ts).toBe(unMeseFa);
 
   const home = await openTab('filo://newtab/');
-  const cerca = home.locator('#cercaInput');
+  const cerca = (await campoRicerca(home));
   await cerca.fill('aringhe');
   const risultato = home.locator('.dash-cerca-pagina, [data-url]').filter({ hasText: 'Appunti di viaggio' }).first();
   await expect(risultato).toBeVisible({ timeout: 8_000 });

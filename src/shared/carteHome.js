@@ -20,17 +20,26 @@
     },
     {
       id: 'rapide', titolo: 'Impostazioni rapide', icona: 'options', url: 'filo://preferences/preferences.html',
-      nomi: ['impostazioni rapide', 'rapide', 'impostazioni', 'preferenze rapide'],
+      nomi: ['impostazioni rapide', 'rapide', 'preferenze rapide'],
     },
   ];
 
-  // Le app che una carta non ce l'hanno: in «altro» restano un'icona.
+  // Le app che una carta non ce l'hanno: in «altro» restano un tasto.
   const APP = [
-    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
-    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
+    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html', nomi: ['aperti per dopo', 'per dopo', 'perdopo', 'salvati per dopo'] },
+    // Niente «download» fra i nomi: a parole quello è lo scaricamento a sinistra.
+    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html', nomi: ['tasto dei download', 'tasto download', 'pagina dei download', 'app dei download'] },
     // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
-    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
-    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html', nomi: ['memorie', 'quaderno', 'quaderno delle memorie', 'cronologia'] },
+    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html', nomi: ['bacheca', 'segnalazioni'] },
+  ];
+  // I tasti di «altro» (#2372): le app, la ricerca nel filo e i comandi che stavano in alto a destra. Il «+» non è un
+  // tasto: è fisso e tiene quelli fuori vista. `fuori`: di serie sta nel «+».
+  const TASTI = [
+    { id: 'cerca', titolo: 'Cerca nel filo', icona: 'search', nomi: ['cerca', 'cerca nel filo', 'ricerca', 'ricerca nel filo', 'lente'] },
+    ...APP,
+    { id: 'impostazioni', titolo: 'Impostazioni', icona: 'options', comando: 'settings', nomi: ['impostazioni', 'opzioni', 'ingranaggio', 'menu delle impostazioni'] },
+    { id: 'profilo', titolo: 'Profilo', icona: 'user', comando: 'account', fuori: true, nomi: ['profilo', 'account', 'accedi', 'avatar'] },
   ];
 
   const VERSIONE = 1;
@@ -41,25 +50,34 @@
   const TETTO_CHIAVE = 200;
 
   const IDS = CARTE.map((c) => c.id);
+  const ID_TASTI = TASTI.map((t) => t.id);
   const carta = (id) => CARTE.find((c) => c.id === id) || null;
+  const tasto = (id) => TASTI.find((t) => t.id === id) || null;
   const lista = (v) => (Array.isArray(v) ? v : []);
   const unici = (arr) => [...new Set(arr)];
   const chiaveValida = (k) => typeof k === 'string' && k.length > 0 && k.length <= TETTO_CHIAVE;
 
   function predefinita() {
-    return { versione: VERSIONE, destra: IDS.slice(), tolte: [], sinistra: [], nascoste: [] };
+    return normalizza({});
   }
 
-  // Una carta che il catalogo non conosceva quando l'utente ha salvato compare in fondo a destra: tolta è
-  // solo quella che l'utente ha tolto.
+  // Una carta o un tasto che il catalogo non conosceva quando l'utente ha salvato compare in fondo, o nel «+» se di
+  // serie sta lì: tolto è solo quello che l'utente ha tolto.
   function normalizza(raw) {
     const r = raw && typeof raw === 'object' ? raw : {};
     const tolte = unici(lista(r.tolte).filter((id) => IDS.includes(id)));
     const destra = unici(lista(r.destra).filter((id) => IDS.includes(id) && !tolte.includes(id)));
     for (const id of IDS) if (!destra.includes(id) && !tolte.includes(id)) destra.push(id);
+    const riposti = unici(lista(r.riposti).filter((id) => ID_TASTI.includes(id)));
+    const tasti = unici(lista(r.tasti).filter((id) => ID_TASTI.includes(id) && !riposti.includes(id)));
+    for (const t of TASTI) {
+      if (tasti.includes(t.id) || riposti.includes(t.id)) continue;
+      if (t.fuori) riposti.push(t.id);
+      else tasti.push(t.id);
+    }
     const sinistra = unici(lista(r.sinistra).filter(chiaveValida)).slice(0, TETTO_ORDINE);
     const nascoste = unici(lista(r.nascoste).filter(chiaveValida)).slice(-TETTO_NASCOSTE);
-    return { versione: VERSIONE, destra, tolte, sinistra, nascoste };
+    return { versione: VERSIONE, destra, tolte, tasti, riposti, sinistra, nascoste };
   }
 
   function senzaAccenti(s) {
@@ -67,18 +85,23 @@
   }
 
   function pulisciNome(nome) {
-    return senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli|l')\s*/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
+    // L'articolo vuole lo spazio dopo (o l'apostrofo): «impostazioni» non comincia con «i».
+    return senzaAccenti(nome).replace(/^(?:(?:la|il|lo|le|i|gli)\s+|l'\s*)/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
   }
 
-  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor») → id del catalogo, o null.
-  // `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor», «il tasto delle impostazioni») → id del catalogo
+  // delle carte o dei tasti, o null. `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Un tasto si riconosce solo dai suoi nomi: il titolo «Download» a parole è lo scaricamento a sinistra.
   function risolvi(nome, { esatto = false } = {}) {
-    const s = pulisciNome(nome);
+    const intero = pulisciNome(nome);
+    const s = intero.replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
     if (!s) return null;
     if (IDS.includes(s)) return s;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
+    for (const t of TASTI) if (t.nomi.includes(s) || t.nomi.includes(intero)) return t.id;
     if (esatto) return null;
     for (const c of CARTE) if (c.nomi.some((n) => s.includes(n))) return c.id;
+    for (const t of TASTI) if (t.nomi.some((n) => s.includes(n))) return t.id;
     return null;
   }
 
@@ -211,6 +234,23 @@
 
   const uguali = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+  // Le stesse mosse delle carte, sui tasti di «altro»: «togli» lo mette nel «+», «aggiungi» lo rimette in vista.
+  // → [layout, errore?]
+  function mossaTasto(l, tipo, id, verso, rif) {
+    if (tipo === 'togli') return [{ ...l, tasti: l.tasti.filter((x) => x !== id), riposti: [...l.riposti.filter((x) => x !== id), id] }];
+    if (tipo === 'aggiungi') {
+      const dove = verso === 'cima' ? l.tasti.filter((x) => x !== id)[0] ?? null : rif;
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove), riposti: l.riposti.filter((x) => x !== id) }];
+    }
+    if (tipo === 'sposta') {
+      if (!l.tasti.includes(id)) return [l, 'il tasto è nel «+»: prima va rimesso in vista'];
+      const dove = verso ? primaDa(l.tasti, id, verso) : rif;
+      if (dove === undefined) return [l, 'verso sconosciuto'];
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove) }];
+    }
+    return [l, 'mossa sconosciuta'];
+  }
+
   // Una mossa → { layout, cambiato, errore? }. Una mossa che non si può fare dice perché e lascia tutto com'era.
   function applica(raw, mossa) {
     const prima = normalizza(raw);
@@ -235,9 +275,11 @@
       if (!ordine.length) return fine(prima, 'ordine vuoto');
       return fine({ ...prima, sinistra: unici([...ordine, ...prima.sinistra]) });
     }
-    const id = IDS.includes(m.carta) ? m.carta : risolvi(m.carta);
+    const perId = (x) => ([...IDS, ...ID_TASTI].includes(x) ? x : risolvi(x));
+    const id = perId(m.carta);
     if (!id) return fine(prima, 'carta sconosciuta');
-    const rif = m.prima == null ? null : (IDS.includes(m.prima) ? m.prima : risolvi(m.prima));
+    const rif = m.prima == null ? null : perId(m.prima);
+    if (ID_TASTI.includes(id)) return fine(...mossaTasto(prima, tipo, id, m.verso, ID_TASTI.includes(rif) ? rif : null));
     if (tipo === 'togli') {
       return fine({ ...prima, destra: prima.destra.filter((x) => x !== id), tolte: [...prima.tolte, id] });
     }
@@ -268,13 +310,15 @@
     const l = normalizza(raw);
     return {
       destra: l.destra.map((id) => carta(id).titolo),
-      altro: l.tolte.map((id) => carta(id).titolo),
+      tasti: l.tasti.map((id) => tasto(id).titolo),
+      // Nel «+»: le carte tolte e i tasti messi via.
+      altro: [...l.tolte.map((id) => carta(id).titolo), ...l.riposti.map((id) => tasto(id).titolo)],
     };
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
-    carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
+    CARTE, APP, TASTI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
+    carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

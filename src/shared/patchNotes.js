@@ -14,6 +14,9 @@
         { testo: 'Su un video di YouTube l\'Aiuto e la chat leggono la trascrizione del video: a «di cosa parla?» rispondono da quello che si dice, e se il video non ha trascrizione te lo dicono.', segnalazione: 1977 },
         { testo: 'Nelle risposte di Filo le parole in corsivo hanno una spiegazione: passaci sopra col mouse e la leggi, a volte con un disegno, senza che la risposta si allunghi. Filo sceglie cosa spiegarti in base a quello che sa di te; col tasto destro sulla parola chiedi di più o copi la spiegazione.', segnalazione: 2388 },
         { testo: 'Nella chat della home puoi chiedere a Filo di passare alla scheda dopo o a quella prima, di riaprire l\'ultima scheda chiusa, di salvare per dopo la pagina e di cercare un\'immagine con Google Lens: lo fa lui, invece di spiegarti dove cliccare.', segnalazione: 2371 },
+        { testo: 'La home ha un campo solo, quello della chat: quello che scrivi ci finisce anche se non ci hai cliccato. La ricerca nel filo è diventata un tasto della colonna di destra: passando sui risultati, o scorrendoli con le frecce, il filo al centro ti porta lì, ed Esc la chiude. Puoi anche scrivere «cerca nel filo» seguito da quello che cerchi.', segnalazione: 2372 },
+        { testo: 'I tasti della colonna di destra, comprese Impostazioni e Profilo, si spostano trascinandoli; quelli che non ti servono li metti nel «+», che li tiene a un clic.', segnalazione: 2372 },
+        { testo: 'Puoi dare una lettera a un tasto della home o a un sito: battila due volte all\'inizio del campo e si apre. La assegni dal tasto destro del tasto, dalle Preferenze o chiedendolo a Filo; di serie nessuna lettera fa niente.', segnalazione: 2372 },
       ],
       fixes: [
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, il tasto destro dato appena aperta la pagina apre il menu invece di andare perso.', segnalazione: 2444 },

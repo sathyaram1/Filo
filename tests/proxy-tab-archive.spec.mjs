@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer as createNetServer, connect as netConnect } from 'node:net';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 // Mini SOCKS5 (no-auth) come provider di test: serve solo perché setTabProxy
 // applichi DAVVERO il proxy (resolve trova un endpoint) e la view rinasca nella
@@ -96,7 +97,7 @@ test('archivia una tab proxata e la riapre proxata sulla stessa location', async
     // Riapri dalla ricerca del filo (la Cronologia non c'è più, #872): il risultato porta la voce d'archivio,
     // e il main la riapre con la location proxy che la voce ricorda.
     const home = await openTab('filo://newtab/');
-    await home.locator('#cercaInput').fill('Sito Proxato');
+    await (await campoRicerca(home)).fill('Sito Proxato');
     const voce = home.locator('.dash-cerca-pagina', { hasText: 'Sito Proxato' });
     await expect(voce).toBeVisible({ timeout: 8_000 });
     await voce.click();

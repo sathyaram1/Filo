@@ -9,6 +9,7 @@ import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -91,7 +92,7 @@ async function nienteInVista(app, shell) {
   await expect(quaderno.locator('.qd-riga', { hasText: 'Marta' })).toHaveCount(0);
   // Chat e schede chiuse stanno nel filo: la ricerca della home non le ritrova.
   const casa = await pagina(app, shell, 'filo://newtab/');
-  await casa.locator('#cercaInput').fill('ZQX');
+  await (await campoRicerca(casa)).fill('ZQX');
   await expect(casa.locator('#cercaRisultati .dash-cerca-niente').first()).toBeVisible({ timeout: 10_000 });
   await expect(casa.locator('#cercaRisultati .dash-cerca-pagina, #cercaRisultati .dash-cerca-msg')).toHaveCount(0);
   const editor = await pagina(app, shell, 'filo://editor/editor.html');

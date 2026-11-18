@@ -277,9 +277,17 @@
       const toccate = Array.isArray(o.tolte) && o.tolte.length ? o.tolte : (Array.isArray(o.rimesse) && o.rimesse.length ? o.rimesse : null);
       if (toccate) nome = toccate.length === 1 ? corto(toccate[0].titolo) : `${toccate.length} carte`;
       else if (o.spostata) nome = corto(o.spostata);
-      else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
+      let tasto = false;
+      if (!toccate && !o.spostata && Array.isArray(o.destra) && !o.error && C) {
+        const id = C.risolvi(a.carta);
+        const def = id ? C.carta(id) || C.tasto(id) : null;
+        nome = def ? def.titolo : '';
+        tasto = !!(def && C.tasto(id));
+      }
       const op = String(a.operazione || '').toLowerCase();
-      const cosa = { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' }[op];
+      // Un tasto di «altro» (#2372) tolto va nel «+».
+      const cosa = (tasto ? { togli: 'Tasto messo nel «+»', rimetti: 'Tasto rimesso in vista', aggiungi: 'Tasto rimesso in vista', sposta: 'Tasto spostato' }
+        : { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' })[op];
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
       return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
     },

@@ -268,10 +268,17 @@
     const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
     const detto = String((a && a.carta) || '').trim();
     // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza. Un nome non riconosciuto è del modello.
-    const nome = id ? [` «${C.carta(id).titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
+    const def = id ? C.carta(id) || C.tasto(id) : null;
+    const nome = def ? [` «${def.titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
     const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
     const frase = (prima, dopo) => (fatto ? piatto([prima, ...nome, dopo]) : [prima, ...nome, dopo]);
     if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
+    // Un tasto di «altro» (#2372): togliere lo mette nel «+».
+    if (def && C.tasto(id)) {
+      if (op === 'togli') return fatto ? frase('Tasto', ' messo nel «+»') : frase('Mettere il tasto', ' nel «+»');
+      if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Tasto', ' rimesso in vista') : frase('Rimettere in vista il tasto', '');
+      return fatto ? frase('Tasto', ' spostato') : frase('Spostare il tasto', '');
+    }
     if (op === 'togli' && !id) return fatto ? frase('Carta', ' tolta dalla home') : frase('Togliere la carta', ' dalla home');
     if (op === 'togli') return fatto ? frase('Carta', ' tolta dalla home: ora è un\'icona in «altro»') : frase('Togliere la carta', ' dalla home');
     if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Carta', ' rimessa nella home') : frase('Rimettere la carta', ' nella home');

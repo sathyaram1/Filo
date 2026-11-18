@@ -1,17 +1,19 @@
-// #1491: Impostazioni e Profilo stanno in cima alla sola colonna destra; le carte di sinistra e il filo partono
-// dall'alto invece di lasciare una fascia intera alle due icone. Il menu di ciascuna si apre sotto di lei, anche
-// con la pagina ingrandita e anche dopo l'attesa che il menu dell'account fa prima di aprirsi.
+// #1491, #2372: Impostazioni e Profilo sono tasti di «altro» nella colonna destra; le tre colonne partono dall'alto,
+// senza una fascia per le icone. Il menu di ciascuno si apre sotto il suo tasto, anche con la pagina ingrandita e
+// anche dopo l'attesa che il menu dell'account fa prima di aprirsi.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuAperto } from './helpers/barra.mjs';
+import { homeIntera, tastoHome, TASTO } from './helpers/tastiHome.mjs';
 
 const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'tests', '.shots');
 
-async function home(openTab) {
+async function home(app, openTab) {
+  await homeIntera(app);
   const page = await openTab('filo://newtab/');
-  await page.waitForSelector('#dashControls .dash-ctrl[data-command="account"]', { timeout: 8_000 });
+  await expect(page.locator(TASTO('impostazioni'))).toBeVisible({ timeout: 8_000 });
   return page;
 }
 
@@ -22,11 +24,10 @@ function geometria(page) {
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
     };
     return {
-      icone: box('#dashControls'),
+      icone: box('#altro'),
       destra: box('#right'),
       sinistra: box('#left'),
       centro: box('#center'),
-      cerca: box('#cercaFilo'),
       campo: box('#inputForm'),
       larga: document.documentElement.scrollWidth,
       vw: innerWidth,
@@ -35,22 +36,20 @@ function geometria(page) {
 }
 
 function controllaColonne(g) {
-  // Le icone stanno sopra la colonna destra, dentro la sua larghezza.
+  // I tasti stanno nella colonna destra, dentro la sua larghezza.
   expect(g.icone.left).toBeGreaterThanOrEqual(g.destra.left - 0.5);
   expect(g.icone.right).toBeLessThanOrEqual(g.destra.right + 0.5);
-  expect(g.icone.bottom).toBeLessThanOrEqual(g.destra.top + 0.5);
-  // Sinistra e filo cominciano all'altezza delle icone, non sotto di loro.
-  expect(g.sinistra.top).toBeLessThanOrEqual(g.icone.top + 0.5);
-  expect(g.centro.top).toBeLessThanOrEqual(g.icone.top + 0.5);
-  expect(g.cerca.top).toBeLessThan(g.icone.bottom);
+  // Le tre colonne cominciano alla stessa altezza: niente fascia in cima.
+  expect(Math.abs(g.destra.top - g.sinistra.top)).toBeLessThanOrEqual(0.5);
+  expect(g.centro.top).toBeLessThanOrEqual(g.destra.top + 0.5);
   expect(g.campo.left).toBeGreaterThanOrEqual(g.sinistra.right);
   expect(g.campo.right).toBeLessThanOrEqual(g.destra.left);
   expect(g.larga).toBeLessThanOrEqual(g.vw);
 }
 
-test('le due icone stanno solo sopra la colonna destra e il filo parte dall\'alto', async ({ app, openTab }) => {
+test('i tasti stanno nella colonna destra e le tre colonne partono dall\'alto', async ({ app, openTab }) => {
   test.setTimeout(45_000);
-  const page = await home(openTab);
+  const page = await home(app, openTab);
   controllaColonne(await geometria(page));
   await page.screenshot({ path: join(SHOTS, '1491-home-icone-chiaro.png') });
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
@@ -64,11 +63,11 @@ test('le due icone stanno solo sopra la colonna destra e il filo parte dall\'alt
 });
 
 // L'icona in px dello schermo: la vista della scheda davanti (la home) dentro la finestra, e il suo zoom.
-async function iconaSulloSchermo(app, page, comando) {
-  const r = await page.evaluate((c) => {
-    const b = document.querySelector(`#dashControls .dash-ctrl[data-command="${c}"]`).getBoundingClientRect();
+async function iconaSulloSchermo(app, page, id) {
+  const r = await page.evaluate((s) => {
+    const b = document.querySelector(s).getBoundingClientRect();
     return { top: b.top, bottom: b.bottom, left: b.left, right: b.right };
-  }, comando);
+  }, TASTO(id));
   const v = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
@@ -139,22 +138,30 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   test.setTimeout(60_000);
   // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
   await entraFinto(app, shell);
-  const page = await home(openTab);
+  const page = await home(app, openTab);
+  // Senza le carte i tasti stanno in cima alla colonna, dove stavano le due icone: sotto c'è posto per il menu, che
+  // altrimenti la shell apre sopra il tasto.
+  // Il Profilo, rimesso in vista, in cima ai tasti come stava in cima alla colonna.
+  const mosse = [...['editor', 'mazzi', 'suggerimenti', 'rapide'].map((c) => ({ tipo: 'togli', carta: c })),
+    { tipo: 'aggiungi', carta: 'impostazioni', verso: 'cima' }, { tipo: 'aggiungi', carta: 'profilo', verso: 'cima' }];
+  for (const m of mosse) await page.evaluate((x) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CARTE_HOME_MODIFICA, mossa: x }), m);
+  await expect(page.locator('#tieni .dash-carta')).toHaveCount(0);
+  await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app').first()).toHaveAttribute('data-id', 'profilo');
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
   });
   await expect.poll(() => page.evaluate(() => devicePixelRatio)).toBeGreaterThanOrEqual(1.5);
 
-  await page.locator('#dashControls .dash-ctrl[data-command="settings"]').click();
+  await (await tastoHome(page, 'impostazioni')).click();
   const impostazioni = await menuSulloSchermo(app);
-  sottoLIcona(impostazioni, await iconaSulloSchermo(app, page, 'settings'));
+  sottoLIcona(impostazioni, await iconaSulloSchermo(app, page, 'impostazioni'));
   await expect(impostazioni.menu.locator('.item').first()).toBeVisible();
   await chiudiMenu(app, impostazioni.menu);
 
-  await page.locator('#dashControls .dash-ctrl[data-command="account"]').click();
+  await (await tastoHome(page, 'profilo')).click();
   const profilo = await menuSulloSchermo(app);
   await expect(profilo.menu.locator('.menu')).toContainText('mario@example.it');
-  sottoLIcona(profilo, await iconaSulloSchermo(app, page, 'account'));
+  sottoLIcona(profilo, await iconaSulloSchermo(app, page, 'profilo'));
   await chiudiMenu(app, profilo.menu);
 });

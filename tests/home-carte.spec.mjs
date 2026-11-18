@@ -45,6 +45,12 @@ async function finestraCon(app, prefisso) {
 const manda = (page, msg) => page.evaluate((m) => new Promise((ok) => chrome.runtime.sendMessage(m, (r) => ok(r))), msg);
 const MSG = (page) => page.evaluate(() => window.SN_MSG.MSG);
 const ordineDestra = (page) => page.locator('#tieni > .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.chiave));
+// Le carte tolte stanno nel «+» di «altro» (#2372): lo si apre come l'utente, se non è già aperto.
+async function fuoriVista(page) {
+  const piu = page.locator('#altroPiu');
+  if ((await piu.getAttribute('aria-expanded')) !== 'true') await piu.click();
+  await expect(page.locator('#altroFuori')).toBeVisible();
+}
 
 // `ritardoMs`: quanto ci mette il modello finto a rispondere (un lavoro lungo).
 async function modelloFinto(app, risposte, ritardoMs = 0) {
@@ -183,6 +189,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
     await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
     await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
     const icona = page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]');
+    await fuoriVista(page);
     await expect(icona).toBeVisible();
 
     // Dal «+» si rimettono, in fondo.
@@ -200,6 +207,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
     app = await lancia();
     page = await home(app);
     expect(await ordineDestra(page)).toEqual(['suggerimenti', 'editor', 'rapide']);
+    await fuoriVista(page);
     await expect(page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
 
     // Trascinata da «altro» nella colonna, torna dove la lascio.
@@ -226,6 +234,7 @@ test('«Filo ti suggerisce» è una carta sola e si toglie; senza chiave la prim
   await sug.hover();
   await sug.locator('.dash-carta-togli').click();
   await expect(page.locator('#tieni .dash-carta[data-tipo="suggerimenti"]')).toHaveCount(0);
+  await fuoriVista(page);
   await expect(page.locator('#altro .dash-altro-app[data-id="suggerimenti"]')).toBeVisible();
 
   await prima.locator('.dash-carta-az.principale').click();
@@ -259,6 +268,7 @@ test('hover e tasto destro su ogni carta; la stessa mossa si chiede a Filo a par
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Tolta' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  await fuoriVista(page);
   await expect(page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
 });
 
@@ -454,7 +464,8 @@ test('una carta di sinistra che non si trova: Filo riceve tutte le carte con la 
   expect(chiavi).toHaveLength(3);
   for (const k of chiavi) expect(esito).toContain(k);
   expect(esito).not.toContain('"lavoro');
-  expect(esito).toContain('"altro":["Mazzi"]');
+  // Nel «+» stanno anche i tasti fuori vista (#2372): di serie il Profilo.
+  expect(esito).toContain('"altro":["Mazzi","Profilo"]');
   expect(esito).not.toMatch(/destra[^\]]*Mazzi/);
 });
 
@@ -563,6 +574,7 @@ test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra
 
   const inAltro = page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'Crediti' });
   await expect(inAltro).toHaveCount(1);
+  await fuoriVista(page);
   await inAltro.click({ button: 'right' });
   await expect(page.locator('.dash-menu .dash-menu-voce')).toHaveText(['Apri Crediti', 'Rimetti nella home']);
   await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti' }).click();
@@ -592,6 +604,7 @@ test('uno scaricamento tolto dalla home torna chiesto a parole, e la disposizion
     await carta.hover();
     await carta.locator('.dash-carta-togli').click();
     await expect(carta).toHaveCount(0);
+    await fuoriVista(page);
     await expect(page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'bolletta-luce.bin' })).toBeVisible();
 
     await modelloFinto(app, [
@@ -619,6 +632,7 @@ test('una finestra incognito mostra le carte di destra come le ha disposte l’u
 
   const inc = await homeIncognito(app, shell, normale);
   await expect.poll(() => ordineDestra(inc)).toEqual(disposta);
+  await fuoriVista(inc);
   await expect(inc.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
   // E quello che si muove lì resta lì.
   await inc.locator('#altro .dash-altro-app[data-id="mazzi"] + .dash-altro-rimetti').click();

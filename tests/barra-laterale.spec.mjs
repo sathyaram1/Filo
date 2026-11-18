@@ -322,11 +322,11 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(false);
 });
 
-test('le voci che stavano in alto nella home sono in fondo alla barra; in alto a destra restano Impostazioni e Profilo', async ({ app, openTab }) => {
+test('le voci che stavano in alto nella home sono in fondo alla barra; nella home Impostazioni e Profilo sono tasti di «altro»', async ({ app, openTab }) => {
   await apriRedteamATutti(app);
   const home = await openTab('filo://newtab/');
-  await expect.poll(() => home.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command)), { timeout: 8_000 })
-    .toEqual(['settings', 'account']);
+  await expect.poll(() => home.$$eval('#altro .dash-altro-app[data-id="impostazioni"], #altro .dash-altro-app[data-id="profilo"]', (els) => els.map((e) => e.dataset.id)), { timeout: 8_000 })
+    .toEqual(['impostazioni', 'profilo']);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);

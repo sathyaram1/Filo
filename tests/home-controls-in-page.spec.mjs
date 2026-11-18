@@ -1,16 +1,17 @@
-// #871 porta le icone che stavano in alto a destra nella home nella barra laterale; in alto a destra
-// restano Impostazioni e Profilo, dove ogni app li mette. Gli assert verificano il SUCCESSO: le voci
-// stanno nella barra, il profilo mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
+// #871 porta le icone che stavano in alto a destra nella home nella barra laterale; Impostazioni e Profilo sono
+// tasti di «altro» come gli altri (#2372). Gli assert verificano il SUCCESSO: le voci stanno nella barra, il profilo
+// mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, comandaBarra, menuAperto, pannelloFermo } from './helpers/barra.mjs';
+import { homeIntera, TASTO } from './helpers/tastiHome.mjs';
 
-test('In alto a destra nella home restano Impostazioni e Profilo; le altre voci stanno nella barra laterale', async ({ app, openTab }) => {
+test('Nella home Impostazioni è un tasto in vista e il Profilo sta nel «+»; le altre voci stanno nella barra laterale', async ({ app, openTab }) => {
+  await homeIntera(app);
   const page = await openTab('filo://newtab/');
-  await page.waitForSelector('#dashControls .dash-ctrl', { timeout: 8_000 });
-  const commands = await page.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command));
-  expect(commands).toEqual(['settings', 'account']);
-  expect(await page.$$eval('#dashControls .dash-ctrl svg', (els) => els.length)).toBe(2);
+  await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="impostazioni"]')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#altroFuori .dash-altro-app[data-id="profilo"]')).toBeAttached();
+  expect(await page.$$eval(`${TASTO('impostazioni')} svg, ${TASTO('profilo')} svg`, (els) => els.length)).toBe(2);
   const barra = await barraPage(app);
   const nav = await barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
   expect(nav).toContain('home');

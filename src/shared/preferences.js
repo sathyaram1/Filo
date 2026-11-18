@@ -751,6 +751,24 @@
     return { partial: { avvisoSchermoPieno: { durataMs: n } }, label: `Avviso del sito a schermo intero → ${cifre(n)} ms` };
   }
 
+  // Le lettere della home le riconosce src/shared/doppioTocco.js, che chiede i nomi dei tasti a carteHome.js.
+  function doppioTocco() {
+    if (!global.SN_DOPPIO_TOCCO && typeof require === 'function') {
+      try { if (!global.SN_CARTE_HOME) require('./carteHome.js'); require('./doppioTocco.js'); } catch (_) {}
+    }
+    return global.SN_DOPPIO_TOCCO || null;
+  }
+
+  // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità sono millisecondi, sotto `secondiSotto` secondi.
+  function msDaTesto(v, secondiSotto = 0) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < secondiSotto)) n *= 1000;
+    return Math.round(n);
+  }
+
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
   const RIGORE_COOKIE = { manual: 0, default: 1, privacy: 2 };
   const RIGORE_IMPRONTA = { off: 0, default: 1, privacy: 2 };
@@ -1170,6 +1188,48 @@
       keys: ['avviso_schermo_pieno', 'avviso schermo pieno', 'avviso schermo intero', 'avviso a schermo intero',
         'durata avviso schermo intero', 'avviso del sito a schermo intero', 'esc per uscire'],
       build(v) { return msAvvisoSchermoPieno(v); },
+    },
+    // #2372 — la home: le lettere del doppio tocco, la loro soglia e la pausa della ricerca nella colonna.
+    {
+      scrive: ['doppioTocco.lettere'],
+      costo: 1,
+      aiuto: 'una lettera e cosa apre: «y youtube.com» (un indirizzo) o «e editor» (un tasto o una carta della home: cerca, impostazioni, profilo, memorie, editor…); «togli y» la libera. Due «y» come prime battute nel campo della home lo lanciano; di serie nessuna lettera fa niente',
+      keys: ['doppio_tocco', 'doppio tocco', 'lettera doppia', 'doppia lettera', 'scorciatoia lettera', 'scorciatoia della home',
+        'lettere della home', 'assegna lettera', 'assegna una lettera'],
+      build(v, attuali) {
+        const D = doppioTocco();
+        const r = D && D.daTesto(v, attuali);
+        if (!r) return null;
+        if (r.rifiuto) return { rifiuto: r.rifiuto };
+        return { partial: { doppioTocco: { lettere: r.lettere } }, label: r.label };
+      },
+    },
+    {
+      scrive: ['doppioTocco.sogliaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 100-1000 (entro quanto la seconda lettera vale come doppio tocco)',
+      keys: ['soglia_doppio_tocco', 'soglia doppio tocco', 'velocita doppio tocco', 'velocità doppio tocco', 'tempo del doppio tocco'],
+      build(v) {
+        const n = msDaTesto(v, 10);
+        const D = doppioTocco();
+        if (n == null || !D) return null;
+        const [min, max] = D.SOGLIA_LIMITI;
+        if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+        return { partial: { doppioTocco: { sogliaMs: n } }, label: `Doppio tocco entro → ${cifre(n)} ms` };
+      },
+    },
+    {
+      scrive: ['ricercaFilo.pausaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 0-3000 (la pausa nello scrivere prima che la ricerca nel filo porti il centro della home sul risultato più probabile)',
+      keys: ['pausa_ricerca', 'pausa ricerca', 'pausa della ricerca', 'pausa ricerca nel filo', 'attesa ricerca nel filo', 'scorrimento della ricerca'],
+      build(v) {
+        const n = msDaTesto(v);
+        if (n == null) return null;
+        const [min, max] = global.SN_CONST.RICERCA_FILO_LIMITI.pausaMs;
+        if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+        return { partial: { ricercaFilo: { pausaMs: n } }, label: `Pausa della ricerca nel filo → ${cifre(n)} ms` };
+      },
     },
     {
       scrive: ['terminal.enabled'],

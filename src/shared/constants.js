@@ -2689,6 +2689,10 @@
     // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
     // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     avvisoSchermoPieno: { durataMs: 3000 },
+    // La home (#2372): le lettere che col doppio tocco lanciano un'azione (di serie nessuna, src/shared/doppioTocco.js)
+    // e la pausa nello scrivere prima che la ricerca nella colonna porti il filo sul risultato più probabile.
+    doppioTocco: { sogliaMs: 350, lettere: [] },
+    ricercaFilo: { pausaMs: 500 },
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
     homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true, volume: true },
@@ -3135,6 +3139,14 @@
     const buono = Number.isFinite(n) && o.durataMs !== null && o.durataMs !== '' && typeof o.durataMs !== 'boolean';
     return { durataMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.avvisoSchermoPieno.durataMs };
   }
+  const RICERCA_FILO_LIMITI = Object.freeze({ pausaMs: Object.freeze([0, 3000]) });
+  function opzioniRicercaFilo(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const n = Math.round(Number(o.pausaMs));
+    const [min, max] = RICERCA_FILO_LIMITI.pausaMs;
+    const buono = Number.isFinite(n) && o.pausaMs !== null && o.pausaMs !== '' && typeof o.pausaMs !== 'boolean';
+    return { pausaMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.ricercaFilo.pausaMs };
+  }
 
   // I minuti fra due messaggi di Filo sui download (#2294): solo le scelte della pagina, la più vicina per un numero
   // qualunque; illeggibile prende il predefinito.
@@ -3428,6 +3440,8 @@
     opzioniPannelloDestro,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
+    RICERCA_FILO_LIMITI,
+    opzioniRicercaFilo,
     FILO_PARLA_DOWNLOAD_MIN,
     minutiFraDownload,
     nomeRitmoDownload,

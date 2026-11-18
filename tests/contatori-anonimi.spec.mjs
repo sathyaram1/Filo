@@ -11,6 +11,7 @@ import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
 import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { batti } from './helpers/tastiera.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -593,7 +594,7 @@ test('«Cerca nel filo» conta l’apertura del pannello e la chiusura senza sce
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
-  const campo = home.locator('#cercaInput');
+  const campo = (await campoRicerca(home));
   await expect(campo).toBeVisible({ timeout: 10_000 });
   await campo.fill('zanzibar quattro');
   await expect(home.locator('#cercaRisultati')).toBeVisible({ timeout: 8_000 });
