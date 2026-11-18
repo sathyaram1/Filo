@@ -198,6 +198,13 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
   expect(visto).toContain('la segnalazione automatica di Filo (non l\'assistente): INVIA_FEEDBACK');
   expect(visto).toContain('Filo sa fare «Finestra in incognito», ma l\'assistente non ha uno strumento per farlo');
   expect(visto).toContain('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
+
+  // La stessa funzione non si ripropone: una volta per versione.
+  await chiedi(chat, 'riaprimi una finestra in incognito');
+  await expect(chat.locator('.dash-bubble-filo')).toHaveCount(3, { timeout: 15_000 });
+  await chat.waitForTimeout(1_500);
+  expect(await confirmText(chat)).toBe('');
+  await expect(chat.locator('.dash-bubble-filo').last().locator('.dash-action-btn', { hasText: /feedback/i })).toHaveCount(0);
 });
 
 test('una riflessione senza richieste non fa nascere nessuna segnalazione (#2348)', async ({ app }) => {
