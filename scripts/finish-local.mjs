@@ -80,6 +80,8 @@ import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInAr
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { apriCorsa, corsaInterrotta, guastoDellaCorsa } from './lib/corsa-controlli.mjs';
+import { letturaMemoria, testoMemoria } from './lib/memoria-contenitore.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
