@@ -759,12 +759,13 @@
     return global.SN_DOPPIO_TOCCO || null;
   }
 
-  // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità è in millisecondi.
-  function msDaTesto(v) {
+  // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità sono millisecondi, sotto `secondiSotto` secondi.
+  function msDaTesto(v, secondiSotto = 0) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
     if (!Number.isFinite(n)) return null;
-    if (/\bs(ec|econd[oi])?\b/.test(s) && !/\bms\b|millisecond/.test(s)) n *= 1000;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < secondiSotto)) n *= 1000;
     return Math.round(n);
   }
 
