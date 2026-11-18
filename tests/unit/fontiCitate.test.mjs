@@ -161,6 +161,23 @@ test('il prompt della chat chiede il marcatore nella forma che il controllo rico
   assert.doesNotMatch(prompt, /cita da quale pagina viene ogni dato, con il link/);
 });
 
+test('l\'archivio tiene le fonti della risposta, e riaperta dopo un riavvio la fonte si apre sulla frase senza chiedere l\'OK', () => {
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const V = require(join(ROOT, 'src', 'main', 'services', 'verdettiUscite.js'));
+  const url = 'https://example.com/f';
+  const r = F.controlla(`Dato. [[fonte: ${url} | frase vera]]`, F.sorgenti([lettura(url, 'Una frase vera qui.')]));
+  const salvato = globalThis.SN_CHAT_ARCHIVE.toStoredMessage({ role: 'filo', text: r.text, fonti: r.fonti });
+  assert.deepEqual(salvato.fonti, F.perIlDisco(r.fonti, r.text));
+  assert.equal(salvato.fonti[0].esito, 'verificata');
+  V.svuota();
+  V.ricordaArchiviati([salvato], () => []);
+  assert.equal(V.alClic(F.indirizzoConFrase(url, salvato.fonti[0].citazione), { proposta: true }).daChiedere, false);
+  // Una risposta mai giudicata (interrotta) non presta il verdetto alle sue fonti.
+  V.svuota();
+  V.ricordaArchiviati([{ ...salvato, senzaVerdetto: true }], () => []);
+  assert.equal(V.alClic(url, { proposta: true }).daChiedere, true);
+});
+
 test('una citazione con i puntini salta una parte, ma l\'ordine conta', () => {
   const url = 'https://example.com/d';
   const s = F.sorgenti([lettura(url, 'Il treno parte alle 8, con fermate intermedie, e arriva alle 11.')]);
