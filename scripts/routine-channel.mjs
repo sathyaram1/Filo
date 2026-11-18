@@ -2469,7 +2469,7 @@ if (isMain) {
     if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
     const r = await operazione(biglietto, nome, dati);
     // Chi lavora un compito col tetto vede a ogni operazione quanto ha speso (#2303.1); la misura non ferma mai l'esito.
-    if (r.outcome !== 'unreachable') await stampaSpesa(biglietto);
+    await stampaSpesa(biglietto);
     if (r.outcome === 'ok') {
       if (cmd === 'segnala') console.log(testoSegnalaRiuscita(r.body));
       else if (cmd === 'rapporto') console.log(testoRapportoRiuscito(r.body));
