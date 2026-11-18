@@ -46,10 +46,12 @@ test('il menu di Rinomina appena aperto su una pagina scorsa resta, e si chiude 
     document.body.appendChild(alto);
   });
   await inCima(page);
-  await page.evaluate((voce) => {
+  // Dentro un fotogramma l'evento dello scorrimento arriva solo al fotogramma dopo, quando il menu ascolta già.
+  await page.evaluate((voce) => new Promise((ok) => requestAnimationFrame(() => {
     window.scrollTo({ top: 400, behavior: 'instant' });
     window.SN_RINOMINA_UI.menu(300, 300, [[voce, () => {}]]);
-  }, VOCE);
+    ok();
+  })), VOCE);
   await fotogrammi(page);
   const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: VOCE });
   await expect(voce).toBeVisible();
