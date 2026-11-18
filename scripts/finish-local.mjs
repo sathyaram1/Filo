@@ -955,7 +955,7 @@ async function main() {
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     const memoria = memoriaSpecVerdi(ROOT, shaProvato);
     if (blocking.length) {
-      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria, corsa.fase)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
