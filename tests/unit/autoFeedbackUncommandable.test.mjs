@@ -55,10 +55,10 @@ test('vale anche per altre capacità del manifesto', () => {
       cap: 'translate-page',
     },
     {
-      user: 'salva questa pagina per dopo',
-      reply: 'Puoi salvare la pagina per dopo dal menu del tasto destro, alla voce "Salva per dopo": '
-        + 'la ritrovi poi nell\'elenco delle pagine salvate quando ti serve.',
-      cap: 'save-for-later',
+      user: 'mostrami il qr code della pagina',
+      reply: 'Il QR code della pagina lo trovi nella barra laterale: clicca l\'icona "QR code" '
+        + 'e compare il codice da inquadrare col telefono per aprire la stessa pagina.',
+      cap: 'qr-code',
     },
   ];
   for (const c of casi) {
