@@ -165,7 +165,7 @@ Gestione → Automazioni.
    entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
    clone, che aggiornano da sé in sola lettura; se il clone manca o non si aggiorna lo dicono: allora i lavori del
    server li decidi alla cieca. Un compito può stare davanti a un feedback. **Un lavoro già iniziato non si mette in
-   attesa di un lavoro non iniziato**: finisce da solo.
+   attesa di un lavoro non iniziato**: lo tieni nell'ordine, sopra i primi lavori che deve precedere.
 5. **Insieme.** Lavori che non toccano gli stessi file vanno in parallelo, anche sul server: quanti lavori del server
    tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami (`incroci` senza
    numero). Nell'ordine metti solo ciò che può girare insieme adesso.
