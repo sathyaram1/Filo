@@ -19,6 +19,14 @@ function quandoPronta(wc, chiave, invia) {
   }
   coda.push({ chiave, invia });
 }
+// Un `shell:toast` a una cornice, subito o appena ha caricato. `detto`: quando l'ha ricevuto.
+function allaCornice(wc, dati, detto) {
+  if (!wc || wc.isDestroyed?.()) return false;
+  const invia = () => { if (!wc.isDestroyed()) { wc.send('shell:toast', dati); try { detto?.(); } catch (_) {} } };
+  if (wc.isLoading?.()) quandoPronta(wc, dati && dati.opts && dati.opts.key, invia);
+  else invia();
+  return true;
+}
 
 // `azioni`: i bottoni del toast nella forma che la cornice capisce (src/renderer/shell.js, per esempio { label, openUrl }).
 // La forma (angolo, colonna della home, notifica del sistema) la sceglie ogni shell: `uid` fa dello stesso avviso
