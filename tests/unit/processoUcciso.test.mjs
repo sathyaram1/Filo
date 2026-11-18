@@ -189,6 +189,46 @@ describe('il segno della corsa di finish:check', () => {
     assert.equal(corsaInterrotta(root, { viva: () => false }).pid, 4242);
     assert.equal(corsaInterrotta(cartellaTemporanea('filo-senza-git-')), null, 'senza git nessun segno');
   });
+
+  // Il clone passa da un lavoro all'altro: il segno di quello prima non è del worker di adesso.
+  const cloneDiUnAltroLavoro = () => {
+    const root = repo();
+    const g = (...a) => execFileSync('git', ['-C', root, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { encoding: 'utf8' });
+    g('checkout', '-q', '-b', 'worker/primo');
+    g('commit', '-q', '--allow-empty', '-m', 'primo');
+    apriCorsa(root, { sha: 'abcdef1234567890', proc: { pid: 2 ** 22 + 13, on: () => {} }, memoria: () => ({}) });
+    const sulSuoRamo = corsaInterrotta(root);
+    g('checkout', '-q', '--orphan', 'worker/secondo');
+    g('commit', '-q', '--allow-empty', '-m', 'secondo');
+    return { root, sulSuoRamo };
+  };
+
+  test('il segno vale solo sul ramo che l\'ha scritto: né l\'attesa né la veglia lo danno al lavoro dopo', { skip: process.platform !== 'linux' && 'i processi si leggono da /proc' }, async () => {
+    const { root, sulSuoRamo } = cloneDiUnAltroLavoro();
+    assert.equal(sulSuoRamo.ramo, 'worker/primo', 'sul suo ramo la corsa morta si vede');
+    assert.equal(corsaInterrotta(root), null);
+    assert.equal(autopsiaDelWorker(root, { mio: true }, { memoria: () => ({}) }).corsa, null);
+    const r = await new Promise((ok) => {
+      const p = spawn(process.execPath, [join(REPO, 'scripts', 'routine-channel.mjs'), 'aspetta', 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde'], {
+        cwd: root, env: { ...process.env, FILO_REPO_ROOT: root, FILO_NO_BEAT: '1', FILO_ASPETTA_FETTA_MS: '0' },
+      });
+      let so = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { so += c; });
+      p.on('close', (code) => ok({ code, so }));
+    });
+    assert.equal(r.code, 0, r.so);
+    assert.doesNotMatch(r.so, /morta senza finire|--guasto/);
+  });
+
+  test('ogni corsa dice in fondo la sua memoria: picco e uccisioni da quando è partita', () => {
+    let n = 0;
+    const letture = [contenitore({ oomCmd: 1, oomSis: 1 }), contenitore({ oomCmd: 1, oomSis: 1 })];
+    const c = apriCorsa(repo(), { proc: { pid: 4243, on: () => {} }, memoria: () => letturaMemoria(leggiDa(letture[n++])) });
+    assert.match(c.bilancio(), /picco dei comandi 13,3 GB; processi uccisi per memoria da allora: 0 nella macchina, 0 fra i comandi$/);
+    const sorgente = readFileSync(join(REPO, 'scripts', 'finish-local.mjs'), 'utf8');
+    assert.match(sorgente, /process\.on\('exit', \(\) => console\.log\(`\\n▸ Memoria della corsa: \$\{corsa\.bilancio\(\)/);
+  });
 });
 
 describe('il guasto di un processo ucciso', () => {
