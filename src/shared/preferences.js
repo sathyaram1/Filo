@@ -1210,8 +1210,9 @@
       keys: ['soglia_doppio_tocco', 'soglia doppio tocco', 'velocita doppio tocco', 'velocità doppio tocco', 'tempo del doppio tocco'],
       build(v) {
         const n = msDaTesto(v);
-        if (n == null) return null;
-        const [min, max] = global.SN_DOPPIO_TOCCO.SOGLIA_LIMITI;
+        const D = doppioTocco();
+        if (n == null || !D) return null;
+        const [min, max] = D.SOGLIA_LIMITI;
         if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
         return { partial: { doppioTocco: { sogliaMs: n } }, label: `Doppio tocco entro → ${cifre(n)} ms` };
       },
