@@ -434,6 +434,35 @@ test('biglietto nuovo dopo un tentativo morto: si riparte dalla sua punta, e all
   }
 });
 
+// #2518: dalla cloud la cancellazione su origin prende 403 a ogni partenza; i superati li toglie la potatura del server.
+test('giro vero: un lavoro nuovo non cancella da origin i tentativi superati, né del suo feedback né degli altri', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    const altro = 'fid1170';
+    tentativo(casa, ramo('20261012T000000Z', altro), main, 3);
+    const fusoAltro = tentativo(casa, ramo('20261018T000000Z', altro), main, 1);
+    tentativo(casa, ramo('20261101T000000Z'), main, 2);
+    const fusoMio = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+    git(casa, 'merge', '-q', '--no-ff', '--no-edit', fusoAltro);
+    git(casa, 'merge', '-q', '--no-ff', '--no-edit', fusoMio);
+    git(casa, 'push', '-q', 'origin', 'main');
+    assert.deepEqual(tentativiPrecedenti({ root: casa, id: ID }).superati, [ramo('20261101T000000Z')], 'la scena ha davvero un superato');
+
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(r.json.payload.ripartenza, undefined, 'il superato non torna come base');
+    for (const superato of [ramo('20261101T000000Z'), ramo('20261012T000000Z', altro)]) {
+      assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${superato}`), '', `${superato} resta alla potatura del server`);
+    }
+    assert.doesNotMatch(r.se, /tolti da origin|restano su origin/);
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
 test('giro vero, tentativi nati tutti da main: la busta nomina quelli che il ramo nuovo non contiene', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, port } = await fintoServer();
