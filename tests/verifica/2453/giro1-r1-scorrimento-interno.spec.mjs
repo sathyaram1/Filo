@@ -82,6 +82,7 @@ test('r1 con gli angoli squadrati (Raggio degli angoli a 0): uno scorrimento fin
     await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: { radius: '0px' } }); });
     const esito = await restaAperto(await chatConFile(app));
     expect(esito.angolo).toBe('0px');
+    expect(esito.copreIlPunto, JSON.stringify(esito)).toBe(true);
   } finally {
     await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: {} }); });
     await ripristina(app);
