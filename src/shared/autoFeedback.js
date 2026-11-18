@@ -187,6 +187,13 @@
     return frasiDi(t).some((f) => INTERROGATIVI_RE.test(f));
   }
 
+  // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?»): un'azione secca non le
+  // risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
+  function domandaOltreAlComando(text) {
+    const periodi = String(text || '').split(/(?<=[.!?\n])\s*/).map((s) => s.trim()).filter(Boolean);
+    return periodi.some((p) => chiedeInformazione(p) && !chiedeAzione(p));
+  }
+
   // La voce del manifesto ha uno strumento della chat che la comanda? (capabilities.js, mappa STRUMENTO: SOLO_A_MANO
   // vuol dire nessuno). Una voce senza dichiarazione conta come senza strumento.
   function haStrumento(cap) {
