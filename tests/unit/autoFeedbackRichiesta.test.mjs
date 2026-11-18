@@ -13,11 +13,10 @@ const Caps = globalThis.SN_CAPABILITIES;
 const CAPS = Caps.all();
 
 // #2348: una riflessione sui default dell'interfaccia, e una risposta che a parole nomina menu e impostazioni.
-const RIFLESSIONE = 'che sia ereditato non significa che non sia una scelta. il colore della selezione, l\'inerzia '
+const RIFLESSIONE = 'che sia ereditato non significa che non sia una scelta. i colori della selezione, le animazioni '
   + 'dello scorrimento: Apple li ha decisi decenni fa e tutti li tengono per inerzia, nessuno si chiede più se servono';
-const RISPOSTA_ALLA_RIFLESSIONE = 'Hai ragione: ereditare un default è una scelta per omissione. Il colore della selezione '
-  + 'lo trovi nelle impostazioni del sistema, nel menu Aspetto, e l\'inerzia della finestra in incognito o delle schede '
-  + 'non la cambia quasi nessuno: premi due tasti e la convenzione resta lì per decenni.';
+const RISPOSTA_ALLA_RIFLESSIONE = 'Hai ragione: ereditare un default è una scelta per omissione. Le convenzioni restano '
+  + 'perché nessuno le rimette in discussione; in Filo colori e animazioni li trovi in Preferenze, nella sezione Aspetto.';
 
 test('#2348: un messaggio che riflette, senza chiedere niente, non fa nascere nessuna segnalazione', () => {
   const a = AF.analyzeReply(RISPOSTA_ALLA_RIFLESSIONE, [], RIFLESSIONE, CAPS);
