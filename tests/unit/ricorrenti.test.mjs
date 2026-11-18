@@ -86,6 +86,14 @@ test('il tetto che vale: quello dell’owner, o il doppio della mediana delle ul
   assert.equal(R.tettoAutomatico(corse), 20);
 });
 
+test('#2303.1: il tetto automatico non scende sotto la corsa più cara delle ultime né sotto il minimo', () => {
+  // Una settimana senza niente da fare non lascia un tetto da 1 $ che nessuna corsa vera passa più.
+  assert.deepEqual(R.tettoDi({ costiCorse: [0.4] }), { usd: R.TETTO_COSTO.minimo, da: 'corse', mediana: 0.4, corse: 1 });
+  // Settimane quiete e una pesante già finita: la pesante resta passabile.
+  assert.equal(R.tettoAutomatico([0.4, 0.5, 0.4, 20, 0.6]), 20);
+  assert.equal(R.tettoAutomatico([10, 10, 10, 30.2]), 31);
+});
+
 test('quando: giorno, data e ora italiana', () => {
   assert.equal(R.quandoTesto(Date.parse('2026-10-26T00:00:00Z')), 'lun 26/10 01:00');
   assert.equal(R.quandoTesto(0), '');
