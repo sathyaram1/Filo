@@ -20,7 +20,7 @@ function idVideo(indirizzo) {
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
   const host = u.hostname.toLowerCase();
   let id = '';
-  if (host === 'youtu.be') id = u.pathname.split('/')[1] || '';
+  if (host === HOST_BREVE) id = u.pathname.split('/')[1] || '';
   else if (HOST_VIDEO.has(host)) {
     if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
     else {
