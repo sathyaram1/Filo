@@ -169,10 +169,10 @@ function main() {
   }
   // Una parte non decide la corsa: esce verde con l'esito scritto, e lo giudica il lavoro che unisce.
   const json = JSON.stringify(campo);
-  riassunto(`Unit sulla fusione (${a.parte}, ${a.unit})`, testo, json);
+  riassunto(sommario, `Unit sulla fusione (${a.parte}, ${a.unit})`, testo, json);
   console.log(`${MARCA_PARTE} ${a.parte} ${json}`);
-  if (process.env.GITHUB_OUTPUT) {
-    try { appendFileSync(process.env.GITHUB_OUTPUT, `campo=${json}\n`, 'utf8'); } catch (e) {
+  if (uscita) {
+    try { appendFileSync(uscita, `campo=${json}\n`, 'utf8'); } catch (e) {
       console.error(`unit-fusione-azione: non riesco a scrivere l'esito della parte (${e.message})`);
       process.exit(2);
     }
