@@ -92,11 +92,12 @@
   // delle carte o dei tasti, o null. `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
   // Un tasto si riconosce solo dai suoi nomi: il titolo «Download» a parole è lo scaricamento a sinistra.
   function risolvi(nome, { esatto = false } = {}) {
-    const s = pulisciNome(nome).replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
+    const intero = pulisciNome(nome);
+    const s = intero.replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
     if (!s) return null;
     if (IDS.includes(s)) return s;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
-    for (const t of TASTI) if (t.nomi.includes(s)) return t.id;
+    for (const t of TASTI) if (t.nomi.includes(s) || t.nomi.includes(intero)) return t.id;
     if (esatto) return null;
     for (const c of CARTE) if (c.nomi.some((n) => s.includes(n))) return c.id;
     for (const t of TASTI) if (t.nomi.some((n) => s.includes(n))) return t.id;
