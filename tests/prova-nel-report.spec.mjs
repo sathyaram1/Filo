@@ -76,6 +76,7 @@ test('l\'owner trova sotto il report l\'esito della prova e le sue schermate, ap
 
   const dir = join('tests', '.shots');
   mkdirSync(dir, { recursive: true });
-  await bolla.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(dir, 'prova-nel-report.png') });
+  await imgs.first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(dir, 'prova-nel-report-schermate.png') });
 });
