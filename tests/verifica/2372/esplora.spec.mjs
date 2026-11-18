@@ -1,11 +1,7 @@
-// Esplorazione del giro 1 (da cancellare): foto della home e stato dei tasti.
+// Esplorazione del giro 1 (da cancellare).
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
 import { home } from '../../helpers/chatFinta.mjs';
 import { homeIntera } from '../../helpers/tastiHome.mjs';
-
-const SHOTS = 'tests/.shots/v2372';
-mkdirSync(SHOTS, { recursive: true });
 
 async function casa(app) {
   await homeIntera(app);
@@ -15,38 +11,22 @@ async function casa(app) {
   await expect(page.locator('#altroPiu')).toBeVisible({ timeout: 10_000 });
   return page;
 }
+const aperte = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  return w._filoTabs.tabs.filter((t) => { try { return t.view.webContents.getURL().startsWith(u); } catch (_) { return false; } }).length;
+}, url);
+const info = (page) => page.evaluate(() => ({ val: document.getElementById('input').value, att: document.activeElement && (document.activeElement.id || document.activeElement.tagName) }));
 
-test('esplora', async ({ app, shell }) => {
-  test.setTimeout(120_000);
-  const page = await casa(app);
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: `${SHOTS}/home-chiara.png` });
-  const stato = await page.evaluate(() => ({
-    vista: [...document.querySelectorAll('.dash-altro-griglia.vista .dash-altro-app')].map((n) => n.dataset.id || n.id),
-    fuori: [...document.querySelectorAll('#altroFuori .dash-altro-app')].map((n) => n.dataset.id),
-    campi: [...document.querySelectorAll('input, textarea, [contenteditable="true"]')].filter((n) => { const r = n.getBoundingClientRect(); return r.width && r.height; }).map((n) => n.id || n.className),
-    att: document.activeElement && (document.activeElement.id || document.activeElement.tagName),
-    carte: [...document.querySelectorAll('#tieni > *')].map((n) => n.dataset.chiave || n.className),
-  }));
-  console.log('STATO', JSON.stringify(stato));
-  const shellBtns = await shell.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().width).map((b) => b.id || b.getAttribute('aria-label')));
-  console.log('SHELL', JSON.stringify(shellBtns));
-  await page.locator('#altroPiu').click();
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: `${SHOTS}/home-piu.png` });
-  console.log('FUORI', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('#altroFuori .dash-altro-app')].map((n) => n.dataset.id))));
-  await page.locator('#altroPiu').click();
-  await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: `${SHOTS}/home-menu-tasto.png` });
-  await page.keyboard.press('Escape');
-  await page.locator('#altro .dash-altro-app[data-id="cerca"]').click();
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: `${SHOTS}/home-ricerca.png` });
-  console.log('FUOCO', await page.evaluate(() => document.activeElement && document.activeElement.id));
-  await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); await globalThis.SN_STORAGE.saveSettings?.({ ...s, theme: 'dark' }); });
-  await page.keyboard.press('Escape');
-  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: `${SHOTS}/home-scura.png` });
-});
+for (const caso of ['diretto', 'dopo-clic', 'dopo-fill', 'dopo-fill-clic']) {
+  test(`yy ${caso}`, async ({ app, testServer }) => {
+    const url = testServer.html('<title>Video</title><h1>video</h1>');
+    await app.evaluate((u) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', url: u }] } }), url);
+    const page = await casa(app);
+    if (caso.startsWith('dopo-fill')) { await page.keyboard.type('yo', { delay: 30 }); await page.locator('#input').fill(''); }
+    if (caso.endsWith('clic')) await page.mouse.click(640, 300);
+    console.log(caso, 'prima', JSON.stringify(await info(page)));
+    await page.keyboard.type('yy', { delay: 40 });
+    await page.waitForTimeout(800);
+    console.log(caso, 'dopo', JSON.stringify(await info(page)), 'aperte', await aperte(app, url));
+  });
+}
