@@ -306,12 +306,12 @@
   function vociMenu(target) {
     const el = etichettaDi(target && target.nodeType === 1 ? target : target && target.parentElement);
     if (!el || !apritoreDi(el)) return [];
-    const I = global.SN_ICONS;
-    const icona = (n) => (I && typeof I.svg === 'function' ? I.svg(n, 16) : undefined);
+    const I = global.SN_ICONS || {};
+    const icona = (n) => (typeof I[n] === 'function' ? I[n](16) : '');
     return [
       { type: 'item', icon: icona('copy'), label: 'Copia la citazione', onClick: () => { copia(el.dataset.fonteCitazione || ''); } },
       { type: 'item', icon: icona('link'), label: 'Copia l’indirizzo', onClick: () => { copia(el.dataset.fonteUrl || ''); } },
-      { type: 'item', icon: icona('external'), label: 'Apri la pagina', onClick: () => apriEtichetta(el) },
+      { type: 'item', icon: icona('openTab'), label: 'Apri la pagina sulla frase', onClick: () => apriEtichetta(el) },
     ];
   }
 
