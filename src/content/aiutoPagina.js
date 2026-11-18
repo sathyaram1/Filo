@@ -207,13 +207,7 @@
         || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
       if (hit) return hit;
     }
-    let best = null; let bestArea = 0;
-    for (const im of imgs) {
-      const r = im.getBoundingClientRect();
-      const area = r.width * r.height;
-      if (area > bestArea && r.width > 32 && r.height > 32) { best = im; bestArea = area; }
-    }
-    return best;
+    return global.SN_IMMAGINE_PRINCIPALE.scegli(imgs);
   }
 
   // Link bersaglio: per selettore (anche su un figlio del link), per URL. Collegamento e indirizzo come li vede il menu.

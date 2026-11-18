@@ -39,7 +39,7 @@
     // ── impostazioni ──
     LEGGI_IMPOSTAZIONI: {
       via: ['impostazioni', 'leggi'], risultato: true,
-      description: 'com\'è impostato Filo adesso: ogni voce con chiave e valori ammessi, i permessi dei siti, i token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
+      description: 'com\'è impostato Filo: chiavi e valori ammessi, permessi dei siti, token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
       properties: { cerca: S() }, required: [],
     },
     IMPOSTA_PREFERENZA: {
@@ -60,7 +60,7 @@
     },
     IMPOSTA_ESTETICA: {
       via: ['impostazioni', 'aspetto'],
-      description: 'un token dell\'aspetto di Filo (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Scegli tu un valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
+      description: 'un token dell\'aspetto (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
       properties: { token: S(), valore: S() }, required: ['token', 'valore'],
     },
     PULSANTE_PREFERENZE: {
@@ -102,12 +102,22 @@
     },
     MOSTRA_SCHEDA: {
       via: ['scheda', 'mostra'],
-      description: 'porta l\'utente su una scheda già aperta, senza ricaricarla.',
-      properties: { scheda: I() }, required: ['scheda'],
+      description: 'porta l\'utente su una scheda aperta (verso: la dopo o la prima), senza ricaricarla.',
+      properties: { scheda: I(), verso: S({ enum: ['dopo', 'prima'] }) }, required: [],
+    },
+    SALVA_PER_DOPO: {
+      via: ['scheda', 'salva'],
+      description: 'salva per dopo e chiude una pagina (senza scheda: la web davanti).',
+      properties: { scheda: I() }, required: [],
+    },
+    CERCA_IMMAGINE: {
+      via: ['scheda', 'lens'],
+      description: 'Google Lens: immagine N della chat, o scheda per la più grande della pagina; senza, l\'ultima della chat.',
+      properties: { immagine: I(), scheda: I() }, required: [],
     },
     CHIUDI_SCHEDE: {
       via: ['scheda', 'chiudi'],
-      description: 'chiude schede per numero, per sito o tutte, tranne quelle in tranne; tutte e sito lasciano aperta questa chat.',
+      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat.',
       properties: { schede: LISTA(I()), sito: S(), tutte: B(), tranne: LISTA(I()) }, required: [],
     },
     PULISCI_TAB: {
@@ -122,8 +132,8 @@
     },
     RIAPRI_SCHEDA: {
       via: ['scheda', 'riapri'], risultato: true,
-      description: 'riapre com\'era una scheda trovata con chiuse.',
-      properties: { id: S() }, required: ['id'],
+      description: 'riapre com\'era una scheda trovata con chiuse; senza id l\'ultima chiusa.',
+      properties: { id: S() }, required: [],
     },
     CERCA_SALVATE: {
       via: ['scheda', 'salvate'], risultato: true,

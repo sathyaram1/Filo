@@ -50,7 +50,7 @@ const {
   ingressiContati,
 } = require('./autonomiaFonti');
 const {
-  voceChiusa, schedeNumerate, schedaPerNumero, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
+  voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
 } = require('./osservazioniPerModello');
 const { handleAIRequest, handleStream, maybeRunCompactor, stimaSogliaCompattazione } = require('./chiamateModello');
 const {
@@ -183,7 +183,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   // #884 — una scheda chiusa si riapre con l'indirizzo dell'archivio, mai con uno scritto dal modello: il popup la nomina.
-  if (type === 'RIAPRI_SCHEDA') {
+  // Senza id è l'ultima chiusa, la stessa di Ctrl+Shift+T (#2371).
+  if (type === 'RIAPRI_SCHEDA' && String(action.id ?? '').trim()) {
     const v = await voceChiusa(action.id);
     if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
     action._titolo = v.perModello.titolo;
@@ -194,9 +195,11 @@ async function eseguiAzioneFilo(action, {
     const b = tm ? await bersaglioAudio(tm, action, schedeViste) : null;
     if (b && (b.tab || b.chiusa)) action._titolo = (await nomeDellaScheda())(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
   }
-  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA') {
+  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA' || type === 'SALVA_PER_DOPO') {
     const tm = winOf(sender)?._filoTabs;
-    const b = tm ? (type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste) : await schedaPerNumero(tm, action, schedeViste)) : null;
+    const b = !tm ? null : type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste)
+      : type === 'MOSTRA_SCHEDA' ? await schedaDaMostrare(tm, action, schedeViste)
+        : action.scheda != null ? await schedaPerNumero(tm, action, schedeViste) : { tab: require('./handlersComuni').targetWebTab(sender).tab };
     const tabs = b ? (b.tabs || (b.tab ? [b.tab] : [])) : [];
     if (tabs.length) { const nome = await nomeDellaScheda(); action._titolo = tabs.map(nome).join(', '); }
   }

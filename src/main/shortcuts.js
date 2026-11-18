@@ -204,12 +204,16 @@ function riceviRicevuta(ricevuta, tabId, presa) {
 // Un secondo Alt+S sulla scheda che aspetta ancora la pagina o il ripiego non avvia un altro salvataggio con la sua conferma.
 const salvataggiInCorso = new Set();
 
-async function saveForLater(win, tab) {
-  if (salvataggiInCorso.has(tab.id)) return;
+// Torna true a salvataggio fatto (anche dalla pagina), false se ne era già in corso uno. La chat (#2371) non aspetta la
+// conferma sulla scheda davanti: la risposta arriva subito e la conferma compare lo stesso.
+async function saveForLater(win, tab, { attendiConferma = true } = {}) {
+  if (salvataggiInCorso.has(tab.id)) return false;
   salvataggiInCorso.add(tab.id);
   let entry = null;
   try { entry = await salvaPerDopo(win, tab); } finally { salvataggiInCorso.delete(tab.id); }
-  if (entry) await confermaSullaSchedaDavanti(win, entry);
+  if (entry && attendiConferma) await confermaSullaSchedaDavanti(win, entry);
+  else if (entry) confermaSullaSchedaDavanti(win, entry).catch(() => {});
+  return true;
 }
 
 // Il ripiego scrive dove scriverebbe la pagina passando dall'IPC: in incognito, nella memoria della sessione e non sul disco.

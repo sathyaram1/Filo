@@ -376,7 +376,10 @@ async function executeFiloAction(action, opzioni = {}) {
   // Un «annulla» o Ctrl/Cmd+Z subito dopo disfa quest'azione: i contatori la ricordano coi suoi cambi (#1461).
   if (res && res.executed) contaSe('azioneDiFilo', String((action && action.type) || '').toUpperCase(), raccolti.map((v) => v.id));
   const finale = raccolti.length && res && typeof res === 'object' ? { ...res, cambi: raccolti } : res;
-  if (!segnoAzione.scritta) azioneNelFilo(action, finale, { via, chatId: chatNelFilo, incognito: require('../shim/storage').inIncognito(), url });
+  // Nel registro il clic sulla conferma è dell'utente, e la proposta della segnalazione automatica non è
+  // dell'assistente (#2371): `nelFilo` cambia solo chi la riga nomina, non la strada dell'azione.
+  const viaNelFilo = opzioni.nelFilo === 'conferma' || opzioni.nelFilo === 'segnalazione' ? opzioni.nelFilo : via;
+  if (!segnoAzione.scritta) azioneNelFilo(action, finale, { via: viaNelFilo, chatId: chatNelFilo, incognito: require('../shim/storage').inIncognito(), url });
   return finale;
 }
 

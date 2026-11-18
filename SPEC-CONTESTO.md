@@ -316,7 +316,7 @@ misure:
 | Costante | Valore |
 |---|---|
 | Tetto della parte fissa | 8 000 token |
-| Tetto degli strumenti | 8 000 token |
+| Tetto degli strumenti | 8 200 token (da 8 000 il 18/11: salva per dopo, Google Lens, scheda dopo e prima, #2371) |
 | Tetto di chi è l'utente + preferenze | 3 000 token |
 | Tetto dell'indice delle memorie | 2 000 token |
 | Tetto del filo compattato (giorni + ore) | 7 000 token |

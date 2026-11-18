@@ -253,10 +253,29 @@
     try { return new URL(url).hostname; } catch (_) { return ''; }
   }
 
+  // Chi ha fatto l'azione (#2371): con un «Filo» unico l'assistente non distingueva le sue azioni dalla conferma
+  // cliccata dall'utente né dalla segnalazione automatica partita a nome dell'utente.
+  function autoreDellaRiga(ev) {
+    if (ev.via === 'segnalazione') return 'la segnalazione automatica di Filo (non l\'assistente)';
+    if (ev.autore === 'utente') return ev.via === 'conferma' ? 'l\'utente, col pulsante di conferma' : 'l\'utente';
+    return ev.autore === 'automazione' ? 'Filo da sé' : 'l\'assistente';
+  }
+  // Il testo di una segnalazione va intero: l'assistente deve poterla spiegare o correggere (tetto in esitoAzione.js).
+  function testoSegnalazione(ev) {
+    const t = ev.nome === 'INVIA_FEEDBACK' && ev.parametri && stringa(ev.parametri.testo) ? ev.parametri.testo : '';
+    if (!t) return '';
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    const n = E().neutralizza(t, { unaRiga: true });
+    return ` — testo intero: «${global.SN_ESITO ? global.SN_ESITO.testoSegnalazione(n) : n}»`;
+  }
+
   function rigaAzione(ev) {
-    const chi = ev.autore === 'utente' ? 'l\'utente' : (ev.autore === 'automazione' ? 'Filo da sé' : 'Filo');
+    const chi = autoreDellaRiga(ev);
     let par = '';
-    try { par = ev.parametri && Object.keys(ev.parametri).length ? ` ${JSON.stringify(ev.parametri)}` : ''; } catch (_) { par = ''; }
+    const testo = testoSegnalazione(ev);
+    const { testo: _t, ...senzaTesto } = ev.parametri || {};
+    const parametri = testo ? senzaTesto : ev.parametri;
+    try { par = parametri && Object.keys(parametri).length ? ` ${JSON.stringify(parametri)}` : ''; } catch (_) { par = ''; }
     const e = ev.esito || {};
     let esito;
     if (e.eseguita) esito = stringa(e.fatto) ? `fatta: ${e.fatto}` : 'fatta';
@@ -265,7 +284,7 @@
     else if (stringa(e.fermata)) esito = `fermata (${e.fermata})`;
     else esito = stringa(e.errore) ? `non riuscita: ${e.errore}` : 'non fatta';
     const cambi = Array.isArray(e.cambi) && e.cambi.length ? ` (cambio ${e.cambi.join(', ')})` : '';
-    return `${chi}: ${campo(ev.nome, 60)}${campo(par)} → ${campo(esito)}${cambi}`;
+    return `${chi}: ${campo(ev.nome, 60)}${campo(par)} → ${campo(esito)}${cambi}${testo}`;
   }
 
   function rigaCambio(e) {

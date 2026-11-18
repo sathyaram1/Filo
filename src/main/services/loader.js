@@ -87,6 +87,7 @@ require(path.join(SHARED, 'filoAccaduti.js'));  // #1561 — cosa di azioni, sis
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
+require(path.join(SHARED, 'immaginePrincipale.js'));  // #2371 — l'immagine della pagina che cercano Aiuto e chat
 require(path.join(SHARED, 'filoTrattoVivo.js'));  // #1562 — il CONTESTO dell'utente fotografato e quello che succede fra i messaggi (logica pura)
 require(path.join(SHARED, 'filoCompattazione.js'));  // #1563 — la compattazione del filo a livelli (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni

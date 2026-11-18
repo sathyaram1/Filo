@@ -45,6 +45,9 @@ async function prepara(app, { owner }) {
     const AF = globalThis.SN_AUTO_FEEDBACK;
     AF.analyzeReply = () => ({ kind: 'capability_gap' });
     AF.composeProposal = () => null;
+    // Qui ogni giro è un buco diverso: uno per voce e per versione lo prova tests/chat-funzioni-segnalate.spec.mjs.
+    let giro = 0;
+    AF.chiaveInvio = () => `prova:${++giro}`;
     AF.compose = () => ({ text: 'Filo non sa fare una cosa', name: 'Un buco', clientId: 'c-test' });
     globalThis.__inviate = [];
     globalThis.__scritture = [];

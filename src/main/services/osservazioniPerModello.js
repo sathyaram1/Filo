@@ -358,6 +358,16 @@ async function schedeNumerate(win, schedeViste) {
   try { return (await FiloState.listTabs({ windowId: win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { return []; }
 }
 
+// La scheda che MOSTRA_SCHEDA porta davanti: col numero, o `verso` dopo/prima di quella davanti come Ctrl+Tab (#2371).
+async function schedaDaMostrare(tm, action, schedeViste) {
+  const verso = String(action.verso ?? '').trim().toLowerCase();
+  if (!(verso === 'dopo' || verso === 'prima') || action.scheda != null) return schedaPerNumero(tm, action, schedeViste);
+  const tabs = Array.isArray(tm.tabs) ? tm.tabs : [];
+  if (tabs.length < 2) return { errore: 'c\'è una scheda sola: non ce n\'è un\'altra su cui passare' };
+  const i = globalThis.SN_TASTI.schedaNelVerso(verso, tabs.findIndex((t) => t.id === tm.activeId), tabs.length);
+  return tabs[i] ? { tab: tabs[i] } : null;
+}
+
 // La scheda col numero `scheda` di TAB APERTE: { tab }, { errore } o null se il numero non c'è.
 async function schedaPerNumero(tm, action, schedeViste) {
   const numero = Number(action.scheda ?? action.numero ?? 0);
@@ -1606,7 +1616,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     if (!analysis || !analysis.kind) return null;
     const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
     // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
-    return proposta ? { ...proposta, _proposta: true } : null;
+    // `_unaVolta`: la funzione per nome si segnala una volta per versione (#2371), col conto dell'invio anonimo: proposta
+    // (confermata o no) e invio sono la stessa segnalazione. Senza nome ogni richiesta è diversa.
+    return proposta ? { ...proposta, _proposta: true, ...(analysis.capabilityId ? { _unaVolta: AF.chiaveInvio(analysis) } : {}) } : null;
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -1648,8 +1660,11 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const payload = AF.compose(analysis);
     if (!payload) return;
 
-    let userAgent = 'Filo desktop auto';
-    try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
+    let versione = '';
+    try { versione = require('electron').app.getVersion(); } catch (_) {}
+    // Una per voce e per versione (#2371): la stessa mancanza la seconda volta non aggiunge niente.
+    if (!(await require('./autoFeedbackInviati').prenota(versione, AF.chiaveInvio(analysis)))) return;
+    const userAgent = versione ? `Filo desktop ${versione} auto` : 'Filo desktop auto';
 
     // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
     // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
@@ -1666,7 +1681,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const nelFilo = (r) => {
       const ok = !!r && r.ok !== false && !r.error;
       const esito = ok ? { eseguita: true } : { eseguita: false, errore: (r && (r.error || r.errore)) || 'non partita' };
-      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { testo: voce.text }, esito, { daSola: 'filo', chat: chatId }); } catch (_) {}
+      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { titolo: voce.name, testo: voce.text }, esito, { daSola: 'automazione', via: 'segnalazione', chat: chatId }); } catch (_) {}
       return r;
     };
     const spedisci = () => Promise.resolve(Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
@@ -1724,6 +1739,7 @@ module.exports = {
   voceChiusa,
   schedeNumerate,
   schedaPerNumero,
+  schedaDaMostrare,
   bersaglioPausa,
   bersaglioAudio,
   salvatePerChat,

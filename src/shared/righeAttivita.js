@@ -165,6 +165,15 @@
       const t = pulito(o.titolo || a._titolo) || 'la scheda';
       return { icon: '↗', text: `Ti ho portato su «${t}»` };
     },
+    SALVA_PER_DOPO: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo) || 'la pagina';
+      return { icon: '🔖', text: `Salvata per dopo «${t}»` };
+    },
+    CERCA_IMMAGINE: (a) => {
+      const o = a._output || {};
+      return { icon: '🔎', text: o.numero ? `Cercata con Google Lens l'immagine ${o.numero}` : 'Cercata con Google Lens l\'immagine della pagina' };
+    },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
@@ -411,6 +420,7 @@
     SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
     RIPRENDI_AUDIO: 'Musica non ripartita',
     PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
+    SALVA_PER_DOPO: 'Pagina non salvata', CERCA_IMMAGINE: 'Immagine non cercata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',

@@ -210,7 +210,8 @@ test('un comando uscito con errore resta «non riuscito» col codice e la prima 
 
 test('non riuscita dopo un OK: la riga è la domanda a cui l\'utente ha risposto, e il perché viaggia con lei', () => {
   const v = E.voceArchivio({ type: 'INVIA_FEEDBACK', testo: 'x', _rigaChiesta: 'Inviare questo feedback a tuo nome', _executed: false, _output: { error: 'problema di rete' } });
-  assert.deepEqual(v, { type: 'INVIA_FEEDBACK', esito: 'fallito', riga: 'Inviare questo feedback a tuo nome', motivo: 'problema di rete' });
+  // Il testo della segnalazione resta con la voce: l'assistente la può spiegare anche dopo (#2371).
+  assert.deepEqual(v, { type: 'INVIA_FEEDBACK', esito: 'fallito', riga: 'Inviare questo feedback a tuo nome', motivo: 'problema di rete', segnalazione: 'x' });
 });
 
 // #1685 — la conferma rimasta senza risposta porta con sé azione e domanda: riaperta, la chat ridisegna il bottone.

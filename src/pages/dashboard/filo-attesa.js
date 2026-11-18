@@ -25,6 +25,8 @@
     RIPRENDI_AUDIO: ['Fatta ripartire la musica', (k) => `Fatta ripartire la musica ${n(k)} volte`, 'musica'],
     PAUSA_AUDIO: ['Messa in pausa la musica', (k) => `Messa in pausa la musica ${n(k)} volte`, 'musica'],
     MOSTRA_SCHEDA: ['Portato su una scheda', (k) => `Portato su una scheda ${n(k)} volte`, 'scheda'],
+    SALVA_PER_DOPO: ['Salvata una pagina per dopo', (k) => `Salvate ${n(k)} pagine per dopo`, 'pagina salvata'],
+    CERCA_IMMAGINE: ['Cercata un\'immagine', (k) => `Cercate ${n(k)} immagini`, 'immagine'],
     LEGGI_TRASPARENZA: ['Riletta la trasparenza', (k) => `Rilette ${n(k)} pagine di trasparenza`, 'trasparenza'],
     LEGGI_IMPOSTAZIONI: ['Lette le impostazioni', (k) => `Lette le impostazioni ${n(k)} volte`, 'impostazioni'],
     CAPACITA_DETTAGLIO: ['Verificato cosa so fare', (k) => `Verificato cosa so fare ${n(k)} volte`, 'capacità'],

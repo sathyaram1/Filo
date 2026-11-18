@@ -58,7 +58,7 @@
     {
       id: 'reopen-closed-tab', title: 'Riapri l’ultima scheda chiusa', category: 'navigation',
       desc: 'Riapre la scheda chiusa più di recente com’era: nello stesso posto della fila, con Indietro e Avanti, lo scorrimento, lo zoom e il paese da cui passava. Ripetendo riapre quella chiusa prima, e così via; finite quelle chiuse da quando hai aperto Filo continua con l’archivio delle schede chiuse, dalla più recente. Vale anche per le pagine di Filo e in incognito.',
-      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa": con Filo acceso e nessuna sua finestra aperta ridà la finestra con le sue schede. Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
+      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa": con Filo acceso e nessuna sua finestra aperta ridà la finestra con le sue schede. Oppure chiedilo a Filo in chat («riapri l’ultima scheda chiusa»). Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
       doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa. Tenendo premuti i tasti riapre una scheda sola, non a raffica. Senza niente da riaprire te lo dice con un avviso, e la voce del tasto destro è spenta.',
     },
     {
@@ -76,7 +76,7 @@
     {
       id: 'switch-tab-next-prev', title: 'Passa alla scheda dopo o a quella prima', category: 'navigation',
       desc: 'Porta in primo piano la scheda a destra di quella attiva, o quella a sinistra. Dall’ultima si torna alla prima, e dalla prima all’ultima.',
-      invoke: 'Ctrl+Tab per la scheda dopo, Ctrl+Shift+Tab per quella prima, anche su Mac (col tasto Control, perché Cmd+Tab lì cambia applicazione). Funziona anche mentre stai guardando un sito o scrivi in un campo di testo.',
+      invoke: 'Ctrl+Tab per la scheda dopo, Ctrl+Shift+Tab per quella prima, anche su Mac (col tasto Control, perché Cmd+Tab lì cambia applicazione). Funziona anche mentre stai guardando un sito o scrivi in un campo di testo. Oppure chiedilo a Filo in chat («passa alla scheda dopo»).',
       doesNot: 'Con una scheda sola non succede niente.',
     },
     {
@@ -271,8 +271,9 @@
     },
     {
       id: 'search-image', title: 'Cerca un’immagine sul web', category: 'media',
-      desc: 'Cerca sul web a partire da un’immagine della pagina (ricerca per immagine).',
-      invoke: 'Clic destro su un’immagine → cerca immagine.',
+      desc: 'Cerca sul web a partire da un’immagine (ricerca per immagine con Google Lens, in una scheda nuova): un’immagine della pagina, o una che hai mandato nella chat di Filo.',
+      invoke: 'Clic destro su un’immagine → cerca immagine. Oppure chiedilo a Filo in chat («cerca questa immagine»): cerca l’ultima immagine che gli hai mandato, quella che indichi col suo numero, o la più grande della pagina, la stessa che cerca l’Aiuto.',
+      doesNot: 'Dalla chat sceglie Filo quale immagine della pagina cercare (la più grande, anche fuori vista): per un’altra usa il tasto destro su quella. Dalla chat l’immagine parte verso Google con l’OK che chiede il tuo livello di autonomia, come le altre azioni che portano fuori un tuo dato.',
     },
     {
       id: 'video-audio-controls', title: 'Comanda un video o un audio della pagina', category: 'media',
@@ -352,7 +353,7 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: '{tasto:save-for-later}, oppure l\'icona «Salva per dopo» della barra laterale, oppure chiedendolo all’Aiuto sopra la pagina («salvala per dopo»): salva allo stesso modo e chiude la scheda.',
+      invoke: '{tasto:save-for-later}, oppure l\'icona «Salva per dopo» della barra laterale, oppure chiedendolo all’Aiuto sopra la pagina o alla chat di Filo («salvala per dopo», «salva per dopo la scheda di prima»): salva allo stesso modo e chiude la scheda.',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla. Ne tiene al massimo 1000: oltre, la più vecchia esce dall’elenco e un avviso nella finestra dice quale.',
     },
     {
@@ -770,7 +771,7 @@
       id: 'site-own-menu', title: 'Il menu del tasto destro dei siti che ne hanno uno', category: 'navigation',
       desc: 'Sui siti che hanno un loro menu del tasto destro, come Google Docs o Figma, il menu di Filo ha in cima «Menu di» e il nome del sito: un clic apre il menu del sito nello stesso punto. Filo lo riconosce perché la pagina ascolta il tasto destro. Se lì il sito non mostra niente, compare il menu del browser e su quella pagina la voce non torna fino al prossimo caricamento. Quando su un sito scegli spesso quella voce, Filo propone una volta, con un avviso in basso, di aprire subito il menu del sito: se accetti, lì il tasto destro apre il menu del sito e quello di Filo resta a Shift + tasto destro.',
       invoke: 'Tasto destro sul sito, poi «Menu di …» in cima al menu di Filo. La freccia accanto alla voce ha «Aprilo subito col tasto destro»; su un sito già scelto, con Shift + tasto destro, ha «Col tasto destro apri il menu di Filo». In Preferenze, sotto «Siti col loro menu del tasto destro», vedi tutti i siti scelti e li togli con la ×. Oppure chiedilo a Filo: «su questo sito apri il menu del sito col tasto destro», «su figma.com torna al menu di Filo», «su quali siti il tasto destro apre il menu del sito?».',
-      doesNot: 'Non vede i siti che aprono il loro menu senza ascoltare il tasto destro, e a volte mostra la voce su un sito che il tasto destro lo blocca e basta. Il menu del sito lo apre la pagina: un sito che accetta solo il clic vero del mouse dalla voce non lo apre, e compare quello del browser.',
+      doesNot: 'Non vede i siti che aprono il loro menu senza ascoltare il tasto destro, e a volte mostra la voce su un sito che il tasto destro lo blocca e basta. Il menu del sito lo apre la pagina: un sito che accetta solo il clic vero del mouse dalla voce non lo apre, e compare quello del browser. Dalla chat Filo sceglie quale menu apre il tasto destro su un sito, ma non apre adesso il menu del sito: quello si apre solo col tasto destro sulla pagina.',
     },
     {
       id: 'filo-off-on-site', title: 'Spegnere Filo su un sito', category: 'navigation',
@@ -966,10 +967,10 @@
     'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
     'email-nei-siti': 'impostazioni(imposta)', 'testo-dei-campi': 'impostazioni(imposta)', 'spellcheck-manage': 'scheda(apri)',
     editor: 'file(leggi_editor)', 'translate-page': SOLO_A_MANO, 'explain-image': SOLO_A_MANO,
-    'copy-download-image': SOLO_A_MANO, 'search-image': SOLO_A_MANO, 'video-audio-controls': 'scheda(pausa_audio)',
+    'copy-download-image': SOLO_A_MANO, 'search-image': 'scheda(lens)', 'video-audio-controls': 'scheda(pausa_audio)',
     'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
     ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
-    'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': SOLO_A_MANO,
+    'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': 'scheda(salva)',
     'open-for-later': 'scheda(salvate)', archive: 'scheda(chiuse)', 'chat-archive': 'filo(cerca)',
     'visited-pages': 'filo(cancella_pagine)', 'filo-accaduti': 'filo(espandi)', 'chat-archive-recall': 'filo(cerca)',
     'response-length': 'impostazioni(imposta)', 'app-chats-in-filo': 'filo(cerca)', 'chat-conti-cambi': 'web(cerca)',

@@ -36,7 +36,7 @@ test('altre ammissioni di non avere un dato sono riconosciute', () => {
     'Non ho visibilità su quello che succede nelle altre finestre di Filo.',
   ];
   for (const r of frasi) {
-    assert.equal(AF.analyzeReply(r, [], 'una domanda', CAPS).kind, 'capability-gap', r);
+    assert.equal(AF.analyzeReply(r, [], 'quante cose ho fatto oggi?', CAPS).kind, 'capability-gap', r);
   }
 });
 

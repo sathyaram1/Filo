@@ -1226,7 +1226,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       // Un seguito già scritto (#1296) va letto al passo dopo, insieme all'esito: il turno resta uno. Anche quello letto
       // prima della prima chiamata (un turno lento a partire, #2173): il comando secco non gli risponde.
       const chiude = passi === 1 && !onbActive && !turno.seguiti.length && !seguitiLetti.length
-        && GiroAzioni.chiudeIlTurno(results, { testo: text, daLeggere: (x) => !!observationsForPrompt([x.rendered]) });
+        && GiroAzioni.chiudeIlTurno(results, {
+          testo: text, messaggio: internal ? '' : userMessage, daLeggere: (x) => !!observationsForPrompt([x.rendered]),
+        });
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       // Quello di un giro di soli bottoni, o dell'ultimo, invece resta nella bolla.
@@ -1392,11 +1394,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
+  if (proposal && proposal._unaVolta) {
+    let versione = '';
+    try { versione = require('electron').app.getVersion(); } catch (_) {}
+    if (!(await require('./autoFeedbackInviati').prenota(versione, proposal._unaVolta))) proposal = null;
+  }
   if (proposal) {
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
     // La segnalazione la propone Filo, non l'ha chiesta l'utente: è fuori dal perimetro del compito (#530).
-    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false, chiesta: false };
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false, chiesta: false, nelFilo: 'segnalazione' };
     let res = await executeFiloAction(proposal, conContesto);
     if (res.output && res.output.blocked === 'segreto') {
       proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
