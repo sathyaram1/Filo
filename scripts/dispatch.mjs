@@ -88,7 +88,7 @@ import {
   proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
-import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
+import { avvisoForzatura, installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { accendi as accendiClone, cloneDelGiro, preparaIntestazione, preparaPerIlGiro, rilancia } from './lib/worker-nel-clone.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
