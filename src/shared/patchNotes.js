@@ -12,6 +12,7 @@
       version: '0.2.291', date: '2026-11-18',
       features: [
         { testo: 'Nella nuova scheda c\'è una barra per i tuoi siti e programmi: ci trascini una scheda, un collegamento o un gioco dal desktop e lo riapri con un clic. Con la freccia accanto ripieghi la chat e la barra va al centro, con le icone grandi. Puoi anche chiedere a Filo di metterci o toglierci un sito.', segnalazione: 1803 },
+        { testo: 'Su un video di YouTube l\'Aiuto e la chat leggono la trascrizione del video: a «di cosa parla?» rispondono da quello che si dice, e se il video non ha trascrizione te lo dicono.', segnalazione: 1977 },
         { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
