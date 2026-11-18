@@ -1830,7 +1830,7 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|aspetta|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|aspetta|release|deliver|operazione|segnala|rapporto|spesa|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
