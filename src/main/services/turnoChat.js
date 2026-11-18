@@ -501,7 +501,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // #2536 — nell'intervista rifatta conta solo quello che l'utente dice lì: la memoria che il modello vedeva la citava,
   // gliela attribuiva o la ricopiava nel profilo, anche col divieto scritto. Fuori dall'intervista torna intera.
-  const memoriaNascosta = false && onbActive && onbBefore.rifatta === true;
+  const memoriaNascosta = onbActive && onbBefore.rifatta === true;
   const memory = memoriaNascosta ? null : await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = memoriaNascosta ? {} : FiloMem.renderMemoryForPrompt(memory);
   const lezioni = memoriaNascosta ? '' : await lessonsBufferText();
