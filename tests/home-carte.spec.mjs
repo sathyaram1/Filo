@@ -464,7 +464,8 @@ test('una carta di sinistra che non si trova: Filo riceve tutte le carte con la 
   expect(chiavi).toHaveLength(3);
   for (const k of chiavi) expect(esito).toContain(k);
   expect(esito).not.toContain('"lavoro');
-  expect(esito).toContain('"altro":["Mazzi"]');
+  // Nel «+» stanno anche i tasti fuori vista (#2372): di serie il Profilo.
+  expect(esito).toContain('"altro":["Mazzi","Profilo"]');
   expect(esito).not.toMatch(/destra[^\]]*Mazzi/);
 });
 
