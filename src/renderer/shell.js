@@ -1961,7 +1961,7 @@
       eraHome = ora;
       let mosse = false;
       for (const c of vive()) {
-        if (ora && c.dataset.carta) { if (colloca(c) !== 'angolo') mosse = true; continue; }
+        if (ora && davanti && c.dataset.carta) { delete c.dataset.attesa; colloca(c); mosse = true; continue; }
         if (c.dataset.attesa === '1' || c._durata > 0) continue;
         avviaTempo(c, c._durata);
       }
