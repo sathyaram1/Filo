@@ -248,6 +248,31 @@ test('il motivo del correttore: quattro forme, e senza motivo un errore che dice
   }
 });
 
+// #2498: «conflitto: a, b (ramo del server)» diventava cinque file, tre dei quali parole della nota.
+test('nel motivo di un conflitto quello fra parentesi è una nota, non dei file, e resta nel motivo', async () => {
+  const letto = (t) => R.leggiMotivoCorrettore(t).motivo;
+  assert.deepEqual(letto('conflitto: src/shared/patchNotes.js, PATTERNS.md (ramo del server)'),
+    { tipo: 'conflitto', file: ['src/shared/patchNotes.js', 'PATTERNS.md'], testo: 'ramo del server' });
+  assert.deepEqual(letto('conflitto: a.js (solo righe di novità), b.js (import)'), { tipo: 'conflitto', file: ['a.js', 'b.js'], testo: 'solo righe di novità; import' });
+  assert.deepEqual(letto('conflitto: nessuno (il ramo era già sopra main)'), { tipo: 'conflitto', file: [], testo: 'il ramo era già sopra main' });
+  assert.deepEqual(letto('conflitto: a.js (nota senza chiusura'), { tipo: 'conflitto', file: ['a.js'], testo: 'nota senza chiusura' });
+  assert.deepEqual(letto('conflitto: a.js ()'), { tipo: 'conflitto', file: ['a.js'] }, 'una parentesi vuota non lascia una nota vuota');
+  assert.equal(R.leggiMotivoCorrettore('conflitto: (solo una nota)').ok, false, 'una nota senza file non è un elenco');
+  assert.equal(R.leggiMotivoCorrettore(`conflitto: a.js (${'x'.repeat(1001)})`).ok, false, 'la nota ha il tetto del testo, col numero');
+  assert.deepEqual(letto('prove rosse: apertura scheda (tasto destro)'), { tipo: 'prove-rosse', prove: ['apertura scheda (tasto destro)'] },
+    'il titolo di una prova può avere parentesi sue');
+  for (const testo of ['conflitto: a.js, b.js (ramo del server)', 'conflitto: nessuno (niente da fare)', 'conflitto: a.js (x; y)']) {
+    const m = letto(testo);
+    assert.equal(R.testoMotivo(m), testo, 'la riga si rilegge uguale');
+    assert.deepEqual(letto(R.testoMotivo(m)), m, 'e l\'oggetto pure: il server lo rilegge così');
+  }
+  // Il conto che il correttore vede dopo la consegna: due file di servizio e una nota non chiedono un giro di verifica.
+  const { esitoRiallineamento } = await import('../../scripts/dispatch.mjs');
+  const esito = esitoRiallineamento({ ok: true, file: [], conflitti: [] }, letto('conflitto: src/shared/patchNotes.js, PATTERNS.md (ramo del server)'));
+  assert.equal(esito.riallineamento.giro, 'nessuno', esito.riga);
+  assert.doesNotMatch(esito.riga, /file di codice|ramo|server\b.*:/);
+});
+
 test('i file di servizio sono quelli della regola 3 della spec', () => {
   assert.deepEqual(R.FILE_DI_SERVIZIO.slice().sort(),
     ['PATTERNS.md', 'src/shared/capabilities.js', 'src/shared/patchNotes.js', 'tests/rossi-noti.json']);
