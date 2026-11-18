@@ -151,7 +151,8 @@ test('un intoppo passeggero di GitHub su una delle tre letture non ferma l\'atte
   assert.deepEqual([p.esito, p.remota.url], ['verde', 'https://g/9']);
   assert.deepEqual(chiamate, { elenco: 2, jobs: 2, registro: 3 }, 'ogni lettura ripetuta finché risponde, nessuna corsa riaccesa');
   assert.equal(righe.filter((r) => /riprovo fra \d+ s/.test(r)).length, 4, righe.join('\n'));
-  assert.match(righe.join('\n'), /il registro della corsa \(GitHub risponde 404[^)]*\): riprovo fra 30 s, tentativo 3 di 5/);
+  assert.match(righe.join('\n'), /il registro della corsa \(GitHub risponde 404[^)]*\): riprovo fra 10 s, tentativo 2 di 5/);
+  assert.match(righe.join('\n'), /il registro della corsa \(GitHub risponde 503\): riprovo fra 30 s, tentativo 3 di 5/);
   assert.equal(o.adesso(), PAUSE_RIPROVA_MS[0] * 3 + PAUSE_RIPROVA_MS[1], 'le pause sono quelle dichiarate, dalla prima per ogni lettura');
 });
 
