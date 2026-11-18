@@ -234,6 +234,7 @@ test('«Filo ti suggerisce» è una carta sola e si toglie; senza chiave la prim
   await sug.hover();
   await sug.locator('.dash-carta-togli').click();
   await expect(page.locator('#tieni .dash-carta[data-tipo="suggerimenti"]')).toHaveCount(0);
+  await fuoriVista(page);
   await expect(page.locator('#altro .dash-altro-app[data-id="suggerimenti"]')).toBeVisible();
 
   await prima.locator('.dash-carta-az.principale').click();
