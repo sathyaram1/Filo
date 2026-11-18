@@ -50,25 +50,36 @@
   const TETTO_CHIAVE = 200;
 
   const IDS = CARTE.map((c) => c.id);
+  const ID_TASTI = TASTI.map((t) => t.id);
   const carta = (id) => CARTE.find((c) => c.id === id) || null;
+  const tasto = (id) => TASTI.find((t) => t.id === id) || null;
   const lista = (v) => (Array.isArray(v) ? v : []);
   const unici = (arr) => [...new Set(arr)];
   const chiaveValida = (k) => typeof k === 'string' && k.length > 0 && k.length <= TETTO_CHIAVE;
 
   function predefinita() {
-    return { versione: VERSIONE, destra: IDS.slice(), tolte: [], sinistra: [], nascoste: [] };
+    return normalizza({});
   }
 
-  // Una carta che il catalogo non conosceva quando l'utente ha salvato compare in fondo a destra: tolta è
-  // solo quella che l'utente ha tolto.
+  // Una carta o un tasto che il catalogo non conosceva quando l'utente ha salvato compare in fondo, o nel «+» se di
+  // serie sta lì: tolto è solo quello che l'utente ha tolto.
   function normalizza(raw) {
     const r = raw && typeof raw === 'object' ? raw : {};
     const tolte = unici(lista(r.tolte).filter((id) => IDS.includes(id)));
     const destra = unici(lista(r.destra).filter((id) => IDS.includes(id) && !tolte.includes(id)));
     for (const id of IDS) if (!destra.includes(id) && !tolte.includes(id)) destra.push(id);
+    const conTasti = Array.isArray(r.tasti) || Array.isArray(r.riposti);
+    const riposti = unici(lista(r.riposti).filter((id) => ID_TASTI.includes(id)));
+    const tasti = unici(lista(r.tasti).filter((id) => ID_TASTI.includes(id) && !riposti.includes(id)));
+    for (const t of TASTI) {
+      if (tasti.includes(t.id) || riposti.includes(t.id)) continue;
+      // Chi ha salvato prima dei tasti (#2372) ha le app in vista: le ritrova lì, e il resto va dove sta di serie.
+      if (t.fuori && !(conTasti === false && APP.some((a) => a.id === t.id))) riposti.push(t.id);
+      else tasti.push(t.id);
+    }
     const sinistra = unici(lista(r.sinistra).filter(chiaveValida)).slice(0, TETTO_ORDINE);
     const nascoste = unici(lista(r.nascoste).filter(chiaveValida)).slice(-TETTO_NASCOSTE);
-    return { versione: VERSIONE, destra, tolte, sinistra, nascoste };
+    return { versione: VERSIONE, destra, tolte, tasti, riposti, sinistra, nascoste };
   }
 
   function senzaAccenti(s) {
