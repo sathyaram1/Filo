@@ -134,6 +134,72 @@ test('Modelli: la stessa voce sulle impostazioni della pagina', async ({ openTab
   expect(await etichette(page)).toContain('Rimetti di serie');
 });
 
+// #2444 — il menu di Filo sulle pagine interne ascolta solo a impostazioni lette. Il test le trattiene finché vuole: il
+// tasto destro cade per forza prima che il menu ascolti, come su una macchina lenta.
+const trattieniImpostazioni = (app) => app.evaluate(() => {
+  const S = globalThis.SN_STORAGE;
+  const vera = S.getSettings;
+  let apri;
+  const cancello = new Promise((r) => { apri = r; });
+  // Solo la lettura chiesta dalle pagine: la scheda si apre lo stesso.
+  S.getSettings = function (...a) {
+    if (/handlers[\\/]storage\.js/.test(new Error().stack || '')) return cancello.then(() => vera.apply(S, a));
+    return vera.apply(S, a);
+  };
+  globalThis.__apriImpostazioni = () => { S.getSettings = vera; apri(); };
+});
+const apriImpostazioni = (app) => app.evaluate(() => globalThis.__apriImpostazioni());
+const menuInAscolto = (page) => page.evaluate(() => document.documentElement.dataset.filoContentReady === '1');
+
+for (const { nome, url, casella } of [
+  { nome: 'Preferenze', url: 'filo://preferences/preferences.html', casella: '#tabPreviewEnabled' },
+  { nome: 'Modelli', url: 'filo://options/options.html', casella: '#useDefaultModels' },
+]) {
+  test(`${nome}: il tasto destro dato appena aperta la pagina apre il menu quando Filo è pronto`, async ({ app, openTab }) => {
+    test.setTimeout(60_000);
+    await trattieniImpostazioni(app);
+    const page = await openTab(url);
+    const etichetta = page.locator('label', { has: page.locator(casella) }).first();
+    await expect(etichetta).toBeVisible({ timeout: 10_000 });
+    expect(await menuInAscolto(page)).toBe(false);
+    await etichetta.click({ button: 'right' });
+    await apriImpostazioni(app);
+    expect(await etichette(page)).toContain('Rimetti di serie');
+  });
+}
+
+test('Preferenze: un tasto destro dato prima non si rigioca se la pagina l’ha preso, o se è troppo vecchio', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await trattieniImpostazioni(app);
+  const preso = await openTab('filo://preferences/preferences.html');
+  const etichetta = preso.locator('label', { has: preso.locator('#tabPreviewEnabled') });
+  await expect(etichetta).toBeVisible({ timeout: 10_000 });
+  // Una voce col menu suo, come l'elenco documenti dell'Editor.
+  await etichetta.evaluate((el) => el.addEventListener('contextmenu', (e) => { e.preventDefault(); el.dataset.menuSuo = '1'; }));
+  await etichetta.click({ button: 'right' });
+  await expect(etichetta).toHaveAttribute('data-menu-suo', '1');
+
+  const vecchio = await openTab('filo://options/options.html');
+  const altra = vecchio.locator('label', { has: vecchio.locator('#useDefaultModels') }).first();
+  await expect(altra).toBeVisible({ timeout: 10_000 });
+  await altra.click({ button: 'right' });
+  // Oltre il tempo del rigioco l'utente il menu non lo aspetta più.
+  await vecchio.waitForTimeout(3_500);
+  expect(await menuInAscolto(vecchio)).toBe(false);
+
+  await apriImpostazioni(app);
+  for (const page of [preso, vecchio]) {
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 10_000 });
+  }
+  // Il menu, se partisse, si aprirebbe subito dopo le impostazioni: si lascia il tempo di farlo.
+  await vecchio.waitForTimeout(1_000);
+  await expect(menuDi(preso).principale).toHaveCount(0);
+  await expect(menuDi(vecchio).principale).toHaveCount(0);
+  // Il menu torna ad ascoltare come sempre.
+  await altra.click({ button: 'right' });
+  expect(await etichette(vecchio)).toContain('Rimetti di serie');
+});
+
 // Una chiave non entra nel registro dei cambi: tolta, nessun Annulla la riporta. Si chiama per quello che fa, e chiede.
 test('Modelli: sulla chiave OpenRouter la voce è «Togli la chiave», chiede conferma, e il no la lascia', async ({ app, openTab }) => {
   test.setTimeout(90_000);
