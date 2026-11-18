@@ -499,9 +499,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
   const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
     && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
-  const memory = await FiloMem.getMemory();
-  const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
-  const lezioni = await lessonsBufferText();
+  // #2536 — nell'intervista rifatta conta solo quello che l'utente dice lì: la memoria che il modello vedeva la citava,
+  // gliela attribuiva o la ricopiava nel profilo, anche col divieto scritto. Fuori dall'intervista torna intera.
+  const memoriaNascosta = onbActive && onbBefore.rifatta === true;
+  const memory = memoriaNascosta ? null : await FiloMem.getMemory();
+  const { profilo, preferenze, espansioni } = memoriaNascosta ? {} : FiloMem.renderMemoryForPrompt(memory);
+  const lezioni = memoriaNascosta ? '' : await lessonsBufferText();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
   const { state: statoDelTurno, stateText, sezioniChat: sezioniDelTurno, attese: attesePrimaDelModello } = await FiloState.assemble({
     creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
