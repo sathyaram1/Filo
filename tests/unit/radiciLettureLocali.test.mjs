@@ -140,7 +140,7 @@ test('mille domande lette in una volta partono a pezzi sotto il tetto del server
 test('anche un elenco di sole domande fidate si nomina al server: il timbro tolto dopo raggiunge la sessione che le ha lette', async () => {
   const { esegui } = await import('../../scripts/domanda.mjs');
   const s = spia();
-  const domande = [{ id: 'D-1', titolo: 't', stato: 'aperta', fiducia: 'fidato', radici: ['legacy'] }, { id: 'D-3', titolo: 't', stato: 'aperta', fiducia: 'fidato', radici: [], fidataDallOwner: { il: 1 } }];
+  const domande = [Object.assign({}, D_F, { radici: ['legacy'] }), Object.assign({}, D_F, { id: 'D-3', numero: 3, radici: [], fidataDallOwner: { il: 1 } })];
   const base = { biglietto: async () => '', bigliettoLocale: async () => '', credenziale: async () => ({ tipo: 'admin' }), scrivi: () => {}, errore: () => {} };
   assert.equal(await esegui(['elenco'], Object.assign({}, base, { chiama: async () => ({ ok: true, domande }), sporca: s.sporca })), 0);
   assert.deepEqual(s.sporcate.map((x) => x.letti), [lettiDi(['D-1', 'D-3'])]);
