@@ -104,6 +104,12 @@ test('Trascrivi dalla barra: la porzione resta a schermo, una parola selezionata
   await expect(menu).toBeVisible({ timeout: 5000 });
   await expect(menu.getByText('Cerca', { exact: false }).first()).toBeVisible();
   await strato.screenshot({ path: 'tests/.shots/trascrivi-tasto-destro.png' }).catch(() => {});
+  // Esc chiude prima il menu, poi il riquadro.
+  await strato.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(strato.locator('.sn-tr-overlay')).toBeVisible();
+  await strato.mouse.click(box.x + r0.x + r0.parola + r0.quattro / 2, box.y + r0.y - 12, { button: 'right' });
+  await expect(menu).toBeVisible({ timeout: 5000 });
   await menu.locator('button', { hasText: /^Copia$/ }).first().click();
   await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('4821');
 
