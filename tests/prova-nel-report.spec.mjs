@@ -42,6 +42,14 @@ const FB = {
 test('l\'owner trova sotto il report l\'esito della prova e le sue schermate, aperte', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  // Una schermata finta grande abbastanza da guardarla nello screenshot.
+  const PNG = await page.evaluate(() => {
+    const c = Object.assign(document.createElement('canvas'), { width: 640, height: 400 });
+    const g = c.getContext('2d');
+    g.fillStyle = '#d9c7b0'; g.fillRect(0, 0, 640, 400);
+    g.fillStyle = '#3a2f25'; g.font = '48px sans-serif'; g.fillText('schermata', 200, 210);
+    return c.toDataURL('image/png');
+  });
   await page.evaluate((png) => {
     const orig = window.filo.message.bind(window.filo);
     window.__chieste = [];
