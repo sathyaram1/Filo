@@ -1648,8 +1648,11 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const payload = AF.compose(analysis);
     if (!payload) return;
 
-    let userAgent = 'Filo desktop auto';
-    try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
+    let versione = '';
+    try { versione = require('electron').app.getVersion(); } catch (_) {}
+    // Una per voce e per versione (#2371): la stessa mancanza la seconda volta non aggiunge niente.
+    if (!(await require('./autoFeedbackInviati').prenota(versione, AF.chiaveInvio(analysis)))) return;
+    const userAgent = versione ? `Filo desktop ${versione} auto` : 'Filo desktop auto';
 
     // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
     // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
