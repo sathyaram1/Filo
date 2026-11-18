@@ -159,7 +159,6 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   await expect(impostazioni.menu.locator('.item').first()).toBeVisible();
   await chiudiMenu(app, impostazioni.menu);
 
-  // Il Profilo di serie sta nel «+»: il menu si apre sotto di lui anche lì.
   await (await tastoHome(page, 'profilo')).click();
   const profilo = await menuSulloSchermo(app);
   await expect(profilo.menu.locator('.menu')).toContainText('mario@example.it');
