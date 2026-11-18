@@ -212,7 +212,10 @@ async function scaricamentoComandato(nome) {
   const TOT = 4 * 1024 * 1024;
   const PRIMO = 64 * 1024;
   let res = null;
+  let rotto = false;
   const srv = createServer((req, r) => {
+    // Rotto resta rotto: la ripresa automatica di Chromium non deve ritrovare il file.
+    if (rotto) { r.destroy(); return; }
     r.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': TOT, 'Content-Disposition': `attachment; filename="${nome}"` });
     r.write(Buffer.alloc(PRIMO, 1));
     res = r;
