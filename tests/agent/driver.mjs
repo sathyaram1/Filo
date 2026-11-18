@@ -381,7 +381,8 @@ function COLLECT_FN(soloFilo = false) {
     if (r.bottom < 0 || r.right < 0 || r.top > innerHeight || r.left > innerWidth) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') continue;
-    const label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent || '').trim().slice(0, 40);
+    // data-tip è l'hover di Filo: l'unico nome di un'icona senza testo, come la crocetta della scheda.
+    const label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent.trim() || el.getAttribute('data-tip') || '').trim().slice(0, 40);
     out.push({ x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, tag: el.tagName.toLowerCase(), label });
   }
   return out;
