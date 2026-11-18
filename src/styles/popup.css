@@ -546,7 +546,7 @@
   user-select: none;
   pointer-events: none;
 }
-.sn-tr-testo { position: absolute; inset: 0; cursor: text; }
+.sn-tr-testo { position: absolute; inset: 0; cursor: text; font-size: 0; line-height: 0; }
 .sn-tr-riga {
   position: absolute;
   white-space: pre;
