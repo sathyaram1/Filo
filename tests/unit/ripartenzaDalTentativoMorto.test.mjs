@@ -466,7 +466,8 @@ test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è l
     assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
     assert.equal(r.json.payload.ripartenza, undefined, 'niente da riprendere: il lavoro vivo è già su main');
     assert.equal(git(casa, 'rev-parse', 'HEAD'), git(casa, 'rev-parse', 'origin/main'));
-    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il superato è chiuso');
+    assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il superato resta alla potatura del server');
+    assert.doesNotMatch(r.se, /tolti da origin|restano su origin/);
   } finally {
     srv.close();
     togliCartella(base);
