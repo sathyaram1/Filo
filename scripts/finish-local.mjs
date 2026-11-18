@@ -939,6 +939,8 @@ async function main() {
       if (schermo.nota) console.log(`\n${schermo.nota}`);
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
+    corsa.fase('controlli di logica');
+    console.log(`\n▸ ${testoMemoria(letturaMemoria())}`);
     if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir)) {
       console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
       const puntaProvata = shaProvato;
