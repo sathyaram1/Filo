@@ -2075,6 +2075,14 @@
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
+    for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDalCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+    }
+    $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
+    for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {
+      $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiLettera().catch(() => {}); } });
+    }
     $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
