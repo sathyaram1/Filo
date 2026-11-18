@@ -43,13 +43,19 @@ $null = [Windows.Devices.Radios.RadioAccessStatus,Windows.System.Devices,Content
 
 // I dispositivi abbinati in una ricerca sola, con indirizzo, collegamento e contenitore chiesti insieme (niente
 // FromIdAsync, che costava un'attesa per dispositivo): lo usano lo script dell'elenco e il lettore della home
-// (statoSistema.js), che lo tiene già caricato. Vuole `$asTask`. «Unknown» della radio resta null: non è spento.
+// (statoSistema.js), che lo tiene già caricato. Vuole `$asTask`. AccesoRadio è la sola regola di acceso e spento
+// delle radio, anche per il giro del lettore: «Unknown» resta null, non è spento.
 const PS_ELENCO_BT = String.raw`try {
   $null = [Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime]
   $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
   $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
   $null = [Windows.Devices.Enumeration.DeviceInformationKind,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
 } catch {}
+function AccesoRadio($radio) {
+  if (@($radio | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) { return $true }
+  if (@($radio | Where-Object { @('Off', 'Disabled') -contains [string]$_.State }).Count -gt 0) { return $false }
+  return $null
+}
 function AttendiElenco($op, [Type]$tipo, [int]$ms) {
   $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($op))
   if ($t.Wait($ms)) { $t.Result } else { $null }
