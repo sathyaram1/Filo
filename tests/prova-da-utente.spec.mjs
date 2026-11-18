@@ -133,6 +133,45 @@ test('il tasto destro su un collegamento apre il menu di Filo, e le sue voci han
   togliCartella(r.cartella);
 });
 
+// Chi pilota usa la tastiera e la barra delle schede come chi usa Filo a mano (#2507.1): una scorciatoia data per rotta
+// quando funziona fa sbagliare il giudizio sulla funzione provata.
+test('Ctrl+T premuto mentre si guarda una pagina apre una scheda nuova con la home', async () => {
+  const r = await prova([
+    { azione: 'tasto', tasto: 'Control+t' },
+    { azione: 'aspetta', secondi: 1 },
+    { azione: 'fine', seBadge: '^view:Scrivi a Filo$' },
+  ], ['--compito', 'apri una scheda nuova']);
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
+  togliCartella(r.cartella);
+});
+
+test('Ctrl+Tab e Ctrl+W, scritti come li scrive una persona, passano alla scheda accanto e la chiudono', async () => {
+  const r = await prova([
+    { azione: 'tasto', tasto: 'Control+t' },
+    { azione: 'aspetta', secondi: 1 },
+    { azione: 'tasto', tasto: 'Ctrl+Tab' },
+    { azione: 'tasto', tasto: 'Ctrl+W' },
+    { azione: 'aspetta', secondi: 1 },
+    { azione: 'fine', seBadge: '^view:Scrivi a Filo$', senzaBadge: '^shell:Modulo$' },
+  ], ['--compito', 'chiudi la scheda del modulo']);
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
+  togliCartella(r.cartella);
+});
+
+test('le schede della barra hanno i badge: col clic si passa a una scheda e la sua crocetta la chiude', async () => {
+  const r = await prova([
+    { azione: 'tasto', tasto: 'Control+t' },
+    { azione: 'aspetta', secondi: 1 },
+    { azione: 'clic', etichetta: '^Modulo$', superficie: 'shell' },
+    { azione: 'clic', etichetta: '^Chiudi scheda', superficie: 'shell' },
+    { azione: 'aspetta', secondi: 1 },
+    { azione: 'fine', seBadge: '^view:Scrivi a Filo$', senzaBadge: '^shell:Modulo$' },
+  ], ['--compito', 'torna al modulo e chiudilo']);
+  expect(r.esito.esito, `${r.esito.riga}\n${r.uscita}`).toBe('riuscito');
+  expect(r.esito.passi.slice(2, 4).map((p) => p.mossa.etichetta)).toEqual(['Modulo', 'Chiudi scheda (Ctrl+W)']);
+  togliCartella(r.cartella);
+});
+
 test('quello che sta sopra la scheda (la barra laterale) ha i badge anche lui, e si clicca', async () => {
   const r = await prova([
     { azione: 'clic', etichetta: '^Barra laterale$', superficie: 'shell' },
