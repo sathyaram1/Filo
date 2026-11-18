@@ -105,6 +105,25 @@ test('aspetta <biglietto> sul processo vero: 5 mentre lavora, 0 quando ha finito
   }
 });
 
+// #2498: con la suite del server che girava nel clone della macchina, il test sopra aspettava quei processi e usciva 5.
+test('il clone del server della macchina non è lavoro dei test: chi lo usa nel lanciatore non fa aspettare', { skip: !LINUX && 'i processi si leggono da /proc' }, async () => {
+  const dir = cartellaTemporanea('aspetta-clone-');
+  const temp = cartellaTemporanea('aspetta-temp-');
+  const clone = cartellaTemporanea('filo-security-');
+  const suite = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd: clone, detached: true, stdio: 'ignore' });
+  suite.unref();
+  try {
+    const env = ambientePerITest({ ...process.env, FILO_SERVER_CLONE: clone }, temp);
+    assert.ok(!existsSync(env.FILO_SERVER_CLONE) && env.FILO_SERVER_CLONE.startsWith(temp), env.FILO_SERVER_CLONE);
+    const r = await canale(dir, { ...env, FILO_ASPETTA_FETTA_MS: '3000' }, 'aspetta', T);
+    assert.equal(r.code, USCITA_LIBERA, r.so + r.se);
+    assert.ok(!existsSync(cartellaCloneServer()), 'senzaSessione: neanche un node --test diretto vede il clone della macchina');
+  } finally {
+    try { process.kill(suite.pid); } catch (_) { /* già uscito */ }
+    for (const d of [dir, temp, clone]) togliCartella(d);
+  }
+});
+
 test('aspetta senza il biglietto, o con altro, non aspetta niente', async () => {
   const dir = cartellaTemporanea('aspetta-uso-');
   try {
