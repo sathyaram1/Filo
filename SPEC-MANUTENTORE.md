@@ -159,7 +159,7 @@ non svuotando l'ordine. Non in una giornata a secco. La classe è il primo
 criterio, non un filtro: un lavoro che tocca i file di un ramo vivo aspetta, e
 intanto entra uno di classe più bassa in un'area libera; un compito può stare
 davanti a un feedback; un lavoro già iniziato non si mette in attesa di uno
-non iniziato. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
+non iniziato: resta nell'ordine sopra di lui. Il 06/11 la rosa del mattino si è svuotata a metà giornata,
 nessun battito l'ha riempita e le quote sono rimaste ferme per quattordici ore
 circa.
 
