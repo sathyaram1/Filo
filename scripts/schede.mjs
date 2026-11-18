@@ -350,6 +350,7 @@ async function allineaAlFeedback(cartella, giro, { lettura = null, dryRun = fals
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede, indice);
     scriviSegnalati(cartella, indice);
+    writeFileSync(join(cartella, NON_FIDATI), `${JSON.stringify(r.periziati || [], null, 1)}\n`);
   }
   return { r, indice, scritte };
 }
