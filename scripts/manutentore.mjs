@@ -1257,6 +1257,8 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   if (cmd === 'rami' || cmd === 'incroci') {
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
+    // I non fidati aperti stanno fuori dall'indice (#2337.3): i loro rami restano in corso, non chiusi.
+    if (indice.length) indice = indice.concat(leggiNonFidati(cartella).map((x) => ({ num: String(x.num).replace(/^#/, '') })));
     const r = await leggiRami(indice);
     if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean).join('\n')); return 0; }
     const coda = [r.server.avviso].filter(Boolean);
