@@ -88,6 +88,8 @@ test('la frase presa da una pagina letta porta il nome del sito: passaggio, clic
   await expect(buona).toHaveText('sito-pubblico.test');
   await expect(etichette.nth(1)).toHaveText('sito-pubblico.test?');
   await expect(etichette.nth(1)).toHaveAttribute('data-tip', /Filo non ha trovato questa frase nella pagina/);
+  // La frase sta oltre il pezzo che il modello ha letto: verificata lo stesso, sulla pagina intera.
+  expect(await app.evaluate(() => globalThis.__vistoDalModello)).not.toContain('Calatrava');
   await expect(bolla.locator('.filo-fonte', { hasText: 'inventato' })).toHaveCount(0);
 
   // Il fumetto porta la frase com'è nella pagina, il titolo e quando l'ha letta.
