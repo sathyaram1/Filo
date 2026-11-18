@@ -1734,6 +1734,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-right:hover { scrollbar-color: var(--dash-line-strong) transparent; }
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
+/* La ricerca nel filo (#2372) prende la colonna intera: il resto torna quando la si chiude. */
+.dash-right.in-ricerca > :not(.dash-cerca) { display: none; }
 
 /* Le voci del computer (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano appoggiate
    al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
