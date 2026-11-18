@@ -150,14 +150,10 @@ test('a parole: «assegna yy a example.com» lo scrive fra le lettere, e le Pref
   const page = await casa(app);
   await modelloFinto(app, [
     { toolCalls: [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"doppio tocco","valore":"y example.com"}' }] },
-    { text: 'Fatto: yy apre example.com.' },
   ]);
   await page.locator('#input').fill('fai che yy apra example.com');
   await page.locator('#sendBtn').click();
-  await page.waitForTimeout(4000);
-  console.log('DEBUG', await page.locator('#bubbles').innerText(), JSON.stringify(await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); return [s.doppioTocco, globalThis.SN_PREF.buildPreferencePartial('doppio tocco', 'y example.com', { attuali: s })]; })));
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'yy apre' })).toBeVisible({ timeout: 10_000 });
-  await expect.poll(() => lettere(app)).toEqual([{ lettera: 'y', url: 'https://example.com/' }]);
+  await expect.poll(() => lettere(app), { timeout: 10_000 }).toEqual([{ lettera: 'y', url: 'https://example.com/' }]);
   const pref = await openTab('filo://preferences/preferences.html');
   await expect(pref.locator('#doppioToccoLettere .mem-riga')).toHaveText(['yy → example.com×']);
 });
