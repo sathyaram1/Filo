@@ -4,7 +4,8 @@
 
 'use strict';
 
-const { safeFetch } = require('./safe-fetch');
+const { safeFetch, leggiTesto } = require('./safe-fetch');
+const Trascrizione = require('./trascrizioneYoutube');
 const PT = require('./pageText');
 
 // Circa 7-8 mila parole: una pagina vera ci sta quasi sempre intera, e quella che non ci sta si legge a pezzi con `da`.
