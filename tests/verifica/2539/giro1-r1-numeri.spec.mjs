@@ -71,8 +71,11 @@ test('r1 in una prova di molti passi ogni schermata porta il numero con cui l\'e
   // mouse (title/alt). Oggi tutte dicono solo «allegato».
   const settima = imgs.nth(6);
   const etichetta = await settima.evaluate((el) => {
-    const vicino = (el.closest('figure, .mg-bubble-img, a, div') || el).textContent || '';
-    return [el.getAttribute('title') || '', el.getAttribute('alt') || '', vicino].join(' | ');
+    const box = el.closest('figure, .mg-bubble-img, a, div') || el;
+    const pseudo = [box, el.parentElement].filter(Boolean)
+      .flatMap((n) => ['::before', '::after'].map((p) => getComputedStyle(n, p).content || ''));
+    return [el.getAttribute('title') || '', el.getAttribute('alt') || '', el.getAttribute('aria-label') || '',
+      box.textContent || '', ...pseudo].join(' | ');
   });
   expect(etichetta).toMatch(/\b7\b/);
 });
