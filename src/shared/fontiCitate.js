@@ -25,21 +25,25 @@
 
   // Quello che due scritture della stessa frase non hanno in comune: maiuscole, spazi e a capo, apostrofi e
   // virgolette tipografiche, lineette, puntini, caratteri invisibili. `mappa[i]` è il posto nell'originale.
+  // Gli accenti si confrontano senza segni: «é» composto o scritto come e + accento è la stessa lettera.
+  function piega(c) {
+    return c.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+      .replace(/[­​-‍⁠﻿]/g, '')
+      .replace(/[‘’‚‛′´`]/g, "'")
+      .replace(/[“”„‟«»″]/g, '"')
+      .replace(/[‐-―−]/g, '-')
+      .replace(/…/g, '...');
+  }
   function normalizzaConMappa(s) {
     const src = testo(s);
     let n = '';
     const mappa = [];
     let spazio = false;
     for (let i = 0; i < src.length; i++) {
-      let c = src[i];
       const cp = src.codePointAt(i);
-      if (cp > 0xffff) { c = src.slice(i, i + 2); }
-      let t = c.normalize('NFKC').toLowerCase()
-        .replace(/[­​-‍⁠﻿]/g, '')
-        .replace(/[‘’‚‛′´`]/g, "'")
-        .replace(/[“”„‟«»″]/g, '"')
-        .replace(/[‐-―−]/g, '-')
-        .replace(/…/g, '...');
+      const c = cp > 0xffff ? src.slice(i, i + 2) : src[i];
+      // Una pagina lunga è quasi tutta ASCII: la piega costa solo sul resto.
+      const t = cp < 128 ? (cp === 96 ? "'" : c.toLowerCase()) : piega(c);
       if (/^\s+$/.test(t)) {
         if (n && !spazio) { n += ' '; mappa.push(i); }
         spazio = true;
