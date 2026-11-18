@@ -138,7 +138,7 @@ export function stampoDelTentativo(ramo, id) {
  * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
  * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
  * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
- * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
+ * regola dei tentativi dà per morti, che non si riprendono. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
  * `num`, se c'è, aggiunge alla regola la fusione del feedback letta su main.
  */
 export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', escludi = '' }) {
