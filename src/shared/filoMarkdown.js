@@ -11,6 +11,7 @@
   const S1 = '\uE001';
   const SENTINELLE = /[\uE000\uE001]/g;
   const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
+  const POSTO_FONTE = /\uE002(\d+)\uE003|[\uE002\uE003]/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
