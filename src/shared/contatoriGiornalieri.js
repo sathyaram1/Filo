@@ -1380,7 +1380,7 @@
   function icone() { const D = global.SN_DISPOSIZIONE_ICONE; return D && oggetto(D.ICONE) ? Object.keys(D.ICONE) : []; }
   function carte() {
     const H = global.SN_CARTE_HOME;
-    const ids = H ? [...(H.CARTE || []), ...(H.APP || [])].map((c) => c && c.id).filter(Boolean) : [];
+    const ids = H ? [...(H.CARTE || []), ...(H.TASTI || H.APP || [])].map((c) => c && c.id).filter(Boolean) : [];
     return [...ids, ...TIPI_CARTA_SINISTRA, TUTTE_LE_CARTE];
   }
   function cartaDi(chiave) {
