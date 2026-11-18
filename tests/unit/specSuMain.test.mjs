@@ -149,7 +149,8 @@ test('#2454: su main corre lo spec del ramo, copiato se lì manca o è diverso',
   const dir = cartellaTemporanea('spec-su-main-');
   const repo = join(dir, 'repo');
   const g = (...a) => {
-    const r = spawnSync('git', a, { cwd: repo, encoding: 'utf8' });
+    // Su Windows autocrlf riscrive in CRLF i file del worktree: lo spec uguale non sarebbe più uguale.
+    const r = spawnSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: repo, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     return r.stdout.trim();
   };
