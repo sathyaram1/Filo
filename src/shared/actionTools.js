@@ -137,7 +137,7 @@
     },
     ZOOM_PAGINA: {
       via: ['scheda', 'zoom'],
-      description: 'zoom della pagina davanti: percentuale 25-500 o verso; fino alla chiusura di Filo.',
+      description: 'zoom della pagina davanti: percentuale 25-500 o verso; finché Filo non si chiude.',
       properties: { percentuale: I(), verso: S({ enum: ['in', 'out', 'reset'] }) }, required: [],
     },
     STILE_PAGINA: {
