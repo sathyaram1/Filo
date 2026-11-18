@@ -153,12 +153,14 @@ test('riaperta, la conversazione ridisegna le etichette dall\'archivio, e il tes
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo .filo-fonte')).toHaveText('sito-pubblico.test', { timeout: 30_000 });
 
-  const salvata = await app.evaluate(async () => {
-    const tutte = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.FILO_CHATS, []);
-    const chats = Array.isArray(tutte) ? tutte : Object.values(tutte || {});
-    const msgs = chats.flatMap((c) => (c && Array.isArray(c.messages) ? c.messages : []));
-    return msgs.filter((m) => m.role === 'filo').pop() || null;
-  });
+  let salvata = null;
+  await expect.poll(async () => {
+    salvata = await app.evaluate(async () => {
+      const msgs = (await globalThis.SN_FILO_CHATS.list()).flatMap((c) => (c && Array.isArray(c.messages) ? c.messages : []));
+      return msgs.filter((m) => m.role === 'filo').pop() || null;
+    });
+    return salvata && salvata.text;
+  }, { timeout: 10_000 }).toBe('Inaugurato nel 2015.');
   expect(salvata && salvata.text).toBe('Inaugurato nel 2015.');
   expect(salvata.fonti).toHaveLength(1);
   expect(salvata.fonti[0]).toMatchObject({ esito: 'verificata', sito: 'sito-pubblico.test', titolo: 'Storia del ponte' });
