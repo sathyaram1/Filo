@@ -633,6 +633,8 @@ test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in so
   }
   const nuove = perMessaggio.map((c, i) => c.slice(i ? perMessaggio[i - 1].length : 0));
   const con = nuove.map((c, i) => (c.length ? i : -1)).filter((i) => i >= 0);
+  console.log('DEBUG nuove', JSON.stringify(nuove), 'base', await base(app));
+  for (const ch of await chiamateAlModello(app)) console.log('DEBUG tok', await tokenDi(app, ch), ch.length);
   expect(con.length, 'la chat compatta').toBeGreaterThan(1);
   for (let k = 1; k < con.length; k++) {
     expect(con[k] - con[k - 1], `fra due compattazioni almeno tre messaggi: ${JSON.stringify(nuove)}`).toBeGreaterThanOrEqual(3);
