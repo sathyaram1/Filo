@@ -150,6 +150,23 @@ test('una lettera già data a un sito, ridata a un\'altra cosa, dice cosa apriva
   await expect(page.locator('#dashFlash')).toContainText('example.com');
 });
 
+test('nuova scheda dal tasto della barra e da Ctrl+T: batto subito e il testo è nella chat', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await casa(app);
+  await shell.locator('#tab-new').click();
+  await expect.poll(async () => (await home(app)).url()).toContain('filo://newtab');
+  let page = await home(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await page.waitForTimeout(600);
+  await shell.keyboard.type('primo');
+  await expect(page.locator('#input')).toHaveValue('primo');
+  await page.keyboard.press('Control+T');
+  await page.waitForTimeout(1200);
+  page = await home(app);
+  await shell.keyboard.type('secondo');
+  await expect(page.locator('#input')).toHaveValue('secondo');
+});
+
 test('i tasti si spostano trascinandoli, e il Profilo torna dal «+» trascinandolo in colonna', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await casa(app);
