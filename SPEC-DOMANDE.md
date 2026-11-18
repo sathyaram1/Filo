@@ -275,7 +275,7 @@ lo può scrivere anche un agente pulito.
   gli altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
   restano sotto L5 finché non si chiudono.
 - **Migrazione delle radici (#1918):** ogni cosa non fidata riceve le sue
-  radici. Un feedback di un utente nato dal 24/10/2026 ha `feedback:<seq>`;
+  radici. Un feedback di un utente nato dal 24/10/2026 ha `feedback:<id>`;
   tutto il resto (domande, note, feedback e biglietti senza provenienza, e i
   feedback degli utenti arrivati prima, che l'owner ha già letto) ha
   `legacy`. Ciò che discende da un feedback (il suo derivato, una domanda
