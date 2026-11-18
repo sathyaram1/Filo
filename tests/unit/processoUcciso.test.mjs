@@ -251,6 +251,50 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(senza, /nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
   });
 
+  // L'avvio del contenitore: kernel partito a 1.763.000.000 s, processo 1 dopo `tick` centesimi.
+  const conAvvio = (f, tick) => ({ ...f, '/proc/stat': 'cpu 1 2 3\nbtime 1763000000\n', '/proc/1/stat': `1 (init) S 0 1 1 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 ${tick} 1000 100 1\n` });
+
+  test('dopo una ripartenza i contatori non dicono niente: né conti negativi né «nessun processo ucciso per memoria»', () => {
+    const prima = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 3, oomSis: 2 }), 5000)));
+    assert.equal(prima.avvioS, 1763000050);
+    const ripartito = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 0, oomSis: 0 }), 900000)));
+    const g = guastoDellaCorsa({ ...segno, memoria: prima }, ripartito);
+    assert.match(g, /il contenitore è ripartito alle \d\d:\d\d:\d\d UTC, dopo la partenza: i contatori della memoria ripartono da zero/);
+    assert.match(g, /processi uccisi per memoria dalla ripartenza: 0 nella macchina, 0 fra i comandi\.$/);
+    assert.doesNotMatch(g, /-\d|nessun processo ucciso per memoria/);
+
+    // Stesso contenitore, contatori dei comandi tornati indietro: il gruppo dei comandi è ripartito.
+    const comandi = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 0, oomSis: 2 }), 5000)));
+    const h = guastoDellaCorsa({ ...segno, memoria: prima }, comandi);
+    assert.match(h, /i contatori delle uccisioni per memoria sono tornati indietro/);
+    assert.doesNotMatch(h, /-\d|nessun processo ucciso per memoria/);
+
+    // Niente ripartenze, nessuna uccisione: il colpo è da fuori, e il riavvio è escluso.
+    const fermo = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 3, oomSis: 2 }), 5000)));
+    assert.match(guastoDellaCorsa({ ...segno, memoria: prima }, fermo), /nessun processo ucciso per memoria e il contenitore non è ripartito, quindi un colpo da fuori dei comandi \(la sessione o l'harness\)/);
+
+    // Senza la lettura di allora vale l'ora dello strumento: il contenitore partito dopo vuol dire ripartito.
+    const dopoLoStrumento = testoUcciso({ programma: 'node', codice: 137, cosa: 'x', memoria: ripartito, daMs: Date.parse('2025-11-13T02:00:00Z') });
+    assert.match(dopoLoStrumento, /il contenitore è ripartito/);
+  });
+
+  test('il battito: memoria usata e libera dello stesso cgroup, quello dei comandi', () => {
+    const osImpl = { uptime: () => 100, freemem: () => 100 * MB, loadavg: () => [1] };
+    const s = statoContenitore({ osImpl, proc: { memoryUsage: () => ({ rss: MB }) }, leggi: leggiDa(contenitore()), elenca: () => [] });
+    assert.equal(s.rssMb + s.freeMb, 13675, 'usata più libera fanno il tetto dei comandi, non 14,1 GB usati su 13,4');
+  });
+
+  test('una regola sola per i testi dei guasti, e le intestazioni rimandano a prove che esistono', () => {
+    const veglia = readFileSync(join(REPO, 'scripts', 'lib', 'veglia-worker.mjs'), 'utf8');
+    assert.doesNotMatch(veglia, /^const (pulito|ora) =/m, 'la veglia usa la pulizia e l\'ora del guasto della corsa');
+    for (const f of ['memoria-contenitore.mjs', 'corsa-controlli.mjs']) {
+      const testa = readFileSync(join(REPO, 'scripts', 'lib', f), 'utf8').split('\n').slice(0, 3).join('\n');
+      const rimandi = testa.match(/tests\/unit\/[\w.-]+\.test\.mjs/g) || [];
+      assert.ok(rimandi.length, f);
+      for (const r of rimandi) assert.ok(existsSync(join(REPO, r)), `${f} rimanda a ${r}`);
+    }
+  });
+
   test('il codice di uscita dal risultato di Claude Code', () => {
     const killed = 'Exit code 137\n/bin/bash: line 1: 14423 Killed                  node -e …';
     assert.equal(codiceUscita(killed), 137);
