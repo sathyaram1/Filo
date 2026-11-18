@@ -886,6 +886,10 @@ async function main() {
   // Lo sha si fissa adesso e i controlli girano in una cartella staccata su di lui: se intanto questa cartella cambia
   // ramo (un altro worker, un checkout), l'esito resta di questo commit (#1480, D-91).
   const shaProvato = git(['rev-parse', 'HEAD']).out;
+  // #2571: un lancio ucciso (137) non lascia processi né righe; il suo segno dice a chi viene dopo cosa è morto e dove.
+  const morta = corsaInterrotta(ROOT);
+  if (morta) console.log(`\n▸ ${guastoDellaCorsa(morta, letturaMemoria()).replace(/^guasto: strumento finish-check: /, 'Il lancio precedente: ')}`);
+  const corsa = apriCorsa(ROOT, { sha: shaProvato });
   const albero = apriProvaSulCommit({ root: ROOT, sha: shaProvato });
   if (albero.errore) { console.error(`\n✗ ${albero.errore}`); process.exit(1); }
   process.on('exit', () => { const c = albero.chiudi(); if (!c.ok) console.error(`[finish] ${c.motivo}: la cartella di prova resta, la toglie il prossimo giro`); });
