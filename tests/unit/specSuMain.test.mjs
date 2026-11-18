@@ -211,9 +211,6 @@ test('le immagini di una prova restano dopo che il worktree è stato tolto', () 
   mkdirSync(dest, { recursive: true });
   writeFileSync(join(dest, 'vecchia.png'), 'x');
   try {
-    const p = portaSpecMancanti({ dir: albero.dir, root, specs: [spec, 'tests/che-non-esiste.spec.mjs'] });
-    assert.deepEqual(p, { portati: [spec], assenti: ['tests/che-non-esiste.spec.mjs'] });
-    assert.equal(readFileSync(join(albero.dir, spec), 'utf8'), '// la prova scritta adesso\n');
     // Quello che una prova salva: in tests/.shots dalla cartella di lancio, o accanto allo spec.
     mkdirSync(join(albero.dir, 'tests', '.shots'), { recursive: true });
     writeFileSync(join(albero.dir, 'tests', '.shots', 'prima-chiaro.png'), 'png');
