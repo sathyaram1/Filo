@@ -1002,8 +1002,9 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
   assert.equal(await apriDerivatiDi(dep, p), 0);
   assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
   // L'esterno nasce senza priorità (#2339): «--priorita null» farebbe respingere il feedback dallo strumento.
-  assert.equal(comandi[0], '- --non-locale');
-  assert.equal(comandi[1], '- --non-locale --priorita 1');
+  assert.equal(comandi[0], '- --non-locale', 'un esterno sta già su main: parte subito');
+  // Un interno verte sul codice del ramo (#2554): nessuna routine lo prende prima che il lavoro sia fuso.
+  assert.equal(comandi[1], '- --non-locale --priorita 1 --aspetta 7');
   assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
 });
 
