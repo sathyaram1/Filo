@@ -57,7 +57,7 @@ test('tre NAVIGA nello stesso giro: le schede nascono insieme, non una dopo il c
   }
 });
 
-test('NAVIGA fermata dalla lista: andata via la notifica, «Apri comunque» resta in chat e apre il sito una volta sola', async ({ app, shell, rete }) => {
+test('NAVIGA fermata dalla lista: uscita la notifica dall\'angolo, «Apri comunque» resta in chat e apre il sito una volta sola', async ({ app, shell, rete }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
