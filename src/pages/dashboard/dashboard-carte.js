@@ -1441,10 +1441,7 @@
       const c = C.carta(id);
       if (c && c.url) { apri(c.url); return true; }
       return false;
-    },
-    // Mentre la ricerca tiene la colonna, carte, «altro» e il sistema non si vedono.
-    nascondiColonna(si) { for (const n of [tieniEl, altroEl]) if (n) n.classList.toggle('dietro-ricerca', !!si); },
-    setVive({ timers, notifiche }) {
+    },    setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
       disegna();
