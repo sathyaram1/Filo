@@ -240,7 +240,7 @@
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
         partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
-        no: x.esito === FALLITO && x.no === true,
+        no: x.esito === FALLITO && x.no === true, autore: x.autore,
         ...(generica ? {} : bottoneDi(x.esito, type, x.azione, x.conferma)),
       });
     }
