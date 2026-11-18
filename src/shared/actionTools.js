@@ -102,7 +102,7 @@
     },
     MOSTRA_SCHEDA: {
       via: ['scheda', 'mostra'],
-      description: 'porta l\'utente su una scheda aperta, o su quella dopo/prima (verso), senza ricaricarla.',
+      description: 'porta l\'utente su una scheda aperta (verso: la dopo o la prima), senza ricaricarla.',
       properties: { scheda: I(), verso: S({ enum: ['dopo', 'prima'] }) }, required: [],
     },
     SALVA_PER_DOPO: {
