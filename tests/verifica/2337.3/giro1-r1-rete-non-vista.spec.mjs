@@ -2,7 +2,7 @@
 // comuni oltre a quelle del feedback, né la lettura di un ramo di un worker per sha o FETCH_HEAD dopo averlo scaricato.
 import '../../helpers/senzaSessione.mjs';
 import { test, expect } from '@playwright/test';
-import { chiamaLaRete, leggeIRamiDeiWorker } from '../../../scripts/session-report.mjs';
+import { chiamaLaRete } from '../../../scripts/session-report.mjs';
 
 const RETE = [
   '/usr/bin/env curl https://example.com',
