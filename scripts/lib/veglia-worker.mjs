@@ -416,6 +416,32 @@ export function oltreIlTetto(s, misura) {
   return usd > tetto ? { usd: Math.round(usd * 100) / 100, tettoUsd: tetto } : null;
 }
 
+/** I dollari spesi dal lavoro del biglietto, dai segni già letti: la misura della veglia e quella che vede il worker. */
+export async function misuraDelTetto(s) {
+  return costoDeiFile((s && s.tracce && s.tracce.file) || [], { since: Number.isFinite(s && s.dalMs) ? new Date(s.dalMs).toISOString() : '' });
+}
+
+/** La spesa della corsa del compito `ticket` in `root` (#2303.1): { usd, tettoUsd }, o null senza tetto. */
+export async function spesaDelCompito({ root, ticket, ...resto } = {}) {
+  const s = segniDiVita({ root, ticket, ...resto });
+  if (!(s.tettoUsd > 0)) return null;
+  const m = await misuraDelTetto(s);
+  return { usd: Number(m.usd) || 0, tettoUsd: s.tettoUsd };
+}
+
+// Passata questa parte del tetto il worker deve aver consegnato un rapporto parziale: la veglia misura ogni 90 secondi.
+export const SOGLIA_PARZIALE = 0.5;
+
+/** La riga della spesa per il worker, con l'invito al rapporto parziale passata la soglia. PURA. */
+export function testoSpesa(spesa) {
+  if (!spesa || !(spesa.tettoUsd > 0)) return '';
+  const d = (n) => `${(Math.round(Number(n) * 100) / 100).toFixed(2).replace('.', ',')} $`;
+  const quota = Math.round((Number(spesa.usd) / spesa.tettoUsd) * 100);
+  const riga = `Spesa della corsa: ${d(spesa.usd)} su un tetto di ${d(spesa.tettoUsd)} (${quota}%).`;
+  if (Number(spesa.usd) / spesa.tettoUsd < SOGLIA_PARZIALE) return riga;
+  return `${riga} Oltre il tetto la corsa si ferma e riparte solo dal tuo ultimo rapporto: consegna adesso un rapporto parziale (rapporto --parziale), e aggiornalo a ogni passo.`;
+}
+
 /**
  * La misura del lavoro che il battito porta al server (#1797), dai segni già letti. PURA. Vuota quando non si misura
  * niente di vero (biglietto non di questa cartella, finito, nessun transcript): senza, il server protegge il permesso
