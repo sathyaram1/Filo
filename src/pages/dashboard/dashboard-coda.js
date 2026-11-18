@@ -832,6 +832,6 @@
   }
 
   global.SN_DASH_CODA = {
-    init, carica, sali, fineRisali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
+    init, carica, sali, fineRisali, allinea, metti, vaiA, vaiAPagina, richiudiPagine, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
