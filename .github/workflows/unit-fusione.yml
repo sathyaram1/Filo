@@ -61,7 +61,7 @@ jobs:
       # Le dipendenze del ramo, come la macchina che provava prima: un ramo che ne aggiunge una non esce rosso per quello.
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Unit sulla fusione
         id: prova
@@ -113,7 +113,7 @@ jobs:
 
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Unit sulla fusione su Windows
         id: prova
@@ -162,7 +162,7 @@ jobs:
 
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Binario di Electron
         working-directory: prova
