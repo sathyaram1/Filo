@@ -335,7 +335,7 @@ test('#1803.1 un collegamento lasciato da un\'altra finestra diventa una voce', 
   expect((await salvate(app)).map((v) => v.url)).toEqual([url]);
 });
 
-test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si illumina e lo dice; un file aperto in una scheda resta fuori e lo dice', async ({ app, shell, openTab }) => {
+test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si illumina e lo dice; una scheda che non è un sito resta fuori e lo dice', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await openTab('filo://history/history.html');
   const cron = (await schede(shell)).find((t) => String(t.url).startsWith('filo://history'));
