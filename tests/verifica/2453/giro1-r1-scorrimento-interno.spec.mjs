@@ -36,8 +36,7 @@ async function chatConFile(app) {
 
 // Il riquadro della chat scorre di poco, e il tasto destro arriva nello stesso fotogramma: l'evento dello scorrimento
 // arriva dopo l'apertura, come quando la voce viene portata in vista appena prima del clic.
-// `inFondo`: il file finisce in fondo al riquadro della chat, appena sopra la barra di scrittura, dove sta il file
-// dell'ultima risposta; lì il menu non ci sta sotto il puntatore e sale a coprire il punto del clic.
+// `inFondo`: il file finisce in fondo al riquadro della chat, dove sta il file dell'ultima risposta.
 async function scorriEApri(page, { inFondo = false } = {}) {
   return page.evaluate(async (inFondo) => {
     // La disponibilità del modello è già nota (tasto destro di pochi secondi prima): il menu si apre nello stesso giro.
@@ -47,26 +46,25 @@ async function scorriEApri(page, { inFondo = false } = {}) {
     if (inFondo) s.scrollTop += (b.getBoundingClientRect().bottom - s.getBoundingClientRect().bottom) + 30;
     s.scrollTop += 40;
     const r = b.getBoundingClientRect();
-    const x = r.left + 10;
-    const y = r.top + r.height / 2;
+    const x = Math.round(r.left + 10);
+    const y = Math.round(r.top + r.height / 2);
     b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
-    const m = document.querySelector('.sn-rinomina-menu');
-    const mr = m && m.getBoundingClientRect();
-    const sb = s.getBoundingClientRect();
-    return {
-      copreIlPunto: !!(m && m.contains(document.elementFromPoint(x, y))), x: Math.round(x), y: Math.round(y), vw: innerWidth, vh: innerHeight,
-      menu: mr && [mr.left, mr.top, mr.width, mr.height].map(Math.round), chat: [sb.left, sb.top, sb.right, sb.bottom].map(Math.round),
-    };
+    return { x, y, vw: innerWidth, vh: innerHeight };
   }, inFondo);
 }
 
 async function restaAperto(page, opzioni) {
-  const esito = await scorriEApri(page, opzioni);
+  const punto = await scorriEApri(page, opzioni);
   const menu = page.locator('.sn-rinomina-menu');
   await expect(menu).toBeVisible();
+  const esito = await page.evaluate(({ x, y }) => {
+    const m = document.querySelector('.sn-rinomina-menu');
+    const r = m.getBoundingClientRect();
+    return { copreIlPunto: m.contains(document.elementFromPoint(x, y)), menu: [r.left, r.top, r.width, r.height].map(Math.round), angolo: getComputedStyle(m).borderTopLeftRadius };
+  }, punto);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
-  await expect(menu, JSON.stringify(esito)).toBeVisible();
-  return esito;
+  await expect(menu, JSON.stringify({ ...punto, ...esito })).toBeVisible();
+  return { ...punto, ...esito };
 }
 
 test('file della chat a metà riquadro: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
@@ -78,11 +76,24 @@ test('file della chat a metà riquadro: uno scorrimento finito prima del tasto d
   }
 });
 
-test('r1 file dell\'ultima risposta, in fondo alla chat: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
+test('r1 con gli angoli squadrati (Raggio degli angoli a 0): uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
   test.setTimeout(90_000);
   try {
+    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: { radius: '0px' } }); });
+    const esito = await restaAperto(await chatConFile(app));
+    expect(esito.angolo).toBe('0px');
+  } finally {
+    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: {} }); });
+    await ripristina(app);
+  }
+});
+
+test('r1 finestra bassa, file dell\'ultima risposta in fondo alla chat: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
+  test.setTimeout(90_000);
+  try {
+    await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x.isVisible() || true); w.setSize(1000, 480); });
     const esito = await restaAperto(await chatConFile(app), { inFondo: true });
-    expect(esito.copreIlPunto, `il caso provato è quello col menu sopra il punto del clic: ${JSON.stringify(esito)}`).toBe(true);
+    expect(esito.copreIlPunto, JSON.stringify(esito)).toBe(true);
   } finally {
     await ripristina(app);
   }
