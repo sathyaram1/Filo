@@ -452,7 +452,8 @@ test('giro vero, tentativi nati tutti da main: la busta nomina quelli che il ram
   }
 });
 
-test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è la base e se ne va da origin', async () => {
+// #2518: dalla cloud la cancellazione su origin prende 403 a ogni partenza; i superati li toglie la potatura del server.
+test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è la base, e dispatch non lo cancella', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, port } = await fintoServer();
   try {
