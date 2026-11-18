@@ -186,7 +186,7 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
   await spiaSegnalazioni(app);
   const SPIEGA = 'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l\'icona Nuova finestra '
     + 'incognito nella barra laterale: lì quello che visiti non resta.';
-  await modelloFinto(app, [{ text: SPIEGA }, { text: 'Quella proposta l\'ha scritta la segnalazione automatica.' }]);
+  await modelloFinto(app, [{ text: SPIEGA }, { text: 'Quella proposta l\'ha scritta la segnalazione automatica.' }, { text: SPIEGA }]);
   await chiedi(chat, 'aprimi una finestra in incognito');
   // La proposta si apre da sola col testo intero; l'utente non capisce e dice no, poi chiede.
   await expect.poll(() => confirmText(chat), { timeout: 15_000 }).toContain('Finestra in incognito');
