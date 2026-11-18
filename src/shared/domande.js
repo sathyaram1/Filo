@@ -177,6 +177,10 @@
     if (!id || id.length > TETTI.idCollegamento || !/^[A-Za-z0-9._/#~-]+$/.test(id)) {
       return no('domanda_non_valida', `collegamento ${i + 1}: l'id manca, ha caratteri non ammessi o supera ${TETTI.idCollegamento} caratteri`);
     }
+    // Un feedback che la Gestione non sa aprire sarebbe un collegamento muto (#2229.1): o l'id, o il numero da tradurre.
+    if (c.tipo === 'feedback' && !FEEDBACK_ID_RE.test(id) && !numeroScritto(id)) {
+      return no('domanda_non_valida', `collegamento ${i + 1}: un feedback si nomina con l'id o col numero («#1736», «#831.2»)`, { campo: `collegamenti[${i}].id` });
+    }
     return { ok: true, collegamento: { tipo: c.tipo, id } };
   }
 
