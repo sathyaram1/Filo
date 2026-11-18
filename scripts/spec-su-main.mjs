@@ -2,7 +2,7 @@
 // rosso è del ramo o c'era già (#1290, #1985, #2237.6). Non tocca la cartella: due worktree staccati, tolti alla fine.
 // Prove: tests/unit/specSuMain.test.mjs.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aggiornaMain, testoBaseMain } from './finish-local.mjs';
