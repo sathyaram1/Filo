@@ -381,10 +381,11 @@
     document.addEventListener('drop', lasciaSullaPagina);
     // Una scheda portata giù dalla fila (#2084) arriva dal main come per la chat: qui diventa una voce.
     if (global.SN_SCHEDA_TRASCINATA) {
-      // Anche una pagina di Filo o un file: quello che non entra lo dice il main, con l'avviso.
+      // Anche una pagina di Filo: quello che non entra lo dice il main, con l'avviso. Le pagine di Filo hanno tutte
+      // l'icona di Filo: la lettera del nome le distingue.
       global.SN_SCHEDA_TRASCINATA.registraChat(d.riga, (s) => {
         if (!s || !s.url) return false;
-        muovi({ tipo: 'aggiungi', url: s.url, nome: s.titolo, icona: s.icona });
+        muovi({ tipo: 'aggiungi', url: s.url, nome: s.titolo, icona: /^filo:/i.test(s.url) ? '' : s.icona });
         return true;
       }, { ogniScheda: true });
     }
