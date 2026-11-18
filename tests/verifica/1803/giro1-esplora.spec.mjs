@@ -91,8 +91,10 @@ test('una scheda di Filo trascinata sulla barra', async ({ app, shell, openTab }
   const page = await home(app);
   await page.evaluate(() => {
     window.__flash = [];
-    const f = document.getElementById('dashFlash');
-    new MutationObserver(() => window.__flash.push(f.textContent)).observe(f, { childList: true, characterData: true, subtree: true, attributes: true });
+    new MutationObserver(() => {
+      const f = document.getElementById('dashFlash');
+      if (f && f.textContent && window.__flash[window.__flash.length - 1] !== f.textContent) window.__flash.push(f.textContent);
+    }).observe(document.body, { childList: true, characterData: true, subtree: true });
   });
   console.log('FILO-TAB url', t.url);
   await lasciaSullaBarra(app, shell, page, t.id);
