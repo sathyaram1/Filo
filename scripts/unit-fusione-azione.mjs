@@ -163,7 +163,7 @@ function main() {
   const campo = campoEsito({ ramo: a.ramo, main: a.main, prova });
   if (!a.parte) {
     const riga = rigaEsito(campo);
-    riassunto('Unit sulla fusione', testo, riga);
+    riassunto(sommario, 'Unit sulla fusione', testo, riga);
     console.log(riga);
     process.exit(codiceUscita(campo));
   }
