@@ -60,12 +60,45 @@ test('domandaOltreAlComando: una domanda accanto al comando sì, il comando dett
   assert.equal(AF.domandaOltreAlComando(''), false);
 });
 
-// #2364: «Salva la pagina per dopo» esiste; citata dopo un «non posso» non diventa mai una funzione mancante.
-test('#2364: una voce del manifesto citata dopo «non posso» non è mai «non disponibile»', () => {
-  const reply = 'Non posso fare questa cosa da qui: «Salva la pagina per dopo» lo trovi nella barra laterale, è l\'icona col segnalibro.';
-  const a = AF.analyzeReply(reply, [], 'salvala per dopo', CAPS);
-  assert.equal(a.capabilityId, null);
-  assert.doesNotMatch(AF.compose(a).text, /save-for-later/);
+test('domandaOltreAlComando: «spiegami», «non l\'ho capito», la domanda senza «?» o dopo una virgola sono domande', () => {
+  const si = [
+    'metti il tema scuro e spiegami cosa era quel feedback che mi hai proposto',
+    'metti il tema scuro. perché mi hai proposto quel feedback',
+    'apri youtube, quanti video ho visto oggi?',
+    'metti il tema scuro; ho letto quel feedback più volte e non l\'ho capito',
+    'metti il tema scuro e mi spieghi quel feedback?',
+  ];
+  const no = ['metti il tema scuro, ok?', 'metti il tema scuro e chiudi youtube?', 'metti il tema come prima',
+    'cerca come si cucina il riso', 'apri il sito, per favore', 'imposta il timer: 5 minuti'];
+  for (const t of si) assert.equal(AF.domandaOltreAlComando(t), true, t);
+  for (const t of no) assert.equal(AF.domandaOltreAlComando(t), false, t);
+});
+
+test('una domanda di parere è discussione: nessuna segnalazione; una che chiede un dato resta una richiesta', () => {
+  const casi = [
+    ['non trovi strano che tutti i browser abbiano le schede in alto?',
+      'Sì, è una convenzione dei vecchi schermi. Al momento non è possibile spostarle in Filo, ma è un\'idea interessante.'],
+    ['che sia ereditato non significa che non sia una scelta, no? Apple li ha decisi decenni fa',
+      'Hai ragione: ereditare un default è una scelta per omissione. C\'è un problema con le convenzioni: nessuno le discute.'],
+    ['secondo te perché nessuno cambia il colore della selezione?', 'Per inerzia: non ho modo di sapere perché, ma succede.'],
+    ['mi piacerebbe un mondo senza pubblicità, tu che dici?', 'Sarebbe bello. Non è previsto che Filo blocchi tutto.'],
+  ];
+  for (const [u, r] of casi) assert.equal(AF.analyzeReply(r, [], u, CAPS).kind, null, u);
+  assert.equal(AF.analyzeReply('Non ho accesso al saldo dei crediti da qui, mi dispiace.', [], 'quanti crediti ho?', CAPS).kind,
+    'capability-gap');
+});
+
+// #2364: «Salva la pagina per dopo» esiste e ha il suo strumento: dopo un «non posso» non diventa mai una funzione mancante.
+test('#2364: una voce del manifesto citata o descritta dopo «non posso» non fa nascere nessuna segnalazione', () => {
+  for (const reply of [
+    'Non posso fare questa cosa da qui: «Salva la pagina per dopo» lo trovi nella barra laterale, è l\'icona col segnalibro.',
+    'Mi dispiace, non posso fare il salvataggio da qui: premi Alt+S e la ritrovi in Aperti per dopo.',
+  ]) {
+    const a = AF.analyzeReply(reply, [], 'salvala per dopo', CAPS);
+    assert.equal(a.kind, null, reply);
+    assert.equal(AF.composeProposal(a, { userMessage: 'salvala per dopo', textReply: reply }), null);
+    assert.equal(AF.compose(a), null);
+  }
 });
 
 test('le voci segnalate l\'8 novembre che hanno uno strumento non diventano «non sa azionare»', () => {
