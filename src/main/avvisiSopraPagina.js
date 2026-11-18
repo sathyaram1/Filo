@@ -12,14 +12,19 @@ const PILA = /^(apri|riduci|chiudi-tutti)$/;
 const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
 const ICONA = /^[a-z][A-Za-z]{0,30}$/;
-const CARTA = /^(timer|download):[A-Za-z0-9_-]{1,80}$/;
-// L'azione dalla home su una carta della colonna (#2390): quelle della vista, più «assorbi» (la home ha già la carta).
-const AZIONE_HOME = /^(chiudi|assorbi|\d{1,2})$/;
+// L'azione dalla home su una carta della colonna (#2390): quelle della vista, «apri» il sito da cui è nata, e
+// «assorbi» (la home ha già la carta).
+const AZIONE_HOME = /^(chiudi|assorbi|apri|\d{1,2})$/;
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
 const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
 const icona = (v) => (ICONA.test(testo(v)) ? testo(v) : '');
+const sito = (v) => (/^https?:\/\//i.test(testo(v)) ? testo(v) : '');
+function condiviso(nome, file) {
+  if (!globalThis[nome]) require(path.join('..', 'shared', file));
+  return globalThis[nome];
+}
 
 // L'SVG dell'icona lo scrive il main dalla libreria: la vista non carica script d'altre origini.
 function svgIcona(nome) {
