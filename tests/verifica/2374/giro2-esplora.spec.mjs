@@ -105,6 +105,43 @@ for (const font of ['monospace', 'serif']) {
   });
 }
 
+// Un'immagine con lo sfondo trasparente e la scritta chiara, su una pagina scura: nel riquadro la scritta si deve vedere.
+test('esplora: scritta chiara su sfondo trasparente', async ({ app, openTab, testServer }) => {
+  const pag = `<!doctype html><html><head><meta charset="utf-8"><title>Scuro</title></head>
+<body style="margin:0;padding:60px 20px;background:#151515">
+<img id="foto" width="600" height="120" alt="insegna">
+<script>
+  const c = document.createElement('canvas'); c.width = 600; c.height = 120;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.font = '40px sans-serif';
+  g.fillText('BENVENUTI 2026', 20, 70);
+  document.getElementById('foto').src = c.toDataURL('image/png');
+  window.misure = [{ t: 'BENVENUTI 2026', x: 20, y: 70, w: g.measureText('BENVENUTI 2026').width }];
+</script></body></html>`;
+  const page = await testServer.openReady(openTab, pag);
+  await page.waitForFunction(() => document.getElementById('foto').complete && window.misure);
+  const m = await page.evaluate(() => window.misure);
+  await lettoreFinto(app, [{ testo: m[0].t, x1: 33, y1: 300, x2: Math.round(((20 + m[0].w) / 600) * 1000), y2: 650 }]);
+  await page.locator('#foto').click({ button: 'right', position: { x: 5, y: 5 } });
+  await menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  const scena = await strato.locator('.sn-tr-scena').boundingBox();
+  await strato.screenshot({ path: 'tests/.shots/2374-g2-trasparente.png' });
+  const png = (await strato.screenshot({ clip: scena })).toString('base64');
+  // Quanti pixel della scena si staccano dal colore più comune: la scritta.
+  const staccati = await page.evaluate(async (b64) => {
+    const bmp = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const lum = []; for (let i = 0; i < d.length; i += 4) lum.push(0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]);
+    const ord = [...lum].sort((a, b) => a - b); const med = ord[Math.floor(ord.length / 2)];
+    return lum.filter((l) => Math.abs(l - med) > 60).length / lum.length;
+  }, png);
+  console.log('pixel della scritta:', staccati);
+  expect(staccati).toBeGreaterThan(0.01);
+});
+
 test('esplora: menu della selezione e aspetto nei due temi', async ({ app, openTab, testServer }) => {
   for (const tema of ['light', 'dark']) {
     const { strato, box } = await apri(app, openTab, testServer, 'sans-serif', [['Fattura numero 4821', 20, 50], ['Totale 1250 euro', 20, 110]], tema);
