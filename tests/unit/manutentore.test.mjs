@@ -895,6 +895,8 @@ test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe
   assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
   // La sequenza del server mette i lavori già iniziati davanti all'ordine: il ruolo la dice uguale.
   assert.match(ordine, /prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza/);
+  // Fra i già iniziati decide il posto nell'ordine, non la priorità (#2411): il ruolo lo dice come il server.
+  assert.match(ordine, /fra loro quelli dell'ordine vanno nella sua sequenza, a qualunque priorità, e gli altri dopo, per urgenza/);
   assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
   // Il primo mattino toglie dal taccuino le regole sulla rosa.
   assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);
