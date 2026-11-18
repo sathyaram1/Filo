@@ -172,6 +172,8 @@ test('un doppione arriva al server col numero dell\'originale, che la fusione lo
   const prima = ricevuti.length;
   const casi = [
     [[...base, '--fusione', fusione, '--doppione-di', 'il menu', ...testi], /vuole in --doppione-di il numero/],
+    // La forma del server: lo zero davanti o il figlio «.0» si fermano qui, non dopo l'invio (#2046.2).
+    ...['01776', '0', '1776.0'].map((n) => [[...base, '--fusione', fusione, '--doppione-di', n, ...testi], /vuole in --doppione-di il numero/]),
     [[...base, '--doppione-di', '77', ...testi], /vuole --fusione/],
     [['deliver', 'b'.repeat(43), 'status', '--status', 'design', '--reason', 'clarify', '--doppione-di', '77', ...testi], /va con --status done/],
     [['deliver', 'b'.repeat(43), 'note', '--notes', 'x', '--doppione-di', '77'], /--doppione-di vale solo con deliver status/],
