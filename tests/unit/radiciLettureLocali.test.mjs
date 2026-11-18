@@ -1,15 +1,13 @@
-// #1918: in una sessione locale chi legge dice al server COSA ha letto, e il server ne legge le radici; una
-// conversazione scritta da biglietti puliti non sporca. Le regole del server stanno in filo-security (radiciLetture).
+// #1918: in una sessione locale chi legge dice al server COSA ha letto, e il server ne legge le radici. La fiducia
+// delle note (#1919) la provano tests/unit/fiduciaNote.test.mjs; le regole del server stanno in filo-security (radiciLetture).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { motiviDiLettura, sporca, rigaSporco, cartellaSporchi, ENV_FILE, LETTI_PER_CHIAMATA } from '../../scripts/lib/biglietto-locale.mjs';
+import { sporca, rigaSporco, cartellaSporchi, ENV_FILE, LETTI_PER_CHIAMATA } from '../../scripts/lib/biglietto-locale.mjs';
 import { radiceLettura } from '../../scripts/lib/letture-esterne.mjs';
 import { lettiDi } from '../../scripts/domanda.mjs';
-
-const TURNO_ROUTINE = "--- Aggiornamento dell'agente del 1/11/2026 ---\nReport del lavoro.";
 
 function biglietto() {
   const dir = cartellaTemporanea('radici-locali-');
@@ -26,13 +24,6 @@ function server(risposta) {
   };
   return { mandati, deps: { fetchImpl, idToken: async () => 'token-finto' } };
 }
-
-test('la conversazione: scritta da biglietti puliti non sporca; senza saperlo, il dubbio resta e decide il server', () => {
-  assert.deepEqual(motiviDiLettura({ fiducia: 'fidato', notes: TURNO_ROUTINE, scrittoSporco: false }), []);
-  assert.deepEqual(motiviDiLettura({ fiducia: 'fidato', notes: TURNO_ROUTINE }), ['conversazione con scritti di routine o sessioni']);
-  assert.deepEqual(motiviDiLettura({ fiducia: 'fidato', notes: '', scrittoSporco: true }), ['conversazione con scritti di routine o sessioni']);
-  assert.deepEqual(motiviDiLettura({ fiducia: 'non_fidato', notes: '' }), ['testo di un feedback non fidato']);
-});
 
 test('chi legge nomina cosa ha letto: al server vanno le letture e le radici, mai solo il motivo', async () => {
   const { dir, file } = biglietto();
