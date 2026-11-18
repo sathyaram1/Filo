@@ -12,6 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
 require(join(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(join(ROOT, 'src', 'shared', 'feedbackStatus.js'));
+require(join(ROOT, 'src', 'shared', 'feedbackAttese.js'));
+require(join(ROOT, 'src', 'shared', 'domande.js'));
 require(join(ROOT, 'src', 'shared', 'manageReview.js'));
 const D = globalThis.SN_DOMANDE;
 const A = globalThis.SN_FB_ATTESE;
