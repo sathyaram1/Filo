@@ -38,6 +38,11 @@ ordini che il server applica e apre feedback che le routine lavorano. Dal #2338
 bocciato sui lavori fidati a catena pulita, solo dal suo biglietto pulito; i
 workflow di filo-security, i segreti e le regole dei rami, gli ambienti e i
 prompt delle sessioni, le chiavi e i lavori a catena sporca restano all'owner.
+Una regola sola su chi decide, per le quattro operazioni (L5, L4, `passa`,
+bilanci e tetto) e per i loro elenchi: il biglietto pulito del manutentore, mai
+un biglietto sporco né una chiave. La nota di un controllo bocciato porta la
+fiducia di chi l'ha scritta: scritta da un non fidato, al manutentore arriva il
+solo fatto (numero e ramo) e su quel lavoro decide l'owner.
 
 Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
 consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
