@@ -3752,6 +3752,8 @@ class TabManager {
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true, gesto: gestoPerIlFilo(tab), chiave: tab });
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
+      // YouTube passa da un video all'altro senza ricaricare: anche qui la pagina del video nuovo è pronta.
+      if (isMainFrame === true) TrascrizioneYoutube.precarica(wc, url);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
