@@ -83,7 +83,7 @@
   function restaLocale(fb, { lavoriServer } = {}) {
     const r = fb && fb.restaLocale;
     if (lavoriServer === false) return null;
-    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
+    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !statoCheAspetta(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
     if (!motivi.length) return null;
     const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, fb.branch)))];
