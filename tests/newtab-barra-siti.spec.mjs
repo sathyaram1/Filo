@@ -347,6 +347,8 @@ test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si i
   const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
   await expect(voce).toHaveCount(1, { timeout: 5000 });
   await expect(voce).toHaveAttribute('aria-label', /Cronologia/);
+  // Le pagine di Filo hanno tutte la stessa icona: la voce mostra la lettera del suo nome.
+  await expect(voce.locator('.dash-barra-lettera')).toHaveText('C');
   expect((await salvate(app)).map((v) => v.url)).toEqual(['filo://history/history.html']);
 
   // Di nuovo la stessa: nessuna voce in più, quella che c'è si fa vedere e l'avviso lo dice.
