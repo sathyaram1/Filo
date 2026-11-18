@@ -55,6 +55,7 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
     const menu = page.locator('.sn-rinomina-menu');
     await expect(menu).toBeVisible();
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
+    console.log(JSON.stringify(await page.evaluate(() => window.__log), null, 1));
     await expect(menu).toBeVisible();
   } finally {
     await ripristina(app);
