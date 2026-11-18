@@ -242,7 +242,7 @@ export function testoGuasto({
     const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}), segno che col comando è morta anche la sua sessione. ${coda}`;
     return corsa
       ? guastoDellaCorsa(corsa, memoria, dopo)
-      : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, coda: dopo });
+      : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, daMs: ultimo.ms, coda: dopo });
   }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
