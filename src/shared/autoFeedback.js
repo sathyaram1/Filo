@@ -163,7 +163,7 @@
   const COMANDO_RE = new RegExp(`^${RIEMPITIVI}(?:${VERBI_DI_COMANDO.join('|')})${ENCLITICHE}(?![a-z])`);
   // Un infinito di fare, non di dire o di capire: chi chiede di spiegare vuole parole, non un'azione.
   const INFINITO_DI_FARE = '(?!(?:dir|spiegar|raccontar|descriver|chiarir|capir|saper|conoscer|pensar|parlar|discuter|rifletter|ragionar|creder|esser|aver)[a-z]*(?![a-z]))'
-    + '[a-z]{2,}(?:are|ere|ire|(?:ar|er|ir)(?:mi|ti|ci|vi|lo|la|li|le|ne|gli|melo|mela|meli|mele|celo|cela|glielo|gliela))(?![a-z])';
+    + '[a-z]{2,}(?:are|ere|ire|rre|(?:ar|er|ir|ur|or|ar)(?:mi|ti|ci|vi|lo|la|li|le|ne|gli|melo|mela|meli|mele|celo|cela|glielo|gliela))(?![a-z])';
   // «Non riesco a tradurre la pagina» chiede anche lui che la cosa si faccia (#474).
   const RICHIESTA_CORTESE_RE = new RegExp('\\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di'
     + '|non (?:riesco a|riesco|e possibile|si puo|sai|posso))\\s+(?:[a-z\']+\\s+){0,2}?'
