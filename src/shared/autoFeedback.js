@@ -139,6 +139,69 @@
   // o un errore di parsing.
   const MIN_HOWTO_REPLY_LENGTH = 80;
 
+  // #2348 — si segnala solo se l'utente ha CHIESTO qualcosa: su una riflessione o una discussione ogni proposta è falsa.
+  // Un verbo di comando in testa a una frase (imperativo, o seconda persona: «mi salvi la pagina?»), o una richiesta
+  // cortese seguita da un infinito. Sentinella: tests/unit/autoFeedbackRichiesta.test.mjs.
+  const VERBI_DI_COMANDO = [
+    'apri', 'riapri', 'chiudi', 'richiudi', 'metti', 'rimetti', 'togli', 'leva', 'passa', 'passi', 'vai', 'torna', 'torni',
+    'salva', 'salvi', 'cerca', 'cerchi', 'trova', 'trovi', 'mostra', 'mostri', 'fai', 'fa', 'fam', 'dam', 'cambia', 'cambi',
+    'imposta', 'imposti', 'attiva', 'attivi', 'disattiva', 'disattivi', 'accendi', 'spegni', 'sposta', 'sposti', 'aggiungi',
+    'rimuovi', 'cancella', 'cancelli', 'elimina', 'elimini', 'scrivi', 'riscrivi', 'manda', 'mandi', 'invia', 'invii',
+    'porta', 'porti', 'riporta', 'ingrandisci', 'rimpicciolisci', 'zooma', 'traduci', 'copia', 'copi', 'incolla',
+    'scarica', 'scarichi', 'stampa', 'stampi', 'blocca', 'blocchi', 'sblocca', 'ricarica', 'ricarichi', 'riavvia',
+    'aggiorna', 'segna', 'ricorda', 'leggi', 'rileggi', 'riassumi', 'prendi', 'crea', 'crei', 'ordina', 'riordina',
+    'organizza', 'sistema', 'archivia', 'ripristina', 'annulla', 'rifai', 'ripeti', 'avvia', 'ferma', 'riproduci',
+    'riprendi', 'alza', 'abbassa', 'silenzia', 'condividi', 'rinomina', 'sostituisci', 'correggi', 'controlla',
+    'calcola', 'converti', 'genera', 'seleziona', 'evidenzia', 'collega', 'scollega', 'accedi', 'esci', 'entra',
+    'carica', 'allega', 'usa', 'tieni', 'lascia', 'avvisa', 'sveglia', 'programma', 'svuota', 'pulisci', 'nascondi',
+    'fissa', 'sgancia', 'duplica', 'esporta', 'importa', 'installa', 'disinstalla', 'ascolta', 'guarda',
+  ];
+  const ENCLITICHE = '(?:mi|ti|ci|vi|si|lo|la|li|le|ne|gli|glie(?:lo|la|li|le|ne)|me(?:lo|la|li|le|ne)|te(?:lo|la|li|le|ne)|ce(?:lo|la|li|le|ne))?';
+  const RIEMPITIVI = '(?:(?:ok|okay|dai|allora|ora|adesso|poi|e|ma|ecco|filo|bene|perfetto|grazie|ciao|scusa|ehi|hey|si|no|per favore|perfavore|per piacere|ti prego|subito|anche|invece|pure|mi|ci|me lo|me la|ce lo|ce la)\\s+)*';
+  // «fammi», «dammi», «fallo»: imperativi tronchi col raddoppio.
+  const COMANDO_RE = new RegExp(`^${RIEMPITIVI}(?:${VERBI_DI_COMANDO.join('|')})(?:m|l|n|c)?${ENCLITICHE}(?![a-z])`);
+  // Un infinito che non sia «dire» o «spiegare»: chi chiede di spiegare vuole parole, non un'azione.
+  const RICHIESTA_CORTESE_RE = /\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di|devi|dovresti)\s+(?:\S+\s+){0,2}?(?!(?:dir|spiegar|raccontar|descriver|chiarir)(?:e|mi|ti|ci|lo|la|ne|melo|cela)?\b)[a-z]{2,}(?:are|ere|ire|arl[aoie]|erl[aoie]|irl[aoie]|armi|ermi|irmi|arci|erci|irci|arne|erne|irne|armel[aoie]|ercel[aoie])(?![a-z])/;
+  const RICHIESTA_CHE_RE = /\b(?:vorrei|voglio|mi piacerebbe|ho bisogno|mi serve) che\b/;
+  const INTERROGATIVI_RE = /^(?:(?:e|ma|ok|allora|filo|scusa)\s+)*(?:quant[aeio]|qual[ei]?|chi|cosa|che cosa|quando|dove|perche|come|hai|ho|sai|c'e|ci sono|esiste|esistono|mi dici|dimmi|elenca|elencami)\b/;
+
+  function frasiDi(text) {
+    return normalizzaDomanda(text).split(/[\n.!;:,]+|\?+/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  function chiedeAzione(text) {
+    const norm = normalizzaDomanda(text);
+    if (RICHIESTA_CORTESE_RE.test(norm) || RICHIESTA_CHE_RE.test(norm)) return true;
+    return frasiDi(text).some((f) => COMANDO_RE.test(f));
+  }
+
+  // Una domanda che chiede un dato («quanti crediti ho?»): una richiesta anche lei, ma di sapere, non di fare.
+  function chiedeInformazione(text) {
+    const t = String(text || '');
+    if (/\?/.test(t)) return true;
+    return frasiDi(t).some((f) => INTERROGATIVI_RE.test(f));
+  }
+
+  // La voce del manifesto ha uno strumento della chat che la comanda? (capabilities.js, mappa STRUMENTO: SOLO_A_MANO
+  // vuol dire nessuno). Una voce senza dichiarazione conta come senza strumento.
+  function haStrumento(cap) {
+    if (!cap) return false;
+    const Caps = global.SN_CAPABILITIES;
+    const s = cap.strumento !== undefined ? cap.strumento : (Caps && Caps.STRUMENTO ? Caps.STRUMENTO[cap.id] : undefined);
+    if (!s) return false;
+    return !(Caps && s === Caps.SOLO_A_MANO);
+  }
+
+  function voceDi(id, capabilities) {
+    return Array.isArray(capabilities) ? capabilities.find((c) => c && c.id === id) || null : null;
+  }
+
+  function categoriaDi(cap) {
+    const Caps = global.SN_CAPABILITIES;
+    const cat = cap && cap.category;
+    return (Caps && Caps.CATEGORIES && Caps.CATEGORIES[cat]) || cat || '';
+  }
+
   // Parole troppo comuni per identificare una capacità.
   const TITLE_STOPWORDS = new Set([
     'una', 'uno', 'del', 'della', 'delle', 'dei', 'degli', 'dal', 'dalla',
