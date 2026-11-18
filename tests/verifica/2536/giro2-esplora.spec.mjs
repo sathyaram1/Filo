@@ -50,7 +50,7 @@ async function chiaveVera(app, modello) {
       PROFILO: 'Fa il geometra in uno studio tecnico.\nHa un gatto che si chiama Pepe.\nHa prenotato un volo per Lisbona a dicembre.',
       PREFERENZE: 'Preferisce risposte brevi.',
     });
-  }, KEY);
+  }, [KEY, modello]);
 }
 
 // La risposta è finita quando le bolle di Filo sono `n` e il testo della pagina resta fermo per qualche secondo.
