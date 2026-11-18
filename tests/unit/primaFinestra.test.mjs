@@ -28,6 +28,8 @@ function righeDiCodice(testo) {
 
 const FIRST_WINDOW = /\.firstWindow\s*\(/;
 const ATTESA_WINDOW = /\.waitForEvent\s*\(\s*['"`]window['"`]/;
+// Fra le finestre ce n'è sempre qualcuna con l'indirizzo ancora vuoto: un `new URL()` nudo nella ricerca la fa esplodere.
+const URL_NUDO = /\.windows\(\)\s*\.(?:find|findIndex|findLast|some|every|filter)\(\s*\(?\s*\w+\s*\)?\s*=>\s*new URL\(/;
 
 function chiChiama(re) {
   return fileDiTest()
