@@ -253,10 +253,31 @@
     try { return new URL(url).hostname; } catch (_) { return ''; }
   }
 
+  // Chi ha fatto l'azione (#2371): con un «Filo» unico l'assistente non distingueva le sue azioni dalla conferma
+  // cliccata dall'utente né dalla segnalazione automatica partita a nome dell'utente.
+  function autoreDellaRiga(ev) {
+    if (ev.via === 'segnalazione') return 'la segnalazione automatica di Filo (non l\'assistente)';
+    if (ev.autore === 'utente') return ev.via === 'conferma' ? 'l\'utente, col pulsante di conferma' : 'l\'utente';
+    return ev.autore === 'automazione' ? 'Filo da sé' : 'l\'assistente';
+  }
+  // Il testo di una segnalazione va intero: l'assistente deve poterla spiegare o correggere. Il tetto è largo e il
+  // taglio si dice.
+  const TETTO_TESTO_SEGNALAZIONE = 8000;
+  function testoSegnalazione(ev) {
+    const t = ev.nome === 'INVIA_FEEDBACK' && ev.parametri && stringa(ev.parametri.testo) ? ev.parametri.testo : '';
+    if (!t) return '';
+    const n = E().neutralizza(t, { unaRiga: true });
+    const corpo = n.length > TETTO_TESTO_SEGNALAZIONE
+      ? `${n.slice(0, TETTO_TESTO_SEGNALAZIONE)}… [tagliato qui: ${n.length} caratteri in tutto]` : n;
+    return ` — testo intero: «${corpo}»`;
+  }
+
   function rigaAzione(ev) {
-    const chi = ev.autore === 'utente' ? 'l\'utente' : (ev.autore === 'automazione' ? 'Filo da sé' : 'Filo');
+    const chi = autoreDellaRiga(ev);
     let par = '';
-    try { par = ev.parametri && Object.keys(ev.parametri).length ? ` ${JSON.stringify(ev.parametri)}` : ''; } catch (_) { par = ''; }
+    const testo = testoSegnalazione(ev);
+    const parametri = testo ? { ...ev.parametri, testo: undefined } : ev.parametri;
+    try { par = parametri && Object.keys(parametri).length ? ` ${JSON.stringify(parametri)}` : ''; } catch (_) { par = ''; }
     const e = ev.esito || {};
     let esito;
     if (e.eseguita) esito = stringa(e.fatto) ? `fatta: ${e.fatto}` : 'fatta';
