@@ -105,7 +105,6 @@ test('tasto destro su un tasto: sposta, metti nel «+», rimetti in vista; e a p
   await page.locator('#input').fill('togli le impostazioni dalla home');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'nel «+»' })).toBeVisible({ timeout: 10_000 });
-  console.log('DEBUG', await page.locator('#bubbles').innerText(), JSON.stringify(await app.evaluate(async () => (await chrome.storage.local.get('filo_carte_home')))));
   await expect.poll(() => inVista(page)).not.toContain('impostazioni');
   await expect(fuori(page, 'impostazioni')).toHaveCount(1);
   await expect(page.locator('#tieni .dash-carta[data-tipo="rapide"]')).toHaveCount(1);
