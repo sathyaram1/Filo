@@ -22,7 +22,9 @@ import '../src/shared/prioritaTre.js';
 
 const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const QUI = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Dalla copia fissata degli strumenti git e i marcatori del giro stanno nel progetto che la copia ricorda (#2340.2).
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || QUI);
 
 // Lo stesso tetto del server (functions/src/routine/accensioni.js, ORDINE_MAX): oltre si rifiuta col numero.
 export const ORDINE_MAX = 2000;
