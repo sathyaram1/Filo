@@ -20,17 +20,26 @@
     },
     {
       id: 'rapide', titolo: 'Impostazioni rapide', icona: 'options', url: 'filo://preferences/preferences.html',
-      nomi: ['impostazioni rapide', 'rapide', 'impostazioni', 'preferenze rapide'],
+      nomi: ['impostazioni rapide', 'rapide', 'preferenze rapide'],
     },
   ];
 
-  // Le app che una carta non ce l'hanno: in «altro» restano un'icona.
+  // Le app che una carta non ce l'hanno: in «altro» restano un tasto.
   const APP = [
-    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
-    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
+    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html', nomi: ['aperti per dopo', 'per dopo', 'salvati per dopo'] },
+    // Niente «download» fra i nomi: a parole quello è lo scaricamento a sinistra.
+    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html', nomi: ['tasto dei download', 'tasto download', 'pagina dei download', 'app dei download'] },
     // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
-    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
-    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html', nomi: ['memorie', 'quaderno', 'quaderno delle memorie', 'cronologia'] },
+    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html', nomi: ['bacheca', 'segnalazioni'] },
+  ];
+  // I tasti di «altro» (#2372): le app, la ricerca nel filo e i comandi che stavano in alto a destra. Il «+» non è un
+  // tasto: è fisso e tiene quelli fuori vista. `fuori`: di serie sta nel «+».
+  const TASTI = [
+    { id: 'cerca', titolo: 'Cerca nel filo', icona: 'search', nomi: ['cerca', 'cerca nel filo', 'ricerca', 'ricerca nel filo', 'lente'] },
+    ...APP,
+    { id: 'impostazioni', titolo: 'Impostazioni', icona: 'options', comando: 'settings', nomi: ['impostazioni', 'opzioni', 'ingranaggio', 'menu delle impostazioni'] },
+    { id: 'profilo', titolo: 'Profilo', icona: 'user', comando: 'account', fuori: true, nomi: ['profilo', 'account', 'accedi', 'avatar'] },
   ];
 
   const VERSIONE = 1;
