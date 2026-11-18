@@ -439,6 +439,11 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
   return out;
 }
 
+/** Cosa è morto con un worker fermo: la sua corsa di finish:check rimasta a metà e la memoria di adesso. */
+export function autopsiaDelWorker(root, segni, { memoria = letturaMemoria } = {}) {
+  return { corsa: segni && segni.mio ? corsaInterrotta(root) : null, memoria: memoria() };
+}
+
 export const FERMA_IL_WORKER = 'Il worker però è ancora acceso e spende: fermalo adesso con lo strumento TaskStop (se non lo vedi, caricalo con ToolSearch «select:TaskStop»), passandogli l’id che ti ha dato il suo lancio.';
 
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
