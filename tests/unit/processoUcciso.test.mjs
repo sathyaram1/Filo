@@ -105,7 +105,10 @@ describe('il segno della corsa di finish:check', () => {
     const modulo = pathToFileURL(join(REPO, 'scripts', 'lib', 'corsa-controlli.mjs')).href;
     const c = spawn(process.execPath, ['--input-type=module', '-e',
       `const { apriCorsa } = await import(${JSON.stringify(modulo)}); const c = apriCorsa(${JSON.stringify(root)}, { sha: 'abcdef1234567890' }); c.fase('spec delle aree toccate — lotto 2/3'); console.log('pronto'); setInterval(() => {}, 1000);`,
+      // Nella riga di comando come quello vero: un processo vivo che non è finish:check non tiene viva la corsa.
+      'finish-local',
     ], { stdio: ['ignore', 'pipe', 'inherit'] });
+    setTimeout(() => c.kill('SIGKILL'), 30_000).unref();
     c.stdout.once('data', () => ok(c));
   });
   const fine = (c) => new Promise((ok) => c.once('exit', (codice, segnale) => ok({ codice, segnale })));
