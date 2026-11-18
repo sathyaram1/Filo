@@ -175,8 +175,9 @@ function escPrimaAFilo(e, ascolto, UI) {
 
 // Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
-  const copy = require('./menu-del-sito.js').copiaDelClic(e);
-  const deadline = Date.now() + 3000;
+  const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
+  const copy = copiaDelClic(e);
+  const deadline = Date.now() + RIGIOCO_MS;
   const tick = () => {
     if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
