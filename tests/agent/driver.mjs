@@ -425,8 +425,8 @@ async function superficiVisibili(app, shell, view) {
 }
 
 // Sui siti i pezzi di Filo (la conferma, i riquadri) stanno in radici chiuse che vede solo il mondo dei suoi content
-// script (lo stesso di tests/helpers/riquadri.mjs).
-const MONDO_CONTENT_SCRIPT = 999;
+// script: il numero lo dà Filo (tests/unit/mondoContentScript.test.mjs).
+const { MONDO: MONDO_CONTENT_SCRIPT } = require('../../src/preload/mondo-esente.js');
 async function segniNelMondoDiFilo(app, id) {
   const code = `(${COLLECT_FN.toString()})(true)`;
   try {
