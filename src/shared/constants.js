@@ -2335,7 +2335,7 @@
         ? `═══ COSA SA FARE FILO (capacità) ═══\n`
           + `Questo è l'elenco COMPLETO e VERO di ciò che Filo (il browser) sa fare, raggruppato per area. Ogni voce ha tra parentesi quadre il suo id stabile.\n`
           + `${capacita}\n`
-          + `Come si attiva una voce e i suoi limiti li dà filo_su_di_se(capacita) con l'id: leggili prima di spiegarla, non a memoria. Quello che qui non c'è Filo non lo sa fare: non inventare procedure né voci di menu. Una voce che l'utente vuole fatta adesso e che nessuno strumento comanda la spieghi a mano e la segnali con filo_su_di_se(feedback).\n\n`
+          + `Come si attiva una voce e i suoi limiti li dà filo_su_di_se(capacita) con l'id: leggili prima di spiegarla, non a memoria. Quello che qui non c'è Filo non lo sa fare: non inventare procedure né voci di menu. Una voce che l'utente ti ha chiesto di fare adesso e che nessuno strumento comanda la spieghi a mano e la segnali con filo_su_di_se(feedback), nominandola col suo titolo; una voce che ha il suo strumento la fai, e una che l'utente nomina discutendo, senza chiedere di farla, non si segnala.\n\n`
         : '',
     // La chat riceve lo stile nel suo CONTESTO, non da injectAgentStyle: la parte fissa è uguale per tutti (SPEC-CONTESTO).
     // Lì viene dopo le regole sul contenuto esterno, e la frase dopo la busta gli toglie l'ultima parola su di esse (#592).
