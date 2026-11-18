@@ -98,6 +98,43 @@ test('«salvala per dopo» e «cerca questa immagine» li fa la chat sulla pagin
   await nessunaSegnalazione(app, chat);
 });
 
+test('«cerca questa immagine» su una foto incollata in chat: va a Google Lens coi suoi byte, dopo l\'OK', async ({ app }) => {
+  test.setTimeout(60_000);
+  const chat = await home(app);
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    globalThis.__aperte = [];
+    const vera = tm.openTab.bind(tm);
+    tm.openTab = (url, opts) => {
+      if (!/^https:\/\/lens\.google\.com\//.test(String(url))) return vera(url, opts);
+      const corpo = opts && opts.invio && opts.invio.data ? Buffer.concat(opts.invio.data.map((d) => Buffer.from(d.bytes))) : Buffer.alloc(0);
+      globalThis.__aperte.push({ url: String(url), byte: corpo.length, png: corpo.includes(Buffer.from([0x89, 0x50, 0x4e, 0x47])) });
+      return 'scheda-lens';
+    };
+  });
+  await chat.evaluate(async () => {
+    const dt = new DataTransfer();
+    const cv = new OffscreenCanvas(48, 32);
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(0, 0, 48, 32);
+    dt.items.add(new File([await cv.convertToBlob({ type: 'image/png' })], 'foto.png', { type: 'image/png' }));
+    document.getElementById('inputForm').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await expect(chat.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5000 });
+  await modelloFinto(app, [chiama('l1', 'CERCA_IMMAGINE', { immagine: 1 }), { text: 'Ecco.' }]);
+  await chiedi(chat, 'cerca questa immagine');
+  const bottone = chat.locator('button.dash-action-btn', { hasText: 'immagine 1 di questa chat' });
+  await expect(chat.locator(CONFIRM_HOST).or(bottone)).toBeVisible({ timeout: 15_000 });
+  if (await bottone.isVisible()) await bottone.click();
+  await expect.poll(() => confirmText(chat), { timeout: 8_000 }).toContain('Google Lens');
+  await clickConfirm(chat, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__aperte), { timeout: 10_000 }).toHaveLength(1);
+  const [aperta] = await app.evaluate(() => globalThis.__aperte);
+  expect(aperta.url).toMatch(/^https:\/\/lens\.google\.com\/v3\/upload\?/);
+  expect(aperta.png, 'i byte della foto non partono').toBe(true);
+});
+
 test('«metti il tema scuro» con una domanda: il tema cambia e la domanda ha la sua risposta (#2349)', async ({ app }) => {
   test.setTimeout(60_000);
   const chat = await home(app);
