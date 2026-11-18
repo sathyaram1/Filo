@@ -2,10 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { specDaArgomenti, verdettoAffiancato } from '../../scripts/spec-su-main.mjs';
+import { esitiPerSpec, motivoDelResoconto, portaSpecDelRamo, specDaArgomenti, verdettoAffiancato } from '../../scripts/spec-su-main.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(ROOT, 'scripts', 'spec-su-main.mjs');
