@@ -169,7 +169,6 @@
     region_select_hint: 'Trascina per selezionare una regione · Esc per annullare',
     trascrivi_leggo: 'Leggo il testo…',
     trascrivi_copia_tutto: 'Copia tutto',
-    trascrivi_immagine_illeggibile: 'Non riesco a leggere questa immagine',
     toast_transcribe_empty: 'Nessun testo nell\'immagine',
     toast_region_cancelled: 'Selezione annullata',
     menu_share: 'Condividi',
