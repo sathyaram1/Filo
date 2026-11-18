@@ -1705,6 +1705,12 @@
       titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
       testo: '',
     },
+    // Etichetta e titolo nominano la domanda: li completa fusioneDi.
+    attende_domanda: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'riallinea dopo la risposta',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: si riallinea da solo dopo la tua risposta',
+      testo: '',
+    },
     riallineamento_fallito: {
       attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
       titolo: 'Avevi detto sì, ma il ramo era in conflitto con main e nessuno lo sta riallineando',
@@ -1730,18 +1736,32 @@
     return global.SN_MERGE_APPROVALS;
   }
 
-  // Approvata e finita in conflitto: la routine riallinea da sé solo ciò che la scheda dice (siRiallineaDaSola), e solo
-  // finché la pratica è in lavorazione (routeRealignment del server). Uscita dalla lavorazione (ferma, arenata): non è andato.
+  // Approvata e finita in conflitto (#1425, #2193): il server riallinea da sé il lavoro di una routine (siRiallineaDaSola)
+  // appena la pratica è lavorabile, anche dopo la risposta a una domanda. Restano dell'owner il fermo che il server ha
+  // scritto sulla richiesta (tetto, lavoro locale, archiviata) e le pratiche ferme senza domanda (arenata, chiusa).
   function riallineamentoDi(fb, failed) {
-    const { status } = normalizeStatus(fb);
-    const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
-    return inLavoro && failed.every((r) => schedaFusioni().siRiallineaDaSola(r)) ? 'da_riallineare' : 'riallineamento_fallito';
-  }
-  function testoRiallineamento(failed, inCorso) {
     const MA = schedaFusioni();
-    // La richiesta che decide la frase è quella che non si riallinea da sola, se c'è.
-    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed[0];
-    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, inCorso)}`;
+    const { status } = normalizeStatus(fb);
+    const fallito = { stato: 'riallineamento_fallito' };
+    if (!failed.every((r) => MA.siRiallineaDaSola(r)) || failed.some((r) => MA.fermoDellOwner(r))) return fallito;
+    const domanda = aspettaDomanda(fb);
+    if (domanda) return { stato: 'attende_domanda', domanda };
+    return status === 'todo' || WORK_STAGES.includes(status) ? { stato: 'da_riallineare' } : fallito;
+  }
+  function testoRiallineamento(failed, ria) {
+    const MA = schedaFusioni();
+    // La richiesta che decide la frase è quella che non si riallinea da sola, o quella col fermo del server, se c'è.
+    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed.find((x) => MA.fermoDellOwner(x)) || failed[0];
+    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, ria.stato === 'da_riallineare', ria)}`;
+  }
+
+  // Una pratica chiusa col lavoro in main (#2193): le sue fusioni approvate e non avvenute sono superate, anche se il ramo
+  // fuso è un altro. Fusione registrata = la versione che la contiene, la chiusura «già su main», o una richiesta fusa.
+  function lavoroInMain(fb, recent) {
+    const { status, statusReason } = normalizeStatus(fb);
+    if (status !== 'done' && status !== 'archived') return false;
+    if (String((fb && fb.resolvedInVersion) || '').trim()) return true;
+    return status === 'done' && (statusReason === 'gia_risolto' || recent.some((r) => r && r.used === true && r.outcome === 'merged'));
   }
 
   // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
@@ -1779,7 +1799,7 @@
     const f = (opts && opts.fusioni && typeof opts.fusioni === 'object') ? opts.fusioni : {};
     const lista = (k) => (Array.isArray(f[k]) ? f[k] : []).filter((r) => richiestaDiQuesto(r, fb));
     const pending = lista('pending');
-    const failed = lista('failed');
+    const failed = lavoroInMain(fb, lista('recent')) ? [] : lista('failed');
     const preapproved = lista('preapproved');
     const { status, statusReason } = normalizeStatus(fb);
 
@@ -1823,14 +1843,14 @@
       }, { richiesta: pending[0], richieste: ferme, conflitto: false, fusione, statoFusione: stato });
     }
     if (failed.length) {
-      const stato = riallineamentoDi(fb, failed);
-      const fallito = stato === 'riallineamento_fallito';
+      const ria = riallineamentoDi(fb, failed);
+      const fallito = ria.stato === 'riallineamento_fallito';
       return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
         titolo,
         righe: [],
-        testo: testoRiallineamento(failed, !fallito),
+        testo: testoRiallineamento(failed, ria),
         azioni: [],
-      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
+      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: ria.stato, riallineamento: ria });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();
@@ -1878,8 +1898,17 @@
   }
   /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
   function fusioneDi(fb, opts) {
-    const stato = statoFusione(fb, opts);
-    return stato ? Object.assign({ stato }, STATI_FUSIONE[stato]) : null;
+    if (!fb) return null;
+    const liv = livelloL5(fb, opts);
+    const stato = liv.statoFusione || null;
+    if (!stato) return null;
+    const out = Object.assign({ stato }, STATI_FUSIONE[stato]);
+    const domanda = stato === 'attende_domanda' ? liv.riallineamento.domanda : '';
+    if (domanda) {
+      out.etichetta = `riallinea dopo ${domanda}`;
+      out.titolo = `${out.titolo} a ${domanda}`;
+    }
+    return out;
   }
 
   // Questa segnalazione ha una fusione che aspetta una decisione dell'owner? È quello che fa diventare
@@ -2117,6 +2146,16 @@
     }
     return n;
   }
+  // Quelle che aspettano l'owner, divise fra cose da decidere e cose da fare (#2229): il contatore le dice a parte.
+  function contaDaRispondere(domande) {
+    const D = global.SN_DOMANDE;
+    const n = { daDecidere: 0, daFare: 0 };
+    for (const d of (Array.isArray(domande) ? domande : [])) {
+      if (schedaDomanda(d) !== SCHEDA_DOMANDA.da_rispondere) continue;
+      if (D.daFare(d)) n.daFare++; else n.daDecidere++;
+    }
+    return n;
+  }
   function bloccanteAperta(domande) {
     return (Array.isArray(domande) ? domande : []).some((d) => d && d.stato === 'aperta' && d.priorita === 'bloccante');
   }
@@ -2234,7 +2273,7 @@
     aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
-    schedaDomanda, contaDomande, bloccanteAperta,
+    schedaDomanda, contaDomande, contaDaRispondere, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
     filtraFiducia, contaNonFidate, segnoFiducia, segnoFiduciaNota,
   };

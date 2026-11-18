@@ -91,6 +91,8 @@ require(path.join(SHARED, 'filoCompattazione.js'));  // #1563 — la compattazio
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
+require(path.join(SHARED, 'feedbackAttachTypes.js'));
+require(path.join(SHARED, 'allegatiSegnalazione.js')); // #1668 — gli allegati di una segnalazione mandata dalla chat
 require(path.join(SHARED, 'feedbackL0.js')); // #1403 — la rilettura del feedback prima dell'invio
 require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedback mandati da questa installazione
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard

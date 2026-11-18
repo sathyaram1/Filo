@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -69,7 +70,7 @@ test('le parole e i pulsanti promessi sono quelli dell\'avviso e della pagina Si
 });
 
 test('spento, il rilevatore tiene l\'analisi locale: manifesto, pagina e chat lo dicono', () => {
-  const handlers = leggi('src/main/services/handlers.js');
+  const handlers = sorgenteHandlers();
   assert.match(handlers, /if \(sb\.enabled === false\) \{\s*SB\.configure\(\{ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false \}\);\s*return;/,
     'l\'interruttore spento ferma solo le richieste esterne: se adesso spegne anche gli avvisi, riscrivi i testi qui sotto');
   assert.match(voce().doesNot, /non gli avvisi che Filo decide da solo/);

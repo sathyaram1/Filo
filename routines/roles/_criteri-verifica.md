@@ -25,3 +25,10 @@
 9. **Una causa, tutte le porte.** Davanti a un difetto si cerca lo stato
    sbagliato che lo produce e **tutte le strade che portano a quello stato**:
    la cura è una regola sola sulla causa, non una pezza sulla porta vista.
+10. **Oggetti e tipi.** In una modifica all'interfaccia si elencano gli oggetti
+   e i tipi (titolo, testo, riquadro, tasto pieno, tasto vuoto, icona, link…)
+   che aggiunge alla schermata, confrontando lo screenshot di prima con quello
+   di dopo, e per ciascuno si scrive cosa perde l'utente senza. Un oggetto
+   senza risposta è un rilievo da correggere, non un dubbio: si toglie, o la
+   sua funzione passa al tasto destro o alla richiesta a Filo
+   (`filo_design.txt` § ESTETICA).

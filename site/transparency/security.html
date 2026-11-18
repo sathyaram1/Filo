@@ -134,6 +134,10 @@
   text-underline-offset: 2px;
 }
 
+/* Link a un altro documento: al passaggio la sottolineatura si ispessisce, come un filo tirato. */
+.sn-doc-link:hover,
+.sn-doc-link:focus-visible { text-decoration-thickness: 2px; }
+
 /* Riferimento numerato: piccolo e discreto, ma con un'area di tocco decente. */
 .sn-ref {
   font-size: 0.68em;
@@ -245,6 +249,7 @@ html:not([data-sn-theme]) body {
     <nav class="sn-nav">
       <a class="sn-nav-item" href="./models.html">Modelli</a>
       <a class="sn-nav-item" href="./privacy.html">Privacy</a>
+      <a class="sn-nav-item" href="./privacy-completa.html">Privacy, tutti i dettagli</a>
       <a class="sn-nav-item is-active" href="./security.html">Sicurezza</a>
       <a class="sn-nav-item is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
@@ -346,7 +351,7 @@ html:not([data-sn-theme]) body {
 <script>
 (function () {
   'use strict';
-  var GLOSSARY = {"pesi aperti":"I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.","fornitori indipendenti":"Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.","modelli stretti":"Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.","system card":"Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.","welfare dei modelli":"La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.","Responsible Scaling Policy":"L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.","OpenRouter":"Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.","LLM":"Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.","super PAC":"Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.","open source":"Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.","rischi esistenziali":"I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente.","Safe Browsing":"La lista di siti pericolosi mantenuta da Google e usata da quasi tutti i browser per avvisarti prima di aprire una pagina truffa.","ritenzione zero":"L'impegno di chi fa girare un modello a non conservare né la richiesta né la risposta, una volta risposto.","pseudonimo":"Un codice che tiene insieme i dati della stessa installazione senza dire di chi sono.","impronta":"Un numero calcolato da un dato con una formula a senso unico: dallo stesso dato esce sempre lo stesso numero, ma dal numero non si risale al dato.","Firebase":"Il servizio di Google su cui gira il server di Filo: database, accesso e funzioni.","red team":"Chi attacca un sistema apposta, con permesso, per trovarne i punti deboli prima che li trovi qualcun altro."};
+  var GLOSSARY = {"pesi aperti":"I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.","fornitori indipendenti":"Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.","modelli stretti":"Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.","system card":"Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.","welfare dei modelli":"La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.","Responsible Scaling Policy":"L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.","OpenRouter":"Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.","LLM":"Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.","super PAC":"Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.","open source":"Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.","rischi esistenziali":"I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente.","Safe Browsing":"La lista di siti pericolosi mantenuta da Google e usata da quasi tutti i browser per avvisarti prima di aprire una pagina truffa.","ritenzione zero":"L'impegno di chi fa girare un modello a non conservare né la richiesta né la risposta, una volta risposto.","pseudonimo":"Un codice che tiene insieme i dati della stessa installazione senza dire di chi sono.","impronta":"Un numero calcolato da un dato con una formula a senso unico: dallo stesso dato esce sempre lo stesso numero, ma dal numero non si risale al dato.","Firebase":"Il servizio di Google su cui gira il server di Filo: database, accesso e funzioni.","red team":"Chi attacca un sistema apposta, con permesso, per trovarne i punti deboli prima che li trovi qualcun altro.","modelli di intelligenza artificiale":"Programmi che leggono un testo o un'immagine e scrivono una risposta. Sono quelli che fanno funzionare la chat, le traduzioni, le spiegazioni.","alpha":"La prima fase di prova: Filo lo usano poche persone, e molte cose sono ancora da sistemare.","server":"Un computer sempre acceso, in rete, che conserva i dati condivisi di Filo. Il tuo Filo ci parla quando serve.","fornitori dei modelli":"Le aziende che fanno girare i modelli sui loro computer e rispondono alle richieste, per esempio Anthropic o Together. Molte stanno negli Stati Uniti.","cifrati":"Trasformati in modo che senza la chiave giusta siano illeggibili. La chiave per i feedback ce l'abbiamo solo io e il server di Filo.","crediti di Filo":"Il saldo che ti regalo per usare i modelli senza pagare un tuo abbonamento.","memorie":"Le cose che Filo si ricorda di te, come le tue preferenze, per non dovertele chiedere ogni volta. Le vedi e le cancelli nelle impostazioni.","Aiuto":"La funzione di Filo che fa le cose al posto tuo su un sito, come compilare un modulo o trovare una pagina.","incognito":"Le finestre in cui Filo non salva sul tuo computer le pagine che visiti né le chat.","Tavily":"Un motore di ricerca fatto per i programmi: Filo ci cerca quando deve trovare qualcosa sul web per te.","link accorciato":"Un indirizzo breve, come bit.ly/abc, che rimanda a un altro sito senza dire quale."};
 
   function applyGlossary(root, glossary) {
     if (!root || !glossary) return;
@@ -370,14 +375,30 @@ html:not([data-sn-theme]) body {
     var node;
     while ((node = walker.nextNode())) pending.push(node);
 
+    // Si glossa la prima occorrenza nell'ordine di lettura; a pari posto vince la chiave più lunga, così
+    // «crediti di Filo» non lo copre una chiave «crediti». Solo parole intere: «server» non glossa «serverless».
+    var LETTERA = /[a-z0-9à-öø-ÿ]/;
+    function trova(testo, parola) {
+      for (var da = 0; ;) {
+        var pos = testo.indexOf(parola, da);
+        if (pos === -1) return -1;
+        if (!LETTERA.test(testo.charAt(pos - 1)) && !LETTERA.test(testo.charAt(pos + parola.length))) return pos;
+        da = pos + 1;
+      }
+    }
     for (var i = 0; i < pending.length; i++) {
       var textNode = pending[i];
-      for (var t = 0; t < terms.length; t++) {
-        var term = terms[t];
-        if (done[term]) continue;
+      while (textNode) {
         var value = textNode.nodeValue;
-        var at = value.toLowerCase().indexOf(term.toLowerCase());
-        if (at === -1) continue;
+        var lower = value.toLowerCase();
+        var at = -1;
+        var term = null;
+        for (var t = 0; t < terms.length; t++) {
+          if (done[terms[t]]) continue;
+          var pos = trova(lower, terms[t].toLowerCase());
+          if (pos !== -1 && (at === -1 || pos < at)) { at = pos; term = terms[t]; }
+        }
+        if (!term) break;
         var before = value.slice(0, at);
         var match = value.slice(at, at + term.length);
         var after = value.slice(at + term.length);
@@ -394,7 +415,7 @@ html:not([data-sn-theme]) body {
         if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
         textNode.parentNode.replaceChild(frag, textNode);
         done[term] = true;
-        if (tail) { textNode = tail; } else { break; }
+        textNode = tail;
       }
     }
   }

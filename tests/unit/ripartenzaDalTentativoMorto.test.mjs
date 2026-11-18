@@ -18,7 +18,8 @@ import { conNumeri, numeriDellIndice } from '../../scripts/manutentore.mjs';
 import { segnaProprie } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ID = 'fid-2152';
+// Di sole lettere e cifre come gli id veri: un nome di ramo fuori forma il manutentore non lo vede (#2337).
+const ID = 'fid2152';
 const BIGLIETTO = 'biglietto-di-prova';
 
 const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a],
@@ -276,7 +277,7 @@ describe('quale tentativo precedente si riprende', () => {
       git(casa, 'fetch', '-q', '--prune', 'origin');
 
       // Come lo chiama il manutentore: i numeri dall'indice dei feedback.
-      const numeri = numeriDellIndice([{ id: conCancello, num: '1141' }, { num: '9' }]);
+      const numeri = numeriDellIndice([{ id: conCancello, num: '1141' }, { id: ID, num: '2152' }, { num: '9' }]);
       assert.deepEqual(ramiInCorso(casa, { giorni: 0, numeri }).map((x) => x.ramo), [ramo('20261101T000000Z')],
         'nell\'elenco del manutentore restano solo i lavori vivi');
       assert.equal(ramiInCorso(casa, { giorni: 0 }).filter((x) => x.ramo.includes(conFinish)).length, 0,

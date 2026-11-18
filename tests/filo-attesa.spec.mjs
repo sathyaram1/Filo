@@ -34,8 +34,8 @@ async function impostazioni(app, settings) {
     { url: 'filo://preferences/preferences.html' },
   ), settings);
 }
-// Il posto di un tasto DENTRO il campo, letto col campo nello stesso fotogramma: il campo si stringe quando compare
-// un avviso della barra (#1551; senza portachiavi di sistema ne arriva uno al primo invio), il tasto lo segue.
+// Il posto di un tasto DENTRO il campo, letto col campo nello stesso fotogramma: misurato rispetto al campo, regge
+// anche se il campo cambia misura mentre la risposta arriva.
 async function postoNelCampo(page, sel) {
   return page.evaluate((s) => {
     const c = document.getElementById('inputForm').getBoundingClientRect();

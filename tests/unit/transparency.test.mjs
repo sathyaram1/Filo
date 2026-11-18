@@ -150,7 +150,7 @@ test('la pagina pubblica è autonoma: niente richieste a domini esterni per rend
 test('la navigazione elenca tutte e quattro le aree, anche quelle non ancora scritte', () => {
   const { T } = loadModules();
   const ids = T.NAV.map((n) => n.id);
-  assert.deepEqual(ids, ['models', 'privacy', 'security', 'business']);
+  assert.deepEqual(ids, ['models', 'privacy', 'privacy-completa', 'security', 'business']);
   // Nascondere le aree mancanti darebbe l'impressione che Filo non abbia niente
   // da dire su privacy o sicurezza: restano visibili e spente finché non ci sono.
   const html = readFileSync(join(ROOT, 'site', 'transparency', 'models.html'), 'utf8');
@@ -187,7 +187,7 @@ test('nessuna voce della barra è un vicolo cieco: anche le aree non scritte han
 // #951 — Privacy e Sicurezza sono scritte: la loro pagina pubblica ha il documento, non il segnaposto.
 test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente', () => {
   const { T } = loadModules();
-  for (const [id, titolo] of [['privacy', 'Privacy'], ['security', 'Sicurezza']]) {
+  for (const [id, titolo] of [['privacy', 'Privacy'], ['privacy-completa', 'Privacy, tutti i dettagli'], ['security', 'Sicurezza']]) {
     const doc = T.get(id);
     assert.ok(doc, `il documento "${id}" non esiste`);
     assert.equal(doc.title, titolo);
@@ -204,7 +204,7 @@ test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente'
 // #1407: la sezione diceva solo dove gira il codice, e chi leggeva credeva in Europa anche i dati.
 test('la privacy dice dove sta ogni parte del server', () => {
   const { T } = loadModules();
-  const t = T.get('privacy').text;
+  const t = T.get('privacy-completa').text;
   const sezione = t.slice(t.indexOf('\nIl server di Filo\n'), t.indexOf('\nI feedback\n'));
   const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Gli allegati dei feedback': /Stati Uniti.*Carolina del Sud.*us-east1/, 'Le identità': /Stati Uniti/ };
   for (const [parte, posto] of Object.entries(dove)) {
@@ -276,7 +276,9 @@ function divergenzeManifesto(T, voce) {
   const scritte = T.NAV.filter((n) => T.ids().includes(n.id));
   const mancanti = T.NAV.filter((n) => !T.ids().includes(n.id));
   const elenco = /transparency\.html \(([^)]*)\)/.exec(voce.invoke);
-  const dichiarate = elenco ? elenco[1].split(/,\s*|\s+e\s+/).map((s) => s.trim()).filter(Boolean) : [];
+  // Un nome con la virgola dentro («Privacy, tutti i dettagli») si scrive fra caporali.
+  const dichiarate = elenco ? (elenco[1].match(/«[^»]*»|[^,«]+/g) || []).flatMap((s) => (/^\s*«/.test(s) ? [s] : s.split(/\s+e\s+/)))
+    .map((s) => s.trim().replace(/^«|»$/g, '')).filter(Boolean) : [];
   const attese = scritte.map((n) => n.label);
   if (dichiarate.join('|') !== attese.join('|')) {
     problemi.push(`«invoke» elenca le sezioni (${dichiarate.join(', ')}), quelle scritte sono (${attese.join(', ')})`);
@@ -511,7 +513,7 @@ test('un documento scritto in un\'area annunciata porta nella barra il suo nome 
   });
   const modulo = leggi('src', 'shared', 'transparency.js');
   const nav = JSON.parse(/const NAV = (\[[\s\S]*?\]);/.exec(modulo)[1]);
-  assert.deepEqual(nav.map((n) => n.label), ['Modelli', 'Sicurezza', 'Come si sostiene', 'I tuoi dati'],
+  assert.deepEqual(nav.map((n) => n.label), ['Modelli', 'Privacy, tutti i dettagli', 'Sicurezza', 'Come si sostiene', 'I tuoi dati'],
     'la barra non usa il nome corto e l\'ordine che il documento si dà');
   const barra = leggi('site', 'transparency', 'models.html').split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('>I tuoi dati<'), 'sul sito la barra tiene il nome dell\'area invece di quello del documento');
@@ -559,4 +561,35 @@ test('lo strumento dice al modello di cosa parlano i documenti, e di leggerli pr
   }
   assert.match(fn.description, /security «Sicurezza»/);
   assert.match(fn.description, /leggilo prima di rispondere/);
+});
+
+// #1483 — Un link fra documenti si scrive col solo id: dentro Filo cambia la query, sul sito il file, per
+// l'agente dice quale documento leggere. Non è una fonte numerata.
+test('i link della Privacy breve portano alla politica sui modelli e alla pagina completa, in app, sul sito e per l\'agente', () => {
+  const { T } = loadModules();
+  const breve = T.get('privacy');
+  assert.match(breve.html, /<a class="sn-doc-link" href="\?doc=models">politica sui modelli<\/a>/);
+  assert.match(breve.html, /<a class="sn-doc-link" href="\?doc=privacy-completa">Tutti i dettagli<\/a>/);
+  assert.ok(!breve.sources.some((s) => /^(models|privacy-completa)$/.test(s.url)), 'un link interno è finito fra le fonti');
+  assert.match(breve.text, /politica sui modelli \(documento «models»\)/);
+  assert.match(breve.text, /Tutti i dettagli \(documento «privacy-completa»\)/);
+  const sito = readFileSync(join(ROOT, 'site', 'transparency', 'privacy.html'), 'utf8');
+  assert.match(sito, /href="\.\/models\.html">politica sui modelli</);
+  assert.match(sito, /href="\.\/privacy-completa\.html">Tutti i dettagli</);
+  assert.doesNotMatch(sito, /href="\?doc=/, 'sul sito un link resta nella forma della pagina interna');
+  assert.ok(existsSync(join(ROOT, 'site', 'transparency', 'privacy-completa.html')));
+  assert.equal(T.get('privacy-completa').title, 'Privacy, tutti i dettagli');
+  assert.deepEqual(T.NAV.slice(1, 3).map((n) => n.label), ['Privacy', 'Privacy, tutti i dettagli']);
+});
+
+test('un link a un documento che non esiste ferma la generazione, un\'ancora resta attaccata al link', () => {
+  const { tmp, leggi } = generaCopia({
+    'zz-link.md': ['---', 'id: zz-link', 'title: Link', 'order: 50', '---', '', 'Vedi [i punti deboli](privacy-completa#i-punti-deboli).', ''],
+  });
+  assert.match(leggi('site', 'transparency', 'zz-link.html'), /href="\.\/privacy-completa\.html#i-punti-deboli"/);
+  assert.match(leggi('src', 'shared', 'transparency.js'), /href=\\"\?doc=privacy-completa#i-punti-deboli\\"/);
+  writeFileSync(join(tmp, 'transparency', 'zz-link.md'), ['---', 'id: zz-link', 'title: Link', '---', '', 'Vedi [qui](nessuno).', ''].join('\n'));
+  assert.throws(() => execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8', stdio: 'pipe' }),
+    /documento che non esiste: «nessuno»/);
+  togliCartella(tmp);
 });

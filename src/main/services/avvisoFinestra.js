@@ -4,20 +4,30 @@
 // sua chiave nell'elenco chiuso dei contatori (#1461): si conta quando una finestra l'ha mostrato.
 
 // `azioni`: i bottoni del toast nella forma che la cornice capisce (src/renderer/shell.js, per esempio { label, openUrl }).
-function avvisoNellaFinestra(testo, { chiave, durataSec = 0, azioni, errore = '', tipo = '' } = {}) {
+// La forma (angolo, colonna della home, notifica del sistema) la sceglie ogni shell: `uid` fa dello stesso avviso
+// mandato a più finestre una notifica sola. `incognito`: false = solo finestre normali, true = solo incognito.
+// `carta`, `icona`, `titolo`: src/renderer/shell.js, segni().
+function avvisoNellaFinestra(testo, { chiave, durataSec = 0, azioni, errore = '', tipo = '', carta = '', icona = '', titolo = '', incognito, suono } = {}) {
   let dette = 0;
+  const uid = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   try {
     const { BrowserWindow } = require('electron');
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
+      if (typeof incognito === 'boolean' && !!win._filoIncognito !== incognito) continue;
       const wc = win.webContents;
       // Una cornice che sta ancora caricando non ascolta ancora.
       if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
       try {
-        const opts = { durationSec: durataSec };
+        const opts = { durationSec: durataSec, uid };
         if (chiave) opts.key = chiave;
         // Il tipo per i contatori della finestra (#1470): un errore ha già il suo.
         if (tipo || errore) opts.tipo = tipo || errore;
+        if (errore) opts.errore = true;
+        if (carta) opts.carta = carta;
+        if (icona) opts.icona = icona;
+        if (titolo) opts.titolo = titolo;
+        if (suono === false) opts.sound = false;
         if (Array.isArray(azioni) && azioni.length) opts.actions = azioni;
         wc.send('shell:toast', { text: testo, opts });
         dette++;
@@ -43,6 +53,7 @@ function avvisoQuandoPronta(testo, { chiave, entroMs = 5 * 60 * 1000, detto, azi
 
 // Toglie dalle cornici l'avviso con questa chiave, quando lo stato che diceva non c'è più.
 function ritiraAvviso(chiave) {
+  try { require('./avvisoSistema').ritira(chiave); } catch (_) {}
   try {
     const { BrowserWindow } = require('electron');
     for (const win of BrowserWindow.getAllWindows()) {

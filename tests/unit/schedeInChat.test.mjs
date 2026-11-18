@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
@@ -58,14 +59,14 @@ test('l\'archivio tiene le schede del messaggio, ripulite, e lascia le icone gro
 
 // Il modello riceve ogni scheda come una LEGGI_PAGINA già fatta: stessa lettura, stessa cornice, e le uscite la contano.
 test('main: le schede del messaggio arrivano al modello come letture di pagina, home e Aiuto', () => {
-  const src = fs.readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
+  const src = sorgenteHandlers();
   const lettura = src.slice(src.indexOf('async function lettureDeiGettoni'), src.indexOf('function notaDeiGettoni'));
   assert.match(lettura, /type: 'LEGGI_PAGINA'/);
   assert.match(lettura, /leggiPaginaDa\(s\.url, 0, sender\)/);
   const nota = src.slice(src.indexOf('function notaDeiGettoni'), src.indexOf('function pageReadsForPrompt'));
   assert.match(nota, /pageReadsForPrompt\(letture\)/);
   // La stessa lettura di LEGGI_PAGINA.
-  assert.match(src, /case 'LEGGI_PAGINA': \{[\s\S]{0,2000}leggiPaginaDa\(url, da, sender\)/);
+  assert.match(src, /async function azioneLeggiPagina\([\s\S]{0,2000}leggiPaginaDa\(url, da, sender\)/);
   // Fino alla graffa che chiude la funzione: una finestra di lunghezza fissa si rompe appena la funzione cresce.
   const inizioTurno = src.indexOf('async function turnoFiloChat');
   const turno = src.slice(inizioTurno, src.indexOf('\n}\n', inizioTurno));

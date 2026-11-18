@@ -144,6 +144,19 @@ test('l\'esito unico dalle parti: un rosso di Windows ferma la fusione e si legg
   assert.deepEqual(partiDaAmbiente(['linux'], { CAMPO_LINUX: '{}', RISULTATO_LINUX: 'success' }), [{ nome: 'linux', campo: '{}', risultato: 'success' }]);
 });
 
+test('le novità unite dalla prova arrivano al server solo se le parti che hanno fuso le hanno uguali (#2543)', () => {
+  const parte = (nome, campo) => ({ nome, risultato: 'success', campo: JSON.stringify({ ramo: A, main: B, mainSha: B, ...campo }) });
+  const unisci = (...parti) => unisciParti({ ramo: A, main: B, parti });
+  const n = { sha: 'c'.repeat(40), righe: 2, data: '2026-11-15', conflitto: true };
+  assert.deepEqual(unisci(parte('linux', { esito: 'verde', novita: n }), parte('windows', { esito: 'verde', novita: n })).novita, n);
+  assert.deepEqual(unisci(parte('linux', { esito: 'rosso_anche_su_main', novita: n }), { nome: 'windows', risultato: 'skipped', campo: '' }).novita, n);
+  const diverse = unisci(parte('linux', { esito: 'verde', novita: n }), parte('windows', { esito: 'verde', novita: { ...n, sha: 'd'.repeat(40) } }));
+  assert.equal(diverse.esito, 'non_provata');
+  assert.match(diverse.motivo, /non hanno unito le novità allo stesso modo/);
+  assert.equal(unisci(parte('linux', { esito: 'verde', novita: n }), parte('windows', { esito: 'verde' })).esito, 'non_provata');
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), parte('windows', { esito: 'verde' })).novita, undefined);
+});
+
 // Chi riallinea corregge i rossi firmati perché su Linux sono verdi: uno rosso anche lì non va firmato (verifica #2225 giro 2).
 test('un rosso di tutti e due i sistemi esce una volta, senza firma; la firma è quella che il ruolo del riallineamento nomina', () => {
   const parte = (nome, rossi) => ({ nome, risultato: 'success', campo: JSON.stringify({ ramo: A, main: B, mainSha: B, esito: 'rosso_sulla_fusione', rossi }) });

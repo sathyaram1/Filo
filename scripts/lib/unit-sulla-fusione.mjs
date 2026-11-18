@@ -10,7 +10,17 @@ import {
 import { tmpdir } from 'node:os';
 import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
+
+// Lo stesso di SN_NOVITA_FUSIONE.FILE: lo controlla tests/unit/unitSullaFusione.test.mjs.
+export const FILE_NOVITA = 'src/shared/patchNotes.js';
+// Solo quando serve: chi importa la prova per altro (dispatch, il canale) non deve dipendere da src/shared.
+const novitaFusione = () => {
+  if (!globalThis.SN_NOVITA_FUSIONE) createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'novitaFusione.js'));
+  return globalThis.SN_NOVITA_FUSIONE;
+};
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
@@ -88,7 +98,51 @@ export function campoPerIlServer(prova) {
     if (rossi.length > TETTO_ROSSI) out.altriRossi = rossi.length - TETTO_ROSSI;
   }
   if (p.esito === 'conflitto' && Array.isArray(p.file)) out.file = p.file.slice(0, TETTO_ROSSI).map((f) => String(f).slice(0, 300));
+  if (p.novita && (p.esito === 'verde' || p.esito === 'rosso_anche_su_main')) out.novita = { ...p.novita };
   return out;
+}
+
+/** Lo sha git del blob con questo testo: il server lo ricalcola sul registro che scrive su main e lo confronta. PURA. */
+export function shaBlob(testo) {
+  const b = Buffer.from(String(testo), 'utf8');
+  return createHash('sha1').update(`blob ${b.length}\u0000`).update(b).digest('hex');
+}
+
+/**
+ * Nell'albero `dir` appena fuso (o fermo sul conflitto del solo registro, `conflitto`): le righe di novità del ramo
+ * unite a quelle di main con la regola che applica anche il server (#2543), e committate. Senza conflitto solo se il
+ * registro fuso ha righe del ramo sotto versioni che main ha già pubblicato: altrimenti la fusione resta quella di git.
+ * → null (niente da fare) | { ok: true, novita } | { ok: false, motivo }
+ */
+export function uniscaNovitaNellAlbero({ git, dir, mainSha, punta, conflitto = false, nessunHook = '', oggi = new Date().toISOString().slice(0, 10) }) {
+  // Interi, a capo finale compreso: sono i byte che legge il server.
+  const blob = (ref, file = FILE_NOVITA) => {
+    try { return String(execFileSync('git', ['cat-file', 'blob', `${ref}:${file}`], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })); } catch (_) { return null; }
+  };
+  const main = blob(mainSha);
+  if (main === null) return conflitto ? { ok: false, motivo: 'non leggo il registro di main' } : null;
+  let manifesto;
+  try { manifesto = JSON.parse(blob(mainSha, 'package.json')); } catch (_) { return { ok: false, motivo: 'non leggo il package.json di main' }; }
+  const percorso = join(dir, ...FILE_NOVITA.split('/'));
+  const { sottoUscite, uniscaNovita } = novitaFusione();
+  if (!conflitto) {
+    let sotto;
+    try { sotto = sottoUscite({ main, fuso: readFileSync(percorso, 'utf8'), uscita: String(manifesto.version || '') }); } catch (_) { return null; }
+    if (!sotto.length) return null;
+  }
+  const b = git(['merge-base', mainSha, punta]);
+  if (!b.ok) return { ok: false, motivo: `non trovo la base comune (${primaRiga(b.out)})` };
+  const base = blob(b.out.trim());
+  const ramo = blob(punta);
+  if (base === null || ramo === null) return { ok: false, motivo: 'non leggo il registro della base o del ramo' };
+  const r = uniscaNovita({ base, main, ramo, manifesto, oggi });
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  writeFileSync(percorso, r.src, 'utf8');
+  const nessuno = nessunHook ? ['-c', `core.hooksPath=${nessunHook}`] : [];
+  const add = git(['add', '--', FILE_NOVITA]);
+  const c = add.ok ? git([...IDENTITA, ...nessuno, 'commit', '--quiet', '--no-verify', ...(conflitto ? ['--no-edit'] : ['--amend', '--no-edit'])]) : add;
+  if (!c.ok) return { ok: false, motivo: `non riesco a committare il registro unito (${primaRiga(c.out)})` };
+  return { ok: true, novita: { sha: shaBlob(r.src), righe: r.aggiunte.length, data: oggi, conflitto: !!conflitto } };
 }
 
 /** Quanto era profondo il clone, per il registro del server (#958). PURA. */
@@ -112,6 +166,14 @@ export function unitToccati({ cambiati = [], tutti = [], leggi = () => '' } = {}
   // Il nome intero e non un pezzo: `a.js` non deve scegliere ogni test che nomina `data.js`.
   const cerca = nomi.length ? new RegExp(`(?:^|[^\\w.-])(?:${nomi.map(sfuggi).join('|')})(?![\\w.-])`) : null;
   return tutti.filter((t) => cambiatiSet.has(t) || (cerca && cerca.test(String(leggi(t) || '')))).sort();
+}
+
+/** La riga che dice cosa la prova ha fatto del registro delle novità. PURA. */
+export function testoNovita(n) {
+  const quante = n.righe === 1 ? 'una riga del ramo' : `${n.righe} righe del ramo`;
+  return n.conflitto
+    ? `▸ Novità: il conflitto sul registro risolto tenendo le righe dei due lati (${quante} nel blocco in cima). La fusione vera farà lo stesso.`
+    : `▸ Novità: ${quante} sotto versioni già uscite su main ${n.righe === 1 ? 'portata' : 'portate'} nel blocco in cima. La fusione vera farà lo stesso.`;
 }
 
 /** Cosa si stampa dopo la prova. PURA. */
@@ -475,14 +537,29 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
     const a = apriAlbero(git, base, 'fusione', contenuto ? punta : mainSha);
     if (a.dir) alberi.push(a.dir);
     if (a.errore) return { errore: a.errore, mainSha };
+    let novita = null;
     if (!contenuto) {
       const ga = gitIn(a.dir);
       const fusa = ga([...IDENTITA, '-c', `core.hooksPath=${nessunHook}`, 'merge', '--no-ff', '--no-edit', '--quiet', punta]);
+      let n = null;
       if (!fusa.ok) {
         const u = ga(['diff', '--name-only', '--diff-filter=U']);
         const file = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : [];
-        if (file.length) return { ...decidiEsito({ conflitto: file }), mainSha };
-        return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+        if (!file.length) return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+        // Un conflitto sul solo registro delle novità si risolve tenendo le righe dei due lati, come farà il server.
+        if (file.length !== 1 || file[0] !== FILE_NOVITA) return { ...decidiEsito({ conflitto: file }), mainSha };
+        n = uniscaNovitaNellAlbero({ git: ga, dir: a.dir, mainSha, punta, conflitto: true, nessunHook });
+        if (!n.ok) {
+          scrivi(`▸ Novità: il conflitto sul registro non si risolve a macchina (${n.motivo}).`);
+          return { ...decidiEsito({ conflitto: file }), mainSha };
+        }
+      } else {
+        n = uniscaNovitaNellAlbero({ git: ga, dir: a.dir, mainSha, punta, nessunHook });
+        if (n && !n.ok) scrivi(`▸ Novità: le righe del ramo sotto versioni uscite non si spostano a macchina (${n.motivo}).`);
+      }
+      if (n && n.ok) {
+        novita = n.novita;
+        scrivi(testoNovita(novita));
       }
     }
     let scelti = null;
@@ -490,7 +567,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
       if (s.errore) return { errore: s.errore, mainSha };
       scelti = s.file;
-      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 };
+      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0, ...(novita ? { novita } : {}) };
       scrivi(`▸ Solo gli unit toccati dal ramo (${scelti.length} file): ${scelti.join(', ')}`);
     }
     const quali = scelti ? { file: scelti } : {};
@@ -536,7 +613,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...segno, ...toccati, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return { ...d, mainSha, ...segno, ...toccati, ...(novita ? { novita } : {}), ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
     const collegamento = togliCollegamento(join(base, 'node_modules'));
     const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);

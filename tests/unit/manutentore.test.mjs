@@ -126,7 +126,8 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
   const env = { FILO_SERVER_CLONE: join(dir, 'nessun-clone') };
   assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
-  assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
+  // Il nome del ramo lo sceglie chi lavora: si mostra col commit (#2337); il file nuovo si incrocia per nome intero.
+  assert.match(out.join('\n'), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#44\): src\/a\.js$/m);
   assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
   assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
@@ -139,7 +140,10 @@ function repoConRami(rami) {
   const repo = cartellaTemporanea('manutentore-rami');
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
   g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
-  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  // I file dei rami ci sono già su main: un file nuovo non si mostra (#2337), e qui si provano i file in chiaro.
+  writeFileSync(join(repo, 'x.txt'), 'x');
+  for (const [, file] of rami) { mkdirSync(join(repo, file, '..'), { recursive: true }); writeFileSync(join(repo, file), 'x'); }
+  g('add', '-A'); g('commit', '-qm', 'inizio');
   g('update-ref', 'refs/remotes/origin/main', 'HEAD');
   for (const [ramo, file, msg] of rami) {
     g('checkout', '-q', '-B', 'tmp', 'main');
@@ -184,18 +188,20 @@ test('rami e incroci leggono anche i rami del clone di filo-security, e se il cl
 
   assert.equal(await M.main(['rami', ...opz], { root: app, env: {} }), 0);
   const rami = leggi();
-  assert.match(rami, /^claude\/app \(#30\), 1 commit, .*: src\/a\.js$/m);
-  assert.match(rami, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  // Rami che il server non ha nominato: il nome resta nascosto anche sul server (#2337), numero e file no.
+  assert.match(rami, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#30\), 1 commit, .*: src\/a\.js$/m);
+  assert.match(rami, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(rami, /claude\/(app|uno|due|tre)\b/);
   assert.doesNotMatch(rami, /NON letti/);
 
   assert.equal(await M.main(['incroci', ...opz], { root: app, env: {} }), 0);
   const fra = leggi();
-  assert.match(fra, /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
-  assert.doesNotMatch(fra, /claude\/tre/, 'su un file che nessun altro tocca non c\'è incrocio');
-  assert.doesNotMatch(fra, /claude\/app/);
+  assert.match(fra, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\) e claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\): filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(fra, /#33/, 'su un file che nessun altro tocca non c\'è incrocio');
+  assert.doesNotMatch(fra, /#30/);
 
   assert.equal(await M.main(['incroci', '40', ...opz], { root: app, env: {} }), 0);
-  assert.match(leggi(), /^claude\/tre sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
+  assert.match(leggi(), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
 
   const solo = repoConRami([['claude/uno', 'functions/src/x.js', '#31'], ['claude/tre', 'functions/src/y.js', '#33']]);
   t.after(() => togliCartella(solo));
@@ -205,7 +211,7 @@ test('rami e incroci leggono anche i rami del clone di filo-security, e se il cl
   const assente = join(schede, 'filo-security');
   assert.equal(await M.main(['rami', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
   const senza = leggi();
-  assert.match(senza, /^claude\/app/m, 'i rami dell\'app restano');
+  assert.match(senza, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#30\)/m, 'i rami dell\'app restano');
   assert.ok(senza.includes(`Rami del server NON letti: nessun clone di filo-security in ${assente}`), senza);
   assert.equal(await M.main(['incroci', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
   assert.match(leggi(), /Rami del server NON letti/);
@@ -261,11 +267,11 @@ test('nelle routine il clone del server si aggiorna da sé, anche poco profondo 
   spingi('claude/due', '#32 due');
   assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
   const out = leggi();
-  assert.match(out, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
-  assert.match(out, /^claude\/due sul server \(#32\)/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#32\)/m);
   assert.doesNotMatch(out, /NON aggiornati/);
   assert.equal(await M.main(['incroci', '--ticket', 'biglietto-finto', '--clone-server', clone], { root: app, env: {} }), 0);
-  assert.match(leggi(), /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+  assert.match(leggi(), /claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\) e claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
 });
 
 test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce lo dice, col clone com\'era (#2340)', async (t) => {
@@ -275,12 +281,12 @@ test('in locale il clone del server si aggiorna prima di leggerlo; se non riesce
   const { origine, clone, spingi } = serverConOrigine(t, { corto: true });
   spingi('claude/uno', '#31 uno');
   assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
-  assert.match(leggi(), /^claude\/uno sul server \(#31\)/m);
+  assert.match(leggi(), /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\)/m);
   // Un'origine che non risponde: l'avviso, e i rami di prima restano.
   togliCartella(origine);
   assert.equal(await M.main(['rami', '--clone-server', clone], { root: app, env: {} }), 0);
   const out = leggi();
-  assert.match(out, /^claude\/uno sul server/m);
+  assert.match(out, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#31\)/m);
   assert.match(out, /Rami del server NON aggiornati \(.+\): sono quelli del clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\./);
   // Un clone poco profondo che non si completa lo dice: i lavori del server probabilmente mancano.
   const { origine: o2, clone: c2 } = serverConOrigine(t, { corto: true });
@@ -304,12 +310,18 @@ test('il contesto intero e quello piccolo portano anche i rami del server, coi f
 });
 
 test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
-  const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  // Non sotto src/: lì va il collegamento al repo vero.
+  const repo = repoConRami([['claude/app', 'app/a.js', 'auto: #30']]);
   t.after(() => togliCartella(repo));
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
-  g('checkout', '-q', '-B', 'lungo', 'main');
+  // File che su main ci sono, così l'elenco li stampa: i nuovi si contano e basta (#2337).
+  const tanti = Array.from({ length: 700 }, (_, i) => join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`));
   mkdirSync(join(repo, 'f'));
-  for (let i = 0; i < 700; i += 1) writeFileSync(join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`), String(i));
+  for (const f of tanti) writeFileSync(f, 'x');
+  g('add', '-A'); g('commit', '-qm', 'tanti file su main');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  g('checkout', '-q', '-B', 'lungo', 'main');
+  tanti.forEach((f, i) => writeFileSync(f, String(i)));
   g('add', '-A'); g('commit', '-qm', 'tanti file (#1)');
   g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
   g('checkout', '-q', 'main');
@@ -936,4 +948,30 @@ test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a s
   const spec = testi.spec.replace(/\s+/g, ' ');
   assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
   assert.match(spec, /battito\*\* ogni due ore al massimo/);
+});
+
+test('stato mostra le pause di ogni voce e il perché dell’ultimo giro, e un server vecchio non sembra «nessuna pausa» (#2488)', () => {
+  const fino = Date.parse('2026-11-14T15:24:00Z');
+  const pause = { serverB: { finoMs: fino, perche: 'dead_round', dettaglio: '', strikes: 1, account: 'B', oggi: 3 } };
+  const voci = {
+    normale: { perche: 'accounts_paused', percheMs: Date.parse('2026-11-14T14:04:00Z') },
+    server: { perche: 'server_paused', percheMs: Date.parse('2026-11-14T12:35:00Z') },
+    reteAperta: { perche: '', percheMs: 0 },
+    riservati: { perche: 'no_riservati_work', percheMs: Date.parse('2026-11-14T10:00:00Z') },
+  };
+  const righe = M.righeStato({ ...STATO, pause, voci });
+  const da = righe.indexOf('Pause in corso (1):');
+  assert.ok(da > 0, righe.join('\n'));
+  assert.equal(righe[da + 1], '- serverB fino a 2026-11-14T15:24:00.000Z, perché dead_round, fallimenti di fila 1');
+  assert.equal(righe[da + 2], 'Ultimo giro per voce: normale accounts_paused dal 2026-11-14T14:04:00.000Z; '
+    + 'server server_paused dal 2026-11-14T12:35:00.000Z; riservati no_riservati_work dal 2026-11-14T10:00:00.000Z.');
+  assert.ok(M.righeStato({ ...STATO, pause: {}, voci: {} }).includes('Pause in corso (0):'));
+  assert.ok(M.righeStato({ ...STATO, pause: null, voci: null }).includes('Pause in corso (stato del pacemaker non letto):'));
+  assert.ok(M.righeStato(STATO).includes('Pause delle voci: il server non le elenca ancora.'));
+  // Il messaggio di claude.ai di un rifiuto arriva in una riga sola: un a capo non apre una sezione nel contesto.
+  const sporco = M.righePause({ A: { finoMs: fino, perche: 'rejected_429', dettaglio: 'limite\n## Spesa', strikes: 2 } }, {});
+  assert.ok(sporco.every((r) => !r.includes('\n')));
+  assert.match(sporco[1], /^- A fino a .*perché rejected_429, fallimenti di fila 2: limite ## Spesa$/);
+  assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, pause, voci }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /serverB fino a/);
+  assert.match(RUOLO.replace(/\s+/g, ' '), /accensione nata morta di qualunque voce/);
 });

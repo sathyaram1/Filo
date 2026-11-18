@@ -9,6 +9,7 @@ import { readFileSync, existsSync, readdirSync, statSync, appendFileSync } from 
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { percorsiDiHandlers } from '../helpers/sorgenteHandlers.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 import '../../src/shared/sitiComuni.js';
@@ -335,7 +336,7 @@ test('ogni accaduto ha un punto solo da cui nasce', () => {
   const tutti = sorgenti();
   const chi = (re) => tutti.filter((s) => re.test(s.testo)).map((s) => s.p).sort();
   const PORTE = {
-    azione: [/accaduti'\)\.azione\(/, ['src/main/services/handlers.js']],
+    azione: [/accaduti'\)\.azione\(/, ['src/main/services/autonomiaFonti.js']],
     // Volume, Wi-Fi e Bluetooth: dalla porta che chat e tasti della home condividono.
     comandoSistema: [/accaduti'\)\.comandoSistema\(/, ['src/main/services/comandiSistema.js']],
     ricerca: [/SN_ACCADUTI\?\.ricerca\(|accaduti'\)\.ricerca\(/, ['src/main/services/webSearch.js']],
@@ -360,7 +361,8 @@ test('ogni accaduto ha un punto solo da cui nasce', () => {
   const ilFilo = tutti.find((s) => s.p === 'src/main/services/ilFilo.js').testo;
   assert.equal((ilFilo.match(/TIPI\.RICERCA/g) || []).length, 1);
   // Un'azione entra una volta per esecuzione: executeFiloAction la manda, nessun altro.
-  const handlers = tutti.find((s) => s.p === 'src/main/services/handlers.js').testo;
+  const parti = percorsiDiHandlers();
+  const handlers = tutti.filter((s) => parti.includes(s.p)).map((s) => s.testo).join('\n');
   assert.equal((handlers.match(/azioneNelFilo\(action, finale/g) || []).length, 1);
   // Le porte dell'Aiuto che non passano da executeFiloAction (ricerca web, documenti, barra) la mandano da sé.
   assert.deepEqual(chi(/ctx\.azioneDellAiuto\(/),

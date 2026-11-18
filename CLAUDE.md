@@ -237,8 +237,10 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
   suo `prossimaVersione` se lo dichiara); se
   quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
   versione uscita non la vede chi aggiorna. Se esce su main mentre il ramo
-  aspetta, le righe le sposta il riallineamento prima della fusione
-  (`scripts/novita-in-cima.mjs`, dopo il rebase): non si rincorre. Sentinella:
+  aspetta, le righe le sposta da sé la fusione con main, e un conflitto sul
+  solo registro lo risolve lei tenendo le righe dei due lati
+  (`src/shared/novitaFusione.js`; dopo un rebase `scripts/novita-in-cima.mjs`):
+  non si rincorre. Sentinella:
   `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col

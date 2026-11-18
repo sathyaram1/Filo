@@ -309,7 +309,7 @@ const fiduciaDetta = (f) => (f === 'fidato' ? 'fidata' : 'non fidata');
 /** La domanda intera per il terminale: ogni testo d'agente coi caratteri di controllo resi visibili. PURA. */
 export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) {
   const x = d || {};
-  const righe = [`${visibile(x.id || '?')} · ${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
+  const righe = [`${visibile(x.id || '?')} · ${D.daFare(x) ? 'da fare · ' : ''}${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
@@ -330,7 +330,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   if (opzioni.length) {
     righe.push('', 'Opzioni');
     opzioni.forEach((o, i) => {
-      const etichetta = D.etichettaAzione(o.azione, riferimenti);
+      const etichetta = D.etichettaOpzione(x, i, riferimenti);
       const segni = [etichetta ? `pulsante: ${etichetta}` : 'nessun pulsante: azione non applicabile'];
       if (soloDaFilo(o.azione)) segni.push('solo dalla finestra di Filo');
       if (x.consiglio && x.consiglio.opzione === i) segni.push('consigliata');
@@ -402,6 +402,8 @@ export function formattaFeedbackOrigine(fb, { quando = dataOra } = {}) {
   const x = fb || {};
   if (!x.num && !x.id) return 'Feedback d\'origine: nessuno (la domanda non viene da un lavoro).';
   const righe = [`Feedback d'origine: ${visibile(x.num || x.id)} · ${visibile(x.stato || '?')}${x.motivo ? ` (${visibile(x.motivo)})` : ''}${Number.isInteger(x.priorita) ? ` · priorità ${x.priorita}` : ''}`];
+  // Senza testo perché riservato (#1928.5): chi smista deve sapere che non l'ha letto, non che è vuoto.
+  if (x.riservato) righe.push('  Riservato: testo e note arrivano solo a chi gira nei riservati, non sai cosa chiede.');
   if (x.nome) righe.push(rientro(`Titolo: ${x.nome}`));
   if (x.testo) righe.push('  Testo:', rientro(x.testo, '    '));
   if (x.note) righe.push('  Note:', rientro(x.note, '    '));
@@ -434,6 +436,11 @@ export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
     }
     const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
     if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
+    // Il suo testo arriva solo nell'ambiente dei riservati (#1928.2): come la illeggibile, non è «senza titolo».
+    if (d.riservata) {
+      righe.push(`  ${visibile(d.id || '?')} [${segni.join(' · ')} · riservata: il testo arriva solo a chi gira nei riservati, non sai che scelta chiede]`);
+      continue;
+    }
     righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
     if (d.contesto) righe.push(rientro(`Contesto: ${d.contesto}`, '    '));
     if (d.problema) righe.push(rientro(`Problema: ${d.problema}`, '    '));
@@ -528,6 +535,7 @@ export function formattaElenco(domande) {
     if (b.gruppo) out.push(`  gruppo «${visibile(b.gruppo)}»`);
     for (const d of b.domande) {
       const segni = [visibile(d.stato || '?'), fiduciaDetta(d.fiducia)];
+      if (D.daFare(d)) segni.unshift('da fare');
       if (d.smistamento === 'fallito') segni.push('non riscritta');
       if (D.schedaDi(d) === 'risposte_automatiche') segni.push('automatica');
       out.push(`${b.gruppo ? '    ' : '  '}${visibile(d.id || '?')}  ${visibile(d.titolo || '')}  [${segni.join(' · ')}]`);

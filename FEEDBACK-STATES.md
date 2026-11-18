@@ -256,7 +256,7 @@ dirette verso `done`, strette: `todo → done` della pipeline per una segnalazio
 un pacchetto fuso (o un derivato in correzione fuso col suo lavoro, `statusReason: in_correzione`,
 §4c), e `working → done` della routine per un feedback già risolto su main.
 Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
-lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
+lavoro, o dalla sua ripresa su un ramo che non porta niente rispetto a main (#2427), con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
 altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
 illegale.
 
@@ -324,7 +324,8 @@ riallineamento e risposte dell'owner li assegna il server come sempre, anche per
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
 semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
-dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
+dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i lavori
+già iniziati, i feedback dell'ordine, il resto nell'ordine della coda; e
 accendono una sessione per ciascuno fino ai posti liberi, e per ogni routine non più di
 quanti biglietti al minuto il server dà alla sua chiave, meno uno per il manutentore: le
 altre vanno all'altro account o al giro dopo (#2343). Una priorità 3 già in viaggio non
@@ -341,8 +342,9 @@ prende prima il prossimo dell'ordine, poi il resto, e non il posto che una sessi
 per l'ordine e ancora in viaggio sta per prendere. Quando
 una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
 lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
-dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
-nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+dell'ordine chiuso o inesistente non conta, e un ordine senza lavori che una voce possa
+cominciare adesso vale come nessun ordine: non conta un lavoro server con l'interruttore
+spento, né uno che resterebbe locale, per qualunque chiave chieda (#2269.1). Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
 un pacchetto nato prima del 30/10 si chiudono solo sulle strade della fusione: un «fatto»
 consegnato da un ruolo non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
@@ -373,7 +375,8 @@ la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `de
 status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
 → done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
 sta sulla linea principale di `origin/main`; il server lo riprova da sé e lo accetta
-solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale (una
+solo dal primo lavoro (o dalla sua ripresa, se il ramo non porta niente rispetto a main
+né nell'app né sul server: #2427), da `working`, se la fusione sta sulla linea principale (una
 fusione più vecchia di quanto il server rilegge di main, ~12.000 commit, basta che sia
 arrivata su main), porta una citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
 la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report
@@ -388,6 +391,15 @@ girava, che non cita l'allarme ed è più vecchia della sua nascita. Il server a
 allora una fusione sulla linea principale (o arrivata su main, oltre la finestra) che il
 commit provato NON contiene, più recente dell'ultima riapertura (non della nascita),
 senza chiedere la citazione, e mai la propria.
+
+Un **doppione** di un feedback già risolto non ha fusioni che lo citino (#2046): la
+sessione aggiunge `--doppione-di <M>` e il server riceve `doppioneDi`. Lo strumento
+rifiuta solo un numero storto; il server, al posto della citazione del feedback e della
+nascita, vuole che la fusione sia di M (cita `#M`, oppure è lo sha registrato alla
+chiusura di M o nomina il suo ramo: l'approvazione dell'owner fonde «finish: <ramo>»
+senza numero), che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
+dell'ultima riapertura del doppione (riaperto dopo, vuol dire non risolto). Il report
+porta in testa anche la riga «doppione di #M».
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da

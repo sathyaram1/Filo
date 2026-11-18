@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { percorsiDiHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -160,7 +161,7 @@ test('scelte, categorie, lavori, tipi, regole, verbi e tetti sono quelli del cod
   assert.deepEqual(S.TETTI_CODICE.filter((t) => t.startsWith('automatiche_')).sort(), automatiche.sort());
   const sorgenti = ['src/main/services/handlers/ai.js', 'src/main/services/riquadriRotti.js', 'src/main/services/geoBlockClassifier.js',
     'src/main/services/safebrowse/index.js', 'src/main/services/segretiLetti.js', 'src/shared/contatoriGiornalieri.js',
-    'src/main/services/schermo.js', 'src/main/tabs.js', 'src/main/services/handlers.js'].map(leggi).join('\n');
+    'src/main/services/schermo.js', 'src/main/tabs.js', ...percorsiDiHandlers()].map(leggi).join('\n');
   assert.match(sorgenti, /misura\('tetto', `automatiche_\$\{fermo\.gruppo\}`\)/);
   for (const t of S.TETTI_CODICE.filter((x) => !x.startsWith('automatiche_'))) assert.ok(sorgenti.includes(`'${t}'`), `nessuno conta il tetto ${t}`);
   for (const l of S.LAVORI) assert.ok(sorgenti.includes(`'${l}'`), `nessuno conta il lavoro ${l}`);
@@ -431,7 +432,7 @@ test('la porta conta ogni blocco una volta, da qualunque strada; chi giudica sol
     assert.match(s, /controllaUscita: portaUscite/, `${f} riceve la porta da ctx col suo nome`);
     assert.match(s, /const controllaUscita = (ContatoriSicurezza|require\('\.\.\/contatoriSicurezza'\))\.contaUscite\(portaUscite\)/, `${f} non la avvolge`);
   }
-  const tutti = ['src/main/services/handlers.js', ...['ai.js', 'misc.js', 'filo.js'].map((f) => join(dir, f))].map(leggi).join('\n');
+  const tutti = [...percorsiDiHandlers(), ...['ai.js', 'misc.js', 'filo.js'].map((f) => join(dir, f))].map(leggi).join('\n');
   assert.match(tutti, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(/);
   assert.doesNotMatch(tutti, /misura\('uscitaFermata'/, 'un chiamante che conta da sé conterebbe due volte');
 });

@@ -134,6 +134,28 @@ html, body {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
 }
+/* #2390 — l'avviso di una cosa che ha già la sua carta: la carta stessa si fa notare, un piccolo sobbalzo e un alone. */
+.dash-carta.dash-notare {
+  border-color: var(--dash-accent);
+  animation: dash-notare calc(0.6s * var(--sn-motion, 1)) ease-in-out 3;
+}
+@keyframes dash-notare {
+  0%, 100% { transform: none; box-shadow: 0 0 0 0 transparent; }
+  40% { transform: scale(1.025); box-shadow: 0 0 0 5px color-mix(in srgb, var(--dash-accent) 35%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-carta.dash-notare { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 35%, transparent); }
+}
+/* La copia che vola dall'angolo alla colonna (#2390): sopra tutto, senza prendere il puntatore. */
+.dash-carta-in-volo {
+  position: fixed;
+  margin: 0;
+  z-index: 50;
+  pointer-events: none;
+  transform-origin: top left;
+  box-sizing: border-box;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
+}
 
 .dash-carta-testa {
   display: flex;
@@ -1722,17 +1744,16 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
   box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
-  /* Centrato fino a 720px; a destra lascia libera la pila degli avvisi della barra, che il main misura in
-     --filo-avvisi-barra-larga dal bordo della scheda: senza, una carta lunga copre l'invio (#1551). */
+  /* Centrato fino a 720px. Non si stringe per gli avvisi della barra (D-276, #2390): nella home un avviso sta
+     nell'angolo il tempo di leggerlo e poi vola nella colonna di sinistra. */
   --dash-centro: max(0px, (100% - 720px) / 2);
-  margin: var(--dash-gap) max(var(--dash-centro), var(--filo-avvisi-barra-larga, 0px) / var(--sn-zoom, 1) - var(--dash-lato) - var(--dash-colonna) - var(--dash-gap)) 0 var(--dash-centro);
+  margin: var(--dash-gap) var(--dash-centro) 0 var(--dash-centro);
   max-width: 720px;
-  /* Senza, il minimo del suo contenuto (la textarea) vince sul margine e sotto gli 840px l'invio torna coperto. */
   min-width: 0;
   box-sizing: border-box;
 }
 /* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
-.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease, margin-right calc(0.2s * var(--sn-motion, 1)) ease; }
+.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease; }
 .dash-input-wrap.dash-input-bersaglio {
   border-color: var(--sn-accent);
   box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb), 0.18);

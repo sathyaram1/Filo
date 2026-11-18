@@ -87,7 +87,7 @@ test('un ripristino o un backup non alzano quanto esce: restano i livelli più s
 // #1483 — il documento sulla privacy descrive i livelli come sono davvero.
 test('il documento Privacy nomina i tre livelli, il livello di serie, l\'incognito e quello che non esce mai', async () => {
   const { readFile } = await import('node:fs/promises');
-  const testo = await readFile(new URL('../../transparency/privacy.md', import.meta.url), 'utf8');
+  const testo = await readFile(new URL('../../transparency/privacy-completa.md', import.meta.url), 'utf8');
   for (const l of L.LIVELLI) assert.ok(testo.includes(`- **${l.nome}`), `manca il livello ${l.nome}`);
   assert.match(testo, /\*\*Tutto in anticipo\*\*, il livello di serie/);
   assert.match(testo, /Sulla sanità Filo chiede prima/);

@@ -141,7 +141,9 @@ Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
 Alla fine (hook) chiudono il biglietto se è sporco; uno pulito resta, perché la
 sessione si può riprendere senza nascere sporca. Quelli fermi da più di 30
 giorni, o di sessioni morte senza l'hook di fine, li chiude l'avvio di una
-sessione successiva.
+sessione successiva. Se il biglietto nasce pulito lo decide la sessione, e
+può prenderne uno nuovo quando vuole: limite accettato dall'owner (D-263),
+scritto in ROUTINE-AUTH-SPEC.md § 7.
 
 ### 1.3 Unire senza sporcare: la delega
 
@@ -313,7 +315,25 @@ dall'owner e dal server. Campi:
   nota. Un resoconto senza niente da decidere (§ 4.8) non è una domanda: va nel
   rapporto settimanale o nelle note del feedback. Fa eccezione la domanda che
   il server apre al terzo guasto uguale (§ 3.8): un'opzione sola, perché non
-  arriva all'owner e la smista il compito della § 3.5 (#1790).
+  arriva all'owner e la smista il compito della § 3.5 (#1790), e il «da fare».
+- `tipo` (#2229): `da_fare` per un passo che solo l'owner può fare (un
+  segreto, un'impostazione di GitHub o di Firebase, una prova o una modifica
+  dal suo PC); assente, o `da_decidere`, per una domanda. Un «da fare» sta
+  nella stessa lista delle domande, col segno «da fare» accanto a «da
+  decidere», e il contatore di Gestione lo conta a parte. `problema` sono i
+  passi e dove si fanno, `contesto` perché serve, i collegamenti il lavoro che
+  aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
+  pulsante «Fatto», la seconda, facoltativa, «Non lo faccio»; il nome lo dà la
+  posizione, l'azione lo segue (`riprendi` o `attendi` sul lavoro che aspetta,
+  `archivia`, o `nessuna` quando non aspetta niente, ammessa solo qui). Senza
+  consiglio «applica il consiglio» non lo segna mai fatto, e un principio del
+  registro non lo chiude (§ 3.5). Chiunque scopra un passo così lo apre come
+  «da fare», non lo scrive nel testo o nelle note di un feedback.
+- Nelle azioni `feedbackId` può essere il numero col cancelletto (`#1736`,
+  `#831.2`): il server lo traduce nell'id all'ingresso
+  (`SN_DOMANDE.traduciNumeri`), per i biglietti come per la chiave del
+  manutentore e quella owner-non-fidato, e rifiuta col numero quello che non
+  esiste. Una domanda salvata porta sempre l'id.
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
@@ -414,6 +434,18 @@ una sessione né la chiave owner-non-fidato). «Togli fiducia» la riporta indie
 Un turno non fidato dopo la ricalcola come sempre. La nascita del biglietto di
 un lavoro server prevede questo sporco come il ritiro, e lo stesso per le
 provvisorie: un lavoro che resterebbe locale non accende una sessione.
+
+«Segna fidata» copre anche quello che la risposta ha scritto sui lavori (#2235):
+la risposta di una domanda non fidata, o data dalla chiave owner-non-fidato o
+da una sessione, sporca la conversazione del lavoro, e un lavoro server con un
+biglietto sporco resta locale. Quando una risposta così scrive su un lavoro
+server fidato e aperto, il server apre subito un «da fare» legato al lavoro,
+«Conferma la risposta a D-n», che non lo ferma: il suo «Fatto», premuto dalla
+finestra (mai da una sessione o dalla chiave), segna fidata D-n e il lavoro
+riparte da solo. Si chiude da sé quando l'owner segna fidata D-n dalle Domande
+o dichiara fidato il contenuto del lavoro. Il motivo «resta locale» porta la
+causa (quale risposta, da quale chiave o biglietto) sulle schede del
+manutentore e in `leggi`.
 
 Stanno nel documento della domanda, sul server: non in un feedback (una domanda
 non è sempre una cosa da fare) e non nel repo pubblico. Se il lavoro esiste già,
@@ -518,13 +550,18 @@ rispondere.
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
-  d'origine con conversazione e note; `vive`, le altre domande vive
+  d'origine con conversazione e note (di uno riservato il testo arriva solo
+  nell'ambiente dei riservati, e segna il biglietto; fuori ne escono numero,
+  stato, motivo, priorità e fiducia, col segno `riservato`: § 5.1, #1928.5);
+  `vive`, le altre domande vive
   (`in_smistamento`, `aperta`, `in_lavorazione`) sullo stesso feedback
   d'origine, provvisorie comprese (#1928): dalla più recente, al più 20, con
   `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
   `titolo`, `contesto`, `problema`, `opzioni`, `consiglio`, `blocca`,
   `provvisoria`, mai le note per gli agenti; senza feedback d'origine il campo
-  non c'è. Il registro dei principi come per il compito della risposta (fuori
+  non c'è. Il testo di una viva riservata arriva solo nell'ambiente dei
+  riservati, e segna il biglietto (§ 5.1, #1928.2); fuori ne escono `id`,
+  `stato`, `blocca` e `provvisoria`, col segno `riservata`. Il registro dei principi come per il compito della risposta (fuori
   dall'ambiente dei riservati è `assente`, e il passo 3 si salta). Il compito
   legge testo scritto da altri: è non fidato, e quello che scrive nasce non
   fidato. La fiducia della domanda non cambia.
@@ -1045,6 +1082,11 @@ dicono gli esperimenti (§ 4.6).
   ne toglie al più 400 a giro (100 al primo), distanziati, e al primo rifiuto
   di GitHub per troppe richieste si ferma: il resto lo conta come rimandato al
   lunedì dopo. L'agente non allunga l'elenco.
+- **L'agente controlla che la cancellazione funzioni.** Il server gli passa
+  l'esito del suo ultimo giro (quando, tolti, rimandati, guasti): i candidati
+  già cancellabili prima di quel giro che restano non superano rimandati più
+  guasti, e un giro vecchio di oltre otto giorni vuol dire che non è partito.
+  Altrimenti è un feedback.
 - **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
   i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
   fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
@@ -1109,7 +1151,11 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     giudice (§ 4.6);
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
-    registro delle decisioni (§ 3.6), che è testo di altre domande;
+    registro delle decisioni (§ 3.6), che è testo di altre domande, o il
+    testo di una domanda viva riservata sullo stesso lavoro (§ 3.5, #1928.2)
+    o di un feedback d'origine riservato (§ 3.5, #1928.5). La domanda del
+    terzo guasto (§ 3.8) la compone il server: nasce riservata se lo è il
+    feedback su cui nasce o il biglietto che ha scritto il guasto;
     l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
     riservato, cosa che il server sa già quando li crea. Le eccezioni sono
     due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,

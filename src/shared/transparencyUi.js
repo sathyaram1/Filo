@@ -28,14 +28,30 @@
     var node;
     while ((node = walker.nextNode())) pending.push(node);
 
+    // Si glossa la prima occorrenza nell'ordine di lettura; a pari posto vince la chiave più lunga, così
+    // «crediti di Filo» non lo copre una chiave «crediti». Solo parole intere: «server» non glossa «serverless».
+    var LETTERA = /[a-z0-9à-öø-ÿ]/;
+    function trova(testo, parola) {
+      for (var da = 0; ;) {
+        var pos = testo.indexOf(parola, da);
+        if (pos === -1) return -1;
+        if (!LETTERA.test(testo.charAt(pos - 1)) && !LETTERA.test(testo.charAt(pos + parola.length))) return pos;
+        da = pos + 1;
+      }
+    }
     for (var i = 0; i < pending.length; i++) {
       var textNode = pending[i];
-      for (var t = 0; t < terms.length; t++) {
-        var term = terms[t];
-        if (done[term]) continue;
+      while (textNode) {
         var value = textNode.nodeValue;
-        var at = value.toLowerCase().indexOf(term.toLowerCase());
-        if (at === -1) continue;
+        var lower = value.toLowerCase();
+        var at = -1;
+        var term = null;
+        for (var t = 0; t < terms.length; t++) {
+          if (done[terms[t]]) continue;
+          var pos = trova(lower, terms[t].toLowerCase());
+          if (pos !== -1 && (at === -1 || pos < at)) { at = pos; term = terms[t]; }
+        }
+        if (!term) break;
         var before = value.slice(0, at);
         var match = value.slice(at, at + term.length);
         var after = value.slice(at + term.length);
@@ -52,7 +68,7 @@
         if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
         textNode.parentNode.replaceChild(frag, textNode);
         done[term] = true;
-        if (tail) { textNode = tail; } else { break; }
+        textNode = tail;
       }
     }
   }

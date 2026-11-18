@@ -409,7 +409,7 @@
   // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461); la chiave è anche il loro tipo.
   function avvisoErrore(testo, chiave, opts) {
     try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
-    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave });
+    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave, errore: true });
   }
 
   async function doSignIn() {
@@ -1630,6 +1630,8 @@
     reloadBtn.disabled = !a;
 
     applyChrome(isHomeUrl(a ? a.url : null));
+    // #2390 — nella home e fuori gli avvisi dell'angolo hanno tempi diversi. Al primo disegno NOTIFS può non esserci ancora.
+    try { NOTIFS.cambiaLuogo(); } catch (_) {}
   }
 
   // Gli eventi delle schede stanno sulla striscia: valgono per ogni nodo, anche nato dopo, e leggono la
@@ -1751,6 +1753,16 @@
     let seq = 0;
     // Il puntatore sopra la pila: le carte in vista in quel momento sono lette (#1470).
     let sopraOra = false;
+    // #2390 — dove va un avviso lo dice SN_FORMA_AVVISO: `data-luogo` è angolo (in basso a destra), colonna (una carta
+    // della colonna sinistra della home) o fuori (è diventato una notifica del sistema e aspetta il suo clic).
+    const FORMA = window.SN_FORMA_AVVISO;
+    let davanti = true;
+    let eraHome = null;
+    const inHome = () => { const a = activeTab(); return isHomeUrl(a ? a.url : null); };
+    const riduci = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+    const luogo = (c) => c.dataset.luogo || 'angolo';
+    // Le parcheggiate per il sistema senza durata aspettano il ritorno; oltre questo numero le più vecchie restano solo lì.
+    const FUORI_MAX = 30;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -1762,7 +1774,7 @@
         }
         new MutationObserver(rispecchia).observe(host, {
           childList: true, subtree: true, characterData: true,
-          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa'],
+          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa', 'data-luogo'],
         });
       }
       return host;
@@ -1772,21 +1784,35 @@
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const figli = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const tutte = figli.filter((c) => luogo(c) === 'angolo');
+      const testoDi = (c) => c.querySelector('.shell-notif-msg')?.textContent || '';
+      const azioniDi = (c) => Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || '');
       const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
-        testo: c.querySelector('.shell-notif-msg')?.textContent || '',
-        azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
+        testo: testoDi(c),
+        azioni: azioniDi(c),
         chiusa: c.dataset.closing === '1',
         indirizzo: c.dataset.indirizzo || '',
         // #588.8 — lo scaricamento che la carta porta con sé quando la si trascina.
         trascina: c.dataset.trascina || '',
+        icona: c.dataset.icona || '',
+      }));
+      // Le carte della colonna della home, le più recenti in cima: le disegna la home, il modello resta qui.
+      const colonna = figli.filter((c) => luogo(c) === 'colonna' && c.dataset.closing !== '1').reverse().map((c) => ({
+        id: c.dataset.nid || '',
+        testo: testoDi(c),
+        azioni: azioniDi(c),
+        icona: c.dataset.icona || '',
+        titolo: c.dataset.titolo || '',
+        carta: c.dataset.carta || '',
+        vola: Number(c.dataset.vola) || 0,
       }));
       const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars }, colonna }); } catch (_) {}
     }
     if (api.avvisi) {
       if (api.avvisi.onSopra) {
@@ -1800,6 +1826,8 @@
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
         if (!card || card.dataset.closing === '1') return;
+        // #2390 — la home aveva già la carta di questa cosa e l'ha fatta notare: l'avviso non serve più.
+        if (dati.azione === 'assorbi') { if (card.dataset.carta) dismiss(card, 'ritirata'); return; }
         const btn = dati.azione === 'chiudi'
           ? card.querySelector('.shell-notif-close')
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
@@ -1807,8 +1835,20 @@
       });
       if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
+      if (api.avvisi.davanti) Promise.resolve(api.avvisi.davanti()).then((v) => cambiaDavanti(v !== false)).catch(() => {});
+      if (api.avvisi.onDavanti) api.avvisi.onDavanti((dati) => cambiaDavanti(!(dati && dati.davanti === false)));
+      // Il clic sulla notifica del sistema: Filo è tornato davanti, e l'avviso prende la forma di qui.
+      if (api.avvisi.onRichiama) {
+        api.avvisi.onRichiama((dati) => {
+          const uid = String((dati && dati.uid) || '');
+          const card = uid && Array.from(hostEl().children).find((c) => c.dataset.uid === uid && c.dataset.closing !== '1');
+          if (card && luogo(card) === 'fuori') { colloca(card, true); disponi(); }
+        });
+      }
     }
-    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Le vive dell'angolo: la colonna e le parcheggiate per il sistema non contano nel tetto della pila.
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1' && luogo(c) === 'angolo');
+    const tutteVive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
     // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
     function disponi() {
       const live = vive();
@@ -1842,9 +1882,85 @@
       card._alChiudere = null;
       if (typeof fn === 'function') { try { fn(); } catch (_) {} }
     }
+    // Nella colonna non scade niente; nell'angolo della home anche chi resta finché lo si chiude ci sta il tempo di
+    // leggerlo, poi vola. Le parcheggiate per il sistema tengono i loro tempi: chi aspetta la loro chiusura non resta appeso.
+    const lettura = () => window.SN_AVVISI.durata(undefined, notifConfig.durationSec);
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
-      card._tempo = tempi.avvia(ms, () => dismiss(card, 'scaduta'));
+      card._tempo = null;
+      const qui = luogo(card);
+      if (qui === 'colonna') return;
+      const t = qui === 'fuori' ? ms : FORMA.tempoNellAngolo(ms, { home: inHome(), letturaMs: lettura() });
+      card._tempo = tempi.avvia(t, () => scaduta(card));
+    }
+    // A tempo, e qualcuno aspetta che se ne vada (#2570): la sua scadenza è la sua chiusura, anche nella home.
+    const scadenzaAttesa = (card) => typeof card._alChiudere === 'function' && card._durata > 0;
+    function scaduta(card) {
+      if (luogo(card) === 'angolo' && FORMA.allaScadenza({ home: inHome(), scadenzaAttesa: scadenzaAttesa(card) }) === 'vola') vola(card);
+      else dismiss(card, 'scaduta');
+    }
+    // Il volo lo disegna la home (dall'angolo alla cima della colonna): qui l'avviso cambia solo posto.
+    function vola(card) {
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = null;
+      card.dataset.vola = riduci() ? '0' : String(Date.now());
+      card.dataset.luogo = 'colonna';
+      disponi();
+    }
+    function colloca(card, forzaDavanti = false) {
+      const f = FORMA.forma({
+        davanti: forzaDavanti || davanti, home: inHome(), haCarta: !!card.dataset.carta, riduciMovimento: riduci(), scadenzaAttesa: scadenzaAttesa(card),
+      });
+      if (f === 'angolo' || f === 'sistema') {
+        card.dataset.luogo = f === 'sistema' ? 'fuori' : 'angolo';
+        avviaTempo(card, card._durata);
+        if (f === 'sistema') chiediAlSistema(card);
+      } else {
+        // `carta`: se la home ha già la carta di questa cosa la fa notare e l'avviso se ne va; se no resta una carta.
+        if (card._tempo) card._tempo.annulla();
+        card._tempo = null;
+        card.dataset.vola = '0';
+        card.dataset.luogo = 'colonna';
+      }
+      return f;
+    }
+    function chiediAlSistema(card) {
+      if (!card.dataset.uid) card.dataset.uid = `${Date.now().toString(36)}-${card.dataset.nid}-${Math.random().toString(36).slice(2, 8)}`;
+      const fuori = tutteVive().filter((c) => luogo(c) === 'fuori');
+      for (const c of fuori.slice(0, Math.max(0, fuori.length - FUORI_MAX))) dismiss(c, 'scaduta');
+      const resta = () => {
+        if (luogo(card) !== 'fuori' || card.dataset.closing === '1') return;
+        colloca(card, true);
+        disponi();
+      };
+      const chiesta = api.avvisi && api.avvisi.sistema ? api.avvisi.sistema({
+        uid: card.dataset.uid,
+        testo: card.querySelector('.shell-notif-msg')?.textContent || '',
+        titolo: card.dataset.titolo || '',
+        chiave: card.dataset.key || card.dataset.unica || '',
+      }) : false;
+      Promise.resolve(chiesta).then((ok) => { if (!ok) resta(); }, resta);
+    }
+    // Tornato davanti, quello che aspettava di essere chiuso riprende il suo posto qui; a tempo resta solo nel sistema.
+    function cambiaDavanti(ora) {
+      if (ora === davanti) return;
+      davanti = ora;
+      if (!ora) return;
+      let mosse = false;
+      for (const c of tutteVive()) {
+        if (luogo(c) === 'fuori' && !(c._durata > 0)) { colloca(c); mosse = true; }
+      }
+      if (mosse) disponi();
+    }
+    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono.
+    function cambiaLuogo() {
+      const ora = inHome();
+      if (ora === eraHome) return;
+      eraHome = ora;
+      for (const c of vive()) {
+        if (c.dataset.attesa === '1' || c._durata > 0) continue;
+        avviaTempo(c, c._durata);
+      }
     }
     // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
     function contaUscita(card, esito) {
@@ -1924,10 +2040,12 @@
         gemella.dataset.trascina = opts.trascinaDownloadId ? String(opts.trascinaDownloadId) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        segni(gemella, opts);
         gemella._durata = durata;
-        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
-        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
-        avviaTempo(gemella, durata);
+        // Rinnovata mentre aspettava dietro il «+N» (o nella colonna): è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1' || luogo(gemella) === 'colonna') { delete gemella.dataset.attesa; hostEl().appendChild(gemella); }
+        colloca(gemella);
+        disponi();
         return gemella;
       }
 
@@ -1957,8 +2075,10 @@
       close.addEventListener('click', () => dismiss(card, 'chiusa_x'));
       card.appendChild(close);
       azioni(card, opts.actions);
+      segni(card, opts);
 
       hostEl().appendChild(card);
+      const forma = colloca(card);
       disponi();
       if (sopraOra && card.dataset.attesa !== '1') card._letta = true;
       // forza reflow così la transizione di entrata parte
@@ -1966,7 +2086,8 @@
       card.offsetHeight;
       card.classList.add('show');
 
-      const wantSound = opts.sound !== undefined
+      // Fuori da Filo suona la notifica del sistema, con la sua voce.
+      const wantSound = forma === 'sistema' ? false : opts.sound !== undefined
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
@@ -1975,9 +2096,17 @@
           window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
         } catch (_) {}
       }
-
-      avviaTempo(card, durata);
       return card;
+    }
+    // `carta`: la carta della home che racconta già la stessa cosa (timer:<id>, download:<id>); `icona` e `titolo`
+    // per la carta e la notifica del sistema; `uid`: lo stesso avviso mandato dal main a più finestre.
+    function segni(card, opts) {
+      const carta = typeof opts.carta === 'string' && /^(timer|download):[A-Za-z0-9_-]{1,80}$/.test(opts.carta) ? opts.carta : '';
+      if (carta) card.dataset.carta = carta; else delete card.dataset.carta;
+      card.dataset.icona = FORMA.icona({ icona: opts.icona, carta, errore: !!opts.errore });
+      if (typeof opts.titolo === 'string' && opts.titolo.trim()) card.dataset.titolo = opts.titolo.trim().slice(0, 80);
+      else delete card.dataset.titolo;
+      if (typeof opts.uid === 'string' && opts.uid) card.dataset.uid = opts.uid.slice(0, 80);
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
     function dismissKey(key, esito = 'ritirata') {
@@ -1985,7 +2114,7 @@
         if (c.dataset.key === String(key)) dismiss(c, esito);
       }
     }
-    return { show, dismiss, dismissKey, rispecchia };
+    return { show, dismiss, dismissKey, rispecchia, cambiaLuogo };
   })();
 
   // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
@@ -2107,6 +2236,11 @@
                 if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home', { tipo: 'riordino_schede' });
               }).catch(() => {}),
             };
+          }
+          // #2390 — «Ferma» sull'avviso del timer scaduto: quello che fa il pulsante della suoneria nella fila di schede.
+          if (a && typeof a.fermaTimer === 'string' && !a.onClick && MSG_FILO.FILO_STOP_TIMER_ALARM) {
+            const id = a.fermaTimer;
+            return { label: a.label, onClick: () => api.message({ type: MSG_FILO.FILO_STOP_TIMER_ALARM, id }).catch(() => {}).then(refreshRinging) };
           }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };

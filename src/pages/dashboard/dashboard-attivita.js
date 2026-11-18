@@ -1558,6 +1558,15 @@
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
         const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', parti: a._confirm.parti, avviso: a._confirm.avviso || '' };
+        // #1668 — gli allegati di una segnalazione si vedono in miniatura prima del sì; li prende il main dalla chat.
+        let allegati = null;
+        if (type === 'INVIA_FEEDBACK') {
+          try {
+            const p = await send({ type: MSG.FILO_FEEDBACK_ALLEGATI, action: a, chatId: chat || chatAttuale() || '' });
+            if (p && p.ok && ((p.allegati || []).length || (p.scartati || []).length)) allegati = p;
+          } catch (_) {}
+          if (allegati) Object.assign(opts, { allegati: allegati.allegati || [], scartati: allegati.scartati || [], limiti: allegati.limiti });
+        }
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
@@ -1579,7 +1588,11 @@
         // Le parole di un'altra conversazione non sbloccano niente in questa (#810).
         const qui = !chat || chat === chatAttuale();
         const chiesta = primaRigaConferma(a);
-        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: qui ? paroleUtente() : [], chatId: chat || chatAttuale() || '' });
+        const scelti = opts.allegati ? opts.allegati.filter((v) => v.tieni).map((v) => v.id) : [];
+        const r = await send({
+          type: MSG.FILO_CONFIRM_ACTION, action: a, parole: qui ? paroleUtente() : [], chatId: chat || chatAttuale() || '',
+          ...(type === 'INVIA_FEEDBACK' ? { allegatiScelti: scelti } : {}),
+        });
         // #1373 — la conferma è una pausa del lavoro, non la sua fine: com'è andata (fatta o no) torna al modello, che
         // continua o chiude. Un segreto fermato non torna: il modello cercherebbe un'altra strada per farlo uscire.
         const riprende = !!(r && !r.rejected && !(r.output && r.output.blocked === 'segreto'));

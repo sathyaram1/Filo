@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -53,7 +54,7 @@ test('nessuna chiave da nessuna parte: stringhe vuote, mai undefined', () => {
 // La regola vive in un posto solo: se withDefaults torna a decidere l'ordine da sé, le due
 // strade possono di nuovo divergere come prima del #1107.
 test('withDefaults chiede l\'ordine delle chiavi a SN_CONST.effectiveApiKeys', () => {
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const src = sorgenteHandlers();
   assert.match(src, /SN_CONST\.effectiveApiKeys\(/);
   assert.doesNotMatch(src, /apiKeys\.tavily\s*=/);
 });

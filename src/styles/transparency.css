@@ -126,6 +126,10 @@
   text-underline-offset: 2px;
 }
 
+/* Link a un altro documento: al passaggio la sottolineatura si ispessisce, come un filo tirato. */
+.sn-doc-link:hover,
+.sn-doc-link:focus-visible { text-decoration-thickness: 2px; }
+
 /* Riferimento numerato: piccolo e discreto, ma con un'area di tocco decente. */
 .sn-ref {
   font-size: 0.68em;

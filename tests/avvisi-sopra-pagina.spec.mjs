@@ -450,7 +450,9 @@ test('col riquadro Aiuto aperto gli avvisi della barra non coprono la sua riga p
   await expect.poll(fondoRiga).toBe(prima);
 });
 
-test('un avviso a tempo resta finché il puntatore ci sta sopra, e se ne va da solo quando esce', async ({ shell, avvisi }) => {
+test('un avviso a tempo resta finché il puntatore ci sta sopra, e se ne va da solo quando esce', async ({ shell, avvisi, openTab, testServer }) => {
+  // Su una pagina: nella home, finito il tempo, l'avviso non se ne va ma vola nella colonna (#2390).
+  await testServer.openReady(openTab, '<h1>Una pagina</h1>');
   await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', {
     durationSec: 2,
     actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }],

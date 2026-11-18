@@ -111,7 +111,7 @@ test('fasce, tipi, passi, proposte e automatismi sono quelli del codice, e ognun
   const dove = {
     apri_da_altro_paese: 'src/main/tabs/tabGeoBlock.js', email_account: 'src/main/propostaEmail.js',
     riquadro_rotto: 'src/main/services/riquadriRotti.js', resta_connesso: 'src/main/services/handlers/contatori.js',
-    banner_cookie: 'src/main/tabs/tabCookies.js', zoom_ricordato: 'src/main/tabs.js', segnalazione_automatica: 'src/main/services/handlers.js',
+    banner_cookie: 'src/main/tabs/tabCookies.js', zoom_ricordato: 'src/main/tabs.js', segnalazione_automatica: 'src/main/services/osservazioniPerModello.js',
     pubblicita_saltata: 'src/content/adSkip.js',
   };
   for (const t of [...H.TIPI_PROPOSTA, ...H.AUTOMATISMI]) assert.ok(leggi(dove[t]).includes(`'${t}'`), `nessuno conta ${t}`);

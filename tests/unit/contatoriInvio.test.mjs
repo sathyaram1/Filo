@@ -459,7 +459,7 @@ test('ogni banco che spedisce i contatori porta la sua identità finta, mai quel
 // L'identità anonima la crea chiunque con la chiave web: la Privacy non promette che riconosca Filo, e lo scopo dello
 // pseudonimo resta attaccato allo pseudonimo, non alle frasi sull'identità.
 test('la Privacy dice dell’identità dei contatori solo quello che è vero, senza staccare lo pseudonimo dal suo scopo (#1547)', () => {
-  for (const f of ['transparency/privacy.md', 'site/transparency/privacy.html']) {
+  for (const f of ['transparency/privacy-completa.md', 'site/transparency/privacy-completa.html']) {
     const t = readFileSync(join(ROOT, f), 'utf8');
     assert.doesNotMatch(t, /accetta solo contatori che arrivano da una copia di Filo/, f);
     assert.match(t, /una anonima se la può creare chiunque/, `${f}: l’identità non prova che i contatori vengano da Filo`);

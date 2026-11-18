@@ -69,11 +69,13 @@ test('senza portachiavi: all\'accesso Filo dice subito che non verrà ricordato'
     await expect(avviso).toContainText('GNOME Keyring');
     await expect(avviso).not.toContainText('KWallet');
   } else await expect(avviso).not.toContainText('GNOME Keyring');
-  // Resta finché non lo si chiude: chi era sulla pagina di Google lo trova al ritorno.
-  await shell.waitForTimeout(6_500);
-  await expect(avviso).toBeVisible();
   mkdirSync(SHOTS, { recursive: true });
   await vista.screenshot({ path: join(SHOTS, 'accesso-non-ricordato.png') });
+  // Resta finché non lo si chiude: chi era sulla pagina di Google lo trova al ritorno, nella home in cima alla colonna
+  // delle carte dopo il tempo di leggerlo (#2390).
+  await shell.waitForTimeout(6_500);
+  const home = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+  await expect(home.locator('#accade > .dash-carta[data-tipo="cornice"]', { hasText: 'dovrai accedere di nuovo' })).toBeVisible();
 
   const stato = await shell.evaluate(() => window.filoShell.auth.status());
   expect(stato.signedIn).toBe(true);

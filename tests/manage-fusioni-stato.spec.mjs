@@ -1,6 +1,7 @@
 // Gestione: rosso e in cima solo una fusione che aspetta davvero l'owner (#1425, #1040.2); la riga dei tasti non
 // chiude una pratica mentre la sua fusione aspetta (#928); quadrato, registro dei rifiuti e Log dicono il vero (#1327);
 // la scheda della richiesta tiene il tempo, mostra la rotella e dice il ruolo in italiano (#1328). Pacchetto #1839.
+// Dopo il sì, un conflitto con main non chiede niente all'owner se il lavoro è in main o aspetta una domanda (#2193).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -106,6 +107,43 @@ test('In coda: una fusione approvata in conflitto che la routine riallinea non �
   await expect(box.locator('.sn-mac-title-text')).toHaveText('Una fusione approvata è da riallineare');
   await expect(box.locator('.sn-mac-why')).toContainText('torna da solo alla routine');
   await page.screenshot({ path: 'tests/.shots/fusioni-stato-riallinea.png' });
+});
+
+// ── #2193: dopo il sì il conflitto con main non chiede niente all'owner ──────
+
+test('fusione approvata in conflitto: sparisce se il lavoro è in main, aspetta la risposta se la pratica ha una domanda', async ({ openTab }) => {
+  const docs = [
+    fb('fusa733', 733, { status: 'done', resolvedInVersion: '0.2.150', branch: 'worker/nuovo' }),
+    fb('domanda798', 798, { status: 'design', statusReason: 'clarify', domandaId: 'D-221' }),
+  ];
+  const page = await apri(openTab, docs, {
+    failed: [
+      richiesta('a'.repeat(24), 'fusa733', 733, { used: true, outcome: 'conflict', branch: 'worker/vecchio' }),
+      richiesta('b'.repeat(24), 'domanda798', 798, { used: true, outcome: 'conflict' }),
+    ],
+  });
+
+  // Nei Ricevuti nessuna delle due chiede la fusione: niente chip rosso, niente «fusione non avvenuta».
+  await apriScheda(page, 'inbox');
+  await expect(page.locator('#mgList .mg-fusione-badge', { hasText: 'fusione non avvenuta' })).toHaveCount(0);
+  await expect(scheda(page, 'fusa733')).toHaveCount(0);
+  await expect(page.locator('#mgList .mg-item--fusione')).toHaveCount(0);
+
+  // La pratica ferma sulla domanda dice cosa aspetta, senza rosso.
+  await page.evaluate(() => window.__mgTest.openDetail('domanda798'));
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  const box = page.locator('#mgSideBody .sn-mac-failed');
+  await expect(box).toHaveClass(/sn-mac-failed--in-corso/);
+  await expect(box.locator('.sn-mac-card-failed')).toHaveAttribute('data-riallineamento', 'dopo_domanda');
+  await expect(box.locator('.sn-mac-why')).toContainText('Si riallinea da sola dopo la tua risposta a D-221');
+  await expect(box).not.toContainText('In coda');
+  await page.screenshot({ path: 'tests/.shots/fusioni-stato-dopo-domanda.png' });
+
+  // La pratica col lavoro in main: il quadrato dice che è entrato, e nessuna scheda di fusione non avvenuta.
+  await page.evaluate(() => window.__mgTest.openDetail('fusa733'));
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText('Il lavoro è entrato in main');
+  await expect(page.locator('#mgSideBody .sn-mac-failed')).toHaveCount(0);
 });
 
 // ── #928: niente «Risolto» né altre chiusure mentre la fusione aspetta ──────

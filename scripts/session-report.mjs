@@ -195,6 +195,30 @@ export function slugProgetto(percorso) {
   return String(percorso || '').replace(/[^A-Za-z0-9]/g, '-');
 }
 
+// I comandi della shell che scaricano da un indirizzo, contati in `tools.byName` sotto questo nome (#2337).
+export const STRUMENTO_RETE = 'Bash_rete';
+// L'elenco del classificatore dei comandi (PROGRAMMI_RETE di src/shared/cmdClassify.js), qui senza importarlo: un
+// modulo dell'app raggiunto da uno script dell'owner vorrebbe il suo sì a ogni modifica. La sentinella in
+// tests/unit/perizia.test.mjs li tiene uguali. In più gh, e un interprete che apre un indirizzo; git solo con un indirizzo.
+const RE_PROGRAMMA_RETE = /^(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin|tracert|traceroute|whois|socat|smbclient|git)(?:\.exe)?\b/i;
+const RE_SOLO_QUI = /^gh(?:\.exe)?\b/i;
+const RE_INTERPRETE = /^(?:node|nodejs|deno|bun|python[0-9.]*|py|perl|ruby|php|pwsh|powershell)(?:\.exe)?\b/i;
+const RE_INDIRIZZO = /\b(?:https?|ftp):\/\//i;
+const RE_PREFISSI = /^(?:(?:sudo|command|exec|nohup|time|env(?:\s+\S+=\S*)*|xargs(?:\s+-\S+)*)\s+)+/i;
+
+/** Il comando chiama la rete? Ogni pezzo in posizione di comando, anche col percorso intero del programma. PURA. */
+export function chiamaLaRete(comando) {
+  const tutto = String(comando || '');
+  for (const pezzo of tutto.split(/[;&|\n`()]|\$\(/)) {
+    const s = pezzo.trim().replace(RE_PREFISSI, '').replace(/^["']?(?:[^\s"']*[\\/])?/, '');
+    const m = RE_PROGRAMMA_RETE.exec(s);
+    if (m && (!/^git\b/i.test(m[0]) || RE_INDIRIZZO.test(s))) return true;
+    // Il codice di un interprete sta fra virgolette e parentesi, che spezzano il comando: l'indirizzo si cerca in tutto.
+    if (RE_SOLO_QUI.test(s) || (RE_INTERPRETE.test(s) && RE_INDIRIZZO.test(tutto))) return true;
+  }
+  return false;
+}
+
 /** Una chiave ammessa da Firestore: solo [A-Za-z0-9_-], il resto diventa `_`. PURA. */
 export function chiaveSicura(nome) {
   const s = String(nome || '').replace(/[^A-Za-z0-9_-]/g, '_');
@@ -711,7 +735,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
         const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
         const ordine = rep.tools.total;
-        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') { comandi.push(input.command); ultimaShell = ordine; }
+        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') {
+          comandi.push(input.command);
+          ultimaShell = ordine;
+          // Il server ritira la fiducia del manutentore a ogni strumento fuori dall'elenco pulito (#2337): la rete della shell conta a parte.
+          if (chiamaLaRete(input.command)) rep.tools.byName[STRUMENTO_RETE] = (rep.tools.byName[STRUMENTO_RETE] || 0) + 1;
+        }
         const file = percorsoNorma(typeof input.file_path === 'string' ? input.file_path : input.notebook_path).join('/');
         if (file && (b.name === 'Read' || STRUMENTI_SCRITTURA.includes(b.name))) {
           Object.assign(info, { file, ordine });

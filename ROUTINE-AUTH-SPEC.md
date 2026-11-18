@@ -232,7 +232,7 @@ diventa un **muro**.
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver scritto la critica, nella verifica piena, i rilievi del sotto-agente che legge il diff con la richiesta davanti (`lettura-diff.md`, #1363: la registrazione rifiuta la critica senza la sua ricevuta); **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `risposta` | la **sua domanda** (conversazione e note per gli agenti, allegati dell'owner aperti), numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5) | testi di feedback, diff, rami; nessun passaggio di stato, nessuna azione di consenso |
-| `smistamento` | la **sua domanda** appena nata (note per gli agenti comprese), il feedback da cui viene con conversazione e note, numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5, #1790) | diff, rami; le azioni fuori da `guasto`, `ricevuti`, `automatica` e `pubblica`; nessuna azione di consenso |
+| `smistamento` | la **sua domanda** appena nata (note per gli agenti comprese), il feedback da cui viene con conversazione e note, numero, stato e priorità dei feedback che nomina; le altre domande vive sullo stesso lavoro, il testo di quelle riservate e il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5, #1790, #1928.2) | diff, rami; le azioni fuori da `guasto`, `ricevuti`, `automatica` e `pubblica`; nessuna azione di consenso |
 
 Delle note di un feedback chi lo lavora riceve solo la spec di un pacchetto nato
 prima di #2033 (FEEDBACK-STATES.md § 3a, #2038): i turni «SPEC DEL PACCHETTO»,
@@ -283,6 +283,17 @@ rispettare.
   inventata, e il server non lo distingue ancora da una vera: la fiducia per
   sessione (§ 2, principio 6) ferma chi usa la propria sessione o la toglie,
   non chi la inventa. Aperto in #2044.
+- **Una sessione locale decide da sola se il suo biglietto nasce pulito**
+  (#1924.1, limite accettato dall'owner con D-263). La parola d'ordine di
+  sessione le toglie le azioni di consenso (segnare fidato, approvare fusioni,
+  archiviare), ma il biglietto locale nasce pulito se la sessione non dice di
+  essere sporca, e uno nuovo si prende quando si vuole. Una sessione che ha
+  letto un testo non fidato e ne segue le istruzioni prende un biglietto
+  pulito: quello che apre nasce fidato, i rami che dichiara risultano fidati e
+  la loro fusione salta L5. Il server non sa cosa la sessione ha letto prima di
+  chiedere. Chiuderlo vuole un gesto dell'owner a ogni biglietto pulito (nasce
+  non fidato, lo pulisce lui dalla Gestione): scartato perché costa ogni
+  giorno, contro un attacco mirato che sappia come si riparte puliti.
 
 ---
 

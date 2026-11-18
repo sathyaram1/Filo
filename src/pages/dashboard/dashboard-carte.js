@@ -23,6 +23,7 @@
     tuttiSuggerimenti: false,
     downloads: [],
     lavori: [],
+    cornice: [],
     editor: null,
     mazzi: null,
     impostazioni: null,
@@ -373,6 +374,114 @@
     return carta;
   }
 
+  // ===== Gli avvisi della barra volati qui (#2390) =====
+  // Il modello sta nella shell della finestra: la carta ne mostra testo e azioni, e ogni gesto torna a lei.
+  const TITOLO_DA_ICONA = { warning: 'Avviso', download: 'Scaricamento', timer: 'Timer', alarm: 'Sveglia' };
+  function cartaCornice(a) {
+    const allaShell = (azione) => () => d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione });
+    const chiudi = allaShell('chiudi');
+    const azioni = (a.azioni || []).map((etichetta, i) => ({ etichetta, fai: allaShell(String(i)) })).filter((x) => x.etichetta);
+    return {
+      chiave: `cornice:${a.id}`, tipo: 'cornice', icona: a.icona || 'bell',
+      titolo: a.titolo || TITOLO_DA_ICONA[a.icona] || 'Filo', stato: a.testo, lungo: true,
+      principale: azioni[0] ? { ...azioni[0], forte: true } : { etichetta: 'Chiudi', fai: chiudi },
+      secondaria: azioni[0] ? (azioni[1] || { etichetta: 'Chiudi', fai: chiudi }) : null,
+      // Come «Chiudi tutti» della pila nell'angolo: più avvisi volati qui si tolgono con un gesto.
+      altreVoci: dati.cornice.length > 1
+        ? [...azioni.slice(2), { etichetta: 'Chiudi tutti gli avvisi', fai: () => { for (const x of dati.cornice) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); } }]
+        : azioni.slice(2),
+      togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
+      filo: a.testo,
+    };
+  }
+  // Un avviso che racconta una cosa che ha già la sua carta non diventa una carta in più: la home fa notare quella,
+  // e solo se si vede (in una home dietro un'altra scheda l'avviso aspetta, senza doppioni).
+  const assorbiti = new Set();
+  function separaCornice(chiavi) {
+    const nuove = [];
+    const da = [];
+    for (const a of dati.cornice) {
+      if (a.carta && chiavi.has(a.carta)) {
+        if (document.visibilityState === 'visible' && !assorbiti.has(a.id)) { assorbiti.add(a.id); da.push(a); }
+        continue;
+      }
+      nuove.push(a);
+    }
+    for (const a of da) {
+      d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione: 'assorbi' });
+      // Al giro dopo: il timer che suona arriva un attimo dopo il suo avviso e rifà la carta.
+      setTimeout(() => fattiNotare(a.carta), 400);
+    }
+    return nuove;
+  }
+  const movimentoRidotto = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+  function durataMoto(ms) {
+    const m = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sn-motion'));
+    return Math.round(ms * (Number.isFinite(m) ? m : 1));
+  }
+  function fattiNotare(chiave) {
+    const art = [...accadeEl.querySelectorAll(':scope > .dash-carta')].find((n) => n.dataset.chiave === chiave);
+    if (!art) return;
+    try { art.scrollIntoView({ block: 'nearest', behavior: movimentoRidotto() ? 'auto' : 'smooth' }); } catch (_) {}
+    art.classList.remove('dash-notare');
+    // eslint-disable-next-line no-unused-expressions
+    art.offsetWidth;
+    art.classList.add('dash-notare');
+    clearTimeout(art._notare);
+    art._notare = setTimeout(() => art.classList.remove('dash-notare'), 2400);
+  }
+  // Il volo: dall'angolo in basso a destra, dove l'avviso stava, alla sua carta in cima alla colonna. Lo fa una
+  // copia sopra la pagina (la colonna taglierebbe la carta vera), che lascia il posto alla carta all'arrivo.
+  const VOLO_MS = 560;
+  const volate = new Set();
+  function volaQui() {
+    const ora = Date.now();
+    for (const a of dati.cornice) {
+      if (!a.vola || volate.has(a.id)) continue;
+      volate.add(a.id);
+      if (ora - a.vola > 2500 || document.visibilityState !== 'visible' || movimentoRidotto()) continue;
+      const art = [...accadeEl.querySelectorAll(':scope > .dash-carta')].find((n) => n.dataset.chiave === `cornice:${a.id}`);
+      const ms = durataMoto(VOLO_MS);
+      if (art && ms > 0) vola(art, ms);
+    }
+  }
+  function vola(art, ms) {
+    const r = art.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const w = Math.min(360, global.innerWidth * 0.8);
+    const h = Math.max(44, Math.min(r.height, 120));
+    const da = { x: global.innerWidth - 16 - w, y: global.innerHeight - 16 - h };
+    const copia = art.cloneNode(true);
+    copia.removeAttribute('id');
+    copia.classList.add('dash-carta-in-volo');
+    copia.setAttribute('aria-hidden', 'true');
+    Object.assign(copia.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    document.body.appendChild(copia);
+    art.style.visibility = 'hidden';
+    const fine = () => { copia.remove(); art.style.visibility = ''; };
+    try {
+      const anim = copia.animate([
+        { transform: `translate(${da.x - r.left}px, ${da.y - r.top}px) scale(${w / r.width}, ${h / r.height})`, opacity: 0.85 },
+        { transform: 'translate(0, 0) scale(1, 1)', opacity: 1 },
+      ], { duration: ms, easing: 'cubic-bezier(.2, .75, .25, 1)' });
+      anim.onfinish = fine;
+      anim.oncancel = fine;
+    } catch (_) { fine(); }
+  }
+  async function caricaCornice() {
+    const r = await d.send({ type: MSG.AVVISI_COLONNA_LEGGI });
+    if (r && r.ok && Array.isArray(r.carte)) riceviCornice(r.carte, { senzaVolo: true });
+  }
+  // Riaperta o tornata in vista, la home non rifà i voli di prima.
+  function riceviCornice(carte, { senzaVolo = false } = {}) {
+    dati.cornice = (Array.isArray(carte) ? carte : []).filter((a) => a && a.id);
+    if (senzaVolo) for (const a of dati.cornice) volate.add(a.id);
+    const vivi = new Set(dati.cornice.map((a) => a.id));
+    for (const id of assorbiti) if (!vivi.has(id)) assorbiti.delete(id);
+    disegna();
+    volaQui();
+  }
+
   // L'ordine (urgenza di Filo, poi quello dell'utente) lo decide il modulo condiviso: la chat lo legge uguale.
   const PER_TIPO = {
     crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
@@ -384,9 +493,15 @@
       crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
     };
   }
+  // Gli avvisi volati qui stanno in cima, i più recenti per primi, e lì restano finché li si chiude.
   function carteSinistra() {
     programmaLavori();
-    return C.sinistra(datiSinistra(), layout).map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa }));
+    const voci = C.sinistra(datiSinistra(), layout);
+    const cornice = separaCornice(new Set(voci.map((v) => v.chiave)));
+    return [
+      ...cornice.map((a) => Object.assign(cartaCornice(a), { fissa: true })),
+      ...voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa })),
+    ];
   }
 
   // ===== Le carte di destra =====
@@ -1108,6 +1223,7 @@
       if (msg.type === MSG.CARTE_HOME_CAMBIATE && msg.layout) { layout = C.normalizza(msg.layout); disegna(); }
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
+      else if (msg.type === MSG.AVVISI_COLONNA && Array.isArray(msg.carte)) riceviCornice(msg.carte);
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
       else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
       else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
@@ -1123,10 +1239,12 @@
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
         caricaPrimoIncontro().catch(() => {});
+        // Tornata davanti: un avviso con la sua carta arrivato mentre era dietro adesso si fa notare.
+        disegna();
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
-      caricaAperte(true)]).catch(() => {});
+      caricaAperte(true), caricaCornice()]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {

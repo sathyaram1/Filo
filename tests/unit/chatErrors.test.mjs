@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/chatErrors.js');
@@ -173,7 +174,7 @@ test('ogni errore che il main scrive per l’utente è nella lista dei codici gi
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
   const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const src = sorgenteHandlers();
   const righe = src.split('\n');
   for (let i = 0; i < righe.length; i += 1) {
     const m = /\b\w+\.code\s*=\s*'([A-Z_]+)'/.exec(righe[i]);

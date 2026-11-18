@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sorgenteHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -165,7 +166,7 @@ test('ogni voce degli elenchi che nascono qui la conta qualcuno', () => {
   assert.match(g, /contaAccesso\('browser', motivo\)/);
   assert.match(g, /contaAccesso\('browser', 'senza_scheda'\)/);
   for (const e of R.ESITI_RINNOVO) assert.match(g, new RegExp(`contaAccesso\\('rinnovo', '${e}'\\)`));
-  const handlers = leggi('src/main/services/handlers.js');
+  const handlers = sorgenteHandlers();
   const attesa = leggi('src/main/services/autoFeedbackAttesa.js');
   for (const e of ['sostituita', 'spenta']) assert.match(handlers, new RegExp(`esito\\('${e}'\\)`));
   for (const e of ['inviata', 'in_coda', 'fallita', 'annullata']) assert.ok(attesa.includes(`'${e}'`), e);

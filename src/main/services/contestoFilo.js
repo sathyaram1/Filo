@@ -65,6 +65,19 @@ function ricordaImmagini(chat, ts, immagini) {
   while (caratteriFoto > MAX_CARATTERI_FOTO && foto.size > 1) togliFoto(foto.keys().next().value);
 }
 
+// L'ultima finestra guardata in una chat, solo perché l'utente la possa allegare a una segnalazione (#1668): in memoria,
+// mai su disco né al modello della chat, una per chat; se ne va con la chat come le foto.
+const MAX_SCHERMATE = 32;
+const schermate = new Map();
+function ricordaSchermata(chat, { dataUrl, nome } = {}) {
+  if (!chat || typeof dataUrl !== 'string' || !/^data:image\//i.test(dataUrl)) return;
+  if (require('../shim/storage').inIncognito()) chatIncognito.add(chat);
+  schermate.delete(chat);
+  schermate.set(chat, { dataUrl, nome: String(nome || '') });
+  while (schermate.size > MAX_SCHERMATE) schermate.delete(schermate.keys().next().value);
+}
+const schermataDi = (chat) => (chat && schermate.get(chat)) || null;
+
 // Un messaggio uscito dal tratto non torna più davanti al modello: le sue immagini non servono più.
 function potaFoto(vecchi) {
   if (!foto.size) return;
@@ -173,6 +186,7 @@ function dimentica(chat) {
     esiti.clear();
     foto.clear();
     caratteriFoto = 0;
+    schermate.clear();
     preamboli.clear();
     giri.clear();
     fotografie.normale = null;
@@ -181,6 +195,7 @@ function dimentica(chat) {
   }
   for (const mappa of [esiti, preamboli, giri]) for (const k of [...mappa.keys()]) if (k.startsWith(`${chat}|`)) mappa.delete(k);
   for (const k of [...foto.keys()]) if (k.startsWith(`${chat}|`)) togliFoto(k);
+  schermate.delete(chat);
 }
 
 // Tutto il filo in messaggi, in ordine di tempo. A parità d'ora decide la conversazione: lo stesso ordine a ogni turno.
@@ -596,7 +611,7 @@ function riparti(incognito = false) {
 }
 
 module.exports = {
-  ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
+  ricordaEsiti, ricordaImmagini, ricordaSchermata, schermataDi, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
   senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, caratteriPreambolo, ultimaFotografia, riparti, eventiDa, eventiDavanti, diIncognito, durataMs,
 };
 globalThis.SN_CONTESTO_FILO = module.exports;

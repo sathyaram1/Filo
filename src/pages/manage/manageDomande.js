@@ -47,6 +47,19 @@
   const TITOLO_SEGNA_FIDATA = 'L’hai letta, note per gli agenti comprese: chi riprende un lavoro con la sua decisione non si sporca più';
   const TITOLO_TOGLI_FIDUCIA = 'Torna non fidata: chi ne riceve le note si sporca di nuovo';
   const segnataDaTe = (d) => `Segnata fidata da te ${quando(d.fidataDallOwner.il, true)}.`;
+  // Il segno che separa le cose da fare da quelle da decidere (#2229), uguale in elenco e nella domanda aperta.
+  const TIPO = {
+    da_fare: { nome: 'da fare', titolo: 'Un passo che solo tu puoi fare: quando l’hai fatto, premi «Fatto».' },
+    da_decidere: { nome: 'da decidere', titolo: 'Una scelta che spetta a te: le opzioni dicono cosa fa ognuna.' },
+  };
+  const tipoDi = (d) => (D.daFare(d) ? 'da_fare' : 'da_decidere');
+  function segnoTipo(d, cls) {
+    const t = tipoDi(d);
+    const s = el('span', `${cls} ${cls}--${t === 'da_fare' ? 'fare' : 'decidere'}`, TIPO[t].nome);
+    s.dataset.tipo = t;
+    s.title = TIPO[t].titolo;
+    return s;
+  }
 
   // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
   // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
@@ -272,7 +285,9 @@
     if (nelGruppo) li.classList.add('mg-domanda--gruppo');
     if (aperta && aperta.ids.includes(li.dataset.id)) li.classList.add('mg-domanda--aperta');
     if (tab === 'domande') li.appendChild(casella([li.dataset.id], `Scegli ${li.dataset.id} per «Applica il consiglio»`));
+    li.dataset.tipo = tipoDi(d);
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
+    li.appendChild(segnoTipo(d, 'mg-domanda-tipo'));
     const titolo = el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)'));
     // Sotto il titolo quello che la scheda deve dire senza aprire: la scelta e il principio di un'automatica,
     // il lavoro che una in smistamento tiene fermo, chi ha risposto fuori da qui (#2011).
@@ -360,7 +375,7 @@
     const bl = blocchi(scheda);
     const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
       bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia,
-        d.priorita, d.blocca, d.legata, lavoroFermo(d), principioUsato(d), sceltaFatta(d)])])]);
+        d.priorita, d.blocca, d.legata, lavoroFermo(d), principioUsato(d), sceltaFatta(d), tipoDi(d)])])]);
     if (firma === firmaLista && !lista.hidden) return;
     firmaLista = firma;
     const nuove = [];
@@ -494,6 +509,7 @@
   function testata(d) {
     const meta = el('div', 'mg-dq-meta');
     meta.appendChild(el('span', 'mg-dq-num', idDi(d)));
+    meta.appendChild(segnoTipo(d, 'mg-dq-tipo'));
     if (PRIORITA[d.priorita]) {
       const p = el('span', 'mg-dq-prio', PRIORITA[d.priorita]);
       p.dataset.priorita = d.priorita;
@@ -583,6 +599,12 @@
   }
 
   function etichettaDi(o) { return o ? D.etichettaAzione(o.azione, stato.riferimenti) : null; }
+  // In un «da fare» il contesto dice perché serve e il problema i passi; le opzioni sono i pulsanti per chiuderlo.
+  function nomiSezioni(d) {
+    return D.daFare(d)
+      ? { contesto: 'Perché serve', problema: 'Cosa fare', opzioni: 'Quando hai finito' }
+      : { contesto: 'Contesto', problema: 'Problema', opzioni: 'Opzioni' };
+  }
   function consigliata(d) {
     return d.consiglio && Number.isInteger(d.consiglio.opzione) ? (d.opzioni || [])[d.consiglio.opzione] || null : null;
   }
@@ -612,7 +634,7 @@
         li.appendChild(pc);
       }
       if (rispondibile) {
-        const etichetta = etichettaDi(o);
+        const etichetta = D.etichettaOpzione(d, i, stato.riferimenti);
         if (etichetta) {
           const b = el('button', 'sn-btn mg-dq-azione', etichetta);
           b.type = 'button';
@@ -628,7 +650,7 @@
       }
       lista.appendChild(li);
     });
-    return sezione('mg-dq-opz', 'Opzioni', lista);
+    return sezione('mg-dq-opz', nomiSezioni(d).opzioni, lista);
   }
 
   function consiglio(d) {
@@ -948,8 +970,9 @@
       art.appendChild(risposta(d));
       return art;
     }
-    if (d.contesto) art.appendChild(sezione('', 'Contesto', md(d.contesto)));
-    if (d.problema) art.appendChild(sezione('', 'Problema', md(d.problema)));
+    const nomi = nomiSezioni(d);
+    if (d.contesto) art.appendChild(sezione('', nomi.contesto, md(d.contesto)));
+    if (d.problema) art.appendChild(sezione('', nomi.problema, md(d.problema)));
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
@@ -1012,7 +1035,10 @@
       if (!d || d.stato !== 'aperta') { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
       const o = consigliata(d);
       const etichetta = etichettaDi(o);
-      if (!etichetta) { fuori.push({ id, perche: o ? 'il consiglio da qui non si applica' : 'nessun consiglio' }); continue; }
+      if (!etichetta) {
+        fuori.push({ id, perche: D.daFare(d) ? 'da fare: la segni tu, con «Fatto», quando l’hai fatta' : o ? 'il consiglio da qui non si applica' : 'nessun consiglio' });
+        continue;
+      }
       const v = D.validaAzione(o.azione);
       if (tante && v.ok && !D.TIPI[v.azione.tipo].bulk) { fuori.push({ id, perche: `una per una: ${etichetta}` }); continue; }
       voci.push({ id, etichetta });
@@ -1269,13 +1295,14 @@
   // La domanda come la vede l'owner, in testo: è quello che Filo legge di una riga trascinata in chat.
   function riferimentoDi(d) {
     const id = idDi(d);
-    const righe = [`Domanda ${id} (${[PRIORITA[d.priorita], NOMI_SCHEDA[MR.schedaDomanda(d)]].filter(Boolean).join(', ').toLowerCase()})`];
+    const nomi = nomiSezioni(d);
+    const righe = [`Domanda ${id} (${[TIPO[tipoDi(d)].nome, PRIORITA[d.priorita], NOMI_SCHEDA[MR.schedaDomanda(d)]].filter(Boolean).join(', ').toLowerCase()})`];
     if (d.illeggibile) righe.push('Il server non riesce ad aprire il testo di questa domanda.');
-    if (d.contesto) righe.push('', 'Contesto:', String(d.contesto));
-    if (d.problema) righe.push('', 'Problema:', String(d.problema));
+    if (d.contesto) righe.push('', `${nomi.contesto}:`, String(d.contesto));
+    if (d.problema) righe.push('', `${nomi.problema}:`, String(d.problema));
     const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
     if (ops.length) {
-      righe.push('', 'Opzioni:');
+      righe.push('', `${nomi.opzioni}:`);
       ops.forEach((o, i) => {
         const segni = [d.consiglio && d.consiglio.opzione === i ? 'consigliata' : '', sceltaFatta(d) === i && d.stato !== 'aperta' ? 'scelta' : ''].filter(Boolean);
         righe.push(`${i + 1}. ${o.testo}${segni.length ? ` (${segni.join(', ')})` : ''}`);

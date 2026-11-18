@@ -13,6 +13,9 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Le regole dell'angolo di una pagina: nella home, finito il tempo, un avviso vola nella colonna (#2390).
+test.beforeEach(async ({ openTab, testServer }) => { await testServer.openReady(openTab, '<h1>Una pagina</h1>'); });
+
 test('notifica a tempo sparisce dopo il timeout', async ({ shell, avvisi }) => {
   await shell.evaluate(() => window.filoNotify('Notifica a tempo', { durationSec: 1 }));
 

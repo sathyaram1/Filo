@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileDiHandlers } from '../helpers/sorgenteHandlers.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -124,7 +125,7 @@ test('il motivo del silenzio distingue la chiave, l’interruttore e i modelli',
 test('nessun controllo di prontezza legge apiKeys[settings.provider]', async () => {
   const { readFileSync } = await import('node:fs');
   const files = [
-    join(ROOT, 'src', 'main', 'services', 'handlers.js'),
+    ...fileDiHandlers(),
     join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'),
     join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'),
   ];
