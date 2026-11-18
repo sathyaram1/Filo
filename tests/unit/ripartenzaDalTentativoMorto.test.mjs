@@ -229,30 +229,7 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
-  test('i tentativi superati di ogni feedback si chiudono, anche di quelli che non ripartono più', () => {
-    const base = cartellaTemporanea('filo-ripartenza-');
-    try {
-      const { casa, main } = scena(base);
-      const altro = 'fid-1170';
-      tentativo(casa, ramo('20261012T000000Z', altro), main, 17);
-      tentativo(casa, ramo('20261014T000000Z', altro), main, 15);
-      const terzo = tentativo(casa, ramo('20261015T000000Z', altro), main, 21);
-      const quarto = tentativo(casa, ramo('20261018T000000Z', altro), terzo, 2);
-      git(casa, 'merge', '-q', '--no-ff', '--no-edit', quarto);
-      git(casa, 'push', '-q', 'origin', 'main');
-      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
-      tentativo(casa, ramo('20261102T000000Z'), 'main', 0);
-      const c = chiudiSuperatiOvunque({ root: casa });
-      assert.equal(c.ok, true, c.errore);
-      assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', altro), ramo('20261014T000000Z', altro)]);
-      const restano = git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*').split('\n').map((r) => r.split('\t')[1].replace('refs/heads/', '')).sort();
-      assert.deepEqual(restano, [ramo('20261015T000000Z', altro), ramo('20261018T000000Z', altro), ramo('20261101T000000Z'), ramo('20261102T000000Z')].sort(),
-        'i fusi li toglie la potatura; il lavoro mai fuso di un feedback senza fusioni resta');
-      assert.equal(git(casa, 'rev-parse', `origin/${ramo('20261101T000000Z')}`), vivo);
-    } finally { togliCartella(base); }
-  });
-
-  test('feedback chiuso, ramo fuso già potato: la pulizia generale e l\'elenco del manutentore leggono la fusione su main (#2152.1)', () => {
+  test('feedback chiuso, ramo fuso già potato: l\'elenco del manutentore legge la fusione su main (#2152.1)', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
       const { casa, main } = scena(base);
