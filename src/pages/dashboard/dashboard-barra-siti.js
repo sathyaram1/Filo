@@ -367,11 +367,12 @@
     document.addEventListener('drop', lasciaSullaPagina);
     // Una scheda portata giù dalla fila (#2084) arriva dal main come per la chat: qui diventa una voce.
     if (global.SN_SCHEDA_TRASCINATA) {
+      // Anche una pagina di Filo o un file: quello che non entra lo dice il main, con l'avviso.
       global.SN_SCHEDA_TRASCINATA.registraChat(d.riga, (s) => {
         if (!s || !s.url) return false;
         muovi({ tipo: 'aggiungi', url: s.url, nome: s.titolo, icona: s.icona });
         return true;
-      });
+      }, { ogniScheda: true });
     }
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.BARRA_SITI_CAMBIATA && Array.isArray(msg.voci)) disegna(msg.voci);
