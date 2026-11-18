@@ -38,7 +38,7 @@ function chiChiama(re) {
     .map((p) => relative(TESTS, p).replace(/\\/g, '/'));
 }
 
-test('i due riconoscitori prendono le chiamate e lasciano stare i commenti', () => {
+test('i riconoscitori prendono le chiamate e lasciano stare i commenti', () => {
   assert.ok(FIRST_WINDOW.test(righeDiCodice('const s = await app.firstWindow({ timeout: 5000 });')));
   assert.ok(ATTESA_WINDOW.test(righeDiCodice("const p = await app.waitForEvent('window');")));
   assert.ok(ATTESA_WINDOW.test(righeDiCodice('const p = await app.waitForEvent( "window", { timeout: 1 });')));
