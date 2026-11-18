@@ -623,7 +623,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   if (dopo) return dopo;
   const v = verdetto(esito.url, analizza);
   const p = porzione(String(esito.testo || ''), Number(da));
-  return {
+  const letta = {
     ...vuoto,
     ok: true,
     url: esito.url,
