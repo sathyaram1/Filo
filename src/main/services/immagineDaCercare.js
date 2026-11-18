@@ -54,7 +54,7 @@ async function scegli(action, { sender, chatId, schedeViste } = {}) {
     tab = b.tab;
   } else tab = targetWebTab(sender).tab;
   const url = await immagineDellaPagina(tab);
-  return url ? { url } : { errore: 'nessuna immagine da cercare: né mandata in questa chat né in vista nella pagina' };
+  return url ? { url } : { errore: 'nessuna immagine da cercare: né mandata in questa chat né nella pagina con un indirizzo da dare a Google' };
 }
 
 module.exports = { scegli };
