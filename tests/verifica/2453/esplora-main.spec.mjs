@@ -53,7 +53,6 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
       b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + r.height / 2, button: 2 }));
     });
     const menu = page.locator('.sn-rinomina-menu');
-    await expect(menu).toBeVisible();
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
     console.log(JSON.stringify(await page.evaluate(() => window.__log), null, 1));
     await expect(menu).toBeVisible();
