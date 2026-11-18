@@ -172,6 +172,15 @@ async function azioneRiprendiAudio(action, { sender, schedeViste }) {
   };
 }
 
+// Trascrivi chiesto a parole (#2374): parte come dall'icona della barra, con le sue regole sulla pagina davanti.
+async function azioneTrascrivi(action, { sender }) {
+  const tm = winOf(sender)?._filoTabs;
+  if (!tm || !tm.barra || typeof tm.barra.azioneSullaPagina !== 'function') return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
+  const perche = tm.barra.azioneSullaPagina('transcribe');
+  if (perche) return { executed: false, kept: false, output: { error: perche } };
+  return { executed: true, kept: false, output: { avviata: true } };
+}
+
 async function azionePausaAudio(action, { sender, schedeViste }) {
   const tm = winOf(sender)?._filoTabs;
   if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
