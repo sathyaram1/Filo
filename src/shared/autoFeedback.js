@@ -192,7 +192,9 @@
   // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?»): un'azione secca non le
   // risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
   function domandaOltreAlComando(text) {
-    const periodi = String(text || '').split(/(?<=[.!?\n])\s*/).map((s) => s.trim()).filter(Boolean);
+    const periodi = String(text || '')
+      .split(/(?<=[.!?\n])\s*|\s+(?:e|ma|poi)\s+(?=(?:dimmi|mi dici|quant|qual|cos|come|perch|dove|chi\b|quando))/i)
+      .map((s) => (s || '').trim()).filter(Boolean);
     return periodi.some((p) => chiedeInformazione(p) && !chiedeAzione(p));
   }
 
