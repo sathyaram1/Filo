@@ -69,7 +69,7 @@
 //   node scripts/routine-channel.mjs aspetta <biglietto>
 //       → il worker che ha solo da aspettare i suoi comandi e sotto-agenti in sottofondo (#2185, #2304), al massimo una
 //         fetta (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella né sotto-agente al lavoro,
-//         5 = lavorano ancora (si rilancia).
+//         5 = lavorano ancora (si rilancia). Con 0 dice anche se finish:check è morto a metà (lib/corsa-controlli.mjs).
 //
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
