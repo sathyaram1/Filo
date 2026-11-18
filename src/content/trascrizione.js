@@ -124,6 +124,11 @@
       posa(a);
       try { radice.focus({ preventScroll: true }); } catch (_) {}
     };
+    img.onerror = () => {
+      if (aperto !== a) return;
+      chiudi();
+      global.SN_POPUP?.showToast?.(t('menu_image_unreadable'));
+    };
     img.src = dataUrl;
     leggi(a, dataUrl);
   }
