@@ -53,18 +53,25 @@ async function scorriEApri(page, { inFondo = false } = {}) {
   }, inFondo);
 }
 
-async function restaAperto(page, opzioni) {
-  const punto = await scorriEApri(page, opzioni);
+// L'evento arriva un fotogramma dopo, e non sempre dopo che il menu ascolta: tre aperture di fila, ognuna deve reggere.
+// `copre`: il caso provato è quello col menu disegnato sopra il punto del clic.
+async function restaAperto(page, { copre = false, ...opzioni } = {}) {
   const menu = page.locator('.sn-rinomina-menu');
-  await expect(menu).toBeVisible();
-  const esito = await page.evaluate(({ x, y }) => {
-    const m = document.querySelector('.sn-rinomina-menu');
-    const r = m.getBoundingClientRect();
-    return { copreIlPunto: m.contains(document.elementFromPoint(x, y)), menu: [r.left, r.top, r.width, r.height].map(Math.round), angolo: getComputedStyle(m).borderTopLeftRadius };
-  }, punto);
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
-  await expect(menu, JSON.stringify({ ...punto, ...esito })).toBeVisible();
-  return { ...punto, ...esito };
+  for (let giro = 0; giro < 3; giro++) {
+    const punto = await scorriEApri(page, opzioni);
+    await expect(menu).toBeVisible();
+    const esito = await page.evaluate(({ x, y }) => {
+      const m = document.querySelector('.sn-rinomina-menu');
+      const r = m.getBoundingClientRect();
+      return { copreIlPunto: m.contains(document.elementFromPoint(x, y)), menu: [r.left, r.top, r.width, r.height].map(Math.round), angolo: getComputedStyle(m).borderTopLeftRadius };
+    }, punto);
+    const tutto = JSON.stringify({ giro, ...punto, ...esito });
+    if (copre) expect(esito.copreIlPunto, tutto).toBe(true);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))));
+    await expect(menu, tutto).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
 }
 
 test('file della chat a metà riquadro: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
@@ -80,9 +87,7 @@ test('r1 con gli angoli squadrati (Raggio degli angoli a 0): uno scorrimento fin
   test.setTimeout(90_000);
   try {
     await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: { radius: '0px' } }); });
-    const esito = await restaAperto(await chatConFile(app));
-    expect(esito.angolo).toBe('0px');
-    expect(esito.copreIlPunto, JSON.stringify(esito)).toBe(true);
+    await restaAperto(await chatConFile(app), { copre: true });
   } finally {
     await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ themeTokens: {} }); });
     await ripristina(app);
@@ -92,9 +97,10 @@ test('r1 con gli angoli squadrati (Raggio degli angoli a 0): uno scorrimento fin
 test('r1 finestra bassa, file dell\'ultima risposta in fondo alla chat: uno scorrimento finito prima del tasto destro non chiude il menu', async ({ app }) => {
   test.setTimeout(90_000);
   try {
-    await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) w.setSize(1000, 480); });
-    const esito = await restaAperto(await chatConFile(app), { inFondo: true });
-    expect(esito.copreIlPunto, JSON.stringify(esito)).toBe(true);
+    await app.evaluate(({ BaseWindow }) => { for (const w of BaseWindow.getAllWindows()) w.setSize(1000, 460); });
+    const page = await chatConFile(app);
+    await expect.poll(() => page.evaluate(() => innerHeight)).toBeLessThan(470);
+    await restaAperto(page, { inFondo: true, copre: true });
   } finally {
     await ripristina(app);
   }
