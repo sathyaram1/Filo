@@ -69,7 +69,7 @@
         return { testo: r.testo, x: p.x1 * w, y: p.y1 * h, w: (p.x2 - p.x1) * w, h: (p.y2 - p.y1) * h };
       }
       const y = fascia * i++;
-      return { testo: r.testo, x: 0, y, w, h: fascia };
+      return { testo: r.testo, x: 0, y, w, h: fascia, stimata: true };
     });
   }
 
