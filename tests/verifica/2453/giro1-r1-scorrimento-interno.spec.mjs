@@ -21,18 +21,19 @@ async function chatConFile(app) {
   // La chat più alta del suo riquadro: sotto il file c'è altro, e il riquadro scorre.
   const scorre = await page.evaluate(() => {
     const b = document.querySelector('.dash-file-btn');
-    let s = b.parentElement;
-    while (s && !/(auto|scroll)/.test(getComputedStyle(s).overflowY)) s = s.parentElement;
+    const s = b.closest('.dash-bubbles');
     const zavorra = document.createElement('div');
-    zavorra.style.height = '3000px';
+    zavorra.style.cssText = 'height:3000px;flex:none';
     s.appendChild(zavorra);
-    s.scrollTop = 0;
     b.scrollIntoView({ block: 'center' });
-    return { classe: s.className, alto: s.scrollHeight > s.clientHeight };
+    return { scrollHeight: s.scrollHeight, clientHeight: s.clientHeight, top: s.scrollTop, pagina: document.scrollingElement.scrollHeight > innerHeight };
   });
-  expect(scorre.alto).toBe(true);
+  expect(scorre.scrollHeight, JSON.stringify(scorre)).toBeGreaterThan(scorre.clientHeight);
+  expect(scorre.pagina, 'la pagina intera non scorre: scorre solo il riquadro della chat').toBe(false);
   return page;
 }
+
+const scorritore = () => 'document.querySelector(".dash-file-btn").closest(".dash-bubbles")';
 
 // Il riquadro della chat scorre di poco, e il tasto destro arriva nello stesso fotogramma: l'evento dello scorrimento
 // arriva dopo l'apertura, come quando la voce viene portata in vista appena prima del clic.
