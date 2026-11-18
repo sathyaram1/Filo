@@ -106,11 +106,10 @@ generatore), si rilegge. Il rapporto di fine sessione conta i rifiuti con la cau
 
 ## Sotto-agenti
 
-Puoi lanciarne; la catena arriva a tre livelli sotto l'orchestratore, tu
-compreso. Il modello lo dà la definizione del `subagent_type`, o il
-parametro `model` dello strumento Agent dove c'è. Con `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`
-acceso nell'ambiente il parametro sparisce e ogni sotto-agente gira sul modello
-forzato: non si aggira, lo scrive già il rapporto di fine sessione.
+Puoi lanciarne fino a tre livelli sotto l'orchestratore, tu compreso. Il
+modello lo dà la definizione, o il parametro `model` di Agent dove c'è: con
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` acceso nell'ambiente il parametro sparisce e
+tutti girano sul modello forzato.
 
 **Una lettura o una ricerca che deleghi** (dove sta una cosa, come arriva un
 messaggio, quali file toccano una regola) va a `subagent_type: lettore`, col
