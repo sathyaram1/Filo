@@ -17,13 +17,19 @@
     return LETTERA_RE.test(x) ? x : '';
   };
 
-  // Un indirizzo che si apre da sé: http(s) o una pagina di Filo. «youtube.com» prende https://.
+  // Testo → indirizzo con la regola della barra (src/shared/urlNav.js): «youtube.com» prende https://.
+  function nav() {
+    if (!global.SN_URL_NAV && typeof require === 'function') { try { require('./urlNav.js'); } catch (_) {} }
+    return global.SN_URL_NAV || null;
+  }
+  // Un indirizzo che si apre da sé: http(s) o una pagina di Filo; una parola qualunque non è un sito.
   function indirizzo(s) {
     let u = String(s == null ? '' : s).trim();
     if (!u || u.length > TETTO_URL || /\s/.test(u)) return '';
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) {
-      if (!/^[^/]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(u)) return '';
-      u = `https://${u}`;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u) || /^[a-z0-9.-]+:\d/i.test(u)) {
+      const U = nav();
+      if (!U || !U.looksLikeAddress(u)) return '';
+      u = U.normalizeUrl(u);
     }
     try {
       const x = new URL(u);
