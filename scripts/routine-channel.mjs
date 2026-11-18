@@ -2004,7 +2004,7 @@ if (isMain) {
     }
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
-    const { veglia, segniDiVita, FETTA_MS } = await import('./lib/veglia-worker.mjs');
+    const { veglia, segniDiVita, autopsiaDelWorker, FETTA_MS } = await import('./lib/veglia-worker.mjs');
     const { stopBeat } = await import('./lib/routine-beat.mjs');
     const ticket = args[0];
     const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
