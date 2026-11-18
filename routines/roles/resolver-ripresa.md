@@ -55,7 +55,7 @@ porta solo l'ultima.
 
 Se la risposta dice che la richiesta è già coperta su `main`, o lo trovi tu, e
 il ramo non porta niente rispetto a main (`git diff --quiet origin/main...HEAD`
-esce 0), non c'è niente da mandare in verifica: chiudi come il primo lavoro.
+esce 0), non c'è niente da mandare in verifica.
 
 <!-- includi: _chiudi-gia-risolto.md -->
 
