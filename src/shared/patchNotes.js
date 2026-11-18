@@ -16,6 +16,9 @@
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
       ],
+      fixes: [
+        { testo: 'Quando rifai l\'intervista di benvenuto, Filo parte da quello che gli dici lì: non tira fuori di sua iniziativa quello che ricorda di te e non ti fa dire cose che non hai detto.', segnalazione: 2536 },
+      ],
     },
     {
       version: '0.2.290', date: '2026-11-17',
