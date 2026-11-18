@@ -143,9 +143,9 @@ test('una risposta senza indicazioni manuali non diventa un buco', () => {
 });
 
 test('l\'ammissione esplicita resta il caso di prima (non viene scavalcata)', () => {
-  const reply = 'Non sono in grado di mettere Filo a schermo intero da qui: puoi farlo tu '
-    + 'cliccando l\'icona in alto a destra nella barra.';
-  assert.equal(AF.analyzeReply(reply, [], CHIESTO, CAPS).kind, 'capability-gap');
+  const reply = 'Non sono in grado di esportare le schede in un file da qui: puoi copiarle tu '
+    + 'cliccando una per una.';
+  assert.equal(AF.analyzeReply(reply, [], 'esporta le schede in un file', CAPS).kind, 'capability-gap');
 });
 
 test('composeProposal → segnalazione già scritta che dice "esiste ma non l\'ha fatta"', () => {
