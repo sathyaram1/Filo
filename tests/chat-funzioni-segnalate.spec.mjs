@@ -80,12 +80,11 @@ test('«salvala per dopo» e «cerca questa immagine» li fa la chat sulla pagin
 
   await modelloFinto(app, [chiama('l1', 'CERCA_IMMAGINE', {}), { text: 'Ecco la ricerca.' }]);
   await chiedi(chat, 'cerca questa immagine');
-  await chat.waitForTimeout(5000);
-  console.log('DEBUG', JSON.stringify((await chiamateAlModello(app)).map((m) => m.filter((x) => x.role !== 'system').slice(-3))).slice(-3000));
-  console.log('DEBUG2', await chat.locator('#messages, .dash-chat, body').first().innerText().catch(() => ''));
-  // L'immagine va a Google: la chat chiede prima l'OK, e il popup dice dove va.
-  await expect.poll(() => confirmText(chat), { timeout: 15_000, message: 'nessuna conferma prima di mandare l\'immagine a Google' })
-    .toContain('Google Lens');
+  // L'immagine va a Google: la chat chiede prima l'OK, e il bottone dice dove va.
+  const bottone = chat.locator('button.dash-action-btn', { hasText: 'Google Lens' });
+  await expect(chat.locator(CONFIRM_HOST).or(bottone)).toBeVisible({ timeout: 15_000 });
+  if (await bottone.isVisible()) await bottone.click();
+  await expect.poll(() => confirmText(chat), { timeout: 8_000 }).toContain('Google Lens');
   await clickConfirm(chat, 'ok');
   await expect.poll(() => app.evaluate(() => globalThis.__aperte), { timeout: 10_000, message: 'Google Lens non si è aperto' })
     .toEqual([{ url: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(img)}`, invio: false }]);
