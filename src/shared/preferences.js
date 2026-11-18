@@ -751,6 +751,14 @@
     return { partial: { avvisoSchermoPieno: { durataMs: n } }, label: `Avviso del sito a schermo intero → ${cifre(n)} ms` };
   }
 
+  // Le lettere della home le riconosce src/shared/doppioTocco.js, che chiede i nomi dei tasti a carteHome.js.
+  function doppioTocco() {
+    if (!global.SN_DOPPIO_TOCCO && typeof require === 'function') {
+      try { if (!global.SN_CARTE_HOME) require('./carteHome.js'); require('./doppioTocco.js'); } catch (_) {}
+    }
+    return global.SN_DOPPIO_TOCCO || null;
+  }
+
   // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità è in millisecondi.
   function msDaTesto(v) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
