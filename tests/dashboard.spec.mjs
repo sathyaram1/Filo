@@ -51,9 +51,9 @@ test.describe('dashboard', () => {
     await expect(page.locator('#right')).toBeAttached();
     await expect(page.locator('#input')).toBeVisible();
     await expect(page.locator('#sendBtn')).toBeVisible();
-    // Il centro è il filo (#869), col campo per cercarci dentro.
+    // Il centro è il filo (#869); per cercarci dentro c'è il tasto della ricerca nella colonna (#2372).
     await expect(page.locator('#threadView')).toBeVisible();
-    await expect((await campoRicerca(page))).toBeVisible();
+    await expect(page.locator(TASTO('cerca'))).toBeVisible();
   });
 
   test('senza API key la home indica il codice d\'invito (non una chiave da mettere)', async ({ app, shell }) => {
