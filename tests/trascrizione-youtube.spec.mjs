@@ -155,7 +155,7 @@ fixture('la chat che legge la pagina di un video ne ha la trascrizione, presa ap
   const giri = await app.evaluate(() => globalThis.__chiamate);
   const letto = giri[1].filter((m) => m.role === 'tool').map((m) => String(m.content || '')).join('\n');
   expect(letto).toContain('letta dalla scheda aperta');
-  expect(letto).toContain('[0:04] e vi dico subito che il segreto del pane è la biga');
+  expect(letto).toContain('[0:00] ciao a tutti, oggi facciamo il pane e vi dico subito che il segreto del pane è la biga');
   expect(letto).toContain('[1:35] la biga riposa diciotto ore');
   expect(letto).toMatch(/È la pagina di un video di YouTube: il testo della pagina comincia con la trascrizione del video \(italiano, sottotitoli generati da YouTube\)/);
   expect(letto.indexOf('Trascrizione del video')).toBeLessThan(letto.indexOf('Descrizione: ricetta di casa'));
