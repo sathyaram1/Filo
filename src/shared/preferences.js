@@ -1210,7 +1210,7 @@
       aiuto: 'millisecondi 100-1000 (entro quanto la seconda lettera vale come doppio tocco)',
       keys: ['soglia_doppio_tocco', 'soglia doppio tocco', 'velocita doppio tocco', 'velocità doppio tocco', 'tempo del doppio tocco'],
       build(v) {
-        const n = msDaTesto(v);
+        const n = msDaTesto(v, 10);
         const D = doppioTocco();
         if (n == null || !D) return null;
         const [min, max] = D.SOGLIA_LIMITI;
