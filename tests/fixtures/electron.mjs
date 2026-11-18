@@ -165,6 +165,7 @@ export const test = base.extend({
       },
     });
     const usciteApp = registraUsciteApp(app);
+    nelContestoNormale(app);
     await use(app);
     await chiudiApp(app);
     // Dopo la chiusura, così ci sono anche le righe di un'app che muore male uscendo.
