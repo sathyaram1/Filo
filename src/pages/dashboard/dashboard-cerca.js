@@ -373,7 +373,9 @@
     d = deps;
     host = deps.host;
     if (!host) return;
-    const box = el('label', 'dash-cerca-campo');
+    // Non un <label>: il clic sul riquadro premerebbe la lente, che chiude.
+    const box = el('div', 'dash-cerca-campo');
+    box.addEventListener('mousedown', (e) => { if (e.target === box) { e.preventDefault(); campo.focus(); } });
     // La lente è il tasto della ricerca rimasto in cima alla colonna: un clic la chiude, come Esc.
     const ic = el('button', 'dash-cerca-lente');
     ic.type = 'button';
