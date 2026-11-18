@@ -546,7 +546,8 @@ async function primaAlBrowser(app, page, input) {
     const wc = webContents.getAllWebContents().find((w) => !w.isDestroyed() && w.getOrCreateDevToolsTargetId() === bersaglio);
     if (!wc) return false;
     let fermato = false;
-    wc.emit('before-input-event', { sender: wc, preventDefault() { fermato = true; } }, { isAutoRepeat: false, isComposing: false, location: 0, ...input });
+    const modifiers = ['shift', 'control', 'alt', 'meta'].filter((m) => input[m]);
+    wc.emit('before-input-event', { sender: wc, preventDefault() { fermato = true; } }, { isAutoRepeat: false, isComposing: false, location: 0, modifiers, ...input });
     return fermato;
   }, { bersaglio, input });
 }
