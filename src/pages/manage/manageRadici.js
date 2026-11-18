@@ -30,7 +30,7 @@
   function titolo(x) {
     const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
       : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
-        : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
+        : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.numero || x.valore}: leggilo prima di timbrarlo.`
           : x.sessione === true ? letturaDellaSessione(x)
             : `${x.nome || x.valore}: guardalo prima di timbrarlo.`;
     if (x.tipo === 'ignota') return cosa;
