@@ -1,6 +1,6 @@
-// Sentinella: sotto tests/ una finestra di Filo non si prende mai appena annunciata (`firstWindow()` nudo,
-// `waitForEvent('window')`): da Electron 44 arriva vuota e naviga subito dopo, e lo spec cade con «Execution context
-// was destroyed». Le prove dei giri (tests/verifica/) restano com'erano: le scrive e le corre chi verifica.
+// Sentinella: sotto tests/ una finestra di Filo non si prende appena annunciata (`firstWindow()`, `waitForEvent('window')`:
+// arriva vuota, «Execution context was destroyed»), né cercandola in `app.windows()` con `new URL()` senza try (#2579).
+// Le prove dei giri (tests/verifica/) restano com'erano: le scrive e le corre chi verifica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
