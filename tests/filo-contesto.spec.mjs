@@ -641,13 +641,15 @@ test('l\'esito di un comando dato in chat resta davanti alle altre schede col tr
 test('un messaggio lunghissimo incollato torna intero nei turni dopo e si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
-  const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
+  // Circa 56.000 token per lato e lato: dentro il tetto di serie, ben oltre i 20.000 del tetto basso.
+  const lato = Math.round(28_000 * await app.evaluate(() => globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN));
+  const lungo = 'a'.repeat(lato) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(lato);
   await preparaModello(app, [
     { text: 'Letto.' },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
     { text: 'Fatto.' },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
-    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: 90_000 } }] },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: Math.round(lato * 0.9) } }] },
     { text: 'Fatto.' },
   ]);
   await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
