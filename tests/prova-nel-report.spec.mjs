@@ -7,7 +7,6 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const URL = 'filo://manage/manage.html';
-const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const url = (n) => {
   const u = `0123abcd-0123-4567-89ab-0123456789${String(n).padStart(2, '0')}`;
   return `https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1763469000000_${u}.octetstream?alt=media&token=${u}`;
