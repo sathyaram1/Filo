@@ -226,7 +226,7 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
     };
   });
 
-  await page.locator('#input').fill('metti Filo a schermo intero');
+  await page.locator('#input').fill('aprimi una finestra in incognito');
   await page.locator('#sendBtn').click();
 
   const proposal = page.locator('.dash-bubble-actions .dash-action-btn-primary', {
