@@ -181,7 +181,7 @@
   function nascosteSinistra(dati, layout, ora = Date.now()) {
     const l = normalizza(layout);
     const nascoste = new Set(l.nascoste);
-    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
+    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => v.tipo !== 'cornice' && nascoste.has(v.chiave));
   }
 
   // Il primo incontro (#1661): finché l'accoglienza non si è chiusa la home tiene solo la colonna di sinistra, se la
