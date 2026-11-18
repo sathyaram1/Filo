@@ -212,6 +212,15 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   const disco = readFileSync(join(userData, 'storage.json'), 'utf8');
   expect(disco).not.toContain('segreto incognito');
   const normale = await registro(app);
+  const diag = await app.evaluate(async () => {
+    const D = require('/tmp/filo-lavori/1/src/main/shim/storage.js');
+    const F = require('/tmp/filo-lavori/1/src/main/services/ilFilo.js');
+    const ctx = D.inIncognito();
+    const n = await F.cambi({ incognito: false });
+    const i = await F.cambi({ incognito: true });
+    return { ctx, n: JSON.stringify(n).includes('segreto incognito'), nLen: n.length, i: JSON.stringify(i).includes('segreto incognito'), iLen: i.length, iChat: i.map((e) => e.cambi[0]?.dopo?.chat) };
+  });
+  console.log('DIAG', JSON.stringify(diag), JSON.stringify(normale).includes('segreto incognito'));
   expect(JSON.stringify(normale)).not.toContain('segreto incognito');
   await ripristina(app);
 });
