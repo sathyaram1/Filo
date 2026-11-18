@@ -1628,8 +1628,8 @@
     if (!r || r.rifiuto) {
       if (hint) {
         hint.textContent = !l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre';
-        hint.classList.add('show');
-        setTimeout(() => { hint.classList.remove('show'); hint.textContent = 'Salvato'; }, 2400);
+        hint.classList.add('sn-show');
+        setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, 2400);
       }
       return;
     }
