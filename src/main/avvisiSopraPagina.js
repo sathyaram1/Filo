@@ -148,13 +148,22 @@ class AvvisiSopraPagina {
 
   colonna() { return this.stato.colonna; }
 
-  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista.
+  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista. Il sito da aprire è
+  // quello che la shell ha dato alla carta, non uno scritto da chi chiede.
   azioneDallaHome(id, azione) {
     const i = testo(id);
     const a = testo(azione);
-    if (!AZIONE_HOME.test(a) || !this.stato.colonna.some((c) => c.id === i)) return false;
+    const carta = this.stato.colonna.find((c) => c.id === i);
+    if (!AZIONE_HOME.test(a) || !carta) return false;
     if (!this.win || this.win.isDestroyed()) return false;
+    if (a === 'apri') return this._apriSito(carta.indirizzo);
     try { this.win.webContents.send('avvisi:azione', { id: i, azione: a }); } catch (_) { return false; }
+    return true;
+  }
+
+  _apriSito(indirizzo) {
+    if (!sito(indirizzo)) return false;
+    try { this.win._filoTabs.openTab(indirizzo); } catch (_) { return false; }
     return true;
   }
 
