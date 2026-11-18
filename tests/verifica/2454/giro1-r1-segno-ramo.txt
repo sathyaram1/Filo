@@ -1,0 +1,1 @@
+Esiste solo nel ramo: lo strumento su main copia lo spec, non questo file.
