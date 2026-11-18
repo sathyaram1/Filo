@@ -79,7 +79,9 @@ for (const [nome, font, testo, parola] of [
     const strato = await apriSuImmagine(app, page);
     await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
     await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+    console.log(nome, 'RIGA', JSON.stringify(await strato.locator('.sn-tr-riga').first().boundingBox()), 'IMG', JSON.stringify(box), 'PUNTO', box.x + 20 + p.a + p.w / 2, p);
     await strato.mouse.dblclick(box.x + 20 + p.a + p.w / 2, box.y + 60);
+    console.log(nome, 'SEL', JSON.stringify(await strato.evaluate(() => String(getSelection())))).catch(() => {});
     await strato.keyboard.press('ControlOrMeta+c');
     await page.waitForTimeout(500);
     console.log(nome, 'COPIATO:', JSON.stringify(await appunti(app)));
