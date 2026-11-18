@@ -41,6 +41,8 @@ test('un numero di feedback si riconosce citato da solo, non dentro un altro num
   assert.equal(numeroFeedback('#1680'), '1680');
   assert.equal(numeroFeedback(' 1680.2 '), '1680.2');
   assert.equal(numeroFeedback('1680a'), '');
+  // La forma del server (#2046.2): niente zeri davanti, niente figlio zero.
+  for (const no of ['01680', '0', '#0', '1680.0', '1680.02']) assert.equal(numeroFeedback(no), '', no);
   const re = new RegExp(regexCitazione('1680'));
   for (const si of ['merge-gate: #1680 via server', 'chiude #1680.', '(#1680)', 'fine #1680']) assert.ok(re.test(si), si);
   for (const no of ['merge-gate: #16800 via server', 'figlio #1680.2', 'nessuno']) assert.ok(!re.test(no), no);
