@@ -1450,6 +1450,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
+        ...(fonti.length ? { fonti } : {}),
       },
       { onboarding: onbActive },
     );
