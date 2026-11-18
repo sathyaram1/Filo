@@ -6,6 +6,7 @@ import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { TASTO } from './helpers/tastiHome.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -52,7 +53,7 @@ test.describe('dashboard', () => {
     await expect(page.locator('#sendBtn')).toBeVisible();
     // Il centro è il filo (#869), col campo per cercarci dentro.
     await expect(page.locator('#threadView')).toBeVisible();
-    await expect(page.locator('#cercaInput')).toBeVisible();
+    await expect((await campoRicerca(page))).toBeVisible();
   });
 
   test('senza API key la home indica il codice d\'invito (non una chiave da mettere)', async ({ app, shell }) => {

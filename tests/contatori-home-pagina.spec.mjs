@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { confermaSopraPagina, aspettaConfermaPronta } from './helpers/confirm.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const homePagina = (app) => app.evaluate(async () => {
@@ -110,7 +111,7 @@ test('la ricerca nel filo conta risultati, cosa si apre, a che posto e dopo quan
   }
   await semina(app, chats);
   const page = await openTab('filo://newtab/');
-  const campo = page.locator('#cercaInput');
+  const campo = (await campoRicerca(page));
   await campo.fill('zzqqxx');
   await expect(page.locator('#cercaRisultati')).toContainText('Niente nel filo', { timeout: 8_000 });
   await expect.poll(() => voce(app, 'ricerca_home', 'risultati:r0'), { timeout: 8_000 }).toBe(1);

@@ -10,6 +10,7 @@ import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -231,9 +232,9 @@ test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trov
 
   await attiva(shell, 'filo://newtab');
   // La ricerca del filo la trova dal testo dello scambio (la Cronologia, che lo faceva, non c'è più: #872).
-  await casa.locator('#cercaInput').fill('licheni');
+  await (await campoRicerca(casa)).fill('licheni');
   await expect(casa.locator('.dash-cerca-msg', { hasText: 'licheni' }).first()).toBeVisible({ timeout: 10_000 });
-  await casa.locator('#cercaInput').press('Escape');
+  await (await campoRicerca(casa)).press('Escape');
   const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click({ button: 'right' });

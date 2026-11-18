@@ -15,6 +15,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const HOME = 'filo://newtab/';
 const risultati = (page) => page.locator('#cercaRisultati .dash-cerca-msg');
@@ -130,7 +131,7 @@ test('una chat finita si salva per intero e si ritrova nel filo', async ({ app, 
   // Nella home la conversazione sta nel filo, e la ricerca la ritrova.
   const page = await openTab(HOME);
   await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toContainText('Secondo te la coscienza è emergente?');
-  await page.locator('#cercaInput').fill('coscienza');
+  await (await campoRicerca(page)).fill('coscienza');
   await expect(risultati(page).first()).toContainText('coscienza');
 });
 
@@ -147,16 +148,16 @@ test('la ricerca trova una parola detta a metà conversazione, non solo nel tito
 
   const page = await openTab(HOME);
   // "Marte" non compare in nessun titolo: sta dentro il messaggio.
-  await page.locator('#cercaInput').fill('marte');
+  await (await campoRicerca(page)).fill('marte');
   await expect(risultati(page)).toHaveCount(1);
   await expect(risultati(page).first()).toContainText('Parlami della gravità su Marte');
 
   // Senza accenti e senza maiuscole, come si scrive di fretta.
-  await page.locator('#cercaInput').fill('GRAVITA');
+  await (await campoRicerca(page)).fill('GRAVITA');
   await expect(risultati(page)).toHaveCount(1);
 
   // Nessun risultato: lo dice, invece di sembrare un archivio cancellato.
-  await page.locator('#cercaInput').fill('astronomia siderale');
+  await (await campoRicerca(page)).fill('astronomia siderale');
   await expect(risultati(page)).toHaveCount(0);
   await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('Niente nel filo per');
 });
@@ -227,12 +228,12 @@ test('input limite: messaggi enormi, soli spazi e caratteri strani non rompono n
   const page = await openTab(HOME);
   // Il testo è TESTO, non HTML: uno script scritto in chat resta scritto, nel filo e nella ricerca.
   await expect(page.locator('.dash-bubble', { hasText: '<script>alert(1)</script>' }).first()).toBeVisible();
-  await page.locator('#cercaInput').fill('alert');
+  await (await campoRicerca(page)).fill('alert');
   await expect(risultati(page).first()).toContainText('<script>alert(1)</script>');
   expect(await page.evaluate(() => document.querySelectorAll('#bubbles script, #cercaRisultati script').length)).toBe(0);
 
   // Una ricerca di soli spazi non apre un elenco vuoto.
-  await page.locator('#cercaInput').fill('   ');
+  await (await campoRicerca(page)).fill('   ');
   await expect(page.locator('#cercaRisultati')).toBeHidden();
 });
 
@@ -324,7 +325,7 @@ test('senza modello la chat non si perde: prende il primo messaggio come titolo 
 
   // E la ricerca del filo la trova lo stesso: nel dubbio si mostra.
   const page = await openTab(HOME);
-  await page.locator('#cercaInput').fill('Luna');
+  await (await campoRicerca(page)).fill('Luna');
   await expect(risultati(page).first()).toContainText('Quanto dista la Luna?');
 });
 
@@ -823,7 +824,7 @@ test('cercare una frase intera trova la chat, e la ricerca dice con quali parole
   test.setTimeout(120_000);
   await preparaDueChat(app);
   const page = await openTab(HOME);
-  await page.locator('#cercaInput').fill('la discussione di ieri sulla coscienza');
+  await (await campoRicerca(page)).fill('la discussione di ieri sulla coscienza');
   await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
   await expect(risultati(page).first()).toContainText('coscienza');
   // E lo dice: i risultati rispondono a meno parole di quelle scritte.
@@ -960,7 +961,7 @@ test('una parola corta che non è vuota conta: lo Zen e SQL si ritrovano a parol
   }
 
   const page = await openTab(HOME);
-  await page.locator('#cercaInput').fill('la chat sullo Zen');
+  await (await campoRicerca(page)).fill('la chat sullo Zen');
   await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
   await expect(risultati(page).first()).toContainText('Zen');
   const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
@@ -969,7 +970,7 @@ test('una parola corta che non è vuota conta: lo Zen e SQL si ritrovano a parol
   await page.screenshot({ path: 'tests/.shots/1295-parola-corta.png' });
 
   // Una parola corta vale da inizio parola: «IVA» non trova la chat dove i pacchi «arrivano».
-  await page.locator('#cercaInput').fill('la chat sull’IVA');
+  await (await campoRicerca(page)).fill('la chat sull’IVA');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('Niente nel filo per «la chat sull’IVA»', { timeout: 10_000 });
   await expect(risultati(page)).toHaveCount(0);
 });
@@ -978,14 +979,14 @@ test('una ricerca senza risultati dice che sono zero, e la riga si legge intera'
   test.setTimeout(120_000);
   await preparaDueChat(app);
   const page = await openTab(HOME);
-  await page.locator('#cercaInput').fill('zabaione');
+  await (await campoRicerca(page)).fill('zabaione');
   const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
   await expect(nota).toHaveText('Niente nel filo per «zabaione»', { timeout: 10_000 });
   await expect(risultati(page)).toHaveCount(0);
   expect(await scoperto(nota)).toBe(true);
   await page.screenshot({ path: 'tests/.shots/1295-ricerca-vuota.png' });
   // Svuotando la ricerca il filo resta com'era.
-  await page.locator('#cercaInput').fill('');
+  await (await campoRicerca(page)).fill('');
   await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toBeVisible();
 });
 
@@ -1001,7 +1002,7 @@ test('una sigla in maiuscolo conta anche se si scrive come una parola vuota: «l
   const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'riprendi la chat sull’AI' }));
   expect(((r.output || {}).results || []).map((x) => x.id)).toEqual(['c-ai']);
   const page = await openTab(HOME);
-  await page.locator('#cercaInput').fill('la chat sull’AI');
+  await (await campoRicerca(page)).fill('la chat sull’AI');
   await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
   await expect(risultati(page).first()).toContainText('AI');
 });

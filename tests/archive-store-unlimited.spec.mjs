@@ -17,6 +17,7 @@ import { argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { createRequire } from 'node:module';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -143,7 +144,7 @@ test('la prima ricerca per significato trova già una scheda vecchia rimasta sen
     globalThis.SN_PROVIDER_OPENROUTER.embed = (a) => f({ ...a, texts: a.texts.map((t) => t.replace(/romanzo siciliano/i, 'gattopardo')) });
   });
   const page = await openTab('filo://newtab/');
-  await page.locator('#cercaInput').fill('romanzo siciliano');
+  await (await campoRicerca(page)).fill('romanzo siciliano');
   await expect(page.locator('.dash-cerca-niente').first()).toBeVisible({ timeout: 8_000 });
   await page.locator('.dash-cerca-significato').click();
   await expect(page.locator('.dash-cerca-pagina').first()).toContainText('Il Gattopardo, riassunto', { timeout: 30_000 });
@@ -229,7 +230,7 @@ test('tolta dalla ricerca del filo, una scheda chiusa non si trova più in nessu
   expect(fileCheContengono(dati, url).length).toBeGreaterThan(0);
 
   const home = await openTab('filo://newtab/');
-  await home.locator('#cercaInput').fill('825');
+  await (await campoRicerca(home)).fill('825');
   const voce = home.locator('.dash-cerca-pagina', { hasText: 'Da cancellare' });
   await expect(voce).toBeVisible({ timeout: 8_000 });
   // Il tasto destro sul risultato: «Togli dal filo».
@@ -407,7 +408,7 @@ testSenzaFixture('dopo la migrazione le schede senza vettore si indicizzano da s
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://newtab')); return !!page; }).toBe(true);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('#cercaInput').fill('libro sulla nobiltà in Sicilia');
+    await (await campoRicerca(page)).fill('libro sulla nobiltà in Sicilia');
     await page.locator('.dash-cerca-significato').click();
     await expect(page.locator('.dash-cerca-pagina').first()).toContainText('Il Gattopardo', { timeout: 10_000 });
     expect(await app.evaluate(() => globalThis.__embedCalls.map((t) => t.length))).toEqual([1]);

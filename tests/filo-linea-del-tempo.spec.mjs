@@ -12,6 +12,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -96,7 +97,7 @@ test('dopo l’aggiornamento le chat di prima sono nel filo della home e Filo le
     const elenco = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chats_list' }));
     expect(elenco.chats.map((c) => [c.id, c.messageCount])).toEqual([['chat-coscienza', 3], ['chat-sveglia', 2]]);
     const casa = await paginaInterna(app, shell, 'filo://newtab/');
-    await casa.locator('#cercaInput').fill('coscienza emergente');
+    await (await campoRicerca(casa)).fill('coscienza emergente');
     await expect(casa.locator('.dash-cerca-msg', { hasText: 'Secondo te la coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
 
     const riaperta = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chat_get', id: 'chat-coscienza' }));
