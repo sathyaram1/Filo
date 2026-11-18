@@ -71,7 +71,7 @@ async function scrivi(page, testo) {
 }
 
 const GIRI = [
-  ...[1, 2, 3, 4, 5, 6].map((n) => ({ n, modello: 'deepseek/deepseek-v4-flash', conChatPassata: n > 4 })),
+  ...[1, 2, 3, 4, 5, 6, 11, 12, 13, 14].map((n) => ({ n, modello: 'deepseek/deepseek-v4-flash', conChatPassata: n > 4 && n !== 7 })),
   { n: 7, modello: 'deepseek/deepseek-v4.1-flash' }, { n: 8, modello: 'deepseek/deepseek-v4.1-flash' },
   { n: 9, modello: 'anthropic/claude-haiku-5.5' }, { n: 10, modello: 'anthropic/claude-haiku-5.5' },
 ];
