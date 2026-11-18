@@ -34,7 +34,7 @@ test('r1 fuori dalla scheda, con la traccia vuota, la trascrizione arriva dal pa
   expect(dallaScheda.stato).toBe('ok');
   T._cache.clear();
   // Dalla rete, la strada di un link incollato in chat o di una scheda chiusa: deve esserci lo stesso.
-  const e = await T.dallaRete(`https://www.youtube.com/watch?v=${ID}`, (url) => youtubeFinto(url));
+  const e = await T.dallaRete(`https://www.youtube.com/watch?v=${ID}`, youtubeFinto);
   expect(e && e.stato).toBe('ok');
   expect(e.testo).toContain('il segreto del pane è la pazienza');
 });
