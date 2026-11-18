@@ -83,9 +83,7 @@ export function provaSpec({ root, ramo, main, spec, noti = [], lancia = lanciaPl
 
 /** L'ambiente degli spec provati: senza i file dei comandi di Actions, come per gli unit (#2225). PURA. */
 export function ambienteDegliSpec(env, out) {
-  const e = { ...env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' };
-  for (const k of COMANDI_DI_ACTIONS) delete e[k];
-  return e;
+  return { ...senzaComandiDiActions(env), PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' };
 }
 
 function lanciaPlaywright(root, file) {
