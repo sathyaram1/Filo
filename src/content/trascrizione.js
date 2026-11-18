@@ -25,8 +25,7 @@
     if (!/^data:image\//i.test(dataUrl)) return false;
     if (dataUrl.length > DATI_MAX) dataUrl = await inJpeg(dataUrl);
     const rect = rettangolo(opz.rect);
-    const sopra = global.SN_RIQUADRI_SOPRA;
-    if (sopra && sopra.apri('trascrizione', { dataUrl, rect }, () => disegna({ dataUrl, rect }))) return true;
+    if (global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, () => disegna({ dataUrl, rect }))) return true;
     disegna({ dataUrl, rect });
     return true;
   }
