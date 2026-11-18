@@ -186,7 +186,7 @@
     },
     NON_TENERE_APERTA: {
       via: ['scheda', 'non_tenere_aperta'],
-      description: 'toglie la regola di tieni_aperta.',
+      description: 'toglie tieni_aperta.',
       properties: { sito: S() }, required: [],
     },
     RIPRENDI_AUDIO: {
