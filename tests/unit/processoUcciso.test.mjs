@@ -173,7 +173,7 @@ describe('il guasto di un processo ucciso', () => {
     assert.ok(t.includes(`--guasto "${g}"`), t);
     assert.doesNotMatch(g, /["`$]/, 'il guasto sta fra virgolette doppie in una riga di comando');
     const senza = guastoDellaCorsa(segno, segno.memoria);
-    assert.match(senza, /nessun processo ucciso per memoria: un riavvio del contenitore o un tetto dell'harness/);
+    assert.match(senza, /nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
   });
 
   test('il codice di uscita dal risultato di Claude Code', () => {
