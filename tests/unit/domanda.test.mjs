@@ -269,7 +269,8 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
 
   const pulita = finto({ mostra: { ok: true, domanda: { id: 'D-6', ...DOMANDA, fiducia: 'fidato' } } });
   await esegui(['mostra', 'D-6'], pulita.io);
-  assert.equal(pulita.sporcate.length, 0);
+  // Il server decide se lasciarle radici (fidata per timbri): nominata, ma senza dire «non fidata».
+  assert.deepEqual(pulita.sporcate.map((x) => x.motivi), [['domande lette']]);
 
   const elenco = finto({ elenco: { ok: true, domande: [
     { id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' },
