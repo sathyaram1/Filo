@@ -2410,6 +2410,13 @@ if (isMain) {
         process.exit(1);
       }
     }
+    // Per ultima, a consegna già controllata qui: le schermate salgono nel deposito solo per una consegna che parte.
+    if (data.prova !== undefined) {
+      const { provaDaAllegare } = await import('./lib/prova-allegata.mjs');
+      const p = await provaDaAllegare(data.prova);
+      if (!p.ok) { console.error(p.errore); process.exit(1); }
+      data.prova = p.prova;
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
