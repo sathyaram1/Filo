@@ -99,8 +99,8 @@ test('tasto destro su un tasto: sposta, metti nel «+», rimetti in vista; e a p
 
   // A parole, con l'azione della chat: il tasto delle impostazioni va nel «+», le carte non si toccano.
   await modelloFinto(app, [
-    { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"impostazioni"}' }] },
-    { testo: 'Fatto: le impostazioni sono nel «+».' },
+    { toolCalls: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"impostazioni"}' }] },
+    { text: 'Fatto: le impostazioni sono nel «+».' },
   ]);
   await page.locator('#input').fill('togli le impostazioni dalla home');
   await page.locator('#sendBtn').click();
@@ -198,7 +198,7 @@ test('«cerca nel filo orche» scritto nella chat apre la stessa ricerca, senza 
   test.setTimeout(45_000);
   await semina(app);
   const page = await casa(app);
-  await modelloFinto(app, [{ testo: 'NON DOVEVO RISPONDERE' }]);
+  await modelloFinto(app, [{ text: 'NON DOVEVO RISPONDERE' }]);
   await page.locator('#input').fill('cerca nel filo orche');
   await page.keyboard.press('Enter');
   await expect(page.locator('#cercaFilo')).toBeVisible();

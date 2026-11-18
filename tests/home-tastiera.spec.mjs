@@ -148,8 +148,8 @@ test('a parole: «assegna yy a example.com» lo scrive fra le lettere, e le Pref
   test.setTimeout(60_000);
   const page = await casa(app);
   await modelloFinto(app, [
-    { strumenti: [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"doppio tocco","valore":"y example.com"}' }] },
-    { testo: 'Fatto: yy apre example.com.' },
+    { toolCalls: [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"doppio tocco","valore":"y example.com"}' }] },
+    { text: 'Fatto: yy apre example.com.' },
   ]);
   await page.locator('#input').fill('fai che yy apra example.com');
   await page.locator('#sendBtn').click();
