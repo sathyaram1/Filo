@@ -92,7 +92,8 @@ speso te lo dicono `operazione`, `segnala` e `rapporto`, in fondo, e
 `node scripts/routine-channel.mjs spesa`; passata la metà del tetto la riga ti
 chiede il rapporto parziale. Su un compito lungo consegnalo prima, a ogni
 passo grosso. La corsa conta per il tetto automatico delle istanze dopo
-(il doppio della mediana delle ultime) solo se consegna il rapporto finale.
+(il doppio della mediana delle ultime) solo se consegna il rapporto finale, e
+conta tutta l'istanza, anche le sessioni prima della tua.
 Se un comando del canale ti risponde che il biglietto è già rilasciato,
 fermati lì: il lavoro che faresti dopo non lo consegna nessuno.
 
