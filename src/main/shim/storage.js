@@ -209,6 +209,19 @@ const INCOGNITO_READABLE = new Set([
 // leggono e si scrivono sul disco come fuori, se no il limite di spesa lì dentro non esiste (#591). Sono totali, non navigazione.
 const INCOGNITO_SHARED = new Set(['costs', 'credits']);
 
+// Di queste chiavi l'incognito vede dal disco solo un segno, non il contenuto. «Già accolto» (finita o rifatta) vale per
+// tutte le finestre, se no l'intervista riparte in incognito (#2578); le risposte date restano fuori.
+const INCOGNITO_SEGNI = {
+  filo_onboarding: (v) => (v && typeof v === 'object' && (v.done === true || v.rifatta === true) ? { done: true } : undefined),
+  filo_welcomed: (v) => (v ? true : undefined),
+};
+
+function dalDiscoInIncognito(k) {
+  if (INCOGNITO_READABLE.has(k)) return STATE.data[k];
+  if (Object.prototype.hasOwnProperty.call(INCOGNITO_SEGNI, k)) return INCOGNITO_SEGNI[k](STATE.data[k]);
+  return undefined;
+}
+
 function inIncognito() {
   const s = als.getStore();
   return !!(s && s.incognito);
