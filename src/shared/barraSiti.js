@@ -138,7 +138,7 @@
     if (!v) return errore(voci, voci.length ? 'nella barra non c\'è questa voce' : 'la barra dei siti è vuota');
     if (tipo === 'togli') return esito(voci.filter((x) => x !== v), true, { voce: v });
     if (tipo === 'rinomina') {
-      const nome = testo(m.nome);
+      const nome = nomeLeggibile(m.nome);
       if (!nome) return errore(voci, 'manca il nome nuovo');
       if (nome.length > MAX_NOME) return errore(voci, `il nome ha ${nome.length} caratteri, il massimo è ${MAX_NOME}`);
       if (nome === v.nome) return esito(voci, false, { voce: v });
