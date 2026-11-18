@@ -203,8 +203,9 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
     // azione — solo indicazioni su dove cliccare.
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       const text = JSON.stringify({
-        text: 'Per andare a schermo intero clicca l’icona con le due frecce in alto a '
-          + 'destra nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo.',
+        // Una voce che nessuno strumento della chat comanda: lo schermo intero oggi ce l'ha (#2371).
+        text: 'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l’icona Nuova finestra '
+          + 'incognito nella barra laterale: lì quello che visiti non resta.',
         actions: [],
       });
       try { onDelta && onDelta(text); } catch (_) {}
