@@ -309,10 +309,13 @@ export async function letturaCloud(ticket, opz = {}) {
   if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
   // Al manutentore fidato un non fidato arriva senza scheda né testi (#2337): fuori dal censimento, ne decide la perizia.
   const voci = r.voci.filter((v) => !v.nonFidato);
+  const fuori = r.voci.filter((v) => v.nonFidato && v.num);
   return {
     ok: true, righe: voci.filter((v) => v.riga).map((v) => v.riga), schede: voci.filter((v) => v.scheda).map((v) => v.scheda),
     segnalati: new Map(voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
     nonFidati: r.voci.length - voci.length,
+    // I non fidati aperti con la loro perizia (dati validati dal server): restano aperti per rami e incroci (#2337.3).
+    periziati: fuori.map((v) => ({ num: String(v.num), perizia: v.perizia && typeof v.perizia === 'object' ? v.perizia : null })),
     // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita. Una
     // scheda non fidata data al fidato senza contenuto c'è, e non si riscrive.
     illeggibili: voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato && !v.schedaNonFidata)).length,
