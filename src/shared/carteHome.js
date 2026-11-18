@@ -215,7 +215,7 @@
     const s = pulisciNome(raw).replace(/^(de(i|gli|ll[ae']?|l)|di)\s*/, '');
     if (!s) return { voci: [], perTipo: false, tipo: null };
     for (const [tipo, nomi] of Object.entries(TIPI_SINISTRA)) {
-      if (nomi.includes(s)) return { voci: tutte.filter((v) => v.tipo === tipo), perTipo: true, tipo };
+      if (nomi.includes(s)) return { voci: tutte.filter(diTipo(tipo)), perTipo: true, tipo };
     }
     const tit = (v) => senzaAccenti(v.titolo);
     const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2);
