@@ -3,10 +3,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { leggiArgomenti, campoDaVerdetto, provaSpec, TETTO_SPEC, ambienteDegliSpec } from '../../scripts/spec-fusione-azione.mjs';
 import { unisciParti } from '../../scripts/unit-fusione-azione.mjs';
 import { conGliSpec, richiestaDispatch } from '../../scripts/lib/prova-remota.mjs';
