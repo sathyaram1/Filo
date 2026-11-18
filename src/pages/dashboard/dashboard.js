@@ -3129,6 +3129,7 @@
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
+      impostazioniHome = settings || null;
       Sistema.applicaImpostazioni(settings);
       BarraSiti.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
