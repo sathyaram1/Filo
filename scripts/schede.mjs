@@ -16,6 +16,8 @@ const SS = globalThis.SN_SCHEDE;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CARTELLA_PREDEFINITA = resolve(ROOT, '..', 'filo-schede');
 export const INDICE = 'indice.json';
+// I non fidati aperti, fuori dall'indice, con la loro perizia: li scrive elenca, li leggono rami e incroci (#2337.3).
+export const NON_FIDATI = 'non-fidati.json';
 
 export const { STATI_CHIUSI, VALIDI, TIPI, AREE, validaScheda } = SS;
 export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt', 'waitsFor', 'unisce'];
