@@ -297,8 +297,7 @@
   async function copia(t) {
     try { await navigator.clipboard.writeText(t); return; } catch (_) {}
     try {
-      const MSG = global.SN_MESSAGES || global.SN_MSG;
-      const tipo = MSG && (MSG.COPY_TEXT_TO_CLIPBOARD || (MSG.MSG && MSG.MSG.COPY_TEXT_TO_CLIPBOARD));
+      const tipo = global.SN_MSG && global.SN_MSG.MSG && global.SN_MSG.MSG.COPY_TEXT_TO_CLIPBOARD;
       if (tipo && global.chrome && global.chrome.runtime) await global.chrome.runtime.sendMessage({ type: tipo, text: t });
     } catch (_) {}
   }
