@@ -463,7 +463,17 @@
   }
   // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
   const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
+  // Titolo e testo di una segnalazione, interi: al passaggio del mouse su ogni suo tasto e riga si legge cosa parte (#1635).
+  function testoSegnalazione(a) {
+    if (!isType(a, 'INVIA_FEEDBACK')) return '';
+    return [a.titolo ?? a.title, a.testo ?? a.text ?? a.messaggio].map((x) => String(x ?? '').trim()).filter(Boolean).join('\n\n');
+  }
   function rigaAttivita(a) {
+    const r = rigaSenzaFumetto(a);
+    const testo = r && !r.title ? testoSegnalazione(a) : '';
+    return testo ? { ...r, title: testo } : r;
+  }
+  function rigaSenzaFumetto(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
     // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
@@ -596,7 +606,7 @@
   }
 
   global.SN_RIGHE_ATTIVITA = {
-    riga: rigaAttivita, rigaArchivio, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
+    riga: rigaAttivita, rigaArchivio, testoSegnalazione, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
     rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati, testoEliminati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

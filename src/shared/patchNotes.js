@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.291', date: '2026-11-18',
+      features: [
+        { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
+        { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
+      ],
+    },
+    {
       version: '0.2.290', date: '2026-11-17',
       features: [
         { testo: 'Gli avvisi di Filo arrivano dove sei. Su una pagina compaiono in basso a destra con la loro icona, e il timer scaduto ha lì il suo «Ferma». Nella home, dopo il tempo di leggerli, volano in cima alla colonna di sinistra e restano come carte finché non le chiudi; se la cosa ha già la sua carta, come un timer o uno scaricamento, si fa notare quella. Con Filo ridotto a icona o dietro un\'altra finestra arriva la notifica del computer, e un clic ti riporta in Filo.', segnalazione: 2390 },

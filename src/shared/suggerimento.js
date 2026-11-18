@@ -35,13 +35,21 @@
     return { x: Math.round(x), y: Math.round(y), sotto };
   }
 
+  // Un testo lungo non copre il pezzo che lo mostra: alto quanto il lato più libero, il resto scorre (#1635).
+  // Un'ancora che lascia meno di ALTEZZA_MINIMA su entrambi i lati non ha lato libero: vale la vista intera.
+  const ALTEZZA_MINIMA = 48;
+  function altezzaMassima({ ancora, vh, margine = MARGINE, stacco = STACCO }) {
+    const lato = Math.max(vh - ancora.bottom - stacco - margine, ancora.top - stacco - margine);
+    return Math.floor(lato >= ALTEZZA_MINIMA ? lato : vh - 2 * margine);
+  }
+
   function msDi(valore, predefinito) {
     const T = global.SN_THEME_TOKENS;
     const n = T && typeof T.durataMs === 'function' ? T.durataMs(valore) : NaN;
     return Number.isFinite(n) ? n : predefinito;
   }
 
-  const api = { posiziona, senzaParole, installa: () => {}, aperto: () => null };
+  const api = { posiziona, altezzaMassima, senzaParole, installa: () => {}, aperto: () => null };
   global.SN_SUGGERIMENTO = global.SN_SUGGERIMENTO || api;
   if (global.SN_SUGGERIMENTO !== api) return;
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
@@ -193,7 +201,9 @@
 
   const FOGLIO = `
     .tip {
-      box-sizing: border-box; display: block; max-width: 320px; max-height: var(--fumetto-altezza, 90vh); overflow: hidden;
+      box-sizing: border-box; display: block; max-width: 320px; max-height: var(--fumetto-altezza, 90vh);
+      overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain;
+      scrollbar-color: color-mix(in srgb, var(--fumetto-testo, CanvasText) 35%, transparent) transparent;
       padding: 4px 8px; border-radius: var(--sn-radius, 6px);
       font: 12px/1.35 var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
       white-space: pre-line; overflow-wrap: anywhere; text-align: left;
@@ -245,26 +255,30 @@
     }
   }
 
-  function disegna(testo) {
+  // `daCapo`: un fumetto che si apre parte dall'inizio; quello aperto che si aggiorna resta dove lo si è scorso.
+  function disegna(testo, { daCapo = false } = {}) {
     bolla();
     colora();
-    tipEl.textContent = testo;
+    const nuovo = tipEl.textContent !== testo;
+    if (nuovo) tipEl.textContent = testo;
     const zoom = Number(host.currentCSSZoom) || 1;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    host.style.setProperty('--fumetto-altezza', `${Math.max(16, (vh - 2 * MARGINE) / zoom)}px`);
+    const r = ancoraDi(corrente);
+    host.style.setProperty('--fumetto-altezza', `${Math.max(16, altezzaMassima({ ancora: r, vh }) / zoom)}px`);
     host.style.setProperty('left', '0px', 'important');
     host.style.setProperty('top', '0px', 'important');
     host.style.setProperty('display', 'block', 'important');
     // Riaperto ogni volta: sale sopra a quello che è entrato nello strato più alto dopo di lui (una finestra modale).
     try { if (host.matches(':popover-open')) host.hidePopover(); host.showPopover(); } catch (_) {}
+    if (nuovo || daCapo) tipEl.scrollTop = 0;
     const misura = host.getBoundingClientRect();
-    const r = ancoraDi(corrente);
     const p = posiziona({ ancora: r, w: misura.width, h: misura.height, vw, vh });
     host.style.setProperty('left', `${p.x / zoom}px`, 'important');
     host.style.setProperty('top', `${p.y / zoom}px`, 'important');
     host.dataset.lato = p.sotto ? 'sotto' : 'sopra';
     visibile = true;
+    accendiRotella(tipEl.scrollHeight > tipEl.clientHeight);
   }
 
   // Su un pezzo grande (una riga, un'immagine) il fumetto sta sotto il puntatore, non in fondo al pezzo.
@@ -281,7 +295,7 @@
     if (!corrente || !corrente.el.isConnected) { nascondi(); return; }
     const testo = testoProprio(corrente.el);
     if (!testo) { nascondi(); return; }
-    disegna(testo);
+    disegna(testo, { daCapo: true });
     // Chi conta le etichette lette (le icone del menu) lo sa dal pezzo stesso, anche dentro uno shadow chiuso.
     try { corrente.el.dispatchEvent(new CustomEvent('sn-fumetto-mostrato')); } catch (_) {}
   }
@@ -295,6 +309,7 @@
     }
     visibile = false;
     corrente = null;
+    accendiRotella(false);
     if (!spogliati.size) smettiDiOsservare();
   }
 
@@ -409,6 +424,27 @@
       nascondi();
       ultimoBersaglio = null;
     }
+  }
+
+  // Il fumetto non prende il puntatore: la rotella sopra il pezzo scorre lui finché ha testo da mostrare, poi la pagina.
+  // In ascolto solo mentre un fumetto troppo lungo è aperto: un ascolto della rotella che blocca rallenta ogni pagina.
+  const ROTELLA = { capture: true, passive: false };
+  let rotellaAccesa = false;
+  function suRotella(e) {
+    if (!visibile || !corrente || corrente.origine !== 'puntatore' || !tipEl || e.ctrlKey || e.metaKey) return;
+    const max = tipEl.scrollHeight - tipEl.clientHeight;
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tipEl.clientHeight : e.deltaY;
+    const su = tipEl.scrollTop;
+    if (max <= 0 || !dy || (dy > 0 && su >= max - 1) || (dy < 0 && su <= 0)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    tipEl.scrollTop = su + dy;
+  }
+  function accendiRotella(serve) {
+    if (serve === rotellaAccesa) return;
+    rotellaAccesa = serve;
+    if (serve) document.addEventListener('wheel', suRotella, ROTELLA);
+    else document.removeEventListener('wheel', suRotella, ROTELLA);
   }
 
   function installa(opzioni = {}) {

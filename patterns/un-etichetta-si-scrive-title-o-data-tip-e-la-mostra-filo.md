@@ -26,6 +26,9 @@ copre anche il `title` scritto domani da chi non conosce questa regola.
 - Ritardo (token `fumetto.ritardo`), colori (`fumetto.sfondo`, `fumetto.testo`, `fumetto.bordo`), forma e
   larghezza (320 px) sono gli stessi del fumetto della barra: il main li passa alla sua finestra
   (`src/main/movimento.js`). Si cambiano in Preferenze → Avanzate o a parole, come gli altri token.
+- Un testo lungo (una segnalazione intera, #1635) non si accorcia: il fumetto è alto al più quanto il lato libero
+  accanto al pezzo, così non lo copre, e il resto scorre con la rotella tenuta sopra il pezzo, con la barra sottile
+  che dice che c'è altro. L'ascolto della rotella c'è solo mentre un fumetto così è aperto.
 - Sparisce col clic, lo scorrimento, l'Esc e la perdita del fuoco; compare anche col fuoco da tastiera (non con
   quello che un campo prende da solo all'apertura).
 - Sta nello strato più alto (popover), dentro uno shadow aperto: sopra le finestre modali e lontano dal CSS della pagina.

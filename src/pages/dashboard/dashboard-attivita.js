@@ -1532,6 +1532,8 @@
         segnaComando('▶');
       } else {
         btn.textContent = shortLabel;
+        const segnalazione = RA.testoSegnalazione(a);
+        if (segnalazione) btn.title = segnalazione;
       }
       // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il
       // popup di conferma da sole: marchiamo il bottone perché renderActions lo
