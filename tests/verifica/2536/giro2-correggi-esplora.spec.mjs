@@ -65,7 +65,12 @@ for (const { giro, chiede, toglie } of CASI) {
     const testo = (await intervista.locator('.dash-bubble-filo').last().innerText());
     const righe = (await intervista.locator('body').innerText()).split('\n').filter((l) => /Memorizzato|Dimentic|Tolt|Nascost|Corrett/i.test(l)).join(' / ');
     console.log(`\n=== correggi ${giro} ===\nFILO: ${testo}\nRIGHE: ${righe}\nPROFILO VISTO DALLA CHAT DOPO: ${memoria}`);
-    expect(memoria).not.toMatch(/pepe/i);
-    expect(memoria).toMatch(/geometra/i);
+    if (toglie) {
+      expect(memoria).not.toMatch(/pepe/i);
+      expect(memoria).toMatch(/geometra/i);
+    } else {
+      // Chiesto da lui, la memoria si può dire; mai che sia vuota quando non lo è.
+      expect(testo).not.toMatch(/non (ho|c'è|ricordo) (ancora )?(niente|nulla)|(è|era) (ancora )?vuota|non so (ancora )?(niente|nulla)|nessun ricordo|non mi ricordo (niente|nulla)/i);
+    }
   });
 }
