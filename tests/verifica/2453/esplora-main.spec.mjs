@@ -28,8 +28,25 @@ test('esplora: su main lo scorrimento finito prima chiude il menu', async ({ app
       const z = document.createElement('div'); z.style.cssText = 'height:3000px;flex:none'; s.appendChild(z);
       b.scrollIntoView({ block: 'center' });
     });
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty('--sn-radius', '0px');
+      window.__log = [];
+      const M = window.SN_MENU;
+      window.__log.push('SN_MENU ' + typeof M + ' ' + typeof (M && M.fotoDelloScorrimento));
+      if (M && M.fotoDelloScorrimento) {
+        const orig = M.fotoDelloScorrimento;
+        M.fotoDelloScorrimento = (x, y) => {
+          const el = document.elementFromPoint(x, y);
+          window.__log.push('foto ' + x + ',' + y + ' ' + (el && el.className));
+          const f = orig(x, y);
+          return (e) => { const v = f(e); window.__log.push('scroll ' + (e.target.className || e.target.nodeName) + ' -> ' + v); return v; };
+        };
+      }
+      document.addEventListener('scroll', (e) => window.__log.push('ev ' + (e.target.className || e.target.nodeName) + ' t=' + Math.round(performance.now())), true);
+    });
     await page.evaluate(async () => {
       await window.SN_RINOMINA_UI.disponibile();
+      window.__log.push('click t=' + Math.round(performance.now()));
       const b = document.querySelector('.dash-file-btn');
       b.closest('.dash-bubbles').scrollTop += 40;
       const r = b.getBoundingClientRect();
