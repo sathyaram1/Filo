@@ -133,6 +133,7 @@ async function azioneSchedeChiuse(action) {
 async function azioneRiapriScheda(action, { sender }) {
   const tm = winOf(sender)?._filoTabs;
   if (!tm) return { executed: false, kept: true, output: { riaperta: false, error: 'nessuna finestra con schede' } };
+  if (!String(action.id ?? '').trim()) return riapriUltima(tm);
   const v = await voceChiusa(action.id);
   if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
   const base = { titolo: v.perModello.titolo, url: v.perModello.url, chiusa: v.perModello.chiusa };
