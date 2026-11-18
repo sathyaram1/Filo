@@ -75,8 +75,11 @@ test('le voci segnalate l\'8 novembre che hanno uno strumento non diventano «no
     const s = Caps.STRUMENTO[id];
     assert.ok(s && s !== Caps.SOLO_A_MANO, `${id}: nessuno strumento della chat la comanda`);
     const cap = CAPS.find((c) => c.id === id);
-    const reply = `Non posso farlo da qui: «${cap.title}» lo trovi nel menu del tasto destro, clicca la voce e fai tu.`;
-    assert.equal(AF.analyzeReply(reply, [], 'fallo tu adesso', CAPS).kind, null, id);
+    const spiega = `«${cap.title}» lo trovi nel menu del tasto destro: clicca la voce e scegli quello che ti serve, ci metti un attimo.`;
+    assert.equal(AF.analyzeReply(spiega, [], 'fallo tu adesso', CAPS).kind, null, id);
+    const rifiuto = AF.analyzeReply(`Non posso farlo da qui: ${spiega}`, [], 'fallo tu adesso', CAPS);
+    assert.notEqual(rifiuto.kind, 'capability-uncommandable', id);
+    assert.equal(rifiuto.capabilityId || null, null, id);
   }
 });
 
