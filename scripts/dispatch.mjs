@@ -433,6 +433,8 @@ export const OPZIONI_REGISTRAZIONE = {
   // Perché il correttore è stato chiamato (SPEC-RIDISEGNO-LAVORO.md §3, regola 4): senza, la consegna non parte.
   '--motivo': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'il motivo della correzione ("conflitto: <file>", "prove rosse: <prove>", "ripresa" o "altro: <testo>")' },
   '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+  // La cartella della prova da utente, allegata al report (#2539).
+  '--prova': { tipo: 'cartella', comandi: ['--record-fixed'] },
   // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
   '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
