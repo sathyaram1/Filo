@@ -87,7 +87,7 @@ test('la carta Editor trascinata nel «+» ci resta dopo un ricarico e torna; il
   const nelPiu = page.locator('#altroFuori .dash-altro-app[data-id="editor"]');
   await expect(nelPiu).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/piu-con-editor.png` });
-  await page.locator('#altroFuori .dash-altro-cella', { has: nelPiu }).locator('.dash-altro-rimetti').click();
+  await page.locator('#altroFuori .dash-altro-cella:has(.dash-altro-app[data-id="editor"]) .dash-altro-rimetti').click();
   await expect(page.locator('#tieni .dash-carta[data-tipo="editor"]')).toHaveCount(1);
 
   const prima = await inVista(page);
