@@ -358,6 +358,16 @@ async function schedeNumerate(win, schedeViste) {
   try { return (await FiloState.listTabs({ windowId: win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { return []; }
 }
 
+// La scheda che MOSTRA_SCHEDA porta davanti: col numero, o `verso` dopo/prima di quella davanti come Ctrl+Tab (#2371).
+async function schedaDaMostrare(tm, action, schedeViste) {
+  const verso = String(action.verso ?? '').trim().toLowerCase();
+  if (!(verso === 'dopo' || verso === 'prima') || action.scheda != null) return schedaPerNumero(tm, action, schedeViste);
+  const tabs = Array.isArray(tm.tabs) ? tm.tabs : [];
+  if (tabs.length < 2) return { errore: 'c\'è una scheda sola: non ce n\'è un\'altra su cui passare' };
+  const i = globalThis.SN_TASTI.schedaNelVerso(verso, tabs.findIndex((t) => t.id === tm.activeId), tabs.length);
+  return tabs[i] ? { tab: tabs[i] } : null;
+}
+
 // La scheda col numero `scheda` di TAB APERTE: { tab }, { errore } o null se il numero non c'è.
 async function schedaPerNumero(tm, action, schedeViste) {
   const numero = Number(action.scheda ?? action.numero ?? 0);
