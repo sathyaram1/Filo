@@ -49,7 +49,7 @@ function controllaColonne(g) {
 
 test('i tasti stanno nella colonna destra e le tre colonne partono dall\'alto', async ({ app, openTab }) => {
   test.setTimeout(45_000);
-  const page = await home(openTab);
+  const page = await home(app, openTab);
   controllaColonne(await geometria(page));
   await page.screenshot({ path: join(SHOTS, '1491-home-icone-chiaro.png') });
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
