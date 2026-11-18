@@ -698,6 +698,7 @@
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
+    try { popup.staccaSpiegazioni?.(); } catch (_) {}
     togliRiquadro(popup.root);
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
@@ -790,6 +791,8 @@
     };
 
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
+    // #2388 — le spiegazioni al passaggio; «Spiegami di più» prosegue la conversazione di questo riquadro.
+    popup.staccaSpiegazioni = global.SN_SPIEGAZIONI?.attacca(popup.bodyEl || root, { chiedi: (testo) => chiedi(popup, testo) }) || null;
     attachDrag(
       root,
       root.querySelector('.sn-popup-header'),

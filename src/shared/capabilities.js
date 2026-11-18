@@ -398,6 +398,12 @@
       doesNot: 'Non accorcia le risposte normali: il tetto è largo. Un fornitore che non regge il tetto scelto viene scartato, e se non ne resta nessuno Filo te lo dice e ti manda a Preferenze.',
     },
     {
+      id: 'spiegazioni-al-passaggio', title: 'Le parole in corsivo hanno una spiegazione', category: 'assistant',
+      desc: 'In Filo il corsivo vuol dire una cosa sola: su quella parola c’è una spiegazione. Nelle risposte di Filo (chat della home, Aiuto, riquadri delle spiegazioni e del tasto destro{se:mazzi}, chat dei Mazzi{/se}) un termine che per te potrebbe non essere ovvio esce in corsivo: Filo decide quali guardando quello che sa di te, così risponde breve senza perderti. Passandoci sopra la parola cambia colore e dopo un attimo si apre un riquadro con la spiegazione, a volte con un disegno; una parola in corsivo dentro il riquadro ne apre un altro accanto, e uscendo col mouse si chiudono tutti. Il clic (o il tocco) tiene aperto il riquadro finché non clicchi fuori o premi Esc. Col tasto destro sulla parola: «Spiegami di più» manda la domanda alla stessa conversazione, «Copia la spiegazione» la copia. Il resto delle risposte è dritto, e anche le righe di servizio (Filo sta scrivendo, note, stati) non sono in corsivo.',
+      invoke: 'Passa il mouse su una parola in corsivo di una risposta, cliccala, o tasto destro.',
+      doesNot: 'Non vale per quello che scrivi tu: il corsivo dei tuoi documenti e dei tuoi messaggi resta corsivo. I disegni nelle spiegazioni li fa il modello e non caricano niente da internet. Una spiegazione che è una pagina da usare (un gioco, uno schema interattivo) per ora si mostra come testo.',
+    },
+    {
       id: 'app-chats-in-filo', title: 'Le chat delle app entrano nel filo', category: 'assistant',
       desc: 'Le conversazioni che fai con Filo nell\'Editor{se:mazzi}, nei Mazzi{/se} e nell\'Aiuto sopra un sito entrano nella linea del tempo di Filo come una riga ciascuna, per esempio «4 messaggi nell\'Editor su tesi». Nella home la riga compare nel filo, al suo posto nel tempo. Cliccandola si apre e vedi lo scambio; col tasto destro la copi, apri l\'app al documento{se:mazzi}, al mazzo{/se} o alla pagina, o la togli dal filo. Filo sa che c\'è stata e, quando gli chiedi di quella conversazione, la rilegge per intero; la trova anche il campo «Cerca nel filo». Ogni app continua a mostrare la sua conversazione come prima. Dopo un\'ora di silenzio, o per l\'Aiuto a ogni apertura, si comincia una riga nuova.',
       invoke: 'Succede da sé: scrivi nella chat dell\'Editor{se:mazzi}, dei Mazzi{/se} o nell\'Aiuto, poi torna alla home. Clic sulla riga per aprirla, tasto destro per le altre azioni.',
@@ -967,6 +973,7 @@
     'open-for-later': 'scheda(salvate)', archive: 'scheda(chiuse)', 'chat-archive': 'filo(cerca)',
     'visited-pages': 'filo(cancella_pagine)', 'filo-accaduti': 'filo(espandi)', 'chat-archive-recall': 'filo(cerca)',
     'response-length': 'impostazioni(imposta)', 'app-chats-in-filo': 'filo(cerca)', 'chat-conti-cambi': 'web(cerca)',
+    'spiegazioni-al-passaggio': SOLO_A_MANO,
     history: 'scheda(apri)', 'downloads-list': 'scheda(apri)', 'help-sidebar': 'scheda(finestra)',
     'chat-schede-trascinate': SOLO_A_MANO, 'chat-immagini-trascinate': SOLO_A_MANO, 'voice-chat': SOLO_A_MANO,
     'web-search-assistant': 'web(cerca)', feedback: 'filo_su_di_se(feedback)', 'transparency-docs': 'filo_su_di_se(documento)',

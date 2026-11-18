@@ -1010,6 +1010,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   suRichiesta(['SN_WALLET'], () => { try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } }); // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
+  try { require(path.join(SHARED_DIR, 'spiegazioni.js')); } catch (e) { console.error('[Filo CS] spiegazioni', e); } // #2388 — le spiegazioni al passaggio di popup e Aiuto
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }
   try { require(path.join(SHARED_DIR, 'suggerimento.js')); } catch (e) { console.error('[Filo CS] suggerimento', e); } // #2095 — il fumetto sui pezzi di Filo: DOPO filoUi e themeTokens

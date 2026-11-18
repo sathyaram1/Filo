@@ -15,6 +15,7 @@
         { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
+        { testo: 'Nelle risposte di Filo le parole in corsivo hanno una spiegazione: passaci sopra col mouse e la leggi, a volte con un disegno, senza che la risposta si allunghi. Filo sceglie cosa spiegarti in base a quello che sa di te; col tasto destro sulla parola chiedi di più o copi la spiegazione.', segnalazione: 2388 },
       ],
     },
     {

@@ -8571,6 +8571,8 @@
   window.addEventListener('resize', applyLayout);
 
   async function init() {
+    // #2388 — i testi dei modelli hanno le spiegazioni al passaggio; qui non c'è una chat, solo «Copia».
+    window.SN_SPIEGAZIONI?.attacca(document.body);
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.

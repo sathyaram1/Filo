@@ -6,6 +6,16 @@
   'use strict';
 
   const LINK_CLASS = 'filo-md-link';
+  // Il corsivo di Filo vuol dire «qui c'è una spiegazione al passaggio» (#2388): la classe la leggono
+  // src/shared/spiegazioni.js e src/styles/spiegazioni.css.
+  const SPIEGA_CLASS = 'filo-spiega';
+  // Segnaposto delle immagini (E004/E005: E002/E003 sono i posti delle fonti), stesse regole di quelli qui sotto.
+  const S2 = String.fromCharCode(0xE004);
+  const S3 = String.fromCharCode(0xE005);
+  const TUTTE_LE_SENTINELLE = new RegExp('[' + String.fromCharCode(0xE000) + '-' + S3 + ']', 'g');
+  // In prepara restano i posti delle fonti, messi da fontiCitate.conPosti prima del render.
+  const FUORI_DAI_POSTI_FONTE = new RegExp('[\\uE000\\uE001' + S2 + S3 + ']', 'g');
+  const SEGNAPOSTO_IMG = new RegExp(S2 + '(\\d+)' + S3, 'g');
   // Sentinelle Private-Use dei segnaposto: tolte dal testo in arrivo, così ogni segnaposto è uno dei nostri.
   const S0 = '\uE000';
   const S1 = '\uE001';
@@ -62,10 +72,107 @@
     return [m.slice(0, fine), m.slice(fine)];
   }
 
-  // Grassetto poi corsivo: l'ordine evita che ** venga letto come due *.
+  // Grassetto poi enfasi: l'ordine evita che ** venga letto come due *. L'enfasi esce dritta: in Filo il corsivo
+  // è solo delle spiegazioni (#2388).
   const enfasi = (s) => s
     .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+    .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1$2');
+
+  // Un disegno del modello entra solo come <img> con data: (#2388): da immagine un SVG non esegue script e non
+  // carica indirizzi esterni. Senza xmlns il browser non lo disegnerebbe.
+  function immagineSvg(svg) {
+    const conNs = /^<svg\b[^>]*\bxmlns\s*=/i.test(svg) ? svg : svg.replace(/^<svg\b/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+    return '<img class="filo-md-img" alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(conNs) + '">';
+  }
+
+  // Il codice (``` e `…`) resta com'è: un SVG o un marcatore mostrati come codice non si interpretano. Un SVG
+  // ancora aperto nell'ultimo paragrafo è quello che sta arrivando: non si mostra il suo sorgente.
+  const SVG_O_CODICE = /(```[\s\S]*?(?:```|$)|`[^`\n]+`)|<svg\b[\s\S]*?<\/svg\s*>|<svg[\s>](?:(?!\n\s*\n)[\s\S])*$/gi;
+
+  // Le parentesi graffe di una riga appaiate in un passaggio solo (lineare anche con mille «{{» aperte), saltando
+  // il codice fra backtick. chiude[i] = indice della } che chiude la { in i; barra[i] = la prima | che ha la { in i
+  // come graffa più interna; aperte = le { rimaste senza coppia.
+  function graffe(s) {
+    const chiude = {};
+    const barra = {};
+    const pila = [];
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '`') { const j = s.indexOf('`', i + 1); if (j > i + 1) { i = j; continue; } }
+      if (c === '{') pila.push(i);
+      else if (c === '}' && pila.length) chiude[pila.pop()] = i;
+      else if (c === '|' && pila.length && barra[pila[pila.length - 1]] == null) barra[pila[pila.length - 1]] = i;
+    }
+    return { chiude, barra, aperte: pila };
+  }
+
+  // Un marcatore {{termine|spiegazione}} in i: la fine (indice dopo «}}») e la barra che separa, o null.
+  function marcatoreIn(s, i, g) {
+    if (s[i] !== '{' || s[i + 1] !== '{') return null;
+    const fine = g.chiude[i];
+    if (fine == null || g.chiude[i + 1] !== fine - 1 || g.barra[i + 1] == null) return null;
+    const corpo = s.slice(i + 2, fine - 1);
+    const barra = g.barra[i + 1] - (i + 2);
+    if (barra <= 0) return null;
+    let termine = corpo.slice(0, barra).trim();
+    const spiegazione = corpo.slice(barra + 1).trim();
+    let tipo = 'testo';
+    const p = /^pagina:\s*/i.exec(termine);
+    if (p) { tipo = 'pagina'; termine = termine.slice(p[0].length).trim(); }
+    if (!termine || !spiegazione) return null;
+    return { fine: fine + 1, termine, spiegazione, tipo };
+  }
+
+  // Ogni marcatore della riga diventa un segnaposto; la spiegazione si disegna come una riga di Filo (con i suoi
+  // marcatori: una spiegazione dentro una spiegazione) e va fra le definizioni del testo.
+  // Oltre PROFONDITA_MAX livelli il marcatore resta scritto com'è: il testo si legge, e la pila non scoppia.
+  const PROFONDITA_MAX = 8;
+  function marcatori(s, ctx, stash) {
+    if (s.indexOf('{{') < 0 || ctx.prof >= PROFONDITA_MAX) return s;
+    const g = graffe(s);
+    let out = '';
+    for (let i = 0; i < s.length;) {
+      if (s[i] === '`') {
+        const j = s.indexOf('`', i + 1);
+        if (j > i + 1) { out += s.slice(i, j + 1); i = j + 1; continue; }
+      }
+      const m = marcatoreIn(s, i, g);
+      if (!m) { out += s[i]; i++; continue; }
+      const n = ctx.defs.length;
+      ctx.defs.push(null);
+      const termineHtml = enfasi(m.termine);
+      ctx.prof++;
+      ctx.defs[n] = { tipo: m.tipo, termine: termineHtml.replace(/<[^>]*>/g, ''), html: inlineMd(m.spiegazione, ctx) };
+      ctx.prof--;
+      out += stash('<span class="' + SPIEGA_CLASS + '" data-spiega="' + n + '" tabindex="0">' + termineHtml + '</span>');
+      i = m.fine;
+    }
+    return out;
+  }
+
+  // Le immagini vanno via prima delle righe (un SVG va a capo), e in coda a un testo che arriva un marcatore
+  // ancora aperto mostra il solo termine invece delle graffe.
+  function prepara(text, ctx) {
+    let t = String(text == null ? '' : text).replace(FUORI_DAI_POSTI_FONTE, '');
+    t = t.replace(SVG_O_CODICE, (m, codice) => {
+      if (codice) return m;
+      if (!/<\/svg\s*>$/i.test(m)) return '';
+      return S2 + (ctx.immagini.push(immagineSvg(m)) - 1) + S3;
+    });
+    const ultimoCapo = t.lastIndexOf('\n');
+    const coda = t.slice(ultimoCapo + 1);
+    const { aperte } = graffe(coda);
+    const insieme = new Set(aperte);
+    const prima = aperte.find((i) => coda[i + 1] === '{' && insieme.has(i + 1));
+    if (prima != null) {
+      const resto = coda.slice(prima + 2);
+      const barra = resto.indexOf('|');
+      if (barra > 0) t = t.slice(0, ultimoCapo + 1) + coda.slice(0, prima) + resto.slice(0, barra).replace(/^pagina:\s*/i, '');
+    }
+    return t;
+  }
+
+  const nuovoCtx = (fonti = null) => ({ defs: [], immagini: [], prof: 0, fonti });
 
   // Link markdown [testo](url). Il testo non contiene [ né ]: da ogni [ la ricerca
   // si ferma alla quadra seguente, così una fila di [ aperte resta lineare (#853).
@@ -78,16 +185,20 @@
   // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
   // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo
   // di un link ha la sua enfasi e il suo codice, rimessi dentro l'<a> (#853).
-  // `fonti`: le etichette delle fonti controllate dal main (src/shared/fontiCitate.js), una per posto; il testo da
-  // solo non ne disegna nessuna, qualunque cosa contenga.
-  function inlineMd(escaped, fonti = null) {
+  // `ctx` porta spiegazioni, immagini e fonti del testo intero: senza, la riga fa da testo a sé.
+  // `ctx.fonti`: le etichette delle fonti controllate dal main (src/shared/fontiCitate.js), una per posto; il testo
+  // da solo non ne disegna nessuna, qualunque cosa contenga.
+  function inlineMd(escaped, ctx) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
-    let t = String(escaped).replace(SENTINELLE, '');
-    const F = global.SN_FONTI_CITATE;
-    t = t.replace(POSTO_FONTE, (m, i) => (F && fonti && fonti[Number(i)] ? stash(F.html(fonti[Number(i)])) : ''));
+    let t = String(escaped).replace(ctx ? SENTINELLE : TUTTE_LE_SENTINELLE, '');
+    const c = ctx || nuovoCtx();
 
+    t = marcatori(t, c, stash);
+    const F = global.SN_FONTI_CITATE;
+    const fonti = c.fonti;
+    t = t.replace(POSTO_FONTE, (m, i) => (F && fonti && fonti[Number(i)] ? stash(F.html(fonti[Number(i)])) : ''));
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
     t = t.replace(LINK_MD, (m, label, url) => {
@@ -101,7 +212,7 @@
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });
 
-    return rimetti(enfasi(t));
+    return rimetti(enfasi(t)).replace(SEGNAPOSTO_IMG, (m, i) => c.immagini[Number(i)] || '');
   }
 
   // I blocchi del testo (paragrafi, titoli, elenchi, codice ```), con le righe GIA' escapate. Li leggono sia
@@ -164,13 +275,15 @@
 
   // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
   // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
+  // Le spiegazioni viaggiano con l'HTML in un <template> (inerte: niente si carica finché non si apre), così ogni
+  // superficie che riceve il render le ha già; le apre src/shared/spiegazioni.js.
   function render(text, { fonti = null } = {}) {
     const F = global.SN_FONTI_CITATE;
     const conFonti = F && Array.isArray(fonti) && fonti.length ? F.conPosti(text, fonti) : null;
-    const etichette = conFonti ? conFonti.fonti : null;
-    const riga = (s) => inlineMd(s, etichette);
+    const ctx = nuovoCtx(conFonti ? conFonti.fonti : null);
+    const riga = (r) => inlineMd(r, ctx);
     const out = [];
-    for (const b of blocchi(conFonti ? conFonti.text : text)) {
+    for (const b of blocchi(prepara(conFonti ? conFonti.text : text, ctx))) {
       if (b.k === 'p') out.push('<p>' + b.righe.map(riga).join('<br>') + '</p>');
       else if (b.k === 'h') out.push('<h' + b.livello + '>' + riga(b.riga) + '</h' + b.livello + '>');
       else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n').replace(POSTO_FONTE, '') + '</code></pre>');
@@ -180,6 +293,11 @@
         out.push('</' + b.k + '>');
       }
     }
+    if (ctx.defs.length) {
+      out.push('<template class="filo-spieghe">' + ctx.defs.map((d, i) => '<div data-spiega-def="' + i
+        + '" data-tipo="' + d.tipo + '" data-termine="' + d.termine.replace(/"/g, '&quot;') + '">' + d.html + '</div>').join('')
+        + '</template>');
+    }
     return out.join('\n');
   }
 
@@ -188,9 +306,10 @@
   const DISESCAPE = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
   const disescapa = (s) => s.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => DISESCAPE[e]);
   // Il testo entra escapato, quindi gli unici < rimasti sono i tag messi da inlineMd.
-  const inlineTesto = (riga) => disescapa(inlineMd(riga).replace(/<[^>]*>/g, ''));
   function testo(text) {
-    return blocchi(text).map((b) => {
+    const ctx = nuovoCtx();
+    const inlineTesto = (riga) => disescapa(inlineMd(riga, ctx).replace(/<[^>]*>/g, ''));
+    return blocchi(prepara(text, ctx)).map((b) => {
       if (b.k === 'p') return b.righe.map(inlineTesto).join('\n');
       if (b.k === 'h') return inlineTesto(b.riga);
       if (b.k === 'code') return disescapa(b.righe.join('\n'));
@@ -223,5 +342,5 @@
     return !!(el && el.closest && (el.closest('a.' + LINK_CLASS) || el.closest('[data-filo-verdetti]')));
   }
 
-  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, scrittoDaUnModello, LINK_CLASS };
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, disescapa, safeLinkUrl, bindLinks, scrittoDaUnModello, LINK_CLASS, SPIEGA_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

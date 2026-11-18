@@ -189,7 +189,9 @@ test('la nota di Filo si legge col markdown formattato, come in Gestione; il tes
   await page.locator('[data-tab="resolved"]').click();
   const filo = page.locator('.fb-bubble--model');
   await expect(filo.locator('ul li strong')).toHaveText(['A.', 'B.']);
-  await expect(filo.locator('em')).toHaveText('meno');
+  // In Filo il corsivo è solo delle spiegazioni al passaggio (#2388): l'enfasi esce dritta, senza asterischi.
+  await expect(filo.locator('em, i')).toHaveCount(0);
+  await expect(filo).toContainText('la meno invasiva');
   await expect(filo.locator('h4')).toHaveText('Scelte');
   await expect(filo).not.toContainText('**');
   await expect(filo).toContainText('<b>finto</b>');

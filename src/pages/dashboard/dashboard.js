@@ -954,6 +954,17 @@
     }
   }
 
+  // La risposta mentre arriva si legge già formattata (#2388): un marcatore di spiegazione non si vede fra graffe.
+  function scriviInDiretta(el, text) {
+    if (text && self.SN_MARKDOWN) {
+      el.innerHTML = self.SN_MARKDOWN.render(text);
+      el.classList.add('dash-bubble-md');
+    } else {
+      el.textContent = text || '';
+      el.classList.remove('dash-bubble-md');
+    }
+  }
+
   // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
   // pagina interna.
   // L'etichetta di una fonte apre la pagina sulla frase dalla stessa porta dei collegamenti della chat (#2383).
@@ -967,6 +978,14 @@
     e.preventDefault();
     e.stopPropagation();
     send({ type: MSG.OPEN_URL, url, via: 'chat' });
+  });
+
+  // #2388 — le spiegazioni al passaggio, anche nelle conversazioni delle app sulla home; «Spiegami di più» va alla
+  // chat della home solo dalle sue bolle.
+  self.SN_SPIEGAZIONI?.attacca(document.body, {
+    chiedi: (testo) => submitMessage(testo, { soloTesto: true }),
+    puoChiedere: (parola) => bubblesEl.contains(parola),
+    apriLink: (url) => send({ type: MSG.OPEN_URL, url, via: 'chat' }),
   });
 
   // ===== Invio messaggio =====
@@ -1123,7 +1142,7 @@
         if (data.reset) {
           // Fallback provider a metà: butta ciò che il giro aveva già messo a schermo, non accodare.
           streamedText = '';
-          if (streamBubble) streamBubble.textContent = rispostaPrima;
+          if (streamBubble) scriviInDiretta(streamBubble, rispostaPrima);
           return;
         }
         if (!data.delta || turno.fermato) return;
@@ -1135,7 +1154,7 @@
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        bollaDellaRisposta().textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
+        scriviInDiretta(bollaDellaRisposta(), rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro());
         followBottomIfNear();
       });
     }
@@ -1146,10 +1165,10 @@
     const chiudiGiro = (data) => {
       if (data.risposta) {
         rispostaPrima = unisci(rispostaPrima, data.text ? senzaMarcatori(data.text) : testoDelGiro());
-        bollaDellaRisposta().textContent = rispostaPrima;
+        scriviInDiretta(bollaDellaRisposta(), rispostaPrima);
       } else if (streamBubble && rispostaPrima) {
-        pending.aggiungiNota(testoDelGiro());
-        streamBubble.textContent = rispostaPrima;
+        pending.aggiungiNota(self.SN_MARKDOWN?.testo ? self.SN_MARKDOWN.testo(testoDelGiro()) : testoDelGiro());
+        scriviInDiretta(streamBubble, rispostaPrima);
       } else if (streamBubble) {
         if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
         streamBubble = null;
@@ -1415,9 +1434,11 @@
   }
 
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
-  async function submitMessage(text, { daModello = false } = {}) {
+  // `soloTesto`: parte solo `text`, e la bozza nella barra (testo, allegati, citazione) resta dov'è.
+  async function submitMessage(text, { daModello = false, soloTesto = false } = {}) {
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
-    await inviaComposto(prendiComposizione(text), { daModello });
+    const c = soloTesto && text ? composizione(text) : prendiComposizione(text);
+    await inviaComposto(c, { daModello });
   }
   // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
   // rimetterlo nella barra com'era (un seguito che non parte, #1296).
@@ -1443,7 +1464,12 @@
     const citata = Rispondi.prendi();
     const schede = Gettoni ? Gettoni.schede() : [];
     if (Gettoni) Gettoni.svuota();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata, schede };
+    return composizione(text, { immagini, daFuori, scritto, incollato, file, percorsi, citata, schede });
+  }
+  // La forma di un messaggio, in un posto solo: la barra la riempie, «Spiegami di più» (#2388) la manda col solo testo.
+  function composizione(text, parti = {}) {
+    const t = String(text || '');
+    return { text: t, immagini: [], daFuori: false, scritto: t, incollato: false, file: [], percorsi: new Map(), citata: null, schede: [], ...parti };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });

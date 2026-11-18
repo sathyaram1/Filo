@@ -176,6 +176,7 @@
     }
     try { stackEntry?.unregister?.(); } catch (_) {}
     stackEntry = null;
+    try { root._filoSpiegazioni?.(); } catch (_) {}
     root.remove();
     root = null;
     convFilo = '';
@@ -289,6 +290,8 @@
       </form>
     `;
     document.documentElement.appendChild(root);
+    // #2388 — le spiegazioni al passaggio; «Spiegami di più» è una domanda nuova di questa conversazione.
+    global.SN_SPIEGAZIONI?.attacca(root, { chiedi: (testo) => submit({ userMessage: testo }) });
     // Partecipa allo stacking dei popup: sopra quelli aperti prima, sotto quelli aperti dopo.
     // Con uno z-index fisso altissimo finiva sopra al modale feedback, aperto dopo di lei.
     stackEntry = Popup?.registerStack?.(root) || null;

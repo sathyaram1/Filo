@@ -101,7 +101,7 @@
 .sn-sidebar-allegati:not([hidden]) + .sn-sidebar-input,
 .sn-sidebar.sn-sidebar-collapsed .sn-sidebar-allegati { border-top: 0; }
 .sn-sidebar-msg-immagini { display: block; }
-.sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
+.sn-sidebar-msg-loading { color: var(--sn-muted); }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
 /* Il markdown leggero delle risposte è già HTML: via il pre-wrap, che renderebbe letterali gli a-capo
@@ -116,7 +116,6 @@
   margin: 8px 0 4px 0; font-weight: 600; font-size: 1em;
 }
 .sn-sidebar-msg-assistant strong { font-weight: 600; }
-.sn-sidebar-msg-assistant em { font-style: italic; }
 .sn-sidebar-msg-assistant ul, .sn-sidebar-msg-assistant ol {
   margin: 4px 0 8px 0; padding-left: 20px;
 }
@@ -525,7 +524,6 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts,
 .sn-sidebar-feedback-thanks {
   font-size: 11px;
   color: var(--sn-muted);
-  font-style: italic;
 }
 
 .sn-sidebar-feedback-dismissed {

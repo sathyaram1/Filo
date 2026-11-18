@@ -304,6 +304,19 @@
       css: '--sn-fumetto-ritardo',
       default: '350ms',
     },
+    // Le parole spiegate al passaggio (#2388, src/shared/spiegazioni.js): senza override il colore resta l'accento.
+    'spiega.colore': {
+      label: 'Colore della parola spiegata quando ci passi sopra',
+      type: 'color',
+      css: '--sn-spiega-colore',
+      default: '#c45a3b',
+    },
+    'spiega.ritardo': {
+      label: 'Attesa prima che compaia la spiegazione di una parola in corsivo',
+      type: 'time',
+      css: '--sn-spiega-ritardo',
+      default: '350ms',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.

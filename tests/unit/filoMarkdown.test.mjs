@@ -25,12 +25,89 @@ const { render, safeLinkUrl, LINK_CLASS } = globalThis.SN_MARKDOWN;
 
 // ─── formattazione leggera: il cuore del fix (prima si vedeva testo grezzo) ───
 
-test('#418 grassetto/corsivo/codice diventano HTML, non asterischi grezzi', () => {
+test('#418 grassetto/codice diventano HTML, non asterischi grezzi; l\'enfasi senza spiegazione esce dritta (#2388)', () => {
   const html = render('Vedi **grassetto**, *corsivo* e `codice`.');
   assert.match(html, /<strong>grassetto<\/strong>/);
-  assert.match(html, /<em>corsivo<\/em>/);
+  assert.match(html, /, corsivo e /);
+  assert.doesNotMatch(html, /<em>|<i>|\*/);
   assert.match(html, /<code>codice<\/code>/);
-  assert.doesNotMatch(html, /\*\*/);
+});
+
+// ─── #2388: spiegazioni al passaggio ───
+
+const defsDi = (html) => {
+  const tpl = /<template class="filo-spieghe">([\s\S]*)<\/template>/.exec(html);
+  return tpl ? [...tpl[1].matchAll(/<div data-spiega-def="(\d+)" data-tipo="(\w+)" data-termine="([^"]*)">([\s\S]*?)<\/div>(?=<div data-spiega-def|$)/g)]
+    .map((m) => ({ n: Number(m[1]), tipo: m[2], termine: m[3], html: m[4] })) : [];
+};
+
+test('#2388 {{termine|spiegazione}}: il termine si marca, la spiegazione viaggia nel template', () => {
+  const html = render('Il {{DNS|Traduce i **nomi** dei siti in numeri.}} e l\'{{algoritmo|Una ricetta di passi.}} lavorano.');
+  assert.match(html, /<p>Il <span class="filo-spiega" data-spiega="0" tabindex="0">DNS<\/span> e l&#39;<span class="filo-spiega" data-spiega="1" tabindex="0">algoritmo<\/span> lavorano\.<\/p>/);
+  assert.deepEqual(defsDi(html), [
+    { n: 0, tipo: 'testo', termine: 'DNS', html: 'Traduce i <strong>nomi</strong> dei siti in numeri.' },
+    { n: 1, tipo: 'testo', termine: 'algoritmo', html: 'Una ricetta di passi.' },
+  ]);
+  assert.doesNotMatch(html, /\{\{|\}\}/);
+  assert.equal(globalThis.SN_MARKDOWN.testo('Il {{DNS|Traduce i nomi.}} lavora.'), 'Il DNS lavora.');
+});
+
+test('#2388 una spiegazione dentro una spiegazione rimanda a un\'altra definizione dello stesso testo', () => {
+  const html = render('Il {{DNS|Dà l\'indirizzo {{IP|Il numero di un computer in rete.}} di un sito.}} risponde.');
+  const d = defsDi(html);
+  assert.equal(d.length, 2);
+  assert.match(d[0].html, /<span class="filo-spiega" data-spiega="1" tabindex="0">IP<\/span>/);
+  assert.equal(d[1].html, 'Il numero di un computer in rete.');
+});
+
+test('#2388 il markdown normale non imita il marcatore: codice, graffe senza barra, enfasi', () => {
+  for (const t of ['`{{a|b}}`', '```\n{{a|b}}\n```', 'Vue: {{ messaggio }}', '{{|vuoto}}', '{{solo|}}', '*enfasi*', '[a|b](https://x.it)']) {
+    const html = render(t);
+    assert.doesNotMatch(html, /filo-spiega/, t);
+    assert.doesNotMatch(html, /<template/, t);
+  }
+  assert.match(render('`{{a|b}}`'), /<code>\{\{a\|b\}\}<\/code>/);
+});
+
+test('#2388 tipo pagina: previsto dal renderer, per ora mostrato come testo', () => {
+  const d = defsDi(render('Prova il {{pagina:gioco|<b>clicca</b> qui}}.'));
+  assert.equal(d[0].tipo, 'pagina');
+  assert.equal(d[0].termine, 'gioco');
+  assert.equal(d[0].html, '&lt;b&gt;clicca&lt;/b&gt; qui');
+});
+
+test('#2388 un SVG del modello diventa <img> con data:, mai SVG nel documento', () => {
+  const svg = '<svg viewBox="0 0 10 10"><script>alert(1)</script><circle r="4" onload="alert(2)"/></svg>';
+  const html = render('Un {{cerchio|La figura:\n' + svg + '}} tondo.');
+  assert.doesNotMatch(html.replace(/src="[^"]*"/g, ''), /<svg|<script|onload/i);
+  const src = /<img class="filo-md-img" alt="" src="(data:image\/svg\+xml;charset=utf-8,[^"]+)">/.exec(html);
+  assert.ok(src, html);
+  assert.match(decodeURIComponent(src[1].split(',')[1]), /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox/);
+  // Mostrato come codice resta codice.
+  assert.match(render('```\n' + svg + '\n```'), /&lt;svg/);
+  // Nessun indirizzo esterno: un'immagine del modello non si carica da fuori.
+  assert.doesNotMatch(render('![x](https://example.com/a.png)'), /<img/);
+});
+
+test('#2388 mentre arriva: un marcatore aperto in coda mostra il termine, un SVG aperto non mostra il sorgente', () => {
+  assert.equal(render('Il {{DNS|Traduce i no'), '<p>Il DNS</p>');
+  assert.equal(render('Ecco:\n<svg viewBox="0 0 4 4"><rect'), '<p>Ecco:</p>');
+  // Un'apertura vecchia, staccata da una riga vuota, resta testo.
+  assert.match(render('<svg> è un tag\n\nfine'), /&lt;svg&gt; è un tag/);
+});
+
+test('#2388 resta lineare con mille graffe aperte', () => {
+  let annidati = '';
+  for (const [nome, testo] of [
+    ['aperte', '{{a|'.repeat(20000) + 'x'],
+    ['appaiate', '{'.repeat(50000) + '|' + '}'.repeat(50000)],
+    ['annidate', '{{a|'.repeat(20000) + 'b' + '}}'.repeat(20000)],
+  ]) {
+    const c = costoInUnita(() => { annidati = render(testo); }, { tetto: 10 });
+    assert.ok(c.entro, `${nome}: ${c.come}`);
+  }
+  assert.equal(defsDi(annidati).length, 8);
+  assert.match(annidati, /\{\{a\|/);
 });
 
 test('#418 gli elenchi diventano <ul>/<ol>', () => {
@@ -161,7 +238,7 @@ test('#853 il testo di un link resta quello scritto, anche con codice o grassett
     { href: 'https://it.wikipedia.org/wiki/Roma', dentro: '<strong>Wikipedia</strong>' },
   ]);
   const misto = render('[*vedi* `x` e **y**](https://example.com/a_(b))');
-  assert.deepEqual(linkDi(misto), [{ href: 'https://example.com/a_(b)', dentro: '<em>vedi</em> <code>x</code> e <strong>y</strong>' }]);
+  assert.deepEqual(linkDi(misto), [{ href: 'https://example.com/a_(b)', dentro: 'vedi <code>x</code> e <strong>y</strong>' }]);
   assert.doesNotMatch(html + misto, SEGNAPOSTI);
   // «Copia» porta lo stesso testo che si legge.
   assert.equal(globalThis.SN_MARKDOWN.testo('Vedi [`map()`](https://example.com/m) e [**Roma**](https://example.com/r).'), 'Vedi map() e Roma.');
