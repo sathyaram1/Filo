@@ -62,31 +62,14 @@ test('#1642 nel campo della chat della home il valore trovato mostra il fumetto 
   await expect(v).toBeVisible({ timeout: 10_000 });
   expect(await v.evaluate((el) => el.hasAttribute('title'))).toBe(false);
   const b = await riquadroDelSegno(v);
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
+  // Sulla home il valore sta accanto alle x, velato sulle parole: la strada è passare sulle x e poi sul valore.
+  const x = await riquadroDelSegno(segniDi(page, '.sn-spell-overlay .sn-suggerimento', { hasText: 'xx' }));
+  const viaLeX = async () => {
+    await page.mouse.move(x.x + x.width / 2, x.y + x.height / 2, { steps: 3 });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 6 });
+  };
+  await viaLeX();
   const tip = page.locator('[data-sn-fumetto] .tip');
-  await page.waitForTimeout(1500);
-  console.log('DEBUG', JSON.stringify(await page.evaluate(({ x, y }) => {
-    const giu = document.elementFromPoint(x, y);
-    const v = document.querySelector('.sn-spell-valori .sn-spell-valore') || null;
-    const tutti = [...document.querySelectorAll('*')].filter((e) => e.shadowRoot).map((e) => e.tagName + '.' + e.className);
-    return {
-      giu: giu && (giu.tagName + '.' + giu.className + ' tip=' + (giu.dataset && giu.dataset.tip)),
-      v: v && v.dataset.tip, sugg: !!window.SN_SUGGERIMENTO, aperto: window.SN_SUGGERIMENTO && window.SN_SUGGERIMENTO.aperto(),
-      fumetti: document.querySelectorAll('[data-sn-fumetto]').length, ombre: tutti.slice(0, 10),
-    };
-  }, { x: b.x + b.width / 2, y: b.y + b.height / 2 })));
-  console.log('DEBUG2', JSON.stringify(await page.evaluate(() => {
-    const v = document.querySelector('.sn-spell-valori .sn-spell-valore');
-    const ta = document.querySelector('#input');
-    const catena = [];
-    for (let e = v; e; e = e.parentElement) { const cs = getComputedStyle(e); catena.push(`${e.tagName}.${e.className} z=${cs.zIndex} pos=${cs.position} pe=${cs.pointerEvents}`); }
-    const catTa = [];
-    for (let e = ta; e; e = e.parentElement) { const cs = getComputedStyle(e); catTa.push(`${e.tagName}.${e.className} z=${cs.zIndex} pos=${cs.position}`); }
-    return { catena, catTa, rv: v.getBoundingClientRect().toJSON(), rta: ta.getBoundingClientRect().toJSON() };
-  })));
-  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
-  await page.waitForTimeout(800);
-  console.log('DEBUG3', await page.locator('#input').inputValue());
   await expect(tip).toBeVisible({ timeout: 3000 });
   await expect(tip).toContainText('Rapporto prezzo/utili di Alphabet');
   await expect(tip).toContainText('Fonte: borsa.example');
