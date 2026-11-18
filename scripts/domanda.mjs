@@ -779,8 +779,8 @@ export async function esegui(argv, io = {}) {
       }
       if (!(await conCredenziale())) return 1;
       const r = conChiave() ? await registroChiave(cred.passphrase, a.parole) : await lettura({ op: 'registro', parole: a.parole });
-      const nf = nonFidate(r.voci);
-      if (nf.length || fidatePerTimbri(r.voci).length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri(r.voci))) }));
+      const riga = await sporcaPerLeDomande(sporca, `registro per «${visibile(a.parole).slice(0, 60)}»`, r.voci);
+      if (riga) errore(riga);
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
