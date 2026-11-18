@@ -1076,8 +1076,9 @@
     const at = fratelli.indexOf(art);
     if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
     if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
-    if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
+    // La lettera del doppio tocco di una carta che apre un'app (#2372); «Togli» resta l'ultima voce.
     if (art.dataset.colonna === 'destra') voci.push(...vociLettera(art.dataset.chiave, c.titolo));
+    if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
     return voci;
   }
   // Il menu di una pastiglia delle Impostazioni rapide: le stesse cose del suo clic, più la sua voce in Preferenze.
