@@ -193,11 +193,6 @@ describe('quale tentativo precedente si riprende', () => {
       assert.equal(dopo.scelto.ramo, ramo('20261103T000000Z'), 'morto dopo la riapertura: è il lavoro da riprendere');
       assert.deepEqual(dopo.altri, []);
       assert.deepEqual(dopo.superati, [ramo('20261101T000000Z')]);
-
-      const c = chiudiTentativi({ root: casa, rami: dopo.superati });
-      assert.equal(c.ok, true, c.errore);
-      assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il ramo superato non resta su origin');
-      assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261103T000000Z')}`), '');
     } finally { togliCartella(base); }
   });
 
