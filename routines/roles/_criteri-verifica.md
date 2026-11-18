@@ -31,4 +31,10 @@
    di dopo, e per ciascuno si scrive cosa perde l'utente senza. Un oggetto
    senza risposta è un rilievo da correggere, non un dubbio: si toglie, o la
    sua funzione passa al tasto destro o alla richiesta a Filo
-   (`filo_design.txt` § ESTETICA).
+   (`filo_design.txt` § ESTETICA). Il prima è la stessa schermata su `main`,
+   o lo screenshot allegato alla segnalazione quando c'è: si fotografa con
+   una prova che salva in `tests/.shots/`, e
+   `node scripts/spec-su-main.mjs tests/<nome>.spec.mjs` la corre sul ramo e
+   su `main`, anche se l'hai scritta adesso, e tiene le immagini dei due lati
+   in `tests/.shots/confronto/`. Gli oggetti si contano sulle immagini, non a
+   memoria.
