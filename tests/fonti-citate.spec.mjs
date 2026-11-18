@@ -1,6 +1,6 @@
-// Fonti verificate nelle risposte (#2383): dopo una lettura vera la frase porta il nome del sito; il passaggio mostra la
-// frase della pagina, il clic apre la scheda scesa fino alla frase, il tasto destro copia. Un indirizzo che il turno
-// non ha letto non diventa un'etichetta, e nemmeno il markdown che la imita. Logica pura: tests/unit/fontiCitate.test.mjs.
+// Fonti verificate nelle risposte (#2383): dopo una lettura vera la frase porta il nome del sito, anche presa oltre il
+// pezzo che il modello ha letto; passaggio, clic sulla frase, tasto destro. Un indirizzo non letto nel turno e il
+// markdown che imita l'etichetta non ne producono. Logica pura: tests/unit/fontiCitate.test.mjs.
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
