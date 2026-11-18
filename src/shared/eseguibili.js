@@ -280,6 +280,7 @@
   global.SN_ESEGUIBILI = {
     ESTENSIONI,
     nomeVisibile,
+    nomeVero,
     estensione,
     eEseguibile,
     eImmagineDisco,
