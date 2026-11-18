@@ -239,12 +239,12 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
   // l'ha fatta. È la differenza con il caso "non esiste".
   await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
     timeout: 10_000, intervals: [100],
-  }).toMatch(/schermo intero/i);
+  }).toMatch(/«Finestra in incognito»/);
 
   // Confermata, parte davvero, citando cosa l'utente aveva chiesto.
   await expect.poll(async () => app.evaluate(() => (globalThis.__submitted || []).map((p) => p.text).join('\n')), {
     timeout: 10_000, intervals: [200],
-  }).toMatch(/schermo intero/i);
+  }).toMatch(/finestra in incognito/i);
 
   // Una sola segnalazione per lo stesso buco: quella anonima non parte in parallelo.
   const sources = await app.evaluate(() => (globalThis.__submitted || []).map((p) => String(p.clientId || '')));
