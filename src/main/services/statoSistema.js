@@ -696,15 +696,16 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   // L'elenco (bluetooth o wifi) dal PowerShell acceso: l'oggetto della sua risposta; { tempo: true } se non arriva in
   // tempo; null se il lettore non può (spento, arreso, muto) e chi chiede passa allo script.
   function chiedi(cosa, ms) {
-    if (!figlio || muti || !figlio.stdin || (cosa !== 'bluetooth' && cosa !== 'wifi')) return Promise.resolve(null);
+    if (!figlio || figlio.muto || !figlio.stdin || (cosa !== 'bluetooth' && cosa !== 'wifi')) return Promise.resolve(null);
     const c = richieste.get(cosa);
     if (c) return c.p;
     const acceso = fresco;
+    const chiesto = figlio;
     const voce = {};
     voce.p = new Promise((risolvi) => {
       voce.risolvi = risolvi;
       voce.timer = setTimeout(() => {
-        if (acceso && figlio) muti = true;
+        if (acceso) chiesto.muto = true;
         consegna(cosa, acceso ? null : { tempo: true });
       }, ms != null ? ms : (acceso ? ELENCO_ACCESO_MS : ELENCO_A_FREDDO_MS));
     });
