@@ -55,14 +55,7 @@ function avvisoNellaFinestra(testo, { chiave, durataSec = 0, azioni, errore = ''
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
       if (typeof incognito === 'boolean' && !!win._filoIncognito !== incognito) continue;
-      const wc = win.webContents;
-      if (!wc || wc.isDestroyed?.()) continue;
-      const invia = () => { if (!wc.isDestroyed()) { wc.send('shell:toast', { text: testo, opts }); visto(); } };
-      try {
-        if (wc.isLoading?.()) quandoPronta(wc, chiave, invia);
-        else invia();
-        dette++;
-      } catch (_) {}
+      try { if (allaCornice(win.webContents, { text: testo, opts }, visto)) dette++; } catch (_) {}
     }
   } catch (_) {}
   return dette > 0;
