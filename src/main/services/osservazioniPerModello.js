@@ -1669,7 +1669,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const nelFilo = (r) => {
       const ok = !!r && r.ok !== false && !r.error;
       const esito = ok ? { eseguita: true } : { eseguita: false, errore: (r && (r.error || r.errore)) || 'non partita' };
-      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { testo: voce.text }, esito, { daSola: 'automazione', via: 'segnalazione', chat: chatId }); } catch (_) {}
+      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { titolo: voce.name, testo: voce.text }, esito, { daSola: 'automazione', via: 'segnalazione', chat: chatId }); } catch (_) {}
       return r;
     };
     const spedisci = () => Promise.resolve(Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
