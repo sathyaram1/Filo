@@ -117,9 +117,9 @@ test('#1635 una segnalazione con markup nel titolo e nel testo si legge come tes
     // Riaperta la home, la conversazione ritorna: il tasto della segnalazione dice ancora cosa partirebbe.
     await page.reload();
     const di = await home(app);
-    const tasto2 = di.locator('.dash-bubble-filo .dash-action-btn').first();
+    const tasto2 = di.getByText('Segnalazione non inviata').first();
     await expect(tasto2).toBeVisible({ timeout: 10_000 });
-    console.log('DEBUG-RELOAD', await tasto2.evaluate((el) => `${el.textContent} | title=${el.getAttribute('title')} | tip=${el.dataset.tip}`));
+    console.log('DEBUG-RELOAD', await tasto2.evaluate((el) => `${el.tagName}.${el.className} ${el.outerHTML.slice(0, 300)} || parent=${el.parentElement.outerHTML.slice(0, 400)}`));
     const c = await tasto2.boundingBox();
     await di.mouse.move(c.x + c.width / 2, c.y + c.height / 2, { steps: 3 });
     await expect(di.locator('[data-sn-fumetto] .tip')).toContainText('Riga dopo spazi', { timeout: 3000 });
