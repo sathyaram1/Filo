@@ -90,7 +90,7 @@ test('«salvala per dopo» e «cerca questa immagine» li fa la chat sulla pagin
   await expect.poll(() => confirmText(chat), { timeout: 8_000 }).toContain('Google Lens');
   await clickConfirm(chat, 'ok');
   await expect.poll(() => app.evaluate(() => globalThis.__aperte), { timeout: 10_000, message: 'Google Lens non si è aperto' })
-    .toEqual([{ url: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(img)}`, invio: false }]);
+    .toEqual([{ url: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(grande)}`, invio: false }]);
   await nessunaSegnalazione(app, chat);
 
   await modelloFinto(app, [chiama('s1', 'SALVA_PER_DOPO', {}), { text: 'Salvata.' }]);
