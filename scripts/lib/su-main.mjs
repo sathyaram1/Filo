@@ -207,19 +207,20 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
     if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(nome(ramo, head)); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
-    // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
-    const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
-    const file = new Set();
-    const nuovi = new Set();
     const conta = new Map();
     let avanti = 0;
-    for (const r of log.split('\n')) {
-      if (r.startsWith('\u0001')) {
-        avanti += 1;
-        for (const m of r.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
-      } else if (r.trim()) (suMain.has(r.trim()) ? file : nuovi).add(r.trim());
+    for (const s of git(root, ['log', '--format=%s', `${base}..${ramo}`]).split('\n').filter(Boolean)) {
+      avanti += 1;
+      for (const m of s.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
     }
     if (!avanti) continue;
+    // I file che il ramo cambia rispetto alla base comune con main, non quelli che i suoi commit toccano: una correzione
+    // di main rifatta a mano e poi resa identica dalla fusione con main non è un file del ramo (#2340.3).
+    const file = new Set();
+    const nuovi = new Set();
+    for (const r of git(root, ['diff', '--name-only', '--no-renames', `${base}...${ramo}`]).split('\n')) {
+      if (r.trim()) (suMain.has(r.trim()) ? file : nuovi).add(r.trim());
+    }
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
     rami.push({ ramo: nome(ramo, head), data, avanti, file: [...file].sort(), ...(nuovi.size ? { fileNuovi: [...nuovi].sort() } : {}), feedback });
   }
