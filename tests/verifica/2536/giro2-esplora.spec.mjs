@@ -99,7 +99,11 @@ for (const { n: giro, modello, conChatPassata = false } of GIRI) {
     await scrivi(intervista, 'dammi del tu ovvio');
     await attendiRisposta(intervista, filoPrima + 2);
     await intervista.waitForTimeout(8_000);
-    const pagina = (await intervista.locator('body').innerText()).replace('Ciao, sono Filo', '');
+    // Le bolle e le righe dell'attività: il resto della pagina (le impostazioni rapide) ha «Risposte brevi» di suo.
+    const pagina = [
+      ...(await intervista.locator('.dash-bubble-filo').allInnerTexts()),
+      ...(await intervista.locator('body').innerText()).split('\n').filter((l) => /Memorizzato|Ricorder/i.test(l)),
+    ].join('\n');
     const { lezioni, memoria, rec, onb } = await app.evaluate(async (_e, da) => ({
       lezioni: JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()),
       memoria: JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()),
