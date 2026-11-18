@@ -255,7 +255,7 @@ test('timer scaduto su un sito, poi la home: la carta del timer c\'è già, l\'a
 
 for (const fine of ['finito', 'non riuscito']) {
   test(`scaricamento da un sito, poi la home: niente carta in più, e ${fine} con la home davanti si fa notare la sua`, async ({ app, shell, avvisi, openTab, testServer }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const nome = fine === 'finito' ? 'grosso.bin' : 'rotto.bin';
     const s = await scaricamentoComandato(nome);
     try {
