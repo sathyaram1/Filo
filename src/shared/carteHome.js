@@ -125,15 +125,30 @@
   const scadenza = (t) => { const v = Date.parse(t && t.endsAt); return Number.isFinite(v) ? v : Infinity; };
   const nomeTimer = (t) => t.label || (t.kind === 'alarm' ? 'Sveglia' : 'Timer');
 
-  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: i Crediti e ciò che suona in cima, poi
-  // le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti in corso, timer
-  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce. `chat`: la
-  // conversazione di chi guarda.
-  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null } = {}, layout, ora = Date.now()) {
+  // Le chiavi delle carte che un avviso può nominare per farsi assorbire (#2390): chi avvisa le chiede qui, dove
+  // nascono le carte, e chi le riceve le controlla con `cartaDiAvviso`.
+  const chiaveTimer = (id) => `timer:${id}`;
+  const chiaveDownload = (id) => `download:${id}`;
+  const CARTA_DI_AVVISO = new RegExp(`^(${[chiaveTimer(''), chiaveDownload('')].join('|')})[A-Za-z0-9_-]{1,80}$`);
+  const cartaDiAvviso = (k) => (typeof k === 'string' && CARTA_DI_AVVISO.test(k) ? k : '');
+
+  // Gli avvisi volati nella colonna della home (#2390) stanno in cima, i più recenti per primi, finché li si chiude.
+  // Quello che racconta una cosa che ha già la sua carta non è una carta in più: è quella.
+  function avvisiVolati(cornice, chiavi) {
+    return lista(cornice).filter((a) => a && a.id && !(a.carta && chiavi.has(a.carta))).map((a) => ({
+      chiave: `cornice:${a.id}`, tipo: 'cornice', titolo: String(a.testo || a.titolo || 'avviso'), ref: a, fissa: true,
+    }));
+  }
+
+  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: gli avvisi volati, i Crediti e ciò che
+  // suona in cima, poi le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti
+  // in corso, timer per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce.
+  // `chat`: la conversazione di chi guarda; `cornice`: gli avvisi volati nella colonna della sua finestra.
+  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null, cornice = [] } = {}, layout, ora = Date.now()) {
     const nascoste = new Set(normalizza(layout).nascoste);
     const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
-    const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
-    const vD = (r) => voce(`download:${r.id}`, 'download', r.filename || 'download', r);
+    const vT = (t) => voce(chiaveTimer(t.id), t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
+    const vD = (r) => voce(chiaveDownload(r.id), 'download', r.filename || 'download', r);
     // `fissa`: sta in cima per regola, quindi né si sposta né la si scavalca (menu, trascinamento, chat).
     const cima = [];
     if (crediti && !nascoste.has('crediti')) cima.push(voce('crediti', 'crediti', 'Crediti', null));
