@@ -795,8 +795,8 @@ export async function esegui(argv, io = {}) {
     }
     if (a.cmd === 'elenco') {
       const r = await lettura(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
-      const nf = nonFidate(r.domande);
-      if (nf.length || fidatePerTimbri(r.domande).length) errore(await sporca('elenco delle domande', [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri(r.domande))) }));
+      const riga = await sporcaPerLeDomande(sporca, 'elenco delle domande', r.domande);
+      if (riga) errore(riga);
       scrivi(formattaConteggi(conteggiDi(r.domande, r.conteggi)));
       scrivi('');
       scrivi(formattaElenco(r.domande));
