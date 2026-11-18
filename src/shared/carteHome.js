@@ -308,13 +308,15 @@
     const l = normalizza(raw);
     return {
       destra: l.destra.map((id) => carta(id).titolo),
-      altro: l.tolte.map((id) => carta(id).titolo),
+      tasti: l.tasti.map((id) => tasto(id).titolo),
+      // Nel «+»: le carte tolte e i tasti messi via.
+      altro: [...l.tolte.map((id) => carta(id).titolo), ...l.riposti.map((id) => tasto(id).titolo)],
     };
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
-    carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
+    CARTE, APP, TASTI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
+    carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
