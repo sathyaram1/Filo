@@ -321,6 +321,16 @@
       dove: ['src/main/services/bloccoYouTube.js'], prova: "require('./adblock').fetchList",
     },
     {
+      id: 'trascrizione-youtube', nome: 'YouTube, per la trascrizione di un video',
+      // Dalla pagina la richiesta va all'origine del video (anche youtube.com o m.youtube.com): pagina, traccia e pannello.
+      base: ['https://www.youtube.com', 'https://youtube.com', 'https://m.youtube.com'],
+      quando: 'pagina',
+      occasione: 'quando apri un video di YouTube, dalla pagina del video coi suoi cookie; senza cookie quando la chat legge un video che non hai aperto',
+      riceve: 'la richiesta della trascrizione del video che stai guardando',
+      frase: 'YouTube, per la trascrizione di un video',
+      dove: ['src/main/services/trascrizioneYoutube.js'],
+    },
+    {
       id: 'liste-cookie', nome: 'Fanboy ed EasyList, per i banner dei cookie',
       base: [
         'https://secure.fanboy.co.nz/fanboy-cookiemonster.txt',

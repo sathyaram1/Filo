@@ -10,6 +10,7 @@ const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
+const TrascrizioneYoutube = require('./services/trascrizioneYoutube');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
@@ -3614,6 +3615,7 @@ class TabManager {
         Strade.misura('caricata', tab);
       }
       this.visite.caricata(wc);
+      TrascrizioneYoutube.precarica(wc, wc.getURL());
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
@@ -3750,6 +3752,8 @@ class TabManager {
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true, gesto: gestoPerIlFilo(tab), chiave: tab });
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
+      // YouTube passa da un video all'altro senza ricaricare: anche qui la pagina del video nuovo è pronta.
+      if (isMainFrame === true) TrascrizioneYoutube.precarica(wc, url);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
