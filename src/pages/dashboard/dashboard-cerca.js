@@ -75,16 +75,65 @@
     return `${giorno} ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`.trim();
   }
 
-  function chiudi({ svuota = false } = {}) {
+  // Svuota i risultati; la colonna resta alla ricerca finché non la si chiude.
+  function svuotaRisultati() {
     contaCorrente();
     if (sessione && !sessione.scelto) contaRicerca({ esito: 'vuota' });
     sessione = null;
+    clearTimeout(seguiTimer);
     pannello.hidden = true;
     pannello.replaceChildren();
     voci = [];
     scelta = -1;
+    mostrato = null;
     campo.setAttribute('aria-expanded', 'false');
-    if (svuota) campo.value = '';
+  }
+
+  // Il tasto la apre: la colonna diventa la ricerca e il fuoco va nel suo campo. `q`: la frase chiesta a parole.
+  function apri(q) {
+    if (!host) return;
+    if (!aperta) {
+      aperta = true;
+      manuale = false;
+      host.hidden = false;
+      if (d.colonna) d.colonna.classList.add('in-ricerca');
+    }
+    if (typeof q === 'string' && q.trim()) {
+      campo.value = q.trim();
+      ultimaBattuta = Date.now();
+      cerca().catch(() => {});
+    }
+    campo.focus({ preventScroll: true });
+  }
+  // Esc o il tasto la chiudono: la colonna torna com'era e si riscrive nella chat.
+  function chiudi() {
+    if (!aperta) return;
+    aperta = false;
+    clearTimeout(attesa);
+    ++giro;
+    svuotaRisultati();
+    campo.value = '';
+    host.hidden = true;
+    if (d.colonna) d.colonna.classList.remove('in-ricerca');
+    if (d.coda.richiudiPagine) d.coda.richiudiPagine();
+    if (d.chat) d.chat.focus({ preventScroll: true });
+  }
+
+  // Il risultato al centro: un messaggio al suo punto del filo, una pagina sulla sua riga di pagine.
+  function mostra(b) {
+    const r = b && b._risultato;
+    if (!r || r.k === 'significato' || r.k === 'nascosta' || mostrato === b) return;
+    mostrato = b;
+    if (d.mostraFilo) d.mostraFilo();
+    if (r.k === 'pagina') { if (d.coda.vaiAPagina) d.coda.vaiAPagina({ url: r.url, ts: r.ts }).catch(() => {}); return; }
+    d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts }).catch(() => {});
+  }
+  // Dopo una pausa nello scrivere il centro va sul primo risultato, il più probabile.
+  function seguiDopoLaPausa() {
+    clearTimeout(seguiTimer);
+    if (manuale || !voci.length) return;
+    const pausa = d.pausaMs ? d.pausaMs() : 500;
+    seguiTimer = setTimeout(() => { if (aperta && !manuale && scelta < 0) mostra(voci[0]); }, Math.max(0, ultimaBattuta + pausa - Date.now()));
   }
 
   function voce(r) {
