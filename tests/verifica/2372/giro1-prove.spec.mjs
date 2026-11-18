@@ -131,6 +131,39 @@ test('ricerca: il testo con markup resta testo, Esc da un risultato rimette il f
   await expect(page.locator('#cercaInput')).toBeFocused();
 });
 
+test('una lettera già data a un sito, ridata a un\'altra cosa, dice cosa apriva prima', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate((_, x) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', url: 'https://www.youtube.com/' }] } }));
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#doppioToccoLettere .mem-riga')).toHaveCount(1);
+  await pref.locator('#doppioToccoNuova').fill('y');
+  await pref.locator('#doppioToccoDove').fill('example.com');
+  await pref.locator('#doppioToccoAggiungi').click();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).doppioTocco.lettere.map((v) => v.url).join())).toBe('https://example.com/');
+  await expect.soft(pref.locator('#sec-doppio-tocco')).toContainText('youtube');
+
+  const page = await casa(app);
+  await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Assegna una lettera' }).click();
+  await page.keyboard.press('y');
+  await expect(page.locator('#dashFlash')).toContainText('Impostazioni');
+  await expect(page.locator('#dashFlash')).toContainText('example.com');
+});
+
+test('i tasti si spostano trascinandoli, e il Profilo torna dal «+» trascinandolo in colonna', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await casa(app);
+  await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').dragTo(page.locator('#altro .dash-altro-app[data-id="cerca"]'));
+  await expect.poll(() => inVista(page)).toEqual(['impostazioni', 'cerca', 'perDopo', 'scaricamenti', 'cronologia', 'bacheca']);
+  await page.locator('#altroPiu').click();
+  await page.locator('#altroFuori .dash-altro-app[data-id="profilo"]').dragTo(page.locator('#altro .dash-altro-app[data-id="cerca"]'));
+  await expect.poll(() => inVista(page)).toContain('profilo');
+  await page.reload();
+  await expect(page.locator('#altroPiu')).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => inVista(page)).toContain('profilo');
+  expect((await inVista(page))[0]).toBe('impostazioni');
+});
+
 test('Preferenze: «ww» si assegna e funziona, e togliendola dall\'elenco non fa più niente', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const url = testServer.html('<title>W</title><h1>w</h1>');
