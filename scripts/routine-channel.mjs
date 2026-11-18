@@ -2462,20 +2462,28 @@ if (isMain) {
         console.error(`${cmd} vuole il testo, fra due righe FINE: … ${cmd} <<'FINE'\n  <testo>\n  FINE\nIl server non è stato chiamato.`);
         process.exit(1);
       }
-      dati = { testo: grezzo };
+      dati = { testo: grezzo, ...(data.parziale === true ? { parziale: true } : {}) };
     }
     const { readTicket } = await import('./lib/routine-ticket.mjs');
     const biglietto = mano.ticket || readTicket(ROOT);
     if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
     const r = await operazione(biglietto, nome, dati);
+    // Chi lavora un compito col tetto vede a ogni operazione quanto ha speso (#2303.1); la misura non ferma mai l'esito.
+    if (r.outcome !== 'unreachable') await stampaSpesa(biglietto);
     if (r.outcome === 'ok') {
       if (cmd === 'segnala') console.log(testoSegnalaRiuscita(r.body));
-      else if (cmd === 'rapporto') console.log(`OK: rapporto consegnato${r.body.chiuso ? `, ${r.body.compito} chiuso` : ''}.`);
+      else if (cmd === 'rapporto') console.log(testoRapportoRiuscito(r.body));
       else console.log(JSON.stringify(r.body, null, 2));
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'spesa') {
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || args[0] || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: passalo con --ticket <codice>.'); process.exit(1); }
+    if (!(await stampaSpesa(biglietto, { suOut: true }))) console.log('Questa corsa non ha un tetto di costo.');
+    process.exit(0);
   } else if (cmd === 'sporca') {
     // Il biglietto è quello del giro (il marcatore lo scrive dispatch): sulla riga c'è solo il motivo.
     const motivo = args.join(' ').trim();
