@@ -45,6 +45,12 @@ async function finestraCon(app, prefisso) {
 const manda = (page, msg) => page.evaluate((m) => new Promise((ok) => chrome.runtime.sendMessage(m, (r) => ok(r))), msg);
 const MSG = (page) => page.evaluate(() => window.SN_MSG.MSG);
 const ordineDestra = (page) => page.locator('#tieni > .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.chiave));
+// Le carte tolte stanno nel «+» di «altro» (#2372): lo si apre come l'utente, se non è già aperto.
+async function fuoriVista(page) {
+  const piu = page.locator('#altroPiu');
+  if ((await piu.getAttribute('aria-expanded')) !== 'true') await piu.click();
+  await expect(page.locator('#altroFuori')).toBeVisible();
+}
 
 // `ritardoMs`: quanto ci mette il modello finto a rispondere (un lavoro lungo).
 async function modelloFinto(app, risposte, ritardoMs = 0) {
