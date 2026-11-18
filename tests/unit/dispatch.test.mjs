@@ -1416,8 +1416,10 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   process.stdout.write = (s) => { out += s; return true; };
   try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
   const j = JSON.parse(out);
-  assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
-  assert.match(j.instructions.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
+  // Su Windows i percorsi più lunghi possono portare la stampa oltre la soglia: il ruolo allora esce nel suo file.
+  const ruolo = j.istruzioniFile ? readFileSync(j.istruzioniFile, 'utf8') : j.instructions;
+  assert.match(ruolo, /diffServerFile/, 'il testo del ruolo dice del diff del server');
+  assert.match(ruolo.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
   assert.equal(j.payload.diffServer, undefined);
   assert.ok(isAbsolute(j.payload.diffServerFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
