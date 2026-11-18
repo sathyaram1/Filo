@@ -276,7 +276,8 @@
     const chi = autoreDellaRiga(ev);
     let par = '';
     const testo = testoSegnalazione(ev);
-    const parametri = testo ? { ...ev.parametri, testo: undefined } : ev.parametri;
+    const { testo: _t, ...senzaTesto } = ev.parametri || {};
+    const parametri = testo ? senzaTesto : ev.parametri;
     try { par = parametri && Object.keys(parametri).length ? ` ${JSON.stringify(parametri)}` : ''; } catch (_) { par = ''; }
     const e = ev.esito || {};
     let esito;
