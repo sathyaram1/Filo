@@ -108,6 +108,8 @@ function leggiNoti(strumenti) {
 }
 
 function main() {
+  // Prima di qualunque figlio: anche la fusione di prova esegue codice del ramo (hook e filtri di git) (#2558).
+  const { GITHUB_OUTPUT: uscita } = prendiComandiDiActions();
   const a = leggiArgomenti(process.argv.slice(2));
   const campo = a.errori.length
     ? { ramo: a.ramo, main: a.main, esito: 'non_provata', motivo: a.errori.join('; ').slice(0, 300) }
