@@ -109,8 +109,6 @@ export function programmaDi(comando) {
   return '';
 }
 
-// Il guasto finisce in un argomento e nelle note del feedback: una riga, senza virgolette, apici inversi, dollari.
-const pulito = (t) => String(t || '').replace(/\\/g, '/').replace(/["`$]/g, "'");
 
 const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 60);
 
