@@ -83,6 +83,8 @@
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
   // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
   let pendingFiles = [];
+  // Le impostazioni come le ha la home: la pausa della ricerca e le lettere del doppio tocco le leggono da qui.
+  let impostazioniHome = null;
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
   // #892.5 — svuotato e riportato con Annulla, un testo incollato lo resta: la regola è dell'Aiuto e della home insieme.
