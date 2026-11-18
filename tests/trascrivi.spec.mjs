@@ -199,6 +199,98 @@ test('l\'Aiuto trascrive l\'immagine indicata, e una porzione la fa scegliere al
   await expect(nuova.locator('.sn-region-overlay')).toHaveCount(0);
 });
 
+async function trascriviDalTastoDestro(app, page, sel = '#foto') {
+  await page.locator(sel).click({ button: 'right', position: { x: 10, y: 10 } });
+  await menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  return paginaDelloStrato(app, page);
+}
+
+test('una selezione su più righe si copia con le righe separate, da Ctrl+C, dal tasto destro e da Ctrl+A', async ({ app, openTab, testServer }) => {
+  const { page, m } = await apri(app, openTab, testServer);
+  const box = await page.locator('#foto').boundingBox();
+  const strato = await trascriviDalTastoDestro(app, page);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  const r0 = m[0];
+  const seleziona = async () => {
+    await strato.mouse.move(box.x + r0.x + r0.parola + 1, box.y + r0.y - 12);
+    await strato.mouse.down();
+    await strato.mouse.move(box.x + 20 + 150, box.y + m[1].y - 12, { steps: 6 });
+    await strato.mouse.up();
+  };
+
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await seleziona();
+  await strato.keyboard.press('ControlOrMeta+c');
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toMatch(/^4821\nTotale/);
+
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await seleziona();
+  await strato.mouse.click(box.x + r0.x + r0.parola + r0.quattro / 2, box.y + r0.y - 12, { button: 'right' });
+  const menu = menuDi(strato).locator('.sn-menu').first();
+  await expect(menu).toBeVisible({ timeout: 5000 });
+  await menu.locator('button', { hasText: /^Copia$/ }).first().click();
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toMatch(/^4821\nTotale/);
+
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await strato.keyboard.press('ControlOrMeta+a');
+  await strato.keyboard.press('ControlOrMeta+c');
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toBe('Fattura numero 4821\nTotale 1250 euro');
+});
+
+test('un\'immagine SVG si trascrive come le altre: il lettore la riceve in un formato che legge', async ({ app, openTab, testServer }) => {
+  const svg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/><text x="20" y="56" font-size="32" font-family="sans-serif">Fattura numero 4821</text></svg>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:60px 40px">
+<img id="foto" width="${W}" height="${H}" src="data:image/svg+xml,${svg}"></body></html>`);
+  await page.waitForFunction(() => document.getElementById('foto').complete);
+  await lettoreFinto(app, [{ testo: 'Fattura numero 4821', x1: 33, y1: 175, x2: 600, y2: 400 }]);
+  const strato = await trascriviDalTastoDestro(app, page);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await expect(strato.locator('.sn-tr-riga')).toHaveText(['Fattura numero 4821']);
+  expect(await app.evaluate(() => globalThis.__letture)).toEqual([{ immagine: true }]);
+});
+
+test('un\'immagine più pesante del limite dello strato si rimpicciolisce e si apre', async ({ app, openTab, testServer }) => {
+  // Rumore: non si comprime, e anche in JPEG supera il limite.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:20px">
+<img id="foto" style="width:600px;height:400px">
+<script>
+  const c = document.createElement('canvas'); c.width = 3600; c.height = 2400;
+  const g = c.getContext('2d'); const d = g.createImageData(c.width, c.height);
+  for (let i = 0; i < d.data.length; i++) d.data[i] = (i % 4 === 3) ? 255 : (Math.random() * 256) | 0;
+  g.putImageData(d, 0, 0);
+  document.getElementById('foto').src = c.toDataURL('image/png');
+</script></body></html>`);
+  await page.waitForFunction(() => document.getElementById('foto').complete && document.getElementById('foto').naturalWidth > 0, null, { timeout: 30_000 });
+  await lettoreFinto(app, [{ testo: 'rumore', x1: 0, y1: 0, x2: 500, y2: 100 }]);
+  const strato = await trascriviDalTastoDestro(app, page);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-riga')).toHaveText(['rumore']);
+});
+
+test('l\'Aiuto aperto su un sito trascrive l\'immagine indicata e fa scegliere una porzione della pagina sotto', async ({ app, openTab, testServer }) => {
+  const { page } = await apri(app, openTab, testServer);
+  const box = await page.locator('#foto').boundingBox();
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+
+  expect(await nelloStrato(app, page, () => globalThis.__filoSidebarTest.runPageAction({ op: 'transcribe_image', selector: '#foto' }))).toBe(true);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await expect(strato.locator('.sn-tr-riga')).toHaveText(['Fattura numero 4821', 'Totale 1250 euro']);
+  await strato.keyboard.press('Escape');
+  await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
+
+  expect(await nelloStrato(app, page, () => globalThis.__filoSidebarTest.runPageAction({ op: 'transcribe_region' }))).toBe(true);
+  await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10_000 });
+  await page.mouse.move(box.x, box.y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.move(box.x + box.width, box.y + box.height, { steps: 4 });
+  await page.mouse.up();
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
+  await expect(strato.locator('.sn-tr-riga')).toHaveText(['Fattura numero 4821', 'Totale 1250 euro']);
+});
+
 test('nessun testo nell\'immagine: il riquadro lo dice e non offre niente da copiare', async ({ app, openTab, testServer }) => {
   const { page } = await apri(app, openTab, testServer);
   await lettoreFinto(app, []);
