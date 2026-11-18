@@ -64,27 +64,35 @@ test('analyzeReply → kind:capability-gap quando la risposta dice "non posso fa
 
 test('analyzeReply → kind:capability-gap con frase "non sono in grado di"', () => {
   const reply = 'Non sono in grado di aprire un lettore RSS integrato, questa funzione non fa parte delle capacità attuali di Filo.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'apri un lettore rss', FAKE_CAPS);
   assert.equal(result.kind, 'capability-gap');
 });
 
 test('analyzeReply → kind:capability-gap con frase "non è supportato"', () => {
   const reply = 'Purtroppo il lettore RSS non è supportato al momento da Filo, non esiste questa funzionalità.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'puoi leggermi i feed rss?', FAKE_CAPS);
   assert.equal(result.kind, 'capability-gap');
 });
 
-test('analyzeReply → capabilityId identificato se il titolo della capacità è nella risposta', () => {
+// #2364: una voce che il manifesto ha non è mai «non disponibile»; senza strumento è una funzione non azionabile.
+test('analyzeReply → la voce citata dopo «non posso» esiste: non azionabile, col suo titolo', () => {
   const reply = 'Filo non può fare la traduzione di questa pagina in questo modo, al momento non è tra le mie capacità.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
-  assert.equal(result.kind, 'capability-gap');
-  // "Traduzione" è nel titolo di FAKE_CAPS → capabilityId dovrebbe essere 'traduzione'
+  const result = AF.analyzeReply(reply, [], 'traduci questa pagina', FAKE_CAPS);
+  assert.equal(result.kind, 'capability-uncommandable');
   assert.equal(result.capabilityId, 'traduzione');
+  assert.equal(result.capabilityTitle, 'Traduzione');
+  assert.doesNotMatch(result.genericDesc, /non disponibile/);
+});
+
+test('analyzeReply → la voce citata ha uno strumento: niente da segnalare', () => {
+  const caps = FAKE_CAPS.map((c) => (c.id === 'traduzione' ? { ...c, strumento: 'scheda(apri)' } : c));
+  const reply = 'Filo non può fare la traduzione di questa pagina in questo modo, al momento non è tra le mie capacità.';
+  assert.equal(AF.analyzeReply(reply, [], 'traduci questa pagina', caps).kind, null);
 });
 
 test('analyzeReply → capabilityId=null se nessun titolo corrisponde', () => {
   const reply = 'Non posso fare questa cosa perché Filo non ha questa funzione sconosciuta.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'fammi il caffè', FAKE_CAPS);
   assert.equal(result.kind, 'capability-gap');
   assert.equal(result.capabilityId, null);
 });
@@ -93,22 +101,29 @@ test('analyzeReply → capabilityId=null se nessun titolo corrisponde', () => {
 
 test('analyzeReply → kind:complaint con "non funziona correttamente"', () => {
   const reply = 'Sembra che il salvataggio pagine non funziona correttamente in questo momento, prova a ripetere l\'operazione.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'salva le pagine aperte', FAKE_CAPS);
   assert.equal(result.kind, 'complaint');
   assert.ok(result.genericDesc);
 });
 
 test('analyzeReply → kind:complaint con "si è verificato un errore"', () => {
   const reply = 'Si è verificato un errore imprevisto durante il caricamento della pagina, non riesco a procedere.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'carica la pagina del meteo', FAKE_CAPS);
   assert.equal(result.kind, 'complaint');
+});
+
+// #2348: senza una richiesta dell'utente nessun segnale, qualunque cosa dica la risposta.
+test('analyzeReply → nessun segnale se il messaggio non chiede niente', () => {
+  const reply = 'Non posso fare questa azione, al momento non è supportato. Sembra che ci sia un problema anche con l\'interfaccia.';
+  assert.equal(AF.analyzeReply(reply, [], '', FAKE_CAPS).kind, null);
+  assert.equal(AF.analyzeReply(reply, [], 'secondo me le convenzioni restano per inerzia', FAKE_CAPS).kind, null);
 });
 
 // ── analyzeReply: priorità capability-gap su complaint ────────────────────────
 
 test('analyzeReply → kind:capability-gap ha priorità su complaint nella stessa risposta', () => {
   const reply = 'Non posso fare questa azione, al momento non è supportato. Sembra che ci sia un problema anche con l\'interfaccia.';
-  const result = AF.analyzeReply(reply, [], '', FAKE_CAPS);
+  const result = AF.analyzeReply(reply, [], 'esporta le schede in pdf', FAKE_CAPS);
   // La rilevazione di "non supportato" avviene prima → capability-gap
   assert.equal(result.kind, 'capability-gap');
 });
