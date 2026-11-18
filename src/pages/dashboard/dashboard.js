@@ -1377,6 +1377,7 @@
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
+      if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
