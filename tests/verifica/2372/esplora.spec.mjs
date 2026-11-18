@@ -20,7 +20,7 @@ const info = (page) => page.evaluate(() => ({ val: document.getElementById('inpu
 for (const caso of ['diretto', 'dopo-clic', 'dopo-fill', 'dopo-fill-clic']) {
   test(`yy ${caso}`, async ({ app, testServer }) => {
     const url = testServer.html('<title>Video</title><h1>video</h1>');
-    await app.evaluate((u) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', url: u }] } }), url);
+    await app.evaluate((_, u) => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', url: u }] } }), url);
     const page = await casa(app);
     if (caso.startsWith('dopo-fill')) { await page.keyboard.type('yo', { delay: 30 }); await page.locator('#input').fill(''); }
     if (caso.endsWith('clic')) await page.mouse.click(640, 300);
