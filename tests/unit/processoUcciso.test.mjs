@@ -139,7 +139,7 @@ describe('il segno della corsa di finish:check', () => {
 
     const pulito = repo();
     const modulo = pathToFileURL(join(REPO, 'scripts', 'lib', 'corsa-controlli.mjs')).href;
-    execFileSync(process.execPath, ['--input-type=module', '-e', `const { apriCorsa } = await import(${JSON.stringify(modulo)}); apriCorsa(${JSON.stringify(pulito)}); process.exit(1);`]);
+    assert.throws(() => execFileSync(process.execPath, ['--input-type=module', '-e', `const { apriCorsa } = await import(${JSON.stringify(modulo)}); apriCorsa(${JSON.stringify(pulito)}); process.exit(1);`], { stdio: 'ignore' }), /status 1|failed/);
     assert.equal(existsSync(fileCorsa(pulito)), false, 'anche un rosso è una corsa finita');
     assert.equal(corsaInterrotta(pulito), null);
   });
