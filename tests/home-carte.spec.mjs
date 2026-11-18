@@ -573,6 +573,7 @@ test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra
 
   const inAltro = page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'Crediti' });
   await expect(inAltro).toHaveCount(1);
+  await fuoriVista(page);
   await inAltro.click({ button: 'right' });
   await expect(page.locator('.dash-menu .dash-menu-voce')).toHaveText(['Apri Crediti', 'Rimetti nella home']);
   await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti' }).click();
