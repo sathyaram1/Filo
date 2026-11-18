@@ -234,6 +234,90 @@ test('ogni piattaforma ha il suo ramo: Windows vuole .exe/.lnk/.url, Mac un .app
   assert.ok(S.controllaProgramma('relativo/gioco.exe', 'win32').errore);
 });
 
+// Le strade dell'avvio su Windows e Mac, dalla voce salvata al comando che parte: la shell di Electron è finta, il resto vero.
+function sistemaFinto() {
+  const chiamate = [];
+  return {
+    chiamate,
+    dip: {
+      shell: { openPath: async (p) => { chiamate.push(['openPath', p]); return ''; } },
+      spawn: (cmd, args) => {
+        chiamate.push(['spawn', cmd, ...args]);
+        return { once(ev, fn) { if (ev === 'spawn') setTimeout(fn, 0); }, unref() {} };
+      },
+      execFile: (cmd, args, _o, fatto) => { chiamate.push(['execFile', cmd, ...args]); fatto(null); },
+    },
+  };
+}
+
+test('#1803.1 su Windows un .exe o un .lnk messo nella barra parte al clic col programma che lo apre di solito', async () => {
+  storageFinto();
+  const S = Servizio();
+  const dir = cartellaTemporanea('barra-siti-windows');
+  const steam = join(dir, 'Steam.lnk');
+  const gioco = join(dir, 'Gioco.exe');
+  writeFileSync(steam, 'x');
+  writeFileSync(gioco, 'x');
+  const { chiamate, dip } = sistemaFinto();
+  const lanciatore = (p, pf) => S.lancia(p, pf, dip);
+  for (const p of [steam, gioco]) {
+    const r = await S.modifica({ tipo: 'aggiungi', percorso: p }, { piattaforma: 'win32' });
+    assert.equal(r.cambiato, true, r.errore);
+    const via = await S.avvia(r.voce.id, { lanciatore, piattaforma: 'win32' });
+    assert.deepEqual(via, { ok: true, nome: r.voce.nome });
+  }
+  assert.deepEqual(chiamate, [['openPath', steam], ['openPath', gioco]]);
+  assert.deepEqual((await S.leggi()).map((v) => v.nome), ['Steam', 'Gioco']);
+  // Un errore di Windows («nessun programma associato») arriva all'utente col nome della voce.
+  const rotto = { ...dip, shell: { openPath: async () => 'Nessuna applicazione associata' } };
+  const r = await S.avvia((await S.leggi())[0].id, { lanciatore: (p, pf) => S.lancia(p, pf, rotto), piattaforma: 'win32' });
+  assert.deepEqual(r, { ok: false, error: 'Steam non è partito: Nessuna applicazione associata' });
+});
+
+test('#1803.1 sul Mac un .app (una cartella) parte con l\'apertura del Finder, un eseguibile da sé', async () => {
+  storageFinto();
+  const S = Servizio();
+  const dir = cartellaTemporanea('barra-siti-mac');
+  const app = join(dir, 'Factorio.app');
+  mkdirSync(app, { recursive: true });
+  const { chiamate, dip } = sistemaFinto();
+  const r = await S.modifica({ tipo: 'aggiungi', percorso: `${app}/` }, { piattaforma: 'darwin' });
+  assert.equal(r.cambiato, true, r.errore);
+  assert.equal(r.voce.nome, 'Factorio');
+  assert.deepEqual(await S.avvia(r.voce.id, { lanciatore: (p, pf) => S.lancia(p, pf, dip), piattaforma: 'darwin' }), { ok: true, nome: 'Factorio' });
+  assert.deepEqual(chiamate, [['openPath', `${app}/`]]);
+  if (process.platform !== 'win32') {
+    const bin = join(dir, 'gioco');
+    writeFileSync(bin, '#!/bin/sh\n');
+    chmodSync(bin, 0o755);
+    const b = await S.modifica({ tipo: 'aggiungi', percorso: bin }, { piattaforma: 'darwin' });
+    assert.equal(b.cambiato, true, b.errore);
+    assert.equal((await S.avvia(b.voce.id, { lanciatore: (p, pf) => S.lancia(p, pf, dip), piattaforma: 'darwin' })).ok, true);
+    assert.deepEqual(chiamate[1], ['spawn', bin]);
+  }
+  // Linux: un lanciatore .desktop lo avvia gio.
+  const lanciatore = join(dir, 'gioco.desktop');
+  writeFileSync(lanciatore, '[Desktop Entry]\n');
+  const l = await S.modifica({ tipo: 'aggiungi', percorso: lanciatore }, { piattaforma: 'linux' });
+  assert.equal(l.cambiato, true, l.errore);
+  assert.equal((await S.avvia(l.voce.id, { lanciatore: (p, pf) => S.lancia(p, pf, dip), piattaforma: 'linux' })).ok, true);
+  assert.deepEqual(chiamate[chiamate.length - 1], ['execFile', 'gio', 'launch', lanciatore]);
+});
+
+test('#1803.1 la riga della conversazione riconosce i sinonimi che la barra accetta', () => {
+  const R = globalThis.SN_RIGHE_ATTIVITA;
+  const riga = (a) => R.descrivi ? R.descrivi(a) : null;
+  assert.ok(riga, 'la riga si chiede a righeAttivita');
+  const casi = [
+    [{ type: 'BARRA_SITI', operazione: 'rimuovi', elemento: 'YouTube', _output: { voce: 'YouTube' } }, 'Tolto dalla barra dei siti · YouTube'],
+    [{ type: 'BARRA_SITI', operazione: 'togli', elemento: 'YouTube', _output: { voce: 'YouTube' } }, 'Tolto dalla barra dei siti · YouTube'],
+    [{ type: 'BARRA_SITI', operazione: 'metti', elemento: 'youtube.com', _output: { voce: 'YouTube' } }, 'Messo nella barra dei siti · YouTube'],
+    [{ type: 'BARRA_SITI', op: 'Rimuovi', elemento: 'YouTube' }, 'Tolto dalla barra dei siti · YouTube'],
+    [{ type: 'BARRA_SITI', operazione: 'leggi' }, 'Letta la barra dei siti'],
+  ];
+  for (const [a, testo] of casi) assert.equal(riga(a).text, testo, JSON.stringify(a));
+});
+
 test('dalla chat: un sito costa 1, un programma chiede conferma (costo 3) e si mostra col percorso intero', () => {
   const L = globalThis.SN_ACTION_LEVELS;
   assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'youtube.com' }), 1);
