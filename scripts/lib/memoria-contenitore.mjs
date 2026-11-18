@@ -104,16 +104,27 @@ function arrotonda(o) {
 const gb = (mb) => `${(mb / 1024).toFixed(1).replace('.', ',')} GB`;
 
 /**
+ * Il contenitore, o il cgroup dei comandi, è ripartito fra `prima` e `dopo`: avvio diverso, o un contatore tornato
+ * indietro. Allora i contatori di adesso non dicono niente di quello che è successo prima. PURA.
+ */
+export function ripartito(dopo, prima) {
+  if (!dopo || !prima) return false;
+  if (Number.isFinite(dopo.avvioS) && Number.isFinite(prima.avvioS) && Math.abs(dopo.avvioS - prima.avvioS) > 5) return true;
+  return ['uccisioniSistema', 'uccisioniComandi'].some((k) => Number.isFinite(dopo[k]) && Number.isFinite(prima[k]) && dopo[k] < prima[k]);
+}
+
+/**
  * La memoria in una riga, per un guasto o una stampa: solo i numeri letti. `prima` (una lettura precedente) fa contare
- * le uccisioni da allora invece che dall'avvio. PURA.
+ * le uccisioni da allora invece che dall'avvio, se nel frattempo niente è ripartito. PURA.
  */
 export function testoMemoria(m, prima = null) {
   if (!m) return 'memoria: non letta';
   const parti = [];
   if (Number.isFinite(m.disponibileMb)) parti.push(`disponibili ${gb(m.disponibileMb)}${Number.isFinite(m.tettoMb) ? ` su un tetto dei comandi di ${gb(m.tettoMb)}` : Number.isFinite(m.totaleMb) ? ` su ${gb(m.totaleMb)}` : ''}`);
   if (Number.isFinite(m.piccoMb)) parti.push(`picco dei comandi ${gb(m.piccoMb)}`);
-  const da = (k) => (prima && Number.isFinite(prima[k]) && Number.isFinite(m[k]) ? m[k] - prima[k] : m[k]);
-  const cosa = prima ? 'da allora' : 'dall\'avvio';
+  const base = prima && !ripartito(m, prima) ? prima : null;
+  const da = (k) => (base && Number.isFinite(base[k]) && Number.isFinite(m[k]) ? m[k] - base[k] : m[k]);
+  const cosa = base ? 'da allora' : prima ? 'dalla ripartenza' : 'dall\'avvio';
   const uc = da('uccisioniComandi');
   const us = da('uccisioniSistema');
   if (Number.isFinite(uc) || Number.isFinite(us)) {
