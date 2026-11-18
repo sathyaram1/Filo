@@ -250,6 +250,24 @@
   function indirizzoRicercaImmagine(src) {
     return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
   }
+  // Un'immagine senza indirizzo (mandata in chat) va caricata: il modulo che usa Chrome per «Cerca con Google Lens».
+  // Torna { url, data, contentType, boundary } per l'`invio` di openTab, o null se non è un'immagine in data URL.
+  const LENS_CARICA = 'https://lens.google.com/v3/upload';
+  function invioRicercaImmagine(dataUrl) {
+    const m = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i.exec(String(dataUrl || ''));
+    if (!m || typeof Buffer === 'undefined') return null;
+    const byte = Buffer.from(m[2], 'base64');
+    if (!byte.length) return null;
+    const ext = m[1].split('/')[1].replace(/[^a-z0-9]/gi, '') || 'png';
+    const boundary = `----filo${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+    const testa = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="encoded_image"; filename="immagine.${ext}"\r\n`
+      + `Content-Type: ${m[1]}\r\n\r\n`);
+    const coda = Buffer.from(`\r\n--${boundary}--\r\n`);
+    return {
+      url: `${LENS_CARICA}?ep=ccm&s=&st=${Date.now()}`, contentType: 'multipart/form-data', boundary,
+      data: [{ type: 'rawData', bytes: Buffer.concat([testa, byte, coda]) }],
+    };
+  }
 
   // Le parole che l'indirizzo cerca davvero, se è una ricerca di testo o d'immagine come le costruisce Filo
   // (qui sopra): null per qualunque altro indirizzo, anche con un parametro in più (#1312).
