@@ -209,7 +209,7 @@
     // ── home ──
     CARTA_HOME: {
       via: ['home', 'carta'],
-      description: 'togli|rimetti|sposta (verso su|giu|cima|fondo, o prima_di)|ripristina. Destra: editor, suggerimenti, rapide; tasti (togli = nel «+»): cerca, impostazioni, profilo, memorie, bacheca, aperti per dopo, tasto dei download; sinistra: timer, avvisi, scaricamenti… detti a parole.',
+      description: 'togli|rimetti|sposta (verso su|giu|cima|fondo, o prima_di)|ripristina. Destra: editor, suggerimenti, rapide; tasti (togli=nel +): cerca, impostazioni, profilo…; sinistra: timer, avvisi, scaricamenti… a parole.',
       properties: { operazione: S(), carta: S(), verso: S(), prima_di: S() }, required: ['operazione'],
     },
     BARRA_SITI: {
