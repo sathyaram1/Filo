@@ -1720,7 +1720,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 
 .dash-right {
   grid-column: 3;
-  grid-row: 2 / span 2;
+  grid-row: 1 / -1;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
