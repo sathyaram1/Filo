@@ -138,22 +138,23 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   test.setTimeout(60_000);
   // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
   await entraFinto(app, shell);
-  const page = await home(openTab);
+  const page = await home(app, openTab);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
   });
   await expect.poll(() => page.evaluate(() => devicePixelRatio)).toBeGreaterThanOrEqual(1.5);
 
-  await page.locator('#dashControls .dash-ctrl[data-command="settings"]').click();
+  await (await tastoHome(page, 'impostazioni')).click();
   const impostazioni = await menuSulloSchermo(app);
-  sottoLIcona(impostazioni, await iconaSulloSchermo(app, page, 'settings'));
+  sottoLIcona(impostazioni, await iconaSulloSchermo(app, page, 'impostazioni'));
   await expect(impostazioni.menu.locator('.item').first()).toBeVisible();
   await chiudiMenu(app, impostazioni.menu);
 
-  await page.locator('#dashControls .dash-ctrl[data-command="account"]').click();
+  // Il Profilo di serie sta nel «+»: il menu si apre sotto di lui anche lì.
+  await (await tastoHome(page, 'profilo')).click();
   const profilo = await menuSulloSchermo(app);
   await expect(profilo.menu.locator('.menu')).toContainText('mario@example.it');
-  sottoLIcona(profilo, await iconaSulloSchermo(app, page, 'account'));
+  sottoLIcona(profilo, await iconaSulloSchermo(app, page, 'profilo'));
   await chiudiMenu(app, profilo.menu);
 });
