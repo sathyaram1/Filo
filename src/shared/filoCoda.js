@@ -49,6 +49,8 @@
     // I verdetti dei collegamenti di una frase di Filo (#868.6, #1505): la home li ritrova anche dopo un riavvio.
     if (Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length) v.linkDaConfermare = m.linkDaConfermare.slice();
     if (m.senzaVerdetto === true) v.senzaVerdetto = true;
+    // Le etichette delle fonti (#2383): la bolla riaperta le ridisegna uguali.
+    if (m.role === 'filo' && Array.isArray(m.fonti) && m.fonti.length) v.fonti = m.fonti.slice();
     if (c.onboarding) v.onboarding = true;
     const disp = Array.isArray(c.dispositivi) ? c.dispositivi[i] : '';
     if (qui && disp && disp !== qui) v.altrove = true;

@@ -117,6 +117,7 @@ require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'pavimento.js')); // #1589 — cosa non esce mai verso un modello, a nessun livello (dopo guardianoStatico)
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
+require(path.join(SHARED, 'fontiCitate.js')); // #2383 — le fonti citate nelle risposte, controllate (dopo sitiComuni)
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli

@@ -11,6 +11,7 @@
   const S1 = '\uE001';
   const SENTINELLE = /[\uE000\uE001]/g;
   const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
+  const POSTO_FONTE = /\uE002(\d+)\uE003|[\uE002\uE003]/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -77,11 +78,15 @@
   // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
   // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo
   // di un link ha la sua enfasi e il suo codice, rimessi dentro l'<a> (#853).
-  function inlineMd(escaped) {
+  // `fonti`: le etichette delle fonti controllate dal main (src/shared/fontiCitate.js), una per posto; il testo da
+  // solo non ne disegna nessuna, qualunque cosa contenga.
+  function inlineMd(escaped, fonti = null) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
     let t = String(escaped).replace(SENTINELLE, '');
+    const F = global.SN_FONTI_CITATE;
+    t = t.replace(POSTO_FONTE, (m, i) => (F && fonti && fonti[Number(i)] ? stash(F.html(fonti[Number(i)])) : ''));
 
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
@@ -159,15 +164,19 @@
 
   // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
   // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
-  function render(text) {
+  function render(text, { fonti = null } = {}) {
+    const F = global.SN_FONTI_CITATE;
+    const conFonti = F && Array.isArray(fonti) && fonti.length ? F.conPosti(text, fonti) : null;
+    const etichette = conFonti ? conFonti.fonti : null;
+    const riga = (s) => inlineMd(s, etichette);
     const out = [];
-    for (const b of blocchi(text)) {
-      if (b.k === 'p') out.push('<p>' + b.righe.map(inlineMd).join('<br>') + '</p>');
-      else if (b.k === 'h') out.push('<h' + b.livello + '>' + inlineMd(b.riga) + '</h' + b.livello + '>');
-      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n') + '</code></pre>');
+    for (const b of blocchi(conFonti ? conFonti.text : text)) {
+      if (b.k === 'p') out.push('<p>' + b.righe.map(riga).join('<br>') + '</p>');
+      else if (b.k === 'h') out.push('<h' + b.livello + '>' + riga(b.riga) + '</h' + b.livello + '>');
+      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n').replace(POSTO_FONTE, '') + '</code></pre>');
       else {
         out.push(b.k === 'ol' && b.da !== 1 ? '<ol start="' + b.da + '">' : '<' + b.k + '>');
-        for (const v of b.voci) out.push('<li>' + inlineMd(v) + '</li>');
+        for (const v of b.voci) out.push('<li>' + riga(v) + '</li>');
         out.push('</' + b.k + '>');
       }
     }

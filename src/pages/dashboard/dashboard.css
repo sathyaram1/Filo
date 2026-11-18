@@ -782,6 +782,13 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   cursor: pointer; word-break: break-word;
 }
 .dash-bubble-md a.filo-md-link:hover { text-decoration: none; }
+/* La fonte di una frase (#2383): si legge senza passarci sopra, col colore delle righe di servizio, mai da link. */
+.filo-fonte {
+  font-size: 0.8em; color: var(--dash-ink-mute); white-space: nowrap; cursor: pointer;
+  padding: 0 3px; margin: 0 -1px; border-radius: 4px; text-decoration: none;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.filo-fonte:hover, .filo-fonte:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
 
 /* Bolla che si sta scrivendo in diretta: il cursore lampeggiante dice che la risposta è ancora
    in arrivo, e sparisce quando lo streaming finisce. */

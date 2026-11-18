@@ -520,7 +520,7 @@
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length || archiviati.righe) {
-        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser, fonti: isUser ? null : m.fonti });
         if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
           window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
         }
@@ -909,7 +909,7 @@
   }
 
   // ===== Bolle conversazione =====
-  function makeBubble({ role, text, pending = false, markdown = false }) {
+  function makeBubble({ role, text, pending = false, markdown = false, fonti = null }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
@@ -920,17 +920,18 @@
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
-    if (text) setBubbleText(div, text, markdown);
+    if (text) setBubbleText(div, text, markdown, fonti);
     else div.classList.add('dash-bubble-actions-only');
     return div;
   }
 
   // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
   // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
-  function setBubbleText(el, text, markdown) {
+  // `fonti`: le etichette che il main ha controllato per questa risposta (#2383); dal solo testo non ne nasce nessuna.
+  function setBubbleText(el, text, markdown, fonti = null) {
     Rispondi.ricorda(el, text);
     if (markdown && text && self.SN_MARKDOWN) {
-      el.innerHTML = self.SN_MARKDOWN.render(text);
+      el.innerHTML = self.SN_MARKDOWN.render(text, { fonti });
       el.classList.add('dash-bubble-md');
       // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
       const ultimo = el.lastElementChild;
@@ -942,6 +943,9 @@
 
   // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
   // pagina interna.
+  // L'etichetta di una fonte apre la pagina sulla frase dalla stessa porta dei collegamenti della chat (#2383).
+  self.SN_FONTI_CITATE?.aggancia(document, (url, el) => apriProposta(url, el));
+
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
@@ -1080,7 +1084,9 @@
     let rispostaPrima = '';
     let giroIniziato = false;
     const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-    const testoDelGiro = () => (globalThis.SN_CALC
+    // I marcatori delle fonti non si vedono mentre arrivano: l'etichetta la mette la risposta finale, controllata (#2383).
+    const senzaMarcatori = (t) => (globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || ''));
+    const testoDelGiro = () => senzaMarcatori(globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
     const bollaDellaRisposta = () => {
@@ -1125,7 +1131,7 @@
     // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
     const chiudiGiro = (data) => {
       if (data.risposta) {
-        rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
+        rispostaPrima = unisci(rispostaPrima, data.text ? senzaMarcatori(data.text) : testoDelGiro());
         bollaDellaRisposta().textContent = rispostaPrima;
       } else if (streamBubble && rispostaPrima) {
         pending.aggiungiNota(testoDelGiro());
@@ -1216,7 +1222,7 @@
     // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
-      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
+      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, testoDelGiro()) });
       turno.voce = chiusa.entry;
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown, chat: msg.chatId }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
@@ -1325,7 +1331,7 @@
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
           // #418 — a fine turno il testo grezzo dello streaming diventa la risposta formattata.
-          setBubbleText(streamBubble, r.text, true);
+          setBubbleText(streamBubble, r.text, true, r.fonti);
           filoBubble = streamBubble;
         } else {
           // Il testo si è svuotato (es. reset non recuperato): niente bolla vuota.
@@ -1336,7 +1342,7 @@
       } else {
         // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
         if (r.text && !r.notaRisposta) pending.dropNote(r.text);
-        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
+        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true, fonti: r.fonti });
         bubblesEl.appendChild(filoBubble);
       }
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
@@ -1371,6 +1377,7 @@
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
+      if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1866,8 +1873,9 @@
       delete entry.interrotto;
       delete entry.fermato;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
       host.hidden = false;
-      setBubbleText(host, r.text, true);
+      setBubbleText(host, r.text, true, r.fonti);
       nota.remove();
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }

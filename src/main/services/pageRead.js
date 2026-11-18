@@ -623,7 +623,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   if (dopo) return dopo;
   const v = verdetto(esito.url, analizza);
   const p = porzione(String(esito.testo || ''), Number(da));
-  return {
+  const letta = {
     ...vuoto,
     ok: true,
     url: esito.url,
@@ -638,6 +638,11 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     sospetto: v && v.livello === 'sospetto' ? (v.messaggio || 'sito sospetto') : '',
     ...p,
   };
+  // La citazione di una risposta si controlla sulla pagina intera, anche sulla parte che la finestra non ha (#2383).
+  // Non enumerabili: non escono verso la scheda né verso l'archivio della chat.
+  Object.defineProperty(letta, 'testoIntero', { value: String(esito.testo || ''), enumerable: false });
+  Object.defineProperty(letta, 'lettaIl', { value: new Date().toISOString(), enumerable: false });
+  return letta;
 }
 
 // Estrazione in un thread a parte, col suo tetto di tempo: una pagina scritta male o apposta non ferma le finestre

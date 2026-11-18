@@ -1049,13 +1049,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
   const archiviaGiaFatto = async () => {
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    const giaScritta = unisciTesti(risposta);
+    // Anche la parte già scritta porta le sue fonti controllate, mai i marcatori grezzi (#2383).
+    const F = globalThis.SN_FONTI_CITATE;
+    const citate = F.controlla(unisciTesti(risposta), F.sorgenti(renderedActions));
+    const giaScritta = citate.text;
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
     const dopo = await appendToChatArchive(chatId, {
       role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
+      ...(citate.fonti.length ? { fonti: citate.fonti } : {}),
     }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
@@ -1370,7 +1374,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
   // #1373 — dopo l'OK il modello riprende sempre: a lavoro finito non ha niente da aggiungere, e il silenzio è la risposta.
   const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
-  textReply = String(textReply || '').trim() || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
+  // #2383 — i marcatori di fonte si controllano qui, prima che la risposta si salvi o si mostri: resta l'etichetta solo
+  // per un indirizzo letto in questo turno, con la frase cercata nella pagina intera.
+  const Fonti = globalThis.SN_FONTI_CITATE;
+  const citate = Fonti.controlla(textReply, Fonti.sorgenti(renderedActions));
+  const fonti = citate.fonti;
+  textReply = citate.text || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
+  if (notaRisposta) notaRisposta = Fonti.nascondi(notaRisposta).trim();
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -1420,7 +1430,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
-      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
+      indirizzi: [...renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])), ...fonti.map((f) => f.url)],
     });
   } catch (e) {
     senzaVerdetto = true;
@@ -1444,6 +1454,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
+        ...(fonti.length ? { fonti } : {}),
       },
       { onboarding: onbActive },
     );
@@ -1535,8 +1546,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Note di lavoro e ragionamento strutturato dell'ultimo giro: la scheda li tiene con la
     // conversazione, e il ragionamento torna al modello al turno dopo.
-    notes, reasoningDetails,
+    notes: notes.map((n) => Fonti.nascondi(n).trim()).filter(Boolean), reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
+    ...(fonti.length ? { fonti } : {}),
     ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),

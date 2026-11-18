@@ -151,7 +151,9 @@ function ricordaArchiviati(messages, linkDi) {
     const chiedono = Array.isArray(m.linkDaConfermare) ? m.linkDaConfermare : [];
     for (const x of chiedono) if (x && typeof x.url === 'string') segnaDaConfermare(x.url, x.motivo);
     if (m.senzaVerdetto) continue;
-    for (const grezzo of linkDi(String(m.text || ''))) {
+    // Le fonti della risposta (#2383) le ha giudicate il turno insieme ai collegamenti del testo.
+    const fonti = Array.isArray(m.fonti) ? m.fonti.map((f) => f && f.url) : [];
+    for (const grezzo of [...linkDi(String(m.text || '')), ...fonti]) {
       const url = indirizzoWeb(grezzo);
       if (url && !daConfermare.has(chiave(url))) segnaGiudicato(url);
     }
