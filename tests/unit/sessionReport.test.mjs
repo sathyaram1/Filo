@@ -368,6 +368,43 @@ test('i sotto-agenti entrano nel conto: costo, token, turni e strumenti sommati,
   } finally { togliCartella(casa); }
 });
 
+// #2553: il rilascio confronta i turni del worker con la decisione del server, e dice se l'ambiente forza il modello.
+test('rapporto del worker: modello e sforzo fuori dalla decisione del server finiscono nelle note, i figli non contano', async () => {
+  const casa = cartellaTemporanea('filo-rapporto-decisione-');
+  try {
+    const { registraDecisione } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+    const biglietto = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
+    const sub = join(casa, 'sess', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const turno = (id, model, effort, ts) => JSON.stringify({ type: 'assistant', sessionId: 'sess', timestamp: ts, effort,
+      message: { id, model, role: 'assistant', usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 }, content: [] } });
+    const worker = join(sub, 'agent-w.jsonl');
+    writeFileSync(worker, [turno('w1', 'claude-opus-5-5', 'high', T('00:10')), turno('w2', 'claude-opus-5-5', 'high', T('00:20'))].join('\n'), 'utf8');
+    // Un lettore lanciato dal worker: Haiku a medium per definizione, non è il worker.
+    writeFileSync(join(sub, 'agent-l.jsonl'), turno('l1', 'claude-haiku-5-5', 'medium', T('00:15')), 'utf8');
+    writeFileSync(join(sub, 'agent-l.meta.json'), JSON.stringify({ parentAgentId: 'w' }), 'utf8');
+    const config = join(casa, 'claude');
+    const decidi = (model, effort) => assert.equal(registraDecisione({ ticket: biglietto, role: 'fixer', model, effort }, { dir: config }).ok, true);
+    const rapporto = (env) => generaRapporto({ transcript: worker, ticket: biglietto, role: 'fixer', configDir: config, env });
+
+    decidi('opus', 'high');
+    const pulito = await rapporto({});
+    assert.equal(pulito.notes.filter((n) => /deciso dal server|forzato/.test(n)).length, 0, pulito.notes.join(' | '));
+    assert.ok(pulito.models.includes('claude-haiku-5-5'), 'i turni del lettore restano nel conto');
+
+    decidi('haiku', 'medium');
+    const forzato = await rapporto({ CLAUDE_CODE_SUBAGENT_MODEL_FORCE: '1', CLAUDE_CODE_SUBAGENT_MODEL: 'opus' });
+    assert.ok(forzato.notes.some((n) => /^modello dei sotto-agenti forzato a opus /.test(n)), forzato.notes.join(' | '));
+    assert.ok(forzato.notes.includes('modello deciso dal server haiku, turni del worker su claude-opus-5-5'), forzato.notes.join(' | '));
+    assert.ok(forzato.notes.includes('sforzo deciso dal server medium, turni del worker high 2'), forzato.notes.join(' | '));
+    assert.match(riassunto(forzato)[4], /forzato a opus/, 'chi rilascia lo vede nel riassunto');
+    assert.equal(registrazioniDelRapporto(forzato).report.notes, forzato.notes, 'le note viaggiano col rilascio');
+
+    const senzaBiglietto = await generaRapporto({ transcript: worker, configDir: config, env: {} });
+    assert.equal(senzaBiglietto.notes.filter((n) => /deciso dal server/.test(n)).length, 0, 'fuori dalle routine niente confronto');
+  } finally { togliCartella(casa); }
+});
+
 // ─── Giro 2 della verifica (16/09/2026) ──────────────────────────────────────
 // Tre porte trovate lì: la prima riga di un messaggio su più righe porta un
 // output parziale; chi rilascia nelle routine è un SOTTO-AGENTE
