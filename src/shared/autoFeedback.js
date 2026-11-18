@@ -514,6 +514,8 @@
     _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
     _matchCapabilityByWords: matchCapabilityByWords,
     _isHowtoQuestion: isHowtoQuestion,
+    chiedeAzione,
+    chiedeInformazione,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
