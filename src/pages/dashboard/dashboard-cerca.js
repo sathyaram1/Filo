@@ -1,17 +1,25 @@
 // Cercare nel filo dalla home senza passare dalla chat (#869): parole nei messaggi, nelle pagine visitate e nel contenuto
-// delle schede chiuse. Un messaggio porta al suo punto del filo, una pagina si riapre. Cosa trova lo decide il main
-// (src/shared/filoCoda.js); non tocca il DOM al caricamento.
+// delle schede chiuse. Il suo tasto (#2372) le dà la colonna destra: il risultato sotto il puntatore o le frecce si
+// mostra al centro, una pagina si riapre. Cosa trova lo decide il main (src/shared/filoCoda.js); non tocca il DOM al caricamento.
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
   let d = null;
+  let host = null;
   let campo = null;
   let pannello = null;
   let giro = 0;
   let attesa = null;
   let voci = [];
   let scelta = -1;
+  let aperta = false;
+  // Il centro segue la ricerca finché l'utente non lo scorre a mano: da lì lo muovono solo puntatore e frecce.
+  let manuale = false;
+  let ultimaBattuta = 0;
+  let seguiTimer = null;
+  let mostrato = null;
+  let passaggio = null;
   // La ricerca in corso, per i contatori (#1461): dall'apertura del pannello alla scelta, la posizione della voce, o niente.
   let sessione = null;
   function contaRicerca(evento) {
