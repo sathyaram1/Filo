@@ -563,25 +563,29 @@
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding: 4px 6px;
-  background: var(--sn-overlay-bg, #f8f6f0);
-  color: var(--sn-fg, #1a1918);
-  border: 1px solid var(--sn-border, #e0dcd4);
-  border-radius: var(--sn-radius, 10px);
-  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  gap: 8px;
+  min-height: 34px;
   font-size: 13px;
   white-space: nowrap;
 }
-.sn-tr-stato { display: flex; align-items: center; gap: 7px; padding: 0 6px; color: var(--sn-muted, #6e6b63); }
+.sn-tr-stato {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: var(--sn-overlay-bg, #f8f6f0);
+  color: var(--sn-muted, #6e6b63);
+  border-radius: var(--sn-radius, 10px);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
 .sn-tr-stato:empty { display: none; }
 .sn-tr-copia {
-  padding: 6px 12px;
+  padding: 8px 14px;
   border-radius: var(--sn-radius, 10px);
   border: 1px solid transparent;
   background: var(--sn-btn-bg, #1a1918);
   color: var(--sn-btn-fg, #fff);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
   font: inherit;
   cursor: pointer;
   transition: opacity calc(0.12s * var(--sn-motion, 1)) ease;
