@@ -12,6 +12,7 @@
       version: '0.2.292', date: '2026-11-18',
       features: [
         { testo: 'Su un video di YouTube l\'Aiuto e la chat leggono la trascrizione del video: a «di cosa parla?» rispondono da quello che si dice, e se il video non ha trascrizione te lo dicono.', segnalazione: 1977 },
+        { testo: 'Nelle risposte di Filo le parole in corsivo hanno una spiegazione: passaci sopra col mouse e la leggi, a volte con un disegno, senza che la risposta si allunghi. Filo sceglie cosa spiegarti in base a quello che sa di te; col tasto destro sulla parola chiedi di più o copi la spiegazione.', segnalazione: 2388 },
       ],
     },
     {

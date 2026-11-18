@@ -904,7 +904,8 @@ section:has(#rifiutateList) .sn-spell-add-row {
 .filo-md > :first-child { margin-top: 0; }
 .filo-md h3, .filo-md h4, .filo-md h5, .filo-md h6 { margin: 10px 0 4px 0; font-weight: 600; font-size: 1em; }
 .filo-md strong { font-weight: 600; }
-.filo-md em { font-style: italic; }
+/* Il corsivo di Filo è solo delle spiegazioni al passaggio (#2388): i tag che il browser inclina escono dritti. */
+em, i, cite, dfn, var, address { font-style: normal; }
 .filo-md ul, .filo-md ol { margin: 4px 0 8px 0; padding-left: 22px; }
 .filo-md li { margin: 2px 0; }
 .filo-md code {

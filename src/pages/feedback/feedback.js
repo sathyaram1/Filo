@@ -19,6 +19,8 @@
   const caselleTesti = window.SN_CASELLE.crea();
   const PAUSA_TESTI_MS = 1500;
   let live = null;
+  // #2388 — le risposte di Filo nelle conversazioni hanno le spiegazioni al passaggio; qui non c'è una chat, solo «Copia».
+  window.SN_SPIEGAZIONI?.attacca(document.body);
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');

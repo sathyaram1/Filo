@@ -182,6 +182,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo riquadri] nomiSito.js', e); }
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo riquadri] wallet.js', e); }
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo riquadri] filoMarkdown.js', e); }
+  try { require(path.join(SHARED_DIR, 'spiegazioni.js')); } catch (e) { console.error('[Filo riquadri] spiegazioni.js', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo riquadri] linkSospetto.js', e); }
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo riquadri] themeTokens.js', e); }
   try { require(path.join(SHARED_DIR, 'suggerimento.js')); } catch (e) { console.error('[Filo riquadri] suggerimento.js', e); }

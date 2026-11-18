@@ -107,8 +107,8 @@
   color: var(--sn-fg);
   max-width: 80%;
 }
-.sn-msg-loading { color: var(--sn-muted); font-style: italic; }
-.sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
+.sn-msg-loading { color: var(--sn-muted); }
+.sn-msg-muted .sn-msg-text { color: var(--sn-muted); }
 .sn-msg-error .sn-msg-text { color: var(--sn-error); }
 
 .sn-msg-rimedio {
@@ -130,8 +130,6 @@
 .sn-toast .sn-msg-rimedio:hover,
 .sn-menu .sn-msg-rimedio:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
 .sn-toast .sn-msg-rimedio { margin-top: 8px; }
-/* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
-.sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
 /* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
 /* L'etichetta di un tasto sta dopo tutta la riga (Copia, Rispondi): non copre il tasto vicino (#2096). */
@@ -252,7 +250,6 @@
   font-size: 1em;
 }
 .sn-msg-text strong, .sn-menu-inline strong { font-weight: 600; }
-.sn-msg-text em, .sn-menu-inline em { font-style: italic; }
 .sn-msg-text ul, .sn-msg-text ol,
 .sn-menu-inline ul, .sn-menu-inline ol {
   margin: 4px 0 8px 0;

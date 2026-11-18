@@ -114,6 +114,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'nomiSito.js'), 'SN_NOMI_SITO'); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js'), 'SN_WALLET'); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js'), 'SN_MARKDOWN'); // #853 — senza, le risposte del modello entrano come HTML
+  safe(path.join(SHARED, 'spiegazioni.js'), 'SN_SPIEGAZIONI'); // #2388 — le spiegazioni al passaggio di popup e Aiuto
   safe(path.join(SHARED, 'linkSospetto.js'), 'SN_LINK_SOSPETTO'); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'), 'SN_THEME_TOKENS');
   safe(path.join(SHARED, 'suggerimento.js'), 'SN_SUGGERIMENTO'); // #2095 — il fumetto di Filo al posto del title nativo: DOPO themeTokens

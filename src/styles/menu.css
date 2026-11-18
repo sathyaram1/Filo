@@ -224,8 +224,7 @@
   border-color: rgba(var(--sn-accent-rgb), 0.6);
 }
 
-/* Riga d'origine dell'immagine: sta in cima al riquadro e non deve prendere
-   il corsivo dell'attesa né il rosso dell'errore di chi le sta sotto. */
+/* Riga d'origine dell'immagine: sta in cima al riquadro e non prende il rosso dell'errore di chi le sta sotto. */
 .sn-menu-origine {
   display: block;
   font-style: normal;
@@ -262,13 +261,11 @@
 .sn-menu-segno-citazione {
   margin-top: 4px;
   color: var(--sn-muted);
-  font-style: italic;
 }
 
 .sn-menu-inline.sn-menu-inline-loading,
 .sn-menu-inline.sn-menu-inline-muted {
   color: var(--sn-muted);
-  font-style: italic;
 }
 .sn-menu-inline.sn-menu-inline-error {
   color: var(--sn-error);
@@ -278,7 +275,6 @@
 .sn-key-fallback {
   margin-top: 6px;
   font-size: 12px;
-  font-style: italic;
   line-height: 1.35;
   white-space: normal;
   color: var(--sn-muted);
@@ -405,7 +401,6 @@
 .sn-menu-correction-main:disabled {
   cursor: default;
   font-weight: 400;
-  font-style: italic;
   color: var(--sn-muted);
 }
 .sn-menu-correction-arrow {
@@ -427,7 +422,6 @@
 }
 .sn-menu-correction-loading .sn-menu-correction-main {
   font-weight: 400;
-  font-style: italic;
   color: var(--sn-muted);
 }
 
@@ -541,16 +535,14 @@
 .sn-menu-empty {
   padding: 8px 12px;
   color: var(--sn-muted);
-  font-style: italic;
   font-size: 12px;
 }
-/* Una riga informativa non è un'azione: il corsivo la distingue dalle voci cliccabili del menu. */
+/* Una riga informativa non è un'azione: il grigio la distingue dalle voci (il corsivo è delle spiegazioni, #2388). */
 .sn-menu-info {
   padding: 8px 12px;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--sn-fg);
-  font-style: italic;
+  color: var(--sn-muted);
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 280px;
@@ -676,7 +668,6 @@
 }
 .sn-editbox-proposed.sn-editbox-empty {
   color: var(--sn-muted);
-  font-style: italic;
 }
 /* Il motivo per cui la proposta non è arrivata: col colore dell'errore, mai con quello dell'attesa (#663). */
 .sn-editbox-proposed.sn-editbox-errore {

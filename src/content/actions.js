@@ -806,6 +806,7 @@
         let cancelled = false;
         let arrivata = false;
         let approfondita = false;
+        let staccaSpiegazioni = null;
         const apertaIl = Date.now();
         const mostra = (res) => {
           arrivata = true;
@@ -834,6 +835,11 @@
             return;
           }
           body.innerHTML = daMostrare ? Popup.renderMarkdown(daMostrare) : '';
+          // Le parole spiegate del riquadro si aprono qui come in ogni risposta (#2388). Nello strato il corpo nasce in un
+          // documento senza finestra, che lo strato ricopia: lì non c'è niente da collegare.
+          if (body.ownerDocument && body.ownerDocument.defaultView && !staccaSpiegazioni) {
+            staccaSpiegazioni = global.SN_SPIEGAZIONI?.attacca(body) || null;
+          }
           Popup.notaRipiego(body, res.keyFallback);
           // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302); senza testo il riquadro
           // riparte dalla nota, perché un turno del modello vuoto alcuni host lo rifiutano.
@@ -852,6 +858,7 @@
         // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
         return () => {
           cancelled = true;
+          if (staccaSpiegazioni) { try { staccaSpiegazioni(); } catch (_) {} staccaSpiegazioni = null; }
           if (!arrivata && !approfondita) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.EXPLAIN, attesaMs: Date.now() - apertaIl });
         };
       },

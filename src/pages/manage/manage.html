@@ -38,6 +38,7 @@
   <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
+  <script src="filo://shared/spiegazioni.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
        normalizzato, e se mancano si ferma dicendolo. -->
   <script src="filo://shared/feedbackStats.js"></script>
@@ -1090,7 +1091,7 @@
       width: 7px; height: 7px; border-radius: 50%; background: var(--sn-accent);
       animation: mg-eval-bounce calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
-    .mg-work-idle { flex-basis: 100%; font-style: italic; }
+    .mg-work-idle { flex-basis: 100%; }
     @media (prefers-reduced-motion: reduce) {
       .mg-work-live i { animation: none; }
     }
@@ -1124,7 +1125,7 @@
 
     .mg-detail-empty {
       display: flex; align-items: center; justify-content: center;
-      flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
+      flex: 1; color: var(--sn-muted); font-size: 13px;
     }
     .mg-detail { display: flex; flex-direction: column; height: 100%; }
     .mg-detail-head {
@@ -1220,7 +1221,7 @@
     .mg-bubble-body {
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
-    .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
+    .mg-bubble-body > em { color: var(--sn-muted); }
     /* Nota lunga ripiegata (#559): otto righe e una sfumatura che dice «continua»; un tocco la apre. */
     .mg-bubble--ripiegata .mg-bubble-body {
       max-height: calc(8 * 1.55em); overflow: hidden; cursor: pointer;
@@ -1269,7 +1270,7 @@
        aspettare il clic, e smette di sembrare un collegamento che funziona. */
     .mg-bubble-file a.mg-img-failed { color: var(--sn-muted); cursor: default; }
     .mg-bubble-file a.mg-img-failed:hover { text-decoration: none; }
-    .mg-file-note { color: var(--sn-muted); font-style: italic; }
+    .mg-file-note { color: var(--sn-muted); }
 
     .mg-lightbox {
       position: fixed; inset: 0; background: rgba(0,0,0,0.85);
@@ -1305,7 +1306,7 @@
     #mgSideEmpty[hidden]   { display: none; }
     .mg-side-empty {
       display: flex; align-items: center; justify-content: center;
-      flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
+      flex: 1; color: var(--sn-muted); font-size: 13px;
     }
 
     .mg-class-badge {
@@ -1323,12 +1324,11 @@
       word-break: break-word; color: var(--sn-text);
       margin-top: 10px;
     }
-    .mg-reasoning em { color: var(--sn-muted); font-style: italic; }
+    .mg-reasoning em { color: var(--sn-muted); }
     .mg-judge-model {
       font-size: 12px; color: var(--sn-muted); margin-top: 8px;
       word-break: break-all;
     }
-    .mg-judge-model em { font-style: italic; }
     /* Una frase, non un nome di modello: va a capo fra le parole. */
     .mg-judge-nonviste { word-break: normal; overflow-wrap: anywhere; }
     .mg-judge-detail { display: flex; flex-direction: column; align-items: flex-start; }
@@ -1785,7 +1785,7 @@
     .mg-rc-tag--riservato { color: var(--sn-accent, #c8763c); border-color: color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent); }
     .mg-rc-puo { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 1px; }
     .mg-rc-op--spenta { color: var(--sn-muted); opacity: 0.75; }
-    .mg-rc-op-non { font-style: italic; margin-left: 4px; }
+    .mg-rc-op-non { margin-left: 4px; }
     .mg-rc-nonpuo, .mg-rc-usato { margin: 4px 0 0; color: var(--sn-muted); overflow-wrap: anywhere; }
     .mg-rc-nonpuo b, .mg-rc-usato b { font-weight: 600; }
     .sn-page .mg-rc-ambito-testa button.sn-btn { margin-left: auto; padding: 2px 10px; font-size: 11.5px; }
@@ -1965,7 +1965,7 @@
     .mg-ct-ore-titolo { font-size: 12.5px; font-weight: 600; color: var(--sn-muted); margin: 18px 0 6px; }
     .mg-ct-totale { margin: 0 0 12px; font-size: 12.5px; color: var(--sn-muted); }
     .mg-ct-totale b { font-size: 26px; font-weight: 650; color: var(--sn-fg); font-variant-numeric: tabular-nums; margin-right: 6px; }
-    .mg-ct-sotto { color: var(--sn-muted); font-style: italic; white-space: nowrap; }
+    .mg-ct-sotto { color: var(--sn-muted); white-space: nowrap; }
 
     /* Le colonne dei grafici: come «Quando sono arrivati», con il tetto di larghezza quando sono poche. */
     .mg-ct-grafico {
