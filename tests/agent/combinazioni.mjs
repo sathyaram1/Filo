@@ -35,7 +35,7 @@ export function leggiTasto(testo, piattaforma = process.platform) {
   if (!t) return { ok: false, errore: 'tasto vuoto' };
   let parti;
   let tasto;
-  if (t.length > 1 && t.endsWith('++')) { parti = t.slice(0, -2).split('+'); tasto = '+'; }
+  if (t === '+' || t.endsWith('++')) { parti = t.slice(0, -2).split('+'); tasto = '+'; }
   else { parti = t.split('+'); tasto = parti.pop(); }
   tasto = tasto.trim();
   if (!tasto) return { ok: false, errore: `nella combinazione «${t}» manca il tasto` };
