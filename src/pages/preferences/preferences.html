@@ -592,6 +592,15 @@
         <input type="number" id="avvisoSchermoPienoDurata" min="1000" max="10000" step="500" style="width:120px;" />
       </section>
 
+      <!-- #2372 — i tempi della home: il doppio tocco di una lettera e la ricerca nel filo nella colonna destra. -->
+      <section id="sec-home-tempi">
+        <h2>Tempi della home</h2>
+        <label for="doppioToccoSoglia" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Entro quanto la seconda lettera vale come doppio tocco (millisecondi, da 100 a 1.000)</label>
+        <input type="number" id="doppioToccoSoglia" min="100" max="1000" step="50" style="width:120px;" />
+        <label for="ricercaFiloPausa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa nello scrivere prima che la ricerca nel filo porti il centro sul risultato (millisecondi, da 0 a 3.000)</label>
+        <input type="number" id="ricercaFiloPausa" min="0" max="3000" step="100" style="width:120px;" />
+      </section>
+
       <!-- #1803 — colori e misura delle icone stanno nei token estetici qui sotto (barraSiti.*). -->
       <section id="sec-barra-siti">
         <h2>Barra dei siti</h2>
