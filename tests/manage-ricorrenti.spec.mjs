@@ -231,7 +231,7 @@ test('il rapporto parziale di una corsa fermata si legge come tale, e la regola 
   await expect(b).toHaveAttribute('title', 'Dove era arrivata l’ultima istanza: la prossima riparte da qui');
   await b.click();
   await expect(r.locator('.mg-rc-rapporto-testo')).toHaveText('A metà: 25 di 50, riparti da #900.');
-  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /la prossima riparte dal suo rapporto parziale\. Vuoto: il doppio della mediana delle ultime corse finite col rapporto\. Nessuna corsa finita col rapporto ancora/);
+  await expect(r.locator('.mg-rc-tetto')).toHaveAttribute('title', /la prossima riparte dal suo rapporto parziale\. Vuoto: il doppio della mediana delle ultime corse finite col rapporto, mai meno della più cara di loro né di 5 \$\. Nessuna corsa finita col rapporto ancora/);
   await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-rapporto-parziale.png', fullPage: true });
 });
 
