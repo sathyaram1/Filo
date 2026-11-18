@@ -114,12 +114,12 @@ function lancia(percorso, piattaforma = process.platform, dip = {}) {
 }
 
 // Il clic su una voce-programma: il percorso viene dalla barra salvata, l'id dalla pagina.
-async function avvia(id, { lanciatore = lancia } = {}) {
+async function avvia(id, { lanciatore = lancia, piattaforma = process.platform } = {}) {
   const voce = (await leggi()).find((v) => v.id === String(id || ''));
   if (!voce || voce.tipo !== 'app') return { ok: false, error: 'questa voce non è un programma della barra' };
-  const c = controllaProgramma(voce.percorso);
+  const c = controllaProgramma(voce.percorso, piattaforma);
   if (c.errore) return { ok: false, error: c.errore };
-  const e = await lanciatore(voce.percorso);
+  const e = await lanciatore(voce.percorso, piattaforma);
   const r = e ? { ok: false, error: `${voce.nome} non è partito: ${e}` } : { ok: true, nome: voce.nome };
   // Come ogni file aperto col sistema, l'avvio entra nel filo (#1561).
   try { require('./accaduti').fileAperto({ percorso: voce.percorso }, r, { incognito: require('../shim/storage').inIncognito() }); } catch (_) {}
