@@ -119,8 +119,8 @@ test('nella home un avviso senza carta: angolo, poi volo in cima alla colonna; a
 
   await carta.click({ button: 'right' });
   const menu = home.locator('.dash-menu');
-  await expect(menu.locator('.dash-menu-voce', { hasText: 'Riprova' })).toBeVisible();
-  await expect(menu.locator('.dash-menu-voce', { hasText: 'Chiudi l’avviso' })).toBeVisible();
+  // Le voci dell'angolo, una chiusura sola; in più quello che ogni carta della home sa fare.
+  expect(await menu.locator('.dash-menu-voce').allTextContents()).toEqual(['Riprova', 'Chiudi', 'Apri nel filo']);
   await menu.locator('.dash-menu-voce', { hasText: 'Riprova' }).click();
   await expect.poll(() => shell.evaluate(() => window.__riprovato)).toBe(1);
   await expect(carta).toHaveCount(0, { timeout: 5_000 });
