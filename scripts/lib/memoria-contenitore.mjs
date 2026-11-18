@@ -133,8 +133,9 @@ export function testoMemoria(m, prima = null) {
   return parti.length ? `memoria: ${parti.join('; ')}` : 'memoria: non letta';
 }
 
-/** Ci sono state uccisioni per memoria fra `prima` e `dopo`? null se non si sa. PURA. */
+/** Ci sono state uccisioni per memoria fra `prima` e `dopo`? null se non si sa (anche dopo una ripartenza). PURA. */
 export function uccisiPerMemoria(dopo, prima = null) {
+  if (ripartito(dopo, prima)) return null;
   const conta = (k) => (dopo && Number.isFinite(dopo[k]) ? dopo[k] - (prima && Number.isFinite(prima[k]) ? prima[k] : 0) : NaN);
   const n = [conta('uccisioniSistema'), conta('uccisioniComandi')].filter(Number.isFinite);
   return n.length ? n.some((x) => x > 0) : null;
