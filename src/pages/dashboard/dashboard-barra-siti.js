@@ -30,8 +30,21 @@
     return d.send({ type: MSG.BARRA_SITI_MODIFICA, mossa }).then((r) => {
       if (r && Array.isArray(r.voci)) disegna(r.voci);
       if (r && r.ok === false && r.error) avviso(maiuscola(r.error));
+      if (r && r.ok && r.gia && r.voce) giaQui(r.voce);
       return r || { ok: false };
     });
+  }
+  // Lasciata di nuovo una voce che c'è già: quella voce si fa vedere, o il gesto sembra non riuscito.
+  function giaQui(v) {
+    const n = nodi.get(v.id);
+    if (n) {
+      n.classList.remove('dash-barra-gia');
+      void n.offsetWidth;
+      n.classList.add('dash-barra-gia');
+      try { n.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+      n.addEventListener('animationend', () => n.classList.remove('dash-barra-gia'), { once: true });
+    }
+    avviso(`${v.nome} è già nella barra`);
   }
   const maiuscola = (t) => String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1);
 
