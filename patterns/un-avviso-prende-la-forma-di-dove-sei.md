@@ -30,5 +30,7 @@ Perché la home e non l'angolo: nell'angolo l'avviso copriva il tasto Invio, e s
 posto (#1551) lo riduceva a una fessura. Dove un avviso ha un posto fisso che è suo, lì va.
 
 Un avviso nuovo non sceglie la propria forma: passa da `avvisoNellaFinestra` (main) o `NOTIFS.show` (shell) e, se
-racconta una cosa che ha una carta nella home, dice quale con `carta`. Mai una `new Notification` altrove.
+racconta una cosa che ha una carta nella home, dice quale con `carta`. Mai una `new Notification` altrove. Dal main
+un avviso a una finestra che sta ancora caricando aspetta che abbia finito (`allaCornice`): perso lì, con Filo non
+davanti non arrivava nessuna notifica.
 Sentinella: `tests/unit/formaAvviso.test.mjs`; prova d'uso: `tests/avvisi-forma.spec.mjs`.
