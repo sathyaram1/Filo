@@ -157,8 +157,8 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
 }
 
 /**
- * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
- * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
+ * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che cambia rispetto
+ * a main e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
  * sessione si guarda chi lavora già sugli stessi file. Sono rami di lavoro solo `worker/` e `claude/`; `fuori`, se
  * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge. `numeri` ({ N: id }) come
  * in fusioniSuMain.
