@@ -1060,7 +1060,7 @@
 
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
-    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, schedaNelVerso, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA, comandoLucchettoBarra, etichettaLucchettoBarra, ACCEL_LUCCHETTO_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
