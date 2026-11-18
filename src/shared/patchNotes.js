@@ -22,6 +22,9 @@
     {
       version: '0.2.291', date: '2026-11-18',
       features: [
+        { testo: 'La home ha un campo solo, quello della chat: quello che scrivi ci finisce anche se non ci hai cliccato. La ricerca nel filo è diventata un tasto della colonna di destra: passando sui risultati, o scorrendoli con le frecce, il filo al centro ti porta lì, ed Esc la chiude. Puoi anche scrivere «cerca nel filo» seguito da quello che cerchi.', segnalazione: 2372 },
+        { testo: 'I tasti della colonna di destra, comprese Impostazioni e Profilo, si spostano trascinandoli; quelli che non ti servono li metti nel «+», che li tiene a un clic.', segnalazione: 2372 },
+        { testo: 'Puoi dare una lettera a un tasto della home o a un sito: battila due volte all\'inizio del campo e si apre. La assegni dal tasto destro del tasto, dalle Preferenze o chiedendolo a Filo; di serie nessuna lettera fa niente.', segnalazione: 2372 },
         { testo: 'Nella nuova scheda c\'è una barra per i tuoi siti e programmi: ci trascini una scheda, un collegamento o un gioco dal desktop e lo riapri con un clic. Con la freccia accanto ripieghi la chat e la barra va al centro, con le icone grandi. Puoi anche chiedere a Filo di metterci o toglierci un sito.', segnalazione: 1803 },
         { testo: 'Passando il mouse sul valore che il correttore propone al posto delle x leggi da dove viene e perché, senza aprire il tasto destro.', segnalazione: 1642 },
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
