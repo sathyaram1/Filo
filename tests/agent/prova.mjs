@@ -53,25 +53,6 @@ function apriModello(claude, modello, prompt) {
   };
 }
 
-async function esegui(app, shell, mossa, map, fuoco) {
-  const m = mossa.segno != null ? map.find((x) => x.i === mossa.segno) : null;
-  if (m) mossa.etichetta = m.label || m.tag;
-  switch (mossa.azione) {
-    case 'clic': return d.clickMark(app, shell, map, mossa.segno);
-    case 'destro': return d.clickMark(app, shell, map, mossa.segno, { button: 'right' });
-    case 'doppio': return d.clickMark(app, shell, map, mossa.segno, { clickCount: 2 });
-    case 'scrivi': {
-      const dove = mossa.segno != null ? await d.clickMark(app, shell, map, mossa.segno) : fuoco;
-      await d.typeText(app, shell, mossa.testo, dove);
-      return dove;
-    }
-    case 'tasto': await d.pressKey(app, shell, mossa.tasto, fuoco); return fuoco;
-    case 'scorri': await d.scrollBy(app, shell, mossa.dy); return fuoco;
-    case 'aspetta': await d.sleep(mossa.secondi * 1000); return fuoco;
-    default: return fuoco;
-  }
-}
-
 async function run() {
   const a = leggiArgomenti(process.argv.slice(2));
   if (!a.ok) { console.error(`${a.errore}\n\n${USO}`); return 2; }
