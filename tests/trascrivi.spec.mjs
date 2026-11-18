@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
-import { paginaDelloStrato } from './helpers/riquadri.mjs';
+import { paginaDelloStrato, nelMondoDiFilo, nelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const W = 600;
