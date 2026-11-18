@@ -2292,11 +2292,12 @@
     // ripaga a ogni messaggio. Anche l'onboarding (#524) sta qui: vale solo nei primi minuti.
     // #1398: rifatta o ripresa, l'intervista ha davanti memoria e filo di un utente noto; dirgli «è appena arrivato»
     // lasciava al modello indovinare perché fosse lì (un «test» che nessuno aveva nominato).
+    // #2536: il divieto nomina la MEMORIA con le sue parti: detto solo delle conversazioni passate, il profilo sembrava ammesso.
     filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + (onboardingRifatta
-          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la memoria e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato, e non tirare in ballo cose delle conversazioni passate che qui non ha nominato. `
+          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la MEMORIA (profilo e preferenze) e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato. Finché dura l'intervista, quello che sai solo dalla MEMORIA o dalle conversazioni passate (il lavoro, le persone, gli animali, i viaggi, i gusti, come vuole le risposte) non lo nomini, non glielo attribuisci («mi hai detto», «so che») e non lo metti in un'impostazione o in memoria(impara): conta solo quello che ti dice qui. `
           : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
         + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
