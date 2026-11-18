@@ -31,3 +31,19 @@ for (const messaggio of [
     expect(await app.evaluate(() => globalThis.__inviate)).toEqual([]);
   });
 }
+
+// L'altra direzione dello stesso riconoscimento: una richiesta senza verbo di comando non conta più come richiesta.
+for (const messaggio of ['una finestra in incognito per favore', 'voglio una finestra anonima']) {
+  test(`r1 «${messaggio}»: una richiesta vera, e la funzione spiegata a mano si segnala`, async ({ app }) => {
+    test.setTimeout(60_000);
+    const chat = await home(app);
+    await app.evaluate(() => {
+      globalThis.SN_FEEDBACK.submit = async () => ({ id: 'fb' });
+    });
+    await modelloFinto(app, [{ text: 'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l\'icona Nuova finestra '
+      + 'incognito nella barra laterale: lì quello che visiti non resta.' }]);
+    await chiedi(chat, messaggio);
+    await expect.poll(() => confirmText(chat), { timeout: 15_000, message: 'la richiesta non è stata riconosciuta: nessuna proposta' })
+      .toContain('Finestra in incognito');
+  });
+}
