@@ -94,8 +94,7 @@
   function risolvi(nome, { esatto = false } = {}) {
     const s = pulisciNome(nome).replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
     if (!s) return null;
-    const id = [...IDS, ...ID_TASTI].find((x) => senzaAccenti(x) === s);
-    if (id) return id;
+    if (IDS.includes(s)) return s;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
     for (const t of TASTI) if (t.nomi.includes(s)) return t.id;
     if (esatto) return null;
