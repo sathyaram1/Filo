@@ -102,7 +102,9 @@ Avviare un PowerShell nuovo per ogni apertura del riquadro costava da solo
 decine di secondi sul PC dell'owner. Gli elenchi (dispositivi abbinati, reti
 conosciute) si chiedono al PowerShell del lettore, una riga su stdin, e la
 risposta torna come riga `{"elenco": …}`; lo script a parte resta la riserva se
-il lettore non può. Le reti conosciute usano wlanapi, che vuole la posizione:
+il lettore non può. Un PowerShell che non risponde in tempo resta segnato lui
+solo, finché non arriva una sua risposta: quello nuovo non eredita il segno.
+Le reti conosciute usano wlanapi, che vuole la posizione:
 il lettore le legge solo su richiesta, mai nel suo giro, e la home non le
 precarica (gli abbinati sì, all'apertura). La sentinella è in
 `tests/unit/statoSistema.test.mjs`.
