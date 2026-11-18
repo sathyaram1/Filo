@@ -124,7 +124,7 @@ async function run() {
       console.log(`[passo ${n}] ${passo.vedo} → ${rigaMossa(letta.mossa)}`);
       if (letta.mossa.azione === 'fine') { fine = letta.mossa; break; }
       try {
-        fuoco = (await esegui(app, shell, letta.mossa, map, fuoco)) || fuoco;
+        fuoco = await eseguiMossa(app, shell, letta.mossa, map, fuoco);
         await d.sleep(500);
       } catch (e) {
         passo.nota = `la mossa non è riuscita: ${String(e.message).split('\n')[0].slice(0, 200)}`;
