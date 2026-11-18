@@ -37,11 +37,60 @@ const Servizio = () => require(join(ROOT, 'src', 'main', 'services', 'barraSiti.
 test('un indirizzo scritto a mano diventa un sito; uno che non si apre in una scheda no', () => {
   assert.equal(B.normalizzaIndirizzo('youtube.com'), 'https://youtube.com/');
   assert.equal(B.normalizzaIndirizzo('  https://www.example.org/a?b=1 '), 'https://www.example.org/a?b=1');
-  assert.equal(B.normalizzaIndirizzo('localhost:3000'), 'https://localhost:3000/');
   assert.equal(B.normalizzaIndirizzo('http://127.0.0.1:8080/x'), 'http://127.0.0.1:8080/x');
-  for (const no of ['', '   ', 'javascript:alert(1)', 'file:///etc/passwd', 'ciao', 'due parole.it', 'filo://newtab/']) {
+  for (const no of ['', '   ', 'javascript:alert(1)', 'file:///etc/passwd', 'ciao', 'due parole.it', 'C:\\Users\\a.pdf']) {
     assert.equal(B.normalizzaIndirizzo(no), '', `«${no}» non è un sito`);
   }
+});
+
+test('#1803.1 un indirizzo scritto si apre come lo apre la navigazione: http alla rete di casa, una macchina con la porta', () => {
+  const Nav = globalThis.SN_URL_NAV;
+  const casi = {
+    'localhost:3000': 'http://localhost:3000/',
+    '192.168.1.1': 'http://192.168.1.1/',
+    '10.0.0.5:8080/admin': 'http://10.0.0.5:8080/admin',
+    'fritz.box': 'http://fritz.box/',
+    'nas.local:5000': 'http://nas.local:5000/',
+    'nas:5000': 'http://nas:5000/',
+    'youtube.com': 'https://youtube.com/',
+  };
+  for (const [scritto, atteso] of Object.entries(casi)) {
+    assert.equal(B.normalizzaIndirizzo(scritto), atteso, scritto);
+    assert.equal(new URL(Nav.normalizeUrl(scritto)).href, atteso, `la navigazione apre ${scritto} allo stesso modo`);
+  }
+  const r = B.applica([], { tipo: 'aggiungi', url: 'nas:5000' });
+  assert.equal(r.cambiato, true, r.errore);
+  assert.equal(r.voci[0].nome, 'nas');
+});
+
+test('#1803.1 le pagine di Filo entrano nella barra; un file aperto in una scheda no, e lo dice', () => {
+  let r = B.applica([], { tipo: 'aggiungi', url: 'filo://history/history.html', nome: 'Cronologia' });
+  assert.equal(r.cambiato, true, r.errore);
+  assert.deepEqual([r.voci[0].tipo, r.voci[0].url, r.voci[0].nome], ['sito', 'filo://history/history.html', 'Cronologia']);
+  // La forma lunga della stessa pagina è la stessa voce.
+  const gia = B.applica(r.voci, { tipo: 'aggiungi', url: 'filo://src/pages/history/history.html' });
+  assert.equal(gia.gia, true);
+  r = B.applica(r.voci, { tipo: 'aggiungi', url: 'filo://editor/editor.html' });
+  assert.equal(r.voci[1].nome, 'editor', 'senza titolo vale il nome della pagina');
+  assert.equal(B.normalizza(r.voci).length, 2, 'restano al riavvio');
+  assert.match(B.applica([], { tipo: 'aggiungi', url: 'file:///home/a/fattura.pdf' }).errore, /un file aperto in una scheda non va nella barra: ci vanno siti, pagine di Filo e programmi/);
+  assert.match(B.applica([], { tipo: 'aggiungi', url: 'chrome://settings' }).errore, /non è l'indirizzo di un sito/);
+});
+
+test('#1803.1 l\'estensione di un programma la riconosce la regola dei file che eseguono: punti, spazi e segni invisibili in coda', () => {
+  const E = globalThis.SN_ESEGUIBILI;
+  for (const p of ['C:\\Giochi\\Gioco.exe.', 'C:\\Giochi\\Gioco.exe  ', 'C:\\Giochi\\Gioco.EXE', '/Applications/Gioco.app/']) {
+    assert.equal(B.estensione(p), E.estensione(p.replace(/[\\/]+$/, '').split(/[\\/]/).pop()), p);
+  }
+  assert.equal(B.estensione('C:\\Giochi\\Gioco.exe. '), 'exe');
+  assert.equal(B.nomeDelProgramma('C:\\Giochi\\Gioco.exe. '), 'Gioco');
+  // «Fattura‮exe.txt» si leggerebbe «Fatturatxt.exe»: il nome mostrato perde il segno che capovolge.
+  const rlo = 'C:\\Doc\\Fattura\u202Etxt.exe';
+  assert.equal(B.nomeDelProgramma(rlo), 'Fatturatxt');
+  const r = B.applica([], { tipo: 'aggiungi', percorso: rlo });
+  assert.equal(r.voci[0].nome, 'Fatturatxt');
+  assert.equal(r.voci[0].percorso, rlo, 'il percorso resta quello vero, che parte al clic');
+  assert.equal(B.applica(r.voci, { tipo: 'rinomina', voce: r.voci[0].id, nome: 'Gioco\u202Eexe.txt' }).voci[0].nome, 'Gioco exe.txt'.replace(' ', ''));
 });
 
 test('aggiungi, togli, rinomina e sposta: la barra cambia come chiede la mossa', () => {
