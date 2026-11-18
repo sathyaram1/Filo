@@ -67,7 +67,7 @@
     } else if (sovrapposto()) return;
     const cfg = d.impostazioni() && d.impostazioni().doppioTocco;
     const vuoto = campo.value === '';
-    const esito = tocco.battuta({ key: e.key, repeat: e.repeat, mod: e.ctrlKey || e.metaKey || e.altKey, t: e.timeStamp, vuoto }, cfg);
+    const esito = tocco.battuta({ key: e.key, repeat: e.repeat, mod, t: e.timeStamp, vuoto }, cfg);
     if (esito && esito.scatta) {
       e.preventDefault();
       e.stopPropagation();
