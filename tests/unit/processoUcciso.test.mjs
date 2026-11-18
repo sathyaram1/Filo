@@ -108,7 +108,7 @@ describe('il segno della corsa di finish:check', () => {
       // Nella riga di comando come quello vero: un processo vivo che non è finish:check non tiene viva la corsa.
       'finish-local',
     ], { stdio: ['ignore', 'pipe', 'inherit'] });
-    setTimeout(() => c.kill('SIGKILL'), 30_000).unref();
+    setTimeout(() => c.kill('SIGKILL'), TETTO_ATTESA_MS).unref();
     c.stdout.once('data', () => ok(c));
   });
   const fine = (c) => new Promise((ok) => c.once('exit', (codice, segnale) => ok({ codice, segnale })));
