@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   repoDaOrigin, modoWindows, nomeCorsa, richiestaDispatch, corsaDallElenco, campoDalRegistro, provaDalCampo,
-  avviaProvaRemota, attendiProvaRemota, tokenGitHub,
+  avviaProvaRemota, attendiProvaRemota, tokenGitHub, apiGitHub, letturaRipetibile, PAUSE_RIPROVA_MS,
 } from '../../scripts/lib/prova-remota.mjs';
 import { giudizioRemoto } from '../../scripts/finish-local.mjs';
 import { campoPerIlServer } from '../../scripts/lib/unit-sulla-fusione.mjs';
@@ -126,6 +126,83 @@ test('attendiProvaRemota senza corsa, oltre il tetto o senza il lavoro dell\'esi
   const senzaUnit = async (p) => (p.includes('/runs?') ? { workflow_runs: [{ id: 1, display_title: 'unit-fusione c', status: 'completed', conclusion: 'cancelled' }] } : { jobs: [{ id: 3, name: 'linux' }] });
   assert.match((await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: senzaUnit }, orologio())).errore, /finita \(cancelled\) senza il lavoro che scrive l'esito/);
   const giu = async () => { throw new Error('GitHub risponde 502'); };
-  assert.match((await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: giu }, orologio())).errore, /non riesco a leggere le corse su GitHub \(GitHub risponde 502\)/);
+  assert.match((await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: giu }, { ...orologio(), scrivi: () => {} })).errore, /non riesco a leggere le corse su GitHub \(GitHub risponde 502\)/);
   assert.match((await attendiProvaRemota({ errore: 'x', main: M })).errore, /^x$/);
+});
+
+/** Un errore come quelli di apiGitHub: col codice della risposta, o senza (rete, tempo scaduto). */
+const errore = (status, testo = '') => Object.assign(new Error(`GitHub risponde ${status}${testo ? `: ${testo}` : ''}`), { status });
+
+test('un intoppo passeggero di GitHub su una delle tre letture non ferma l\'attesa: si riprova e arriva l\'esito (#1737.1)', async () => {
+  const o = orologio();
+  const intoppi = { elenco: [errore(502)], jobs: [new TypeError('fetch failed')], registro: [errore(404, '{"message":"Not Found"}'), errore(503)] };
+  const chiamate = { elenco: 0, jobs: 0, registro: 0 };
+  const api = async (p) => {
+    const quale = p.includes('/runs?') ? 'elenco' : p.endsWith('/jobs?per_page=100') ? 'jobs' : 'registro';
+    chiamate[quale]++;
+    if (intoppi[quale].length) throw intoppi[quale].shift();
+    if (quale === 'elenco') return { workflow_runs: [{ id: 9, display_title: 'unit-fusione c1', status: 'completed', html_url: 'https://g/9' }] };
+    if (quale === 'jobs') return { jobs: [{ id: 2, name: 'unit' }] };
+    return `2026-11-16T07:00:00Z FILO-UNIT-FUSIONE ${JSON.stringify({ ramo: R, main: M, esito: 'verde', mainSha: M })}\n`;
+  };
+  const righe = [];
+  const p = await attendiProvaRemota({ repo: 'o/filo', ramo: R, main: M, corsa: 'c1', api }, { ...o, scrivi: (s) => righe.push(s) });
+  assert.equal(p.errore, undefined, p.errore);
+  assert.deepEqual([p.esito, p.remota.url], ['verde', 'https://g/9']);
+  assert.deepEqual(chiamate, { elenco: 2, jobs: 2, registro: 3 }, 'ogni lettura ripetuta finché risponde, nessuna corsa riaccesa');
+  assert.equal(righe.filter((r) => /riprovo fra \d+ s/.test(r)).length, 4, righe.join('\n'));
+  assert.match(righe.join('\n'), /il registro della corsa \(GitHub risponde 404[^)]*\): riprovo fra 10 s, tentativo 2 di 5/);
+  assert.match(righe.join('\n'), /il registro della corsa \(GitHub risponde 503\): riprovo fra 30 s, tentativo 3 di 5/);
+  assert.equal(o.adesso(), PAUSE_RIPROVA_MS[0] * 3 + PAUSE_RIPROVA_MS[1], 'le pause sono quelle dichiarate, dalla prima per ogni lettura');
+});
+
+test('GitHub giù davvero: dopo tutte le pause si arrende dicendo quante volte ha provato; una risposta definitiva ferma subito', async () => {
+  const o = orologio();
+  let n = 0;
+  const giu = async () => { n++; throw errore(502); };
+  const p = await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: giu }, { ...o, scrivi: () => {} });
+  assert.match(p.errore, /non riesco a leggere le corse su GitHub \(GitHub risponde 502\), nemmeno dopo 5 tentativi/);
+  assert.equal(n, PAUSE_RIPROVA_MS.length + 1);
+  assert.equal(o.adesso(), PAUSE_RIPROVA_MS.reduce((a, b) => a + b, 0));
+
+  for (const [status, testo] of [[401, 'Bad credentials'], [403, 'Resource not accessible by integration'], [422, 'x']]) {
+    const t = orologio();
+    let k = 0;
+    const no = async () => { k++; throw errore(status, testo); };
+    const q = await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: no }, { ...t, scrivi: () => {} });
+    assert.match(q.errore, new RegExp(`GitHub risponde ${status}`));
+    assert.doesNotMatch(q.errore, /tentativi/);
+    assert.deepEqual([k, t.adesso()], [1, 0], `${status}: la stessa richiesta avrebbe la stessa risposta`);
+  }
+});
+
+test('le pause dei tentativi restano dentro i tetti di tempo dell\'attesa', async () => {
+  const o = orologio();
+  let giri = 0;
+  const api = async (p) => {
+    if (p.includes('/runs?')) { giri++; return { workflow_runs: [{ id: 1, display_title: 'unit-fusione c', status: 'completed', html_url: 'https://g/1' }] }; }
+    if (p.endsWith('/jobs?per_page=100')) return { jobs: [{ id: 2, name: 'unit' }] };
+    throw errore(500);
+  };
+  const p = await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api }, { ...o, tettoCorsa: 45000, scrivi: () => {} });
+  assert.match(p.errore, /non riesco a leggere il registro della corsa \(GitHub risponde 500\), nemmeno dopo 3 tentativi/);
+  assert.equal(p.remota.url, 'https://g/1');
+  assert.ok(o.adesso() <= 45000, `ha aspettato ${o.adesso()} ms oltre il tetto`);
+
+  const t = orologio();
+  const senzaCorsa = async () => { throw errore(502); };
+  const q = await attendiProvaRemota({ repo: 'o/f', ramo: R, main: M, corsa: 'c', api: senzaCorsa }, { ...t, tettoPartenza: 20000, scrivi: () => {} });
+  assert.match(q.errore, /nemmeno dopo 2 tentativi/);
+  assert.ok(t.adesso() <= 20000, 'prima che la corsa compaia vale il tetto della partenza');
+});
+
+test('quali letture fallite si ripetono, e apiGitHub porta il codice della risposta', async () => {
+  for (const e of [new TypeError('fetch failed'), Object.assign(new Error('timeout'), { name: 'TimeoutError' }), errore(404), errore(429), errore(500), errore(502), errore(503), errore(403, 'API rate limit exceeded for user'), errore(403, 'You have exceeded a secondary rate limit')]) {
+    assert.equal(letturaRipetibile(e), true, e.message);
+  }
+  for (const e of [errore(400), errore(401, 'Bad credentials'), errore(403, 'Must have admin rights'), errore(410), errore(422)]) {
+    assert.equal(letturaRipetibile(e), false, e.message);
+  }
+  const fetchImpl = async () => ({ ok: false, status: 502, text: async () => '<html>Bad gateway</html>' });
+  await assert.rejects(apiGitHub({ token: 't', base: 'http://x', fetchImpl })('repos/o/f/actions/jobs/1/logs'), (e) => e.status === 502 && /GitHub risponde 502 a GET/.test(e.message));
 });
