@@ -9,6 +9,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaCloneServer } from './lib/git-server.mjs';
 import { cartellaDelServer } from './lib/ramo-server.mjs';
+import { marcatoreWorker } from './lib/dati-worker.mjs';
+import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { fileConRepo, incroci, incrociFraRami, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
@@ -22,7 +24,9 @@ import '../src/shared/prioritaTre.js';
 
 const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const QUI = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Dalla copia fissata degli strumenti git e i marcatori del giro stanno nel progetto che la copia ricorda (#2340.2).
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || QUI);
 
 // Lo stesso tetto del server (functions/src/routine/accensioni.js, ORDINE_MAX): oltre si rifiuta col numero.
 export const ORDINE_MAX = 2000;
@@ -156,12 +160,15 @@ export function rigaRamo(r) {
 /**
  * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no quello dei lavori server
  * (cartellaCloneServer), se no accanto al checkout di Filo anche da una sua worktree (cartellaDelServer, la ricerca di
- * chiusura e verifica locali). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ * chiusura e verifica locali), se no accanto alla cartella della sessione che il marcatore di un clone del giro nomina
+ * (#2340.2). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste` e `marcatore`.
  */
-export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
+export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync, marcatore = marcatoreWorker } = {}) {
   const dato = String(scelta || '').trim();
   const accanto = dato ? '' : cartellaDelServer(root, esiste);
-  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security')];
+  const m = dato ? null : marcatore(root);
+  const daSessione = m ? join(dirname(resolve(m.principale)), 'filo-security') : '';
+  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), accanto ? dirname(accanto) : join(dirname(resolve(root)), 'filo-security'), daSessione].filter(Boolean);
   const dir = cercati.find((d) => esiste(join(d, '.git')));
   return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
 }
@@ -1375,7 +1382,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const r = await leggiRami(indiceDalServer(sc.schede));
       const lista = r.lista;
       if (r.server.avviso) console.error(`AVVISO: ${r.server.avviso}`);
-      const dirRuoli = join(ROOT, 'routines', 'roles');
+      const dirRuoli = join(QUI, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
       const stato = st.ok === false ? { segnali: [] } : st;

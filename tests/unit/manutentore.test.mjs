@@ -141,8 +141,8 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
 });
 
 // #2340: i lavori del server si aprono in parallelo se i loro rami non si toccano, quindi rami e incroci li vedono.
-function repoConRami(rami) {
-  const repo = cartellaTemporanea('manutentore-rami');
+function repoConRami(rami, repo = cartellaTemporanea('manutentore-rami')) {
+  mkdirSync(repo, { recursive: true });
   const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
   g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
   // I file dei rami ci sono già su main: un file nuovo non si mostra (#2337), e qui si provano i file in chiaro.
@@ -237,6 +237,39 @@ test('il clone del server si cerca dove lo mettono le routine e la sessione loca
 test('il clone del server si cerca accanto al repo anche da una sua worktree, come fanno chiusura e verifica locali', () => {
   const ci = new Set([join(resolve('/x/filo-security'), '.git'), join(resolve('/x/filo-security'), 'functions', 'tools', 'server-fondi.js')]);
   assert.deepEqual(M.cloneDelServer({ root: '/x/Filo/.claude/worktrees/w', env: {}, esiste: (p) => ci.has(p) }), { dir: resolve('/x/filo-security') });
+});
+
+test('da un clone del giro il clone del server si cerca accanto alla cartella della sessione che il marcatore nomina (#2340.2)', () => {
+  const c = (dir) => (p) => p === join(resolve(dir), '.git');
+  const marcatore = (r) => (resolve(r) === resolve('/tmp/filo-lavori/1') ? { indice: 1, principale: '/home/u/Filo' } : null);
+  assert.deepEqual(M.cloneDelServer({ root: '/tmp/filo-lavori/1', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/home/u/filo-security'), marcatore }),
+    { dir: resolve('/home/u/filo-security') });
+  assert.deepEqual(M.cloneDelServer({ root: '/tmp/filo-lavori/1', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: () => false, marcatore }).cercati,
+    [resolve('/srv/fs'), resolve('/tmp/filo-lavori/filo-security'), resolve('/home/u/filo-security')], 'chi non lo trova nomina anche la cartella della sessione');
+  assert.deepEqual(M.cloneDelServer({ root: '/tmp/filo-lavori/1', scelta: '/a', env: {}, esiste: c('/home/u/filo-security'), marcatore }), { dir: '', cercati: [resolve('/a')] },
+    'la cartella scelta vale ancora da sola');
+});
+
+test('il manutentore dagli strumenti fissati, lanciato dal clone del giro, legge i rami dell\'app e quelli del clone del server della sessione (#2340.2)', (t) => {
+  const sessione = cartellaTemporanea('manutentore-sessione');
+  const giro = cartellaTemporanea('manutentore-giro');
+  const strumenti = cartellaTemporanea('manutentore-strumenti');
+  t.after(() => { togliCartella(sessione); togliCartella(giro); togliCartella(strumenti); });
+  repoConRami([['claude/srv', 'functions/src/x.js', '#41 srv']], join(sessione, 'filo-security'));
+  const clone = repoConRami([['claude/app', 'src/a.js', 'auto: #40']], join(giro, '1'));
+  mkdirSync(join(clone, '.claude'), { recursive: true });
+  writeFileSync(join(clone, '.claude', 'filo-worker.json'), JSON.stringify({ indice: 1, paralleli: 0, principale: join(sessione, 'Filo') }));
+  // La copia fissata: fuori dal progetto, ricorda il clone del giro come il suo progetto (lib/tools-pin.mjs).
+  for (const d of ['scripts', 'src', 'routines', 'node_modules']) collegaCartella(join(RADICE_DEL_REPO, d), join(strumenti, d));
+  writeFileSync(join(strumenti, '.filo-repo-root'), `${clone}\n`);
+  const env = { ...process.env, FILO_SERVER_CLONE: join(strumenti, 'manca') };
+  for (const k of ['FILO_REPO_ROOT', 'FILO_TOOLS_ROOT']) delete env[k];
+  const r = spawnSync(process.execPath, ['--preserve-symlinks', '--preserve-symlinks-main', join(strumenti, 'scripts', 'manutentore.mjs'), 'rami', '--senza-fetch'],
+    { cwd: clone, encoding: 'utf8', env, timeout: TETTO_ATTESA_MS });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} \(#40\), 1 commit, .*: src\/a\.js$/m, 'i rami dell\'app vengono dal clone del giro');
+  assert.match(r.stdout, /^claude\/\(nome non mostrato\) @[0-9a-f]{7} sul server \(#41\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m, r.stdout);
+  assert.doesNotMatch(r.stdout, /NON letti/);
 });
 
 // Il server su un'origine locale: main, poi lavori spinti dopo che il clone è nato (come nella sessione cloud).
