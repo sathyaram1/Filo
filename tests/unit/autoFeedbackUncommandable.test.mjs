@@ -154,9 +154,9 @@ test('composeProposal → segnalazione già scritta che dice "esiste ma non l\'h
   assert.ok(p, 'nessuna proposta composta');
   assert.equal(p.type, 'INVIA_FEEDBACK');
   // Cita la richiesta dell'utente: senza, la segnalazione non è azionabile.
-  assert.match(p.testo, /schermo intero/i);
-  // Dice il punto: la funzione c'è, è l'assistente che non la sa azionare.
-  assert.match(p.testo, /sa fare questa cosa/i);
+  assert.match(p.testo, /ricarica la pagina/i);
+  // Dice il punto, per nome (#2348): la funzione c'è, è l'assistente che non la sa azionare.
+  assert.match(p.testo, /sa fare «Ricarica la pagina», ma l'assistente non ha uno strumento/);
   assert.ok(p.titolo && p.titolo.length <= 60, `titolo strano: ${p.titolo}`);
 });
 
