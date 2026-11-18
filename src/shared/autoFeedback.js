@@ -401,6 +401,18 @@
     return null;
   }
 
+  // L'invio anonimo parte al più una volta per voce e per versione di Filo (#2371: tre segnalazioni uguali in nove
+  // minuti). Regola pura: il registro `{ versione, chiavi }` lo tiene su disco src/main/services/autoFeedbackInviati.js.
+  function chiaveInvio(analysis) {
+    return `${analysis && analysis.kind}:${(analysis && analysis.capabilityId) || '-'}`;
+  }
+  function primoInvio(registro, versione, chiave) {
+    const v = String(versione || '');
+    const chiavi = registro && registro.versione === v && Array.isArray(registro.chiavi) ? registro.chiavi : [];
+    if (chiavi.includes(chiave)) return { invia: false, registro: { versione: v, chiavi } };
+    return { invia: true, registro: { versione: v, chiavi: [...chiavi, chiave] } };
+  }
+
   // Proposta in chat (#360): a differenza di compose() questo testo CITA la richiesta
   // dell'utente, che la legge prima di autorizzare — è ciò che la rende utile.
 
