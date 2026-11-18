@@ -128,15 +128,21 @@ describe('il segno della corsa di finish:check', () => {
     assert.equal(codiceDellaCorsa(s), CODICE_SIGKILL);
   });
 
-  test('un segnale che node vede resta scritto, e un\'uscita normale toglie il segno', { skip: process.platform === 'win32' }, async () => {
+  test('fermata durante una prova lanciata in modo sincrono la corsa si ferma subito, e un\'uscita normale toglie il segno', { skip: process.platform === 'win32' }, async () => {
+    // Un gestore dei segnali girerebbe solo a prova finita: la corsa fermata lancerebbe ancora il lotto dopo.
     const root = repo();
-    const c = await lancia(root);
+    const modulo = pathToFileURL(join(REPO, 'scripts', 'lib', 'corsa-controlli.mjs')).href;
+    const c = spawn(process.execPath, ['--input-type=module', '-e',
+      `import { spawnSync } from 'node:child_process'; const { apriCorsa } = await import(${JSON.stringify(modulo)}); apriCorsa(${JSON.stringify(root)}); console.log('pronto'); spawnSync('sleep', ['20']); spawnSync('sleep', ['20']);`,
+      'finish-local',
+    ], { stdio: ['ignore', 'pipe', 'inherit'] });
+    await new Promise((ok) => c.stdout.once('data', ok));
     const finito = fine(c);
+    const da = Date.now();
     c.kill('SIGTERM');
-    assert.equal((await finito).codice, 143);
-    const s = corsaInterrotta(root);
-    assert.equal(s.segnale, 'SIGTERM');
-    assert.equal(codiceDellaCorsa(s), 143);
+    assert.equal((await finito).segnale, 'SIGTERM');
+    assert.ok(Date.now() - da < 10_000, `fermata dopo ${Date.now() - da} ms`);
+    assert.equal(codiceDellaCorsa(corsaInterrotta(root)), CODICE_SIGKILL, 'il segno resta, col processo morto');
 
     const pulito = repo();
     const modulo = pathToFileURL(join(REPO, 'scripts', 'lib', 'corsa-controlli.mjs')).href;
