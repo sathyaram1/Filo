@@ -337,6 +337,8 @@
     scelta = (i + voci.length) % voci.length;
     voci.forEach((b, j) => b.classList.toggle('scelta', j === scelta));
     voci[scelta].scrollIntoView({ block: 'nearest' });
+    clearTimeout(seguiTimer);
+    mostra(voci[scelta]);
   }
 
   function vociMenu(target) {
