@@ -13,6 +13,9 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'barraSiti.js'));
+require(join(ROOT, 'src', 'shared', 'urlNav.js'));
+require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+require(join(ROOT, 'src', 'shared', 'righeAttivita.js'));
 require(join(ROOT, 'src', 'shared', 'actionTools.js'));
 require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
 
