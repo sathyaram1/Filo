@@ -202,12 +202,40 @@ test('la proposta in chat: l\'assistente la legge intera e sa che non l\'ha scri
   expect(visto).toContain('Filo sa fare «Finestra in incognito», ma l\'assistente non ha uno strumento per farlo');
   expect(visto).toContain('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
 
-  // La stessa funzione non si ripropone.
+  // La stessa funzione non si ripropone, e il no alla proposta vale anche per l'invio anonimo.
   await chiedi(chat, 'riaprimi una finestra in incognito');
   await expect(chat.locator('.dash-bubble-filo')).toHaveCount(3, { timeout: 15_000 });
-  await chat.waitForTimeout(1_500);
+  await chat.waitForTimeout(3_000);
   expect(await confirmText(chat)).toBe('');
   await expect(chat.locator('.dash-bubble-filo').last().locator('.dash-action-btn', { hasText: /feedback/i })).toHaveCount(0);
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'segnalato a chi sviluppa Filo' }),
+    'detto no alla proposta, la stessa segnalazione è partita in forma anonima').toHaveCount(0);
+  expect(await inviate(app)).toEqual([]);
+});
+
+test('la proposta confermata: l\'assistente legge che l\'ha mandata l\'utente col pulsante, e non ne parte un\'altra', async ({ app, avvisi }) => {
+  test.setTimeout(60_000);
+  const chat = await home(app);
+  await spiaSegnalazioni(app);
+  const SPIEGA = 'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l\'icona Nuova finestra '
+    + 'incognito nella barra laterale: lì quello che visiti non resta.';
+  await modelloFinto(app, [{ text: SPIEGA }, { text: SPIEGA }, { text: 'L\'hai mandata tu.' }]);
+  await chiedi(chat, 'aprimi una finestra in incognito');
+  await expect.poll(() => confirmText(chat), { timeout: 15_000 }).toContain('Finestra in incognito');
+  await clickConfirm(chat, 'ok');
+  await expect.poll(() => inviate(app), { timeout: 10_000 }).toHaveLength(1);
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+
+  await chiedi(chat, 'aprimi una finestra in incognito');
+  await expect(chat.locator('.dash-bubble-filo')).toHaveCount(2, { timeout: 15_000 });
+  await chat.waitForTimeout(3_000);
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'segnalato a chi sviluppa Filo' })).toHaveCount(0);
+  expect(await inviate(app)).toHaveLength(1);
+
+  await chiedi(chat, 'chi l\'ha mandata quella segnalazione?');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'L\'hai mandata tu.' })).toBeVisible({ timeout: 15_000 });
+  const visto = JSON.stringify((await chiamateAlModello(app)).at(-1));
+  expect(visto).toContain('l\'utente, col pulsante di conferma: INVIA_FEEDBACK');
 });
 
 test('una riflessione senza richieste non fa nascere nessuna segnalazione (#2348)', async ({ app }) => {
