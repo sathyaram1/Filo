@@ -397,28 +397,14 @@ function elencaCartella(p) {
  * { usedMb, limitMb }, con limitMb 0 se non c'è un tetto; null fuori da un
  * cgroup. In un contenitore la memoria «libera» del kernel è quella della
  * macchina che lo ospita, non la sua: un worker ucciso per aver superato il
- * tetto del cgroup lasciava un battito con venti giga liberi. PURA (legge con
- * `leggi`).
+ * tetto del cgroup lasciava un battito con venti giga liberi. Una lettura
+ * sola, quella dei comandi (#2571): usata e tetto dello stesso cgroup. PURA
+ * (legge con `leggi`).
  */
 export function memoriaContenitore(leggi = leggiFileDiSistema) {
-  const mb = (s) => { const n = Number(String(s == null ? '' : s).trim()); return Number.isFinite(n) ? n / 1048576 : NaN; };
-  const v2 = leggi('/sys/fs/cgroup/memory.current');
-  if (v2 !== null) {
-    const used = mb(v2);
-    if (!Number.isFinite(used)) return null;
-    const max = String(leggi('/sys/fs/cgroup/memory.max') || '').trim();
-    const limit = max && max !== 'max' ? mb(max) : 0;
-    return { usedMb: used, limitMb: Number.isFinite(limit) ? limit : 0 };
-  }
-  const v1 = leggi('/sys/fs/cgroup/memory/memory.usage_in_bytes');
-  if (v1 !== null) {
-    const used = mb(v1);
-    if (!Number.isFinite(used)) return null;
-    const limit = mb(leggi('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
-    // In v1 «senza tetto» è un numero enorme (circa 2^63): non è un limite.
-    return { usedMb: used, limitMb: Number.isFinite(limit) && limit < 1024 * 1024 * 1024 ? limit : 0 };
-  }
-  return null;
+  const m = letturaMemoria(leggi);
+  if (!Number.isFinite(m.usataMb)) return null;
+  return { usedMb: m.usataMb, limitMb: Number.isFinite(m.tettoMb) ? m.tettoMb : 0 };
 }
 
 /**
