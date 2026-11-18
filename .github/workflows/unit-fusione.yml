@@ -59,6 +59,7 @@ jobs:
           node-version: 20
 
       # Le dipendenze del ramo, come la macchina che provava prima: un ramo che ne aggiunge una non esce rosso per quello.
+      # Il codice del ramo (qui gli script di installazione) gira senza i file dei comandi di Actions (#2558).
       - name: Dipendenze del ramo
         working-directory: prova
         run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
