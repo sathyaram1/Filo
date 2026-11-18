@@ -90,6 +90,29 @@ test('E8 cerca nel filo senza parole, e frase lunga', async ({ app }) => {
   console.log('E8b ricerca', await page.locator('#cercaFilo').isVisible(), 'valore', await page.locator('#cercaInput').inputValue(), 'modello', await page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA DEL MODELLO' }).count());
 });
 
+test('E13 Editor nel «+»: trascinata e a parole', async ({ app }) => {
+  const page = await casa(app);
+  const editor = page.locator('#tieni .dash-carta').filter({ hasText: 'Editor' }).first();
+  console.log('E13 carte', JSON.stringify(await page.locator('#tieni .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.tipo || n.dataset.id))));
+  await editor.dragTo(page.locator('#altroPiu'));
+  await page.waitForTimeout(500);
+  console.log('E13 dopo drag carte', JSON.stringify(await page.locator('#tieni .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.tipo || n.dataset.id))));
+  await page.locator('#altroPiu').click();
+  console.log('E13 nel piu', JSON.stringify(await page.locator('#altroFuori .dash-altro-app').evaluateAll((ns) => ns.map((n) => n.dataset.id))));
+  await page.screenshot({ path: `${SHOTS}/esplora-e13.png` });
+  await page.keyboard.press('Escape');
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"rapide"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await page.locator('#input').fill("togli le impostazioni rapide dalla home");
+  await page.locator('#sendBtn').click();
+  await page.waitForTimeout(2500);
+  console.log('E13 dopo parole carte', JSON.stringify(await page.locator('#tieni .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.tipo || n.dataset.id))));
+  if ((await page.locator('#altroPiu').getAttribute('aria-expanded')) !== 'true') await page.locator('#altroPiu').click();
+  console.log('E13 nel piu 2', JSON.stringify(await page.locator('#altroFuori .dash-altro-app').evaluateAll((ns) => ns.map((n) => n.dataset.id))));
+});
+
 test('E12 tasti di serie, finestre comuni', async ({ app }) => {
   const page = await casa(app);
   for (const [w, h] of [[1366, 728], [1280, 680], [1536, 824], [1440, 860]]) {
