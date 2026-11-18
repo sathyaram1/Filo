@@ -751,6 +751,15 @@
     return { partial: { avvisoSchermoPieno: { durataMs: n } }, label: `Avviso del sito a schermo intero → ${cifre(n)} ms` };
   }
 
+  // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità è in millisecondi.
+  function msDaTesto(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    if (/\bs(ec|econd[oi])?\b/.test(s) && !/\bms\b|millisecond/.test(s)) n *= 1000;
+    return Math.round(n);
+  }
+
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
   const RIGORE_COOKIE = { manual: 0, default: 1, privacy: 2 };
   const RIGORE_IMPRONTA = { off: 0, default: 1, privacy: 2 };
