@@ -221,7 +221,7 @@ async function azioneSalvaPerDopo(action, { sender, schedeViste }) {
     return { executed: false, kept: true, output: { error: 'nessuna pagina web da salvare: le schermate di Filo non si salvano per dopo' } };
   }
   const titolo = (await nomeDellaScheda())(tab);
-  const r = await require('../../shortcuts').saveForLater(win, tab);
+  const r = await require('../../shortcuts').saveForLater(win, tab, { attendiConferma: false });
   if (!r) return { executed: false, kept: true, output: { error: 'salvataggio già in corso per questa scheda' } };
   return { executed: true, kept: true, output: { salvata: true, titolo } };
 }
