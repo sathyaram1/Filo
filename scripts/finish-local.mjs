@@ -894,6 +894,8 @@ async function main() {
   const morta = corsaInterrotta(ROOT);
   if (morta) console.log(`\n▸ ${guastoDellaCorsa(morta, letturaMemoria()).replace(/^guasto: strumento finish-check: /, 'Il lancio precedente: ')}`);
   const corsa = apriCorsa(ROOT, { sha: shaProvato });
+  // Ogni corsa arrivata in fondo è la misura che un ramo largo non va oltre il tetto dei comandi (#2571).
+  process.on('exit', () => console.log(`\n▸ Memoria della corsa: ${corsa.bilancio().replace(/^memoria: /, '')}`));
   const albero = apriProvaSulCommit({ root: ROOT, sha: shaProvato });
   if (albero.errore) { console.error(`\n✗ ${albero.errore}`); process.exit(1); }
   process.on('exit', () => { const c = albero.chiudi(); if (!c.ok) console.error(`[finish] ${c.motivo}: la cartella di prova resta, la toglie il prossimo giro`); });
