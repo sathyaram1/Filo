@@ -191,7 +191,7 @@ export function quadroDelFermo({ tracce = null, processiLetti = false, comandi =
     parti.push('Transcript del worker non visto: niente strumenti, tracce o modello.');
   } else {
     const ultimo = ultimoStrumento(t);
-    const uscita = ultimo && Number.isFinite(ultimo.uscita) ? ` uscita ${ultimo.uscita}` : '';
+    const uscita = ultimo && Number.isFinite(ultimo.uscita) ? `, uscita ${ultimo.uscita}` : '';
     parti.push(ultimo
       ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? `con risposta${uscita}` : 'senza risposta'}.`
       : 'Ultimo strumento: nessuno nel transcript.');
