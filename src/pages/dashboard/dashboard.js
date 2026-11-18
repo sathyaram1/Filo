@@ -943,6 +943,9 @@
 
   // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
   // pagina interna.
+  // L'etichetta di una fonte apre la pagina sulla frase dalla stessa porta dei collegamenti della chat (#2383).
+  self.SN_FONTI_CITATE?.aggancia(document, (url, el) => apriProposta(url, el));
+
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
