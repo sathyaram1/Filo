@@ -84,9 +84,11 @@ async function daChat(action) {
   };
 }
 
-function lancia(percorso, piattaforma = process.platform) {
-  const { shell } = require('electron');
-  const { spawn, execFile } = require('child_process');
+// `dip` (shell di Electron, spawn, execFile) lo passano solo le prove, per vedere il ramo di un'altra piattaforma.
+function lancia(percorso, piattaforma = process.platform, dip = {}) {
+  const shell = dip.shell || require('electron').shell;
+  const spawn = dip.spawn || require('child_process').spawn;
+  const execFile = dip.execFile || require('child_process').execFile;
   const staccato = (cmd, args) => new Promise((resolve) => {
     try {
       const figlio = spawn(cmd, args, { detached: true, stdio: 'ignore', cwd: path.dirname(percorso) });
