@@ -27,8 +27,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { leggiMarcatoreBiglietto } from './routine-ticket.mjs';
-import { pinnedRepoRoot } from './tools-pin.mjs';
+import { leggiMarcatoreBiglietto, ticketFile } from './routine-ticket.mjs';
+import { pinnedRepoRoot, repoMarkFile } from './tools-pin.mjs';
 
 // Oltre questa età il marcatore non è più credibile (una sessione di routine
 // dura ore, non giorni): meglio "automazione" generica che l'etichetta sbagliata.
@@ -112,15 +112,15 @@ function readMarkerFrom(dir) {
  * un'altra cartella, ma il marcatore l'ha scritto il dispatcher nel checkout
  * principale.
  */
-export function readMarker(root, { now = Date.now() } = {}) {
+export function readMarker(root, { now = Date.now(), conta = () => true } = {}) {
   const here = readMarkerFrom(root);
-  if (isFresh(here, now)) return here;
+  if (isFresh(here, now) && conta(roleFile(root))) return here;
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) {
       const main = readMarkerFrom(resolve(common, '..'));
-      if (isFresh(main, now)) return main;
+      if (isFresh(main, now) && conta(roleFile(resolve(common, '..')))) return main;
     }
   } catch (_) { /* niente git o repo nudo: pazienza */ }
   return null;
@@ -139,13 +139,14 @@ export function readRole(root, { now = Date.now() } = {}) {
  * chiamata della shell riparte senza l'export (#1966): valgono anche biglietto e ruolo che dispatch scrive nella
  * cartella, e gli strumenti che girano dalla copia fissata dal preflight, che esiste solo in un giro.
  */
-export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = () => !!pinnedRepoRoot() } = {}) {
+export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = (o = {}) => !!pinnedRepoRoot() && (!o.conta || o.conta(repoMarkFile())), conta = () => true } = {}) {
   const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
   if (dichiarata && dichiarata !== '0') return true;
   if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
   if (normalizeRole(env && env.FILO_ROUTINE_ROLE)) return true;
+  // `conta(file)`: chi decide un confine di fiducia scarta i segni che il repo stesso può portare (unit-sul-pc.mjs).
   const biglietto = leggiMarcatoreBiglietto(root);
-  if (biglietto && String(biglietto.ticket || '').trim()) return true;
-  if (readMarker(root, { now })) return true;
-  return !!copiaDelGiro();
+  if (biglietto && String(biglietto.ticket || '').trim() && conta(ticketFile(root))) return true;
+  if (readMarker(root, { now, conta })) return true;
+  return !!copiaDelGiro({ conta });
 }

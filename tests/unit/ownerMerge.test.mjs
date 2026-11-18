@@ -265,6 +265,23 @@ describe('la pratica del lavoro locale (#908)', () => {
     assert.equal(exitCodeForOwnerMerge(r), 0);
   });
 
+  // D-101 (#1139.2): il lavoro fidato salta L5 anche sulla catena di pubblicazione; un fermo qui vuole una decisione nuova.
+  test('lavoro fidato che tocca la catena di pubblicazione: blocco registrato, fusione fatta senza il sì', () => {
+    const catena = { gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', detail: 'scripts/release-bump.mjs, scripts/gen-feedback-keys.mjs, .github/workflows/release.yml' };
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, fidato: true, blocks: [catena] } };
+    const r = classifyOwnerMerge(200, risposta(corpo));
+    assert.equal(r.outcome, 'merged');
+    assert.equal(r.skippedL5, true);
+    assert.equal(r.fidato, true);
+    assert.equal(exitCodeForOwnerMerge(r), 0);
+    assert.equal(richiestaForseInAttesa(r), false);
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
+    assert.match(msg, /^✓/);
+    assert.match(msg, /L5 saltato: lavoro locale di #908, lavoro fidato/);
+    assert.match(msg, /Blocchi registrati \(1\)[^\n]*\n\s+· Tocca aree protette .*release-bump\.mjs.*release\.yml/);
+    assert.doesNotMatch(msg, /aspetta il tuo sì|BLOCCATA/);
+  });
+
   test('blocchi col solo nome, o con un elenco lunghissimo: si stampano, e un taglio si dichiara', () => {
     const lungo = Array.from({ length: 400 }, (_, i) => `src/file-${i}.js`).join(', ');
     const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, blocks: ['new_dependency', { ...BLOCCO, detail: lungo }] } };

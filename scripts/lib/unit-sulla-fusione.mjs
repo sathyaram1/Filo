@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
+import { gitIn, refspecMain } from './git-main.mjs';
 
 // Lo stesso di SN_NOVITA_FUSIONE.FILE: lo controlla tests/unit/unitSullaFusione.test.mjs.
 export const FILE_NOVITA = 'src/shared/patchNotes.js';
@@ -31,10 +32,13 @@ export const TENTATIVI = 3;
 // La storia intera del repo da una rete lenta: due minuti non bastano.
 export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
+// Gli esiti di una prova fatta con cui il finish va avanti, sul PC e in cloud; il server fonde anche su `main_contenuto`,
+// che dice «nessuna prova serviva» (unit-fusione-azione.mjs). L'unico posto della regola: #1737 giro 1.
+export const ESITI_CHE_PROSEGUONO = Object.freeze(['verde', 'rosso_anche_su_main']);
+export const unitProseguono = (p) => !!p && !p.errore && !p.saltata && ESITI_CHE_PROSEGUONO.includes(p.esito);
 export const TETTO_ROSSI = 40;
 const MAIN = 'main';
-// Esplicito: in un clone a ramo singolo `fetch origin main` muove solo FETCH_HEAD, e origin/main resta vecchio (#2237.3).
-export const refspecMain = (main = MAIN) => `+refs/heads/${main}:refs/remotes/origin/${main}`;
+export { gitIn, refspecMain };
 const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-fusione@filo.invalid', '-c', 'commit.gpgsign=false'];
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
@@ -206,17 +210,6 @@ export function testoProva(prova) {
     }
     default: return `▸ Unit sulla fusione: esito ${p.esito}.`;
   }
-}
-
-/** Esecutore git con un tetto sul tempo, come quello del cancello. */
-export function gitIn(root, ms = 120000) {
-  return function git(args) {
-    try {
-      return { ok: true, out: String(execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: ms }) || '').trim() };
-    } catch (e) {
-      return { ok: false, out: `${(e && e.stdout) || ''}${(e && e.stderr) || ''}`.trim() || String((e && e.message) || e) };
-    }
-  };
 }
 
 /**
@@ -396,6 +389,8 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   // I file dei comandi di Actions no: il codice provato scriverebbe l'esito della propria prova (#2225).
   const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
   for (const k of COMANDI_DI_ACTIONS) delete env[k];
+  // I file li sceglie la prova (tutti, o `file`): la regola del PC dell'owner non li riduce (unit-sul-pc.mjs).
+  env.FILO_UNIT_LONTANE = '0';
   let r;
   try {
     const reporter = ['--test-reporter=spec', '--test-reporter-destination=stdout', `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`];
@@ -633,8 +628,8 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
  */
 export function provaDaRiusare({ fatta, punta } = {}) {
   const p = fatta && fatta.prova;
-  if (!p || !punta || fatta.punta !== punta || p.contenuto || p.errore || p.saltata) return null;
-  return p.esito === 'verde' || p.esito === 'rosso_anche_su_main' ? p : null;
+  if (!p || !punta || fatta.punta !== punta || p.contenuto) return null;
+  return unitProseguono(p) ? p : null;
 }
 
 /**
@@ -646,7 +641,8 @@ export function provaDaRiusare({ fatta, punta } = {}) {
 export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s), primaProva = null } = {}) {
   let ultima = null;
   for (let i = 1; i <= tentativi; i++) {
-    ultima = i === 1 && primaProva ? primaProva : prova({ root, punta, scrivi });
+    // `await`: la prova del PC dell'owner la fa GitHub, e arriva tardi (prova-remota.mjs).
+    ultima = i === 1 && primaProva ? primaProva : await prova({ root, punta, scrivi });
     scrivi(testoProva(ultima));
     if (fermaSe(ultima)) return { prova: ultima, fermo: true, tentativi: i };
     const reply = await chiedi(campoPerIlServer(ultima));

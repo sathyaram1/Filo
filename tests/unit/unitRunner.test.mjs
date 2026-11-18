@@ -132,7 +132,7 @@ describe('il lanciatore lanciato da fuori', () => {
     const altrove = cartellaTemporanea('filo-altrove-');
     try {
       const r = spawnSync(process.execPath, [LANCIATORE, '--list'], {
-        cwd: altrove, encoding: 'utf8',
+        cwd: altrove, encoding: 'utf8', env: { ...process.env, FILO_UNIT_LONTANE: '0' },
       });
       assert.equal(r.status, 0, `uscita ${r.status}: ${r.stderr}`);
       const righe = r.stdout.split(/\r?\n/).filter(Boolean);
@@ -518,7 +518,7 @@ test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto d
     mkdirSync(join(casa, 'tests', 'unit'), { recursive: true });
     writeFileSync(join(casa, 'package.json'), '{"type":"module"}\n');
     writeFileSync(join(casa, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n");
-    const env = { ...process.env };
+    const env = { ...process.env, FILO_UNIT_LONTANE: '0' };
     delete env.NODE_TEST_CONTEXT;
     delete env.FILO_UNIT_DIR;
     const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });

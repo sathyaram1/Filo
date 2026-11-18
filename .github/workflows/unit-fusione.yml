@@ -119,9 +119,69 @@ jobs:
         id: prova
         run: node strumenti/scripts/unit-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN" --parte windows --unit "$MODO"
 
+  # Gli spec delle aree toccate che il PC dell'owner non gira più (#1737, D-185): solo se la richiesta li elenca.
+  # Il server non li chiede, e la parte salta.
+  spec:
+    if: ${{ github.event.client_payload.spec }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    outputs:
+      campo: ${{ steps.prova.outputs.campo }}
+    env:
+      GIT_TERMINAL_PROMPT: '0'
+      RAMO: ${{ github.event.client_payload.ramo }}
+      MAIN: ${{ github.event.client_payload.main }}
+      SPEC: ${{ github.event.client_payload.spec }}
+    steps:
+      - name: La coppia da provare
+        run: |
+          if [[ ! "$RAMO" =~ ^[0-9a-f]{40}$ || ! "$MAIN" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "coppia non valida: servono due sha interi"
+            exit 2
+          fi
+
+      - name: Strumenti di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: strumenti
+          persist-credentials: false
+
+      - name: Il ramo, con la storia di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RAMO }}
+          path: prova
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dipendenze del ramo
+        working-directory: prova
+        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+
+      - name: Binario di Electron
+        working-directory: prova
+        run: node scripts/ensure-electron.mjs
+
+      - name: Schermo virtuale (xvfb)
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb
+          fi
+
+      - name: Spec sulla fusione
+        id: prova
+        run: xvfb-run -a node strumenti/scripts/spec-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN" --spec "$SPEC"
+
   # Gira anche con una parte caduta: senza riga il server riaccenderebbe la corsa invece di leggere perché.
   unit:
-    needs: [linux, windows]
+    needs: [linux, windows, spec]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -132,6 +192,8 @@ jobs:
       RISULTATO_LINUX: ${{ needs.linux.result }}
       CAMPO_WINDOWS: ${{ needs.windows.outputs.campo }}
       RISULTATO_WINDOWS: ${{ needs.windows.result }}
+      CAMPO_SPEC: ${{ needs.spec.outputs.campo }}
+      RISULTATO_SPEC: ${{ needs.spec.result }}
     steps:
       - name: Strumenti di main
         uses: actions/checkout@v4
@@ -146,4 +208,4 @@ jobs:
           node-version: 20
 
       - name: L'esito per il server
-        run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows --ramo "$RAMO" --main "$MAIN"
+        run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows,spec --ramo "$RAMO" --main "$MAIN"

@@ -77,7 +77,9 @@ import { fileRiscritti } from './lib/su-main.mjs';
 import { cambiatiSoloNeiCommenti } from './lib/solo-commenti.mjs';
 import { specCheUsano, leggiSorgenti, SOGLIA_SPEC_DI_UN_MODULO } from './lib/spec-che-usano.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
-import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain } from './lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain, unitProseguono } from './lib/unit-sulla-fusione.mjs';
+import { unitLontane, VAR_LONTANE, specSulPc, cambiatiDelRamo } from './lib/unit-sul-pc.mjs';
+import { avviaProvaRemota, attendiProvaRemota, provaRemota } from './lib/prova-remota.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
@@ -157,6 +159,27 @@ function git(args, opts = {}) {
   } catch (e) {
     return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message };
   }
+}
+
+/**
+ * Spedisce il ramo su origin e controlla che lì ci sia `cur`. '' = fatto, se no il perché. È l'unico punto in cui
+ * questa macchina scrive su origin: qualunque cosa sia successa prima, il ramo principale non parte.
+ */
+function spedisciIlRamo({ branch, cur, principale }) {
+  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
+  let copie = [];
+  try { installaControlloSpedizione(ROOT); } catch (_) { /* per i push a mano dopo: questo lo controlla la riga sotto */ }
+  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
+  if (copie.length) return avvisoSpedizione(copie);
+  if (isProtectedBranch(branch, principale)) return `'${branch}' è il ramo principale: da qui non si spedisce.`;
+  // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la configurazione locale di git.
+  const pushed = git(pushArgs(branch));
+  if (!pushed.ok) return `Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`;
+  // Se `origin/<ramo>` non si risolve, `out` è il testo dell'errore di git, non uno sha.
+  const rem = git(['rev-parse', `origin/${branch}`]);
+  if (!rem.ok) return `Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`;
+  if (rem.out !== cur) return `Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`;
+  return '';
 }
 
 /** Il ramo di default di origin secondo il repo ('' se non lo sa). */
@@ -514,7 +537,7 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
   const p = prova || {};
   const m = String(p.mainSha || '').slice(0, 8);
   const ins = Array.isArray(p.instabili) && p.instabili.length;
-  if (!p.errore && !p.saltata && (p.esito === 'verde' || p.esito === 'rosso_anche_su_main')) {
+  if (unitProseguono(p)) {
     let perche;
     if (p.esito === 'rosso_anche_su_main') perche = 'sono rossi uguali anche su main da solo, senza test rotti in più';
     else if (p.contenuto) perche = `rifatti sul ramo (che contiene già main ${m}) in una cartella pulita sono verdi`;
@@ -535,6 +558,29 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
   const dettaglio = p.esito === 'rosso_sulla_fusione' ? [testoProva(p)] : [];
   const coda = checkOnly ? 'corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' : 'non pubblico. Sistema e rilancia.';
   return { ferma: !checkOnly, rosso: true, messaggio: [...dettaglio, `✗ Controlli di logica rossi: ${motivo}; ${coda}`].join('\n') };
+}
+
+/**
+ * Sul PC dell'owner gli unit li giudica la corsa su GitHub (D-185): senza il suo esito, o con un esito che non fonde,
+ * ci si ferma anche con `--check`, e mai rifacendoli qui. `rossiQui`: rossi quelli del ramo, gli unici girati qui. PURA.
+ */
+export function giudizioRemoto({ prova, rossiQui = false }) {
+  const p = prova || {};
+  const link = p.remota && p.remota.url ? `\n  La corsa: ${p.remota.url}` : '';
+  const m = String(p.mainSha || '').slice(0, 8);
+  const spec = Number(p.specChiesti) > 0 ? ` (con ${p.specProvati} spec delle aree toccate)` : '';
+  if (p.errore) {
+    return { ferma: true, messaggio: `✗ Gli unit arrivati da main non sono provati: GitHub non ha dato l'esito (${p.errore}).\n`
+      + `  Sul tuo PC non li eseguo al posto suo. Rilancia quando GitHub risponde.${link}` };
+  }
+  if (unitProseguono(p)) {
+    const come = p.esito === 'verde' ? 'verdi' : 'rossi uguali anche su main da solo, senza test rotti in più';
+    const qui = rossiQui ? ' Quelli rossi qui sul tuo PC lassù passano: proseguo.' : ' Proseguo.';
+    return { ferma: false, messaggio: `▸ Unit su GitHub${spec}, sulla fusione con main ${m}: ${come}.${qui}${link}` };
+  }
+  if (p.esito === 'rosso_sulla_fusione') return { ferma: true, messaggio: `${testoProva(p)}\n✗ Unit rossi su GitHub${spec}: non pubblico. Sistema e rilancia.${link}` };
+  if (p.esito === 'conflitto') return { ferma: true, messaggio: `${testoProva(p)}\n✗ Riallinea il ramo su origin/main e rilancia.${link}` };
+  return { ferma: true, messaggio: `✗ La corsa su GitHub ha risposto «${p.esito || 'niente'}», che non dice se gli unit passano: non pubblico.${link}` };
 }
 
 /**
@@ -662,6 +708,17 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
   ].join('\n');
 }
 
+/**
+ * Gli spec scelti per area divisi fra PC e GitHub, col conto del lanciatore degli unit (cambiatiDelRamo): senza main
+ * fresco sul PC non ne gira nessuno (#1737 giro 3). → { qui, lontani, nota }.
+ */
+export function specDelPc({ lontane, specs, dir }) {
+  if (!lontane) return { qui: specs, lontani: [], nota: '' };
+  const delRamo = specs.length ? cambiatiDelRamo(dir, 'tests') : null;
+  const nota = delRamo && delRamo.errore ? `▸ Spec delle aree toccate: non so quali cambia il ramo (${delRamo.errore}), sul tuo PC non ne giro nessuno.` : '';
+  return { ...specSulPc({ specs, cambiati: delRamo && !delRamo.errore ? delRamo.cambiati : null }), nota };
+}
+
 /** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
 export function fermoDopoLaProva(prova) {
   const p = prova || {};
@@ -724,7 +781,9 @@ export async function dopoLaFusioneDellApp({ reply, id, ramo }, { of, inSospeso 
  * richiesta: quando main si muove e la prova si rifà, il server può essere arrivato intanto. `deps` è per le prove.
  * @returns {Promise<{ fermo?: true, prova, reply?, riga: string }>}
  */
-export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null }, deps = {}) {
+export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null, provaDelRamo = null, specRemoti = [] }, deps = {}) {
+  // Sul PC dell'owner anche la prova rifatta perché main si è mosso la fa GitHub, con gli stessi spec (#1737 giro 1).
+  const prova = deps.prova || (unitLontane(root) ? (o) => provaRemota({ ...o, spec: specRemoti }) : null);
   const log = deps.log || ((s) => console.log(s));
   const of = deps.of || await import('./owner-feedback.mjs');
   const chiedi = deps.askServerMerge || askServerMerge;
@@ -743,7 +802,7 @@ export async function chiediLaFusione({ root = ROOT, branch, cur, pratica = null
   let tentativo = 0;
   const giro = await chiediConProva({
     root, punta: cur, primaProva,
-    ...(deps.prova ? { prova: deps.prova } : {}),
+    ...(prova ? { prova } : {}),
     fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
     chiedi: (provaUnit) => {
       const pendingParts = tentativo++ === 0 ? fuori : inSospeso();
@@ -916,6 +975,14 @@ async function main() {
   let unitRossi = false;
   let provaDelRamo = null;
 
+  // Sul PC dell'owner gli unit arrivati da main girano su GitHub (D-185): la corsa parte adesso e l'esito si legge dopo
+  // la verifica, che senza --check ferma prima e la corsa non serve. Qui il lanciatore prende solo i file del ramo.
+  const lontane = unitLontane(ROOT);
+  let avvioRemoto = null;
+  let rossiQui = false;
+  let specRemoti = [];
+  if (lontane) process.env[VAR_LONTANE] = '1';
+
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
     // adesso e non dopo gli unit test.
@@ -927,23 +994,46 @@ async function main() {
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
     const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
-    const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
-    console.log(`\n${stimaDurataControlli(specs.length).testo}`);
-    if (specs.length) {
+    // Sul PC dell'owner gli spec arrivati da main li prova GitHub, come gli unit (D-185, #1737 giro 1).
+    const divisi = specDelPc({ lontane, specs, dir: albero.dir });
+    if (divisi.nota) console.log(`\n${divisi.nota}`);
+    const qui = divisi.qui;
+    specRemoti = divisi.lontani;
+    const { blocking, informative } = splitKnownRed(qui, readKnownRed(albero.dir));
+    // La corsa parte adesso e l'esito si legge dopo la verifica, che senza --check ferma prima e la corsa non serve.
+    if (lontane && (checkOnly || v.ok)) {
+      // La corsa scarica il ramo da origin.
+      const fermo = spedisciIlRamo({ branch, cur: shaProvato, principale });
+      if (fermo) { console.error(`\n✗ ${fermo}\n  GitHub non avrebbe il commit da provare.`); process.exit(1); }
+      avvioRemoto = await avviaProvaRemota({ root: ROOT, punta: shaProvato, spec: specRemoti });
+      if (avvioRemoto.errore) { console.error(`\n${giudizioRemoto({ prova: { errore: avvioRemoto.errore } }).messaggio}`); process.exit(1); }
+      console.log(`\n▸ Unit sulla fusione con main ${avvioRemoto.main.slice(0, 8)}: li prova GitHub (corsa ${avvioRemoto.corsa}), di solito in 20-30 minuti.`
+        + '\n  Sul tuo PC giro solo quelli che il ramo cambia; l\'esito di GitHub lo leggo dopo gli spec.'
+        + (specRemoti.length ? `\n  Nella stessa corsa GitHub prova anche ${specRemoti.length} spec delle aree toccate che il ramo non cambia; qui giro solo quelli del ramo (${qui.length}).` : ''));
+    } else if (specRemoti.length) {
+      console.log(`\n▸ Spec delle aree toccate che il ramo non cambia (${specRemoti.length}): sul tuo PC non li giro, li prova GitHub quando chiudi il lavoro.`);
+    }
+    console.log(`\n${stimaDurataControlli(qui.length).testo}`);
+    if (qui.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
       if (schermo.nota) console.log(`\n${schermo.nota}`);
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir)) {
-      console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
-      const puntaProvata = shaProvato;
-      const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
-      provaDelRamo = { prova, punta: puntaProvata };
-      const esito = esitoUnitDelRamo({ checkOnly, prova });
-      (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
-      if (esito.ferma) process.exit(1);
-      unitRossi = esito.rosso;
+      if (lontane) {
+        rossiQui = true;
+        console.log('\n▸ Controlli di logica non verdi sul tuo PC: li giudica la prova su GitHub, che li rifà sulla fusione con main');
+      } else {
+        console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
+        const puntaProvata = shaProvato;
+        const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
+        provaDelRamo = { prova, punta: puntaProvata };
+        const esito = esitoUnitDelRamo({ checkOnly, prova });
+        (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
+        if (esito.ferma) process.exit(1);
+        unitRossi = esito.rosso;
+      }
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
@@ -998,6 +1088,14 @@ async function main() {
     }
   }
 
+  if (lontane) {
+    const prova = await attendiProvaRemota(avvioRemoto);
+    const g = giudizioRemoto({ prova, rossiQui });
+    (g.ferma ? console.error : console.log)(`\n${g.messaggio}`);
+    if (g.ferma) process.exit(1);
+    provaDelRamo = { prova, punta: shaProvato };
+  }
+
   if (unitRossi) {
     console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
     process.exit(1);
@@ -1016,45 +1114,11 @@ async function main() {
   //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
   //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
-  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
-  let copie = [];
-  try { installaControlloSpedizione(ROOT); } catch (_) { /* per i push a mano dopo: questo lo controlla la riga sotto */ }
-  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
-  if (copie.length) {
-    console.error(`\n✗ ${avvisoSpedizione(copie)}`);
-    process.exit(1);
-  }
   {
-    // Ultimo controllo prima dell'unica riga di questo script che scrive su
-    // origin: qualunque cosa sia successa sopra, quello che si spedisce non
-    // può essere il ramo principale. È una guardia doppia, e va bene così: è
-    // l'unico punto in cui questa macchina potrebbe scrivere sul ramo da cui
-    // si costruiscono le versioni degli utenti.
-    if (isProtectedBranch(branch, principale)) {
-      console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
-      process.exit(1);
-    }
-    // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la
-    // configurazione locale di git (vedi il commento lì sopra).
-    const pushed = git(pushArgs(branch));
-    if (!pushed.ok) {
-      console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
-      console.error('  Senza il ramo su origin il server non ha niente da fondere.');
-      process.exit(1);
-    }
-    // L'esito di questa lettura VA GUARDATO: se `origin/<ramo>` non si risolve,
-    // `out` è il testo dell'errore di git, e finiva stampato all'utente come se
-    // fosse uno sha ("è a origin/c"). Un ramo appena spedito che origin non
-    // mostra è un guasto vero, non un dettaglio: si ferma.
-    const rem = git(['rev-parse', `origin/${branch}`]);
-    if (!rem.ok) {
-      console.error(`\n✗ Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`);
+    const fermo = spedisciIlRamo({ branch, cur, principale });
+    if (fermo) {
+      console.error(`\n✗ ${fermo}`);
       console.error('  Il server non avrebbe la versione appena controllata.');
-      process.exit(1);
-    }
-    if (rem.out !== cur) {
-      console.error(`\n✗ Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
-      console.error('  Il server fonderebbe una versione diversa da quella controllata.');
       process.exit(1);
     }
   }
@@ -1072,7 +1136,7 @@ async function main() {
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
   //    un'identità che qui non esiste.
-  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo });
+  const giro = await chiediLaFusione({ branch, cur, pratica, provaDelRamo, specRemoti });
   if (giro.fermo) {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);

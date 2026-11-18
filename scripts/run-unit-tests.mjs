@@ -1,6 +1,6 @@
 // Lanciatore degli unit test: trova da sé i *.test.mjs (un glob sul runner Node 20 non lo espande nessuno) e li passa a
 // `node --test` relativi alla root e, se la riga supera il tetto di Windows, a gruppi con un riepilogo unico (#765).
-// Zero file = uscita rossa. `--list` stampa i file, `--solo` fa girare solo i file dati; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
+// Zero file = uscita rossa; sul PC dell'owner solo i file che il ramo cambia (lib/unit-sul-pc.mjs). `--list` stampa i file, `--solo` fa girare solo i file dati; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import path, { resolve, dirname, join } from 'node:path';
@@ -593,7 +593,19 @@ async function main() {
   const solo = argv.includes(SOLO);
   const flags = argv.filter((a) => a !== '--list' && a !== SOLO);
 
-  const files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
+  let files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
+  // Sul PC dell'owner la cartella intera no: quello che è arrivato da main senza il suo sì gira su GitHub (D-185).
+  // Con `FILO_UNIT_LONTANE=0` i file li ha scelti chi lancia (la prova sulla fusione): niente regola, niente libreria.
+  if (!solo && !process.env.FILO_UNIT_DIR && process.env.FILO_UNIT_LONTANE !== '0' && files.length) {
+    const { unitLontane, unitDelRamo, testoSulPc } = await import('./lib/unit-sul-pc.mjs');
+    if (unitLontane(REPO_ROOT)) {
+      const scelta = unitDelRamo(REPO_ROOT, files);
+      console.error(testoSulPc(scelta, files.length));
+      if (scelta.errore) { process.exitCode = 1; return; }
+      if (!scelta.file.length) { process.exitCode = 0; return; }
+      files = scelta.file;
+    }
+  }
   if (!files.length) {
     console.error(solo ? `[test:unit] ${SOLO} senza file da lanciare: mi fermo.` : `[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
     console.error('[test:unit] zero test eseguiti non è un successo — controlla la cartella.');

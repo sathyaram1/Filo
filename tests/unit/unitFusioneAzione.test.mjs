@@ -41,7 +41,7 @@ test('la coppia del server non entra mai in una shell come testo', () => {
   const righe = W.split('\n').filter((r) => r.includes('client_payload'));
   assert.ok(righe.length >= 3);
   for (const r of righe) {
-    assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN|MODO): |\s{4}if: github\.event\.client_payload\.windows != 'spento'$)/, `client_payload fuori da run-name, env e la parte spenta: ${r.trim()}`);
+    assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN|MODO|SPEC): |\s{4}if: github\.event\.client_payload\.windows != 'spento'$|\s{4}if: \$\{\{ github\.event\.client_payload\.spec \}\}$)/, `client_payload fuori da run-name, env e le parti spente: ${r.trim()}`);
   }
   assert.doesNotMatch(W, /run:[^\n]*\$\{\{/, 'un\'espressione dentro `run:` diventa codice della shell');
 });
@@ -63,7 +63,7 @@ test('strumenti di main, ramo dal suo sha, titolo che il server cerca', () => {
 
 // #2225: tre rossi di Windows nati su main da fusioni verdi su Linux.
 test('Linux e Windows provano in parallelo, e la riga per il server la scrive solo `unit`, con entrambi gli esiti', () => {
-  assert.deepEqual(Object.keys(LAVORI).sort(), ['linux', 'unit', 'windows']);
+  assert.deepEqual(Object.keys(LAVORI).sort(), ['linux', 'spec', 'unit', 'windows']);
   assert.match(LAVORI.linux, /runs-on: ubuntu-latest/);
   assert.match(LAVORI.windows, /runs-on: windows-latest/);
   assert.match(LAVORI.windows, /defaults:\n {6}run:\n {8}shell: bash/);
@@ -74,13 +74,22 @@ test('Linux e Windows provano in parallelo, e la riga per il server la scrive so
   }
   assert.match(LAVORI.linux, /--parte linux --unit tutti$/m, 'su Linux la corsa intera, come prima');
   assert.match(LAVORI.windows, /--parte windows --unit "\$MODO"$/m);
-  assert.match(LAVORI.unit, /needs: \[linux, windows\]\n {4}if: \$\{\{ !cancelled\(\) \}\}/, 'anche con una parte caduta la riga si scrive');
-  for (const n of ['LINUX', 'WINDOWS']) {
+  assert.match(LAVORI.unit, /needs: \[linux, windows, spec\]\n {4}if: \$\{\{ !cancelled\(\) \}\}/, 'anche con una parte caduta la riga si scrive');
+  for (const n of ['LINUX', 'WINDOWS', 'SPEC']) {
     const p = n.toLowerCase();
     assert.match(LAVORI.unit, new RegExp(`CAMPO_${n}: \\$\\{\\{ needs\\.${p}\\.outputs\\.campo \\}\\}`));
     assert.match(LAVORI.unit, new RegExp(`RISULTATO_${n}: \\$\\{\\{ needs\\.${p}\\.result \\}\\}`));
   }
-  assert.match(LAVORI.unit, /run: node strumenti\/scripts\/unit-fusione-azione\.mjs --unisci linux,windows --ramo "\$RAMO" --main "\$MAIN"$/m);
+  assert.match(LAVORI.unit, /run: node strumenti\/scripts\/unit-fusione-azione\.mjs --unisci linux,windows,spec --ramo "\$RAMO" --main "\$MAIN"$/m);
+  // #1737: gli spec delle aree che il PC dell'owner non gira più, solo quando la richiesta li elenca (il server no).
+  const s = LAVORI.spec;
+  assert.match(s, /^ {4}if: \$\{\{ github\.event\.client_payload\.spec \}\}$/m);
+  assert.doesNotMatch(s, /needs:/);
+  assert.match(s, /ref: \$\{\{ github\.sha \}\}\n {10}path: strumenti/);
+  assert.match(s, /ref: \$\{\{ env\.RAMO \}\}\n {10}path: prova\n {10}fetch-depth: 0/);
+  assert.match(s, /if \[\[ ! "\$RAMO" =~ \^\[0-9a-f\]\{40\}\$ \|\| ! "\$MAIN" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
+  assert.match(s, /outputs:\n {6}campo: \$\{\{ steps\.prova\.outputs\.campo \}\}/);
+  assert.match(s, /id: prova\n {8}run: xvfb-run -a node strumenti\/scripts\/spec-fusione-azione\.mjs --root prova --ramo "\$RAMO" --main "\$MAIN" --spec "\$SPEC"$/m);
   assert.equal((W.match(/--unisci/g) || []).length, 1);
 });
 

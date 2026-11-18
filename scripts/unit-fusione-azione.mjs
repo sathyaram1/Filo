@@ -5,7 +5,7 @@
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI } from './lib/unit-sulla-fusione.mjs';
+import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI, ESITI_CHE_PROSEGUONO } from './lib/unit-sulla-fusione.mjs';
 
 // Il server cerca la riga che COMINCIA così, l'ultima del registro: l'uscita dei test provati è rientrata, mai in colonna.
 export const MARCA = 'FILO-UNIT-FUSIONE';
@@ -14,7 +14,7 @@ export const MARCA_PARTE = 'ESITO-PARTE-UNIT';
 const SHA = /^[0-9a-f]{40}$/;
 const NOME_PARTE = /^[a-z]{1,20}$/;
 // Gli esiti con cui il server porta il lavoro alla fusione: la corsa verde li dice anche a chi guarda Actions.
-const SI_FONDE = new Set(['verde', 'main_contenuto', 'rosso_anche_su_main']);
+const SI_FONDE = new Set([...ESITI_CHE_PROSEGUONO, 'main_contenuto']);
 const NON_SI_FONDE = new Set(['rosso_sulla_fusione', 'conflitto']);
 // Fra due esiti che fondono vale quello che dice di più: un rosso anche su main non si perde dietro un verde.
 const PESO_SI_FONDE = ['main_contenuto', 'verde', 'rosso_anche_su_main'];
@@ -94,7 +94,10 @@ export function unisciParti({ ramo, main, parti = [] } = {}) {
     if (c.esito === 'non_provata') { mancate.push(`${nome}: ${String(c.motivo || 'prova non fatta')}`); continue; }
     lette.push({ nome, c });
   }
-  const base = { ramo, main };
+  // La parte degli spec (spec-fusione-azione.mjs) dice quanti ne ha avuti: il PC che li ha chiesti lo controlla.
+  const spec = lette.find((l) => l.nome === 'spec');
+  const conta = spec && Number.isInteger(spec.c.specChiesti) ? { specChiesti: spec.c.specChiesti, specProvati: intero(spec.c.specProvati) } : {};
+  const base = { ramo, main, ...conta };
   const conSha = lette.find((l) => SHA.test(String(l.c.mainSha || '')));
   const mainSha = conSha ? conSha.c.mainSha : main;
   const conStoriaParte = lette.find((l) => l.nome === 'linux' && l.c.storia) || lette.find((l) => l.c.storia);
