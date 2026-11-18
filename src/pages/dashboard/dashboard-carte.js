@@ -480,23 +480,20 @@
   // L'ordine (urgenza di Filo, poi quello dell'utente) lo decide il modulo condiviso: la chat lo legge uguale.
   const PER_TIPO = {
     crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
-    avviso: cartaAvviso, lavoro: cartaLavoro,
+    avviso: cartaAvviso, lavoro: cartaLavoro, cornice: cartaCornice,
   };
   function datiSinistra() {
     return {
       timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: dati.lavori,
-      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
+      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(), cornice: dati.cornice,
     };
   }
-  // Gli avvisi volati qui stanno in cima, i più recenti per primi, e lì restano finché li si chiude.
   function carteSinistra() {
     programmaLavori();
     const voci = C.sinistra(datiSinistra(), layout);
-    const cornice = separaCornice(new Set(voci.map((v) => v.chiave)));
-    return [
-      ...cornice.map((a) => Object.assign(cartaCornice(a), { fissa: true })),
-      ...voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa })),
-    ];
+    assorbi(new Set(voci.map((v) => v.chiave)));
+    const volati = voci.filter((v) => v.tipo === 'cornice').map((v) => v.ref);
+    return voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref, volati), { fissa: !!v.fissa }));
   }
 
   // ===== Le carte di destra =====
