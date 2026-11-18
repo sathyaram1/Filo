@@ -141,10 +141,12 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   const page = await home(app, openTab);
   // Senza le carte i tasti stanno in cima alla colonna, dove stavano le due icone: sotto c'è posto per il menu, che
   // altrimenti la shell apre sopra il tasto.
-  for (const carta of ['editor', 'mazzi', 'suggerimenti', 'rapide']) {
-    await page.evaluate((c) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CARTE_HOME_MODIFICA, mossa: { tipo: 'togli', carta: c } }), carta);
-  }
+  // Il Profilo, rimesso in vista, in cima ai tasti come stava in cima alla colonna.
+  const mosse = [...['editor', 'mazzi', 'suggerimenti', 'rapide'].map((c) => ({ tipo: 'togli', carta: c })),
+    { tipo: 'aggiungi', carta: 'impostazioni', verso: 'cima' }, { tipo: 'aggiungi', carta: 'profilo', verso: 'cima' }];
+  for (const m of mosse) await page.evaluate((x) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CARTE_HOME_MODIFICA, mossa: x }), m);
   await expect(page.locator('#tieni .dash-carta')).toHaveCount(0);
+  await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app').first()).toHaveAttribute('data-id', 'profilo');
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
