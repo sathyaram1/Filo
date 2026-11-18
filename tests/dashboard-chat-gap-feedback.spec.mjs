@@ -161,12 +161,12 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
   // segnalazione utile (e ciò che gli permette di decidere se mandarla).
   await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
     timeout: 10_000, intervals: [100],
-  }).toMatch(/quanti crediti ho/i);
+  }).toMatch(/quanti passi ho fatto/i);
 
   // Confermata, la segnalazione parte davvero, col testo che l'utente ha letto.
   await expect.poll(async () => app.evaluate(() => (globalThis.__submitted || []).map((p) => p.text).join('\n')), {
     timeout: 10_000, intervals: [200],
-  }).toMatch(/quanti crediti ho/i);
+  }).toMatch(/quanti passi ho fatto/i);
 
   // Feedback anonimo generico: NON deve partire in parallelo a quello che
   // l'utente ha autorizzato (una sola segnalazione per lo stesso buco).
