@@ -837,6 +837,12 @@ function pubblica(grezzo, { fresco = true, radio = [] } = {}) {
   return stato;
 }
 
+// Un ritocco (una radio letta da un elenco, un comando di Filo, l'avviso del caricatore) cambia lo stato senza
+// rileggerlo: `letto` resta quello della lettura vera, e contano come lette adesso solo le radio in `radio` (#2394.1).
+function ritocca(grezzo, radio = []) {
+  return pubblica(grezzo, { fresco: false, radio });
+}
+
 // La radio letta da un elenco (comandiSistema.js): vale come una lettura del lettore, per quella radio sola.
 function radioLetta(voce, acceso) {
   if (!stato || !RADIO.includes(voce) || typeof acceso !== 'boolean') return;
@@ -844,7 +850,7 @@ function radioLetta(voce, acceso) {
   const grezzo = { ...stato };
   if (voce === 'wifi') grezzo.wifi = { acceso };
   else grezzo.bluetooth = acceso ? { acceso: true, dispositivi: prima && prima.acceso === true ? prima.dispositivi : null } : { acceso: false, dispositivi: [] };
-  pubblica(grezzo, { fresco: false, radio: voce });
+  ritocca(grezzo, [voce]);
 }
 
 // Il lettore dorme quando nessuno guarda: la rete che cade, e su Linux la batteria che scende, si vedono senza
