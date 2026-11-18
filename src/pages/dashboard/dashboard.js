@@ -374,6 +374,11 @@
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
   });
+  self.SN_DASH_TASTIERA.init({
+    send, input: inputEl, dash: $('dash'),
+    impostazioni: () => impostazioniHome,
+    usa: (id) => Carte.usa(id),
+  });
   // La barra dei siti e la freccia che ripiega la chat (#1803).
   const BarraSiti = self.SN_DASH_BARRA_SITI;
   BarraSiti.init({
