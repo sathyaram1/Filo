@@ -191,7 +191,8 @@
       if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
-    chiudi();
+    mostrato = null;
+    if (d.mostraFilo) d.mostraFilo();
     await d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts });
   }
 
@@ -199,9 +200,10 @@
   async function rimetti(r) {
     const res = await d.send({ type: MSG.FILO_CHAT_NASCONDI, id: r.chat, nascosta: false });
     if (!res || !res.ok) return;
-    chiudi();
     if (d.coda.rimettiChat) await d.coda.rimettiChat(r.chat);
+    if (d.mostraFilo) d.mostraFilo();
     await d.coda.vaiA({ chat: r.chat, i: r.i, ts: r.ts });
+    if (aperta && campo.value.trim().length >= 2) await cerca();
   }
 
   async function togli(r) {
