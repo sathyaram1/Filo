@@ -164,7 +164,9 @@
   // Un infinito di fare, non di dire o di capire: chi chiede di spiegare vuole parole, non un'azione.
   const INFINITO_DI_FARE = '(?!(?:dir|spiegar|raccontar|descriver|chiarir|capir|saper|conoscer|pensar|parlar|discuter|rifletter|ragionar|creder|esser|aver)[a-z]*(?![a-z]))'
     + '[a-z]{2,}(?:are|ere|ire|(?:ar|er|ir)(?:mi|ti|ci|vi|lo|la|li|le|ne|gli|melo|mela|meli|mele|celo|cela|glielo|gliela))(?![a-z])';
-  const RICHIESTA_CORTESE_RE = new RegExp('\\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di)\\s+(?:[a-z\']+\\s+){0,2}?'
+  // «Non riesco a tradurre la pagina» chiede anche lui che la cosa si faccia (#474).
+  const RICHIESTA_CORTESE_RE = new RegExp('\\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di'
+    + '|non (?:riesco a|riesco|e possibile|si puo|sai|posso))\\s+(?:[a-z\']+\\s+){0,2}?'
     + INFINITO_DI_FARE);
   const RICHIESTA_CHE_RE = /\b(?:vorrei|voglio|mi piacerebbe|ho bisogno|mi serve) che\b/;
   // Senza punto di domanda valgono solo gli attacchi che non aprono mai una riflessione.
