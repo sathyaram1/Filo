@@ -44,6 +44,15 @@ test('i due riconoscitori prendono le chiamate e lasciano stare i commenti', () 
   assert.ok(ATTESA_WINDOW.test(righeDiCodice('const p = await app.waitForEvent( "window", { timeout: 1 });')));
   assert.ok(!ATTESA_WINDOW.test(righeDiCodice("  // app.waitForEvent('window') può risolvere con la newtab")));
   assert.ok(!ATTESA_WINDOW.test(righeDiCodice("await page.waitForEvent('popup');")));
+  assert.ok(URL_NUDO.test(righeDiCodice('const p = app.windows().find((w) => new URL(w.url()).hostname === host);')));
+  assert.ok(URL_NUDO.test(righeDiCodice('app.windows()\n    .some(p => new URL(p.url()).host === h)')));
+  assert.ok(!URL_NUDO.test(righeDiCodice('app.windows().find((w) => { try { return new URL(w.url()).hostname === h; } catch (_) { return false; } })')));
+  assert.ok(!URL_NUDO.test(righeDiCodice("app.windows().find((w) => w.url().startsWith('filo://newtab'))")));
+});
+
+test('una finestra cercata per indirizzo non fa esplodere la ricerca con un indirizzo vuoto', () => {
+  assert.deepEqual(chiChiama(URL_NUDO), [],
+    "`aspettaFinestra(app, trova, perche)` della fixture, che salta le finestre il cui indirizzo non si legge, o `new URL()` dentro un try");
 });
 
 test('la prima finestra di Filo si aspetta col suo documento, non con firstWindow() nudo', () => {
