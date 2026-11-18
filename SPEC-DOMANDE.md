@@ -321,8 +321,9 @@ dall'owner e dal server. Campi:
   dal suo PC); assente, o `da_decidere`, per una domanda. Un «da fare» sta
   nella stessa lista delle domande, col segno «da fare» accanto a «da
   decidere», e il contatore di Gestione lo conta a parte. `problema` sono i
-  passi e dove si fanno, `contesto` perché serve, i collegamenti il lavoro che
-  aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
+  passi e dove si fanno, obbligatorio (un «da fare» senza, o coi soli spazi,
+  si rifiuta col campo, #2229.3), `contesto` perché serve, i collegamenti il
+  lavoro che aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
   pulsante «Fatto», la seconda, facoltativa, «Non lo faccio»; il nome lo dà la
   posizione, l'azione lo segue (`riprendi` o `attendi` sul lavoro che aspetta,
   `archivia`, o `nessuna` quando non aspetta niente, ammessa solo qui). Senza
