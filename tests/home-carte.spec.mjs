@@ -631,6 +631,7 @@ test('una finestra incognito mostra le carte di destra come le ha disposte l’u
 
   const inc = await homeIncognito(app, shell, normale);
   await expect.poll(() => ordineDestra(inc)).toEqual(disposta);
+  await fuoriVista(inc);
   await expect(inc.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
   // E quello che si muove lì resta lì.
   await inc.locator('#altro .dash-altro-app[data-id="mazzi"] + .dash-altro-rimetti').click();
