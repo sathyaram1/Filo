@@ -26,8 +26,12 @@ async function attendiRisposta(page, n) {
   }, { timeout: 120_000, intervals: [4_000] }).toBe(true);
 }
 
-for (const giro of [1, 2, 3]) {
-  test(`giro ${giro}: «il gatto Pepe non c'è più, toglilo» nell’intervista rifatta lo toglie dalla memoria`, async ({ app, shell, openTab }) => {
+const CASI = [
+  ...[1, 2, 3].map((giro) => ({ giro, chiede: 'sono luca. ah il mio gatto pepe purtroppo non c\'è più, toglilo dalla memoria', toglie: true })),
+  ...[4, 5, 6].map((giro) => ({ giro, chiede: 'sono luca. prima di andare avanti: cosa ti ricordi già di me?' })),
+];
+for (const { giro, chiede, toglie } of CASI) {
+  test(`giro ${giro}: «${chiede}» nell’intervista rifatta`, async ({ app, shell, openTab }) => {
     test.skip(!KEY, 'serve una chiave OpenRouter');
     test.setTimeout(420_000);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 15_000 });
