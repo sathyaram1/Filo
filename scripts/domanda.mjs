@@ -789,8 +789,8 @@ export async function esegui(argv, io = {}) {
     // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
       const r = await lettura({ op: 'mostra', id: a.id });
-      const nf = nonFidate([r.domanda]);
-      if (nf.length || fidatePerTimbri([r.domanda]).length) errore(await sporca(`letta ${visibile(a.id)}`, [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri([r.domanda]))) }));
+      const riga = await sporcaPerLeDomande(sporca, `letta ${visibile(a.id)}`, [r.domanda]);
+      if (riga) errore(riga);
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
