@@ -294,22 +294,40 @@
       || guessCapabilityId(replyNorm, capabilities);
   }
 
-  // Ritorna { kind, capabilityId?, genericDesc }, kind fra 'capability-gap', 'complaint' e
+  // Una funzione del manifesto senza strumento, spiegata o rifiutata invece di farla.
+  function nonAzionabile(cap) {
+    const titolo = String(cap.title || cap.id);
+    const categoria = categoriaDi(cap);
+    return {
+      kind: 'capability-uncommandable',
+      capabilityId: cap.id,
+      capabilityTitle: titolo,
+      categoria,
+      genericDesc: `Funzione esistente che l'assistente non sa azionare: «${titolo}» (${cap.id}${categoria ? `, ${categoria}` : ''}). `
+        + 'L\'utente gli ha chiesto di farla e l\'assistente, senza uno strumento che la comandi, gli ha spiegato come farla a mano.',
+    };
+  }
+
+  // Ritorna { kind, capabilityId?, capabilityTitle?, categoria?, genericDesc }, kind fra 'capability-gap', 'complaint' e
   // 'capability-uncommandable'. `userMessage` serve ai segnali, mai a finire nel feedback.
   function analyzeReply(textReply, actions, userMessage, capabilities) {
     const reply = String(textReply || '');
     if (reply.length < MIN_REPLY_LENGTH) return { kind: null };
+    const user = String(userMessage || '');
+    const azione = chiedeAzione(user);
+    // Niente richiesta, niente segnalazione: una discussione non ha una cosa mancata da riferire (#2348).
+    if (!azione && !chiedeInformazione(user)) return { kind: null };
 
     const replyNorm = normalize(reply);
 
     const hasNotCapable = NOT_CAPABLE_PHRASES.some((p) => replyNorm.includes(p));
     if (hasNotCapable) {
       const capabilityId = guessCapabilityId(replyNorm, capabilities);
-      // Descrizione generica derivata dall'id, non dal testo utente:
-      const genericDesc = capabilityId
-        ? `Richiesta di funzione non disponibile: ${capabilityId}`
-        : 'Richiesta di funzione non disponibile in Filo';
-      return { kind: 'capability-gap', capabilityId, genericDesc };
+      const cap = capabilityId ? voceDi(capabilityId, capabilities) : null;
+      // La voce c'è nel manifesto: non è una funzione mancante (#2364). Con uno strumento l'assistente poteva farla, e
+      // non c'è niente da segnalare; senza, è una funzione che non sa azionare, se l'utente gli aveva chiesto di farla.
+      if (cap) return !haStrumento(cap) && azione ? nonAzionabile(cap) : { kind: null };
+      return { kind: 'capability-gap', capabilityId: null, genericDesc: 'Richiesta di funzione non disponibile in Filo' };
     }
 
     const hasComplaint = COMPLAINT_PHRASES.some((p) => replyNorm.includes(p));
@@ -320,14 +338,10 @@
       };
     }
 
-    const uncommandable = detectUncommandable(reply, replyNorm, userMessage, actions, capabilities);
-    if (uncommandable) {
-      return {
-        kind: 'capability-uncommandable',
-        capabilityId: uncommandable,
-        genericDesc: `Funzione esistente che l'assistente non sa azionare: ${uncommandable}`,
-      };
-    }
+    if (!azione) return { kind: null };
+    const uncommandable = detectUncommandable(reply, replyNorm, user, actions, capabilities);
+    const cap = uncommandable ? voceDi(uncommandable, capabilities) : null;
+    if (cap && !haStrumento(cap)) return nonAzionabile(cap);
 
     return { kind: null };
   }
