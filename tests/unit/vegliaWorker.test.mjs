@@ -16,7 +16,7 @@ const REPO = resolve(import.meta.dirname, '..', '..');
 const {
   giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti, oltreIlTetto,
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
-  chiusuraDi, SOGLIA_CHIUSO_MS,
+  chiusuraDi, SOGLIA_CHIUSO_MS, testoSpesa, spesaDelCompito, misuraDelTetto, SOGLIA_PARZIALE,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 const { processiDiSistema } = await import('../../scripts/lib/branch-integrity.mjs');
