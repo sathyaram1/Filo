@@ -207,6 +207,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
     app = await lancia();
     page = await home(app);
     expect(await ordineDestra(page)).toEqual(['suggerimenti', 'editor', 'rapide']);
+    await fuoriVista(page);
     await expect(page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
 
     // Trascinata da «altro» nella colonna, torna dove la lascio.
