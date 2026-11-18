@@ -68,7 +68,9 @@ test('NAVIGA fermata dalla lista: andata via la notifica, «Apri comunque» rest
     await chiedi(page, 'apri quella pagina');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperta' })).toBeVisible({ timeout: 20_000 });
     expect(await risposteAlModello(app, 1)).toContain('sotto la tua risposta c\'è «Apri comunque»');
-    await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(0, { timeout: 8000 });
+    // Nella home la notifica lascia l'angolo e vola in cima alla colonna delle carte (#2390).
+    await expect(shell.locator('.shell-notif:not([data-luogo="colonna"])', { hasText: 'Sito bloccato' })).toHaveCount(0, { timeout: 8000 });
+    await expect(page.locator('#accade > .dash-carta[data-tipo="cornice"]', { hasText: 'Sito bloccato' })).toHaveCount(1);
     const bottone = page.getByRole('button', { name: /^Apri comunque/ });
     await expect(bottone).toBeVisible();
     await bottone.dblclick();
