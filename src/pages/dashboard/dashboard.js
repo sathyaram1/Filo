@@ -2482,6 +2482,7 @@
       // che lo aspettava parte qui, non alla prossima scheda.
       Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
+      if (msg.settings) impostazioniHome = msg.settings;
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings) BarraSiti.applicaImpostazioni(msg.settings);
