@@ -205,7 +205,6 @@
     if (interrotta) {
       conta('tagliato');
       a.stato.textContent = interrotta;
-      a.stato.classList.add('sn-tr-vuoto');
     }
     const tasto = el('button', 'sn-tr-copia', t('trascrivi_copia_tutto'));
     tasto.type = 'button';
