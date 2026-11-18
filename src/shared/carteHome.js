@@ -256,9 +256,11 @@
       if (!ordine.length) return fine(prima, 'ordine vuoto');
       return fine({ ...prima, sinistra: unici([...ordine, ...prima.sinistra]) });
     }
-    const id = IDS.includes(m.carta) ? m.carta : risolvi(m.carta);
+    const perId = (x) => ([...IDS, ...ID_TASTI].includes(x) ? x : risolvi(x));
+    const id = perId(m.carta);
     if (!id) return fine(prima, 'carta sconosciuta');
-    const rif = m.prima == null ? null : (IDS.includes(m.prima) ? m.prima : risolvi(m.prima));
+    const rif = m.prima == null ? null : perId(m.prima);
+    if (ID_TASTI.includes(id)) return fine(...mossaTasto(prima, tipo, id, m.verso, ID_TASTI.includes(rif) ? rif : null));
     if (tipo === 'togli') {
       return fine({ ...prima, destra: prima.destra.filter((x) => x !== id), tolte: [...prima.tolte, id] });
     }
