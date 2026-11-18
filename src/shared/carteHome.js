@@ -232,6 +232,23 @@
 
   const uguali = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+  // Le stesse mosse delle carte, sui tasti di «altro»: «togli» lo mette nel «+», «aggiungi» lo rimette in vista.
+  // → [layout, errore?]
+  function mossaTasto(l, tipo, id, verso, rif) {
+    if (tipo === 'togli') return [{ ...l, tasti: l.tasti.filter((x) => x !== id), riposti: [...l.riposti.filter((x) => x !== id), id] }];
+    if (tipo === 'aggiungi') {
+      const dove = verso === 'cima' ? l.tasti.filter((x) => x !== id)[0] ?? null : rif;
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove), riposti: l.riposti.filter((x) => x !== id) }];
+    }
+    if (tipo === 'sposta') {
+      if (!l.tasti.includes(id)) return [l, 'il tasto è nel «+»: prima va rimesso in vista'];
+      const dove = verso ? primaDa(l.tasti, id, verso) : rif;
+      if (dove === undefined) return [l, 'verso sconosciuto'];
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove) }];
+    }
+    return [l, 'mossa sconosciuta'];
+  }
+
   // Una mossa → { layout, cambiato, errore? }. Una mossa che non si può fare dice perché e lascia tutto com'era.
   function applica(raw, mossa) {
     const prima = normalizza(raw);
