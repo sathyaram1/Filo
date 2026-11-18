@@ -11,32 +11,52 @@
   // I tipi che un clic avvia. Senza estensione vale solo un eseguibile di Linux o Mac, che controlla il main.
   const ESTENSIONI_APP = ['lnk', 'exe', 'url', 'appref-ms', 'app', 'desktop', 'appimage'];
 
-  const testo = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  // Le regole che Filo ha già: indirizzi della navigazione (urlNav.js) ed estensioni dei file che eseguono (eseguibili.js).
+  const modulo = (nome, file) => {
+    if (!global[nome] && typeof require === 'function') { try { require(file); } catch (_) {} }
+    return global[nome] || null;
+  };
+  const nav = () => modulo('SN_URL_NAV', './urlNav.js');
+  const ese = () => modulo('SN_ESEGUIBILI', './eseguibili.js');
 
+  const testo = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  // Un nome si mostra senza i segni che ne capovolgono la lettura (#588).
+  const nomeLeggibile = (v) => testo(ese() ? ese().nomeVisibile(v) : v);
+
+  const baseDel = (percorso) => String(percorso || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
   function estensione(percorso) {
-    const base = String(percorso || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-    const i = base.lastIndexOf('.');
-    return i > 0 ? base.slice(i + 1).toLowerCase() : '';
+    return ese().estensione(baseDel(percorso));
   }
   function nomeDelProgramma(percorso) {
-    const base = String(percorso || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-    const e = estensione(base);
+    const base = ese().nomeVero(baseDel(percorso));
+    const e = ese().estensione(base);
     return e && ESTENSIONI_APP.includes(e) ? base.slice(0, -(e.length + 1)) : base;
   }
   const assoluto = (p) => /^(\/|[A-Za-z]:[\\/]|\\\\)/.test(p);
 
-  // «youtube.com», «https://…», «localhost:3000»: un indirizzo che si apre in una scheda, o ''.
-  function normalizzaIndirizzo(raw) {
-    let s = testo(raw);
-    if (!s || /\s/.test(s)) return '';
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(s) || /^localhost:\d/i.test(s)) s = `https://${s}`;
+  // Quello che la navigazione aprirebbe scrivendolo: un sito o una pagina di Filo, o '' (una ricerca, un file, uno
+  // schema che non è una pagina). La rete di casa e i server locali vanno in http come nella navigazione.
+  function indirizzoNavigato(raw) {
+    const s = testo(raw);
+    const N = nav();
+    if (!s || /\s/.test(s) || !N) return { url: '', tipo: '' };
+    const n = N.normalizeUrl(s);
+    if (N.ricercaDi(n) === s) return { url: '', tipo: 'ricerca' };
     let u;
-    try { u = new URL(s); } catch (_) { return ''; }
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-    const host = u.hostname;
-    if (!host || !(host.includes('.') || host === 'localhost' || /^\[.*\]$/.test(host))) return '';
-    return u.href;
+    try { u = new URL(n); } catch (_) { return { url: '', tipo: '' }; }
+    if ((u.protocol === 'http:' || u.protocol === 'https:') && u.hostname) return { url: u.href, tipo: 'sito' };
+    if (u.protocol === 'filo:' && u.hostname) return { url: N.canonicalizeFiloUrl(u.href), tipo: 'filo' };
+    return { url: '', tipo: u.protocol === 'file:' ? 'file' : '' };
   }
+  const normalizzaIndirizzo = (raw) => indirizzoNavigato(raw).url;
+  function perchéNonEntra(raw) {
+    const t = testo(raw);
+    if (!t) return 'manca l\'indirizzo del sito';
+    if (indirizzoNavigato(t).tipo === 'file') return 'un file aperto in una scheda non va nella barra: ci vanno siti, pagine di Filo e programmi';
+    return `«${t.slice(0, 80)}» non è l'indirizzo di un sito`;
+  }
+  // Il nome di partenza: il sito, o per una pagina di Filo la sua cartella («history»).
+  const nomeDelSito = (url) => new URL(url).hostname.replace(/^www\./, '');
   const icona = (v) => (typeof v === 'string' && /^data:image\/[a-z0-9.+-]+[;,]/i.test(v) && v.length <= MAX_ICONA ? v : '');
   const nuovoId = () => `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
