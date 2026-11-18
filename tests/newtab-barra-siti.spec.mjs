@@ -384,7 +384,8 @@ test('#1803.1 un server locale scritto nel «+» si apre in http, come dalla nav
   await page.locator('.dash-barra-campo input').fill(scritto);
   await page.keyboard.press('Enter');
   const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
-  await expect(voce).toHaveAttribute('title', `127.0.0.1\n${url}`);
+  await expect(voce).toHaveAttribute('aria-label', '127.0.0.1');
+  expect((await salvate(app)).map((v) => v.url)).toEqual([url]);
   const aperte = async () => (await schede(shell)).filter((t) => t.url === url).length;
   await voce.click();
   await expect.poll(aperte, { timeout: 8000 }).toBe(1);
