@@ -752,32 +752,29 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
   assert.match(storto.err, /ambito di verifica sconosciuto/);
 });
 
-test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il testo del ruolo resta leggibile in stampa', () => {
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
+test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il testo del ruolo resta leggibile', () => {
   const diff = `diff --git a/x b/x\n${'+una riga del ramo\n'.repeat(5000)}`;
   const base = { ref: 'origin/main', sha: 'a'.repeat(40) };
   const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
-  let out = '';
-  const real = process.stdout.write;
-  process.stdout.write = (s) => { out += s; return true; };
-  try { emit(bucket, serverCtx(bucket, null, { diff, base, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
-  // Oltre ~30.000 caratteri l'harness sposta l'uscita in un file, e il ruolo va ripescato dal JSON.
-  assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
-  const j = JSON.parse(out);
-  assert.match(j.instructions, /Ruolo: secaudit/);
-  assert.match(j.instructions, /diffFile/, 'il testo del ruolo dice dove sta il diff');
-  assert.equal(j.payload.diff, undefined);
-  assert.ok(isAbsolute(j.payload.diffFile));
-  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  assert.ok(fuoriDa(repo, j.payload.diffFile), 'il file sta fuori dal repo');
-  assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
-  assert.deepEqual(j.payload.diffBase, base);
-  assert.equal(j.payload.diffComando, `git diff --text --no-textconv ${'a'.repeat(40)}...${'b'.repeat(40)}`);
+  colContrattoVeroEGonfio(['secaudit.md'], (gonfia) => {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, serverCtx(bucket, null, { diff, base, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+    // Oltre ~30.000 caratteri l'harness sposta l'uscita in un file, e il ruolo va ripescato dal JSON.
+    assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
+    const j = JSON.parse(out);
+    if (gonfia) assert.ok(j.istruzioniFile, 'col contratto gonfio il ruolo esce nel suo file');
+    assert.match(j.instructions, /Ruolo: secaudit/);
+    assert.match(ruoloConsegnato(j), /diffFile/, 'il testo del ruolo dice dove sta il diff');
+    assert.equal(j.payload.diff, undefined);
+    assert.ok(isAbsolute(j.payload.diffFile));
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    assert.ok(fuoriDa(repo, j.payload.diffFile), 'il file sta fuori dal repo');
+    assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
+    assert.deepEqual(j.payload.diffBase, base);
+    assert.equal(j.payload.diffComando, `git diff --text --no-textconv ${'a'.repeat(40)}...${'b'.repeat(40)}`);
+  });
 });
 
 test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni corte la stampa resta sotto la soglia', () => {
