@@ -12,6 +12,7 @@
       version: '0.2.293', date: '2026-11-19',
       features: [
         { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
+        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non può leggere gli altri file del computer.', segnalazione: 1905 },
       ],
       fixes: [
         { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
