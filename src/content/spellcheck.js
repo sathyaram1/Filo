@@ -3924,6 +3924,7 @@
     sostituisciNelCampo,
     rimettiNelCampo,
     sostituisciComeBattuta,
+    scriviNellaCasella,
     scriveFilo,
     riallineaIssues,
     addToDictionary,
