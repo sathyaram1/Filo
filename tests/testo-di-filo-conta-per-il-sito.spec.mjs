@@ -232,3 +232,47 @@ test('mentre componi una parola con la tastiera di un\'altra lingua, il testo to
   await expect(page.locator('#ce')).toHaveText('日本 fine');
   await pubblicato(page, 'commento salvato');
 });
+
+// Chi scrive altrove non perde il fuoco nemmeno dove restituirlo non basta: un editor dentro un riquadro (i classici
+// editor di posta) e una modifica in linea che si chiude quando se ne esce. La casella non vede uscite non sue.
+const paginaTardiCon = (editore, script = '') => PAGINA_TARDI
+  .replace(/<div id="ce"[^>]*><\/div>/, editore)
+  .replace("this.addEventListener('input'", "r.querySelector('textarea').addEventListener('blur', () => { window.uscite = (window.uscite || 0) + 1; });\n        this.addEventListener('input'")
+  .replace('</script>', `${script}</script>`);
+
+test('mentre scrivi in un editor dentro un riquadro, il testo che torna non ti toglie il fuoco', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, paginaTardiCon('<iframe id="fr" srcdoc="<body contenteditable=true style=&quot;min-height:60px&quot;></body>" style="width:600px;height:100px"></iframe>'));
+  await ricaricaColTesto(page, 'commento salvato');
+
+  const corpo = page.frameLocator('#fr').locator('body');
+  await corpo.click();
+  await page.keyboard.type('Primo pezzo ');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('secondo pezzo');
+  await expect(corpo).toHaveText('Primo pezzo secondo pezzo');
+  expect(await page.evaluate(() => window.uscite || 0)).toBe(0);
+  await pubblicato(page, 'commento salvato');
+});
+
+test('mentre scrivi in una modifica in linea che si chiude all\'uscita, resta aperta e il testo torna lo stesso', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const script = `
+    const h = document.getElementById('titolo');
+    h.addEventListener('click', () => {
+      const e = document.createElement('div'); e.id = 'ed'; e.contentEditable = 'true'; e.style.cssText = 'width:600px;min-height:30px;border:1px solid #999';
+      e.addEventListener('blur', () => { h.textContent = e.innerText; e.replaceWith(h); });
+      h.replaceWith(e); e.focus();
+    });`;
+  const page = await testServer.openReady(openTab, paginaTardiCon('<h2 id="titolo" style="width:600px;border:1px dashed #999">Titolo</h2>', script));
+  await ricaricaColTesto(page, 'commento salvato');
+
+  await page.locator('#titolo').click();
+  await page.keyboard.type('Primo pezzo ');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('secondo pezzo');
+  await expect(page.locator('#ed')).toHaveText('Primo pezzo secondo pezzo');
+  expect(await page.evaluate(() => window.uscite || 0)).toBe(0);
+  await pubblicato(page, 'commento salvato');
+  await expect(page.locator('#titolo')).toHaveText('Primo pezzo secondo pezzo');
+});
