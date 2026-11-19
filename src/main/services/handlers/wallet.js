@@ -152,14 +152,16 @@ module.exports = function register(on, ctx) {
     if (inVoloConRiga > 0) return;
     const { status } = avvisoSospeso;
     avvisoSospeso = null;
-    const now = Date.now();
-    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
-    ultimoAvvisoRipiego = now;
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+    if (Date.now() - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
+    const messaggio = { type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 };
+    if (CODA) { CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato })); return; }
+    ultimoAvvisoRipiego = Date.now();
+    try { broadcastToTabs(messaggio); } catch (_) {}
   }
   function ripiegoMostrato() {
     ultimoAvvisoRipiego = Date.now();
     annullaAvvisoSospeso();
+    if (CODA) CODA.ritira(AVVISO_RIPIEGO);
   }
   function avvisaRipiegoMuto(status) {
     const now = Date.now();
