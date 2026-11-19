@@ -13,7 +13,7 @@ require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
 require(join(ROOT, 'src', 'shared', 'aestheticRefiner.js'));
 require(join(ROOT, 'src', 'shared', 'fontGenerico.js'));
 const F = globalThis.SN_FONT_GENERICO;
-const SCELTE = globalThis.SN_AESTHETIC_REFINER?.FONT_CHOICES || globalThis.SN_AESTHETIC?.FONT_CHOICES;
+const SCELTE = globalThis.SN_AESTHETIC_REFINER.FONT_CHOICES;
 
 // Solo parole chiave generiche, separate da virgola: niente virgolette, niente nomi di famiglia.
 function soloParoleChiave(g) {
