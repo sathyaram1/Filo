@@ -166,7 +166,6 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     // Il metro è un Filo appena installato acceso nello stesso momento: crediti, contatori, invito e versione vista
     // l'avvio li scrive secondi dopo, quando capita, e un'istantanea presa prima o dopo non vale come confronto (#2585).
     [{ app, shell }, metro] = await Promise.all([avvia(userData), avvia(vergine).then((v) => v.app)]);
-    await app.evaluate(() => globalThis.SN_STORAGE.setRaw('resto_finto', 1)); // PROVA TEMPORANEA: un avanzo
     const scarto = async () => {
       const [dopo, nuovo] = await Promise.all([chiaviPosate(app, userData), chiaviPosate(metro, vergine)]);
       return { inPiu: dopo.filter((k) => !nuovo.includes(k)), mancano: nuovo.filter((k) => !dopo.includes(k)) };
