@@ -53,6 +53,9 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   await sleep(1200); // attendi prima tab + paint
+  // Davanti, come per chi la usa: senza, uno schermo virtuale non dà il fuoco a nessuna finestra, e Filo non sposta la
+  // tastiera (una home nuova, una scheda aperta) che chi pilota deve seguire (destinatario).
+  await bringToFront(app);
   app._filoUserData = userData;
   return { app, shell };
 }
