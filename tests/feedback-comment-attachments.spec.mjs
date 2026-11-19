@@ -310,6 +310,50 @@ test('nel compositore di una risposta una foto oltre i 4 MB sale rimpicciolita',
   expect(salite[0].name).toBe('IMG_2041.JPG');
 });
 
+// #1664 — nella risposta un AVIF sale ridisegnato in PNG, un HEIC (che il browser non apre) resta fuori col perché.
+test('nel compositore di una risposta un AVIF sale ridisegnato, un HEIC no', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(app, page, {
+    _id: 'mock-att-avif',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi una foto del problema?',
+    createdAt: new Date().toISOString(),
+  });
+  const avif = Buffer.from(await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 48;
+    c.getContext('2d').fillRect(0, 0, 32, 24);
+    const b = await new Promise((ok) => c.toBlob(ok, 'image/webp', 0.9));
+    const u = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+    return u.slice(u.indexOf(',') + 1);
+  }), 'base64');
+  await page.evaluate(() => {
+    window.__salite = [];
+    const orig = window.SN_FEEDBACK.uploadAttachment;
+    window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
+      window.__salite.push({ type: blob.type, name: String(name || '') });
+      return orig(blob, name);
+    };
+  });
+
+  await page.locator('[data-tab="inbox"]').click();
+  const mount = page.locator('.fb-card .fb-attach-mount[data-kind="reply"]');
+  const input = mount.locator('input[type="file"]');
+  await expect(input).toHaveAttribute('accept', /\.avif/);
+  await input.setInputFiles({ name: 'scansione.avif', mimeType: 'image/avif', buffer: avif });
+  await expect(mount.locator('.fb-attach-thumb img')).toHaveCount(1, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__salite)).toEqual([{ type: 'image/png', name: 'scansione.avif' }]);
+
+  await input.setInputFiles({ name: 'IMG_2042.HEIC', mimeType: 'image/heic', buffer: Buffer.from([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 1, 2, 3]) });
+  await expect(mount.locator('.fb-attach-status')).toContainText(/IMG_2042\.HEIC.*non sa aprire.*JPEG o PNG/, { timeout: 10_000 });
+  await expect(mount.locator('.fb-attach-thumb img')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__salite)).toHaveLength(1);
+});
+
 // ── #602 — l'allegato di un COMMENTO sale CIFRATO, e la dashboard lo riapre ──
 //
 // Il buco: gli allegati aggiunti ai commenti non passavano dalla cifratura e
