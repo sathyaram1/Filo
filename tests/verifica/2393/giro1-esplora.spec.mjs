@@ -24,9 +24,9 @@ async function nelloSchermo(app, shell, [fn, arg]) {
 }
 
 // Centro della scheda i-esima, bordo fra i e i+1, il +.
-const centro = (i) => () => { const r = document.querySelectorAll('.tab')[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-const bordo = (i) => () => { const a = document.querySelectorAll('.tab')[i].getBoundingClientRect(); const b = document.querySelectorAll('.tab')[i + 1].getBoundingClientRect(); return { x: (a.right + b.left) / 2, y: a.top + a.height / 2 }; };
-const piu = () => { const r = document.getElementById('tab-new').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+const centro = (n) => [(i) => { const r = document.querySelectorAll('.tab')[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, n];
+const bordo = (n) => [(i) => { const a = document.querySelectorAll('.tab')[i].getBoundingClientRect(); const b = document.querySelectorAll('.tab')[i + 1].getBoundingClientRect(); return { x: (a.right + b.left) / 2, y: a.top + a.height / 2 }; }, n];
+const piu = [() => { const r = document.getElementById('tab-new').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, null];
 
 // Trascina tenendo fermo sull'arrivo, e intanto fotografa la shell.
 async function trascinaEFoto(shell, da, a, nome, extra = []) {
