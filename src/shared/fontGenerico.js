@@ -28,14 +28,18 @@
     cursive: 'cursive',
   };
 
-  // La prima famiglia della pila che si conosce decide: è quella che l'utente vede disegnata.
+  const GENERICHE = new Set(['system-ui', 'ui-sans-serif', 'ui-rounded', 'ui-serif', 'serif', 'sans-serif',
+    'ui-monospace', 'monospace', 'cursive']);
+  const conosciuto = (nome) => Object.prototype.hasOwnProperty.call(TABELLA, nome);
+
+  // Decide la prima famiglia della pila, quella che l'utente vede disegnata; se non la conosciamo, la generica che la
+  // pila stessa dichiara («Rockwell, serif» è un carattere con grazie).
   function generica(valore) {
     if (typeof valore !== 'string' || !valore.trim()) return SISTEMA;
-    for (const pezzo of valore.split(',')) {
-      const nome = pezzo.trim().replace(/^['"]|['"]$/g, '').trim().toLowerCase();
-      if (Object.prototype.hasOwnProperty.call(TABELLA, nome)) return TABELLA[nome];
-    }
-    return 'sans-serif';
+    const nomi = valore.split(',').map((p) => p.trim().replace(/^['"]|['"]$/g, '').trim().toLowerCase()).filter(Boolean);
+    if (nomi.length && conosciuto(nomi[0])) return TABELLA[nomi[0]];
+    const dichiarata = nomi.find((n) => GENERICHE.has(n));
+    return dichiarata ? TABELLA[dichiarata] : 'sans-serif';
   }
 
   global.SN_FONT_GENERICO = { generica, TABELLA, PAROLE, SISTEMA };
