@@ -2398,7 +2398,7 @@ class TabManager {
       if (voce && voce.riaperta) continue;
       const presa = voce ? pila.riprendi(voce) : null;
       if (presa && presa.voceArchivio) this._contaTornata(presa.voceArchivio);
-      const nuova = await this.riapri(presa || riserva, { activate: false });
+      const nuova = await this.riapri(presa || riserva, { activate: false, fileDelComputer: true });
       if (!nuova) continue;
       riaperte += 1;
       aperte.add(chiave(riserva.url));
