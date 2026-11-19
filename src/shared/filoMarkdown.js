@@ -194,7 +194,7 @@
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
-    let t = String(escaped).replace(ctx ? SENTINELLE : TUTTE_LE_SENTINELLE, '');
+    let t = String(escaped).replace(ctx ? SENTINELLE : TUTTE_LE_SENTINELLE, '').replace(POSTI_GALLERIA, '');
     const c = ctx || nuovoCtx();
 
     t = marcatori(t, c, stash);
