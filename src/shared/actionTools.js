@@ -375,7 +375,7 @@
     },
     CORREGGI_MEMORIA: {
       via: ['memoria', 'correggi'],
-      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta).',
+      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta); una riga da togliere va a dimentica.',
       properties: { testo: S(), nuovo: S() }, required: ['testo', 'nuovo'],
     },
     DIMENTICA: {
