@@ -102,7 +102,7 @@ test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pa
     const { riga } = await riprovaDallaPagina(openTab, 'foto-protetta.png');
     await expect(riga.locator('.dl-btn', { hasText: 'Apri file' })).toBeVisible({ timeout: 20000 });
     expect((await voce(shell, (x) => x.id === primo.id))?.state).toBe('completed');
-    expect(salvataggi).toBeGreaterThanOrEqual(2);
+    expect(richieste).toBeGreaterThanOrEqual(3);
     expect(visti[visti.length - 1].startsWith(testServer.origin)).toBe(true);
   } finally { await img.close(); }
 });
