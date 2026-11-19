@@ -6,14 +6,6 @@
   'use strict';
 
   const tipi = (dt) => { try { return Array.from((dt && dt.types) || []); } catch (_) { return []; } };
-  // Più di un indirizzo arriva solo da altre app: Chrome apre il primo, e così qui.
-  function primoIndirizzo(uriList, testo) {
-    for (const riga of String(uriList || '').split(/\r?\n/)) {
-      const r = riga.trim();
-      if (r && !r.startsWith('#')) return r;
-    }
-    return String(testo || '').trim();
-  }
 
   // Durante il passaggio si leggono solo i tipi: il contenuto arriva al rilascio.
   function bersaglio(e, { fila, schede, nuova }) {
