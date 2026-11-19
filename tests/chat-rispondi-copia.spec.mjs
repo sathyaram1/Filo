@@ -108,7 +108,7 @@ test('Copia e Rispondi sotto una risposta di Filo: la citazione parte col messag
   await expect(citazione).toBeHidden();
   const mia = home.locator('#bubbles > .dash-bubble-user').last();
   await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', COME_SI_LEGGE);
-  await expect(mia.locator('.dash-citata')).toHaveAttribute('data-chi', 'Filo');
+  await expect(mia.locator('.dash-citata')).not.toHaveAttribute('data-chi');
   expect(await paroleDellaBolla(mia)).toBe('la seconda');
   await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Ottima scelta' })).toBeVisible({ timeout: 20_000 });
 
