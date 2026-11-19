@@ -34,7 +34,7 @@ async function preparaImmagini(app, quante) {
 // Il modello finto: al primo giro chiama lo strumento dato, poi risponde col testo, dove $ID0, $ID1… sono gli id
 // che l'esito gli ha dato.
 async function stubModello(app, { chiamata, finale, conPittore = true }) {
-  await app.evaluate(async (_e, { chiamata, finale, conPittore }) => {
+  await app.evaluate(async ({ nativeImage }, { chiamata, finale, conPittore }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
