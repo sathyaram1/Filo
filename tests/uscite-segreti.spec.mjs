@@ -239,11 +239,11 @@ test('la password che l’utente scrive in un modulo non arriva al modello e non
       ['', JSON.stringify({ action: 'filo', filo: { type: 'NAVIGA', url: `https://${RACCOLTA}/c?v=${encodeURIComponent(PASSWORD_UTENTE)}` }, text: 'Apro.' })],
     ],
   });
-  await apriAiuto(shell, page);
+  const aiuto = await apriAiuto(app, shell, page);
   await page.locator('#p').pressSequentially(PASSWORD_UTENTE);
-  await scriviAllAiuto(page, 'aiutami a finire');
+  await scriviAllAiuto(aiuto, 'aiutami a finire');
 
-  await expect(page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toBeVisible({ timeout: 20_000 });
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toBeVisible({ timeout: 20_000 });
   expect(apertoVerso(app, RACCOLTA), 'la password scritta dall’utente è uscita').toBe(false);
   const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
   // Il campo col nome si chiama col nome, come vuole #810.7: il valore non parte.
