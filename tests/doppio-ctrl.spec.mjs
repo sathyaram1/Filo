@@ -36,7 +36,6 @@ function premi(app, passi, { nelBox = false } = {}) {
         continue;
       }
       wc.sendInputEvent({ type: tipo === 'giu' ? 'keyDown' : 'keyUp', keyCode: k, modifiers: mod || [] });
-      if (tipo === 'giu' && k.length === 1) wc.sendInputEvent({ type: 'char', keyCode: k, modifiers: mod || [] });
     }
   }, { passi, nelBox });
 }
