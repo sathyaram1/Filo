@@ -1584,6 +1584,12 @@
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
+    // Costo 1 (#2377): subito, senza domanda; un blocco non voluto costa solo la password.
+    BLOCCA_PC: {
+      costo: 1,
+      campo: null,
+      describe: () => 'Bloccare il computer',
+    },
     // ── icone del desktop del computer (#1621) ───────────────────────────────
     // Costo 1: ogni riordino è un cambio del filo, e l'annullo rimette ogni icona dov'era.
     ORDINA_DESKTOP: {
