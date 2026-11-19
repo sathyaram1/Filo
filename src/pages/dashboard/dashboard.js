@@ -1148,8 +1148,11 @@
     let rispostaPrima = '';
     let giroIniziato = false;
     const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-    // I marcatori delle fonti non si vedono mentre arrivano: l'etichetta la mette la risposta finale, controllata (#2383).
-    const senzaMarcatori = (t) => (globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || ''));
+    // I marcatori di fonti e immagini non si vedono mentre arrivano: li disegna la risposta finale, controllata (#2383, #2272).
+    const senzaMarcatori = (t) => {
+      const f = globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || '');
+      return globalThis.SN_IMMAGINI_RISPOSTA ? globalThis.SN_IMMAGINI_RISPOSTA.nascondi(f) : f;
+    };
     const testoDelGiro = () => senzaMarcatori(globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
