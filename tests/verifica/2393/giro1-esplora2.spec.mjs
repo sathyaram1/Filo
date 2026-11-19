@@ -7,8 +7,8 @@ import * as Gesti from '../../helpers/gestiVeri.mjs';
 const snap = (shell) => shell.evaluate(() => window.filoShell.tabs.snapshot());
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function nelloSchermo(app, shell, fn) {
-  const r = await shell.evaluate(fn);
+async function nelloSchermo(app, shell, [fn, arg]) {
+  const r = await shell.evaluate(fn, arg);
   const o = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
     const cb = w.getContentBounds();
