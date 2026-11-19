@@ -169,8 +169,7 @@ test('Home: il riquadro di una voce del sistema', async ({ app }) => {
   const page = await home(app);
   const voce = page.locator('#sistema .dash-sis-voce[data-voce="bluetooth"]');
   await expect(voce).toBeVisible({ timeout: 8_000 });
-  await scorriAlGesto(page, 'contextmenu', voce);
-  await voce.click({ button: 'right' });
+  await scorriEApri(page, voce);
   await restaPoiSiChiude(page, page.locator('.dash-sis-box'));
 });
 
