@@ -772,6 +772,10 @@
     const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
+    // Aprire un file di questo computer non manda niente a nessuno (#1905): il suo percorso non è un'uscita.
+    const N = global.SN_URL_NAV;
+    if (tipo === 'NAVIGA' && N && N.fileDiQuestoComputer && N.fileDiQuestoComputer(global.SN_ACTION_LEVELS
+      ? global.SN_ACTION_LEVELS.indirizzoDi(action) : (action.url || ''))) return niente;
     // Una ricerca fra i documenti esce dal computer solo con una cartella su un altro computer: esce il suo nome.
     if (tipo === 'CERCA_DOCUMENTI') {
       if (!diRete(action.cartella)) return niente;
