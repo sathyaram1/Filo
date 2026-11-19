@@ -2,8 +2,12 @@
 // alla home perdendo la bozza, «Riprendiamola» ricominciava da capo, le interviste in Preferenze non si toglievano, la
 // prima risposta non aveva la riga corta, i titoli delle schede arrivavano al modello. Il testo incollato è la guardia.
 
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm, confirmState, confirmText } from './helpers/confirm.mjs';
+
+const SHOTS = join(process.cwd(), 'tests', '.shots');
 
 function newtabWindows(app) {
   return app.windows().filter((w) => w.url().startsWith('filo://newtab'));
