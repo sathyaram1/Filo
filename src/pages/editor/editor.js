@@ -2216,9 +2216,10 @@
     maybeAutoSummary();
   }
 
-  docEl.addEventListener('input', () => {
+  docEl.addEventListener('input', (e) => {
     if (ancorePiantate) togliAncore();
-    handleMarkdownBlock();
+    // Solo la digitazione: il Ripeti che rimette lo spazio di «# » rifarebbe la conversione e si mangerebbe il resto della storia.
+    if (e.inputType === 'insertText') handleMarkdownBlock();
     onDocInput();
   });
   // ── Incolla come testo semplice ─────────────────────────────────────
