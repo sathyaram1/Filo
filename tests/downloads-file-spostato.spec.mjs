@@ -2,7 +2,7 @@
 // Scrivania, Documenti più un livello): trovato, lo apre, dice dove, e la voce punta al posto nuovo.
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { mkdirSync, renameSync, existsSync } from 'node:fs';
+import { mkdirSync, renameSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
