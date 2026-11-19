@@ -74,13 +74,14 @@ test('anche nella finestra normale la barra mostra l\'icona come data: URL, pure
 });
 
 test('passando a un altro sito l\'icona di prima non resta sulla scheda mentre arriva quella nuova', async ({ app, shell }) => {
-  const icone = await app.evaluate(({ BrowserWindow, session, net, nativeImage }) => {
+  await chiudiLaRete(app);
+  const icone = await app.evaluate(({ BrowserWindow, session, nativeImage }) => {
     const png = (bgra) => nativeImage.createFromBitmap(Buffer.from(bgra), { width: 1, height: 1 }).toPNG();
     const rossa = png([0, 0, 255, 255]);
     const blu = png([255, 0, 0, 255]);
     session.defaultSession.protocol.handle('https', async (req) => {
       const u = new URL(req.url);
-      if (!/^(primo|secondo)\.test$/.test(u.hostname)) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (!/^(primo|secondo)\.test$/.test(u.hostname)) return globalThis.__reteChiusa.resto(req);
       if (u.pathname === '/icona.png') {
         // L'icona del secondo sito arriva tardi: intanto la scheda è già sul secondo sito.
         if (u.hostname === 'secondo.test') await new Promise((r) => setTimeout(r, 3000));
