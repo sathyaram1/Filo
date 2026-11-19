@@ -115,12 +115,14 @@ test('col menu del tasto destro aperto, il clic sulla scheda accanto la apre', a
 
 test('r1 la fascia sopra le schede: a finestra massimizzata un clic a filo del bordo alto cade su una scheda', async ({ app, shell, testServer }) => {
   await apri(shell, testServer, 3);
+  // Lo schermo virtuale non ha un gestore di finestre che massimizzi: la finestra lo dice come farebbe il sistema.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w.maximize();
+    w.isMaximized = () => true;
+    w.emit('maximize');
   });
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).isMaximized()), { timeout: 5_000 }).toBe(true);
-  await shell.waitForTimeout(300);
+  await shell.waitForTimeout(500);
   const sopra = await shell.evaluate(() => {
     const t = document.querySelectorAll('#tabs .tab')[1].getBoundingClientRect();
     const el = document.elementFromPoint(t.left + t.width / 2, 2);
