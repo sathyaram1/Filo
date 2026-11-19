@@ -125,7 +125,7 @@
     if (!buona && !daRidisegnare(file)) return null;
     const url = await entroIlTetto(file, tetto, LATO_SEGNALAZIONE);
     const blob = url ? blobDa(url) : null;
-    if (!blob) return { motivo: ammessa ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
+    if (!blob) return { motivo: buona ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
     try { return { file: new File([blob], nome || 'immagine', { type: blob.type }) }; } catch (_) {
       blob.name = nome;
       return { file: blob };
