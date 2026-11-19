@@ -168,20 +168,24 @@
       da = vicina(tutte, attesa);
       a = da + C.length;
     } else {
-      for (const K of CAPI) {
-        if (K > C.length) continue;
-        for (let i = 0; i + K <= C.length && i < PROVE && da < 0; i++) {
-          const occ = occorrenze(D.s, C.slice(i, i + K));
-          if (occ.length) da = vicina(occ, attesa + i);
+      for (const lunghe of CAPI) {
+        for (let i = 0; i < PROVE && i < C.length && da < 0; i++) {
+          for (const K of lunghe) {
+            if (i + K > C.length) continue;
+            const occ = occorrenze(D.s, C.slice(i, i + K));
+            if (occ.length) { da = vicina(occ, attesa + i); break; }
+          }
         }
         if (da >= 0) break;
       }
       if (da < 0) return null;
-      for (const K of CAPI) {
-        if (K > C.length) continue;
-        for (let j = C.length; j - K >= 0 && C.length - j < PROVE && a < 0; j--) {
-          const occ = occorrenze(D.s, C.slice(j - K, j)).filter((p) => p >= da);
-          if (occ.length) a = vicina(occ, da + j - K) + K;
+      for (const lunghe of CAPI) {
+        for (let j = C.length; j > 0 && C.length - j < PROVE && a < 0; j--) {
+          for (const K of lunghe) {
+            if (j - K < 0) continue;
+            const occ = occorrenze(D.s, C.slice(j - K, j)).filter((p) => p >= da);
+            if (occ.length) { a = vicina(occ, da + j - K) + K; break; }
+          }
         }
         if (a >= 0) break;
       }
