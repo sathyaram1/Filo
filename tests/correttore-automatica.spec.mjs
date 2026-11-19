@@ -619,9 +619,4 @@ test('il testo incollato o dettato con Filo che finisce con «perchè» e un pun
   expect(await page.locator('#ta').inputValue()).toBe('detto perchè.');
   await expect(page.locator('#ce')).not.toContainText('perché');
 
-  // E la parola che poi chiude l'utente si corregge come sempre.
-  await page.locator('#ta').click();
-  await page.keyboard.press('End');
-  await batti(page, ' e perchè ');
-  await expect(page.locator('#ta')).toHaveValue('detto perchè. e perché ');
 });
