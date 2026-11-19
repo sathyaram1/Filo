@@ -202,7 +202,11 @@
       t.rows = 1;
       t.value = c.commento;
       t.setAttribute('aria-label', 'Commento alla citazione');
-      t.addEventListener('input', () => { c.commento = t.value; d.campoCambiato && d.campoCambiato(); });
+      t.addEventListener('input', (e) => {
+        c.commento = t.value;
+        if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') fuori = true;
+        if (d.campoCambiato) d.campoCambiato();
+      });
       t.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
         e.preventDefault();
