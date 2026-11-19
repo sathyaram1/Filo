@@ -289,3 +289,127 @@ test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavora
     togliCartella(temp);
   }
 });
+
+// #2133: con `--workers N` uno schermo condiviso dà il fuoco alla finestra di un altro lavoratore e i menu si chiudono.
+// Lo xvfb-run finto risponde con un display nuovo a ogni lancio e se ne va alla fine del suo stdin, come quello vero.
+const xvfbFinto = (primo = 110) => {
+  let n = primo;
+  const lanci = [];
+  const lancia = (_cmd, args, opzioni) => {
+    lanci.push(args);
+    const d = n++;
+    return spawn(process.execPath, ['-e', `process.stdout.write(":${d}\\n/x/auth${d}\\n"); process.stdin.resume(); process.stdin.on("end", () => process.exit(0))`], opzioni);
+  };
+  return { lancia, lanci };
+};
+
+test('accendiSchermi: con più lavoratori uno schermo a testa, elencati per loro, e allo spegnimento l\'ambiente torna com\'era', async () => {
+  const { lancia, lanci } = xvfbFinto();
+  const env = { PATH: process.env.PATH };
+  const s = await accendiSchermi({ quanti: 3, platform: 'linux', env, haXvfb: () => true, worker: { indice: 1, paralleli: 2 }, lancia });
+  assert.deepEqual(s.schermi, [':110', ':111', ':112']);
+  assert.equal(lanci.length, 3);
+  for (const a of lanci) assert.deepEqual(a.slice(0, 3), ['-a', '-n', '110'], 'dalla base del worker (#1157)');
+  assert.equal(env.DISPLAY, ':110', 'chi non è un lavoratore resta sul primo');
+  assert.equal(env.ELECTRON_DISABLE_SANDBOX, '1');
+  assert.deepEqual(JSON.parse(env[SCHERMI_LAVORATORI]).map((x) => x.display), [':110', ':111', ':112']);
+  assert.match(s.nota, /3 lavoratori, uno schermo virtuale ciascuno \(:110 :111 :112\)/);
+  await s.spegni();
+  assert.deepEqual(env, { PATH: process.env.PATH });
+});
+
+test('accendiSchermi con un lavoratore solo resta uno schermo, e un elenco ereditato non passa ai suoi lavoratori', async () => {
+  const { lancia, lanci } = xvfbFinto();
+  const ereditato = JSON.stringify([{ display: ':150' }, { display: ':151' }]);
+  const env = { PATH: process.env.PATH, [SCHERMI_LAVORATORI]: ereditato };
+  const s = await accendiSchermi({ quanti: 1, platform: 'linux', env, haXvfb: () => true, worker: null, lancia });
+  assert.equal(lanci.length, 1);
+  assert.equal(env.DISPLAY, ':110');
+  assert.equal(env[SCHERMI_LAVORATORI], undefined, 'i lavoratori di dentro non prendono gli schermi di quelli di fuori');
+  await s.spegni();
+  assert.deepEqual(env, { PATH: process.env.PATH, [SCHERMI_LAVORATORI]: ereditato });
+});
+
+test('accendiSchermi sotto lo xvfb-run dei nostri script ne accende uno per lavoratore; su uno schermo vero niente', async () => {
+  const sotto = preparaLancioElectron('npx', [], { platform: 'linux', env: { PATH: process.env.PATH }, haXvfb: () => true, worker: null }).env;
+  const { lancia, lanci } = xvfbFinto();
+  const env = { ...sotto, DISPLAY: ':99', XAUTHORITY: '/x/esterno' };
+  const s = await accendiSchermi({ quanti: 2, platform: 'linux', env, haXvfb: () => true, worker: null, lancia });
+  assert.deepEqual(s.schermi, [':110', ':111']);
+  await s.spegni();
+  assert.equal(env.DISPLAY, ':99');
+  assert.equal(env.XAUTHORITY, '/x/esterno');
+  for (const [platform, vero] of [['linux', { DISPLAY: ':0' }], ['win32', {}], ['darwin', {}]]) {
+    const e = { ...vero };
+    const t = await accendiSchermi({ quanti: 4, platform, env: e, haXvfb: mai, lancia: mai });
+    assert.deepEqual([t.schermi, e], [[], vero], platform);
+  }
+});
+
+test('accendiSchermi: se uno degli schermi non si accende spegne gli altri e dice perché', async () => {
+  let k = 0;
+  const lancia = (_cmd, _args, opzioni) => spawn(process.execPath, ['-e', k++ === 1
+    ? 'process.stderr.write("Xvfb failed to start\\n"); process.exit(1)'
+    : 'process.stdout.write(":110\\n/x\\n"); process.stdin.resume(); process.stdin.on("end", () => process.exit(0))'], opzioni);
+  const env = { PATH: process.env.PATH };
+  await assert.rejects(accendiSchermi({ quanti: 3, platform: 'linux', env, haXvfb: () => true, worker: null, lancia }), /Xvfb failed to start/);
+  assert.deepEqual(env, { PATH: process.env.PATH });
+});
+
+test('usaSchermoDelLavoratore: ogni lavoratore prende il suo per indice; fuori da un lavoratore o senza elenco niente', () => {
+  const elenco = JSON.stringify([{ display: ':110', xauthority: '/a0' }, { display: ':111', xauthority: '/a1' }]);
+  const env = { DISPLAY: ':110', [SCHERMI_LAVORATORI]: elenco, TEST_PARALLEL_INDEX: '1' };
+  assert.equal(usaSchermoDelLavoratore(env), ':111');
+  assert.deepEqual([env.DISPLAY, env.XAUTHORITY], [':111', '/a1']);
+  for (const e of [{ DISPLAY: ':110', [SCHERMI_LAVORATORI]: elenco }, { DISPLAY: ':110', TEST_PARALLEL_INDEX: '0' },
+    { DISPLAY: ':110', [SCHERMI_LAVORATORI]: '{rotto', TEST_PARALLEL_INDEX: '0' },
+    { DISPLAY: ':110', [SCHERMI_LAVORATORI]: JSON.stringify([{ display: 'sh -c x' }]), TEST_PARALLEL_INDEX: '0' }]) {
+    const prima = { ...e };
+    assert.equal(usaSchermoDelLavoratore(e), '');
+    assert.deepEqual(e, prima);
+  }
+});
+
+test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre schermi accesi e diversi', { skip: senzaLinuxXvfb }, async () => {
+  const temp = cartellaTemporanea('schermi-lavoratori-');
+  const url = (...p) => JSON.stringify(pathToFileURL(resolve(...p)).href);
+  try {
+    const fuori = resolve(temp, 'fuori');
+    mkdirSync(fuori);
+    // La config vera, caricata da ogni lavoratore, col globalSetup vero sulla radice del repo.
+    writeFileSync(resolve(temp, 'pw.config.mjs'), `import base from ${url(ROOT, 'playwright.config.js')};\n`
+      + `export default { ...base, testDir: ${JSON.stringify(temp)}, outputDir: ${JSON.stringify(resolve(temp, 'risultati'))},`
+      + ` reporter: 'line', retries: 0, globalSetup: ${JSON.stringify(resolve(temp, 'setup.mjs'))} };\n`);
+    writeFileSync(resolve(temp, 'setup.mjs'), `import setup from ${url(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs')};\n`
+      + `export default (c) => setup({ ...c, configFile: ${JSON.stringify(resolve(ROOT, 'playwright.config.js'))} });\n`);
+    for (const nome of ['a', 'b', 'c']) {
+      writeFileSync(resolve(temp, `${nome}.spec.mjs`), `import { test } from ${url(ROOT, 'node_modules', '@playwright', 'test', 'index.mjs')};\n`
+        + "import { existsSync, readdirSync, writeFileSync } from 'node:fs';\n"
+        + `test('${nome}', async () => {\n`
+        + `  writeFileSync(${JSON.stringify(fuori)} + '/${nome}', '');\n`
+        // Si aspetta che ci siano tutti e tre: così i lavoratori girano davvero insieme.
+        + `  while (readdirSync(${JSON.stringify(fuori)}).length < 3) await new Promise((r) => setTimeout(r, 50));\n`
+        + '  const d = process.env.DISPLAY;\n'
+        + `  writeFileSync(${JSON.stringify(fuori)} + '/${nome}.json', JSON.stringify({ d, attivo: existsSync('/tmp/.X11-unix/X' + d.slice(1)) }));\n`
+        + '});\n');
+    }
+    const env = ambienteSenzaSchermo(temp);
+    for (const k of [SCHERMI_LAVORATORI, 'FILO_SCHERMO_VIRTUALE', 'TEST_PARALLEL_INDEX', 'TEST_WORKER_INDEX']) delete env[k];
+    const r = await new Promise((risolvi) => {
+      const p = spawn(process.execPath, [resolve(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config', resolve(temp, 'pw.config.mjs'),
+        '--workers', '3', '--timeout', '30000'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let testo = '';
+      p.stdout.on('data', (d) => { testo += d; });
+      p.stderr.on('data', (d) => { testo += d; });
+      p.on('exit', (status) => risolvi({ status, testo }));
+    });
+    assert.equal(r.status, 0, r.testo);
+    const visti = ['a', 'b', 'c'].map((n) => JSON.parse(readFileSync(resolve(fuori, `${n}.json`), 'utf8')));
+    assert.equal(new Set(visti.map((v) => v.d)).size, 3, `ogni lavoratore sul suo schermo: ${JSON.stringify(visti)}`);
+    assert.ok(visti.every((v) => /^:\d+$/.test(v.d) && v.attivo), `schermi accesi: ${JSON.stringify(visti)}`);
+    assert.match(r.testo, /3 lavoratori, uno schermo virtuale ciascuno/);
+    for (const v of visti) await spento(v.d);
+  } finally {
+    togliCartella(temp);
+  }
+});
