@@ -201,11 +201,12 @@ test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chi
   test.setTimeout(90_000);
   await sito(openTab, testServer);
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('c')]);
+  // La home di partenza c'è già, in un'altra scheda: quella giusta è la scheda del sito, diventata home.
+  let casa = null;
   await expect.poll(async () => {
-    for (const w of app.windows()) { try { if (/^filo:\/\/newtab\//.test(w.url()) && await w.locator('#cercaInput').isVisible()) return true; } catch (_) {} }
+    for (const w of app.windows()) { try { if (/^filo:\/\/newtab\//.test(w.url()) && await w.locator('#cercaInput').isVisible()) { casa = w; return true; } } catch (_) {} }
     return false;
   }, { timeout: 15_000 }).toBe(true);
-  const casa = app.windows().find((w) => /^filo:\/\/newtab\//.test(w.url()));
   await expect.poll(() => casa.evaluate(() => document.activeElement && document.activeElement.id)).toBe('cercaInput');
   expect(casa.url()).not.toContain('cerca');
   await casa.screenshot({ path: `${SHOTS}/2377-cerca-dalla-home.png` });
