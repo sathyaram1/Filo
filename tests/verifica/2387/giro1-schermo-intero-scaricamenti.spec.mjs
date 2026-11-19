@@ -110,6 +110,24 @@ test('a schermo intero una domanda su un programma si vede scoprendo le schede, 
   }
 });
 
+test('esplora: a schermo intero, senza scoprire le schede, la domanda su un programma sta sopra la pagina', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const srv = await apriServer();
+  try {
+    const page = await testServer.openReady(openTab, pagina(srv.base));
+    await schermoIntero(app, true);
+    await page.mouse.move(400, 400);
+    await page.locator('#exe2').click();
+    await expect.poll(() => statoDi(shell, 'altro-setup.exe'), { timeout: 20000 }).toBe('pending');
+    await expect(domanda(shell, 'altro-setup.exe')).toBeVisible({ timeout: 10000 });
+    await new Promise((r) => setTimeout(r, 1500));
+    const s = await stato(app);
+    expect(s.alto, 'la pagina lascia scoperta la domanda').toBeGreaterThan(0);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('entrando e uscendo di fretta dallo schermo intero col pannello aperto la pagina non resta sotto uno spazio vuoto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
