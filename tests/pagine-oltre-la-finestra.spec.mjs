@@ -64,9 +64,11 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
-      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / (pesante ? 3.2 : 3.5));
+      // Conta con la stima di Filo: una cifra scritta qui resta indietro quando la stima si ritara (#2473, #2594).
+      const perToken = globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN * (pesante ? 0.9 : 1);
+      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / perToken);
       const uscita = Number(attempts[0].maxTokens) || 16384;
-      if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / 3.5);
+      if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / perToken);
       if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
         if (anthropic) {
