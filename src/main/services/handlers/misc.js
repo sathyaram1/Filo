@@ -85,42 +85,7 @@ async function fetchToFile({ sender, url, politiche, kind = 'image', onHeaders, 
   }
 }
 
-// Stesso volume: rinomina istantanea. Altro disco: copia a blocchi, mai passando dalla
-// memoria.
-async function moveInto(from, to) {
-  const fs = require('node:fs');
-  try {
-    await fs.promises.rename(from, to);
-    return;
-  } catch (e) {
-    if (!e || (e.code !== 'EXDEV' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e;
-  }
-  await fs.promises.copyFile(from, to);
-  try { await fs.promises.unlink(from); } catch (_) {}
-}
-
-// Nome file dal Content-Disposition se c'è, altrimenti dal path dell'URL.
-function filenameFromHeaders(hdrs, url) {
-  try {
-    const cd = hdrs && hdrs['content-disposition'];
-    if (cd) {
-      // filename*=UTF-8''… (RFC 5987) ha priorità su filename=…
-      let m = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
-      if (m) { try { return decodeURIComponent(m[1].trim().replace(/^["']|["']$/g, '')); } catch (_) { return m[1]; } }
-      m = /filename=("?)([^";]+)\1/i.exec(cd);
-      if (m) return m[2].trim();
-    }
-  } catch (_) {}
-  return filenameFromUrl(url);
-}
-
-function filenameFromUrl(url) {
-  try {
-    const u = new URL(url);
-    const base = decodeURIComponent((u.pathname || '').split('/').filter(Boolean).pop() || '');
-    return base || '';
-  } catch (_) { return ''; }
-}
+const { moveInto, filenameFromHeaders, filenameFromUrl } = require('../riprovaConPagina');
 
 // #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
 // da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
