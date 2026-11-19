@@ -146,7 +146,7 @@ async function cerca(query, { tavilyKey = '' } = {}) {
     ...(v.pagina ? { pagina: v.pagina } : {}),
     ...(v.larghezza ? { larghezza: Number(v.larghezza) } : {}), ...(v.altezza ? { altezza: Number(v.altezza) } : {}),
   }));
-  try { globalThis.SN_ACCADUTI?.ricerca({ testo: q, motore: provider || 'immagini', risultati: immagini.length }); } catch (_) {}
+  WS.annota(q, provider || 'immagini', immagini.length);
   return { ok: immagini.length > 0, provider, immagini, ...(immagini.length ? {} : { reason: candidate.length ? 'immagini non scaricabili' : 'nessuna immagine trovata' }) };
 }
 
