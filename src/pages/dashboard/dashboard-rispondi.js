@@ -143,6 +143,7 @@
     if (ultima && stessa(ultima, c) && !scrittoOra.trim()) { d.inputEl.focus(); return true; }
     if (citate.length >= (R() ? R().MAX_CITAZIONI : 200)) return false;
     if (ultima && scrittoOra.trim()) {
+      if (d.daFuori && d.daFuori()) fuori = true;
       ultima.commento = scrittoOra;
       campo('');
     }
