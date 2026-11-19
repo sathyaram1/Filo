@@ -7,20 +7,19 @@ import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
 // La pagina scorre nello stesso compito del gesto che apre il menu: il suo evento «scroll» arriva al fotogramma dopo,
-// quando il menu ascolta già. Scorre il contenitore che porta `bersaglio`, o la finestra; in fondo ci va dello spazio.
-async function scorriAlGesto(page, gesto, bersaglio) {
+// quando il menu ascolta già. Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato
+// da un'imbottitura: un figlio in più lo toglierebbe la pagina che ridisegna l'elenco.
+async function scorriAlGesto(page, gesto, bersaglio, { finestra = false } = {}) {
   await bersaglio.scrollIntoViewIfNeeded();
-  await bersaglio.evaluate((el, gesto) => {
-    let chi = el.parentElement;
+  await bersaglio.evaluate((el, { gesto, finestra }) => {
+    let chi = finestra ? null : el.parentElement;
     while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
     if (!chi || chi === document.body) chi = document.scrollingElement;
     chi.dataset.scorreProva = '1';
-    const d = document.createElement('div');
-    d.style.cssText = 'height:4000px;flex:0 0 4000px';
-    (chi === document.scrollingElement ? document.body : chi).appendChild(d);
+    (chi === document.scrollingElement ? document.body : chi).style.paddingBottom = '4000px';
     chi.dataset.scorreDa = String(chi.scrollTop);
     window.addEventListener(gesto, () => chi.scrollBy({ top: 300, behavior: 'instant' }), { capture: true, once: true });
-  }, gesto);
+  }, { gesto, finestra });
   await fotogrammi(page);
 }
 const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
@@ -127,7 +126,7 @@ test('Editor: la tendina dei font resta anche quando si scorre il suo elenco', a
   await expect(pop).toBeHidden();
 });
 
-test('Gestione: il menu dell\'ordine', async ({ openTab }) => {
+test('Gestione: il menu di una scheda', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
   await page.evaluate(() => {
