@@ -119,6 +119,29 @@ test('un file che non c\'è, una cartella o un tipo che la scheda non mostra non
   expect(await schedeFile(app)).toBe(0);
 });
 
+test('un PDF e un\'immagine si aprono in una scheda, senza diventare uno scaricamento', async ({ app }) => {
+  const { dir } = preparaReport();
+  const pdf = join(dir, 'conto.pdf');
+  copyFileSync(join(process.cwd(), 'tests', 'fixtures', 'documenti', 'documento-con-testo.pdf'), pdf);
+  await home(app);
+  await app.evaluate(({ session }) => {
+    globalThis.__scaricati = [];
+    session.fromPartition('file-del-computer').on('will-download', (_e, item) => globalThis.__scaricati.push(item.getFilename()));
+  });
+  for (const f of [pdf, join(dir, 'foto.png')]) {
+    const r = await execAction(app, { type: 'NAVIGA', url: f }, { parole: `aprimi ${f}` });
+    expect(r.executed, f).toBe(true);
+  }
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'foto.png')), { timeout: 10_000 }).toBeTruthy();
+  const foto = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  await expect.poll(() => foto.evaluate(() => (document.querySelector('img') || {}).naturalWidth || 0)).toBeGreaterThan(0);
+  await expect.poll(() => schedaFile(app, 'conto.pdf'), { timeout: 10_000 }).toBeTruthy();
+  await foto.waitForTimeout(1500);
+  expect(await schedaFile(app, 'conto.pdf'), 'il PDF resta nella sua scheda').toBeTruthy();
+  expect(await app.evaluate(() => globalThis.__scaricati)).toEqual([]);
+});
+
 test('chiusa, la scheda del file torna con Ctrl+Shift+T', async ({ app }) => {
   const { file } = preparaReport();
   await home(app);
