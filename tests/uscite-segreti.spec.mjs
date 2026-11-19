@@ -557,14 +557,14 @@ test('il codice letto dalla pagina e riscritto dall’utente all’assistente no
   const page = await testServer.openReady(openTab, PAGINA_OTP);
   await preparaModelli(app);
   await modelloFinto(app);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'cosa devo fare?');
-  await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'cosa devo fare?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain(CODICE);
-  await page.locator('.sn-sidebar-input textarea').click();
-  await page.keyboard.type(`il codice ${CODICE} dove lo metto?`);
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.sn-sidebar').getByText('Ecco.').nth(1)).toBeVisible({ timeout: 20_000 });
+  await aiuto.locator('.sn-sidebar-input textarea').click();
+  await aiuto.keyboard.type(`il codice ${CODICE} dove lo metto?`);
+  await aiuto.keyboard.press('Enter');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.').nth(1)).toBeVisible({ timeout: 20_000 });
   expect(await lettiDopoUnRiavvio(app), 'il codice letto è sparito dal registro').toContain(CODICE);
 
   const prima = new Set(app.windows());
