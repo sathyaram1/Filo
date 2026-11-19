@@ -295,12 +295,13 @@
   }
 
   // Stima e avviso di un nome della catena, contro il modello predefinito della funzione (`ctx.predefiniti[action]`).
-  function valuta(action, ref, registry, ctx) {
+  // `nome` è come l'avviso chiama il modello; '' vale «questo modello».
+  function valuta(action, ref, registry, ctx, nome = String(ref).trim()) {
     const c = ctx || {};
     const s = stima(action, voceDi(ref, registry), c);
     if (!s) return null;
     const p = c.predefiniti && c.predefiniti[action] ? stima(action, c.predefiniti[action], c) : null;
-    return { ...s, avviso: avviso({ scelta: s, predefinita: p, soglia: c.soglia, saldo: c.saldo, nome: String(ref).trim() }) };
+    return { ...s, avviso: avviso({ scelta: s, predefinita: p, soglia: c.soglia, saldo: c.saldo, nome }) };
   }
 
   global.SN_STIMA_COSTO = {
