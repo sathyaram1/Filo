@@ -22,7 +22,7 @@ function quanti(app) {
   });
 }
 
-test('mentre si scrive in un editor ricco, il testo che torna nella casella arrivata tardi non sposta il cursore', async ({ app, openTab, testServer }) => {
+test('r1 mentre si scrive in un editor ricco, il testo che torna nella casella arrivata tardi non sposta il cursore', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA);
   await page.locator('#ta').click({ timeout: 8000 });
