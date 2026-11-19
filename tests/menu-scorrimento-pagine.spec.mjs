@@ -135,16 +135,10 @@ test('Gestione: il menu dell\'ordine', async ({ openTab }) => {
     window.__mgTest.setTab('inbox');
   });
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  const lista = '#mgList';
-  await page.evaluate((s) => {
-    const l = document.querySelector(s);
-    const d = document.createElement('div');
-    d.style.height = '4000px';
-    l.appendChild(d);
-  }, lista);
-  await scorriAlGesto(page, 'contextmenu', { scorre: lista });
-  await page.locator('#mgListHeadRow').click({ button: 'right' });
-  await restaPoiSiChiude(page, page.locator('.mg-ctxmenu'), lista);
+  const scheda = page.locator('.mg-item').first();
+  await scorriAlGesto(page, 'contextmenu', scheda);
+  await scheda.click({ button: 'right' });
+  await restaPoiSiChiude(page, page.locator('.mg-ctxmenu'));
 });
 
 test('Home: il riquadro di una voce del sistema', async ({ app }) => {
