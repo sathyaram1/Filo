@@ -15,6 +15,7 @@
       ],
       fixes: [
         { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
+        { testo: 'A schermo intero, portando il puntatore in alto vedi solo le schede: l\'elenco dei download non scende più a coprire mezza pagina. Una domanda su un programma da scaricare resta lì finché non rispondi.', segnalazione: 2387 },
       ],
     },
     {
