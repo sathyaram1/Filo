@@ -292,9 +292,6 @@ async function eseguiAzioneFilo(action, {
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
   let rigaDaCorreggere = null;
   if (type === 'CORREGGI_MEMORIA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     let trovate = [];
     try {
       if (confirmed) {
