@@ -42,8 +42,7 @@ const esegui = (cmd, args) => new Promise((resolve) => {
 
 let finto = null;
 
-// → { ok: true } | { ok: false, errore: 'non-supportato' | 'non-riuscito' | 'prove' }
-async function blocca({ piattaforma = process.platform } = {}) {
+async function prova(piattaforma) {
   if (finto) return finto(piattaforma);
   if (process.env.NODE_ENV === 'test') return { ok: false, errore: 'prove' };
   const lista = tentativi(piattaforma);
@@ -52,6 +51,14 @@ async function blocca({ piattaforma = process.platform } = {}) {
     if (await esegui(cmd, args)) return { ok: true };
   }
   return { ok: false, errore: 'non-riuscito' };
+}
+
+// → { ok: true } | { ok: false, errore: 'non-supportato' | 'non-riuscito' | 'prove' }. Il blocco entra nel filo da qui,
+// da qualunque strada arrivi (lettera o chat).
+async function blocca({ piattaforma = process.platform } = {}) {
+  const r = await prova(piattaforma);
+  try { require('./accaduti').azioneDalPunto('BLOCCA_PC', {}, r.ok ? { eseguita: true } : { eseguita: false, errore: frase(r.errore) }); } catch (_) {}
+  return r;
 }
 
 const FRASI = {
