@@ -220,7 +220,7 @@ test('«cerca nel filo orche» scritto nella chat apre la stessa ricerca, senza 
 test('mouse o frecce su una pagina trovata aprono la sua riga di pagine; un altro risultato o Esc la richiudono', async ({ app }) => {
   test.setTimeout(60_000);
   const NARVALI = 'https://narvali.example/zanna';
-  await app.evaluate(async (url) => {
+  await app.evaluate(async (_e, url) => {
     const E = globalThis.SN_FILO_EVENTI;
     const qui = await globalThis.SN_IL_FILO.dispositivo();
     const iso = (minFa) => new Date(Date.now() - minFa * 60_000).toISOString();
