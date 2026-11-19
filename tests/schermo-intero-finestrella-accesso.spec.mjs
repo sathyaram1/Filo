@@ -13,17 +13,10 @@ const tinta = ([r, g, b]) => `rgb(${r},${g},${b})`;
 const ACCESSO = 'https://login.negozio-finto.it/login';
 
 async function servi(app, pagine) {
-  await app.evaluate(({ session, net }, pg) => {
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', risposta);
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(() => {
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, pagine);
+  });
 }
 
 async function superaAvvisoSeCe(app) {
