@@ -3,6 +3,7 @@
 // finito sulla scheda stessa (portata fuori dalla fila, annullato con Esc sopra la vicina).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { tastoDestro, aspettaMenu, vociDelMenu } from './helpers/menuLinguetta.mjs';
 
 async function treSchede(shell, testServer) {
   for (let i = 0; i < 3; i++) {
