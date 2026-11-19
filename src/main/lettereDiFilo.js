@@ -47,8 +47,13 @@ function tasto(wc, event, input, f) {
   let e = null;
   if (delTocco) e = { tipo: input.type === 'keyDown' ? 'giu' : 'su', t, repeat: !!input.isAutoRepeat };
   else if (input.type === 'keyDown') {
-    // Il box chiesto ma non ancora davanti: la lettera battuta in quell'istante è sua, non della pagina.
-    if (!delBox && tocchi.fase() === 'aperto') return primaDelBox(event, input, f);
+    // Il box chiesto ma non ancora davanti: la lettera battuta in quell'istante è sua, non della pagina. Un box che
+    // non arriva non si tiene le lettere di chi scrive.
+    if (!delBox && tocchi.fase() === 'aperto') {
+      if (t - apertoAlle <= ATTESA_BOX_MS) return primaDelBox(event, input, f);
+      Box.chiudi(finestra(f), 'fuoco');
+      tocchi.chiuso();
+    }
     e = { tipo: 'tasto', key: input.key, code: input.code, t, mod: { ctrl: !!input.control, meta: !!input.meta, alt: !!input.alt, shift: !!input.shift } };
   } else return false;
   const esito = tocchi.evento(e, cfg);
