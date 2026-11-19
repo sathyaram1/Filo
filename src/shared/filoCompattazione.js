@@ -407,6 +407,15 @@
     const { u, ingresso } = ciclo({ soglia: FC().TETTI_DI_SERIE.soglia, base: USO.base });
     return { prompt: Math.round(ingresso), completion: u.uscitaCompattazione };
   }
+  // La parte fissa della richiesta della chat, in token: strumenti, istruzioni e CONTESTO (la parte dell'utente; senza,
+  // quella tipica). Soglia, tetto del tratto e stima accanto alla soglia la contano qui, allo stesso modo.
+  function parteFissa(strumenti, parteUtente = null) {
+    let s = 0;
+    try { s = strumenti ? JSON.stringify(strumenti).length : 0; } catch (_) {}
+    const cpt = FC().CARATTERI_PER_TOKEN;
+    const utente = parteUtente == null ? USO.parteUtente * cpt : String(parteUtente).length;
+    return Math.ceil((global.SN_CONST.PROMPTS.filoChatStatic().length + utente + s) / cpt);
+  }
   // Una soglia che la regola dello spazio alza lo dice, con la parte fissa e da dove compatta davvero.
   const migliaia = (n) => numero(Math.round(n / 1000) * 1000);
   function stimaSoglia({ soglia, base = USO.base, prezzoChat, prezzoCompattazione, prezzoPer = (p) => p, uso = USO } = {}) {
