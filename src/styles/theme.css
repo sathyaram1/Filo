@@ -339,8 +339,8 @@
   gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  padding-bottom: 4px;
+  /* Si scorre con rotella, trackpad e frecce: la barra sarebbe un oggetto in più sotto ogni fila. */
+  scrollbar-width: none;
 }
 .filo-galleria-voce { flex: 0 0 auto; margin: 0; scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; }
 .filo-galleria-img {
