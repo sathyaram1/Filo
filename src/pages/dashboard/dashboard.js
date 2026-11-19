@@ -635,9 +635,10 @@
   function rigaDiStoria(m, { quante, guardate, types, esiti = [] }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
+      const citate = m.rispostaA ? Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) : null;
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA && Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) ? { rispostaA: Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
+        ...(citate ? { rispostaA: citate } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
