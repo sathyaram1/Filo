@@ -3,6 +3,7 @@
 // I siti sono finti e serviti dentro la sessione: ogni richiesta, compresa una a www.google.com, resta registrata.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { chiudiLaRete } from './helpers/reteChiusa.mjs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
