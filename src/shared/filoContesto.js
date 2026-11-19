@@ -367,10 +367,12 @@
   // torna com'era invece di accorciarsi. `dopo` ({ da, a }): il pezzo di filo compattato (SPEC-CONTESTO § La
   // compattazione): il tratto non comincia prima di `a`, e i messaggi fra `da` e `a` non tornano nemmeno come conversazione
   // ripresa, li dicono le righe delle ore. `senzaEsiti`: oltre il listino di Haiku gli esiti dei turni passati escono per primi, e la risposta lo dice.
+  // `fissi`: i token che la richiesta porta oltre al tratto (tettoDelTratto); l'ancora resta legata a `token`.
   function finestra(messaggi, {
-    ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
+    ora = Date.now(), giorni, token, fissi = 0, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
     preambolo = null, note = null, giro = null, salta = null, intero = null, dopo = null, senzaEsiti = false,
   } = {}) {
+    const tettoTratto = tettoDelTratto(token, fissi);
     const lista0 = Array.isArray(messaggi) ? messaggi : [];
     const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
     const n = lista.length;
