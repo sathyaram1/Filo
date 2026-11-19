@@ -2048,6 +2048,8 @@
     });
     $('showHomeMessage').addEventListener('change', persist);
     $('barraSitiVisibile').addEventListener('change', persist);
+    $('doppioCtrlAcceso').addEventListener('change', persist);
+    for (const n of document.querySelectorAll('.tasto-ctrl')) n.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl') : 'Ctrl';
     for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
