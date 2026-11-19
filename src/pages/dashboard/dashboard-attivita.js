@@ -1725,6 +1725,12 @@
         btn.target = '_blank';
         btn.rel = 'noopener';
         btn.title = `Riapri ${label}`;
+        if (file) {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            send({ type: MSG.OPEN_URL, url: file }).catch(() => {});
+          });
+        }
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
       if (a._callId) btn.dataset.callId = String(a._callId);
