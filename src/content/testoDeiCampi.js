@@ -273,6 +273,7 @@
   function rimetti() {
     prossimo = null;
     if (!segui || !rimasti.length) { fermaAttesa(); return; }
+    if (compone()) return;
     const presenti = [];
     const campi = [];
     // L'ordine si conta in un giro solo, per radice: un campo alla volta costerebbe un giro della pagina ciascuno.
