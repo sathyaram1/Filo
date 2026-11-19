@@ -1299,6 +1299,7 @@
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
     global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
+    aggiungiX(el);
     tempi().segui(el);
     toastHost().appendChild(el);
     tempi().ripulisci();
