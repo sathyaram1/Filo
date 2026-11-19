@@ -2142,9 +2142,9 @@
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
-    for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
+    for (const id of ['doppioToccoSoglia', 'doppioCtrlSoglia', 'ricercaFiloPausa']) {
       $(id).addEventListener('change', persist);
-      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(CAMPO_DI[id])); });
     }
     $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
     for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {
