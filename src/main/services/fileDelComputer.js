@@ -46,6 +46,9 @@ function indirizzoDi(percorso) {
 async function giudica(input) {
   const percorso = percorsoDi(input);
   if (!percorso) return { ok: false, motivo: 'rete', percorso: String(input || '') };
+  // Già lo stat contatterebbe l'altro computer (/net/<host> del Mac, unità di rete di Windows): la regola è quella di
+  // comandi e documenti, non una copia.
+  if (require('./documentRead').percorsoDiRete(percorso)) return { ok: false, motivo: 'rete', percorso };
   let st = null;
   try { st = await fs.promises.stat(percorso); } catch (_) {}
   if (!st) return { ok: false, motivo: 'assente', percorso };
