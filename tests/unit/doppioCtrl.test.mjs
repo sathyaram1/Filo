@@ -132,16 +132,16 @@ test('il box mette prima le lettere usate da poco, in fondo quelle senza lettera
 
 test('la frase della chat: assegna, toglie, torna alla serie', () => {
   const a = D.daTesto('e editor', {});
-  assert.deepEqual(a.lettere, { 'app:editor': 'e' });
+  assert.deepEqual(a.lettere, [{ azione: 'app:editor', lettera: 'e' }]);
   assert.match(a.label, /E → Editor/);
-  assert.equal(D.daTesto('editor: e', {}).lettere['app:editor'], 'e');
+  assert.equal(D.diLettera({ lettere: D.daTesto('editor: e', {}).lettere }, 'e').id, 'app:editor');
   const t = D.daTesto('togli b', {});
-  assert.deepEqual(t.lettere, { blocca: '' });
-  assert.deepEqual(D.daTesto('di serie', { doppioCtrl: { lettere: { blocca: '' } } }).lettere, {});
+  assert.deepEqual(t.lettere, [{ azione: 'blocca', lettera: '' }]);
+  assert.deepEqual(D.daTesto('di serie', { doppioCtrl: { lettere: t.lettere } }).lettere, []);
   assert.ok(D.daTesto('togli x', {}).rifiuto);
   assert.ok(D.daTesto('x pizza margherita', {}).rifiuto);
   assert.equal(D.daTesto('', {}), null);
-  assert.equal(D.descrivi({ 'app:editor': 'e', blocca: '' }), 'E → Editor, Blocca il computer senza lettera');
+  assert.equal(D.descrivi([{ azione: 'blocca', lettera: '' }, { azione: 'app:editor', lettera: 'e' }]), 'Blocca il computer senza lettera, E → Editor');
 });
 
 test('la soglia sta nei suoi limiti, e l\'interruttore spento resta spento', () => {
