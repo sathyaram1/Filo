@@ -1827,6 +1827,9 @@ export function fixedReplyText(id, reply, conDomanda = false) {
   if (reply && reply.outcome === 'provvisoria') return `stato ${id}: consegnato, torna in coda per la verifica. La domanda ${reply.domanda || ''} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
   // Un server che non ferma su una domanda che blocca rimette in coda: dirlo, o chi ha chiesto crede di essersi fermato.
   if (conDomanda) return `stato ${id}: ATTENZIONE, la consegna portava una domanda ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La domanda è consegnata lo stesso.`;
+  // Dopo un riallineamento decide il server, non la riga stampata prima della consegna: si dice la sua decisione.
+  if (reply && reply.giro === 'nessuno') return `stato ${id}: consegnato; il server non chiede un giro nuovo di verifica, il lavoro passa al controllo di sicurezza o alla fusione`;
+  if (reply && reply.giro === 'pieno') return `stato ${id}: consegnato; il server chiede la verifica del riallineamento, torna in coda per la verifica`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
 async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null, cartellaProva = '') {
