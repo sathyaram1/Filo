@@ -218,19 +218,57 @@
   }
 
   // Il testo rimesso deve contare per il sito come scritto (#2052): passa dalla regola del correttore, che per farlo
-  // prende il fuoco del campo; poi il fuoco torna dov'era.
+  // prende il fuoco del campo. Chi intanto scrive altrove non se ne accorge (#2052.1): il fuoco torna con la sua
+  // selezione, la pagina resta dov'era, e una parola che si sta componendo (tastiere di altre lingue) si aspetta.
   function scriviNelCampo(el, valore) {
-    const primaAttivo = attivo();
+    const prima = dove();
     rimettendo = true;
     try {
       if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      if (attivo() === el && primaAttivo !== el) {
-        if (primaAttivo && primaAttivo.isConnected && primaAttivo !== document.body) primaAttivo.focus({ preventScroll: true });
-        else el.blur();
-      }
+      if (attivo() === el && prima.attivo !== el) torna(prima, el);
+      if (window.scrollX !== prima.x || window.scrollY !== prima.y) window.scrollTo(prima.x, prima.y);
     } finally { rimettendo = false; }
   }
+
+  function dove() {
+    const a = attivo();
+    const out = { attivo: a, x: window.scrollX, y: window.scrollY, casella: null, punti: null };
+    try {
+      if (a && a.matches && a.matches('input, textarea') && a.selectionStart != null) {
+        out.casella = [a.selectionStart, a.selectionEnd, a.selectionDirection || 'none'];
+      } else if (a && a !== document.body) {
+        const radice = a.getRootNode();
+        const s = (typeof radice.getSelection === 'function' && radice.getSelection()) || document.getSelection();
+        if (s && s.rangeCount && a.contains(s.anchorNode) && a.contains(s.focusNode)) out.punti = [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset];
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  function torna({ attivo: a, casella, punti }, el) {
+    if (!a || !a.isConnected || a === document.body) { el.blur(); return; }
+    try { a.focus({ preventScroll: true }); } catch (_) {}
+    try {
+      if (casella) a.setSelectionRange(casella[0], casella[1], casella[2]);
+      else if (punti) {
+        const radice = a.getRootNode();
+        const s = (typeof radice.getSelection === 'function' && radice.getSelection()) || document.getSelection();
+        s.setBaseAndExtent(...punti);
+      }
+    } catch (_) {}
+  }
+
+  // Una parola composta con l'IME finisce col fuoco: prenderlo a metà la chiuderebbe come non era. Senza la fine, dopo
+  // un minuto si smette di aspettarla.
+  let componeDa = 0;
+  const compone = () => componeDa > 0 && Date.now() - componeDa < 60000;
+  document.addEventListener('compositionstart', (e) => { if (e.isTrusted) componeDa = Date.now(); }, true);
+  document.addEventListener('compositionend', (e) => {
+    if (!e.isTrusted) return;
+    componeDa = 0;
+    if (rimasti.length) setTimeout(() => { rimetti(); if (Date.now() >= fineAttesa) fermaAttesa(); }, 0);
+  }, true);
 
   function rimetti() {
     prossimo = null;
