@@ -7,8 +7,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { ricevi, indirizzoDelWeb, MAX_URL } = require('../../src/main/linkSuScheda.js');
-require('../../src/renderer/link-su-scheda.js');
-const { primoIndirizzo } = globalThis.SN_LINK_SU_SCHEDA;
+require('../../src/shared/indirizziTrascinati.js');
+const { primo: primoIndirizzo } = globalThis.SN_INDIRIZZI_TRASCINATI;
 
 function finta(ids = ['a', 'b']) {
   const fatto = [];
