@@ -47,7 +47,7 @@ test('esplora', async ({ openTab }) => {
     await page.keyboard.type(k);
     const a = await html(page);
     await page.keyboard.type('xy');
-    log.push([`vuoto ${k}`, a, await html(page)]);
+    log.push([`vuoto ${k}`, a + ' | ' + await html(page)]);
   }
   // in mezzo
   await imposta(page, '<p>abc</p><p><br></p><p>def</p>', 'p:nth-child(2)');
