@@ -1077,6 +1077,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const dopo = await appendToChatArchive(chatId, {
       role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
       ...(citate.fonti.length ? { fonti: citate.fonti } : {}),
+      ...(citate.immagini.length ? { immagini: citate.immagini } : {}),
     }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
