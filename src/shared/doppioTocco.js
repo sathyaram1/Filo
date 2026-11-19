@@ -38,18 +38,14 @@
     } catch (_) { return ''; }
   }
 
-  const tastiNoti = () => {
-    const H = global.SN_CARTE_HOME;
-    if (!H) return [];
-    // Le carte valgono se aprono un'app: «Filo ti suggerisce» non ha dove portare.
-    return [...H.TASTI, ...H.CARTE.filter((c) => c.url)].map((t) => t.id);
-  };
+  // Chi può avere una lettera lo dice solo carteHome.js (conLettera): qui, nella home e nelle Preferenze.
+  const prende = (id) => !!(global.SN_CARTE_HOME && typeof id === 'string' && global.SN_CARTE_HOME.prendeLettera(id));
 
   function voce(v) {
     if (!v || typeof v !== 'object') return null;
     const l = lettera(v.lettera);
     if (!l) return null;
-    if (typeof v.tasto === 'string' && tastiNoti().includes(v.tasto)) return { lettera: l, tasto: v.tasto };
+    if (prende(v.tasto)) return { lettera: l, tasto: v.tasto };
     const url = indirizzo(v.url);
     return url ? { lettera: l, url } : null;
   }
