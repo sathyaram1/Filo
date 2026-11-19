@@ -78,6 +78,59 @@ test('un testo di migliaia di righe si incolla subito e il sito lo ha intero', a
   expect(await page.locator('#esito').textContent()).toBe(`Pubblicato: ${testo}`);
 });
 
+test('un commento dettato a Filo si pubblica', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  await casella(page).click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await nelMondoDiFilo(app, page, () => globalThis.SN_ACTIONS.insertDictatedText('Detto a voce, senza tastiera.'));
+  await expect(casella(page)).toHaveValue('Detto a voce, senza tastiera.');
+
+  await page.locator('#invia').click();
+  await expect(page.locator('#esito')).toHaveText('Pubblicato: Detto a voce, senza tastiera.');
+});
+
+test('un commento riscritto con Modifica si pubblica', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EDIT_TEXT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, complete: async () => ({ text: 'Commento riscritto da Filo.', usage: {} }) };
+  });
+  const page = await testServer.openReady(openTab, PAGINA);
+  await casella(page).click();
+  await page.keyboard.type('un comento con erori');
+  await casella(page).evaluate((el) => el.select());
+  await casella(page).click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
+  await clicca(app, page, 'button[data-sc="fix"]');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('riscritto');
+  await clicca(app, page, '.sn-editbox-replace');
+  await expect(casella(page)).toHaveValue('Commento riscritto da Filo.');
+
+  await page.locator('#invia').click();
+  await expect(page.locator('#esito')).toHaveText('Pubblicato: Commento riscritto da Filo.');
+});
+
+test('un commento scritto da Filo per l\'utente (Aiuto che compila) si pubblica', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  const ok = await nelMondoDiFilo(app, page, () => globalThis.SN_HIGHLIGHT.fillElement(
+    document.querySelector('commento-finto').shadowRoot.querySelector('textarea'), 'Scritto da Filo su richiesta.'));
+  expect(ok).toBe(true);
+  await expect(casella(page)).toHaveValue('Scritto da Filo su richiesta.');
+
+  await page.locator('#invia').click();
+  await expect(page.locator('#esito')).toHaveText('Pubblicato: Scritto da Filo su richiesta.');
+});
+
 test('il commento rimesso alla ricarica si pubblica, e il fuoco non resta nella casella', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await casella(page).click();
