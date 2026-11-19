@@ -183,16 +183,19 @@ test('Home: il riquadro di una voce del sistema', async ({ app }) => {
   await restaPoiSiChiude(page, page.locator('.dash-sis-box'));
 });
 
-test('Home: il menu di una parola spiegata', async ({ app }) => {
-  await modelloFinto(app, [{ text: 'Risponde subito se la risposta sta nella {{cache|Una copia vicina dei dati.}}.' }]);
-  const page = await home(app);
-  await chiedi(page, 'come fa il browser a trovare un sito?');
-  const parola = page.locator('.dash-bubble-md .filo-spiega', { hasText: 'cache' }).last();
-  await expect(parola).toBeVisible();
-  // La bolla si ridisegna a fine risposta: si aspetta che stia ferma.
-  await expect(page.locator('#input')).toBeEditable();
-  await attesa(page, 600);
-  await scorriAlGesto(page, 'contextmenu', parola, { su: true });
+// Le parole spiegate si aprono solo a un tasto destro vero; la pagina delle segnalazioni le attacca al suo documento
+// come la home alla chat, e scorre con la finestra.
+test('Il menu di una parola spiegata', async ({ openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForFunction(() => window.SN_MARKDOWN && window.SN_SPIEGAZIONI);
+  await page.evaluate(() => {
+    const d = document.createElement('div');
+    d.id = 'prova';
+    d.innerHTML = window.SN_MARKDOWN.render('Risponde subito se la risposta sta nella {{cache|Una copia vicina dei dati.}}.');
+    document.body.prepend(d);
+  });
+  const parola = page.locator('#prova .filo-spiega');
+  await scorriAlGesto(page, 'contextmenu', parola, { finestra: true });
   await parola.click({ button: 'right' });
   await restaPoiSiChiude(page, page.locator('.filo-spiega-menu'));
 });
