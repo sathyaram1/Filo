@@ -932,7 +932,7 @@
     } else {
       menu.push({ etichetta: v.tasto ? 'Rimetti in vista' : 'Rimetti nella home', fai: rimetti });
     }
-    const lettera = v.tasto || v.url ? vociLettera(v.id, v.titolo) : [];
+    const lettera = vociLettera(v.id, v.titolo);
     if (lettera.length) menu.push(null, ...lettera);
     return menu;
   }
