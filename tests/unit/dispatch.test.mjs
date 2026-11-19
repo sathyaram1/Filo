@@ -53,7 +53,7 @@ function ruoliVeri(nomi, { gonfia = false } = {}) {
   }
 }
 // Il testo del ruolo deve reggere anche un contratto che cresce: ogni prova gira col ruolo in stampa e col ruolo nel file.
-function colContrattoComEOGonfio(nomi, prova) {
+function colContrattoVeroEGonfio(nomi, prova) {
   try {
     for (const gonfia of [false, true]) {
       ruoliVeri(nomi, { gonfia });
