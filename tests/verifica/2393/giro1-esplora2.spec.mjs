@@ -29,9 +29,11 @@ test('voce della barra dei siti della home portata sul centro di una scheda', as
   await page.keyboard.press('Enter');
   const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
   await expect(voce).toHaveCount(1);
-  const prima = await snap(shell);
-  console.log('snap', JSON.stringify(prima.tabs.map((t) => t.url)), await shell.locator('.tab').count());
-  const indice = prima.tabs.findIndex((t) => t.url.includes('127.0.0.1') && t.id !== prima.activeId);
+  let prima = await snap(shell);
+  await shell.evaluate((i) => window.filoShell.tabs.activate(i), prima.tabs[0].id);
+  await expect.poll(async () => (await snap(shell)).activeId).toBe(prima.tabs[0].id);
+  prima = await snap(shell);
+  const indice = 1;
   await Gesti.finestraASchermo(app);
   const da = await Gesti.sulloSchermo(app, page, page, '#barraSiti .dash-barra-voce[data-tipo="sito"]');
   Gesti.trascina(da, await nelloSchermo(app, shell, centro(indice)));
