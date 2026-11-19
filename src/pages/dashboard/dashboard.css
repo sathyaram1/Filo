@@ -1065,67 +1065,72 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-msg-azione.dash-non-copiato::after { color: var(--dash-accent); }
 .dash-msg-azioni:has(.dash-copiato, .dash-non-copiato) .dash-msg-azione:not(.dash-copiato):not(.dash-non-copiato)::after { opacity: 0; }
 
-/* La risposta citata in testa alla bolla dell'utente, come nelle app di messaggi: una striscia, chi l'ha scritta, due
-   righe. Il testo sta negli attributi: la bolla resta fatta delle sole parole dell'utente. */
-.dash-bubble-user { --dash-citata-chi: var(--dash-accent-2); }
-[data-sn-theme="dark"] .dash-bubble-user { --dash-citata-chi: var(--dash-accent); }
+/* Le citazioni nella bolla dell'utente, ognuna prima del suo commento (#2346): una striscia sottile e due righe smorzate,
+   senza nome (si risponde solo a Filo; «Tu» quando si cita un proprio messaggio). Il testo sta negli attributi: la
+   bolla resta fatta delle sole parole dell'utente. */
+.dash-bubble-user { --dash-citata-riga: color-mix(in srgb, var(--dash-paper) 38%, transparent); }
 .dash-citata {
   display: block;
-  margin: -4px -8px 8px;
-  padding: 6px 12px 7px 14px;
-  border-radius: 10px;
-  background:
-    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
-    color-mix(in srgb, var(--dash-paper) 13%, transparent);
+  margin: 2px -6px 4px;
+  padding: 2px 8px 2px 10px;
+  border-radius: 6px;
+  background: linear-gradient(var(--dash-citata-riga), var(--dash-citata-riga)) left / 2px 100% no-repeat;
   white-space: normal;
   cursor: pointer;
   transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
+.dash-citata:first-child { margin-top: -2px; }
 .dash-citata:hover, .dash-citata:focus-visible {
-  background:
-    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
-    color-mix(in srgb, var(--dash-paper) 22%, transparent);
+  background-color: color-mix(in srgb, var(--dash-paper) 10%, transparent);
   outline: none;
 }
-.dash-citata::before {
+.dash-citata[data-chi]::before {
   content: attr(data-chi);
   display: block;
-  font-size: 12.5px; font-weight: 600; line-height: 1.35;
-  color: var(--dash-citata-chi);
+  font-size: 12px; font-weight: 600; line-height: 1.35;
+  opacity: 0.6;
 }
 .dash-citata::after {
   content: attr(data-testo);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
-  opacity: 0.78;
+  opacity: 0.62;
 }
 .dash-citata.dash-citata-manca { cursor: default; }
 
-/* La stessa citazione sopra il campo, finché il messaggio non parte. */
+/* Le stesse citazioni sopra il campo, finché il messaggio non parte: ognuna col suo commento sotto, l'ultima col campo. */
 .dash-citazione {
   flex-basis: 100%;
-  display: flex; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; gap: 4px;
   min-width: 0;
+  max-height: 45vh; overflow-y: auto;
 }
 .dash-citazione[hidden] { display: none; }
+.dash-citazione-pezzo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-citazione-riga { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .dash-citazione-vai {
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; gap: 1px;
-  padding: 6px 12px 7px 15px;
-  border: none; border-radius: 20px 12px 12px 20px;
-  background:
-    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
-    var(--dash-line);
-  font: inherit; text-align: left; color: var(--dash-ink-soft); cursor: pointer;
-  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
+  margin-left: 6px;
+  padding: 3px 10px 4px 12px;
+  border: none; border-radius: 6px;
+  background: linear-gradient(var(--dash-ink-mute), var(--dash-ink-mute)) left / 2px 100% no-repeat;
+  font: inherit; text-align: left; color: var(--dash-ink-mute); cursor: pointer;
+  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-citazione-vai:hover, .dash-citazione-vai:focus-visible {
-  background:
-    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
-    var(--dash-line-strong);
+  background-color: var(--dash-line);
+  color: var(--dash-ink-soft);
   outline: none;
 }
-.dash-citazione-chi { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--dash-accent); }
+.dash-citazione-chi { font-size: 12px; font-weight: 600; line-height: 1.35; }
+.dash-citazione-commento {
+  width: 100%; min-width: 0;
+  border: none; background: transparent; outline: none; resize: none;
+  field-sizing: content; max-height: 30vh;
+  padding: 2px 12px 4px;
+  font-family: inherit; font-size: 15px; line-height: 1.4; color: var(--dash-ink);
+}
 .dash-citazione-testo {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
