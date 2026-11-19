@@ -15,7 +15,10 @@ export async function newtabPage(app) {
 // Con la chiave finta le chiamate fuori dal copione andavano a OpenRouter, i cambi a frankfurter.dev: il turno durava
 // diverso fra GitHub e il contenitore (#2177). Si chiude sotto ogni finto, anche quelli che la prova ha messo prima.
 export async function chiudiLaRete(app) {
-  const chiusa = await app.evaluate(() => process.mainModule.require('./test-servizi-chiusi').chiudiTuttaLaRete());
+  const chiusa = await app.evaluate(({ app: a }) => {
+    const rq = process.mainModule.require;
+    return rq(rq('node:path').join(a.getAppPath(), 'src', 'main', 'test-servizi-chiusi.js')).chiudiTuttaLaRete();
+  });
   if (!chiusa) throw new Error('rete del main non chiusa: Filo non è aperto in modalità test');
 }
 
