@@ -263,6 +263,53 @@ test('nel compositore di una risposta un .svg e un .html sono rifiutati prima di
   expect(await page.evaluate(() => window.__caricati)).toEqual(['note.txt', 'conf.yaml']);
 });
 
+// #1664 — una foto del telefono oltre i 4 MB si allega rimpicciolita invece di essere rifiutata.
+test('nel compositore di una risposta una foto oltre i 4 MB sale rimpicciolita', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(app, page, {
+    _id: 'mock-att-foto',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi una foto del problema?',
+    createdAt: new Date().toISOString(),
+  });
+  // Una «foto» di rumore: il JPEG non la comprime, e a qualità piena passa i 4 MB.
+  const foto = Buffer.from(await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = 3000; c.height = 2000;
+    const g = c.getContext('2d');
+    const im = g.createImageData(c.width, c.height);
+    for (let i = 0; i < im.data.length; i++) im.data[i] = (Math.random() * 256) | 0;
+    g.putImageData(im, 0, 0);
+    const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 1));
+    const u = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+    return u.slice(u.indexOf(',') + 1);
+  }), 'base64');
+  expect(foto.length).toBeGreaterThan(4 * 1024 * 1024);
+  await page.evaluate(() => {
+    window.__salite = [];
+    const orig = window.SN_FEEDBACK.uploadAttachment;
+    window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
+      window.__salite.push({ size: blob.size, type: blob.type, name: String(name || '') });
+      return orig(blob, name);
+    };
+  });
+
+  await page.locator('[data-tab="inbox"]').click();
+  const mount = page.locator('.fb-card .fb-attach-mount[data-kind="reply"]');
+  await mount.locator('input[type="file"]').setInputFiles({ name: 'IMG_2041.JPG', mimeType: 'image/jpeg', buffer: foto });
+  await expect(mount.locator('.fb-attach-thumb img')).toHaveCount(1, { timeout: 20_000 });
+  await expect(mount.locator('.fb-attach-status')).not.toContainText('troppo grande');
+  const salite = await page.evaluate(() => window.__salite);
+  expect(salite).toHaveLength(1);
+  expect(salite[0].size).toBeLessThanOrEqual(4 * 1024 * 1024);
+  expect(salite[0].type).toMatch(/^image\/(jpeg|png)$/);
+  expect(salite[0].name).toBe('IMG_2041.JPG');
+});
+
 // ── #602 — l'allegato di un COMMENTO sale CIFRATO, e la dashboard lo riapre ──
 //
 // Il buco: gli allegati aggiunti ai commenti non passavano dalla cifratura e
