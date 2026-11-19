@@ -56,7 +56,7 @@ async function provaUnTitolo(page) {
   await page.mouse.move(1, 1);
   await expect.poll(() => haTitolo(el)).toBe(true);
   // Rientrato torna; il clic lo chiude e il title è di nuovo al suo posto.
-  await el.hover();
+  await passa();
   await expect(fumetto(page)).toHaveText(titolo);
   await page.mouse.down();
   await expect(fumetto(page)).toBeHidden();
