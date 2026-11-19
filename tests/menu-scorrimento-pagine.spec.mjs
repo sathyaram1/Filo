@@ -6,21 +6,41 @@ import { createServer } from 'node:http';
 import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
-// La pagina scorre nello stesso compito del gesto che apre il menu: il suo evento «scroll» arriva al fotogramma dopo,
-// quando il menu ascolta già. Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato
-// da un'imbottitura: un figlio in più lo toglierebbe la pagina che ridisegna l'elenco.
-async function scorriAlGesto(page, gesto, bersaglio, { finestra = false } = {}) {
+// Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato da un'imbottitura: un figlio in
+// più lo toglierebbe la pagina che ridisegna l'elenco.
+async function preparaScorrimento(bersaglio, { finestra = false } = {}) {
   await bersaglio.scrollIntoViewIfNeeded();
-  await bersaglio.evaluate((el, { gesto, finestra }) => {
+  await bersaglio.evaluate((el, finestra) => {
     let chi = finestra ? null : el.parentElement;
     while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
     if (!chi || chi === document.body) chi = document.scrollingElement;
     chi.dataset.scorreProva = '1';
     (chi === document.scrollingElement ? document.body : chi).style.paddingBottom = '4000px';
     chi.dataset.scorreDa = String(chi.scrollTop);
+  }, finestra);
+}
+// Scorre e apre col tasto destro nello stesso fotogramma, come chi porta la voce sotto il puntatore e preme subito:
+// l'evento «scroll» arriva al fotogramma dopo, quando il menu ascolta già.
+async function scorriEApri(page, bersaglio, opzioni) {
+  await preparaScorrimento(bersaglio, opzioni);
+  await bersaglio.evaluate((el) => new Promise((ok) => {
+    const r = el.getBoundingClientRect();
+    const x = r.left + Math.min(r.width / 2, 40);
+    const y = r.top + r.height / 2;
+    requestAnimationFrame(() => {
+      document.querySelector('[data-scorre-prova]').scrollBy({ top: 300, behavior: 'instant' });
+      el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 2 }));
+      ok();
+    });
+  }));
+}
+// Per chi apre solo a un gesto vero: la pagina scorre nello stesso compito del gesto, prima che il menu nasca.
+async function scorriAlGesto(page, gesto, bersaglio, opzioni) {
+  await preparaScorrimento(bersaglio, opzioni);
+  await page.evaluate((gesto) => {
+    const chi = document.querySelector('[data-scorre-prova]');
     window.addEventListener(gesto, () => chi.scrollBy({ top: 300, behavior: 'instant' }), { capture: true, once: true });
-  }, { gesto, finestra });
-  await fotogrammi(page);
+  }, gesto);
 }
 const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(ok, 150)));
