@@ -65,7 +65,6 @@ test('a finestra massimizzata il tasto destro sul bordo alto apre il menu di que
   await shell.mouse.click(p.x, p.y, { button: 'right' });
   await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Chiudi'));
   // Il menu è quello della scheda sotto il bordo: «Chiudi» chiude lei.
-  const { scegli } = await import('./helpers/menuLinguetta.mjs');
   await scegli(app, 'Chiudi');
   await expect.poll(() => aperte(shell), { timeout: 3_000 }).not.toContain(ids[1]);
 });
