@@ -47,7 +47,6 @@ async function stubModello(app, { chiamata, finale, conPittore = true }) {
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, modalities, messages }) => {
       if (Array.isArray(modalities) && modalities.includes('image')) {
         globalThis.__disegni.push({ modello: attempts[0].model, testo: messages.map((m) => m.content).join('\n') });
-        const { nativeImage } = require('electron');
         const w = 256; const h = 256;
         const buf = Buffer.alloc(w * h * 4, 180);
         return { text: '', images: [`data:image/png;base64,${nativeImage.createFromBitmap(buf, { width: w, height: h }).toPNG().toString('base64')}`], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
