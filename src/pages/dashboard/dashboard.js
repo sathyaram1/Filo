@@ -1867,7 +1867,10 @@
   // immagini, documenti e citazione. Vale per il seguito che non parte (#1296) e per «Chat nuova» (#1596).
   function rimettiNellaCasella(tornati) {
     if (!tornati.length) return;
-    const testi = tornati.map((c) => String(c.scritto || '').trim()).filter(Boolean);
+    // Le citazioni tornano con la prima composizione che ne ha, se intanto l'utente non ne ha scelte altre: ognuna col
+    // suo commento, e l'ultimo nel campo.
+    const conCitate = Rispondi.inCorso() ? null : tornati.find((c) => c.citata);
+    const testi = tornati.map((c) => (c === conCitate ? Rispondi.rimetti(c.citata, c.scritto) : String(c.scritto || '').trim())).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
     if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
