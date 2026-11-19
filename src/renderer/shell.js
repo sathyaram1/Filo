@@ -1654,16 +1654,33 @@
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
   tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
+  // La X premuta: il clic arriva alla scheda se fra pressione e rilascio la mano scivola appena fuori dal tondo,
+  // e la apriva invece di chiuderla (#2382). Vale il rilascio vicino alla X; più lontano il gesto è annullato.
+  const MARGINE_CROCE = 8;
+  let crocePremuta = null; // { id, r, gesto }
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
+    const x = s && e.button === 0 ? e.target.closest('.close') : null;
+    crocePremuta = x ? { id: s.t.id, r: x.getBoundingClientRect(), gesto: gestoStriscia } : null;
     if (s) startTabDrag(e, s.t, s.el);
   });
   tabsEl.addEventListener('click', (e) => {
+    const croce = crocePremuta && crocePremuta.gesto === gestoStriscia ? crocePremuta : null;
+    crocePremuta = null;
+    if (croce) {
+      const { r } = croce;
+      const vicino = e.clientX >= r.left - MARGINE_CROCE && e.clientX <= r.right + MARGINE_CROCE
+        && e.clientY >= r.top - MARGINE_CROCE && e.clientY <= r.bottom + MARGINE_CROCE;
+      if (vicino && state.tabs.some((t) => t.id === croce.id)) api.tabs.close(croce.id, 'pulsante_x');
+      return;
+    }
     const s = schedaDellEvento(e);
     if (!s) return;
     if (e.target.closest('.close')) { api.tabs.close(s.t.id, 'pulsante_x'); return; }
     if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
-    if (suppressClickId === s.t.id) { suppressClickId = null; return; }
+    const zitto = clicZittito && clicZittito.gesto === gestoStriscia ? clicZittito : null;
+    clicZittito = null;
+    if (zitto && zitto.id === s.t.id) return;
     api.tabs.activate(s.t.id);
   });
   tabsEl.addEventListener('auxclick', (e) => {
