@@ -114,6 +114,13 @@ test('un nome solo simile non conta come l\'installer', { skip: !haBash && 'serv
   assert.notEqual(eseguiControllo(['Filo-Setup.exe.blockmap', 'latest.yml']).status, 0);
 });
 
+// Un elenco più grande del tubo rende certo il SIGPIPE che con poche righe capitava solo sotto carico (#2402).
+test('una bozza completa con molti allegati passa', { skip: !haBash && 'serve bash' }, () => {
+  const altri = Array.from({ length: 10000 }, (_, i) => `allegato-${String(i).padStart(5, '0')}-di-prova.bin`);
+  const r = eseguiControllo(['Filo-Setup.exe', ...altri, 'latest.yml']);
+  assert.equal(r.status, 0, r.out.slice(-400));
+});
+
 test('righe con \\r in coda (gh su Windows) non bloccano una bozza completa', { skip: !haBash && 'serve bash' }, () => {
   const r = eseguiControllo(TUTTI, { crlf: true });
   assert.equal(r.status, 0, r.out);

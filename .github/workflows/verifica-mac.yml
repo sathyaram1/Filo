@@ -166,9 +166,10 @@ jobs:
           APP="dist/mac-universal/Filo.app"
           test -d "$APP" || APP=$(find dist -maxdepth 2 -name 'Filo.app' -print -quit)
           echo "app: $APP"
-          lipo -info "$APP/Contents/MacOS/Filo"
-          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'x86_64' || {
+          ARCHITETTURE=$(lipo -info "$APP/Contents/MacOS/Filo")
+          echo "$ARCHITETTURE"
+          grep -q 'x86_64' <<< "$ARCHITETTURE" || {
             echo "::error::il pacchetto non contiene la parte Intel"; exit 1; }
-          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'arm64' || {
+          grep -q 'arm64' <<< "$ARCHITETTURE" || {
             echo "::error::il pacchetto non contiene la parte Apple Silicon"; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$APP"

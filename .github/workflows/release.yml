@@ -425,7 +425,7 @@ jobs:
           echo "Allegati nella bozza:"
           echo "$ELENCO"
           for ATTESO in Filo-Setup.exe latest.yml; do
-            echo "$ELENCO" | grep -qx "$ATTESO" || {
+            grep -qxF "$ATTESO" <<< "$ELENCO" || {
               echo "::error::manca $ATTESO nella bozza ${{ steps.bump.outputs.version }}: non la pubblico."
               {
                 echo "## Pubblicazione ferma: manca $ATTESO"
@@ -677,7 +677,7 @@ jobs:
           ATTESI=$(node "$ALLARME/release-platform-alarm.mjs" --attesi Mac)
           MANCANTI=""
           for ATTESO in $ATTESI; do
-            echo "$ELENCO" | grep -qx "$ATTESO" || MANCANTI="${MANCANTI}${ATTESO} "
+            grep -qxF "$ATTESO" <<< "$ELENCO" || MANCANTI="${MANCANTI}${ATTESO} "
           done
           # Si elencano TUTTI i mancanti, non solo il primo: chi prende il
           # feedback deve sapere quanto manca, non scoprirlo un file alla volta.
@@ -967,7 +967,7 @@ jobs:
           ATTESI=$(node "$ALLARME/release-platform-alarm.mjs" --attesi Linux)
           MANCANTI=""
           for ATTESO in $ATTESI; do
-            echo "$ELENCO" | grep -qx "$ATTESO" || MANCANTI="${MANCANTI}${ATTESO} "
+            grep -qxF "$ATTESO" <<< "$ELENCO" || MANCANTI="${MANCANTI}${ATTESO} "
           done
           # Si elencano TUTTI i mancanti, non solo il primo: chi prende il
           # feedback deve sapere quanto manca, non scoprirlo un file alla volta.
