@@ -3479,7 +3479,10 @@
       el.setSelectionRange(range.start, range.end);
       // Il documento del campo: quello di un riquadro, quando lo corregge la pagina («Valuta», #1449).
       const doc = el.ownerDocument || document;
-      if (testo) doc.execCommand('insertText', false, testo);
+      // insertText paga ogni a capo (mille righe: dieci secondi di pagina ferma); in una casella insertHTML scrive lo
+      // stesso testo esatto in un passo solo (#2052).
+      if (testo.includes('\n')) doc.execCommand('insertHTML', false, testo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+      else if (testo) doc.execCommand('insertText', false, testo);
       else if (range.end > range.start) doc.execCommand('delete', false);
     } catch (_) {}
     if (el.value === prima) return false;
