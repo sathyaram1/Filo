@@ -52,7 +52,12 @@ async function rilascia(page, quale, nome, tipo) {
   }, { quale, nome, tipo });
 }
 
-const byteDelData = (u) => Math.floor((u.length - u.indexOf(',') - 1) * 3 / 4);
+// Quello che parte è quello che la miniatura mostra: se ne leggono peso e tipo.
+const miniaturaN = (page, i) => page.evaluate(async (i) => {
+  const src = document.querySelectorAll('.sn-fb-thumb img')[i].getAttribute('src');
+  const b = await (await fetch(src)).blob();
+  return { size: b.size, type: b.type };
+}, i);
 
 test('riquadro: una foto oltre i 4 MB entra rimpicciolita, un AVIF entra ridisegnato, un HEIC si rifiuta col perché', async ({ app, shell }) => {
   test.setTimeout(90_000);
