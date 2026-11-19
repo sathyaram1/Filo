@@ -588,23 +588,31 @@
       if (!file) return;
       // Il TIPO si guarda PRIMA di caricare: «Tutti i file» del selettore e il drop passano anche quello che il
       // deposito rifiuta, e se ne leggeva il numero d'errore invece della frase giusta.
-      const kind = classificaAllegato(file);
+      const IC = window.SN_IMMAGINI_CHAT;
+      const kind = classificaAllegato(file) || (IC?.daRidisegnare?.(file) ? 'image' : null);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
       const c = counts();
       if (isImg && c.imgs >= ATTACH_MAX_IMAGES) { setStatus(`Massimo ${ATTACH_MAX_IMAGES} immagini.`); return; }
       if (!isImg && c.files >= ATTACH_MAX_FILES) { setStatus(`Massimo ${ATTACH_MAX_FILES} file.`); return; }
-      if (file.size > ATTACH_MAX_BYTES) { setStatus(`«${file.name || 'file'}» troppo grande (max 4 MB).`); return; }
+      if ((!isImg || !IC?.perLaSegnalazione) && file.size > ATTACH_MAX_BYTES) { setStatus(`«${file.name || 'file'}» troppo grande (max 4 MB).`); return; }
       if (!window.SN_FEEDBACK?.uploadAttachment) { setStatus('Upload non disponibile.'); return; }
       uploading++; btn.disabled = true; setStatus('Caricamento…');
+      let avviso = '';
       try {
+        if (isImg && IC?.perLaSegnalazione) {
+          const pronta = await IC.perLaSegnalazione(file);
+          if (!pronta || pronta.motivo) { setStatus(`«${file.name || 'immagine'}»: ${pronta ? pronta.motivo : 'tipo non supportato'}.`); return; }
+          if (pronta.avviso) avviso = `«${file.name || 'immagine'}» ${pronta.avviso}.`;
+          file = pronta.file;
+        }
         const att = await SN_FEEDBACK.uploadAttachment(file, file.name);
         // La copia in chiaro è qui, ed è l'anteprima: quella che sta nel
         // deposito è cifrata e in un <img> non compare (#602).
         if (att && att.kind === 'img') ricordaAnteprimaLocale(att.url, file);
         attachments.push(att);
         renderThumbs();
-        setStatus('');
+        setStatus(avviso);
         if (typeof onChange === 'function') onChange();
       } catch (e) {
         // #602 — se a fermarsi è stata la cifratura, la frase è già quella

@@ -645,19 +645,29 @@
     // null se l'allegato è entrato, sennò { name, reason }.
     const TIPO_NO = 'tipo non supportato';
     const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
+    // { file } entro il tetto, { motivo }, o null se non è un'immagine: le regole stanno in src/shared/immaginiChat.js.
+    async function preparaImmagine(blob) {
+      const IC = global.SN_IMMAGINI_CHAT;
+      if (IC && typeof IC.perLaSegnalazione === 'function') return IC.perLaSegnalazione(blob);
+      if (classifyAttachment(blob) !== 'image') return null;
+      return blob.size > MAX_ATTACH_BYTES ? { motivo: 'troppo grande (max 4 MB)' } : { file: blob };
+    }
     async function addImageFromBlob(blob) {
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
       if (!blob) return null;
-      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
       if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
-      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
-      const dataUrl = await blobToDataUrl(blob);
+      const pronta = await preparaImmagine(blob);
+      if (!pronta) return scarto(blob, TIPO_NO, 'immagine');
+      if (pronta.motivo) return scarto(blob, pronta.motivo, 'immagine incollata');
+      const dataUrl = await blobToDataUrl(pronta.file);
+      // Due gesti di fila: mentre si rimpiccioliva la prima, la seconda può aver preso l'ultimo posto.
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
-      return null;
+      return pronta.avviso ? { name: String(blob.name || 'immagine'), avviso: pronta.avviso } : null;
     }
 
     async function addAttachment(file) {
@@ -665,8 +675,8 @@
       // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
       // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
+      if (kind === 'image' || global.SN_IMMAGINI_CHAT?.daRidisegnare?.(file)) return addImageFromBlob(file);
       if (!kind) return scarto(file, TIPO_NO, 'allegato');
-      if (kind === 'image') return addImageFromBlob(file);
       if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
       if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
       const dataUrl = await blobToDataUrl(file);
@@ -684,16 +694,18 @@
     // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
     async function allega(lista, aggiungi = addAttachment) {
       const fuori = [];
+      const avvisi = [];
       for (const f of lista) {
         const no = await aggiungi(f);
-        if (no) fuori.push(no);
+        if (no && no.avviso) avvisi.push(`«${no.name}» ${no.avviso}.`);
+        else if (no) fuori.push(no);
       }
-      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = avvisi.join(' '); return; }
       const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
         : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
       const tipi = fuori.some((f) => f.reason === TIPO_NO)
         ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
-      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
+      statusEl.textContent = [`${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`, ...avvisi].join(' ');
     }
 
     function caricaImmagine(src) {
