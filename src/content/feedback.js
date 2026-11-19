@@ -668,9 +668,7 @@
       // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
       // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
-      if (kind === 'image' || (!kind && global.SN_IMMAGINI_CHAT?.perLaSegnalazione)) {
-        if (kind || await preparaImmagine(file)) return addImageFromBlob(file);
-      }
+      if (kind === 'image' || global.SN_IMMAGINI_CHAT?.daRidisegnare?.(file)) return addImageFromBlob(file);
       if (!kind) return scarto(file, TIPO_NO, 'allegato');
       if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
       if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
