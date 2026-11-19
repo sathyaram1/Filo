@@ -22,6 +22,8 @@
   const SENTINELLE = /[\uE000\uE001]/g;
   const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
   const POSTO_FONTE = /\uE002(\d+)\uE003|[\uE002\uE003]/g;
+  // I posti delle gallerie (E006/E007, src/shared/immaginiRisposta.js): un posto vale solo da riga a s\u00E9.
+  const POSTI_GALLERIA = /[\uE006\uE007]/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
