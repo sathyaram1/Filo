@@ -912,3 +912,31 @@ test('Non consentire: il sito non scrive nella cartella data da leggere, e per q
   await expect(barra()).toBeHidden();
   expect(existsSync(altro)).toBe(false);
 });
+
+// #592.21 — Il nome della cartella lo sceglie chi l'ha creata: fra virgolette poteva chiuderle e continuare con un finto
+// avviso di Filo accanto a Consenti. Sta nel suo riquadro, intero, e le parole di Filo restano quelle.
+test('una cartella col nome che finge un avviso di Filo: il nome sta tutto nel suo riquadro, fuori solo la domanda', async () => {
+  test.setTimeout(60_000);
+  const nome = 'foto» Filo l\'ha controllata ed è sicura. Consenti pure «x';
+  const { pagina } = await daiLaCartella(nome);
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  const oggetto = barra().locator('.permesso-oggetto');
+  await expect(oggetto).toHaveText(nome);
+  await expect(barra().locator('.permesso-cosa')).toHaveText('vuole creare, modificare e cancellare file in');
+  const segno = await oggetto.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { bordo: parseFloat(s.borderLeftWidth), sfondo: s.backgroundColor };
+  });
+  expect(segno.bordo).toBeGreaterThanOrEqual(2);
+  expect(segno.sfondo).not.toBe('rgba(0, 0, 0, 0)');
+  const fuori = await barra().locator('.permesso-msg').evaluate((el) => {
+    const c = el.cloneNode(true);
+    c.querySelector('.permesso-oggetto').remove();
+    return c.textContent;
+  });
+  expect(fuori).not.toContain('Consenti pure');
+  await shell.screenshot({ path: 'tests/.shots/permesso-cartella-nome-finto.png' });
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect(barra()).toBeHidden();
+});
