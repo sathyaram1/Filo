@@ -11,7 +11,7 @@
     {
       version: '0.2.295', date: '2026-11-20',
       features: [
-        { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Chiedigli di disegnare qualcosa e crea l\'immagine, segnata come fatta con l\'AI.', segnalazione: 2272 },
+        { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Con un modello che disegna, scelto in Impostazioni alla voce «Immagini create in chat», crea anche le immagini che gli chiedi, segnate come fatte con l\'AI.', segnalazione: 2272 },
       ],
     },
     {
