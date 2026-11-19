@@ -34,7 +34,7 @@ async function pagina(app, shell, url) {
   return page;
 }
 
-// Le chiavi di storage.json quando l'avvio si è posato: quelle di un Filo appena installato sono il metro.
+// Le chiavi di storage.json in questo istante, con le scritture in corso già sul disco.
 async function chiaviPosate(app, userData) {
   await app.evaluate(() => globalThis.__filoStorage.whenSettled());
   await app.evaluate(() => globalThis.__filoStorage.flushNow());
