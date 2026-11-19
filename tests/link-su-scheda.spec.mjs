@@ -108,6 +108,9 @@ test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fo
   const dopo = await stato(shell);
   expect(dopo.schede).toHaveLength(5);
   expect(dopo.attiva).toBe(dopo.schede.at(-1).id);
+  let sito = null;
+  await expect.poll(() => Boolean(sito = app.windows().find((w) => w.url() === due)), { timeout: 8_000 }).toBe(true);
+  await sito.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
   // La miniatura lasciata dove non c'è una scheda: l'immagine va alla chat come prima (#1623), nessuna scheda nuova.
   // La fila si è allungata: la parte vuota si rimisura, o il punto cadrebbe sulla scheda appena nata.
   await expect(shell.locator('.tab')).toHaveCount(5);
