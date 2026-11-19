@@ -65,6 +65,10 @@ test('un\'azione secca non chiude il turno se il messaggio ha anche una domanda 
   assert.equal(chiudeIlTurno(tema, { messaggio: 'metti il tema scuro' }), true);
   assert.equal(chiudeIlTurno(tema, { messaggio: 'puoi mettere il tema scuro?' }), true);
   assert.equal(chiudeIlTurno(tema, { messaggio: 'metti il tema scuro. Non ho capito quel feedback: cos\'era?' }), false);
+  // La domanda che è la richiesta stessa (#2593): l'OK chiesto per guardare le risponde dopo, il modello non riparte ora.
+  const guarda = [{ action: { type: 'VEDI_SCHERMO' }, res: { needsConfirm: true }, rendered: { type: 'VEDI_SCHERMO' } }];
+  assert.equal(chiudeIlTurno(guarda, { messaggio: 'guarda lo schermo e dimmi cosa vedi' }), true);
+  assert.equal(chiudeIlTurno(tema, { messaggio: 'cos\'è il tema scuro?' }), true);
 });
 
 test('la scheda dopo e quella prima: la stessa regola di Ctrl+Tab, in tondo', () => {
