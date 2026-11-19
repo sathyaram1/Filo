@@ -27,6 +27,7 @@ require(join(ROOT, 'src', 'shared', 'onboarding.js'));
 require(join(ROOT, 'src', 'shared', 'capabilities.js'));
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+require(join(ROOT, 'src', 'shared', 'actionTools.js'));
 
 const O = globalThis.SN_ONBOARDING;
 const C = globalThis.SN_CONST;
