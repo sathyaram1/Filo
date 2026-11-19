@@ -945,7 +945,7 @@
   }
 
   // ===== Bolle conversazione =====
-  function makeBubble({ role, text, pending = false, markdown = false, fonti = null }) {
+  function makeBubble({ role, text, pending = false, markdown = false, fonti = null, immagini = null }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
