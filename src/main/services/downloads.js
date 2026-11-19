@@ -1424,7 +1424,7 @@ function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', ...elenco(scope) };
   // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
-  if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, ...elenco(scope) };
+  if (rec._riprovaTimer || liveManual.has(rec.id) || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, ...elenco(scope) };
   // Un video in streaming non ha un file da riscaricare: si rifà il salvataggio dalla pagina (#1488), anche da una
   // voce riuscita («Ri-scarica»), che resta com'è mentre ne nasce una nuova.
   if (rec.via === 'streaming' && !NON_TERMINAL.has(rec.state)) {
