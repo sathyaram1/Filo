@@ -919,6 +919,23 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
   deliver();
 });
 
+// «Traduci la pagina» chiesto a Filo in chat (#504): la stessa traduzione dell'icona, con la risposta su com'è andata.
+// Dove Filo è spento il menu non c'è, e nemmeno questa strada.
+ipcRenderer.on('filo:traduci-pagina', (_event, d = {}) => {
+  if (IS_SUBFRAME) return;
+  const rid = String((d && d.rid) || '');
+  const rispondi = () => {
+    let esito = { stato: 'muto' };
+    if (globalThis.__snFiloSpento === true) esito = { stato: 'spento' };
+    else if (contenutiPronti()) {
+      try { esito = globalThis.SN_TRANSLATE_PAGE.daChat(d.originale === true) || esito; } catch (_) {}
+    }
+    try { ipcRenderer.send('filo:traduci-pagina-esito', { rid, ...esito }); } catch (_) {}
+  };
+  if (!contenutiPronti()) { waitForContentScripts(rispondi); return; }
+  rispondi();
+});
+
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
