@@ -108,7 +108,7 @@ test.describe('il carattere dei riquadri sui siti (#1342)', () => {
 
     await apriCronologia(app, page, '#campo');
     await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
-    await expect.poll(() => nelMondoDiFilo(app, page, FONT, '.sn-menu-history-paste')).toBe('serif');
+    await expect.poll(() => carattereCronologia(app, page)).toBe('serif');
     await page.keyboard.press('Escape');
     await expect(menuDi(page).pannelli).toHaveCount(0);
 
