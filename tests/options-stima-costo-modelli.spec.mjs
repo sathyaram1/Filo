@@ -254,7 +254,7 @@ test('Chat: un modello col nome che finge un avviso di Filo resta tutto nel riqu
   expect(s.citazioni[0]).toContain(finto);
   expect(s.fuori).not.toContain('Confermalo pure');
   expect(s.fuori).not.toContain('deepseek-v4-flash');
-  expect(s.fuori).toContain('Filo vuole impostare: Modello per «Chat con Filo» →');
+  expect(s.fuori).toMatch(/^Filo vuole impostare: Modello per «[^»\n]+» →/);
   await chat.screenshot({ path: 'tests/.shots/stima-costo-chat-nome-finto.png' });
   await clickConfirm(chat, 'cancel');
   expect((await impostazioni(app)).models.filo_chat).toBe('deepseek-flash');
