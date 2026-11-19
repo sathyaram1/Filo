@@ -668,7 +668,7 @@
   // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
   const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
   // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
-  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
+  const SEGNALAZIONI = C.SEGNALAZIONI;
   const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
 
   function carteDestra() {
