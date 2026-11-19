@@ -69,7 +69,7 @@ async function azioneVolumeBluetoothWifi(action, { type }) {
 }
 
 // #2377 — la stessa porta della lettera B del doppio Ctrl.
-async function azioneBloccaPc(action) { // eslint-disable-line no-unused-vars
+async function azioneBloccaPc(action) {
   const B = require('../bloccaComputer');
   const r = await B.blocca();
   return { executed: !!r.ok, kept: false, output: r.ok ? { bloccato: true } : { error: B.frase(r.errore) } };
