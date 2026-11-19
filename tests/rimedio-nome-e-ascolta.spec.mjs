@@ -92,7 +92,7 @@ test('pagina Download, coi crediti finiti: «Dai un nome sensato» dice perché 
     await riga.click({ button: 'right' });
     await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
     const stato = dl.locator('.sn-rinomina .sn-rinomina-stato');
-    await expect(stato).toContainText(/invito|Crediti/, { timeout: 15000 });
+    await expect(stato).toContainText('crediti', { timeout: 15000 });
     const tasto = stato.locator('.sn-rinomina-rimedio');
     await expect(tasto).toHaveText('Apri Crediti');
     await dl.locator('.sn-rinomina').screenshot({ path: join(SHOTS, '1344-2-nome-download.png') });
