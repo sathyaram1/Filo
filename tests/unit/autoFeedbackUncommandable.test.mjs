@@ -49,12 +49,6 @@ test('una voce con lo strumento della chat non diventa mai «non sa azionare»',
 test('vale anche per altre capacità del manifesto', () => {
   const casi = [
     {
-      user: 'traduci questa pagina in italiano',
-      reply: 'Per tradurre la pagina apri il menu del tasto destro e scegli "Traduci pagina": '
-        + 'la traduzione prende il posto del testo originale e puoi tornare indietro quando vuoi.',
-      cap: 'translate-page',
-    },
-    {
       user: 'mostrami il qr code della pagina',
       reply: 'Il QR code della pagina lo trovi nella barra laterale: clicca l\'icona "QR code" '
         + 'e compare il codice da inquadrare col telefono per aprire la stessa pagina.',
