@@ -77,11 +77,12 @@ test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pa
   const img = await ascolta((req, res) => {
     const ref = String(req.headers.referer || '');
     visti.push(ref);
-    console.log('DEBUG2', req.method, req.url, JSON.stringify(req.headers));
     if (!ref.startsWith(testServer.origin)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('hotlink'); return; }
-    // La prima richiesta la mostra nella pagina; il primo salvataggio cade a metà, dopo le intestazioni: la riga nasce e
-    // resta «non riuscita».
-    if (++richieste === 2) {
+    // Il salvataggio dal menu (i byte che Filo prende per conto della scheda) cade a metà, dopo le intestazioni: la riga
+    // nasce e resta «non riuscita». Mostrarla nella pagina e scaricarla dal «Riprova» riescono.
+    richieste++;
+    if (req.headers['sec-fetch-mode'] === 'no-cors' && req.headers['sec-fetch-dest'] === 'empty') {
+      salvataggiCaduti++;
       res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': PNG.length * 10 });
       res.write(PNG);
       setTimeout(() => res.destroy(), 100);
