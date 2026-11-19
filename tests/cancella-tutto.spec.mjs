@@ -182,6 +182,7 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     const avvisi = async () => (await Promise.all(app.windows().map((w) => w.evaluate(() => document.body?.textContent || '').catch(() => '')))).join('\n');
     await expect.poll(avvisi, { timeout: 15_000 }).toContain('Ho cancellato tutti i dati di Filo');
   } finally {
+    if (metro) await chiudiApp(metro);
     if (app) await chiudiApp(app);
     for (const d of [vergine, userData, dirname(zip)]) togliCartella(d);
   }
