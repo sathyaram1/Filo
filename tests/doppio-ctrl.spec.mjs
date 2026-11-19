@@ -215,5 +215,46 @@ test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chi
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('z')]);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)
     ._filoTabs.tabs.some((t) => t.url === u), indirizzo), { timeout: 10_000 }).toBe(true);
-  void url;
+});
+
+test('M, U e B passano dalle porte della chat: muto e smuto, le cuffie preferite, il blocco; L legge la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // Un computer finto: i comandi arrivano a lui, con la stessa forma del vero.
+  await app.evaluate(() => {
+    globalThis.__chiamate = [];
+    const pc = { muto: false, cuffie: false };
+    globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer({
+      async volume(p) { globalThis.__chiamate.push(['volume', p.muto]); pc.muto = p.muto; return { ok: true, volume: 40, muto: pc.muto, prima: 40 }; },
+      async radio(p) { return { ok: true, acceso: p.acceso }; },
+      async btElenco() { return { ok: true, acceso: true, dispositivi: [{ nome: 'Cuffie blu', indirizzo: 'AA:BB:CC:DD:EE:FF', collegato: pc.cuffie }] }; },
+      async btCollega(p) { globalThis.__chiamate.push(['cuffie', p.collega]); pc.cuffie = p.collega; return { ok: true, collegato: p.collega }; },
+    });
+    const rq = process.mainModule.require;
+    rq(rq('node:path').join(process.cwd(), 'src/main/services/bloccaComputer.js'))._perProve.usaFinto(() => { globalThis.__chiamate.push(['blocca']); return { ok: true }; });
+  });
+  await imposta(app, { bluetoothPreferiti: ['AA:BB:CC:DD:EE:FF'] });
+  const page = await testServer.openReady(openTab, `${PAGINA}<script>
+    window.__letto = '';
+    document.addEventListener('filo:read-aloud', (e) => { window.__letto = e.detail && e.detail.text; });
+  </script>`);
+  const chiamate = () => app.evaluate(() => globalThis.__chiamate);
+  const doppio = (l) => premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera(l), ['attendi', 400]]);
+
+  await doppio('m');
+  await expect.poll(chiamate).toEqual([['volume', true]]);
+  await doppio('u');
+  await expect.poll(chiamate).toEqual([['volume', true], ['cuffie', true]]);
+  await doppio('u');
+  await expect.poll(chiamate).toEqual([['volume', true], ['cuffie', true], ['cuffie', false]]);
+  await doppio('b');
+  await expect.poll(chiamate).toEqual([['volume', true], ['cuffie', true], ['cuffie', false], ['blocca']]);
+
+  await doppio('l');
+  await expect.poll(() => page.evaluate(() => window.__letto), { timeout: 10_000 }).toContain('Testo della pagina da leggere.');
+  expect(await page.evaluate(() => window.__tasti)).toEqual([]);
+  await app.evaluate(() => {
+    globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer(null);
+    const rq = process.mainModule.require;
+    rq(rq('node:path').join(process.cwd(), 'src/main/services/bloccaComputer.js'))._perProve.usaFinto(null);
+  });
 });
