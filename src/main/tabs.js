@@ -3342,6 +3342,10 @@ class TabManager {
     });
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
+    // Una scheda di dietro che si carica si prende la tastiera da sola (#871.5): torna a quella davanti.
+    wc.on('focus', () => setImmediate(() => {
+      if (tab.id !== this.activeId && tab.view.webContents === wc && this.tabs.includes(tab)) this._tastieraAllaSchedaAttiva();
+    }));
     this._sbSeguiPuntatore(tab, wc);
     this.riquadri.segui(wc);
     wc.on('before-input-event', (event, input) => {
