@@ -512,6 +512,9 @@
 
   let openMenu = null;
   let fuocoPrimaDelMenu = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let scorsoDopo = () => true;
+  function onMenuScroll(e) { if (scorsoDopo(e)) closeCtxMenu(); }
   function closeCtxMenu() {
     if (!openMenu) return;
     const eraDentro = openMenu.contains(document.activeElement);
@@ -519,7 +522,7 @@
     openMenu = null;
     document.removeEventListener('mousedown', onOutsideClick, true);
     document.removeEventListener('keydown', onMenuKeydown, true);
-    window.removeEventListener('scroll', closeCtxMenu, true);
+    window.removeEventListener('scroll', onMenuScroll, true);
     window.removeEventListener('resize', closeCtxMenu);
     if (eraDentro && fuocoPrimaDelMenu && document.contains(fuocoPrimaDelMenu)) {
       try { fuocoPrimaDelMenu.focus(); } catch (_) {}
