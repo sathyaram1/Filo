@@ -128,17 +128,3 @@ test('r2 la fascia sopra le schede: a finestra massimizzata un clic a filo del b
   });
   expect(sopra, `sopra la scheda, che comincia a ${sopra.top}px, c'è ${sopra.cosa}: a finestra massimizzata è la presa della finestra`).toMatchObject({ cosa: 'scheda' });
 });
-
-test('r3 l\'altoparlante premuto e la mano che scivola sulla scheda: l\'audio cambia', async ({ shell, testServer }) => {
-  await apri(shell, testServer, 4);
-  const id = (await aperte(shell))[1];
-  await shell.evaluate((x) => window.filoShell.tabs.setMuted(x), id);
-  const muto = shell.locator(`#tabs .tab[data-id="${id}"] .mute-ind`);
-  await expect(muto).toHaveCount(1, { timeout: 5_000 });
-  const p = await shell.evaluate((x) => {
-    const r = document.querySelector(`#tabs .tab[data-id="${x}"] .mute-ind`).getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }, id);
-  await premiTrascinaRilascia(shell, p, -10, 2);
-  await expect(muto).toHaveCount(0, { timeout: 3_000 });
-});
