@@ -238,6 +238,7 @@
       else citate[k + 1].commento = unisci(c.commento, citate[k + 1].commento);
     }
     citate.splice(k, 1);
+    if (!citate.length) fuori = false;
     disegnaAnteprima();
     return true;
   }
