@@ -368,6 +368,11 @@
       description: 'una regola breve in terza persona su come comportarti con l\'utente, che vale da subito in ogni conversazione.',
       properties: { testo: S() }, required: ['testo'],
     },
+    LEGGI_MEMORIA: {
+      via: ['memoria', 'leggi'], risultato: true,
+      description: 'la memoria intera, quando non è nel CONTESTO.',
+      properties: {}, required: [],
+    },
     CORREGGI_MEMORIA: {
       via: ['memoria', 'correggi'],
       description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta).',
