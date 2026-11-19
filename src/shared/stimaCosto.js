@@ -65,6 +65,7 @@
     [A.TRANSCRIBE_IMAGE]: ['immagine', U('immagine', 'immagini')],
     [A.FILE_NAME]: ['immagine', U('file', 'file')],
     [A.EMBED_COOKIE_CHECK]: ['immagine', U('riquadro', 'riquadri')],
+    [A.IMAGE_GEN]: ['generazione', U('immagine', 'immagini')],
     [A.ARCHIVE_EMBED]: ['vettori', U('scheda', 'schede')],
     [A.TTS]: ['voce', U('lettura', 'letture')],
     [A.TRANSCRIBE_AUDIO]: ['voce', U('dettatura', 'dettature')],
