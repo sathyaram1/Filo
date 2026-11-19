@@ -184,6 +184,7 @@
     [A.PROVIDER_TEST]: 'deepseek-flash, gemma-lite',
     [A.FILE_NAME]: 'gemma, glm',
     [A.EMBED_COOKIE_CHECK]: 'gemma, glm',
+    [A.IMAGE_GEN]: 'pittore',
   };
 
   global.SN_TEST_MODELS = { registry, models };
