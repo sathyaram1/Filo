@@ -1,6 +1,6 @@
 // Le immagini che la chat mette nelle risposte (#2272): trovate sul web (Tavily, Wikimedia Commons) o create da un
 // modello. Le scarica e le copia il main, così la pagina mostra solo copie locali e nessun indirizzo scelto dal modello.
-// Regole del disegno: src/shared/immaginiRisposta.js. Prove: tests/unit/immaginiChat.test.mjs, tests/chat-immagini.spec.mjs.
+// Regole del disegno: src/shared/immaginiRisposta.js. Prove: tests/unit/immaginiDelleRisposte.test.mjs, tests/chat-immagini.spec.mjs.
 
 'use strict';
 
