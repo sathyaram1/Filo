@@ -106,6 +106,7 @@
       return { icon: '💬', text: `Cerco nel filo: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
     LEGGI_IMPOSTAZIONI: (a) => {
       const c = String(a.cerca || '').trim();
       return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
