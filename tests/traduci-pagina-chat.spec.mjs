@@ -109,9 +109,13 @@ test('«traducimi la pagina»: si traduce; chiesto di nuovo resta tradotta; «to
   await expect.poll(async () => (await avvisi(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
   await page.screenshot({ path: 'tests/.shots/traduci-pagina-chat-tradotta.png' }).catch(() => {});
 
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, r)).toMatch(/^Traduzione della pagina partita/);
+
   // L'icona su una pagina tradotta torna all'originale; la frase no: Filo dice che è già fatto.
   await expect.poll(async () => (await traduci(app)).output.traduzione, { timeout: 30000 }).toBe('gia_tradotta');
   await expect(page.locator('#head')).toHaveText(/^IT A feed/);
+  const gia = await traduci(app);
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, gia)).toMatch(/^La pagina è già tradotta tutta/);
 
   const via = await originale(app);
   expect(via.executed).toBe(true);
