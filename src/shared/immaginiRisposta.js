@@ -312,7 +312,6 @@
       apritori.delete(root);
       root.removeEventListener('click', alClic, true);
       root.removeEventListener('wheel', allaRotella);
-      root.removeEventListener('scroll', alloScorrere, true);
       root.removeEventListener('mouseover', allEntrata, true);
     };
   }
