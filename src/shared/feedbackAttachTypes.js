@@ -50,8 +50,14 @@
     return null;
   }
 
-  // Il selettore propone solo quello che `classify` accetta: con image/* e text/* offriva SVG e HTML, poi rifiutati.
-  const ACCEPT = [...RASTER_IMAGE_MIME, ...DOC_MIME, ...[...IMAGE_EXT, ...DOC_EXT].map((e) => `.${e}`)].join(',');
+  // Immagini fuori elenco che si allegano ridisegnate (src/shared/immaginiChat.js): queste il browser le apre, le
+  // altre si riconoscono solo per dire perché non entrano (#1664).
+  const RIDISEGNABILI_EXT = new Set(['avif', 'jfif', 'ico']);
+  const NON_APRIBILI_EXT = new Set(['heic', 'heif', 'tif', 'tiff']);
+
+  // Il selettore propone solo quello che entra: con image/* e text/* offriva SVG e HTML, poi rifiutati.
+  const ACCEPT = [...RASTER_IMAGE_MIME, 'image/avif', ...DOC_MIME,
+    ...[...IMAGE_EXT, ...RIDISEGNABILI_EXT, ...DOC_EXT].map((e) => `.${e}`)].join(',');
   const AMMESSI = 'immagini (PNG, JPEG, GIF, WebP, BMP), PDF, testo, Markdown, CSV, TSV, JSON, YAML e log';
   const MESSAGGIO_TIPO = `Tipo di file non supportato. Ammessi: ${AMMESSI}.`;
   // Gli stessi tetti per ogni casella che allega: il deposito e il server li controllano di nuovo.
