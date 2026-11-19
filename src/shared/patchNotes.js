@@ -12,6 +12,7 @@
       version: '0.2.294', date: '2026-11-19',
       fixes: [
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
+        { testo: 'Se Filo risponde coi suoi crediti perché la tua chiave OpenRouter è stata rifiutata mentre sei in un\'altra applicazione, l\'avviso che lo dice ti aspetta e compare quando torni su Filo.', segnalazione: 662 },
       ],
     },
     {
