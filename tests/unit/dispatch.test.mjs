@@ -977,21 +977,18 @@ test('diffForBranch: un diff vuoto passa solo se il contenuto del ramo è davver
   assert.equal(diffForBranch('worker/vero', repo).vuoto, undefined);
 
   // Al controllo il vuoto arriva col suo perché, mai muto.
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
   const bucket = { role: 'secaudit', id: 's', num: '#740', branch: 'worker/annullato' };
-  let out = '';
-  const real = process.stdout.write;
-  process.stdout.write = (s) => { out += s; return true; };
-  try { emit(bucket, serverCtx(bucket, null, annullato)); } finally { process.stdout.write = real; }
-  const j = JSON.parse(out);
-  assert.match(j.payload.diffVuoto, /vuoto davvero[^]*2 commit propri/);
-  assert.equal(j.payload.diffCaratteri, 0);
-  assert.match(j.instructions, /diffVuoto/, 'il testo del ruolo dice cosa farne');
+  colContrattoVeroEGonfio(['secaudit.md'], (gonfia) => {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, serverCtx(bucket, null, annullato)); } finally { process.stdout.write = real; }
+    const j = JSON.parse(out);
+    if (gonfia) assert.ok(j.istruzioniFile, 'col contratto gonfio il ruolo esce nel suo file');
+    assert.match(j.payload.diffVuoto, /vuoto davvero[^]*2 commit propri/);
+    assert.equal(j.payload.diffCaratteri, 0);
+    assert.match(ruoloConsegnato(j), /diffVuoto/, 'il testo del ruolo dice cosa farne');
+  });
   assert.equal(buildPayload(bucket, serverCtx(bucket, null, diffForBranch('worker/vero', repo))).diffVuoto, undefined);
 });
 
