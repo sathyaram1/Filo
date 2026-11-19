@@ -1385,39 +1385,6 @@ function refererPer(paginaDelClic, verso) {
   } catch (_) { return ''; }
 }
 
-// Chromium scarta il Referer passato fra le intestazioni di downloadURL, e senza i siti che danno il file solo a chi
-// arriva dalla loro pagina rifiutano «Riprova»: lo presenta l'unico onBeforeSendHeaders della sessione (cookies.js),
-// alla richiesta di «Riprova» e ai suoi rimandi.
-const refererAttesi = new Map();   // indirizzo → [{ ses, pagina }]
-const refererInCorso = new Map();  // id della richiesta → pagina del clic
-function attendiReferer(indirizzo, ses, pagina) {
-  if (!pagina) return;
-  refererAttesi.set(indirizzo, (refererAttesi.get(indirizzo) || []).concat({ ses, pagina }));
-}
-function ritiraReferer(indirizzo, ses) {
-  const coda = refererAttesi.get(indirizzo);
-  if (!coda) return;
-  const i = coda.findIndex((x) => x.ses === ses);
-  if (i >= 0) coda.splice(i, 1);
-  if (!coda.length) refererAttesi.delete(indirizzo);
-}
-function refererDaPresentare(details, ses) {
-  if (!details || !details.url) return '';
-  if (/protett/.test(details.url)) console.log('DEBUGREF', details.url, details.resourceType, refererAttesi.size, JSON.stringify([...refererAttesi.keys()]), [...refererAttesi.values()].map((c) => c.map((x) => [x.ses === ses, x.pagina])));
-  let pagina = refererInCorso.get(details.id);
-  if (!pagina) {
-    const coda = refererAttesi.get(details.url);
-    const i = coda ? coda.findIndex((x) => x.ses === ses) : -1;
-    if (i < 0) return '';
-    pagina = coda.splice(i, 1)[0].pagina;
-    if (!coda.length) refererAttesi.delete(details.url);
-    // Tetto: è solo il filo fra una richiesta e i suoi rimandi.
-    if (refererInCorso.size > 64) refererInCorso.delete(refererInCorso.keys().next().value);
-    refererInCorso.set(details.id, pagina);
-  }
-  return refererPer(pagina, details.url);
-}
-
 // Chiave ambito+indirizzo → voci che aspettano il loro will-download. Un tentativo che non parte entro il tempo torna
 // «non riuscito», con «Riprova» di nuovo.
 const riprove = new Map();
