@@ -526,14 +526,18 @@ function chiudiFile(c, file) {
  */
 export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID']);
 
+/**
+ * Le cartelle che i test troverebbero della sessione anche senza variabili, sostituite da cartelle loro: il transcript più
+ * recente di Claude (#730.6), il clone di filo-security dove `aspetta` conta i processi del worker (#2562). PURA.
+ */
+export const cartelleDeiTest = (temp) => ({ CLAUDE_CONFIG_DIR: join(temp, 'claude-dei-test'), FILO_SERVER_CLONE: join(temp, 'filo-security-dei-test') });
+
 /** L'ambiente dei test. PURA. */
 export function ambientePerITest(base, temp = '') {
   // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
   const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, FILO_UNIT_TETTO_FERMO_MS: _f, ...env } = base || {};
   for (const k of IDENTITA_SESSIONE) delete env[k];
-  // Senza variabili la sessione si trova lo stesso: col biglietto in cartella vale il transcript più recente nella
-  // cartella di Claude (#730.6). I test ne hanno una loro, vuota, che se ne va con la corsa.
-  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp, CLAUDE_CONFIG_DIR: join(temp, 'claude-dei-test') });
+  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp, ...cartelleDeiTest(temp) });
   return env;
 }
 
