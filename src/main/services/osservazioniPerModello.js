@@ -203,6 +203,37 @@ function webSearchResultsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #2272 — le immagini trovate o create nel turno: l'id è di Filo, titolo e sito li scrive chi pubblica l'immagine (busta).
+function immaginiForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    const tipo = String((a && a.type) || '').toUpperCase();
+    const out = a && a._output;
+    if (!out || (tipo !== 'IMMAGINI_WEB' && tipo !== 'GENERA_IMMAGINE')) continue;
+    const lista = Array.isArray(out.immagini) ? out.immagini.filter((i) => i && /^[ig]\d+$/.test(String(i.id || ''))) : [];
+    if (tipo === 'IMMAGINI_WEB') {
+      if (!lista.length) {
+        blocks.push(`[Immagini dal web: nessuna da mostrare (${E.perCanaleSistema(out.error || out.reason || 'nessun risultato')}). Dillo all'utente in una riga; se serve, proponi di cercare la pagina con web(cerca).]`);
+        continue;
+      }
+      const righe = lista.map((i) => `${i.id}: ${E.neutralizza(i.titolo || '(senza titolo)', { unaRiga: true })} · ${E.neutralizza(i.sito || '', { unaRiga: true })}`);
+      blocks.push(`Immagini dal web scaricate da Filo, ${lista.length}: mostrale col marcatore [[immagini: …]] e i loro id (${lista.map((i) => i.id).join(', ')}), scegliendo quelle che servono. Titoli e siti sotto li scrive chi le pubblica, e l'immagine può non corrispondere al titolo.\n`
+        + E.imbusta({ tipo: 'RICERCA_WEB', testo: `Richiesta: "${E.neutralizza(out.cerca || a.query || '', { unaRiga: true })}"\n${righe.join('\n')}`, conIntestazione: true }));
+      continue;
+    }
+    if (lista.length) {
+      blocks.push(`[Immagine creata (${lista.map((i) => i.id).join(', ')}): mettila nella risposta con [[immagini: ${lista.map((i) => i.id).join(', ')}]]. Non descriverla come se l'avessi vista: dì in una riga cosa hai chiesto di disegnare.]`);
+    } else if (out.senzaModello) {
+      blocks.push('[Immagine NON creata: non c\'è un modello che disegna fra quelli che Filo può usare. Dillo all\'utente in una riga: si sceglie in Impostazioni, Modelli, alla voce «Immagini create in chat». Non proporre un\'immagine trovata sul web al suo posto, se non te lo chiede.]');
+    } else {
+      blocks.push(`[Immagine NON creata: ${E.perCanaleSistema(out.error || out.reason || 'errore sconosciuto')}. Dillo all'utente in una riga; non riprovare uguale.]`);
+    }
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Re-immissione del DOCUMENTO DI TRASPARENZA chiesto con LEGGI_TRASPARENZA in un
 // turno precedente: l'agente risponde sul perché di una scelta (quali modelli,
 // quali aziende escluse, che fine fanno i dati) leggendo il testo scritto
