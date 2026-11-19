@@ -135,7 +135,9 @@ test('clic sul più, scrivi, Invio: la richiesta parte dalla home nuova', async 
       P.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => { globalThis.__chat.push(JSON.stringify(messages)); onDelta && onDelta('Eccomi.'); return risposta(attempts, 'Eccomi.'); };
       P.completeWithFallback = async ({ attempts }) => risposta(attempts, '{}');
     });
-    await preparaFilo(app, shell, 'k-test').catch(() => {});
+    await preparaFilo(app, shell, 'k-test');
+    await d.navigate(app, shell, `${base}/modulo`);
+    await expect.poll(async () => (await indirizzi(app)).some((u) => u.includes('/modulo'))).toBe(true);
     const { map, voce } = await segno(app, shell, (x) => /^Nuova scheda/.test(x.label) && x.page === 'shell');
     let fuoco = await eseguiMossa(app, shell, { azione: 'clic', segno: voce.i }, map, null);
     await d.sleep(2000);
