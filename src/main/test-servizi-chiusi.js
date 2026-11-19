@@ -20,6 +20,20 @@ function hostChiuso(url) {
   return HOST_CHIUSI.includes(host);
 }
 
+// Una prova col modello finto chiude anche il resto della rete del main (#2177): la chiave finta andava a OpenRouter e i
+// cambi a frankfurter.dev, e il turno durava diverso fra GitHub e il contenitore. Resta aperta solo questa macchina.
+const RETE_CHIUSA = Symbol.for('filo.test.reteChiusa');
+const AVVOLTA = Symbol.for('filo.test.fetchAvvolta');
+
+/** Vero se `url` è http(s) verso una macchina che non è questa. PURA. */
+function fuoriDaQui(url) {
+  let u;
+  try { u = new URL(String(url)); } catch (_) { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const h = u.hostname.toLowerCase().replace(/\.$/, '');
+  return !(h === 'localhost' || h.endsWith('.localhost') || h === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h));
+}
+
 function urlDi(input) {
   if (typeof input === 'string') return input;
   if (input && typeof input.url === 'string') return input.url;
