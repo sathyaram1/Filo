@@ -28,7 +28,7 @@ export function leggiTasto(testo, piattaforma = process.platform) {
   const grezzo = String(testo || '').trim();
   if (!grezzo) return { ok: false, errore: 'tasto vuoto' };
   const t = grezzo === '+' ? 'Plus' : grezzo.split('+').map((p) => (CTRL_O_CMD.test(p.trim()) ? 'Ctrl' : p)).join('+');
-  if (T.soloModificatori(t) || /\+\s*$/.test(t) && !/\+\s*\+$/.test(t)) return { ok: false, errore: `nella combinazione «${grezzo}» manca il tasto` };
+  if (T.soloModificatori(t)) return { ok: false, errore: `nella combinazione «${grezzo}» manca il tasto` };
   const ignoto = T.pezzoSconosciuto(t);
   if (ignoto && ignoto.modificatore) return { ok: false, errore: `«${ignoto.nome}» non è un modificatore (Control, Shift, Alt, Meta)` };
   const l = T.letturaScritta(t);
