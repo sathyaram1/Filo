@@ -1969,9 +1969,14 @@
     // La finestra non sta ferma mentre la tendina è aperta (e in Filo si zooma di continuo): posare
     // solo all'apertura calcola il rientro su uno spazio che un istante dopo non c'è più.
     const riposa = () => { if (!pop.hidden) placePop(); };
+    // Chiude lo scorrimento che sposta il bottone, non quello del suo elenco né uno finito prima dell'apertura (#2586).
+    let scorsoDopo = () => true;
+    const scorre = (e) => { if (!(e.target instanceof Node && wrap.contains(e.target)) && scorsoDopo(e)) close(); };
     function open() {
       if (!pop.hidden) return;
       saveDocSelection(); // prima che il focus passi al popup
+      const b = button.getBoundingClientRect();
+      scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(b.left + b.width / 2, b.top + b.height / 2) || (() => true);
       pop.hidden = false;
       placePop();
       wrap.classList.add('sn-open');
