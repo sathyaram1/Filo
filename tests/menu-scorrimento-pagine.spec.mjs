@@ -111,7 +111,8 @@ test('Editor: la tendina dei font resta anche quando si scorre il suo elenco', a
   await aggiungiStrumento(page, 'font');
   const mod = strumento(page, 'font');
   const pop = mod.locator('.ed-font-pop');
-  await scorriAlGesto(page, 'click', mod.locator('.ed-font-button'));
+  // Al clic il punto del bottone deve restare quello: scorre il documento, non il pannello che lo porta.
+  await scorriAlGesto(page, 'click', mod.locator('.ed-font-button'), { finestra: true });
   await mod.locator('.ed-font-button').click();
   await fotogrammi(page);
   await expect(pop).toBeVisible();
