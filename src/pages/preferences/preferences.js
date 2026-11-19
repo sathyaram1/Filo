@@ -1604,7 +1604,7 @@
     const lista = $('doppioToccoTasti');
     if (lista && !lista.childElementCount && window.SN_CARTE_HOME) {
       const H = window.SN_CARTE_HOME;
-      for (const t of [...H.TASTI, ...H.CARTE.filter((c) => c.url)]) {
+      for (const t of H.conLettera()) {
         const o = document.createElement('option');
         o.value = t.titolo;
         lista.appendChild(o);
