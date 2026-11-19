@@ -56,7 +56,7 @@ test('la X lasciata appena fuori dal suo tondo chiude la scheda', async ({ shell
   await shell.mouse.move(x.x - x.w / 2 - 4, x.y + 3);
   await shell.mouse.up();
   await expect.poll(() => aperte(shell), { timeout: 3_000 }).not.toContain(ids[1]);
-  expect(await attiva(shell)).toBe(ids[2]);
+  expect(await attiva(shell)).toBe(ids.at(-1));
 });
 
 test('la X premuta e portata lontano non chiude e non apre la scheda', async ({ shell, testServer }) => {
@@ -70,7 +70,7 @@ test('la X premuta e portata lontano non chiude e non apre la scheda', async ({ 
   await shell.mouse.up();
   await shell.waitForTimeout(400);
   expect(await aperte(shell)).toEqual(ids);
-  expect(await attiva(shell)).toBe(ids[2]);
+  expect(await attiva(shell)).toBe(ids.at(-1));
 });
 
 test('dopo averla portata fuori dalla fila, il clic sulla scheda la apre', async ({ shell, testServer }) => {
@@ -82,7 +82,7 @@ test('dopo averla portata fuori dalla fila, il clic sulla scheda la apre', async
   await shell.mouse.up();
   await shell.waitForTimeout(300);
   expect(await aperte(shell)).toEqual(ids);
-  expect(await attiva(shell)).toBe(ids[2]);
+  expect(await attiva(shell)).toBe(ids.at(-1));
   await clicUmano(shell, await punto(shell, ids[0], null));
   await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[0]);
 });
@@ -97,7 +97,7 @@ test('dopo un trascinamento annullato con Esc sopra la vicina, il clic sulla sch
   await shell.mouse.up();
   await shell.waitForTimeout(300);
   expect(await aperte(shell)).toEqual(ids);
-  expect(await attiva(shell)).toBe(ids[2]);
+  expect(await attiva(shell)).toBe(ids.at(-1));
   await clicUmano(shell, await punto(shell, ids[0], null));
   await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[0]);
 });
