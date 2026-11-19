@@ -928,20 +928,16 @@
       let res = null;
       const parteDiUnUso = usoContato;
       usoContato = true;
+      // Senza riquadro sotto cui scrivere la riga del ripiego (#662): la dice l'avviso del main, che aspetta una pagina in vista.
       try {
         res = await chrome.runtime.sendMessage({
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSLATE_PAGE,
           payload: { chunk },
-          diceRipiego: true,
           ...(parteDiUnUso ? { parteDiUnUso: true } : {}),
         });
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
-      }
-      if (res?.ok && res.keyFallback && res.keyFallback.line && !ripiegoDelGiro) {
-        ripiegoDelGiro = res.keyFallback.line;
-        Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
       const CE = global.SN_CHAT_ERRORS;
       const tagliata = res?.ok && CE && CE.troncata(res.finishReason) ? CE.erroreTagliata(res.finishReason) : null;
