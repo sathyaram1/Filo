@@ -75,14 +75,20 @@
   const diTasto = (cfg, id) => normalizza(cfg).lettere.find((x) => x.tasto === id) || null;
 
   // Assegna `l` a un tasto o a un indirizzo. Una lettera ha un'azione sola; un tasto ha una lettera sola, così «cambia
-  // lettera» dal suo tasto destro non ne lascia una vecchia. → { lettere } | { rifiuto }
+  // lettera» dal suo tasto destro non ne lascia una vecchia. `sostituita`: quello che la lettera apriva prima, se era
+  // un'altra cosa: chi la ridà deve saperlo. → { lettere, sostituita } | { rifiuto }
   function assegna(cfg, l, bersaglio) {
     const x = voce({ lettera: l, ...(bersaglio || {}) });
     if (!lettera(l)) return { rifiuto: 'serve una lettera sola' };
     if (!x) return { rifiuto: 'serve un tasto della home o un indirizzo da aprire' };
-    const resto = normalizza(cfg).lettere.filter((v) => v.lettera !== x.lettera && !(x.tasto && v.tasto === x.tasto));
-    return { lettere: [...resto, x] };
+    const prima = normalizza(cfg).lettere;
+    const vecchia = prima.find((v) => v.lettera === x.lettera);
+    const resto = prima.filter((v) => v !== vecchia && !(x.tasto && v.tasto === x.tasto));
+    const sostituita = vecchia && (vecchia.tasto !== x.tasto || vecchia.url !== x.url) ? vecchia : null;
+    return { lettere: [...resto, x], sostituita };
   }
+  // La frase che accompagna un'assegnazione: «yy → example.com (prima apriva youtube.com)».
+  const conPrima = (testo, r) => (r && r.sostituita ? `${testo} (prima apriva ${nomeBersaglio(r.sostituita)})` : testo);
   function togli(cfg, l) {
     return { lettere: normalizza(cfg).lettere.filter((v) => v.lettera !== lettera(l)) };
   }
