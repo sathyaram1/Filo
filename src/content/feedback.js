@@ -667,7 +667,7 @@
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
-      return null;
+      return pronta.avviso ? { name: String(blob.name || 'immagine'), avviso: pronta.avviso } : null;
     }
 
     async function addAttachment(file) {
