@@ -5,6 +5,7 @@ import { cartellaInCasa, togliCartella } from '../../helpers/percorsi.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { clickConfirm } from '../../helpers/confirm.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
@@ -71,10 +72,29 @@ test('esplora: conferma per un percorso non scritto, dalla chat', async ({ app }
   console.log('ESPLORA-BOTTONI', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.offsetParent).map((b) => b.textContent.trim()).slice(0, 40))));
   if (await conferma.count()) {
     await conferma.click();
-    await page.getByRole('button', { name: 'OK', exact: true }).click();
+    await clickConfirm(page, 'ok');
     await new Promise((ok) => setTimeout(ok, 2500));
     console.log('ESPLORA-DOPO', JSON.stringify(await schede(app)));
     await page.screenshot({ path: join(SHOTS, 'g2-conferma-dopo.png') });
   }
   await ripristina(app);
+});
+
+test('esplora: duplica la scheda di un file', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  base = cartellaInCasa('filo-1905-g2c-');
+  const dir = join(base, 'Desktop');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'riquadro.html');
+  writeFileSync(file, '<!doctype html><title>Riquadro</title><h1>ciao</h1>');
+  await home(app);
+  const r = await app.evaluate((_e, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action: { type: 'NAVIGA', url: file }, opts: { parole: `apri ${file}` } });
+  expect(r.executed).toBe(true);
+  let s;
+  await expect.poll(async () => { s = (await schede(app)).find((x) => x.titolo === 'Riquadro'); return !!s; }, { timeout: 10_000 }).toBe(true);
+  const nuovo = await shell.evaluate((id) => window.filoShell.tabs.duplicate ? window.filoShell.tabs.duplicate(id) : 'manca', s.id).catch((e) => 'err:' + e.message);
+  console.log('ESPLORA-DUP-RIT', JSON.stringify(nuovo));
+  await new Promise((ok) => setTimeout(ok, 2500));
+  console.log('ESPLORA-DUP', JSON.stringify(await schede(app)));
+  await shell.screenshot({ path: join(SHOTS, 'g2-duplica.png') });
 });
