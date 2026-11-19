@@ -153,7 +153,8 @@
     return out;
   }
   const vicina = (occ, t) => occ.reduce((x, y) => (Math.abs(y - t) < Math.abs(x - t) ? y : x));
-  const CAPI = [16, 8, 4];
+  // I capi si cercano lunghi, il più vicino possibile al bordo del passo; corti solo se lunghi non ce n'è.
+  const CAPI = [[16, 8], [4]];
   const PROVE = 200;
 
   function trovaPasso(dove, cosa, attesa = 0) {
