@@ -337,10 +337,10 @@ for (const [dove, corpo, scrivi] of [
     const page = await testServer.openReady(openTab, PAGAMENTO(corpo));
     await preparaModelli(app);
     await modelloFinto(app);
-    await apriAiuto(shell, page);
-    await scrivi(page);
-    await scriviAllAiuto(page, 'e adesso?');
-    await expect(page.locator('.sn-sidebar').getByText('Ecco.').last()).toBeVisible({ timeout: 20_000 });
+    const aiuto = await apriAiuto(app, shell, page);
+    await scrivi(page, aiuto);
+    await scriviAllAiuto(aiuto, 'e adesso?');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.').last()).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
     const dopo = await lettiDopoUnRiavvio(app);
     expect(dopo).toContain('264087');
