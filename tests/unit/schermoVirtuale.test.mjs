@@ -380,7 +380,8 @@ test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre
     const fuori = resolve(temp, 'fuori');
     mkdirSync(fuori);
     // La config vera, caricata da ogni lavoratore, col globalSetup vero sulla radice del repo.
-    writeFileSync(resolve(temp, 'pw.config.mjs'), `import base from ${url(ROOT, 'playwright.config.js')};\n`
+    // Come la config del repo, la passa il traduttore di Playwright: un percorso, non un indirizzo file://.
+    writeFileSync(resolve(temp, 'pw.config.js'), `import base from ${JSON.stringify(resolve(ROOT, 'playwright.config.js'))};\n`
       + `export default { ...base, testDir: ${JSON.stringify(temp)}, outputDir: ${JSON.stringify(resolve(temp, 'risultati'))},`
       + ` reporter: 'line', retries: 0, globalSetup: ${JSON.stringify(resolve(temp, 'setup.mjs'))} };\n`);
     writeFileSync(resolve(temp, 'setup.mjs'), `import setup from ${url(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs')};\n`
