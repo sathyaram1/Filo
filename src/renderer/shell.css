@@ -203,6 +203,20 @@ html[data-chrome-compact="1"] .addr {
 /* Portata fuori dalla fila torna al suo posto, spenta: la sta prendendo chi sta sotto il puntatore. */
 .tab.dragging.fuori { opacity: 0.45; box-shadow: none; }
 html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
+/* Un collegamento portato sulla fila (#2393): la scheda che lo riceverebbe si tinge d'accento, fra due schede un
+   segno sottile dice dove nascerà quella nuova. */
+.tab.link-sopra,
+.tab.link-sopra:hover { background: color-mix(in srgb, var(--accent) 24%, var(--tab-bg-eff)); }
+.tab.link-sopra::after { display: none; }
+.link-posto {
+  position: fixed;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+.link-posto[hidden] { display: none; }
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);
