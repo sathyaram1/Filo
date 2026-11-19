@@ -126,7 +126,7 @@ test('Esc chiude il menu del tasto destro', async () => {
 });
 
 test('clic sul più, scrivi, Invio: la richiesta parte dalla home nuova', async () => {
-  const { app, shell } = await sulModulo();
+  const { app, shell } = await apriFiloPerLaProva();
   try {
     await app.evaluate(() => {
       globalThis.__chat = [];
