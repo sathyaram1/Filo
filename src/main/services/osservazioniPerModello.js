@@ -1365,7 +1365,18 @@ function toolResultText({ action, res, rendered }, giro = null) {
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
     // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché.
-    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
+    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda le cartelle di rete e gli indirizzi che non sono pagine web o file di questo computer. Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
+  }
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'file') {
+    const o = res.output;
+    const perche = {
+      assente: 'il file non esiste a quel percorso. Controlla maiuscole, cartella e nome; se non lo trovi chiedi all\'utente il percorso giusto',
+      cartella: 'è una cartella, non un file. Per vederne il contenuto usa i comandi dei file',
+      tipo: 'una scheda mostra solo pagine HTML, PDF, immagini, testo, audio e video. Per leggerlo usa file(leggi); per aprirlo col suo programma, file(apri)',
+      assistente: 'l\'assistente sopra una pagina web non apre i file del computer: l\'utente può chiederlo dalla chat della home',
+      rete: 'un percorso su un altro computer della rete non si apre in una scheda',
+    }[o.motivo] || 'non si apre in una scheda';
+    return `File NON aperto${o.percorso ? ` (${o.percorso})` : ''}: ${perche}. Diglielo in una riga. Non riprovare con lo stesso percorso.`;
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
