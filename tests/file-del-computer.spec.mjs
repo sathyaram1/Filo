@@ -148,6 +148,61 @@ test('un PDF e un\'immagine si aprono in una scheda, senza diventare uno scarica
   expect(await app.evaluate(() => globalThis.__scaricati)).toEqual([]);
 });
 
+// L'Aiuto sopra un sito vive nel DOM della pagina, che può scrivergli le parole e premergli i bottoni.
+test('l\'Aiuto sopra un sito non apre un file del computer nemmeno col percorso scritto, e dice di usare la home', async ({ app }) => {
+  const { file } = preparaReport();
+  await home(app);
+  const r = await execAction(app, { type: 'NAVIGA', url: pathToFileURL(file).href }, { assistente: true, parole: `apri ${file}` });
+  expect(r.executed).toBeFalsy();
+  expect(r.output).toMatchObject({ blocked: 'file', motivo: 'assistente' });
+  const riga = await app.evaluate((_e, o) => globalThis.SN_ESITO_AZIONE?.motivoBreve?.({ type: 'NAVIGA', output: o }) ?? null, r.output);
+  if (riga !== null) expect(riga).toContain('home');
+  await new Promise((ok) => setTimeout(ok, 500));
+  expect(await schedeFile(app)).toBe(0);
+});
+
+test('riaperto Filo, la scheda del file torna dalla sessione salvata e si vede', async ({ app }) => {
+  const { file } = preparaReport();
+  await home(app);
+  const url = pathToFileURL(file).href;
+  await app.evaluate(async ({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: ['filo://newtab/', u], activeIndex: 1 });
+    await tm.restoreSession();
+  }, url);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, '2026-10-30-riquadro.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  let pagina = null;
+  await expect.poll(async () => Boolean(pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'))), { timeout: 10_000 }).toBe(true);
+  await expect(pagina).toHaveTitle('Report locale', { timeout: 10_000 });
+  await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth), { message: 'le immagini della sua cartella tornano' }).toBeGreaterThan(0);
+});
+
+test('il collegamento in chat a un file spostato o cancellato lo dice, e non apre niente', async ({ app, avvisi }) => {
+  test.setTimeout(60_000);
+  const { file } = preparaReport();
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: pathToFileURL(file).href }) }] },
+    { text: 'Ecco il report.' },
+  ]);
+  await chiedi(page, `aprimi questo ${file}`);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, '2026-10-30-riquadro.html')), { timeout: 15_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, id) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.closeTab(id);
+    tm.activate(tm.tabs.find((t) => String(t.url).startsWith('filo://newtab')).id);
+  }, id);
+  await expect.poll(() => schedeFile(app)).toBe(0);
+  rmSync(file);
+  await page.getByRole('link', { name: '↗ 2026-10-30-riquadro.html' }).click();
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: `File non trovato: ${file}` })).toBeVisible({ timeout: 8000 });
+  expect(await schedeFile(app)).toBe(0);
+  await ripristina(app);
+});
+
 test('chiusa, la scheda del file torna con Ctrl+Shift+T', async ({ app }) => {
   const { file } = preparaReport();
   await home(app);
