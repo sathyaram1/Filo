@@ -1289,6 +1289,12 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
       broadcast('progress', rec);
     },
+    // Chi ha servito i byte dopo i rimandi, saputo solo alla risposta (#588.3).
+    servito(u) {
+      if (rec._final || !u) return;
+      rec._servito = String(u);
+      rec.servedBy = marca(() => ESE().servitoDa(indirizzo, u), rec.servedBy);
+    },
     // Il paese da cui il lavoro è uscito (#2301): «Riprova» esce di nuovo da lì, anche a scheda chiusa o dopo un riavvio.
     paese(p) {
       if (p && p.country) rec.paese = { country: String(p.country), tier: String(p.tier || '') };
