@@ -1004,8 +1004,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiTratto = async (rifiuto, caratteri, caratteriTratto) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
-    if (token == null || token >= tettiChat.token) return false;
+    const perTratto = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
+    const fissi = tettiChat.fissi || 0;
+    if (perTratto == null || perTratto >= FC.tettoDelTratto(tettiChat.token, fissi)) return false;
+    // Il rifiuto misura il solo tratto; il tetto, che vale per la richiesta intera, ci rimette la parte fissa.
+    const token = perTratto + fissi;
     strette++;
     tettiChat = { ...tettiChat, token };
     try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
