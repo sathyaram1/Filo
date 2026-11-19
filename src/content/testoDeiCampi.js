@@ -260,12 +260,12 @@
   }
 
   // Una parola composta con l'IME finisce col fuoco: prenderlo a metà la chiuderebbe come non era. Senza la fine, dopo
-  // un minuto si smette di aspettarla.
+  // un minuto si smette di aspettarla. La fine si accetta anche non fidata: Chromium la manda così chiudendo da sé.
   let componeDa = 0;
   const compone = () => componeDa > 0 && Date.now() - componeDa < 60000;
   document.addEventListener('compositionstart', (e) => { if (e.isTrusted) componeDa = Date.now(); }, true);
-  document.addEventListener('compositionend', (e) => {
-    if (!e.isTrusted) return;
+  document.addEventListener('compositionend', () => {
+    if (!componeDa) return;
     componeDa = 0;
     if (rimasti.length) setTimeout(() => { rimetti(); if (Date.now() >= fineAttesa) fermaAttesa(); }, 0);
   }, true);
