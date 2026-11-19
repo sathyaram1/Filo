@@ -1765,7 +1765,7 @@ class TabManager {
   // nell'archivio torna riapribile.
   async _riapriDallaPila(v, opts = {}) {
     let id = null;
-    try { id = await this.riapri(v, opts); } catch (_) {}
+    try { id = await this.riapri(v, { ...opts, fileDelComputer: true }); } catch (_) {}
     if (id && v.voceArchivio) this._contaTornata(v.voceArchivio);
     else if (!id && v.archivio) this._pilaChiuse().annullaRiaperta(v.archivio);
     return id;
