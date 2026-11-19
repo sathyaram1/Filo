@@ -224,7 +224,7 @@ function immaginiForPrompt(actions) {
       continue;
     }
     if (lista.length) {
-      blocks.push(`[Immagine creata (${lista.map((i) => i.id).join(', ')}): mettila nella risposta con [[immagini: ${lista.map((i) => i.id).join(', ')}]]. Non descriverla come se l'avessi vista: dì in una riga cosa hai chiesto di disegnare.]`);
+      blocks.push(`[Immagine creata (${lista.map((i) => i.id).join(', ')}): mettila nella risposta col marcatore [[immagini: ${lista.map((i) => i.id).join(', ')}]] su una riga sua. Non descriverla come se l'avessi vista: di' in una riga cosa hai chiesto di disegnare.]`);
     } else if (out.senzaModello) {
       blocks.push('[Immagine NON creata: non c\'è un modello che disegna fra quelli che Filo può usare. Dillo all\'utente in una riga: si sceglie in Impostazioni, Modelli, alla voce «Immagini create in chat». Non proporre un\'immagine trovata sul web al suo posto, se non te lo chiede.]');
     } else {
