@@ -13,8 +13,8 @@ test.skip(!Gesti.disponibili(), 'servono un display X e XTest');
 
 const snap = (shell) => shell.evaluate(() => window.filoShell.tabs.snapshot());
 
-async function nelloSchermo(app, shell, fn) {
-  const r = await shell.evaluate(fn);
+async function nelloSchermo(app, shell, [fn, arg]) {
+  const r = await shell.evaluate(fn, arg);
   const o = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
     const cb = w.getContentBounds();
