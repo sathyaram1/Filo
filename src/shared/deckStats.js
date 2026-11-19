@@ -322,7 +322,7 @@
     const t = Math.max(1, Math.floor(Number(turn) || 1));
     const iters = Math.max(1, Math.floor(Number(iterations) || 10000));
     const totalWanted = reqs.reduce((s, w) => s + w.n, 0);
-    const laterDraws = (t - 1) + (g.firstDraw ? 1 : 0) + countOf(extraDraws);
+    const laterDraws = (t - 1) + (g.firstDraw ? 1 : 0) + cond.extraDraws;
     const h7 = Math.min(7, n);
     const seen = Math.min(n, h7 + laterDraws);
 
