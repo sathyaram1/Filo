@@ -49,11 +49,7 @@ async function boxPagina(app) {
   return null;
 }
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
-const imposta = (app, partial) => app.evaluate(async (_e, p) => { await require('./services/handlers').applySettingsUpdate(p); }, partial)
-  .catch(() => app.evaluate(async (_e, p) => {
-    const s = await globalThis.SN_STORAGE.updateSettings(p);
-    require('./shortcuts').configura(s);
-  }, partial));
+const imposta = (app, partial) => app.evaluate(async (_e, p) => { await globalThis.__filoHandlers.applySettingsUpdate(p); }, partial);
 const temaScuro = (app) => app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors);
 
 async function sito(openTab, testServer) {
