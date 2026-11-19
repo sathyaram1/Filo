@@ -82,8 +82,11 @@
     let ultimo = 0;
     // Un marcatore su una riga sua lascia due a capo di qua e due di là: ne restano due, un paragrafo.
     const attacca = (pezzo) => {
-      const capi = (/\n*$/.exec(out.replace(/[ \t]+$/, ''))[0] || '').length;
-      return capi ? pezzo.replace(new RegExp(`^(?:[ \\t]*\\n){0,${Math.min(capi, 2)}}`), (s) => (capi >= 2 ? '' : s.slice(s.indexOf('\n') + 1 ? 0 : 0, 1) && '\n')) : pezzo;
+      const capi = /\n*$/.exec(out)[0].length;
+      if (!capi) return pezzo;
+      const testa = /^(?:[ \t]*\n)*/.exec(pezzo)[0];
+      const tenuti = Math.max(0, Math.min((testa.match(/\n/g) || []).length, 2 - capi));
+      return '\n'.repeat(tenuti) + pezzo.slice(testa.length);
     };
     MARCATORE.lastIndex = 0;
     let m;
