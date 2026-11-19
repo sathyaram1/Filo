@@ -6,18 +6,19 @@ import { createServer } from 'node:http';
 import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
-// Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato da un'imbottitura: un figlio in
-// più lo toglierebbe la pagina che ridisegna l'elenco. `su`: scorre verso l'alto, per la chat che resta attaccata al fondo.
-async function preparaScorrimento(bersaglio, { finestra = false, su = false } = {}) {
+// Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato da uno spazio in fondo: va
+// fuori dall'elenco che la pagina ridisegna.
+async function preparaScorrimento(bersaglio, { finestra = false } = {}) {
   const page = bersaglio.page();
-  await bersaglio.evaluate((el, { finestra, su }) => {
+  await bersaglio.evaluate((el, finestra) => {
     let chi = finestra ? null : el.parentElement;
     while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
     if (!chi || chi === document.body) chi = document.scrollingElement;
     chi.dataset.scorreProva = '1';
-    chi.dataset.verso = su ? '-1' : '1';
-    (chi === document.scrollingElement ? document.body : chi).style[su ? 'paddingTop' : 'paddingBottom'] = '4000px';
-  }, { finestra, su });
+    const spazio = document.createElement('div');
+    spazio.style.cssText = 'height:4000px;flex:0 0 4000px';
+    (chi === document.scrollingElement ? document.body : chi).appendChild(spazio);
+  }, finestra);
   await fotogrammi(page);
   await bersaglio.scrollIntoViewIfNeeded();
   await fotogrammi(page);
