@@ -57,7 +57,7 @@ async function selezionaDa(el, da, a, n = 0) {
     let k = -1;
     for (let i = 0; i <= n; i++) k = tutto.indexOf(da, k + 1);
     if (k < 0) throw new Error(`non c'è: ${da}`);
-    const j = tutto.indexOf(a, k + da.length - a.length < k ? k : k + da.length - a.length);
+    const j = tutto.indexOf(a, k);
     if (j < 0) throw new Error(`non c'è: ${a}`);
     const dove = (p) => {
       let f = 0;
