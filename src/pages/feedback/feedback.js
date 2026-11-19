@@ -612,7 +612,7 @@
         if (att && att.kind === 'img') ricordaAnteprimaLocale(att.url, file);
         attachments.push(att);
         renderThumbs();
-        setStatus('');
+        setStatus(avviso);
         if (typeof onChange === 'function') onChange();
       } catch (e) {
         // #602 — se a fermarsi è stata la cifratura, la frase è già quella
