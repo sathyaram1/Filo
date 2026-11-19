@@ -58,7 +58,7 @@ test('il turno si chiude da solo solo quando la pagina ha fatto quello che si er
 });
 
 test('la riga del diario dice com\'è andata, non un «tradotta» generico', () => {
-  const riga = (output, executed = true) => R.rigaAttivita({ type: 'TRADUCI_PAGINA', _executed: executed, _output: output }).text;
+  const riga = (output, executed = true) => R.riga({ type: 'TRADUCI_PAGINA', _executed: executed, _output: output }).text;
   assert.equal(riga({ traduzione: 'partita', come: 'pagina' }), 'Traduzione della pagina avviata');
   assert.equal(riga({ traduzione: 'partita', come: 'ripresa', mancanti: 3, di: 10 }), 'Traduzione della pagina ripresa');
   assert.equal(riga({ traduzione: 'partita', come: 'nuovo' }), 'Traduzione del testo nuovo avviata');
