@@ -114,6 +114,25 @@
     return el;
   }
 
+  // Una frase che nomina Crediti o Opzioni porta il tasto per andarci (#1344.2): dove, lo dice SN_CHAT_ERRORS.
+  function mostraRimedio(statoEl, rimedio, chiudiRiquadro) {
+    const vecchio = statoEl.querySelector('.sn-rinomina-rimedio');
+    if (vecchio) vecchio.remove();
+    const CE = global.SN_CHAT_ERRORS;
+    const pagina = rimedio && CE && CE.rimedioPagina ? CE.rimedioPagina(rimedio) : null;
+    if (!pagina) return;
+    const b = doc.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-rinomina-annulla sn-rinomina-rimedio';
+    b.textContent = pagina.label;
+    b.title = pagina.title || '';
+    b.addEventListener('click', () => {
+      send({ type: MSG().OPEN_URL, url: pagina.url }).catch(() => {});
+      chiudiRiquadro();
+    });
+    statoEl.appendChild(b);
+  }
+
   // ── il riquadro ──
   function chiudi() {
     if (!aperto) return;
