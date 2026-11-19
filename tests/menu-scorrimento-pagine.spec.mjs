@@ -6,39 +6,40 @@ import { createServer } from 'node:http';
 import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
-const ALTO = 4000;
-
 // La pagina scorre nello stesso compito del gesto che apre il menu: il suo evento «scroll» arriva al fotogramma dopo,
-// quando il menu ascolta già. `scorre`: chi scorre (la finestra, o un contenitore della pagina).
-async function scorriAlGesto(page, gesto, { scorre = null } = {}) {
-  await page.evaluate(({ gesto, scorre, alto }) => {
-    const el = scorre ? document.querySelector(scorre) : null;
-    if (!el && !document.getElementById('__alto')) {
-      const d = document.createElement('div');
-      d.id = '__alto';
-      d.style.height = `${alto}px`;
-      document.body.appendChild(d);
-    }
-    const chi = el || window;
-    chi.scrollTo({ top: 0, behavior: 'instant' });
+// quando il menu ascolta già. Scorre il contenitore che porta `bersaglio`, o la finestra; in fondo ci va dello spazio.
+async function scorriAlGesto(page, gesto, bersaglio) {
+  await bersaglio.scrollIntoViewIfNeeded();
+  await bersaglio.evaluate((el, gesto) => {
+    let chi = el.parentElement;
+    while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
+    if (!chi || chi === document.body) chi = document.scrollingElement;
+    chi.dataset.scorreProva = '1';
+    const d = document.createElement('div');
+    d.style.cssText = 'height:4000px;flex:0 0 4000px';
+    (chi === document.scrollingElement ? document.body : chi).appendChild(d);
+    chi.dataset.scorreDa = String(chi.scrollTop);
     window.addEventListener(gesto, () => chi.scrollBy({ top: 300, behavior: 'instant' }), { capture: true, once: true });
-  }, { gesto, scorre, alto: ALTO });
+  }, gesto);
   await fotogrammi(page);
 }
 const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(ok, 150)));
 }));
-const scorsa = (page, scorre = null) => page.evaluate((s) => (s ? document.querySelector(s).scrollTop : window.scrollY), scorre);
-const scorriAncora = (page, scorre = null) => page.evaluate((s) => {
-  (s ? document.querySelector(s) : window).scrollBy({ top: 200, behavior: 'instant' });
-}, scorre);
+const scorsa = (page) => page.evaluate(() => {
+  const chi = document.querySelector('[data-scorre-prova]');
+  return chi.scrollTop - Number(chi.dataset.scorreDa);
+});
+const scorriAncora = (page) => page.evaluate(() => {
+  document.querySelector('[data-scorre-prova]').scrollBy({ top: 200, behavior: 'instant' });
+});
 
 // Il menu resta dopo lo scorrimento dell'apertura, e se ne va a quello dopo.
-async function restaPoiSiChiude(page, menu, scorre = null) {
+async function restaPoiSiChiude(page, menu) {
   await fotogrammi(page);
   await expect(menu).toBeVisible();
-  expect(await scorsa(page, scorre), 'la pagina è scorsa davvero all\'apertura').toBeGreaterThan(100);
-  await scorriAncora(page, scorre);
+  expect(await scorsa(page), 'la pagina è scorsa davvero all\'apertura').toBeGreaterThan(100);
+  await scorriAncora(page);
   await expect(menu).toBeHidden();
 }
 
