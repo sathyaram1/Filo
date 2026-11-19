@@ -1471,7 +1471,8 @@
     if (conCitate) text = conCitate.testo;
     // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
     const scritto = conCitate ? conCitate.testo : inputEl.value.trim() ? inputEl.value : String(text || '');
-    const incollato = testoDaFuori;
+    // Un commento incollato sotto una citazione vale come il campo incollato: il messaggio è testo di altri (#1840).
+    const incollato = testoDaFuori || !!(conCitate && conCitate.daFuori);
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
     const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
