@@ -875,6 +875,8 @@
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.sogliaMs($('doppioToccoSoglia').value);
+      case 'doppioCtrl.acceso': return $('doppioCtrlAcceso').checked;
+      case 'doppioCtrl.sogliaMs': return window.SN_DOPPIO_CTRL.sogliaMs($('doppioCtrlSoglia').value);
       case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo({ pausaMs: $('ricercaFiloPausa').value }).pausaMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
