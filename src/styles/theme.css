@@ -211,7 +211,8 @@
 .sn-rinomina-campo:disabled { opacity: 0.6; }
 .sn-rinomina-ext { flex: 0 0 auto; color: var(--sn-muted); white-space: nowrap; }
 .sn-rinomina-ok,
-.sn-rinomina-annulla {
+.sn-rinomina-annulla,
+.sn-rinomina-rimedio {
   flex: 0 0 auto;
   padding: 7px 12px;
   border-radius: var(--sn-radius);
