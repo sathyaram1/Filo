@@ -1829,7 +1829,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
       let c = null;
       try {
-        const tenute = inviaFeedback ? Object.fromEntries(opts.allegati.filter((v) => v.tieni).map((v) => [v.id, v.anteprima])) : null;
+        // Una miniatura tolta nel riquadro ha `tieni` falso; le altre partono.
+        const tenute = inviaFeedback ? Object.fromEntries(opts.allegati.filter((v) => v.tieni !== false).map((v) => [v.id, v.anteprima])) : null;
         c = await chrome.runtime.sendMessage({
           type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente(), ...(tenute ? { immaginiAiuto: tenute } : {}),
         });
