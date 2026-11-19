@@ -148,7 +148,7 @@ async function cambiaLettera(win, id, l) {
 }
 
 function avvisa(win, testo) {
-  try { if (win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 6, key: 'doppio-ctrl' } }); } catch (_) {}
+  try { if (win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 6, key: 'doppio-ctrl', tipo: 'doppio_ctrl' } }); } catch (_) {}
 }
 
 const attivaDi = (win) => {
