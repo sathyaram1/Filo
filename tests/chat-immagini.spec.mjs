@@ -57,7 +57,7 @@ async function stubModello(app, { chiamata, finale, conPittore = true }) {
       const n = globalThis.__chiamate++;
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (n === 0) {
-        const c = { id: 'c0', name: 'immagini', arguments: JSON.stringify(chiamata) };
+        const c = { id: 'c0', name: 'web', arguments: JSON.stringify(chiamata) };
         try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {}
         return { ...base, text: '', toolCalls: [c], finishReason: 'tool_calls' };
       }
