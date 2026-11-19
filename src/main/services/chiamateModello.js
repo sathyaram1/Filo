@@ -777,7 +777,7 @@ async function stimaSogliaCompattazione(valore) {
   const chat = primo(ACTIONS.FILO_CHAT);
   const comp = primo(modelloCheCompatta(settings));
   const base = baseDellaChat(false);
-  const r =globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
+  const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
     soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
   });
   return r ? r.testo : 'Il listino di OpenRouter adesso non dice il prezzo dei modelli scelti: Filo non stima il costo senza.';
