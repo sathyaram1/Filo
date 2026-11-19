@@ -1,6 +1,6 @@
-// L'avviso di una risposta servita da un host che la politica esclude (#1478): uno per host e motivo, in coda finché
-// una pagina davanti agli occhi lo prende (#1478.1). Niente Electron: chi lo crea dice come si spinge alle schede.
-// Regole: tests/unit/avvisiFuoriPolitica.test.mjs.
+// Gli avvisi che contano come detti solo quando una pagina davanti agli occhi li prende (#1478.1): l'host che la politica
+// esclude (#1478), uno per host e motivo, e il ripiego sui crediti di Filo (#662.1). Niente Electron: chi lo crea dice
+// come si spinge alle schede. Regole: tests/unit/avvisiFuoriPolitica.test.mjs.
 'use strict';
 
 const crypto = require('node:crypto');
