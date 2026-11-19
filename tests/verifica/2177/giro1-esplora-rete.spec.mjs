@@ -10,7 +10,9 @@ async function spia(app) {
     const uscite = globalThis.__uscite = [];
     const locale = (h) => !h || h === 'localhost' || /^127\./.test(h) || h === '::1' || h === '[::1]';
     const segna = (strato, h) => { h = String(h || '').toLowerCase(); if (!locale(h)) uscite.push(`${strato}:${h}`); };
-    const hostDi = (u) => { try { return new URL(String(u && u.url ? u.url : u)).hostname; } catch (_) { return String(u); } };
+    const hostDi = (u) => {
+      try { const x = new URL(String(u && u.url ? u.url : u)); return /^(https?|wss?):$/.test(x.protocol) ? x.hostname : ''; } catch (_) { return String(u); }
+    };
     const net = rq('node:net');
     const tls = rq('node:tls');
     const dns = rq('node:dns');
