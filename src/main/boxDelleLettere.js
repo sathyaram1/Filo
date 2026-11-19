@@ -103,6 +103,7 @@ function chiudi(s, perche) {
   s.mani = null;
   s.giro += 1;
   const win = s.win;
+  try { require('./popup-tooltip').hideTooltip(); } catch (_) {}
   if (win && !win.isDestroyed() && win.isVisible()) win.hide();
   // Il fuoco torna dov'era: la scheda davanti, che non deve accorgersi del box.
   try { if (s.parent && !s.parent.isDestroyed() && perche !== 'fuoco') s.parent.focus(); } catch (_) {}
