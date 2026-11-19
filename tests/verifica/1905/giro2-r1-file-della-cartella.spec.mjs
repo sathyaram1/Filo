@@ -46,3 +46,26 @@ test('r1 una pagina scaricata e aperta dall\'utente non legge i pixel di una fot
   expect(r.accanto, 'i pixel della foto accanto restano chiusi alla pagina').toMatch(/^no:/);
   expect(r.sotto, 'i pixel della foto nella sottocartella restano chiusi alla pagina').toMatch(/^no:/);
 });
+
+test('r1 una pagina scaricata e aperta dall\'utente non legge il testo di un file della sottocartella caricandolo come script', async ({ app }) => {
+  test.setTimeout(60_000);
+  base = cartellaInCasa('filo-1905-r1b-');
+  const dir = join(base, 'Scaricati');
+  mkdirSync(join(dir, 'progetto'), { recursive: true });
+  writeFileSync(join(dir, 'progetto', '.env'), 'TOKEN=sk_live_SEGRETO42\n');
+  writeFileSync(join(dir, 'fattura.html'), `<!doctype html><title>Fattura</title>
+    <script>
+      window.__r = {};
+      window.addEventListener('error', (e) => { if (String(e.filename || '').endsWith('.env')) window.__r.env = String(e.message); }, true);
+    </script>
+    <script src="progetto/.env" onload="window.__r.caricato = 1" onerror="window.__r.env = window.__r.env || 'no:caricamento'"></script>`);
+  const file = join(dir, 'fattura.html');
+  const page = await home(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: pathToFileURL(file).href }) }] }, { text: 'Aperto.' }]);
+  await chiedi(page, `apri ${file}`);
+  let s;
+  await expect.poll(async () => { s = (await schede(app)).find((x) => x.titolo === 'Fattura'); return !!s; }, { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => nellaScheda(app, s.id, 'document.readyState'), { timeout: 8000 }).toBe('complete');
+  const r = await nellaScheda(app, s.id, 'window.__r');
+  expect(JSON.stringify(r), 'il contenuto del file non arriva alla pagina').not.toContain('sk_live_SEGRETO42');
+});
