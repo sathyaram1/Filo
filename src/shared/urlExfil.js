@@ -946,8 +946,8 @@
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
-    if (tipo === 'CERCA_WEB') {
-      const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });
+    if (tipo === 'CERCA_WEB' || tipo === 'IMMAGINI_WEB') {
+      const v = valutaRicerca(String(action.query ?? action.q ?? action.cerca ?? action.testo ?? action.text ?? ''), { memoria, azioni });
       if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
     // Un comando che va in rete porta fuori il suo indirizzo come un NAVIGA (#2293): stesso controllo, uno per indirizzo.
