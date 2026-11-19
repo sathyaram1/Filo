@@ -606,7 +606,7 @@
     setTimeout(() => {
       if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      window.addEventListener('scroll', closeCtxMenu, true);
+      window.addEventListener('scroll', onMenuScroll, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
   }
