@@ -1634,7 +1634,7 @@
   // Mentre Filo lavora il posto dell'invio lo prende un quadrato, e Invio da tastiera fa la stessa cosa. Fermato, lo
   // stesso posto offre di riprendere finché l'utente non scrive altro. Racconto: patterns/il-filo-dell-attesa.md.
   function aggiornaTasto() {
-    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length;
+    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length && !Rispondi.commenti();
     const quadrato = sending || (ripresa && vuoto && appenaFermato());
     const modo = ripresa && vuoto && !quadrato ? 'riprendi' : 'invia';
     if (sendBtn.dataset.modo !== modo) {
