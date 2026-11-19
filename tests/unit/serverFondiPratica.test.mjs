@@ -402,6 +402,28 @@ test('con la verifica che regge si fonde, e se main finisce su un altro sha lo s
     stessoAlbero: (_c, x, y) => x === 'a'.repeat(40) && y === 'b'.repeat(40) });
   assert.equal(vuoto.k, 0, vuoto.testo);
   assert.doesNotMatch(vuoto.testo, /Attenzione/);
+});
+
+test('stessoAlbero: un commit vuoto sopra lo sha verificato ha lo stesso albero, un commit con codice no', () => {
+  const dir = cartellaTemporanea('albero-');
+  try {
+    const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...a], { cwd: dir, encoding: 'utf8' }).trim();
+    git('init', '-q');
+    writeFileSync(join(dir, 'f.js'), 'uno\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'verificato');
+    const verificato = git('rev-parse', 'HEAD');
+    git('commit', '-q', '--allow-empty', '-m', '[suite del server] accesa');
+    const acceso = git('rev-parse', 'HEAD');
+    writeFileSync(join(dir, 'f.js'), 'due\n');
+    git('commit', '-q', '-am', 'altro codice');
+    const altro = git('rev-parse', 'HEAD');
+    assert.equal(stessoAlbero(dir, acceso, verificato), true);
+    assert.equal(stessoAlbero(dir, altro, verificato), false);
+    assert.equal(stessoAlbero(dir, 'f'.repeat(40), verificato), false, 'uno sha che il clone non ha non vale uguale');
+  } finally {
+    togliCartella(dir);
+  }
   // Allo strumento del server va il ramo fermo sullo sha verificato, non quello che può ancora muoversi (#1062).
   assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`]]);
   const senzaFermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si, fissa: () => ({ ok: false, motivo: 'push rifiutato' }) });
