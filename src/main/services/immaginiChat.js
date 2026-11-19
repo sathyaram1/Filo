@@ -198,3 +198,4 @@ function registraCopie() {
 registraCopie();
 
 module.exports = { cerca, genera, _dip: dip, TETTO_WEB, TETTO_CREATA, QUANTE };
+if (process.env.NODE_ENV === 'test') globalThis.__filoImmaginiChat = module.exports;
