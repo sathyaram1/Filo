@@ -186,6 +186,8 @@
     modificabile: (b) => composizioni.has(b),
     modifica: (b) => modificaMessaggio(b),
     campoCambiato: () => aggiornaTasto(),
+    daFuori: () => testoDaFuori,
+    segnaDaFuori: () => { testoDaFuori = true; ricordaDaFuori(inputEl.value); },
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
