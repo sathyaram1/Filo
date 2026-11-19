@@ -109,7 +109,8 @@ async function azioneInviaFeedback(action, {
     if (conAllegati) {
       const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
       const { voci } = await require('../allegatiDellaChat').voci(action, chatDellAzione);
-      const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
+      const pronte = globalThis.SN_ALLEGATI_SEGNALAZIONE.conPreparati(voci, action._allegatiPreparati);
+      const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, pronte);
       if (p.errore) return { executed: false, kept: false, output: { error: p.errore } };
       payload = p.payload;
     }
