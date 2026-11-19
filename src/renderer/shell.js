@@ -16,6 +16,7 @@
 
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
+  window.SN_LINK_SU_SCHEDA?.ascolta(document, { fila: tabsEl.closest('.tab-row'), schede: tabsEl, nuova: newBtn, manda: api.linkSuScheda });
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
   // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
   const manigliaBarra = document.getElementById('barra-maniglia');
