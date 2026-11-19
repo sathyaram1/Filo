@@ -10,10 +10,11 @@ import { fileURLToPath } from 'node:url';
 const SORGENTE = readFileSync(fileURLToPath(new URL('../../src/main/tabs.js', import.meta.url)), 'utf8');
 
 function corpoDelMetodo(nome) {
-  const inizio = SORGENTE.search(new RegExp(`^  ${nome}\\(.*\\) \\{$`, 'm'));
-  assert.ok(inizio >= 0, `${nome} non trovato in tabs.js`);
+  const riga = new RegExp(`^  ${nome}\\(.*\\) \\{$`, 'm').exec(SORGENTE);
+  assert.ok(riga, `${nome} non trovato in tabs.js`);
+  const inizio = riga.index;
   let profondita = 0;
-  for (let i = SORGENTE.indexOf('{', inizio); i < SORGENTE.length; i++) {
+  for (let i = inizio + riga[0].length - 1; i < SORGENTE.length; i++) {
     if (SORGENTE[i] === '{') profondita++;
     else if (SORGENTE[i] === '}' && --profondita === 0) return SORGENTE.slice(inizio, i + 1);
   }
