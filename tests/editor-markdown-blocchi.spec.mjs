@@ -22,32 +22,32 @@ test('in un foglio nuovo «# » apre un titolo solo, senza un paragrafo vuoto so
   await page.keyboard.type('# Titolo');
   expect(await blocchi(page)).toEqual(['h1:Titolo']);
   await page.keyboard.press('Enter');
-  await page.keyboard.type('testo');
-  expect(await blocchi(page)).toEqual(['h1:Titolo', 'p:testo']);
+  await page.keyboard.type('- voce');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('altra');
+  expect(await blocchi(page)).toEqual(['h1:Titolo', 'ul:vocealtra']);
+  expect(await page.locator('#doc li').allTextContents()).toEqual(['voce', 'altra']);
   await page.keyboard.press('Control+s');
   await expect(page.locator('.ed-save-state')).toHaveText('Salvato');
   await page.reload();
   await page.waitForSelector('#doc h1');
-  expect(await blocchi(page)).toEqual(['h1:Titolo', 'p:testo']);
+  expect(await blocchi(page)).toEqual(['h1:Titolo', 'ul:vocealtra']);
+  expect(await page.locator('#doc li').allTextContents()).toEqual(['voce', 'altra']);
 });
 
-test('ESPLORA', async ({ openTab }) => {
+test('ESPLORA undo', async ({ openTab }) => {
   const page = await apriFoglioNuovo(openTab);
-  for (const [html, cmd] of [['<p>abc</p>', 'insertUnorderedList'], ['<p><br></p>', 'insertUnorderedList'], ['<div><br></div>', 'insertUnorderedList'], ['<p>x</p><p><br></p><p>y</p>', 'insertOrderedList'], ['<h1>abc</h1>', 'insertUnorderedList']]) {
-    const out = await page.evaluate(({ html, cmd }) => {
-      const d = document.getElementById('doc');
-      d.innerHTML = html;
-      d.focus();
-      const b = [...d.children].find((c) => !c.textContent) || d.firstChild;
-      const r = document.createRange();
-      r.setStart(b, 0);
-      getSelection().removeAllRanges();
-      getSelection().addRange(r);
-      document.execCommand(cmd);
-      return d.innerHTML;
-    }, { html, cmd });
-    console.log('ESPL', html, cmd, '=>', out);
+  const errori = [];
+  page.on('pageerror', (e) => errori.push(e.message));
+  const html = () => page.evaluate(() => document.getElementById('doc').innerHTML.replace(/<button[^>]*>.*?<\/button>/g, ''));
+  for (const seq of ['# Tit', '- voce']) {
+    await page.evaluate(() => { const d = document.getElementById('doc'); d.innerHTML = '<p>sopra</p><p><br></p>'; d.focus(); const r = document.createRange(); r.setStart(d.children[1], 0); getSelection().removeAllRanges(); getSelection().addRange(r); });
+    await page.keyboard.type(seq);
+    console.log('UNDO', seq, 'dopo', await html());
+    for (let i = 0; i < 4; i++) { await page.keyboard.press('Control+Z'); console.log('UNDO', seq, i, await html()); }
+    for (let i = 0; i < 4; i++) { await page.keyboard.press('Control+Shift+Z'); console.log('REDO', seq, i, await html()); }
   }
+  console.log('UNDO errori', errori);
 });
 
 const CASI = [
