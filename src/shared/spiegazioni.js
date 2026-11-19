@@ -143,6 +143,8 @@
       }
     }
     function chiudiMenu() { if (menu) { menu.remove(); menu = null; } }
+    // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+    let menuScorso = () => true;
     function fermaAttesa() { clearTimeout(timerApri); attesa = null; }
     function chiudiTutto() { fermaAttesa(); clearTimeout(timerChiudi); chiudiMenu(); chiudiDa(0); }
 
