@@ -371,9 +371,9 @@ for (const [come, mette] of [
     await expect(aiutoOstile.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => ostile.locator('#t').evaluate((t) => t.value.length), { timeout: 5_000 }).toBeGreaterThan(1_000_000);
     const banca = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>${campoDelSito('731942')}</body></html>`);
-    await apriAiuto(shell, banca);
-    await scriviAllAiuto(banca, 'cosa devo fare?');
-    await expect(banca.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
+    const aiutoBanca = await apriAiuto(app, shell, banca);
+    await scriviAllAiuto(aiutoBanca, 'cosa devo fare?');
+    await expect(aiutoBanca.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('731942');
     expect(await lettiDopoUnRiavvio(app)).toContain('731942');
   });
