@@ -389,7 +389,7 @@ test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre
     writeFileSync(resolve(temp, 'setup.mjs'), `import setup from ${url(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs')};\n`
       + `export default (c) => setup({ ...c, configFile: ${JSON.stringify(resolve(ROOT, 'playwright.config.js'))} });\n`);
     for (const nome of ['a', 'b', 'c']) {
-      writeFileSync(resolve(temp, `${nome}.spec.mjs`), `import { test } from ${url(ROOT, 'node_modules', '@playwright', 'test', 'index.mjs')};\n`
+      writeFileSync(resolve(temp, `${nome}.spec.mjs`), `import { test } from ${url(pw, 'index.mjs')};\n`
         + "import { existsSync, readdirSync, writeFileSync } from 'node:fs';\n"
         + `test('${nome}', async () => {\n`
         + `  writeFileSync(${JSON.stringify(fuori)} + '/${nome}', '');\n`
