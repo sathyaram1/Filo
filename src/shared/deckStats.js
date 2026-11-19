@@ -284,16 +284,14 @@
   }
 
   // Le condizioni della partita dette a parole, per la risposta in chat.
-  function describeConditions({ game, mulligans, keep, extraDraws } = {}) {
-    const parts = [GAMES[gameOf(game)].text];
-    const keepReqs = normReqs(keep);
-    const m = countOf(mulligans);
-    if (m > 0 && keepReqs.length) {
-      parts.push(`fino a ${m} mulligan se la mano non ha almeno ${keepReqs.map((w) => `${w.n} ${w.tag}`).join(' e ')}`);
-    } else if (m > 0) {
+  function describeConditions(cond = {}) {
+    const { game, mulligans: m, keep: keepReqs, extraDraws: x, mulliganUncounted } = resolveConditions(cond);
+    const parts = [GAMES[game].text];
+    if (mulliganUncounted) {
       parts.push('mulligan non contati: dimmi che mano terresti');
+    } else if (m > 0) {
+      parts.push(`fino a ${m} mulligan se la mano non ha almeno ${keepReqs.map((w) => `${w.n} ${w.tag}`).join(' e ')}`);
     }
-    const x = countOf(extraDraws);
     if (x > 0) parts.push(`${x} ${x === 1 ? 'pescata extra' : 'pescate extra'}`);
     return parts.join('; ');
   }
