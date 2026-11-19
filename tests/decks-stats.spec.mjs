@@ -73,6 +73,9 @@ async function mockProvider(app) {
       if (/budget/i.test(last)) text = JSON.stringify({ reply: '', budget: 40 });
       else if (/\bramp\b/i.test(last)) {
         text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 1, keep: { ramp: 1 } } });
+      } else if (/mulligan delle mani/i.test(last)) {
+        // #791.1: la mano da tenere detta, il numero di mulligan no.
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, keep: { terre: 3 } } });
       } else if (/due mulligan/i.test(last)) {
         // #791: mulligan detti senza la mano da tenere.
         text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 2 } });
