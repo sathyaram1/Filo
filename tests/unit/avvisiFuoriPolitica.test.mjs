@@ -78,6 +78,34 @@ test('la pagina prende l’avviso prima di mostrarlo, e al fuoco chiede quelli i
   assert.doesNotMatch(avvisa, /broadcastToTabs/, 'nessuna spinta che salti la coda');
 });
 
+test('ritirato (detto altrove, o non più vero): esce dalla coda senza contare come visto, e la sua pausa si scorda', () => {
+  const { a, mandati, visti, componi } = banco();
+  a.avvisa('ripiego', componi('ripiego'));
+  a.avvisa('excluded|google', componi('Google'));
+  a.ritira('ripiego');
+  assert.deepEqual(a.inAttesa().map((x) => x.text), ['da Google'], 'gli altri restano');
+  assert.deepEqual(a.prendi('id1'), []);
+  assert.deepEqual(visti, []);
+  a.prendi('id2');
+  a.ritira('excluded|google');
+  mandati.length = 0;
+  assert.ok(a.avvisa('excluded|google', componi('Google')), 'chi ritira tiene la pausa: qui non ce n’è più');
+  assert.equal(mandati.length, 1);
+});
+
+// #662.1: l'avviso del ripiego sui crediti di Filo vale come detto quando una pagina in vista lo prende, come quello
+// dell'host escluso; «Traduci la pagina» non ne mostra uno suo, che si vedrebbe anche a Filo dietro un'altra app.
+test('il ripiego sui crediti di Filo passa dalla coda: nessuna spinta che la salti, contato quando si mostra', () => {
+  const wallet = readFileSync(new URL('../../src/main/services/handlers/wallet.js', import.meta.url), 'utf8');
+  const manda = /function mandaAvvisoSospeso\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
+  assert.match(manda, /CODA\.avvisa\(AVVISO_RIPIEGO, \(\) => \(\{ messaggio, alMostrare: ripiegoMostrato \}\)\)/);
+  assert.doesNotMatch(manda, /broadcastToTabs|ultimoAvvisoRipiego =/, 'spedito non vuol dire visto');
+  const mostrato = /function ripiegoMostrato\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
+  assert.match(mostrato, /CODA\.ritira\(AVVISO_RIPIEGO\)/, 'detto dalla riga, l’avviso in coda non lo ripete');
+  const traduci = readFileSync(new URL('../../src/content/translatePage.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(traduci, /keyFallback|ripiegoMostrato|diceRipiego/);
+});
+
 test('tornati su Filo dalla barra delle schede: quelli in coda si offrono di nuovo, quelli presi no', () => {
   const { a, mandati, componi } = banco();
   a.avvisa('excluded|deepseek', componi('DeepSeek'));
