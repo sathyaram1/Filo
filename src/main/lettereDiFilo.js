@@ -125,6 +125,7 @@ function segnaUso(id, win) {
 async function apriBox(win) {
   if (!win || win.isDestroyed()) { tocchi.chiuso(); return; }
   tocchi.aperto();
+  apertoAlle = Date.now();
   const u = await caricaUsate();
   if (tocchi.fase() !== 'aperto' || win.isDestroyed()) return;
   const aperto = Box.apri(win, D.ordinate(cfg, u), {
