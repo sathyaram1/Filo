@@ -230,7 +230,7 @@ const AZIONI = {
 // Le azioni della pagina passano dalla barra laterale, come le sue icone (cattura, trascrivi).
 function sullaPagina(win, icona) {
   const b = win._filoTabs && win._filoTabs.barra;
-  if (b && typeof b.eseguiSullaPagina === 'function') b.eseguiSullaPagina(icona);
+  if (b && typeof b.eseguiSullaPagina === 'function') b.eseguiSullaPagina(icona, { via: 'scorciatoia' });
 }
 
 function esegui(id, win) {
