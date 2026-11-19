@@ -956,7 +956,7 @@
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
-    if (text) setBubbleText(div, text, markdown, fonti);
+    if (text || (markdown && Array.isArray(immagini) && immagini.length)) setBubbleText(div, text, markdown, fonti, immagini);
     else div.classList.add('dash-bubble-actions-only');
     return div;
   }
