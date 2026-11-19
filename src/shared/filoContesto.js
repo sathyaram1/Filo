@@ -101,6 +101,12 @@
   function stimaToken(testo) {
     return Math.ceil(String(testo == null ? '' : testo).length / CARATTERI_PER_TOKEN);
   }
+  // Il tetto in token vale per la richiesta intera (#2473.1): al tratto resta quello che istruzioni, strumenti e CONTESTO
+  // (`fissi`) lasciano, mai meno del minimo del campo. Senza, quando la compattazione non parte, si passava il listino.
+  function tettoDelTratto(token, fissi = 0) {
+    const f = Number(fissi) > 0 ? Number(fissi) : 0;
+    return Math.max(LIMITI.token[0], Number(token) - f);
+  }
 
   // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
   const parti = (c) => (Array.isArray(c) ? c.filter((p) => p && typeof p === 'object') : null);
