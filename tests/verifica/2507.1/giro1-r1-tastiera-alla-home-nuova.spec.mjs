@@ -1,5 +1,5 @@
-// #2507.1 giro 1, rilievo 1: una home nuova aperta dalla barra delle schede si prende la tastiera (#1128), e chi la
-// apre a mano ci scrive subito. Chi pilota, dopo un clic o un tasto nella barra, scriveva nella barra.
+// #2507.1 giro 1, rilievo 1: la tastiera va dove sta il fuoco, non sull'ultima superficie cliccata. Una home nuova aperta
+// dalla barra (#1128) o una scheda aperta da un collegamento se lo prendono; chi pilota scriveva nella barra o nella pagina lasciata.
 
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
