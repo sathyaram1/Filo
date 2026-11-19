@@ -77,6 +77,7 @@ test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pa
   const img = await ascolta((req, res) => {
     const ref = String(req.headers.referer || '');
     visti.push(ref);
+    console.log('DEBUG2', req.method, req.url, JSON.stringify(req.headers));
     if (!ref.startsWith(testServer.origin)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('hotlink'); return; }
     // La prima richiesta la mostra nella pagina; il primo salvataggio cade a metà, dopo le intestazioni: la riga nasce e
     // resta «non riuscita».
