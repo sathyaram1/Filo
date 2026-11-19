@@ -118,7 +118,7 @@ module.exports = function register(on, ctx) {
       const FileDelComputer = require('../fileDelComputer');
       const g = await FileDelComputer.giudica(url);
       if (!g.ok) {
-        const a = FileDelComputer.avviso(g);
+        const a = require('../indirizzoFermato').avvisoFileNonAperto(g);
         try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
         return { ok: false, motivo: g.motivo };
       }
