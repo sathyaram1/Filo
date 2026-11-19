@@ -231,7 +231,7 @@
     } else {
       if (!c.listino) return nonNota('listino', 'Listino di OpenRouter non disponibile adesso: Filo non stima il costo senza.');
       const prezzo = prezzoDi(c.listino, model);
-      if (!prezzo) return nonNota('modello', `OpenRouter non elenca un prezzo per ${model}: Filo non stima il costo senza.`);
+      if (!prezzo) return nonNota('modello', 'OpenRouter non elenca un prezzo per questo modello: Filo non stima il costo senza.');
       const token = tokenTipici(action, c.registro);
       usd = costoUsd(prezzo, token);
       fonte = token.fonte;
