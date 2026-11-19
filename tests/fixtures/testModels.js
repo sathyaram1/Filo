@@ -125,10 +125,9 @@
       ]
     },
     "pittore": {
-      "label": "Modello che disegna (solo prove)",
+      "label": "Gemini Flash Image (disegna)",
       "provider": "openrouter",
-      "model": "prova/pittore-aperto",
-      "weights": "open",
+      "model": "google/gemini-2.5-flash-image",
       "inputs": [
         "text"
       ],
