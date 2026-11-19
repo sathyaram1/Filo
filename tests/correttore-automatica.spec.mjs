@@ -611,7 +611,7 @@ test('il testo incollato o dettato con Filo che finisce con «perchè» e un pun
   await expect(page.locator('#ta')).toHaveValue('detto perchè.');
 
   await incolla('#ce', 'Nel campo perchè.');
-  await expect(page.locator('#ce')).toHaveText('Nel campo perchè.');
+  await expect.poll(() => testoDi(page, '#ce')).toBe('Nel campo perchè.');
   await svuota(page, '#ce');
   await detta('#ce', 'detto perchè ');
   await expect.poll(() => page.locator('#ce').evaluate((el) => el.textContent.replace(/ /g, ' '))).toBe('detto perchè ');
