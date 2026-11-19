@@ -1,6 +1,6 @@
-// Un'immagine data a una chat di Filo, nella forma che il modello legge (#1623): PNG, JPEG, WebP o GIF entro il tetto.
-// Gira solo dove c'è un canvas (pagine e content script), mai nel main. Regole:
-// patterns/un-file-lasciato-dove-la-pagina-non-lo-vuole-va-alla-chat.md
+// Un'immagine data a una chat di Filo (#1623) o allegata a una segnalazione (#1664), nella forma che chi la riceve
+// legge: PNG, JPEG, WebP o GIF entro il tetto. Gira solo dove c'è un canvas (pagine e content script), mai nel main.
+// Regole: patterns/un-file-lasciato-dove-la-pagina-non-lo-vuole-va-alla-chat.md
 
 (function (global) {
   'use strict';
