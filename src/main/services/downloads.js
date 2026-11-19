@@ -1166,8 +1166,9 @@ function annunciaStreaming(rec, state) {
 
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
 // `via: 'streaming'` (#1488): la voce la riempie salvaVideoStreaming.js, e «Riprova» passa da lui. `riusa`: l'id della
-// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova».
-function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '' } = {}) {
+// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova». `pagina` e `sessione` valgono senza
+// scheda (il «Riprova» di riprovaConPagina.js); `annuncia`: arrivo e fallimento si dicono come per un link.
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '', pagina = '', sessione = null, annuncia = false } = {}) {
   const vecchia = riusa ? records.get(riusa) : null;
   const id = vecchia && !NON_TERMINAL.has(vecchia.state) && !liveManual.has(riusa) && !liveItems.has(riusa) ? vecchia.id : uuid();
   const nome = safeName(filename || 'download');
