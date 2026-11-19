@@ -446,6 +446,7 @@
     // Motivi di blocco quando un modello non è adatto alla funzione.
     caps_block_output_text: 'questa funzione richiede un modello che produca testo',
     caps_block_output_audio: 'questa funzione richiede un modello di sintesi vocale (audio)',
+    caps_block_output_image: 'questa funzione richiede un modello che crei immagini',
     caps_block_input_image: 'questa funzione richiede un modello che accetti immagini in input',
     caps_block_input_audio: 'questa funzione richiede un modello che accetti audio in input',
     caps_block_output_embedding: 'questa funzione richiede un modello di indicizzazione (produce vettori, non testo)',
