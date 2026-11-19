@@ -123,9 +123,14 @@
       t.innerHTML = icona(ok === true ? 'check' : 'copy');
       if (ok != null) t._timer = setTimeout(() => esito(t, null), COPIATO_MS);
     }
-    async function fai(azione, m, t = null) {
+    // `fissata`: la selezione di quando si è aperto il menu, che il clic sulla voce può aver già spento.
+    async function fai(azione, m, t = null, fissata = null) {
       const testo = testoDi(m);
-      if (azione !== 'copia') { DEF[azione].fai(m, testo); return true; }
+      if (azione !== 'copia') {
+        const sel = CITANO.has(azione) ? (selezioneIn(m) || fissata) : null;
+        DEF[azione].fai(m, sel ? sel.testo.trim() : testo, sel);
+        return true;
+      }
       if (!testo) return false;
       let ok = false;
       try { ok = await copia(testo, m); } catch (_) { ok = false; }
