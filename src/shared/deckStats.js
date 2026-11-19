@@ -230,6 +230,19 @@
   }
   const countOf = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
+  // Un mulligan detto a metà non si perde in silenzio (#791.1), per simulazione e parole insieme:
+  // una mano da tenere senza il numero conta un mulligan; un numero senza la mano parte da
+  // DEFAULT_KEEP se `categories` la contiene, se no resta `mulliganUncounted` e lo si dice.
+  const DEFAULT_MULLIGANS = 1;
+  function resolveConditions({ game, mulligans, keep, extraDraws } = {}, { categories = null } = {}) {
+    let m = countOf(mulligans);
+    let k = normReqs(keep);
+    if (k.length && !m) m = DEFAULT_MULLIGANS;
+    if (m && !k.length && Array.isArray(categories)
+      && DEFAULT_KEEP.every((w) => categories.map(normTag).includes(w.tag))) k = normReqs(DEFAULT_KEEP);
+    return { game: gameOf(game), mulligans: m, keep: k, extraDraws: countOf(extraDraws), mulliganUncounted: m > 0 && !k.length };
+  }
+
   // Mulligan London: delle 7 carte pescate ne vanno in fondo `bottom`. Prima
   // quelle che non servono né a `keep` né a `want`; se non bastano, fra le utili
   // si tiene la mano che regge `keep`, poi quella che copre più richiesta, poi
