@@ -193,8 +193,9 @@ test('il globalSetup di Playwright è quello che accende lo schermo', () => {
   const config = readFileSync(resolve(ROOT, 'playwright.config.js'), 'utf8');
   assert.match(config, /globalSetup:\s*'\.\/tests\/fixtures\/prima-della-corsa\.mjs'/);
   const setup = readFileSync(resolve(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs'), 'utf8');
-  assert.match(setup, /await accendiSchermo\(/);
-  assert.ok(setup.indexOf('assicuraMotore(') < setup.indexOf('await accendiSchermo('), 'sul motore sbagliato ci si ferma prima di accendere');
+  assert.match(setup, /await accendiSchermi\(\{ quanti/);
+  assert.ok(setup.indexOf('assicuraMotore(') < setup.indexOf('await accendiSchermi('), 'sul motore sbagliato ci si ferma prima di accendere');
+  assert.match(config, /^usaSchermoDelLavoratore\(\);$/m, 'ogni lavoratore, che carica la config, prende il suo schermo');
 });
 
 test('accendiSchermo su Windows, Mac e Linux con schermo non lancia niente e non tocca l\'ambiente', async () => {
