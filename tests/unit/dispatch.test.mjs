@@ -602,6 +602,20 @@ test('fixedReplyText: il fermo lo conferma il server; una domanda non fermata si
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
+test('#2590: un riallineamento per prove rosse non si annuncia pulito, e la risposta dice il giro deciso dal server', () => {
+  const pulito = { ok: true, file: [], conflitti: [] };
+  const rosse = esitoRiallineamento(pulito, { tipo: 'prove-rosse', prove: ['tests/unit/x.test.mjs'] });
+  assert.equal(rosse.riallineamento.giro, 'pieno');
+  assert.doesNotMatch(rosse.riga, /pulito|non serve/);
+  assert.match(rosse.riga, /serve la verifica/);
+  const liscio = esitoRiallineamento(pulito, { tipo: 'conflitto', file: [] });
+  assert.equal(liscio.riallineamento.giro, 'nessuno');
+  assert.match(liscio.riga, /Riallineamento pulito/);
+  assert.match(fixedReplyText('A', { outcome: 'fixed', status: 'revision_capability', giro: 'pieno' }), /chiede la verifica/);
+  assert.match(fixedReplyText('A', { outcome: 'fixed', status: 'revision_security', giro: 'nessuno' }), /non chiede un giro nuovo/);
+  assert.doesNotMatch(fixedReplyText('A', { outcome: 'fixed', status: 'revision_security', giro: 'nessuno' }), /torna in coda/);
+});
+
 test('la nota che lo strumento stampa dopo la critica dice che la domanda ferma, senza --ferma né --segnala', () => {
   assert.match(FERMA_NOTE, /--domanda <file\.json>/);
   assert.match(FERMA_NOTE, /almeno due opzioni con pro e contro/);
