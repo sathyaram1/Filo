@@ -161,6 +161,12 @@
       doesNot: 'Lasciata sulla pagina fuori da un campo, o fuori dalla finestra, torna al suo posto: non apre una finestra nuova. Dentro un riquadro incorporato di un altro sito il campo non la riceve.',
     },
     {
+      id: 'link-su-scheda', title: 'Trascina un collegamento su una scheda', category: 'navigation',
+      desc: 'Un collegamento trascinato da una pagina, come la miniatura di un video, e lasciato al centro di una scheda apre la pagina in quella scheda e la porta davanti. Lasciato sul bordo fra due schede, dopo l’ultima, sul + o sulla parte vuota della fila, apre una scheda nuova in quel punto. Mentre lo porti, la scheda che lo riceverebbe si colora, o un segno sottile mostra dove nascerà quella nuova. A schermo intero le schede scendono quando porti il collegamento contro il bordo alto.',
+      invoke: 'Trascina un collegamento o la miniatura di un video sulla fila delle schede.',
+      doesNot: 'Apre solo indirizzi del web (http e https): un collegamento a un file del computer, a una pagina di Filo o a uno script non fa niente. Un testo selezionato che non è un collegamento non si apre. Un’immagine lasciata sulla parte vuota della fila, senza una scheda sotto, va alla chat come sempre.',
+    },
+    {
       id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
       desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
       invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
@@ -443,7 +449,7 @@
     },
     {
       id: 'chat-immagini-trascinate', title: 'Dai un’immagine a Filo trascinandola', category: 'assistant',
-      desc: 'Un’immagine che trascini dentro Filo entra nella chat come se l’avessi incollata, dovunque la lasci. Nella nuova scheda va nella casella da qualunque punto della pagina, e la casella si accende mentre la trascini; gli altri file entrano col loro nome e percorso. Su un sito o su un’altra pagina di Filo va all’Aiuto, che si apre con l’immagine già allegata e il cursore nella casella. Lasciata sulla fila delle schede o sulla barra laterale va alla chat della scheda che hai davanti. Più immagini insieme entrano tutte, e ognuna si toglie con la sua ×.',
+      desc: 'Un’immagine che trascini dentro Filo entra nella chat come se l’avessi incollata, dovunque la lasci. Nella nuova scheda va nella casella da qualunque punto della pagina, e la casella si accende mentre la trascini; gli altri file entrano col loro nome e percorso. Su un sito o su un’altra pagina di Filo va all’Aiuto, che si apre con l’immagine già allegata e il cursore nella casella. Lasciata sulla parte vuota della fila delle schede o sulla barra laterale va alla chat della scheda che hai davanti; un’immagine presa da una pagina e lasciata proprio su una scheda, o fra due, si apre lì come un collegamento (vedi «Trascina un collegamento su una scheda»). Più immagini insieme entrano tutte, e ognuna si toglie con la sua ×.',
       invoke: 'Trascina un’immagine dal computer o da un’altra finestra e lasciala su Filo, oppure incollala nella casella della chat.',
       doesNot: 'Se il sito accoglie il file da sé, come una pagina che carica foto, lo lascia al sito. Oltre i 4 MB un’immagine presa dal computer entra nella nuova scheda come file col suo percorso; incollata, o nell’Aiuto, entra rimpicciolita. Un’immagine in un formato che il modello non legge, come un SVG, entra convertita. All’Aiuto vanno solo immagini: un altro file lasciato insieme non entra, e un avviso lo dice. Un sito non può farne allegare una da solo: conta solo il tuo trascinamento.',
     },
@@ -969,6 +975,7 @@
     fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
     'pannello-strumenti': 'home(pannello)', 'page-zoom': 'scheda(zoom)', 'network-error-page': SOLO_A_MANO,
     'auto-archive': 'scheda(riordina)', 'restore-tabs': SOLO_A_MANO, 'reorder-tabs': SOLO_A_MANO, 'drag-tab': SOLO_A_MANO,
+    'link-su-scheda': 'scheda(apri)',
     'tab-preview': 'impostazioni(imposta)', 'open-in-background': 'scheda(apri)', 'explain-selection': SOLO_A_MANO,
     'translate-selection': SOLO_A_MANO, 'edit-selection': SOLO_A_MANO, 'read-aloud': SOLO_A_MANO, dictate: SOLO_A_MANO,
     'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,

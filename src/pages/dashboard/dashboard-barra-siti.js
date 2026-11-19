@@ -292,7 +292,7 @@
     if (portaIndirizzo(dt)) {
       e.preventDefault();
       e.stopPropagation();
-      const url = String(dt.getData('text/uri-list') || '').split(/\r?\n/).find((r) => r && !r.startsWith('#'));
+      const url = global.SN_INDIRIZZI_TRASCINATI.primo(dt.getData('text/uri-list'));
       if (url) muovi({ tipo: 'aggiungi', url });
     }
   }

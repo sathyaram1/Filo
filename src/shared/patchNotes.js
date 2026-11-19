@@ -11,6 +11,7 @@
     {
       version: '0.2.293', date: '2026-11-19',
       features: [
+        { testo: 'Trascina un collegamento, o la miniatura di un video, su una scheda per aprirlo lì; fra due schede o sul + si apre in una scheda nuova in quel punto, come in Chrome.', segnalazione: 2393 },
         { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
       ],
       fixes: [
