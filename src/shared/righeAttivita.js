@@ -463,7 +463,7 @@
     PULSANTE_PREFERENZE: 'Pulsante delle Preferenze non premuto',
     CARTA_HOME: 'Carta della home non cambiata',
     BARRA_SITI: 'Barra dei siti non cambiata',
-    CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
+    CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato', TRADUCI_PAGINA: 'Traduzione non cambiata',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
     ORDINA_DESKTOP: 'Icone del desktop non spostate', BLOCCA_PC: 'Computer non bloccato',
