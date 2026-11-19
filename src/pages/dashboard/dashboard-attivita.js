@@ -1846,6 +1846,9 @@
       return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
     if (type === 'CERCA_DOCUMENTI') return stepTrace(`🔎 ${testoRicercaDocumenti(a)}`);
+    // #2272 — le immagini stanno nella risposta: qui resta solo la traccia del passo.
+    if (type === 'IMMAGINI_WEB') return stepTrace(`🖼 Cerco immagini: ${a.query || ''}`.trim());
+    if (type === 'GENERA_IMMAGINE') return stepTrace('🖌 Disegno un\'immagine');
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.
