@@ -287,6 +287,9 @@ test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, 
   await expect(avatar(fuori(page, 'profilo'))).toHaveAttribute('src', foto);
   await expect(fuori(page, 'profilo')).toHaveAttribute('aria-label', 'Profilo: Mario Rossi');
   await apriPiu(page);
+  await page.waitForTimeout(1500);
+  console.log('DEBUG', await page.locator('#altroFuori').evaluate((n) => n.innerHTML.slice(0, 3000)));
+  console.log('DEBUG2', await page.evaluate(async (u) => { try { const r = await fetch(u); return r.status + ' ' + r.headers.get('content-type'); } catch (e) { return String(e); } }, foto));
   await expect.poll(() => avatar(fuori(page, 'profilo')).evaluate((i) => i.naturalWidth)).toBe(1);
   // Rimesso in vista, il tasto ridisegnato ha la sua foto.
   await fuori(page, 'profilo').click({ button: 'right' });
