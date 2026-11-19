@@ -694,16 +694,18 @@
     // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
     async function allega(lista, aggiungi = addAttachment) {
       const fuori = [];
+      const avvisi = [];
       for (const f of lista) {
         const no = await aggiungi(f);
-        if (no) fuori.push(no);
+        if (no && no.avviso) avvisi.push(`«${no.name}» ${no.avviso}.`);
+        else if (no) fuori.push(no);
       }
-      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = avvisi.join(' '); return; }
       const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
         : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
       const tipi = fuori.some((f) => f.reason === TIPO_NO)
         ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
-      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
+      statusEl.textContent = [`${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`, ...avvisi].join(' ');
     }
 
     function caricaImmagine(src) {
