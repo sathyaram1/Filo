@@ -73,9 +73,13 @@ il clic sul pulsante del sito.
    initial` non tocca le variabili). Un font del sito diviso in un pezzo per
    carattere (`unicode-range`) dice, da quali pezzi il browser carica, quali
    caratteri il pannello ha disegnato (#589.8, giro 2). Sui siti il pannello
-   chiuso usa solo **famiglie generiche** (`system-ui, sans-serif`), che nessun
-   `@font-face` rimpiazza; un font chiamato per nome, anche quello scelto
-   dall'utente, lì non entra. Sulle pagine `filo://` il font dell'utente resta.
+   chiuso usa solo **famiglie generiche**, che nessun `@font-face` rimpiazza: la
+   più vicina al carattere scelto (`serif` per Georgia, `monospace` per uno a
+   spaziatura fissa, `system-ui, sans-serif` per quello di sistema; tabella in
+   `src/shared/fontGenerico.js`, #1342), detta allo strato da content.js e mai
+   letta dal documento, dove `--sn-font` lo scrive anche il sito. Un font
+   chiamato per nome, anche quello scelto dall'utente, lì non entra. Sulle
+   pagine `filo://` e nello strato sopra la scheda il font dell'utente resta.
 
 3. **Un clic conta solo dove l'utente vedeva la voce.** Il caso (#589.11): dopo
    un tasto destro vero sul suo campo, il sito stende sopra tutto un velo bianco
