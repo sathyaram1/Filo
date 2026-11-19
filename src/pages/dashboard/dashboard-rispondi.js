@@ -85,44 +85,24 @@
     for (let n = w.nextNode(); n; n = w.nextNode()) out.push(n);
     return out;
   }
-  // La parte della selezione che sta in `el`, e quello che la precede in `el`. `null` se non ne tocca niente.
-  function selezioneIn(el) {
-    const sel = global.getSelection ? global.getSelection() : null;
-    if (!el || !sel || sel.isCollapsed || !sel.rangeCount) return null;
-    const r = sel.getRangeAt(0).cloneRange();
-    if (!r.intersectsNode(el)) return null;
-    const tutto = document.createRange();
-    tutto.selectNodeContents(el);
-    if (r.compareBoundaryPoints(Range.START_TO_START, tutto) < 0) r.setStart(tutto.startContainer, tutto.startOffset);
-    if (r.compareBoundaryPoints(Range.END_TO_END, tutto) > 0) r.setEnd(tutto.endContainer, tutto.endOffset);
-    const testo = r.toString();
-    if (!testo.trim()) return null;
-    const prima = document.createRange();
-    prima.setStart(tutto.startContainer, tutto.startOffset);
-    prima.setEnd(r.startContainer, r.startOffset);
-    return { testo, prima: prima.toString() };
-  }
-  // Il passo selezionato misurato sullo scritto del messaggio; `null` se la selezione è il messaggio intero o non c'è.
-  let fissata = null;
-  const FISSATA_MS = 60_000;
-  function passoSelezionato(el, scrittoDelMessaggio) {
-    const f = fissata && fissata.bolla === el && Date.now() - fissata.quando < FISSATA_MS ? fissata.sel : null;
-    fissata = null;
-    const sel = selezioneIn(el) || f;
+  // Il passo selezionato (`sel`, da src/shared/azioniMessaggio.js → selezioneIn) misurato sullo scritto del messaggio;
+  // `null` se la selezione è il messaggio intero o non c'è.
+  function passoSelezionato(el, scrittoDelMessaggio, sel = null) {
+    const s = sel || global.SN_AZIONI_MESSAGGIO.selezioneIn(el);
     const Ra = R();
-    if (!sel || !Ra || !scrittoDelMessaggio) return null;
-    const t = Ra.trovaPasso(scrittoDelMessaggio, sel.testo, Ra.lettere(sel.prima));
+    if (!s || !Ra || !scrittoDelMessaggio) return null;
+    const t = Ra.trovaPasso(scrittoDelMessaggio, s.testo, Ra.lettere(s.prima));
     return t && !t.tutto ? { da: t.da, a: t.a } : null;
   }
 
   // ── Le citazioni sopra il campo ───────────────────────────────────────────
   // Il posto nel filo lo sa la bolla quando il filo l'ha riconosciuta (`data-key`); appena scritta no, e il main la
   // ritrova dal testo nella chat di adesso. Con del testo selezionato nella bolla si cita quel passo soltanto.
-  function rispondi(b) {
+  function rispondi(b, sel = null) {
     const k = /^m:(.+):(\d+)$/.exec(b.dataset.key || '');
     const role = diUtente(b) ? 'user' : 'filo';
     const s = scritto(b) ?? testoDi(b);
-    const passo = passoSelezionato(b, s);
+    const passo = passoSelezionato(b, s, sel);
     return aggiungi({
       bolla: b,
       chat: k ? k[1] : '',
