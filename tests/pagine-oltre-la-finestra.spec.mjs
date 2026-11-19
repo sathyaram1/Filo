@@ -21,7 +21,7 @@ ${corpo}
 </article></main></body></html>`;
 }
 
-// Il fornitore finto conta come OpenRouter: messaggi e strumenti, più il tetto della risposta. Oltre `finestra` token
+// Il fornitore finto conta come la stima di Filo: messaggi e strumenti, più il tetto della risposta. Oltre `finestra` token
 // rifiuta, con le misure (o senza, `misure: false`). `listino`: il listino di OpenRouter dice la stessa finestra.
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
 // (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti. `posto`: al posto di
