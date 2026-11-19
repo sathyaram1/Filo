@@ -95,7 +95,7 @@ test('sul bordo fra due schede ne nasce una nuova proprio lì, davanti; il segno
   await expect(shell.locator('.link-posto')).toBeHidden();
 });
 
-test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fondo; un’immagine sulla parte vuota resta della chat', async ({ shell, openTab, testServer }) => {
+test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fondo; un’immagine sulla parte vuota resta della chat', async ({ app, shell, openTab, testServer }) => {
   await treSchede(shell, openTab, testServer);
   const uno = testServer.html(pagina('Uno'));
   await trascina(shell, uno, await punto(shell.locator('#tab-new')));
