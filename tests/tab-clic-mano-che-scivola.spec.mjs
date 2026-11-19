@@ -135,8 +135,8 @@ test('col menu del tasto destro aperto, il clic sulla scheda sotto il suo bordo 
   const ids = await treSchede(shell, testServer);
   await tastoDestro(shell, `#tabs .tab[data-id="${ids[1]}"]`);
   await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Chiudi'));
-  const p = await punto(shell, ids[1], '.title');
-  const esito = await clicNelBordoDelMenu(app, p.x, p.y - 4);
+  const p = await punto(shell, ids[1], null);
+  const esito = await clicNelBordoDelMenu(app, p.x - 10, p.y - 4);
   expect(esito.fuori, 'la scheda deve stare sotto la finestra del menu').toBe(false);
   await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[1]);
   await expect.poll(() => vociDelMenu(app), { timeout: 3_000 }).toBe(null);
