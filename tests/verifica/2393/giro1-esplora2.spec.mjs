@@ -16,7 +16,7 @@ async function nelloSchermo(app, shell, [fn, arg]) {
   });
   return { x: Math.round(o.x + r.x * o.z), y: Math.round(o.y + r.y * o.z) };
 }
-const centro = (i) => () => { const r = document.querySelectorAll('.tab')[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+const centro = (n) => [(i) => { const r = document.querySelectorAll('.tab')[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, n];
 
 test('voce della barra dei siti della home portata sul centro di una scheda', async ({ app, shell, openTab, testServer }) => {
   test.skip(!Gesti.disponibili(), 'gesti');
