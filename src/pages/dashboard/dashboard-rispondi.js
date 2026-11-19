@@ -249,6 +249,7 @@
     const testi = citate.slice(0, -1).map((c) => c.commento);
     citate = [];
     campo(unisci(...testi, d.inputEl.value));
+    fuori = false;
     disegnaAnteprima();
     return true;
   }
