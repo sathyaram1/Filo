@@ -17,11 +17,14 @@ const VISIBILI = new Set([
 
 // Con i privilegi di Electron su file:// una pagina locale leggerebbe con fetch ogni file del disco: nei documenti
 // le richieste e i riquadri vanno solo verso il web, e il resto lo ferma la cartella concessa (servi).
+// La sandbox senza allow-same-origin dà al documento un'origine opaca: le immagini della cartella si vedono, ma una
+// tela che le disegna non si fa più leggere (una pagina scaricata leggeva le foto accanto a sé).
 const CSP_DOCUMENTO = [
   'connect-src http: https: ws: wss: data: blob:',
   'frame-src http: https: data: blob:',
   'worker-src http: https: data: blob:',
   "object-src 'none'",
+  'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads allow-pointer-lock allow-presentation',
 ].join('; ');
 
 const fileDi = (input) => globalThis.SN_URL_NAV.fileDiQuestoComputer(input);
