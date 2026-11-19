@@ -108,7 +108,35 @@
     if (!file || !attach() || ammessa(file)) return false;
     const tipo = String(file.type || '').toLowerCase().trim();
     if (tipo.startsWith('image/')) return !tipo.includes('svg');
-    return (!tipo || tipo === 'application/octet-stream') && ALTRE_ESTENSIONI.test(String(file.name || ''));
+    const ext = (/\.([a-z0-9]+)$/i.exec(String(file.name || '')) || [])[1] || '';
+    const A = attach();
+    const nota = (s) => !!(s && typeof s.has === 'function' && s.has(ext.toLowerCase()));
+    return (!tipo || tipo === 'application/octet-stream') && (nota(A.RIDISEGNABILI_EXT) || nota(A.NON_APRIBILI_EXT));
+  }
+
+  // Quanti fotogrammi ha una GIF, leggendo i blocchi senza decodificarli: una animata ridisegnata resta ferma, e
+  // chi la manda deve saperlo. 0 se i byte non sono una GIF.
+  function fotogrammiGif(byte) {
+    const b = byte instanceof Uint8Array ? byte : new Uint8Array(byte || []);
+    if (b.length < 13 || String.fromCharCode(b[0], b[1], b[2]) !== 'GIF') return 0;
+    let i = 13 + ((b[10] & 0x80) ? 3 * (2 << (b[10] & 7)) : 0);
+    const salta = () => { while (i < b.length && b[i] !== 0) i += b[i] + 1; i += 1; };
+    let n = 0;
+    while (i < b.length) {
+      const t = b[i];
+      if (t === 0x3b) break;
+      if (t === 0x21) { i += 2; salta(); continue; }
+      if (t !== 0x2c) break;
+      n += 1;
+      const f = b[i + 9];
+      i += 10 + ((f & 0x80) ? 3 * (2 << (f & 7)) : 0) + 1;
+      salta();
+    }
+    return n;
+  }
+  const AVVISO_FERMA = 'entrata ferma, perché l’animazione non stava nei 4 MB';
+  async function animata(file) {
+    try { return fotogrammiGif(new Uint8Array(await file.arrayBuffer())) > 1; } catch (_) { return false; }
   }
 
   // Una foto del telefono passa spesso i 4 MB, e un AVIF non era fra i tipi ammessi (#1664): prima di rifiutarla si
