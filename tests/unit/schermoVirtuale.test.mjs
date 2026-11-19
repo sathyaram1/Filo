@@ -402,7 +402,7 @@ test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre
     const env = ambienteSenzaSchermo(temp);
     for (const k of [SCHERMI_LAVORATORI, 'FILO_SCHERMO_VIRTUALE', 'TEST_PARALLEL_INDEX', 'TEST_WORKER_INDEX']) delete env[k];
     const r = await new Promise((risolvi) => {
-      const p = spawn(process.execPath, [resolve(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config', resolve(temp, 'pw.config.js'),
+      const p = spawn(process.execPath, [resolve(pw, 'cli.js'), 'test', '--config', resolve(temp, 'pw.config.js'),
         '--workers', '3', '--timeout', '30000'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
       let testo = '';
       p.stdout.on('data', (d) => { testo += d; });
