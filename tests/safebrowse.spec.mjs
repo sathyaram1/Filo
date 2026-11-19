@@ -258,20 +258,14 @@ for (const [cosa, a, b] of [
 // modulo Google chiede la password in un campo di testo. Pagine servite intercettando https; il giudice fa ciò che
 // il suo prompt chiede, cioè sospetta una pagina ospitata che chiede password o pagamento.
 async function servi(app, pagine) {
-  await app.evaluate(async ({ session, net }, pg) => {
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname] || pg[u.hostname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    });
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(async () => {
     globalThis.SN_SAFEBROWSE.setProviders({
       sandbox: null,
       llm: async (meta) => (meta.hostedOn && (meta.hasPassword || meta.hasPayment)
         ? { suspicious: true, reasonKey: 'hosted_credentials', reason: null, confidence: 'high' } : { suspicious: false, reason: null }),
     });
-  }, pagine);
+  });
 }
 
 async function livelloScheda(app, host, ms = 9000) {
