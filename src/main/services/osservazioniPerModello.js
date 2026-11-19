@@ -149,6 +149,21 @@ function capabilityDetailsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #2536.1 — la memoria letta con memoria(leggi), già nella sua busta come nel CONTESTO.
+function memoriaLettaForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_MEMORIA') continue;
+    const o = a._output;
+    if (!o || typeof o.memoria !== 'string') continue;
+    blocchi.push(o.memoria
+      ? `[La memoria di Filo sull'utente, letta con memoria(leggi): com'era in quel momento. Per togliere o correggere una cosa usa memoria(dimentica) o memoria(correggi) con un pezzo del suo testo.]\n${o.memoria}`
+      : '[La memoria di Filo sull\'utente, letta con memoria(leggi): è vuota, di lui non hai salvato niente.]');
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 // Re-immissione dei RISULTATI di una CERCA_WEB eseguita in un turno precedente
 // (#368): l'agente vede titoli, URL e snippet REALI e può rispondere con link
 // veri (o aprirne uno con NAVIGA usando l'URL esatto).
