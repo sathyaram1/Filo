@@ -1,4 +1,4 @@
-// Verifica #810.8 giro 10: il valore che l'utente mette nella pagina non resta fra i segreti letti, per strade nuove.
+// Verifica #810.8 giro 10: il valore che l'utente ha scritto prima di un riavvio, rimesso dal sito, resta suo.
 import { test, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
