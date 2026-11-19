@@ -47,8 +47,15 @@ function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {
     for (const voce of inCoda.values()) { try { manda(voce.messaggio); } catch (_) {} }
   }
 
+  // Detto altrove, o non più vero: esce dalla coda senza contare come visto, e la sua pausa la tiene chi lo ritira.
+  function ritira(chiave) {
+    const k = String(chiave || '');
+    inCoda.delete(k);
+    mostrati.delete(k);
+  }
+
   const inAttesa = () => [...inCoda.values()].map((v) => v.messaggio);
-  return { avvisa, prendi, inAttesa, riproponi };
+  return { avvisa, prendi, inAttesa, riproponi, ritira };
 }
 
 module.exports = { crea, PAUSA_MS };
