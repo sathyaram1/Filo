@@ -645,6 +645,7 @@
     BARRA_SITI: () => 'sistemato la barra dei siti',
     CANCELLA_PAGINE: () => 'cancellato pagine visitate',
     ZOOM_PAGINA: () => 'cambiato lo zoom',
+    TRADUCI_PAGINA: () => 'tradotto una pagina',
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
