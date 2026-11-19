@@ -316,12 +316,12 @@
     fineAttesa = Date.now() + ATTESA_CAMPI_MS;
     try {
       osservatore = new MutationObserver(() => {
-        if (Date.now() > fineAttesa) { fermaAttesa(); return; }
+        if (Date.now() > fineAttesa && !compone()) { fermaAttesa(); return; }
         if (!prossimo) prossimo = setTimeout(rimetti, 150);
       });
       osservatore.observe(document.documentElement, { childList: true, subtree: true });
     } catch (_) {}
-    setTimeout(() => { if (Date.now() >= fineAttesa) fermaAttesa(); }, ATTESA_CAMPI_MS + 50);
+    setTimeout(() => { if (Date.now() >= fineAttesa && !compone()) fermaAttesa(); }, ATTESA_CAMPI_MS + 50);
   }
 
   async function nascita() {
