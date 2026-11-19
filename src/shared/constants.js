@@ -370,6 +370,7 @@
     [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
     [ACTIONS.FILE_NAME]: 'Nomi dei file',
     [ACTIONS.EMBED_COOKIE_CHECK]: 'Contenuti incorporati',
+    [ACTIONS.IMAGE_GEN]: 'Chat con Filo',
   };
 
   function creditUsageGroup(action) {
