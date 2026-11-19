@@ -541,9 +541,9 @@ for (const [come, campo, scrivi, valore] of [
     await preparaModelli(app);
     await modelloFinto(app);
     await scrivi(app, page);
-    await apriAiuto(shell, page);
-    await scriviAllAiuto(page, 'aiutami a finire');
-    await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'aiutami a finire');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
     const dopo = (await lettiDopoUnRiavvio(app)).map((v) => v.replace(/[\s-]/g, '').toLowerCase());
     expect(dopo).toContain('264087');
