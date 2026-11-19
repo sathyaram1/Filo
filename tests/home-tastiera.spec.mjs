@@ -44,6 +44,102 @@ test('un campo solo: quello che batto senza cliccarci finisce nella chat', async
   await expect(page.locator('#input')).toHaveValue('ok');
 });
 
+// #2372.1 — il campo tiene il fuoco davvero: un clic su un punto vuoto lo rimette lì, e ci arrivano tutti i tasti, non
+// solo le lettere.
+test('dopo un clic su un punto vuoto il campo ha il fuoco: Backspace, Ctrl+V, frecce e Invio funzionano come lì dentro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await casa(app);
+  const campo = page.locator('#input');
+  const fuoco = () => page.evaluate(() => document.activeElement && document.activeElement.id);
+  await page.keyboard.type('ciao');
+  await expect(campo).toHaveValue('ciao');
+  await page.mouse.click(640, 300);
+  await expect.poll(fuoco).toBe('input');
+  await page.keyboard.press('Backspace');
+  await expect(campo).toHaveValue('cia');
+  await app.evaluate(({ clipboard }) => clipboard.writeText(' incollato'));
+  await page.mouse.click(640, 300);
+  await page.keyboard.press('Control+V');
+  await expect(campo).toHaveValue('cia incollato');
+  await page.mouse.click(640, 300);
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.type('i');
+  await expect(campo).toHaveValue('ciia incollato');
+
+  // Il fuoco lasciato su un punto vuoto in altro modo (qui un blur da codice, con del testo selezionato nella pagina che
+  // lo tiene lì): Ctrl+C copia la selezione, Backspace e Invio sono del campo, e Invio manda.
+  await page.evaluate(() => {
+    const t = document.querySelector('.dash-altro-tit');
+    const r = document.createRange();
+    r.selectNodeContents(t);
+    document.getSelection().removeAllRanges();
+    document.getSelection().addRange(r);
+    document.activeElement.blur();
+  });
+  await page.waitForTimeout(100);
+  expect(await fuoco()).toBe('');
+  await page.keyboard.press('Control+C');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('altro');
+  await page.keyboard.press('Backspace');
+  await expect(campo).toHaveValue('ciia incollat');
+  await modelloFinto(app, [{ text: 'Eccomi.' }]);
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'ciia incollat' })).toBeVisible({ timeout: 10_000 });
+  await expect(campo).toHaveValue('');
+});
+
+test('con la ricerca aperta il clic su un punto vuoto rimette il fuoco nella ricerca, e il tasto destro non lo sposta', async ({ app }) => {
+  const page = await casa(app);
+  const fuoco = () => page.evaluate(() => document.activeElement && document.activeElement.id);
+  await page.locator('#altro .dash-altro-app[data-id="cerca"]').click();
+  await page.keyboard.type('orc');
+  await page.mouse.click(640, 300);
+  await expect.poll(fuoco).toBe('cercaInput');
+  await page.keyboard.type('he');
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#cercaInput')).toHaveValue('orch');
+  await expect(page.locator('#input')).toHaveValue('');
+  await page.keyboard.press('Escape');
+  await expect.poll(fuoco).toBe('input');
+  // Un menu aperto col tasto destro tiene il suo fuoco: il campo non glielo ruba.
+  await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
+  await expect(page.locator('.dash-menu')).toBeVisible();
+  await page.waitForTimeout(200);
+  await expect(page.locator('.dash-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
+test('una lettera ridata a un’altra cosa dice cosa apriva prima, dalle Preferenze e dal tasto destro', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const urlDi = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).doppioTocco.lettere.map((v) => v.url || v.tasto).join());
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', url: 'https://www.youtube.com/' }] } }));
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#doppioToccoLettere .mem-riga')).toHaveCount(1);
+  await pref.locator('#doppioToccoNuova').fill('y');
+  await pref.locator('#doppioToccoDove').fill('example.com');
+  await pref.locator('#doppioToccoAggiungi').click();
+  await expect.poll(urlDi).toBe('https://example.com/');
+  await expect(pref.locator('#doppioToccoHint')).toBeVisible();
+  await expect(pref.locator('#doppioToccoHint')).toHaveText('Salvato (prima apriva youtube.com)');
+  await pref.locator('#doppioToccoHint').scrollIntoViewIfNeeded();
+  await pref.screenshot({ path: `${SHOTS}/2372-1-lettera-ridata-preferenze.png` });
+  // La stessa lettera ridata alla stessa cosa non perde niente: niente avviso in più.
+  await pref.locator('#doppioToccoNuova').fill('y');
+  await pref.locator('#doppioToccoDove').fill('example.com');
+  await pref.locator('#doppioToccoAggiungi').click();
+  await expect(pref.locator('#doppioToccoHint')).toHaveText('Salvato');
+
+  const page = await casa(app);
+  await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Assegna una lettera' }).click();
+  await page.keyboard.press('y');
+  await expect.poll(urlDi).toBe('impostazioni');
+  await expect(page.locator('#dashFlash')).toContainText('«yy» nella home: Impostazioni (prima apriva example.com)');
+  await page.screenshot({ path: `${SHOTS}/2372-1-lettera-ridata-home.png` });
+});
+
 test('«yy» dato dalle Preferenze apre la pagina; «ayy», la y tenuta premuta, un riquadro sopra e la ricerca no', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const url = testServer.html('<title>Video</title><h1>video</h1>');
