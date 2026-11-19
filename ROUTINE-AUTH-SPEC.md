@@ -786,8 +786,9 @@ e la prova la dichiarava lui al server. Adesso:
   (`tests/unit/unitFusioneAzione.test.mjs`); il server legge il registro del
   solo lavoro `unit`, rifiuta un'altra coppia, rifà da sé ogni campo (esito da
   elenco, sha, tetti sui rossi, storia) e ricalcola le novità unite invece di
-  prenderle dalla corsa (`functions/test/routine-unit-azione.test.js` e
-  `routine-novita-fusione-2543.test.js` in filo-security). Se cade una di
+  prenderle dalla corsa (`functions/test/routine-unit-azione.test.js`,
+  `routine-unit-sulla-fusione.test.js` e `routine-novita-fusione-2543.test.js`
+  in filo-security). Se cade una di
   queste, il muro torna a servire;
 - **il server si fida solo di quello che legge da GitHub per quella coppia**
   (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
