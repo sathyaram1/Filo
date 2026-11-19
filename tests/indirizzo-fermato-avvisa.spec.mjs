@@ -18,6 +18,12 @@ const nelModello = (shell, testo) => shell.evaluate((t) => [...document.querySel
   .filter((c) => c.dataset.closing !== '1' && c.textContent.includes(t)).length, testo);
 const carta = async (avvisi, testo) => (await avvisi()).locator('.shell-notif.show', { hasText: testo });
 
+// La home dell'avvio nasce dopo la shell: un elenco delle schede letto prima di lei la conta come scheda aperta dalla
+// prova (#2597), e `tabs[0]` può non esserci ancora.
+test.beforeEach(async ({ app }) => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoPronta);
+});
+
 test('aperto da Filo in una scheda nuova, un file del computer viene fermato e lo dice, senza «Apri comunque»', async ({ app, shell, avvisi }) => {
   const prima = await schede(app);
   const r = await shell.evaluate(() => window.filoShell.tabs.open('file:///C:/Users/agenti%20AI/Documenti/conto.pdf'));
