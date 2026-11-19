@@ -29,7 +29,7 @@ test('sonda', async ({ app, shell }) => {
     const f = await wc.executeJavaScript(`fetch(${JSON.stringify(s)}).then(r=>r.text()).catch(e=>'ERR '+e)`);
     const x = await wc.executeJavaScript(`new Promise((ok)=>{const q=new XMLHttpRequest();q.open('GET',${JSON.stringify(s)});q.onload=()=>ok('XHR '+q.responseText);q.onerror=()=>ok('XHRERR');q.send();})`);
     const fr = await wc.executeJavaScript(`(()=>{try{return 'IFR '+document.getElementById('f').contentDocument.body.textContent}catch(e){return 'IFRERR '+e.name}})()`);
-    const orig = await wc.executeJavaScript('String(location.origin)+" "+document.title');
+    const orig = await wc.executeJavaScript('String(location.origin)+" "+document.title+" img="+document.getElementById("i").naturalWidth+" css="+getComputedStyle(document.getElementById("p")).color+" canvas="+(()=>{try{const c=document.createElement("canvas");c.width=2;c.height=2;const g=c.getContext("2d");g.drawImage(document.getElementById("i"),0,0);g.getImageData(0,0,1,1);return "LETTO"}catch(e){return e.name}})()');
     return { url: wc.getURL(), f, x, fr, orig, viste };
   }, [u, s]);
   console.log(JSON.stringify(r));
