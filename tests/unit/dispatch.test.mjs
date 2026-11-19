@@ -1093,17 +1093,12 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
 test('emit halt: il testo consegnato chiede la domanda di fine sessione PRIMA del rilascio col guasto (#1205)', () => {
   // Le sessioni andate storte sono quelle che all'owner interessano di più: halt
   // non riceve il contratto (non lavora), ma la sua parte sulla domanda sì.
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'halt.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
+  ruoliVeri(['halt.md', 'resolver.md']);
   let out = '';
   const real = process.stdout.write;
   process.stdout.write = (s) => { out += s; return true; };
   try { emit({ role: 'halt', kind: 'transient', message: 'canale giù' }, {}); } finally { process.stdout.write = real; }
-  const t = JSON.parse(out).instructions;
+  const t = ruoloConsegnato(JSON.parse(out));
   const domanda = t.indexOf('routine-channel.mjs domanda --biglietto <biglietto>');
   const rilascio = t.indexOf('routine-channel.mjs release <biglietto> --role halt --guasto');
   assert.ok(domanda > -1, 'halt riceve la domanda di fine sessione');
