@@ -297,7 +297,7 @@ for (const come of ['npm run test:unit', 'un file di prova lanciato da solo']) {
     const file = join(unit, 'ok.test.mjs');
     writeFileSync(file, `import ${JSON.stringify(PERCORSI)};\nimport { test } from 'node:test';\ntest('ok', () => {});\n`);
     const finto = discoPienoFinché(b, vecchia);
-    const args = come === 'npm run test:unit' ? [join(RADICE, 'scripts', 'run-unit-tests.mjs')] : ['--test', file];
+    const args = come === 'npm run test:unit' ? [join(RADICE, 'scripts', 'run-unit-tests.mjs')] : ['--test', '--test-reporter=tap', file];
     const r = spawnSync(process.execPath, ['--import', finto, ...args],
       { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, encoding: 'utf8' });
     assert.ok(!existsSync(vecchia), 'la cartella vecchia che riempie il disco è ancora lì');
