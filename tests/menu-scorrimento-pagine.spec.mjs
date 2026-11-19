@@ -101,7 +101,7 @@ test('Bacheca: il menu di una propria segnalazione', async ({ app, openTab }) =>
 test('Editor: il menu del titolo', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docSwitch');
-  await scorriAlGesto(page, 'contextmenu');
+  await scorriAlGesto(page, 'contextmenu', page.locator('#docSwitch'));
   await page.click('#docSwitch', { button: 'right' });
   await restaPoiSiChiude(page, page.locator('.ed-title-ctxmenu'));
 });
