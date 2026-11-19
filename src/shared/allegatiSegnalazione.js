@@ -168,11 +168,12 @@
     }));
   }
 
-  // Dall'Aiuto (#1664): le immagini indicate per numero che l'utente ha tenuto, già controllate dal main ({ id: dataUrl }).
-  // File e schermata lì non ci sono.
+  // Dall'Aiuto (#1664): le immagini indicate per numero che l'utente ha tenuto nel riquadro ({ id: dataUrl }), solo nei
+  // formati che si leggono e sotto il tetto. File e schermata lì non ci sono.
   function vociAiuto(action, immagini) {
     const im = immagini && typeof immagini === 'object' ? immagini : {};
-    return richiesti(action).immagini.filter((n) => typeof im[`immagine:${n}`] === 'string')
+    const buona = (u) => typeof u === 'string' && PREPARATA.test(u) && byteDi(u) <= limiti().byte;
+    return richiesti(action).immagini.filter((n) => Object.prototype.hasOwnProperty.call(im, `immagine:${n}`) && buona(im[`immagine:${n}`]))
       .map((n) => ({ id: `immagine:${n}`, tipo: 'immagine', nome: `immagine ${n}.${estensione(im[`immagine:${n}`])}`, dataUrl: im[`immagine:${n}`] }));
   }
 
