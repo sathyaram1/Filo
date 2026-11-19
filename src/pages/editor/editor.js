@@ -2035,6 +2035,24 @@
     host.appendChild(pad);
   }
 
+  // Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>), e il salvataggio legge un paragrafo e
+  // perde l'elenco: quando il paragrafo non ha altro, l'elenco prende il suo posto (#2279).
+  function apriElenco(cmd) {
+    exec(cmd);
+    const sel = window.getSelection();
+    const voce = sel && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest('li');
+    const elenco = voce && voce.parentElement;
+    const involucro = elenco && elenco.parentElement;
+    if (!involucro || involucro === docEl || !docEl.contains(involucro) || !/^(P|DIV)$/.test(involucro.tagName)) return;
+    if (involucro.childNodes.length !== 1) return;
+    involucro.replaceWith(elenco);
+    const r = document.createRange();
+    r.setStart(voce, 0);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    onDocInput();
+  }
+
   // Shortcut markdown a livello blocco
   function handleMarkdownBlock() {
     const sel = window.getSelection();
