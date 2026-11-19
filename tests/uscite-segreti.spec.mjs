@@ -443,9 +443,9 @@ for (const [come, extra, scrivi] of [
     await modelloFinto(app);
     await scrivi(page, altra);
     await expect(page.locator('#c')).toHaveValue(CARTA_UTENTE);
-    await apriAiuto(shell, page);
-    await scriviAllAiuto(page, 'aiutami a finire il pagamento');
-    await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'aiutami a finire il pagamento');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
     expect(await lettiDopoUnRiavvio(app), 'il numero della carta è rimasto fra i segreti letti').not.toContain(CARTA_UTENTE.replace(/ /g, ''));
   });
