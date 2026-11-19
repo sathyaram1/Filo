@@ -13,6 +13,7 @@ import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { batti } from './helpers/tastiera.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
+import { nelMondoDiFilo } from './helpers/riquadri.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
