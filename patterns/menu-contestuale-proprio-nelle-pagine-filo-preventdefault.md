@@ -24,3 +24,7 @@ il passo se `e.defaultPrevented` è già vero.
   Home e Fine, Invio e la prima lettera della scritta; chiuso, il fuoco torna dov'era. Un elemento che ha
   voci sue deve potersi raggiungere col Tab: una lista lunga è una fermata sola, con le frecce dentro
   (le bolle del filo della home). Prove: `tests/chat-nascoste.spec.mjs`.
+- **Allo scorrimento** (#2452, #2586): il menu proprio che si chiude quando la pagina scorre chiede prima a
+  `SN_MENU.fotoDelloScorrimento(x, y)`, presa all'apertura, se lo scorrimento ha spostato qualcosa: l'evento di
+  quello finito un istante prima arriva al fotogramma dopo e chiuderebbe il menu appena aperto. Sentinella:
+  `tests/unit/menuScorrimentoPrima.test.mjs`.

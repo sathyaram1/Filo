@@ -1215,6 +1215,9 @@
   // Menu contestuale proprio, con preventDefault e le classi .sn-select-*. Pattern in
   // patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md.
   let titleMenuEl = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let titleMenuScorso = () => true;
+  function onTitleMenuScroll(e) { if (titleMenuScorso(e)) closeTitleMenu(); }
   function closeTitleMenu() {
     if (!titleMenuEl) return;
     titleMenuEl.remove();
@@ -1222,7 +1225,7 @@
     staleClick.arm(); // il menu sparisce da sotto il cursore
     document.removeEventListener('mousedown', onTitleMenuOutside, true);
     document.removeEventListener('keydown', onTitleMenuKeydown, true);
-    window.removeEventListener('scroll', closeTitleMenu, true);
+    window.removeEventListener('scroll', onTitleMenuScroll, true);
     window.removeEventListener('resize', closeTitleMenu);
   }
   function onTitleMenuOutside(e) {
@@ -1235,6 +1238,7 @@
   function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
     if (!file) closeDocPop();
+    titleMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -1279,7 +1283,7 @@
     setTimeout(() => {
       if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      window.addEventListener('scroll', closeTitleMenu, true);
+      window.addEventListener('scroll', onTitleMenuScroll, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
   }
@@ -1965,9 +1969,14 @@
     // La finestra non sta ferma mentre la tendina è aperta (e in Filo si zooma di continuo): posare
     // solo all'apertura calcola il rientro su uno spazio che un istante dopo non c'è più.
     const riposa = () => { if (!pop.hidden) placePop(); };
+    // Chiude lo scorrimento che sposta il bottone, non quello del suo elenco né uno finito prima dell'apertura (#2586).
+    let scorsoDopo = () => true;
+    const scorre = (e) => { if (!(e.target instanceof Node && wrap.contains(e.target)) && scorsoDopo(e)) close(); };
     function open() {
       if (!pop.hidden) return;
       saveDocSelection(); // prima che il focus passi al popup
+      const b = button.getBoundingClientRect();
+      scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(b.left + b.width / 2, b.top + b.height / 2) || (() => true);
       pop.hidden = false;
       placePop();
       wrap.classList.add('sn-open');
@@ -1976,7 +1985,7 @@
       applyFilter('');
       setHover(visibleOptions()[0] || null);
       document.addEventListener('mousedown', onDocDown, true);
-      window.addEventListener('scroll', close, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', riposa);
       // Lo zoom della pagina muove il riquadro visuale senza sempre cambiare la
       // finestra: è una misura a sé, e va ascoltata a sé.
@@ -1997,7 +2006,7 @@
       button.setAttribute('aria-expanded', 'false');
       setHover(null);
       document.removeEventListener('mousedown', onDocDown, true);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', scorre, true);
       window.removeEventListener('resize', riposa);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', riposa);

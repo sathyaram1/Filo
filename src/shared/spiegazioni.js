@@ -143,6 +143,8 @@
       }
     }
     function chiudiMenu() { if (menu) { menu.remove(); menu = null; } }
+    // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+    let menuScorso = () => true;
     function fermaAttesa() { clearTimeout(timerApri); attesa = null; }
     function chiudiTutto() { fermaAttesa(); clearTimeout(timerChiudi); chiudiMenu(); chiudiDa(0); }
 
@@ -206,6 +208,7 @@
       if (chiedi) voci.push(['Spiegami di più', 'piu', () => opzioni.chiedi(`Spiegami di più su «${termine}».`, da)]);
       if (spiegazione) voci.push(['Copia la spiegazione', 'copia', () => copia(spiegazione)]);
       if (!voci.length) return;
+      menuScorso = (doc === global.document && global.SN_MENU?.fotoDelloScorrimento?.(x, y)) || (() => true);
       menu = doc.createElement('div');
       menu.className = 'filo-spiega-menu';
       menu.setAttribute('role', 'menu');
@@ -306,7 +309,7 @@
       if (menu) { chiudiMenu(); if (!fissata) chiudiDa(0); return; }
       chiudiTutto();
     };
-    const scorre = () => { if (catena.length) riposiziona(); if (menu) chiudiMenu(); };
+    const scorre = (e) => { if (catena.length) riposiziona(); if (menu && (e.type !== 'scroll' || menuScorso(e))) chiudiMenu(); };
     if (radiceNodo && radiceNodo.host) radiceNodo.addEventListener('pointerdown', segnaDentro, true);
     doc.addEventListener('pointerdown', fuori);
     win.addEventListener('keydown', esc, true);

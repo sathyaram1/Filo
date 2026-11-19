@@ -21,6 +21,7 @@
         { testo: 'Le foto oltre i 4 MB, come quelle del telefono, si allegano alle segnalazioni anche dalla chat: Filo le rimpicciolisce da sé invece di rifiutarle. Entrano anche le immagini AVIF; per un HEIC ti dice di salvarlo come JPEG o PNG.', segnalazione: 1664 },
         { testo: 'Chiedendo all’Aiuto di mandare una segnalazione, le immagini che gli hai dato partono con lei: le vedi in miniatura prima dell’invio.', segnalazione: 1664 },
         { testo: 'Prima di rispondere Filo riprende una conversazione vecchia solo se c\'entra davvero con quello che chiedi: un saluto, o una domanda su tutt\'altro, non tirano più fuori ricordi a caso.', segnalazione: 2369 },
+        { testo: 'I menu di Scaricamenti, Aperti per dopo, Bacheca, Editor e Gestione, il riquadro della batteria e della rete nella home e il menu delle parole spiegate restano aperti anche se li apri subito dopo aver fatto scorrere la pagina. Nella tendina dei font dell\'Editor puoi scorrere l\'elenco senza che si chiuda.', segnalazione: 2586 },
       ],
     },
     {

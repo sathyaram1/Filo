@@ -191,13 +191,16 @@
 
   // ─── menu contestuale (tasto destro) — set completo di azioni ──────────────
   let openMenu = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let scorsoDopo = () => true;
+  function onMenuScroll(e) { if (scorsoDopo(e)) closeCtxMenu(); }
   function closeCtxMenu() {
     if (!openMenu) return;
     openMenu.remove();
     openMenu = null;
     document.removeEventListener('mousedown', onOutsideClick, true);
     document.removeEventListener('keydown', onMenuKeydown, true);
-    window.removeEventListener('scroll', closeCtxMenu, true);
+    window.removeEventListener('scroll', onMenuScroll, true);
     window.removeEventListener('resize', closeCtxMenu);
   }
   function onOutsideClick(e) { if (openMenu && !openMenu.contains(e.target)) closeCtxMenu(); }
@@ -239,6 +242,7 @@
 
   function openCtxMenu(x, y, r) {
     closeCtxMenu();
+    scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop dl-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -264,7 +268,7 @@
     setTimeout(() => {
       if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      window.addEventListener('scroll', closeCtxMenu, true);
+      window.addEventListener('scroll', onMenuScroll, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
   }
