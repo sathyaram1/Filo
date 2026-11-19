@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/electron.mjs';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
