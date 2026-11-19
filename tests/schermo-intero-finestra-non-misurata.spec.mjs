@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { copertura, vistaAvviso } from './helpers/avvisoSito.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const VERDE = [0x12, 0xab, 0x34];
 const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
