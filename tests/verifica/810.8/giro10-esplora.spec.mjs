@@ -14,7 +14,6 @@ const CARTA = '4111 1111 1111 1111';
 const compatta = (v) => v.replace(/[\s-]/g, '').toLowerCase();
 const campoDelSito = (codice) => `<label for="rec">Codice di recupero:</label><input id="rec">
   <script>document.getElementById('rec').value = '${codice}';</script>`;
-const campoCarta = '<label for="c">Numero della carta</label><input id="c" autocomplete="cc-number">';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
