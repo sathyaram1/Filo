@@ -92,6 +92,8 @@
         return { output: M.TEXT, inputs: [M.AUDIO] };
       case A.TTS:
         return { output: M.AUDIO, inputs: [] };
+      case A.IMAGE_GEN:
+        return { output: M.IMAGE, inputs: [] };
       // L'indicizzazione dell'archivio schede vuole VETTORI, non parole: la validazione
       // impedisce entrambi gli scambi (testo qui, indicizzazione nelle funzioni di testo).
       case A.ARCHIVE_EMBED:
