@@ -69,6 +69,12 @@ const chiedi = (app, action) =>
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
     return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents, url: 'filo://newtab/' } });
   }, { action });
+// Quello che torna al modello dopo l'azione: da qui dice all'utente com'è andata.
+const perIlModello = (app, action, res) => app.evaluate((_electron, { action, res }) => {
+  const rq = process.mainModule.require;
+  const O = rq(rq('node:path').join(process.cwd(), 'src/main/services/osservazioniPerModello.js'));
+  return O.toolResultText({ action, res, rendered: null });
+}, { action, res });
 const traduci = (app) => chiedi(app, { type: 'TRADUCI_PAGINA' });
 const originale = (app) => chiedi(app, { type: 'TRADUCI_PAGINA', originale: true });
 
