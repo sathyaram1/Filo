@@ -27,7 +27,7 @@ test('il marcatore diventa una galleria al suo posto, con le sole immagini del t
   assert.equal(r.text, 'Ecco le antilopi.\n\nLa seconda è un impala.');
   assert.equal(r.immagini.length, 1);
   assert.deepEqual(r.immagini[0].voci.map((v) => v.titolo), ['Antilope i3', 'Antilope i1']);
-  assert.equal(r.text.slice(0, r.immagini[0].pos), 'Ecco le antilopi.');
+  assert.equal(r.text.slice(0, r.immagini[0].pos).trim(), 'Ecco le antilopi.');
   const html = MD.render(r.text, { immagini: r.immagini });
   assert.ok(html.indexOf('Ecco le antilopi.') < html.indexOf('filo-galleria'), 'la galleria sta dopo la prima frase');
   assert.ok(html.indexOf('filo-galleria') < html.indexOf('La seconda'), 'e prima della seconda');
