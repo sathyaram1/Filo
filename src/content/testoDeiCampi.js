@@ -251,7 +251,13 @@
 
   // Si riscrive da vuoto: lo stesso testo sopra sé stesso per il browser non è una battuta. Un campo che l'utente ha
   // già toccato non serve: le sue battute hanno dato al sito il testo intero.
+  let confermando = false;
   function conferma() {
+    if (confermando) return;
+    confermando = true;
+    try { confermaTutti(); } finally { confermando = false; }
+  }
+  function confermaTutti() {
     for (const [el, valore] of daConfermare) {
       if (!el.isConnected || String(el.value || '') !== valore) { daConfermare.delete(el); continue; }
       if (occupato(el)) continue;
