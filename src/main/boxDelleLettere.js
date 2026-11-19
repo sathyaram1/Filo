@@ -94,7 +94,7 @@ function chiudi(s, perche) {
   const win = s.win;
   if (win && !win.isDestroyed() && win.isVisible()) win.hide();
   // Il fuoco torna dov'era: la scheda davanti, che non deve accorgersi del box.
-  try { if (s.parent && !s.parent.isDestroyed() && perche !== 'scelta') s.parent.focus(); } catch (_) {}
+  try { if (s.parent && !s.parent.isDestroyed() && perche !== 'fuoco') s.parent.focus(); } catch (_) {}
   if (mani && mani.chiuso) { try { mani.chiuso(perche); } catch (_) {} }
 }
 
