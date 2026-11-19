@@ -207,6 +207,7 @@ module.exports = function register(on, ctx) {
   async function ownKeyChanged() {
     ultimoAvvisoRipiego = 0;
     annullaAvvisoSospeso();
+    if (CODA) CODA.ritira(AVVISO_RIPIEGO);
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
