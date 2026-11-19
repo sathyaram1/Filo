@@ -53,6 +53,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Il Node lo sceglie main, come gli strumenti: un ramo nato prima del file non ce l'ha (#2207).
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
