@@ -137,12 +137,14 @@ test.describe('il carattere dei riquadri sui siti (#1342)', () => {
     await scegliCarattere(shell, GEORGIA);
     const page = await sito(openTab, testServer);
     await nelMondoDiFilo(app, page, () => { globalThis.SN_FEEDBACK_UI.open(); });
-    await expect.poll(() => neiRiquadri(app, page, FONT, '.sn-fb-text')).toBe(GEORGIA);
+    // Il browser riscrive le virgolette della pila: si confronta il valore calcolato.
+    const calcolato = GEORGIA.replace(/'/g, '"');
+    await expect.poll(() => neiRiquadri(app, page, FONT, '.sn-fb-text')).toBe(calcolato);
 
     const nuova = await openTab('filo://newtab/');
     await nuova.waitForFunction(() => !!globalThis.SN_FEEDBACK_UI);
     await nuova.evaluate(() => globalThis.SN_FEEDBACK_UI.open());
-    await expect.poll(() => nuova.evaluate(FONT, '.sn-fb-text')).toBe(GEORGIA);
+    await expect.poll(() => nuova.evaluate(FONT, '.sn-fb-text')).toBe(calcolato);
   });
 
   // Un font del sito diviso in un pezzo per carattere, dichiarato col nome scelto e col nome "serif" fra virgolette: i
