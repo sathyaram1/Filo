@@ -213,7 +213,7 @@ async function azioneCorreggiMemoria(action, { rigaDaCorreggere }) {
 }
 
 // #2536.1 — la memoria per il modello che non ce l'ha nel CONTESTO (l'intervista rifatta la tiene fuori). Vuota è ''.
-async function azioneLeggiMemoria() {
+async function azioneLeggiMemoria(action) { // eslint-disable-line no-unused-vars
   const m = await memoriaPerModello();
   const vuota = !['profilo', 'preferenze', 'espansioni', 'lezioni'].some((k) => String(m[k] || '').trim());
   return { executed: true, kept: true, output: { memoria: vuota ? '' : SN_CONST.memoriaImbustata(m) } };
