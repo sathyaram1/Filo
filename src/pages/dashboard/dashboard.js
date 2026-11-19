@@ -353,7 +353,7 @@
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
-      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) return false;
       submitMessage(testo);
       return true;
     },
