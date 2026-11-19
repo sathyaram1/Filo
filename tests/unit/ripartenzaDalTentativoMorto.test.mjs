@@ -11,6 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
 import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, rigaDiErrore } from '../../scripts/lib/branch-integrity.mjs';
 import { leggiTentativo, tentativiSuperati } from '../../scripts/lib/tentativi.mjs';
 import { fusionePropria, fusioniSuMain, ramiInCorso } from '../../scripts/lib/su-main.mjs';
