@@ -20,6 +20,10 @@ const { installZoom, zoomDaTasto } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
+// Caricati qui e non alla prima vista (#2136): una valutazione dell'ispettore (le prove) entra anche a metà del codice
+// sincrono, e un modulo caricato dentro `_makeView` lì si trova ancora senza esportazioni.
+const Downloads = require('./services/downloads');
+const ReteDiCasa = require('./services/homeNetwork');
 const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
 const MenuDiRiserva = require('./menuDiRiserva');
