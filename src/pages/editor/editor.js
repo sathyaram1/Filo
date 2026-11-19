@@ -2038,19 +2038,16 @@
   // Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>), e il salvataggio legge un paragrafo e
   // perde l'elenco: quando il paragrafo non ha altro, l'elenco prende il suo posto (#2279).
   function apriElenco(cmd) {
-    exec(cmd);
     const sel = window.getSelection();
-    const voce = sel && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest('li');
-    const elenco = voce && voce.parentElement;
-    const involucro = elenco && elenco.parentElement;
-    if (!involucro || involucro === docEl || !docEl.contains(involucro) || !/^(P|DIV)$/.test(involucro.tagName)) return;
-    if (involucro.childNodes.length !== 1) return;
-    involucro.replaceWith(elenco);
+    let block = sel.anchorNode;
+    while (block && block !== docEl && !/^(P|DIV)$/.test(block.tagName || '')) block = block.parentNode;
+    if (!block || block === docEl || block.parentNode !== docEl) { exec(cmd); return; }
+    const tag = cmd === 'insertOrderedList' ? 'ol' : 'ul';
     const r = document.createRange();
-    r.setStart(voce, 0);
+    r.selectNode(block);
     sel.removeAllRanges();
     sel.addRange(r);
-    onDocInput();
+    exec('insertHTML', `<${tag}><li><br></li></${tag}>`);
   }
 
   // Shortcut markdown a livello blocco
