@@ -97,7 +97,8 @@ test('Copia e Rispondi sotto una risposta di Filo: la citazione parte col messag
   await rispondi.click();
   const citazione = home.locator('#citazione');
   await expect(citazione).toBeVisible();
-  await expect(citazione).toContainText('Filo');
+  // #2346: si risponde solo a Filo, e il suo nome non sta sopra la citazione.
+  await expect(citazione).not.toContainText('Filo');
   await expect(citazione).toContainText('Risotto ai funghi');
   await expect(home.locator('#input')).toBeFocused();
   await home.screenshot({ path: 'tests/.shots/chat-rispondi-copia-campo.png' });
