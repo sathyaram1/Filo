@@ -819,6 +819,7 @@ module.exports = {
   handleStream,
   extractJson,
   lessonsBufferText,
+  memoriaPerModello,
   lezioniAutomaticheConsentite,
   maybeRunLessonAgent,
   maybeRunCompactor,
