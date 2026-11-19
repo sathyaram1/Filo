@@ -387,9 +387,9 @@ test('un testo lungo che il sito mette negli appunti, incollato, non copre i cod
   await modelloFinto(app);
   const banca = (codice) => `<!doctype html><html><head><title>Banca</title></head><body>${campoDelSito(codice)}</body></html>`;
   const prima = await testServer.openReady(openTab, banca('731942'));
-  await apriAiuto(shell, prima);
-  await scriviAllAiuto(prima, 'cosa devo fare?');
-  await expect(prima.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
+  const aiutoPrima = await apriAiuto(app, shell, prima);
+  await scriviAllAiuto(aiutoPrima, 'cosa devo fare?');
+  await expect(aiutoPrima.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('731942');
 
   const sito = await testServer.openReady(openTab, `<!doctype html><html><head><title>Sconti</title></head><body style="padding:40px">
