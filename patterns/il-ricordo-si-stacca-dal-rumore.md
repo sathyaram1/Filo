@@ -1,5 +1,7 @@
 # Il ricordo si stacca dal rumore, non supera una soglia fissa
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Prima di rispondere Filo ripesca dagli scambi più vecchi della finestra quelli vicini alla domanda (vettori del
 modello che indicizza la Cronologia). Con una soglia fissa di 0,45 sul coseno ripescava quasi sempre tre scambi
 che non c'entravano (#2369): due frasi qualunque in italiano stanno già fra 0,4 e 0,6.
