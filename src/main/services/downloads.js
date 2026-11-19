@@ -1475,15 +1475,9 @@ function riprova(id, scope = '') {
   persist();
   broadcast('progress', rec);
   try {
-    console.log('DEBUGRIP', indirizzo, JSON.stringify(rec._pagina), !!rec._sessione);
-    attendiReferer(indirizzo, ses, rec._pagina);
-    const wcx = require('electron').webContents.getAllWebContents().find((w) => w.session === ses && /^https?:/.test(w.getURL()));
-    console.log('DEBUGWC', !!wcx, wcx && wcx.getURL());
-    if (wcx) wcx.downloadURL(indirizzo); else
     ses.downloadURL(indirizzo);
   } catch (_) {
     clearTimeout(rec._riprovaTimer); rec._riprovaTimer = null;
-    ritiraReferer(indirizzo, ses);
     prendiRiprova(scope, indirizzo);
     rec.state = 'interrupted';
     rec.endedAt = new Date().toISOString();
