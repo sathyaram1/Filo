@@ -1,5 +1,5 @@
-// Una mossa di Haiku eseguita su Filo (tests/agent/prova.mjs), e dove va la tastiera dopo: alla superficie dell'ultimo
-// clic, come per una persona, e alla scheda attiva dopo un tasto che Filo si è preso (una scheda nuova, una chiusa).
+// Una mossa di Haiku eseguita su Filo (tests/agent/prova.mjs), e dove va la tastiera dopo: dove Filo ha spostato il
+// fuoco, se l'ha spostato (driver.mjs), se no alla superficie dell'ultimo clic, o alla scheda attiva dopo un tasto di Filo.
 // Prova: tests/prova-da-utente-filo.spec.mjs.
 
 import * as d from './driver.mjs';
