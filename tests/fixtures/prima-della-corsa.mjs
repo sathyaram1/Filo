@@ -3,7 +3,7 @@
 // alla corsa una temporanea sua che se ne va con lei (#717, regole in tests/helpers/percorsi.mjs).
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
-import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
+import { accendiSchermi } from '../../scripts/lib/schermo-virtuale.mjs';
 import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { chiudiLaCorsa, temporaneaDellaCorsa } from '../helpers/percorsi.mjs';
@@ -14,12 +14,13 @@ export default function primaDellaCorsa(config) {
   assicuraMotore(radice ? { radice } : {});
   // Una libreria nuova del lock arriva prima degli spec che la usano (#1572).
   if (radice) allineaPerLeProve(radice, { prefisso: '[prove]' });
-  return preparaLaCorsa(radice);
+  return preparaLaCorsa(radice, config?.workers);
 }
 
-async function preparaLaCorsa(radice) {
-  // La base del display è quella del worker (#1157), nel marcatore del clone a cui appartiene la config.
-  const schermo = await accendiSchermo(radice ? { worker: datiWorker({ root: radice }) } : {});
+async function preparaLaCorsa(radice, quanti) {
+  // La base del display è quella del worker (#1157), nel marcatore del clone a cui appartiene la config; uno schermo per
+  // lavoratore di Playwright (#2133), che la config assegna a ognuno.
+  const schermo = await accendiSchermi({ quanti, ...(radice ? { worker: datiWorker({ root: radice }) } : {}) });
   if (schermo.nota) console.error(schermo.nota);
   const temp = temporaneaDellaCorsa();
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });

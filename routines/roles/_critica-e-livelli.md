@@ -32,7 +32,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
 - Nel contenitore delle routine `npx playwright test` si accende da solo lo
   schermo virtuale con la sandbox spenta, come `finish:check`; senza xvfb si
   ferma prima di aprire Electron e lo dice. Quello stop non è un rosso del
-  codice.
+  codice. Con `--workers` > 1 accende uno schermo per lavoratore, così fuoco
+  e menu non passano da una finestra all'altra; la CPU invece resta divisa:
+  un rosso di tempi visto solo con più lavoratori si ripete con
+  `--workers 1` prima di farne un rilievo.
 
 ## La critica
 

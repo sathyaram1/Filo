@@ -3,6 +3,10 @@
 // configura solo timeout/retries/output paths.
 
 import { defineConfig } from '@playwright/test';
+import { usaSchermoDelLavoratore } from './scripts/lib/schermo-virtuale.mjs';
+
+// Con `--workers` > 1 nel contenitore ogni lavoratore apre Electron sullo schermo virtuale suo (#2133).
+usaSchermoDelLavoratore();
 
 // Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
 // Sta qui e non nella fixture perché una cinquantina di spec lancia Electron per
