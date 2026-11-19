@@ -95,5 +95,5 @@
     }, true);
   }
 
-  g.SN_LINK_SU_SCHEDA = { ascolta, primoIndirizzo, bersaglio };
+  g.SN_LINK_SU_SCHEDA = { ascolta, bersaglio };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
