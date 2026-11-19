@@ -14,13 +14,27 @@ async function newtabPage(app, index = 0) {
   return win;
 }
 
-async function prepara(app, shell, openTab) {
+async function base(app, shell) {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 15_000 });
   await app.evaluate(async (_, key) => {
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: key } });
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Fa il geometra in uno studio tecnico.\nHa un gatto, Pepe.', PREFERENZE: 'Preferisce risposte brevi.' });
     await globalThis.SN_FILO_MEMORY.appendLesson('Ha prenotato un volo per Lisbona.');
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__chiamate = [];
+    const orig = P.streamCompleteWithFallback;
+    P.streamCompleteWithFallback = async (o) => {
+      const r = await orig(o);
+      if (JSON.stringify(o.messages?.[0] ?? '').includes('Sei Filo, l\'assistente dentro il browser Filo')) {
+        globalThis.__chiamate.push({ model: r && r.model, toolCalls: r && r.toolCalls, text: r && String(r.text || '').slice(0, 200) });
+      }
+      return r;
+    };
   }, process.env.OPENROUTER_API_KEY);
+}
+
+async function prepara(app, shell, openTab) {
+  await base(app, shell);
   const prefs = await openTab('filo://preferences/preferences.html');
   await prefs.locator('#restartOnboarding').click();
   const intervista = await newtabPage(app, 1);
