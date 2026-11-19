@@ -601,10 +601,8 @@ module.exports = function register(on, ctx) {
             + (cats.length ? `: puoi chiedere ${cats.join(', ')}.` : '. Tagga le carte per averne.');
         } else {
           const library = Stats.buildLibrary(base, known);
-          // Un mulligan detto senza la mano da tenere parte da quella del riquadro (#791).
-          const keep = p.mulligans > 0 && !p.keep.length && Stats.DEFAULT_KEEP.every((w) => cats.includes(w.tag))
-            ? Stats.DEFAULT_KEEP : p.keep;
-          const cond = { game: p.game, mulligans: p.mulligans, keep, extraDraws: p.extraDraws };
+          // Le metà del mulligan non dette le completa la regola condivisa col riquadro (#791, #791.1).
+          const cond = Stats.resolveConditions(p, { categories: cats });
           let hits = 0; let iters = 0;
           for (let seed = 1; seed <= CHAT_PROB_BATCHES && !signal.aborted; seed++) {
             const r2 = Stats.simulate({ library, want: p.needs, turn: p.turn, ...cond, iterations: Stats.PROB_BATCH, seed });
