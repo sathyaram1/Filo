@@ -734,9 +734,11 @@ async function sitoEPoiCtrlT(app, shell) {
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // La home che si sta caricando non ha ancora un indirizzo nel suo webContents: vale quello della scheda.
   const schede = () => app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    return { n: tm.tabs.length, attiva: tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL(), sito: tm.tabs.some((t) => /conto-schede/.test(t.view.webContents.getURL())) };
+    const url = (t) => t.view.webContents.getURL() || t.url || '';
+    return { n: tm.tabs.length, attiva: url(tm.tabs.find((t) => t.id === tm.activeId)), sito: tm.tabs.some((t) => /conto-schede/.test(url(t))) };
   });
   const prima = (await schede()).n;
   const tasto = (key, mod) => app.evaluate(({ webContents }, { key, mod }) => {
