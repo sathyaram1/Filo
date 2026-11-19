@@ -127,6 +127,17 @@ test('una combinazione scritta come la scrive una persona diventa il tasto di Pl
   assert.match(leggiTasto('Hyper+a').errore, /non è un modificatore/);
 });
 
+// Il lettore è quello di Filo: chi pilota e chi ascolta i tasti non divergono sui nomi italiani né su Ctrl che sul Mac è Cmd.
+test('una combinazione si legge coi nomi e le regole di Filo, anche in italiano e sul Mac', () => {
+  assert.deepEqual(leggiTasto('Ctrl+W', 'darwin').input, { key: 'w', code: 'KeyW', control: false, shift: false, alt: false, meta: true });
+  assert.deepEqual(leggiTasto('Ctrl+Cmd+F', 'darwin').input, { key: 'f', code: 'KeyF', control: true, shift: false, alt: false, meta: true });
+  assert.equal(leggiTasto('Controllo+T', 'linux').playwright, 'Control+t');
+  assert.equal(leggiTasto('Comando+W', 'darwin').playwright, 'Meta+w');
+  assert.deepEqual(leggiTasto('Opzione+1', 'linux').input, { key: '1', code: 'Digit1', control: false, shift: false, alt: true, meta: false });
+  assert.deepEqual([leggiTasto('Inizio').playwright, leggiTasto('freccia giù').playwright, leggiTasto('Maiusc+Tab').playwright], ['Home', 'ArrowDown', 'Shift+Tab']);
+  assert.equal(leggiTasto('Ctrl+freccia sinistra', 'win32').input.code, 'ArrowLeft');
+});
+
 test('la cartella delle prove non finisce nel repo', () => {
   // check-ignore esce 1 (e execFileSync lancia) se il file non è ignorato.
   execFileSync('git', ['check-ignore', '-q', '--no-index', 'tests/agent/.out/prova-x/passo-01.png'], { cwd: ROOT, stdio: 'pipe' });
