@@ -453,9 +453,25 @@
       if (u.searchParams.has('cerca')) {
         u.searchParams.delete('cerca');
         global.history.replaceState(global.history.state, '', u.pathname + u.search + u.hash);
-        apri();
+        apriAllArrivo();
       }
     } catch (_) {}
+  }
+
+  // Mentre la home si carica, il campo della chat si riprende il fuoco più volte: chi è arrivato per cercare continua
+  // a scrivere nella ricerca, finché non clicca altrove.
+  const TIENI_FUOCO_MS = 4000;
+  function apriAllArrivo() {
+    apri();
+    const fino = Date.now() + TIENI_FUOCO_MS;
+    const torna = () => { if (aperta && Date.now() < fino) campo.focus({ preventScroll: true }); };
+    const smetti = () => {
+      document.removeEventListener('pointerdown', smetti, true);
+      if (d.chat) d.chat.removeEventListener('focus', torna);
+    };
+    document.addEventListener('pointerdown', smetti, true);
+    if (d.chat) d.chat.addEventListener('focus', torna);
+    setTimeout(smetti, TIENI_FUOCO_MS);
   }
 
   global.SN_DASH_CERCA = { init, apri, chiudi, aperta: () => aperta };
