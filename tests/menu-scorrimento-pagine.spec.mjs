@@ -193,7 +193,7 @@ test('Home: il menu di una parola spiegata', async ({ app }) => {
   // La bolla si ridisegna a fine risposta: si aspetta che stia ferma.
   await expect(page.locator('#input')).toBeEditable();
   await attesa(page, 600);
-  await scorriAlGesto(page, 'contextmenu', parola);
+  await scorriAlGesto(page, 'contextmenu', parola, { su: true });
   await parola.click({ button: 'right' });
   await restaPoiSiChiude(page, page.locator('.filo-spiega-menu'));
 });
