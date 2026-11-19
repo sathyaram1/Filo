@@ -36,6 +36,7 @@ export async function configureModel(app) {
 // prima: ms }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti e gli stop. `finoAlFermo`: la
 // chiamata degli strumenti resta a metà finché lo stop non la interrompe. `prima`: attesa prima di qualunque cosa.
 export async function copione(app, passi) {
+  await chiudiLaRete(app);
   await app.evaluate(async (_, passiJson) => {
     const passi = JSON.parse(passiJson);
     const P = globalThis.SN_PROVIDERS;
