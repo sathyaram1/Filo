@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const WORKFLOWS = join(ROOT, '.github', 'workflows');
 
-export const TUBO_IN_GREP_Q = /\|\s*grep\s+(?:-[A-Za-z]*q|[^|\n]*\s-[A-Za-z]*q\b|[^|\n]*--quiet\b)/;
+const TUBO_IN_GREP_Q = /\|\s*grep\s+(?:-[A-Za-z]*q|[^|\n]*\s-[A-Za-z]*q\b|[^|\n]*--quiet\b)/;
 
 test('il riconoscitore prende le forme del tubo in grep -q e lascia le altre', () => {
   for (const riga of [
