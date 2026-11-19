@@ -250,14 +250,15 @@ async function eseguiAzioneFilo(action, {
     } catch (_) {}
   }
 
+  // Le righe della memoria non arrivano a una pagina visitata: né nel popup che le mostra né lette dal modello.
+  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && /^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+  }
+
   // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
   // così il popup mostra quelle che se ne andranno (#592).
-  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
   let righeDaDimenticare = [];
   if (type === 'DIMENTICA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     try {
       if (confirmed) {
         const visti = bersagliMostrati(sender, action);
