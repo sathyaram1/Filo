@@ -632,10 +632,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
-  const notaCitazione = FCx.notaRisposta(citazione.citata);
   // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
   const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
-  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
+  const domandaConCitazione = [FCx.conCitazioni(String(userMessage || ''), citazione.citata), esitoDopoOk].filter(Boolean).join('\n');
   const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
