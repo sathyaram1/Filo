@@ -409,7 +409,7 @@ test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre
     });
     assert.equal(r.status, 0, r.testo);
     const visti = ['a', 'b', 'c'].map((n) => JSON.parse(readFileSync(resolve(fuori, `${n}.json`), 'utf8')));
-    assert.equal(new Set(visti.map((v) => v.d)).size, 3, `ogni lavoratore sul suo schermo: ${JSON.stringify(visti)}`);
+    assert.equal(new Set(visti.map((v) => v.d)).size, 3, `ogni lavoratore sul suo schermo: ${JSON.stringify(visti)}\n${r.testo}`);
     assert.ok(visti.every((v) => /^:\d+$/.test(v.d) && v.attivo), `schermi accesi: ${JSON.stringify(visti)}`);
     assert.match(r.testo, /3 lavoratori, uno schermo virtuale ciascuno/);
     for (const v of visti) await spento(v.d);
