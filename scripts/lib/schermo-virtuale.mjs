@@ -56,7 +56,8 @@ export function preparaLancioElectron(cmd, args = [], opzioni = {}) {
     ok: true,
     cmd: 'xvfb-run',
     args: [...p.xvfb, cmd, ...args],
-    env: { ...env, ELECTRON_DISABLE_SANDBOX: p.sandbox },
+    // Il segno dice al globalSetup che questo DISPLAY è virtuale: con più lavoratori ne accende uno a testa (#2133).
+    env: { ...env, ELECTRON_DISABLE_SANDBOX: p.sandbox, [SEGNO_VIRTUALE]: '1' },
     nota: `Linux senza schermo: gli spec partono dentro \`xvfb-run ${p.xvfb.join(' ')}\`, con ELECTRON_DISABLE_SANDBOX=1.`,
   };
 }
