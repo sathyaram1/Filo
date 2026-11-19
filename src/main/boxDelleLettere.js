@@ -200,6 +200,15 @@ const SCRIPT = `(() => {
     const r = e.target.closest && e.target.closest('.riga');
     if (r) inCambio(r.dataset.id);
   });
+  let sotto = null;
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target.closest && e.target.closest('[data-tip]');
+    if (t === sotto) return;
+    sotto = t;
+    if (!t) { api.fumetto('', 0, 0); return; }
+    const r = t.getBoundingClientRect();
+    api.fumetto(t.dataset.tip, r.left + r.width / 2, r.bottom + 4);
+  });
   document.addEventListener('mousemove', (e) => {
     const r = e.target.closest && e.target.closest('.riga');
     const k = r ? righe().indexOf(r) : -1;
