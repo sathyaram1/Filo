@@ -39,7 +39,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
   const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
   try {
     const proto = new URL(caricato).protocol.toLowerCase();
-    if (!['http:', 'https:', 'filo:'].includes(proto)) {
+    if (!file && !['http:', 'https:', 'filo:'].includes(proto)) {
       return { executed: false, kept: true, output: { blocked: 'scheme' } };
     }
   } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
