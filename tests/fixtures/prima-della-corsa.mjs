@@ -3,7 +3,7 @@
 // alla corsa una temporanea sua che se ne va con lei (#717, regole in tests/helpers/percorsi.mjs).
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
-import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
+import { accendiSchermi } from '../../scripts/lib/schermo-virtuale.mjs';
 import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { chiudiLaCorsa, temporaneaDellaCorsa } from '../helpers/percorsi.mjs';
