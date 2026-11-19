@@ -238,7 +238,7 @@
 
   function dove() {
     const a = attivo();
-    const out = { attivo: a, x: window.scrollX, y: window.scrollY, punti: null };
+    const out = { attivo: a, punti: null };
     try {
       const s = a && a !== document.body ? selezioneDi(a) : null;
       if (s && s.rangeCount && a.contains(s.anchorNode) && a.contains(s.focusNode)) out.punti = [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset];
