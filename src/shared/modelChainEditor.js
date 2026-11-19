@@ -56,6 +56,7 @@
       [A.PROVIDER_TEST, 'options_action_provider_test'],
       [A.FILE_NAME, 'options_action_file_name'],
       [A.EMBED_COOKIE_CHECK, 'options_action_embed_cookie_check'],
+      [A.IMAGE_GEN, 'options_action_image_gen'],
     ];
   }
 
