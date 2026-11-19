@@ -123,7 +123,7 @@ export function conNumeri(rami, indice) {
 
 /** { N: id } dall'indice, per leggere su main le fusioni «merge-gate: #N» dei worker (ramiInCorso). PURA. */
 export function numeriDellIndice(indice) {
-  return Object.fromEntries((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.num), String(f.id)]));
+  return Object.fromEntries([...numeroPerId(indice)].map(([id, n]) => [n, id]));
 }
 
 /**
