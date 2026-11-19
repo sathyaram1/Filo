@@ -583,3 +583,44 @@ test('nell\'editor col corpo modificabile di un riquadro il lampo della correzio
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-lampo'))).toBe(null);
   expect(await corpo.evaluate((b) => b.innerHTML.replace(/&nbsp;/g, ' ').trim())).toBe('ok perché');
 });
+
+// #2052.1: l'Incolla e la dettatura di Filo arrivano al campo come battute vere, col gesto che chiude la parola; la
+// parola che chiudono però non l'ha battuta l'utente, e resta com'è.
+test('il testo incollato o dettato con Filo che finisce con «perchè» e un punto o uno spazio resta com\'è', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  const incolla = async (sel, testo) => {
+    await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), testo);
+    await page.locator(sel).click({ button: 'right' });
+    await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  };
+  const detta = async (sel, testo) => {
+    await page.locator(sel).click({ button: 'right' });
+    await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await nelMondoDelMenu(app, page, `globalThis.SN_ACTIONS.insertDictatedText(${JSON.stringify(testo)})`);
+  };
+
+  await incolla('#ta', 'Non so perchè ');
+  await expect(page.locator('#ta')).toHaveValue('Non so perchè ');
+  await svuota(page);
+  await incolla('#ta', 'Non so perchè.');
+  await expect(page.locator('#ta')).toHaveValue('Non so perchè.');
+  await svuota(page);
+  await detta('#ta', 'detto perchè.');
+  await expect(page.locator('#ta')).toHaveValue('detto perchè.');
+
+  await incolla('#ce', 'Nel campo perchè.');
+  await expect(page.locator('#ce')).toHaveText('Nel campo perchè.');
+  await svuota(page, '#ce');
+  await detta('#ce', 'detto perchè ');
+  await expect.poll(() => page.locator('#ce').evaluate((el) => el.textContent.replace(/ /g, ' '))).toBe('detto perchè ');
+  await page.waitForTimeout(300);
+  expect(await page.locator('#ta').inputValue()).toBe('detto perchè.');
+  await expect(page.locator('#ce')).not.toContainText('perché');
+
+  // E la parola che poi chiude l'utente si corregge come sempre.
+  await page.locator('#ta').click();
+  await page.keyboard.press('End');
+  await batti(page, ' e perchè ');
+  await expect(page.locator('#ta')).toHaveValue('detto perchè. e perché ');
+});
