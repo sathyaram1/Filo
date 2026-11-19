@@ -387,7 +387,7 @@ const SEGNO_DAI_TASTI = {
   gesto: ['INVIA_FEEDBACK', 'TOGLI_PERMESSO_SITO', 'EVENTO_CALENDARIO', 'DIMENTICA', 'CORREGGI_MEMORIA',
     'NON_TENERE_APERTA', 'CARTA_HOME', 'BARRA_SITI', 'INSTALLA_AGGIORNAMENTO', 'CANCELLA_ARCHIVIO'],
   // Chat e tasti passano dallo stesso punto, che scrive l'azione: aprire un file, dargli un nome, instradare una scheda.
-  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY'],
+  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY', 'BLOCCA_PC'],
   // Dai tasti passa dalla porta delle azioni, come la chat.
   porta: ['PULISCI_TAB'],
   // Dai tasti lascia lo stato che scrive: un cambio, una scheda, un documento, una cancellazione, una ricerca.
