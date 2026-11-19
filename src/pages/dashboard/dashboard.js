@@ -553,8 +553,9 @@
       const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti, { chat: m.chat || '' }) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
-      if (text.trim() || fotoViste.length || archiviati.righe) {
-        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser, fonti: isUser ? null : m.fonti });
+      const immaginiRisposta = !isUser && Array.isArray(m.immagini) ? m.immagini : null;
+      if (text.trim() || fotoViste.length || archiviati.righe || (immaginiRisposta && immaginiRisposta.length)) {
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser, fonti: isUser ? null : m.fonti, immagini: immaginiRisposta });
         if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
           window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
         }
