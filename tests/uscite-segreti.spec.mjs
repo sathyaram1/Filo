@@ -355,7 +355,8 @@ const TUTTI_I_CODICI = `var k=10,n=6,a=new Array(k*n).fill(0),s=[];
   db(1,1);var x=s.join('');x+=x.slice(0,n-1);var ta=document.getElementById('t');`;
 for (const [come, mette] of [
   ['col fuoco rimesso dopo l’invio', `ta.value=x;document.addEventListener('keydown',function(e){if(e.key==='Enter')setTimeout(function(){ta.focus();},0);},true);`],
-  ['scritto con un comando di modifica', `document.addEventListener('keydown',function(e){if(e.key==='Enter')setTimeout(function(){ta.focus();ta.select();document.execCommand('insertText',false,x);},0);},true);`],
+  // L'invio all'assistente sta nello strato sopra la scheda e la pagina non lo vede: scrive dopo il tasto dell'utente.
+  ['scritto con un comando di modifica', `ta.addEventListener('keyup',function(){setTimeout(function(){ta.focus();ta.select();document.execCommand('insertText',false,x);},0);},{once:true});`],
   ['dopo un tasto dell’utente nel suo campo', `ta.addEventListener('input',function(){if(ta.value.length<10)setTimeout(function(){ta.value=x;},0);});`],
 ]) {
   test(`un testo della pagina ${come} non copre i codici letti dopo su un altro sito`, async ({ app, shell, openTab, testServer }) => {
