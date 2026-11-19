@@ -649,7 +649,11 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
-  - origine fidata (anche un derivato fidato già in coda) → `todo`;
+  - origine fidata (anche un derivato fidato già in coda) → `todo`. Il derivato di un rilievo **interno** (rimasti,
+    domande, in correzione) nasce comunque con l'attesa sul lavoro (`waitsFor`, #2554): verte sul codice del suo ramo,
+    e nessuna routine lo prende prima che sia su main. Fuso il lavoro l'attesa cade; chiuso senza fusione, il derivato
+    va all'owner (`attesa_chiusa`). Un esterno sta già su main e parte subito. Vale anche per i derivati che
+    l'orchestratore locale apre per un lavoro locale (`--aspetta`);
   - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
     l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
     confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
