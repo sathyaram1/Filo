@@ -73,7 +73,18 @@ function dalBox(s, canale, a, b, c) {
     try { s.mani.assegna(String(a || ''), String(b || '')); } catch (_) {}
   } else if (canale === 'box-lettere:chiudi') {
     if (s.aperto && a === s.giro) chiudi(s, 'esc');
+  } else if (canale === 'box-lettere:fumetto') {
+    fumetto(s, String(a || ''), Number(b), Number(c));
   }
+}
+
+// Il suggerimento del tasto di una riga lo disegna il fumetto di Filo, sopra il box (le coordinate della madre).
+function fumetto(s, testo, x, y) {
+  const T = require('./popup-tooltip');
+  if (!testo || !s.aperto || !s.win || s.win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) { try { T.hideTooltip(); } catch (_) {} return; }
+  const b = s.win.getBounds();
+  const cb = s.parent.getContentBounds();
+  try { T.showTooltip(s.parent, testo, Math.round(b.x - cb.x + x), Math.round(b.y - cb.y + y)); } catch (_) {}
 }
 
 function mostra(s) {
