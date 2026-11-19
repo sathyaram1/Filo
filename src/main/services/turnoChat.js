@@ -1067,11 +1067,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
   const archiviaGiaFatto = async () => {
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    // Anche la parte già scritta porta le sue fonti controllate, mai i marcatori grezzi (#2383).
-    const F = globalThis.SN_FONTI_CITATE;
-    const citate = F.controlla(unisciTesti(risposta), F.sorgenti(renderedActions));
+    // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
+    const citate = globalThis.SN_IMMAGINI_RISPOSTA.controllaConFonti(unisciTesti(risposta), renderedActions);
     const giaScritta = citate.text;
-    if (!chatId || (!successe.length && !giaScritta)) return;
+    if (!chatId || (!successe.length && !giaScritta && !citate.immagini.length)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
