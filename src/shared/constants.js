@@ -1328,6 +1328,9 @@
   // Dove il system della chat smette di essere uguale da un messaggio all'altro: il punto di cache sta prima
   // (SN_FILO_CONTESTO.pianoDellaCache). Sentinella: tests/unit/puntiDiCache.test.mjs.
   const INIZIO_ACCOGLIENZA = '═══ STAI ACCOGLIENDO QUESTO UTENTE';
+  // #2536.1 — senza, il modello prendeva la memoria tolta per vuota: «di te non so niente», «niente da togliere».
+  const MEMORIA_NASCOSTA_NELL_INTERVISTA = 'Finché dura, la sua MEMORIA (profilo, preferenze e lezioni) non ce l\'hai davanti apposta, ma c\'è: non dirgli che è vuota o che di lui non sai niente. '
+    + 'Se ti chiede cosa ricordi o sai di lui, leggila con memoria(leggi) e rispondi da lì. Se ti chiede di togliere o correggere una cosa, memoria(dimentica) e memoria(correggi) la trovano lo stesso, col pezzo di testo che ti ha detto: chiamale anche senza averla letta. ';
   const INIZIO_CONTESTO_CHAT = '═══ CONTESTO (cambia a ogni messaggio) ═══';
   // Dove comincia il CONTESTO dell'utente (blocco 3, fotografato fino al prossimo riassunto): il primo punto di cache
   // sta subito prima. E nei messaggi del tratto vivo, dove cominciano quello che scrive Filo e quello dell'utente.
