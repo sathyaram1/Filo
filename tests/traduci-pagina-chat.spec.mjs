@@ -177,7 +177,8 @@ test('«torna all\'originale» mentre traduce: si ferma e la pagina resta com\'e
   expect(await tradotti(page)).toBe(0);
 });
 
-test('nessuna pagina web aperta: Filo lo dice, invece di dire fatto', async ({ app }) => {
+test('nessuna pagina web aperta: Filo lo dice, invece di dire fatto', async ({ app, shell }) => {
+  await expect(shell.locator('body')).toBeVisible();
   const r = await traduci(app);
   expect(r.executed).toBe(false);
   expect(r.output.traduzione).toBe('no-page');
