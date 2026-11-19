@@ -266,5 +266,5 @@ async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, total
 
 module.exports = {
   collegaScorciatoie, comandoDaTasto, configura, seguiPannelli, registraTasti, staRegistrandoTasti, dispatch, saveForLater, daTastoDaPoco,
-  consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, COMMANDS,
+  consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, finestraDiFilo, COMMANDS,
 };
