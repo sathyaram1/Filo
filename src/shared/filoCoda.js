@@ -51,6 +51,8 @@
     if (m.senzaVerdetto === true) v.senzaVerdetto = true;
     // Le etichette delle fonti (#2383): la bolla riaperta le ridisegna uguali.
     if (m.role === 'filo' && Array.isArray(m.fonti) && m.fonti.length) v.fonti = m.fonti.slice();
+    // Le immagini della risposta (#2272): riaperta, la bolla le rimette al loro posto.
+    if (m.role === 'filo' && Array.isArray(m.immagini) && m.immagini.length) v.immagini = m.immagini.slice();
     if (c.onboarding) v.onboarding = true;
     const disp = Array.isArray(c.dispositivi) ? c.dispositivi[i] : '';
     if (qui && disp && disp !== qui) v.altrove = true;
