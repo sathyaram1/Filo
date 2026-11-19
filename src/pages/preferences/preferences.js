@@ -705,6 +705,16 @@
   }
 
   let modelPreviewAudio = null;
+  // Il tasto della pagina che la frase nomina (Crediti, Opzioni); `pagina` null lo toglie.
+  function mostraRimedioVoce(pagina) {
+    const btn = $('ttsModelPreviewRimedio');
+    if (!btn) return;
+    btn.hidden = !pagina;
+    if (!pagina) return;
+    btn.textContent = pagina.label;
+    btn.title = pagina.title || '';
+    btn.onclick = () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url });
+  }
   async function previewModelVoice() {
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
