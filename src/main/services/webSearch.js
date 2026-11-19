@@ -135,5 +135,5 @@
     }
   }
 
-  global.SN_WEB_SEARCH = { search };
+  global.SN_WEB_SEARCH = { search, annota, riservata };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
