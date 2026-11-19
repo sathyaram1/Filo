@@ -855,12 +855,12 @@ test('un sito che chiede la rete locale si vede chiedere proprio quella, col suo
 
 // #1069 — la cartella data da leggere non diventa scrivibile senza un sì. La si dà al sito trascinandola, come con il
 // selettore: la lettura è concessa, la scrittura no. Il trascinamento è quello vero del sistema, via DevTools.
-async function daiLaCartella() {
+async function daiLaCartella(nome = 'foto da caricare') {
   await apri('/cartella');
   let pagina = null;
   await expect.poll(() => { pagina = paginaDi(origine + '/cartella'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
   await pagina.waitForLoadState('domcontentloaded');
-  const lasciato = await trascina(pagina, 'foto da caricare');
+  const lasciato = await trascina(pagina, nome);
   return { pagina, lasciato };
 }
 
