@@ -1,30 +1,37 @@
 import { test } from './fixtures/electron.mjs';
 
 test('misura', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, '<textarea id="t" style="width:400px;height:200px"></textarea><input id="i" maxlength="5">');
+  const page = await testServer.openReady(openTab, '<textarea id="t" style="width:400px;height:200px"></textarea><input id="i">');
   const r = await page.evaluate(() => {
     const out = {};
     const t = document.getElementById('t');
-    for (const n of [100, 300, 1000]) {
-      t.value = ''; t.focus();
-      const s = Array.from({ length: n }, (_, i) => `riga ${i}`).join('\n');
-      const a = performance.now();
-      document.execCommand('insertText', false, s);
-      out['righe' + n] = Math.round(performance.now() - a);
-    }
-    for (const n of [1000, 5000]) {
-      t.value = ''; t.focus();
-      const s = Array.from({ length: n }, (_, i) => `riga ${i} <b>&amp;</b>`).join('\n');
+    const casi = {
+      spazi: 'a    b\n   rientro\n\tTab\n\n\nvuote sopra  \nfine  ',
+      crlf: 'uno\r\ndue\r\ntre',
+      nbsp: 'x  y\nz',
+      inizioA: '\nprima riga vuota',
+      fineA: 'ultima\n',
+      html: '<script>alert(1)</script>\n&lt; &amp;',
+      emoji: '😀\n👍🏽 ok',
+    };
+    const tipi = [];
+    t.addEventListener('input', (e) => tipi.push([e.inputType, e.isTrusted, e.composed]));
+    for (const [k, s] of Object.entries(casi)) {
+      t.value = 'AB'; t.focus(); t.setSelectionRange(1, 1);
       const esc = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const a = performance.now();
-      const ok = document.execCommand('insertHTML', false, esc);
-      out['html' + n] = [Math.round(performance.now() - a), ok, t.value === s, t.value.length, s.length];
+      document.execCommand('insertHTML', false, esc);
+      const atteso = 'A' + s.replace(/\r\n?/g, '\n') + 'B';
+      out[k] = t.value === atteso ? 'ok' : JSON.stringify(t.value);
+      out[k + '_caret'] = t.selectionStart === 1 + s.replace(/\r\n?/g, '\n').length;
     }
-    t.value = ''; t.focus();
-    const lungo = 'x'.repeat(200000);
-    const b = performance.now();
-    document.execCommand('insertText', false, lungo);
-    out.unaRiga200k = Math.round(performance.now() - b);
+    out.tipi = tipi.slice(0, 2);
+    const i = document.getElementById('i');
+    i.value = ''; i.focus();
+    document.execCommand('insertHTML', false, 'riga uno\nriga due');
+    out.input = JSON.stringify(i.value);
+    i.value = ''; i.focus();
+    document.execCommand('insertText', false, 'riga uno\nriga due');
+    out.inputText = JSON.stringify(i.value);
     return out;
   });
   console.log('MISURA', JSON.stringify(r));
