@@ -522,9 +522,9 @@ async function bersaglioColFuoco(app) {
 // La Page che riceve i tasti: quella a cui Filo ha dato il fuoco dopo l'ultimo clic, se c'è; altrimenti `dove` (la
 // superficie cliccata), altrimenti la scheda attiva. Prove: tests/prova-da-utente-filo.spec.mjs.
 async function destinatario(app, shell, dove) {
-  if (fuocoPrimaDelClic !== undefined) {
+  if (fuocoPrimaDelClic.has(app)) {
     const ora = await bersaglioColFuoco(app);
-    if (ora && ora !== fuocoPrimaDelClic) {
+    if (ora && ora !== fuocoPrimaDelClic.get(app)) {
       for (const p of app.windows()) if (!p.isClosed() && (await bersaglioDi(p)) === ora) return p;
     }
   }
