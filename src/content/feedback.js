@@ -649,10 +649,13 @@
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
       if (!blob) return null;
-      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
       if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
-      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
-      const dataUrl = await blobToDataUrl(blob);
+      const pronta = await preparaImmagine(blob);
+      if (!pronta) return scarto(blob, TIPO_NO, 'immagine');
+      if (pronta.motivo) return scarto(blob, pronta.motivo, 'immagine incollata');
+      const dataUrl = await blobToDataUrl(pronta.file);
+      // Due gesti di fila: mentre si rimpiccioliva la prima, la seconda può aver preso l'ultimo posto.
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
