@@ -1622,20 +1622,25 @@
     const l = D.lettera($('doppioToccoNuova').value);
     const dove = $('doppioToccoDove').value.trim();
     const H = window.SN_CARTE_HOME;
-    const perTitolo = H && [...H.TASTI, ...H.CARTE].find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
+    const perTitolo = H && H.conLettera().find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
     const r = l && dove ? (perTitolo ? D.assegna({ lettere: lettereSalvate }, l, { tasto: perTitolo.id }) : D.daTesto(`${l} ${dove}`, { doppioTocco: { lettere: lettereSalvate } })) : null;
-    const hint = $('doppioToccoHint');
     if (!r || r.rifiuto) {
-      if (hint) {
-        hint.textContent = !l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre';
-        hint.classList.add('sn-show');
-        setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, 2400);
-      }
+      avvisoLettere(!l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre', 2400);
       return;
     }
     $('doppioToccoNuova').value = '';
     $('doppioToccoDove').value = '';
     await salvaLettere(r.lettere);
+    // Ridata a un'altra cosa, la lettera dice cosa apriva: la riga di prima è sparita dall'elenco.
+    if (r.sostituita) avvisoLettere(D.conPrima('Salvato', r), 6000);
+  }
+  function avvisoLettere(testo, ms) {
+    const hint = $('doppioToccoHint');
+    if (!hint) return;
+    hint.textContent = testo;
+    hint.classList.add('sn-show');
+    clearTimeout(_savedTimers.doppioToccoHint);
+    _savedTimers.doppioToccoHint = setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, ms);
   }
 
   async function salvaSitiMenu(nuovo) {
