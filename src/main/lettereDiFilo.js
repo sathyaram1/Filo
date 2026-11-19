@@ -142,7 +142,7 @@ async function cambiaLettera(win, id, l) {
   const r = D.assegna(cfg, id, l);
   if (r.rifiuto) return;
   const { applySettingsUpdate } = require('./services/handlers');
-  await require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio_ctrl' }, () => applySettingsUpdate({ doppioCtrl: { lettere: r.lettere } }));
+  await require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio-ctrl' }, () => applySettingsUpdate({ doppioCtrl: { lettere: r.lettere } }));
   cfg = { ...cfg, lettere: D.normalizza({ lettere: r.lettere }).lettere };
   Box.aggiorna(win, D.ordinate(cfg, await caricaUsate()));
 }
