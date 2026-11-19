@@ -727,7 +727,8 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
   const dir = cartellaTemporanea('filo-appeso-');
   try {
     writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
-    const env = { ...process.env, FILO_UNIT_DIR: dir };
+    // Da Node 24 il tetto della prova non chiude un file col timer acceso: lo chiude la guardia, qui accorciata.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '20000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
       { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
