@@ -56,7 +56,6 @@ async function foto(app, nome) {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     return (await w.webContents.capturePage()).toPNG().toString('base64');
   });
-  const { writeFileSync } = await import('node:fs');
   writeFileSync(join(SHOTS, nome), Buffer.from(b64, 'base64'));
 }
 
