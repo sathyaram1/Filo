@@ -155,8 +155,7 @@ test('l\'Aiuto sopra un sito non apre un file del computer nemmeno col percorso 
   const r = await execAction(app, { type: 'NAVIGA', url: pathToFileURL(file).href }, { assistente: true, parole: `apri ${file}` });
   expect(r.executed).toBeFalsy();
   expect(r.output).toMatchObject({ blocked: 'file', motivo: 'assistente' });
-  const riga = await app.evaluate((_e, o) => globalThis.SN_ESITO_AZIONE?.motivoBreve?.({ type: 'NAVIGA', output: o }) ?? null, r.output);
-  if (riga !== null) expect(riga).toContain('home');
+  expect(await app.evaluate((_e, o) => globalThis.SN_ESITO.motivo({ type: 'NAVIGA', _output: o }), r.output)).toContain('home');
   await new Promise((ok) => setTimeout(ok, 500));
   expect(await schedeFile(app)).toBe(0);
 });
