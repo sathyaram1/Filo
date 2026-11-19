@@ -630,6 +630,7 @@
     NAVIGA: "non ho aperto l'indirizzo",
     LEGGI_PAGINA: 'non ho letto la pagina',
     CERCA_WEB: 'non ho fatto la ricerca',
+    IMMAGINI_WEB: 'non ho cercato le immagini',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
