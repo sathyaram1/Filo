@@ -102,5 +102,30 @@ test('esplora', async ({ openTab }) => {
   log.push(['# bksp', await html(page)]);
   await page.keyboard.type('x');
   log.push(['# bksp x', await html(page)]);
+  // foglio svuotato con seleziona tutto
+  await imposta(page, '<p>abc</p><p>def</p>', 'p');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Delete');
+  log.push(['svuotato', await html(page)]);
+  await page.keyboard.type('# T');
+  log.push(['svuotato # T', await html(page)]);
+  // h2 vuoto e salvataggio
+  await imposta(page, '<p>a</p><h2><br></h2>', 'h2');
+  await page.keyboard.type('# T');
+  await page.keyboard.press('ControlOrMeta+s');
+  await page.waitForTimeout(300);
+  log.push(['h2 salvato', await salvato(page)]);
+  // h1 vuoto con ##
+  await imposta(page, '<h1><br></h1><p>x</p>', 'h1');
+  await page.keyboard.type('## T');
+  log.push(['h1 ##', await html(page)]);
+  // blockquote vuoto con #
+  await imposta(page, '<blockquote><br></blockquote>', 'blockquote');
+  await page.keyboard.type('# T');
+  log.push(['bq #', await html(page)]);
+  // li con >
+  await imposta(page, '<ul><li>a</li><li><br></li></ul>', 'li:nth-child(2)');
+  await page.keyboard.type('> T');
+  log.push(['li >', await html(page)]);
   for (const [n, v] of log) console.log(n, '=>', v);
 });
