@@ -381,9 +381,19 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
   await page.waitForTimeout(300);
   await expect(riquadro(page)).toBeVisible();
   await expect(ultima).toBeInViewport();
-  // La pagina sotto che scorre invece lo chiude, come prima.
-  await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
+  // La pagina sotto che scorre davvero invece lo chiude: un evento senza spostamento no (#2586).
+  await voce(page, 'rete').evaluate((el) => {
+    let chi = el.parentElement;
+    while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
+    if (!chi || chi === document.body) chi = document.scrollingElement;
+    const spazio = document.createElement('div');
+    spazio.id = 'spazio-prova';
+    spazio.style.cssText = 'height:4000px;flex:0 0 4000px';
+    (chi === document.scrollingElement ? document.body : chi).appendChild(spazio);
+    chi.scrollBy({ top: 200, behavior: 'instant' });
+  });
   await expect(riquadro(page)).toHaveCount(0);
+  await page.evaluate(() => document.getElementById('spazio-prova').remove());
 
   // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
   await voce(page, 'rete').click();
