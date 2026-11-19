@@ -272,7 +272,7 @@ const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistam
  * feedback dell'ordine: il manutentore le vede, non le smista (lo fa il compito «Gestisci la domanda»). PURA.
  */
 export function righeDomandeFerme(domande, { indice = [], ordine = [], quando = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') } = {}) {
-  const numDi = new Map((indice || []).map((f) => [f.id, String(f.num)]));
+  const numDi = numeroPerId(indice);
   const nellOrdine = new Set((ordine || []).map(String));
   const voci = [];
   for (const d of Array.isArray(domande) ? domande : []) {
