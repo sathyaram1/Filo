@@ -645,6 +645,13 @@
     // null se l'allegato è entrato, sennò { name, reason }.
     const TIPO_NO = 'tipo non supportato';
     const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
+    // { file } entro il tetto, { motivo }, o null se non è un'immagine: le regole stanno in src/shared/immaginiChat.js.
+    async function preparaImmagine(blob) {
+      const IC = global.SN_IMMAGINI_CHAT;
+      if (IC && typeof IC.perLaSegnalazione === 'function') return IC.perLaSegnalazione(blob);
+      if (classifyAttachment(blob) !== 'image') return null;
+      return blob.size > MAX_ATTACH_BYTES ? { motivo: 'troppo grande (max 4 MB)' } : { file: blob };
+    }
     async function addImageFromBlob(blob) {
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
