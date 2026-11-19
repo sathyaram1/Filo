@@ -115,7 +115,7 @@
     if (!res) return;
     if (res.ok === false) { flashErrore(res.error || 'Cartella non disponibile', 'cartella_non_aperta'); if (res.missing) reload(); return; }
     // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
-    if (res.missing) { flashErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto'); reload(); }
+    if (res.missing) { if (res.avviso) flashErrore(res.avviso, 'file_non_aperto'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
