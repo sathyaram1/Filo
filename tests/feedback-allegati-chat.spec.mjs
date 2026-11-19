@@ -127,3 +127,46 @@ test('oltre le 5 immagini il riquadro dice quante togliere e l\'OK aspetta la sc
   await rimetti(app);
   await ripristina(app);
 });
+
+// #1664 — una foto oltre i 4 MB entra nella chat come riga «File:»: parte rimpicciolita, come dal riquadro; un AVIF
+// parte ridisegnato; un HEIC, che non si apre, resta fuori col perché.
+test('dalla chat una foto grande e un AVIF presi dal computer partono preparati, un HEIC no', async ({ app }) => {
+  test.setTimeout(120_000);
+  const b64 = await app.evaluate(({ nativeImage }) => {
+    const w = 2600;
+    const h = 2000;
+    const buf = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < buf.length; i++) buf[i] = (i % 4 === 3) ? 255 : Math.floor(Math.random() * 256);
+    return nativeImage.createFromBitmap(buf, { width: w, height: h }).toJPEG(95).toString('base64');
+  });
+  const dir = cartellaTemporanea('filo-allegati-chat-');
+  const foto = join(dir, 'IMG_2041.jpg');
+  const avif = join(dir, 'scansione.avif');
+  const heic = join(dir, 'IMG_2042.HEIC');
+  writeFileSync(foto, Buffer.from(b64, 'base64'));
+  expect(statSync(foto).size, 'la foto di prova supera il tetto').toBeGreaterThan(TETTO);
+  copyFileSync('tests/fixtures/provenienza/xmp-ai.avif', avif);
+  writeFileSync(heic, Buffer.from([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 1, 2, 3]));
+
+  const page = await home(app);
+  await depositoFinto(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [feedback({ allegati: [foto, avif, heic] })] }, { text: 'Inviata.' }]);
+  await chiedi(page, `manda queste con la segnalazione\nFile: ${foto}\nFile: ${avif}\nFile: ${heic}`);
+
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => (await confirmState(page))?.allegati?.length).toBe(3);
+  await expect.poll(async () => (await confirmState(page)).allegati.map((v) => [v.immagine, v.tolto]), { timeout: 20_000 })
+    .toEqual([[true, false], [true, false], [false, true]]);
+  expect((await confirmState(page)).notaAllegati).toContain('IMG_2042.HEIC');
+  await conferma(page);
+
+  await expect.poll(async () => (await depositati(app)).length, { timeout: 15_000 }).toBe(1);
+  const [p] = await depositati(app);
+  expect(p.images).toHaveLength(2);
+  for (const im of p.images) {
+    expect(im.dataUrl).toMatch(/^data:image\/(jpeg|png);base64,/);
+    expect(Math.floor((im.dataUrl.length - im.dataUrl.indexOf(',') - 1) * 3 / 4)).toBeLessThanOrEqual(TETTO);
+  }
+  await rimetti(app);
+  await ripristina(app);
+});
