@@ -24,6 +24,7 @@ const Permessi = require('./services/permessiPagine');
 // sincrono, e un modulo caricato dentro `_makeView` lì si trova ancora senza esportazioni.
 const Downloads = require('./services/downloads');
 const ReteDiCasa = require('./services/homeNetwork');
+const FileDelComputer = require('./services/fileDelComputer');
 const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
 const MenuDiRiserva = require('./menuDiRiserva');
