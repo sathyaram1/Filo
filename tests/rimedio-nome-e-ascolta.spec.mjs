@@ -81,11 +81,12 @@ async function scarica(nome, { shell, openTab, testServer }) {
   return async () => { try { srv.closeAllConnections?.(); } catch (_) {} await new Promise((r) => srv.close(r)); };
 }
 
-test('pagina Download, senza invito: «Dai un nome sensato» dice perché e «Apri Crediti» porta lì', async ({ app, shell, openTab, testServer }) => {
+// Senza invito la voce non c'è (nessun modello raggiungibile): la frase senza tasto restava coi crediti finiti.
+test('pagina Download, coi crediti finiti: «Dai un nome sensato» dice perché e «Apri Crediti» porta lì', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chiudi = await scarica('scan_00412.pdf', { shell, openTab, testServer });
   try {
-    await senzaChiave(app);
+    await creditiFiniti(app);
     const dl = await openTab('filo://downloads/downloads.html');
     const riga = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'scan_00412.pdf' }) });
     await riga.click({ button: 'right' });
