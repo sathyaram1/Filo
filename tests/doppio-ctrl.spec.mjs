@@ -83,6 +83,13 @@ test('Ctrl, Ctrl: il box compare dopo l\'attesa con le lettere di serie; un tocc
   await expect.poll(() => boxVisibile(app), { timeout: 5000 }).toBe(true);
   await box.keyboard.press('Escape');
   await expect.poll(() => boxVisibile(app)).toBe(false);
+  // Col tema scuro il box è scuro.
+  await imposta(app, { theme: 'dark' });
+  await premi(app, ['tocco', ['attendi', 80], 'tocco']);
+  await expect.poll(() => boxVisibile(app), { timeout: 5000 }).toBe(true);
+  await expect.poll(() => box.evaluate(() => document.documentElement.classList.contains('scuro'))).toBe(true);
+  await box.screenshot({ path: `${SHOTS}/2377-box-scuro.png` });
+  await box.keyboard.press('Escape');
 });
 
 test('Ctrl, Ctrl, D cambia il tema senza mostrare il box, e la D non arriva alla pagina', async ({ app, openTab, testServer }) => {
