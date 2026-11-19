@@ -475,6 +475,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       tettiChat = { ...tettiChat, token: finestra };
       contaSe('adattamento', ACTIONS.FILO_CHAT, modelloPrimo, 'finestra_piccola');
     }
+    // Il tetto vale per la richiesta intera: il tratto lascia il posto alla parte fissa (#2473.1).
+    try { tettiChat = { ...tettiChat, fissi: baseDellaChat(require('../shim/storage').inIncognito()) }; } catch (_) {}
     filo = await componiFilo(tettiChat);
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
