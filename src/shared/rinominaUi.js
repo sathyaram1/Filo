@@ -123,7 +123,7 @@
     if (!pagina) return;
     const b = doc.createElement('button');
     b.type = 'button';
-    b.className = 'sn-rinomina-annulla sn-rinomina-rimedio';
+    b.className = 'sn-rinomina-rimedio';
     b.textContent = pagina.label;
     b.title = pagina.title || '';
     b.addEventListener('click', () => {
