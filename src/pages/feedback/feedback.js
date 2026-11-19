@@ -598,10 +598,12 @@
       if ((!isImg || !IC?.perLaSegnalazione) && file.size > ATTACH_MAX_BYTES) { setStatus(`«${file.name || 'file'}» troppo grande (max 4 MB).`); return; }
       if (!window.SN_FEEDBACK?.uploadAttachment) { setStatus('Upload non disponibile.'); return; }
       uploading++; btn.disabled = true; setStatus('Caricamento…');
+      let avviso = '';
       try {
         if (isImg && IC?.perLaSegnalazione) {
           const pronta = await IC.perLaSegnalazione(file);
           if (!pronta || pronta.motivo) { setStatus(`«${file.name || 'immagine'}»: ${pronta ? pronta.motivo : 'tipo non supportato'}.`); return; }
+          if (pronta.avviso) avviso = `«${file.name || 'immagine'}» ${pronta.avviso}.`;
           file = pronta.file;
         }
         const att = await SN_FEEDBACK.uploadAttachment(file, file.name);
