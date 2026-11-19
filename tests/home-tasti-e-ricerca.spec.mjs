@@ -273,13 +273,21 @@ test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, 
   test.setTimeout(60_000);
   const foto = await app.evaluate(() => globalThis.__filoCopieIcone.conserva(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC'));
-  await app.evaluate((_e, picture) => {
-    const M = process.getBuiltinModule('module');
-    const ga = M._cache[Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x))].exports;
-    ga.isSignedIn = () => true;
-    ga.isAdmin = () => false;
+  // Un account entrato con la sua foto già copiata, come dopo un accesso vero; il servizio dei token irraggiungibile,
+  // come senza rete, così la sessione finta resta.
+  await app.evaluate(async (_e, foto) => {
+    const vera = globalThis.fetch;
+    globalThis.fetch = function fetch(input, init) {
+      const url = String((input && input.url) || input);
+      if (/^https:\/\/securetoken\.googleapis\.com\//.test(url)) return Promise.reject(new TypeError('fetch failed'));
+      return vera.call(this, input, init);
+    };
+    const req = process.getBuiltinModule('module').createRequire(`${process.cwd()}/src/main/main.js`);
+    const ga = req('./auth/google-auth');
+    const remota = 'https://lh3.example/foto-di-prova';
+    req('./auth/token-store').save({ refreshToken: 'r-finto', email: 'mario@example.it', name: 'Mario Rossi', picture: remota, foto, fotoDi: remota });
+    ga.restore();
     ga.getUid = async () => 'uid-di-prova';
-    ga.getProfile = () => ({ email: 'mario@example.it', name: 'Mario Rossi', picture });
   }, foto);
   const page = await casa(app);
   const avatar = (sel) => sel.locator('img.account-avatar');
@@ -287,9 +295,6 @@ test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, 
   await expect(avatar(fuori(page, 'profilo'))).toHaveAttribute('src', foto);
   await expect(fuori(page, 'profilo')).toHaveAttribute('aria-label', 'Profilo: Mario Rossi');
   await apriPiu(page);
-  await page.waitForTimeout(1500);
-  console.log('DEBUG', await page.locator('#altroFuori').evaluate((n) => n.innerHTML.slice(0, 3000)));
-  console.log('DEBUG2', await page.evaluate(async (u) => { try { const r = await fetch(u); return r.status + ' ' + r.headers.get('content-type'); } catch (e) { return String(e); } }, foto));
   await expect.poll(() => avatar(fuori(page, 'profilo')).evaluate((i) => i.naturalWidth)).toBe(1);
   // Rimesso in vista, il tasto ridisegnato ha la sua foto.
   await fuori(page, 'profilo').click({ button: 'right' });
