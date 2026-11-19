@@ -3786,13 +3786,9 @@
     scriveFilo(el, pezzo);
     const prima = getEditableText(el);
     const doc = el.ownerDocument || document;
-    const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
     try {
       if (campoDiTesto(el)) {
-        if (!sostituisciComeBattuta(el, { start: dove, end: dove }, pezzo, 'end')) {
-          el.setRangeText(pezzo, dove, dove, 'end');
-          el.dispatchEvent(input());
-        }
+        scriviNellaCasella(el, { start: dove, end: dove }, pezzo);
       } else {
         el.focus({ preventScroll: true });
         const sel = (doc.defaultView || window).getSelection();
