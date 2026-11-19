@@ -588,6 +588,19 @@
     };
   }
 
+  // Come `pressioneScritta`, anche per un tasto da solo («Esc», «freccia giù»): chi PREME una combinazione scritta (il
+  // pilota delle prove, tests/agent/combinazioni.mjs) la legge con questi nomi. `cmdECtrl`: Ctrl e Cmd scritti insieme.
+  function letturaScritta(accel) {
+    const parti = pezzi(String(accel || '').trim().replace(/\+\s*\+$/, '+Plus'));
+    if (!parti.length) return null;
+    const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
+    return {
+      ctrl: mods.some((m) => CTRL.test(m)), cmdECtrl: conControlECmd(mods),
+      alt: mods.some((m) => ALT.test(m)), shift: mods.some((m) => SHIFT.test(m)),
+      tasto: tastoCanonico(parti[parti.length - 1]), scritto: parti[parti.length - 1],
+    };
+  }
+
   // Combinazioni che il sistema operativo intercetta prima di Filo: il menu Start, il cambio
   // finestra o app, Spotlight, le istantanee dello schermo, l'uscita forzata, la sessione.
   const PRESI_DAL_SISTEMA = {
