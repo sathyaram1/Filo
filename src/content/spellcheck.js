@@ -3493,10 +3493,8 @@
     return true;
   }
 
-  // Ogni testo che Filo mette in una casella di un sito passa da qui (#2052): il sito deve contarlo come scritto
-  // dall'utente, o al tasto Invia lo trova vuoto (Reddit: «Comment cannot be empty»). Prima come una battuta, che ogni
-  // sito sente; se il campo non si lascia, dal valore nativo (React tiene una copia sull'elemento) con un `input` che
-  // esce dall'ombra, dove ascoltano i componenti. `tipo` (un incolla) arriva in un evento suo: le pagine di Filo lo leggono.
+  // Il testo che Filo mette in una casella il sito deve contarlo come scritto, o all'invio lo trova vuoto (#2052): prima
+  // come una battuta; se no dal valore nativo, con un `input` che esce dall'ombra. `tipo` (un incolla) va in un evento suo.
   function scriviNellaCasella(el, range, testo, { cursore = 'end', tipo = 'insertText' } = {}) {
     if (!el || !el.isConnected) return false;
     testo = String(testo ?? '');
