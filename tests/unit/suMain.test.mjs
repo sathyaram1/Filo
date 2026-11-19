@@ -279,3 +279,17 @@ test('i file di servizio sono quelli della regola 3 della spec', () => {
   assert.deepEqual(R.giroDopoRiallineamento(['src/shared/patchNotes.js', './tests/rossi-noti.json']).giro, 'nessuno');
   assert.deepEqual(R.giroDopoRiallineamento([]).giro, 'nessuno', 'un riallineamento pulito non chiede un giro');
 });
+
+test('#2590: un riallineamento per prove rosse chiede la verifica anche pulito, gli altri motivi no', () => {
+  const rosse = R.leggiMotivoCorrettore('prove rosse: tests/unit/x.test.mjs').motivo;
+  assert.deepEqual(R.giroDopoRiallineamento([], { conflitti: [], motivo: rosse }), { giro: 'pieno', codice: [], proveRosse: true });
+  assert.deepEqual(R.giroDopoRiallineamento(['src/shared/patchNotes.js'], { motivo: rosse }).giro, 'pieno');
+  assert.equal(R.giroDopoRiallineamento(undefined, { motivo: rosse }).proveRosse, true, 'anche senza elenco si dice il perché');
+  assert.equal(R.riallineamentoPerProveRosse(rosse), true);
+  for (const testo of ['conflitto: nessuno', 'ripresa', 'altro: main era già dentro']) {
+    const m = R.leggiMotivoCorrettore(testo).motivo;
+    assert.equal(R.riallineamentoPerProveRosse(m), false, testo);
+    assert.deepEqual(R.giroDopoRiallineamento([], { motivo: m }), { giro: 'nessuno', codice: [] }, testo);
+  }
+  assert.equal(R.riallineamentoPerProveRosse(null), false);
+});
