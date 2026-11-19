@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { barraPage, statoBarra, premi, comandaBarra, menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
