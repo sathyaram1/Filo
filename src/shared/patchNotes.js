@@ -14,6 +14,7 @@
         { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
         { testo: 'Premi due volte Ctrl (Cmd su Mac) e poi una lettera, e Filo la fa subito, da qualunque pagina: C cerca nel filo, D cambia tema, Z riapre la scheda chiusa, L legge ad alta voce, M toglie l\'audio, B blocca il computer e altre. Se non ricordi la lettera, dopo un attimo compare l\'elenco, e lì le cambi o ne dai una alle app. Si spegne e si rallenta in Preferenze → «Lettere di Filo».', segnalazione: 2377 },
         { testo: 'Se sposti un file scaricato, Filo lo ritrova quando lo apri o ne chiedi la cartella: lo cerca in Download, Scrivania e Documenti, ti dice dove l\'ha trovato e da lì in poi lo apre da quel posto.', segnalazione: 473 },
+        { testo: 'Gli avvisi di Filo dentro i siti hanno una X: li chiudi subito, senza aspettare che spariscano.', segnalazione: 1677 },
       ],
       fixes: [
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
@@ -24,6 +25,7 @@
         { testo: 'Il tempo che manca a uno scaricamento non scrive più «1 h 60 min».', segnalazione: 1684 },
         { testo: 'Cancellando le pagine di un sito se ne vanno anche gli avvisi «Nome di prima rimesso» dei file scaricati da lì.', segnalazione: 1561 },
         { testo: 'Senza invito o coi crediti finiti, «Dai un nome sensato» e «Ascolta» nelle Preferenze ti dicono perché e hanno il tasto per andare ai Crediti.', segnalazione: 1344 },
+        { testo: 'Sui siti la cronologia degli appunti segue lo stile del carattere che hai scelto: con o senza grazie, a spaziatura fissa, corsivo.', segnalazione: 1342 },
       ],
     },
     {
