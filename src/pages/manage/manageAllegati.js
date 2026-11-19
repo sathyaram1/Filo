@@ -69,10 +69,11 @@
           const IC = window.SN_IMMAGINI_CHAT;
           const pronta = IC && typeof IC.perLaSegnalazione === 'function' ? await IC.perLaSegnalazione(file) : null;
           if (pronta && pronta.motivo) { avvisa(k, `«${file.name || 'immagine'}»: ${pronta.motivo}.`); continue; }
+          const avviso = pronta && pronta.avviso ? `«${file.name || 'immagine'}» ${pronta.avviso}.` : '';
           if (pronta) file = pronta.file;
           const att = await window.SN_FEEDBACK.uploadAttachment(file, file.name);
           if (att && att.url) liste.set(k, di(k).concat([att]));
-          avvisa(k, '');
+          avvisa(k, avviso);
         } catch (e) {
           const FB = window.SN_FEEDBACK;
           const cifratura = !!(FB && typeof FB.isEncryptionError === 'function' && FB.isEncryptionError(e));
