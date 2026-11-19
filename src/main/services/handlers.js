@@ -210,6 +210,23 @@ async function eseguiAzioneFilo(action, {
     if (esito) return esito;
   }
 
+  // Un file del computer (#1905): si sa prima del gate se si apre, e col percorso non scritto dall'utente chiede il
+  // suo OK. `_fileDelComputer` e `_fileNonScritto` li scrive solo questo punto, mai l'LLM.
+  if (type === 'NAVIGA') {
+    delete action._fileDelComputer;
+    delete action._fileNonScritto;
+    const indirizzo = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+    if (globalThis.SN_URL_NAV.fileDiQuestoComputer(indirizzo)) {
+      const FileDelComputer = require('./fileDelComputer');
+      const g = await FileDelComputer.giudica(indirizzo);
+      // L'assistente sopra una pagina vive nel DOM del sito, che può scrivergli le parole e premergli i bottoni.
+      if (assistente) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'assistente', percorso: g.percorso } };
+      if (!g.ok) return { executed: false, kept: true, output: { blocked: 'file', motivo: g.motivo, percorso: g.percorso } };
+      action._fileDelComputer = g.percorso;
+      if (!FileDelComputer.scrittoDallUtente(g.percorso, parole)) action._fileNonScritto = true;
+    }
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
