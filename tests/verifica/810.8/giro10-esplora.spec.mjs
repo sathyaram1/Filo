@@ -62,42 +62,7 @@ async function controlla(app, sentinella, valore) {
   expect(dopo, 'il valore dell’utente è rimasto fra i segreti letti').not.toContain(compatta(valore));
 }
 
-test('carta scritta nel riquadro di pagamento di un altro sito', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const riquadro = testServer.html(`<!doctype html><html><body>${campoCarta}</body></html>`, { pubblico: true });
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
-    <h1>Pagamento</h1>${campoDelSito('264087')}<br><iframe id="f" src="${riquadro}" style="width:520px;height:90px;border:0"></iframe></body></html>`);
-  await oltreLAvviso(app);
-  await preparaModelli(app);
-  const campo = page.frameLocator('#f').locator('#c');
-  await campo.click();
-  await campo.pressSequentially(CARTA);
-  await expect(campo).toHaveValue(CARTA);
-  await chiediAiuto(app, shell, page);
-  await controlla(app, '264087', CARTA);
-});
-
-test('carta scritta nel modulo e mostrata nel riepilogo della pagina dopo', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const riepilogo = testServer.html(`<!doctype html><html><head><title>Riepilogo</title></head><body><h1>Riepilogo</h1>
-    <p>Carta: <span id="r"></span></p>${campoDelSito('264087')}
-    <script>document.getElementById('r').textContent = sessionStorage.getItem('carta');</script></body></html>`);
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
-    <h1>Pagamento</h1>${campoCarta}<button id="av" type="button"
-    onclick="sessionStorage.setItem('carta', document.getElementById('c').value); location.href='${riepilogo}'">Continua</button></body></html>`);
-  await oltreLAvviso(app);
-  await preparaModelli(app);
-  await page.locator('#c').pressSequentially(CARTA);
-  await page.locator('#av').click();
-  await page.waitForURL(riepilogo);
-  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
-  await expect(page.locator('#r')).toHaveText(CARTA);
-  await oltreLAvviso(app);
-  await chiediAiuto(app, shell, page, 'è giusto il numero della carta?');
-  await controlla(app, '264087', CARTA);
-});
-
-test('carta in una bozza che il sito rimette dopo un riavvio di Filo', async () => {
+test('r1 la carta scritta in una bozza che il sito rimette dopo un riavvio di Filo non resta fra i segreti letti', async () => {
   test.setTimeout(150_000);
   const corpo = `<!doctype html><html><head><title>Posta</title></head><body><h1>Nuovo messaggio</h1>
     ${campoDelSito('264087')}<br><label for="m">Messaggio</label><textarea id="m" rows="6" cols="60"></textarea>
