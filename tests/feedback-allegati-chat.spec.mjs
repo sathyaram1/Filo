@@ -2,8 +2,13 @@
 // il riquadro di conferma le mostra in miniatura, un clic le toglie, oltre i 5 si sceglie prima di poter inviare.
 // Modello finto e deposito finto: si guarda cosa vede l'utente e cosa arriva a SN_FEEDBACK.submit.
 
+import { copyFileSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+
+const TETTO = 4 * 1024 * 1024;
 import { CONFIRM_HOST, confirmState, clickConfirm, scrollConfirmToEnd, aspettaConfermaPronta } from './helpers/confirm.mjs';
 
 const feedback = (args) => ({ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Zoom rotto', testo: 'Lo zoom non si ingrandisce.', ...args }) });
