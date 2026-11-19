@@ -1465,8 +1465,11 @@
   const DOMANDA_SOLO_IMMAGINI = 'Descrivi questa immagine.';
   const domandaDi = (c) => c.text || DOMANDA_SOLO_IMMAGINI;
   function prendiComposizione(text) {
+    // Le citazioni nel campo, coi loro commenti: le parole del messaggio diventano tutti i commenti, in ordine (#2346).
+    const conCitate = Rispondi.prendi(String(text || ''));
+    if (conCitate) text = conCitate.testo;
     // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
-    const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
+    const scritto = conCitate ? conCitate.testo : inputEl.value.trim() ? inputEl.value : String(text || '');
     const incollato = testoDaFuori;
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
