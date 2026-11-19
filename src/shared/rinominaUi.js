@@ -237,15 +237,15 @@
     const bersaglio = downloadId ? { downloadId } : { percorso };
 
     mostraStato('Leggo il file…', { carica: true });
-    const senzaProposta = (frase) => {
+    const senzaProposta = (frase, rimedio) => {
       caricando = false;
       if (!attivo || fatto) return;
       if (confermaInAttesa) { confermaInAttesa = false; ok.disabled = false; }
-      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
+      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true, rimedio });
       try { campo.focus({ preventScroll: true }); } catch (_) {}
     };
     send({ type: MSG().FILE_NOME_PROPONI, ...bersaglio }).then((r) => {
-      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase); return; }
+      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase, r && r.rimedio); return; }
       caricando = false;
       if (!attivo || fatto) return;
       mostraStato('');
