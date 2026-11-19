@@ -7,6 +7,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import { paginaDellAiuto } from '../../helpers/riquadri.mjs';
+import { primaFinestra } from '../../helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from '../../helpers/schede.mjs';
 
 const CARTA = '4111 1111 1111 1111';
 const compatta = (v) => v.replace(/[\s-]/g, '').toLowerCase();
