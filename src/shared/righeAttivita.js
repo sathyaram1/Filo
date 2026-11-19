@@ -321,6 +321,7 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    BLOCCA_PC: () => ({ icon: '🔒', text: 'Computer bloccato' }),
     // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
     ORDINA_DESKTOP: (a) => {
       const o = a._output || {};
