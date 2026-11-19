@@ -1727,6 +1727,10 @@ function openFolder(id, scope = '') {
   if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
   forgetExists(rec.savePath);
   const here = fileExists(rec.savePath);
+  if (!here && rec.state === 'completed' && !opts.cercato) {
+    return ritrova(rec).then((c) => (c === true ? openFolder(id, scope)
+      : Promise.resolve(openFolder(id, scope, { cercato: true })).then((r) => (c === 'scaduto' && r && r.missing ? { ...r, error: CERCATO_TROPPO_TEXT, scaduto: true } : r))));
+  }
   if (!here) broadcast('missing', rec);
   try {
     if (here) { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
