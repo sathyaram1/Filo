@@ -1,6 +1,6 @@
 // I file del computer che si aprono in una scheda (#1905): locali, esistenti, di un tipo che la scheda mostra.
 // Vivono in una sessione loro, dove una pagina locale legge solo la cartella del file aperto e non legge altri file.
-// Chi può chiederli (percorso scritto dall'utente, suo clic) lo decide chi chiama. Prova: tests/file-del-computer.spec.mjs.
+// Chi può chiederli lo decide chi chiama. Regole: patterns/un-file-del-computer-in-una-scheda-vive-in-una-sessione-sua.md.
 
 const fs = require('node:fs');
 const os = require('node:os');
