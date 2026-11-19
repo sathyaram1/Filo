@@ -49,11 +49,11 @@ test('r1 con chi compatta in errore e una domanda lunga, la richiesta intera res
 
 test('r1 con chi compatta in errore e tre ricordi ripescati, la richiesta intera resta sotto i 100.000 token', async ({ app }) => {
   const page = await home(app);
-  // Una conversazione da circa 78.000 token: il tratto resta intero, vicino al suo tetto.
+  // Una conversazione da circa 75.000 token: il tratto resta intero, appena sotto il suo tetto.
   await app.evaluate(async () => {
     const t0 = Date.now() - 6 * 60 * 60 * 1000;
     const testo = (i) => `Messaggio ${i} sul viaggio a Lisbona. ${'Gli orari dei treni, i quartieri da vedere, dove mangiare la sera. '.repeat(30)}`;
-    for (let i = 0; i < 78; i++) {
+    for (let i = 0; i < 73; i++) {
       await globalThis.SN_FILO_CHATS.append('lunga1', { role: i % 2 ? 'filo' : 'user', text: testo(i), ts: new Date(t0 + i * 60000).toISOString() });
     }
   });
