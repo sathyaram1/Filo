@@ -787,7 +787,7 @@ test('con la tastiera rimasta sulla home di dietro, Ctrl+W chiude comunque la sc
   // Quello che fa la home quando si carica: si prende la tastiera, e il tasto arriva a lei.
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    const wc = tm.tabs.find((t) => /^filo:\/\/newtab\//.test(t.view.webContents.getURL())).view.webContents;
+    const wc = tm.tabs.find((t) => t.id !== tm.activeId && /^filo:\/\/newtab\//.test(t.view.webContents.getURL() || t.url)).view.webContents;
     wc.focus();
     wc.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
     wc.sendInputEvent({ type: 'keyUp', keyCode: 'W', modifiers: ['control'] });
