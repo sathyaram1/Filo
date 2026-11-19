@@ -1456,7 +1456,7 @@
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   // `soloTesto`: parte solo `text`, e la bozza nella barra (testo, allegati, citazione) resta dov'è.
   async function submitMessage(text, { daModello = false, soloTesto = false } = {}) {
-    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0 && (soloTesto || !Rispondi.commenti())) || sending) return;
     const c = soloTesto && text ? composizione(text) : prendiComposizione(text);
     await inviaComposto(c, { daModello });
   }
