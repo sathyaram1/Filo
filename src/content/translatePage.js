@@ -82,9 +82,6 @@
   // appena riportato indietro (#407).
   let runSeq = 0;
   let usoContato = false;
-  // La riga del ripiego sui crediti di Filo (#662): la pagina tradotta non ha un riquadro sotto cui
-  // scriverla, la dice un avviso al primo pezzo pagato così (a fine giro si perde chi lascia la pagina prima).
-  let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
   // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
