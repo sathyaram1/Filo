@@ -293,3 +293,15 @@ test('#2590: un riallineamento per prove rosse chiede la verifica anche pulito, 
   }
   assert.equal(R.riallineamentoPerProveRosse(null), false);
 });
+
+test('#2590: la consegna di un riallineamento per prove rosse non si annuncia pulita e manda il giro pieno', async () => {
+  const { esitoRiallineamento } = await import('../../scripts/dispatch.mjs');
+  const pulito = { ok: true, file: [], conflitti: [] };
+  const rosse = esitoRiallineamento(pulito, R.leggiMotivoCorrettore('prove rosse: tests/unit/x.test.mjs').motivo);
+  assert.equal(rosse.riallineamento.giro, 'pieno');
+  assert.doesNotMatch(rosse.riga, /pulito|non serve/);
+  assert.match(rosse.riga, /serve la verifica/);
+  const liscio = esitoRiallineamento(pulito, R.leggiMotivoCorrettore('conflitto: nessuno').motivo);
+  assert.equal(liscio.riallineamento.giro, 'nessuno');
+  assert.match(liscio.riga, /Riallineamento pulito/);
+});
