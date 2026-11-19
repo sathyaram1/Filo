@@ -16,7 +16,8 @@ const dato = (b64) => `data:image/png;base64,${b64}`;
 
 // sito-con-icona.test ha solo /favicon.ico; scheda.test dichiara la sua icona in un altro indirizzo; senza-icona.test niente.
 async function sitiFinti(app) {
-  await app.evaluate(({ session, net }, { rosso, blu }) => {
+  await chiudiLaRete(app);
+  await app.evaluate(({ session }, { rosso, blu }) => {
     const richieste = [];
     globalThis.__richiesteSiti = richieste;
     const png = (b64) => new Response(Buffer.from(b64, 'base64'), { headers: { 'content-type': 'image/png' } });
