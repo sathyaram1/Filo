@@ -229,7 +229,10 @@ test('mentre componi una parola con la tastiera di un\'altra lingua, il testo to
   await expect(casella(page)).toHaveCount(1, { timeout: 8000 });
   await page.waitForTimeout(1000);
   expect(await casella(page).inputValue(), 'a parola aperta il fuoco non si tocca').toBe('');
+  await page.evaluate(() => { window.__ev = []; for (const t of ['compositionstart', 'compositionupdate', 'compositionend', 'input']) document.addEventListener(t, (e) => window.__ev.push(t + ':' + e.isTrusted), true); });
   await cdp.send('Input.insertText', { text: '日本' });
+  await page.waitForTimeout(500);
+  console.log('DEBUG', await page.evaluate(() => window.__ev), await page.locator('#ce').textContent());
   await expect.poll(() => casella(page).inputValue(), { timeout: 5000 }).toBe('commento salvato');
   await page.keyboard.type(' fine');
   await expect(page.locator('#ce')).toHaveText('日本 fine');
