@@ -12,6 +12,7 @@ const COMMANDS = Object.freeze(Object.fromEntries(globalThis.SN_TASTI.AZIONI_FIL
 // All'avvio e a ogni cambio delle impostazioni: da qui in poi valgono i tasti nuovi, e i vecchi tornano alla pagina.
 function configura(settings) {
   globalThis.SN_TASTI.usaScorciatoieFilo(settings && settings.scorciatoie);
+  require('./lettereDiFilo').configura(settings);
 }
 
 // Le combinazioni degli elementi dei pannelli delle app (#1433): la chat e il salvataggio le confrontano con le quattro,
