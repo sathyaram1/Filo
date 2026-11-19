@@ -103,9 +103,9 @@ module.exports = function register(on, ctx) {
     const AS = globalThis.SN_ALLEGATI_SEGNALAZIONE;
     let azione = msg.action;
     if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a) && msg.assistente === true) {
-      // #1664 — dall'Aiuto: le immagini tenute nel suo riquadro, solo se l'utente le aveva date all'Aiuto. L'azione resta
-      // com'era, perché la conferma di un sito combacia con la richiesta solo così.
-      azione = { ...a, _allegatiIndicati: true, _immaginiAiuto: require('../immaginiAiuto').soloViste(sender, msg.immaginiAiuto) };
+      // #1664 — dall'Aiuto: le immagini che l'utente gli ha dato e ha tenuto nel riquadro, che sta nello strato di Filo e
+      // non nel sito. L'azione resta com'era, perché la conferma da un sito combacia con la richiesta solo così.
+      azione = { ...a, _allegatiIndicati: true, _immaginiAiuto: msg.immaginiAiuto && typeof msg.immaginiAiuto === 'object' ? msg.immaginiAiuto : {} };
     } else if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a)) {
       azione = { ...AS.soloQuesti(a, isFilo(origin) && Array.isArray(msg.allegatiScelti) ? msg.allegatiScelti : []), _allegatiIndicati: true };
       // #1664 — le immagini che solo il riquadro sa ridisegnare: valgono per le voci che il main ha segnato da preparare.
