@@ -92,11 +92,8 @@ test.describe('la X degli avvisi (#1677)', () => {
     await expect(avviso).toHaveClass(/sn-toast-visible/);
     await expect(avviso.locator('.sn-toast-x')).toBeVisible();
     await page.waitForTimeout(400);
-    const pila = await page.evaluate(() => {
-      const p = document.querySelector('.sn-toasts');
-      return { scorre: p.classList.contains('scrolling'), sh: p.scrollHeight, ch: p.clientHeight, cls: p.className };
-    });
-    console.log('pila', JSON.stringify(pila));
+    const scorre = await page.evaluate(() => document.querySelector('.sn-toasts').scrollHeight > document.querySelector('.sn-toasts').clientHeight);
+    expect(scorre, 'la X sta dentro l\'avviso: un avviso solo non fa scorrere la pila').toBe(false);
     await shot(page, 'toast-x-1677-scuro');
   });
 });
