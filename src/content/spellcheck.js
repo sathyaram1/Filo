@@ -3489,6 +3489,35 @@
     return true;
   }
 
+  // Ogni testo che Filo mette in una casella di un sito passa da qui (#2052): il sito deve contarlo come scritto
+  // dall'utente, o al tasto Invia lo trova vuoto (Reddit: «Comment cannot be empty»). Prima come una battuta, che ogni
+  // sito sente; se il campo non si lascia, dal valore nativo (React tiene una copia sull'elemento) con un `input` che
+  // esce dall'ombra, dove ascoltano i componenti. `tipo` (un incolla) arriva in un evento suo: le pagine di Filo lo leggono.
+  function scriviNellaCasella(el, range, testo, { cursore = 'end', tipo = 'insertText' } = {}) {
+    if (!el || !el.isConnected) return false;
+    testo = String(testo ?? '');
+    const prima = el.value;
+    const evento = () => {
+      const ev = new InputEvent('input', { bubbles: true, composed: true, inputType: tipo, data: testo });
+      el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+    };
+    if (sostituisciComeBattuta(el, range, testo, cursore)) {
+      if (tipo !== 'insertText') evento();
+      return true;
+    }
+    try {
+      el.setRangeText(testo, range.start, range.end, cursore === 'preserve' ? 'preserve' : 'end');
+    } catch (_) {
+      const v = String(el.value || '');
+      const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+      const nuovo = v.slice(0, range.start) + testo + v.slice(range.end);
+      if (d && d.set) d.set.call(el, nuovo); else el.value = nuovo;
+    }
+    if (el.value === prima) return false;
+    evento();
+    return true;
+  }
+
   // Una correzione applicata da Filo: Ctrl/Cmd+Z subito dopo la disfa, e i contatori lo sanno (#1461).
   function applyFix(el, range, replacement, opts = {}) {
     scriveFilo(el, replacement);
