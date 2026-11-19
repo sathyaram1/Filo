@@ -43,7 +43,7 @@ const schedeFile = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.ge
   .filter((t) => /^file:/.test(t.url || '')).length);
 const execAction = (app, action, opts) => app.evaluate((_e, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 
-test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda con immagini e stile, senza chiedere', async ({ app }) => {
+test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda con immagini e stile, senza chiedere', async ({ app, shell }) => {
   test.setTimeout(60_000);
   const { file, fuori } = preparaReport();
   const page = await home(app);
