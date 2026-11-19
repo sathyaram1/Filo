@@ -1793,6 +1793,8 @@
     CANCELLA_SVEGLIA: fatta,
     MODIFICA_SVEGLIA: fatta,
     ZOOM_PAGINA: senza('limitato'),
+    // Già tradotta, già all'originale o già al lavoro: lo dice il modello, l'utente aveva chiesto altro.
+    TRADUCI_PAGINA: (r) => fatta(r) && !!r.output && ['partita', 'originale', 'fermata'].includes(r.output.traduzione),
     VOLUME: senza('limitato'),
     RIPRENDI_AUDIO: senza('nonPartita'),
     PAUSA_AUDIO: senza('nessuna'),
