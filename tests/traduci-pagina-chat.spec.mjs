@@ -188,6 +188,18 @@ test('«torna all\'originale» mentre traduce: si ferma e la pagina resta com\'e
   expect(await tradotti(page)).toBe(0);
 });
 
+test('chiesto dalla home: si traduce l\'ultima pagina usata, e Filo dice quale, perché non è davanti', async ({ app, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.openTab('filo://newtab/');
+  });
+  const r = await traduci(app);
+  expect(r.output).toMatchObject({ traduzione: 'partita', dietro: true });
+  await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30000 });
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, r)).toContain('non quella che ha davanti');
+});
+
 test('nessuna pagina web aperta: Filo lo dice, invece di dire fatto', async ({ app, shell }) => {
   await expect(shell.locator('body')).toBeVisible();
   const r = await traduci(app);
