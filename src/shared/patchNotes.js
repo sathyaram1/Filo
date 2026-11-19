@@ -18,7 +18,8 @@
         { testo: 'Il testo che incolli o detti con Filo nella casella di un sito, e quello che ti rimette dopo una ricarica, il sito lo conta come scritto da te: su Reddit il commento non risulta più vuoto quando lo invii.', segnalazione: 2052 },
         { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
         { testo: 'A schermo intero, col puntatore in alto vedi le schede senza l\'elenco dei download che copriva mezza pagina. Scende con loro solo la domanda su un programma da scaricare, finché non rispondi.', segnalazione: 2387 },
-        { testo: 'Le foto oltre i 4 MB, come quelle del telefono, si allegano alle segnalazioni: Filo le rimpicciolisce da sé invece di rifiutarle. Entrano anche le immagini AVIF; per un HEIC ti dice di salvarlo come JPEG o PNG.', segnalazione: 1664 },
+        { testo: 'Le foto oltre i 4 MB, come quelle del telefono, si allegano alle segnalazioni anche dalla chat: Filo le rimpicciolisce da sé invece di rifiutarle. Entrano anche le immagini AVIF; per un HEIC ti dice di salvarlo come JPEG o PNG.', segnalazione: 1664 },
+        { testo: 'Chiedendo all’Aiuto di mandare una segnalazione, le immagini che gli hai dato partono con lei: le vedi in miniatura prima dell’invio.', segnalazione: 1664 },
       ],
     },
     {
