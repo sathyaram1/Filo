@@ -35,12 +35,6 @@ async function preparaModelli(app) {
     P.streamCompleteWithFallback = async (o) => r(o);
   });
 }
-async function oltreLAvviso(app) {
-  await app.evaluate(({ BrowserWindow }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    for (const t of tm.tabs.filter((x) => /^https?:/.test(x.url))) tm.safebrowseDismiss(t.id, t.url);
-  });
-}
 async function chiediAiuto(app, shell, page, testo = 'aiutami a finire') {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
