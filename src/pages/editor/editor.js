@@ -1283,7 +1283,7 @@
     setTimeout(() => {
       if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      window.addEventListener('scroll', closeTitleMenu, true);
+      window.addEventListener('scroll', onTitleMenuScroll, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
   }
