@@ -195,6 +195,7 @@ test.describe('utente già accolto', () => {
     const nellIntervista = await ultimo();
     expect(nellIntervista).toContain('DA SCOPRIRE');
     for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(nellIntervista, fatto).not.toContain(fatto);
+    expect(nellIntervista, 'la memoria tolta non è una memoria vuota').toContain('non ce l\'hai davanti apposta, ma c\'è');
     await queueChat(app, { text: 'Va bene, ti do del tu.', actions: [] });
     await scrivi(intervista, 'dammi del tu ovvio');
     await expect(intervista.locator('.dash-bubble-filo', { hasText: 'ti do del tu' })).toBeVisible({ timeout: 30_000 });
