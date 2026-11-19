@@ -3504,7 +3504,7 @@
       const ev = new InputEvent('input', { bubbles: true, composed: true, inputType: tipo, data: testo });
       el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
     };
-    if (sostituisciComeBattuta(el, range, testo, cursore)) {
+    if (fuoco && sostituisciComeBattuta(el, range, testo, cursore)) {
       if (tipo !== 'insertText') evento();
       return true;
     }
