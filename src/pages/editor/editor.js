@@ -2075,14 +2075,13 @@
     ];
     for (const [re, fn] of map) {
       if (re.test(text)) {
-        // Svuotato senza segnaposto il blocco non ha dove tenere il cursore: Chromium lo sposta nel blocco
-        // dopo, che diventava lui il titolo, e lasciava un <p></p> alto zero che si salvava (#2279).
+        // Svuotato a mano il blocco restava senza segnaposto: il cursore scivolava nel blocco dopo, che diventava lui
+        // il titolo, e un <p></p> alto zero si salvava (#2279). La cancellazione dell'editor tiene il <br> e l'Annulla.
         const r = document.createRange();
         r.selectNodeContents(block);
         sel.removeAllRanges();
         sel.addRange(r);
         document.execCommand('delete');
-        console.log('DOPO DELETE', docEl.innerHTML, sel.anchorNode && sel.anchorNode.nodeName, sel.anchorOffset);
         fn();
         return true;
       }
