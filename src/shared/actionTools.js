@@ -368,14 +368,19 @@
       description: 'una regola breve in terza persona su come comportarti con l\'utente, che vale da subito in ogni conversazione.',
       properties: { testo: S() }, required: ['testo'],
     },
+    LEGGI_MEMORIA: {
+      via: ['memoria', 'leggi'], risultato: true,
+      description: 'la memoria intera, quando non è nel CONTESTO.',
+      properties: {}, required: [],
+    },
     CORREGGI_MEMORIA: {
       via: ['memoria', 'correggi'],
-      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta).',
+      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta); una riga da togliere va a dimentica.',
       properties: { testo: S(), nuovo: S() }, required: ['testo', 'nuovo'],
     },
     DIMENTICA: {
       via: ['memoria', 'dimentica'],
-      description: 'nasconde una riga della memoria; per_sempre la cancella.',
+      description: 'nasconde una riga della memoria; per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { testo: S(), per_sempre: B() }, required: ['testo'],
     },
     CANCELLA_MEMORIA: {
@@ -397,7 +402,7 @@
     },
     TOGLI_CHAT: {
       via: ['filo', 'togli_chat'],
-      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella.',
+      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { id: S(), per_sempre: B() }, required: [],
     },
     RIMETTI_CHAT: {

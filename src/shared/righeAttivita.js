@@ -106,6 +106,7 @@
       return { icon: '💬', text: `Cerco nel filo: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
     LEGGI_IMPOSTAZIONI: (a) => {
       const c = String(a.cerca || '').trim();
       return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
@@ -432,7 +433,7 @@
     PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
     SALVA_PER_DOPO: 'Pagina non salvata', CERCA_IMMAGINE: 'Immagine non cercata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
-    TOGLI_PERMESSO_SITO: 'Permesso non tolto',
+    LEGGI_MEMORIA: 'Memoria non letta', TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',

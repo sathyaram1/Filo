@@ -36,7 +36,7 @@ const {
 } = require('./osservazioniPerModello');
 const {
   noteProvenienzaImmagini, ricordaOrigineInChat, origineGiaLettaInChat, buildMessages, handleAIRequest,
-  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat, baseDellaChat,
+  memoriaPerModello, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat, baseDellaChat,
 } = require('./chiamateModello');
 const {
   archiviaDomanda, appendToChatArchive, citazioneDelMessaggio, affidaChat, archiviaAperturaAccoglienza,
@@ -503,10 +503,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // #2536 — nell'intervista rifatta conta solo quello che l'utente dice lì: la memoria che il modello vedeva la citava,
   // gliela attribuiva o la ricopiava nel profilo, anche col divieto scritto. Fuori dall'intervista torna intera.
+  // La frase che dice al modello che la memoria c'è ma è fuori vale solo con questa decisione (payloadBase).
   const memoriaNascosta = onbActive && onbBefore.rifatta === true;
-  const memory = memoriaNascosta ? null : await FiloMem.getMemory();
-  const { profilo, preferenze, espansioni } = memoriaNascosta ? {} : FiloMem.renderMemoryForPrompt(memory);
-  const lezioni = memoriaNascosta ? '' : await lessonsBufferText();
+  const { profilo, preferenze, espansioni, lezioni } = memoriaNascosta ? {} : await memoriaPerModello();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
   const { state: statoDelTurno, stateText, sezioniChat: sezioniDelTurno, attese: attesePrimaDelModello } = await FiloState.assemble({
     creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
@@ -730,6 +729,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
     onboardingRifatta: onbActive && onbBefore.rifatta === true,
+    memoriaNascosta,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
   // SPEC-CONTESTO § La compattazione: prima di ogni richiesta, anche a metà di un giro di strumenti. Oltre la soglia (o
@@ -878,7 +878,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (filo && filo.haDomanda && !internal) {
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
-      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta }) : '',
+      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta, memoriaNascosta: payloadBase.memoriaNascosta }) : '',
       ricordi, dopo: [origineImmagini, gettoniLetti, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;

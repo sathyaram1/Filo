@@ -45,6 +45,7 @@
     TOGLI_CHAT: ['Tolta una conversazione', (k) => `Tolte ${n(k)} conversazioni`, 'conversazione'],
     RIMETTI_CHAT: ['Rimessa una conversazione', (k) => `Rimesse ${n(k)} conversazioni`, 'conversazione'],
     CORREGGI_MEMORIA: ['Corretta una cosa', (k) => `Corrette ${n(k)} cose`, 'memoria'],
+    LEGGI_MEMORIA: ['Riletta la memoria', (k) => `Riletta la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_MEMORIA: ['Cancellata la memoria', (k) => `Cancellata la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_PAGINE: ['Cancellate pagine visitate', (k) => `Cancellate pagine visitate ${n(k)} volte`, 'pagine visitate'],
     IMPOSTA_PREFERENZA: ['Cambiata un\'impostazione', (k) => `Cambiate ${n(k)} impostazioni`, 'impostazione'],

@@ -49,6 +49,7 @@
     ELIMINA_FILE: 'trash',
     RIMETTI_CHAT: 'restore',
     CORREGGI_MEMORIA: 'pencil',
+    LEGGI_MEMORIA: 'readDocument',
     CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',

@@ -282,19 +282,22 @@ test('a voce, una cosa che la memoria non ha: nessun popup, e modello e diario l
   await restore(app);
 });
 
-test('da un sito visitato «dimentica» non parte e non mostra righe della memoria', async ({ app, shell }) => {
+test('da un sito visitato «dimentica» non parte e non mostra righe della memoria, e la memoria non si rilegge', async ({ app, shell }) => {
   void shell;
   const out = await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta', PREFERENZE: '' });
     const MSG = globalThis.SN_MSG.MSG;
     const sito = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
     const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, action: { type: 'DIMENTICA', testo: 'Marta' } }, sito);
-    return { r, dopo: (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO };
+    const leggi = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, action: { type: 'LEGGI_MEMORIA' } }, sito);
+    return { r, leggi, dopo: (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO };
   });
   expect(out.r.executed).toBeFalsy();
   expect(out.r.needsConfirm).toBeFalsy();
   expect(JSON.stringify(out.r)).not.toContain('Si chiama Marta');
   expect(out.dopo).toBe('Si chiama Marta');
+  expect(out.leggi.executed).toBeFalsy();
+  expect(JSON.stringify(out.leggi)).not.toContain('Marta');
 });
 
 // Unicode ha caratteri che a schermo non si disegnano e che il modello legge

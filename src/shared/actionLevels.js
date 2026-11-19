@@ -915,6 +915,13 @@
       campo: null,
       describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
+    LEGGI_MEMORIA: {
+      // #2536.1 — la stessa memoria che la chat ha di solito nel CONTESTO: sola lettura, niente esce.
+      costo: 0,
+      campo: null,
+      describe: () => 'Rileggere la memoria',
+      describeDone: () => 'Riletta la memoria',
+    },
     EVENTO_CALENDARIO: {
       costo: 1,
       campo: null,
@@ -1733,7 +1740,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
+    'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 

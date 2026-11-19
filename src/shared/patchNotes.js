@@ -26,6 +26,7 @@
         { testo: 'Il modello che Filo propone per una funzione, il carattere che propone per l\'interfaccia e il nome di un file o di una cartella che un sito vuole modificare stanno nel loro riquadro anche quando la domanda chiede l\'OK: un testo che finge un avviso di Filo non si confonde più con le sue parole.', segnalazione: 592 },
         { testo: 'A schermo intero la domanda se scaricare un programma o se dare un permesso a un sito compare subito sopra la pagina, senza dover portare il puntatore in alto; risposto, torni a tutto schermo.', segnalazione: 2595 },
         { testo: 'Con i modelli Claude le richieste della chat restano sotto i 100.000 token anche quando la compattazione non riesce o l\'hai spostata oltre il tetto: il tetto conta anche istruzioni, strumenti e memoria.', segnalazione: 2473 },
+        { testo: 'Mentre rifai l\'intervista di benvenuto puoi chiedere a Filo cosa ricorda di te, e togliere o correggere una cosa dalla memoria.', segnalazione: 2536 },
       ],
     },
     {

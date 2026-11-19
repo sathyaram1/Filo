@@ -619,11 +619,16 @@ async function lessonsBufferText() {
   return buf.map((l) => `- ${l.text}`).join('\n');
 }
 
-// Il contesto dell'utente che «Valuta» porta all'Aiuto (#1449): la stessa memoria della chat. Senza, il parere parte lo stesso.
+// La memoria come la vede il modello della chat: la usano il CONTESTO, memoria(leggi) (#2536.1) e «Valuta» (#1449).
+async function memoriaPerModello() {
+  const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
+  return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+}
+
+// Senza memoria il parere di «Valuta» parte lo stesso.
 async function memoriaPerValuta() {
   try {
-    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
-    return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+    return await memoriaPerModello();
   } catch (e) {
     console.warn('[Filo] memoria per «Valuta»:', e?.message || e);
     return {};
@@ -814,6 +819,7 @@ module.exports = {
   handleStream,
   extractJson,
   lessonsBufferText,
+  memoriaPerModello,
   lezioniAutomaticheConsentite,
   maybeRunLessonAgent,
   maybeRunCompactor,
