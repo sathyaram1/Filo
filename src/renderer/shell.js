@@ -1477,7 +1477,10 @@
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
     else close.textContent = '×';
-    el.append(ico, title, close);
+    const cima = document.createElement('span');
+    cima.className = 'tab-cima';
+    cima.setAttribute('aria-hidden', 'true');
+    el.append(ico, title, close, cima);
     el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
     return el;
   }
