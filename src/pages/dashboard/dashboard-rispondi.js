@@ -103,8 +103,12 @@
     return { testo, prima: prima.toString() };
   }
   // Il passo selezionato misurato sullo scritto del messaggio; `null` se la selezione è il messaggio intero o non c'è.
+  let fissata = null;
+  const FISSATA_MS = 60_000;
   function passoSelezionato(el, scrittoDelMessaggio) {
-    const sel = selezioneIn(el);
+    const f = fissata && fissata.bolla === el && Date.now() - fissata.quando < FISSATA_MS ? fissata.sel : null;
+    fissata = null;
+    const sel = selezioneIn(el) || f;
     const Ra = R();
     if (!sel || !Ra || !scrittoDelMessaggio) return null;
     const t = Ra.trovaPasso(scrittoDelMessaggio, sel.testo, Ra.lettere(sel.prima));
