@@ -94,6 +94,15 @@ test('il nome dato dal modello vale solo se è il nome del sito, non se il sito 
   assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Facebook"}', 'facebook-video-login.net').nome, 'facebook-video-login.net');
   assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "BBC"}', 'bbc.co.uk').nome, 'BBC');
   assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Sound Cloud"}', 'soundcloud.com').nome, 'Sound Cloud');
+  assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Ko-fi"}', 'ko-fi.com').nome, 'Ko-fi');
+});
+
+// #592.21 — Il nome sta nel titolo e nel testo della domanda, fra le parole di Filo: con le lettere del sito ma
+// punteggiatura e a capo liberi chiudeva le virgolette, e un altro alfabeto ci scriveva una frase intera.
+test('il nome del modello non porta virgolette, a capo o lettere di altri alfabeti nella domanda di Filo', () => {
+  for (const servizio of ['Sound»\n\n«Cloud', 'Sound" "Cloud', 'SoundCloud Подтвердите это', 'Sound,  Cloud', 'Sound\nCloud', 'SoundCloud: ok']) {
+    assert.equal(R.leggiRisposta(JSON.stringify({ rotto: true, servizio: servizio }), 'soundcloud.com').nome, 'soundcloud.com', servizio);
+  }
 });
 
 test('un contenuto che non c\'è più non si propone a regole, di nessun servizio: decide il modello', () => {
