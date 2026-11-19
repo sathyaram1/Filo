@@ -25,6 +25,12 @@ async function trascina(shell, url, { x, y, fasi = ['dragEnter', 'dragOver', 'dr
   await s.detach().catch(() => {});
 }
 
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3).
+const statoAiuto = (app, page) => neiRiquadri(app, page, () => ({
+  aperto: !!globalThis.SN_SIDEBAR?.isOpen?.(),
+  allegati: globalThis.__filoSidebarTest?.allegati?.() || [],
+}));
+
 const stato = (shell) => shell.evaluate(async () => {
   const snap = await window.filoShell.tabs.snapshot();
   return { attiva: snap.activeId, schede: snap.tabs.map((t) => ({ id: t.id, url: t.url })) };
