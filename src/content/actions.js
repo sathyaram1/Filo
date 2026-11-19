@@ -341,13 +341,12 @@
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
-      el.value = el.value.slice(0, start) + text + el.value.slice(end);
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      scriviNellaCasella(el, { start, end }, text, 'insertFromPaste');
       const caret = start + text.length;
-      el.setSelectionRange(caret, caret);
+      try { el.setSelectionRange(caret, caret); } catch (_) {}
       ctx.start = caret;
       ctx.end = caret;
-      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
-      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // La selezione va ripristinata PRIMA di inserire: il click sul bottone sposta il fuoco,
