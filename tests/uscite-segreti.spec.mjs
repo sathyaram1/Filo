@@ -311,12 +311,12 @@ test('la password che l’assistente propone e l’utente accetta nel campo non 
       ['', JSON.stringify({ text: 'Ti propongo questa.', status: 'done', highlight: { selector: '#p', action: 'fill', value: proposta, note: 'Password nuova' } })],
     ],
   });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'scegli tu una password');
-  await page.locator('.sn-highlight-accept').click({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'scegli tu una password');
+  await aiuto.locator('.sn-highlight-accept').click({ timeout: 20_000 });
   await expect(page.locator('#p')).toHaveValue(proposta);
-  await scriviAllAiuto(page, 'e adesso?');
-  await expect(page.locator('.sn-sidebar').getByText('Premi Entra.')).toBeVisible({ timeout: 20_000 });
+  await scriviAllAiuto(aiuto, 'e adesso?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Premi Entra.')).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('731954');
   const dopo = await lettiDopoUnRiavvio(app);
   expect(dopo).toContain('731954');
