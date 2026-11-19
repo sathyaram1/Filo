@@ -361,6 +361,17 @@
       description: 'risultati con titolo, indirizzo e un pezzo di testo.',
       properties: { query: S() }, required: ['query'],
     },
+    // ── immagini (#2272) ──
+    IMMAGINI_WEB: {
+      via: ['immagini', 'cerca'], risultato: true,
+      description: 'foto dal web su un soggetto, da mostrare nella risposta.',
+      properties: { query: S() }, required: ['query'],
+    },
+    GENERA_IMMAGINE: {
+      via: ['immagini', 'crea'], risultato: true,
+      description: 'disegna un\'immagine nuova da una descrizione dettagliata, solo se l\'utente chiede di crearla.',
+      properties: { descrizione: S() }, required: ['descrizione'],
+    },
     LEGGI_PAGINA: {
       via: ['web', 'leggi'], risultato: true,
       description: 'il testo di una pagina (url, o scheda aperta per numero), anche le parti chiuse; da: il seguito.',
