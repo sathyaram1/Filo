@@ -121,6 +121,39 @@ test('riquadro: una foto grande incollata entra anche lei', async ({ app, shell 
   expect(m.size).toBeLessThanOrEqual(TETTO);
 });
 
+// Una GIF di due fotogrammi gonfiata oltre il tetto da un commento: animata e valida, come una registrazione dello schermo.
+function gifAnimataGrande() {
+  const fotogramma = [0x21, 0xf9, 0x04, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00];
+  const blocchi = Math.ceil((TETTO + 64 * 1024) / 255);
+  const commento = Buffer.alloc(2 + blocchi * 256 + 1, 0x41);
+  commento[0] = 0x21; commento[1] = 0xfe;
+  for (let k = 0; k < blocchi; k++) commento[2 + k * 256] = 255;
+  commento[commento.length - 1] = 0;
+  return Buffer.concat([
+    Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 0, 1, 0, 0x80, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff]),
+    commento, Buffer.from(fotogramma), Buffer.from(fotogramma), Buffer.from([0x3b]),
+  ]);
+}
+
+test('riquadro: una GIF animata oltre i 4 MB entra ferma, e il riquadro lo dice', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  const gif = gifAnimataGrande();
+  expect(gif.length).toBeGreaterThan(TETTO);
+  await page.evaluate((b64) => {
+    const bin = atob(b64);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    window.__gif = new Blob([u], { type: 'image/gif' });
+  }, gif.toString('base64'));
+  await rilascia(page, '__gif', 'difetto.gif', 'image/gif');
+  await expect(page.locator('.sn-fb-thumb img')).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.locator('.sn-fb-status')).toContainText('«difetto.gif» entrata ferma');
+});
+
 test('Gestione: una foto oltre i 4 MB allegata a una risposta sale rimpicciolita', async ({ openTab }) => {
   test.setTimeout(90_000);
   const page = await openTab('filo://manage/manage.html');
