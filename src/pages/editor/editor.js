@@ -2039,9 +2039,16 @@
   // perde l'elenco: quando il paragrafo non ha altro, l'elenco prende il suo posto (#2279).
   function apriElenco(cmd) {
     const sel = window.getSelection();
-    let block = sel.anchorNode;
-    while (block && block !== docEl && !/^(P|DIV)$/.test(block.tagName || '')) block = block.parentNode;
-    if (!block || block === docEl || block.parentNode !== docEl) { exec(cmd); return; }
+    const bloccoAlCursore = () => {
+      let b = sel.anchorNode;
+      while (b && b !== docEl && !/^(P|DIV)$/.test(b.tagName || '')) b = b.parentNode;
+      return b && b !== docEl && b.parentNode === docEl ? b : null;
+    };
+    let block = bloccoAlCursore();
+    if (!block) { exec(cmd); return; }
+    // Su un <div> (quello che apre Invio) l'elenco incollato resterebbe dentro il div.
+    if (block.tagName === 'DIV') { document.execCommand('formatBlock', false, 'P'); block = bloccoAlCursore(); }
+    if (!block) { exec(cmd); return; }
     const tag = cmd === 'insertOrderedList' ? 'ol' : 'ul';
     const r = document.createRange();
     r.selectNode(block);
