@@ -805,12 +805,7 @@ test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni
 });
 
 test('emit: un ruolo che col payload già fuori passa ancora la soglia esce intero nel suo file, e la consegna dopo lo cancella', () => {
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'verifier.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
+  ruoliVeri(['verifier.md']);
   const stampa = (bucket, ctx) => {
     let out = '';
     const real = process.stdout.write;
