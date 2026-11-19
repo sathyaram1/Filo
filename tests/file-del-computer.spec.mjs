@@ -80,6 +80,16 @@ test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda 
   // Un collegamento a un'altra pagina della stessa cartella si segue.
   await pagina.locator('#due').click();
   await expect(pagina).toHaveTitle('Seconda pagina', { timeout: 8000 });
+
+  // Chiusa la scheda, il collegamento in chat la riapre col clic dell'utente.
+  await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(id), id);
+  await expect.poll(() => schedeFile(app)).toBe(0);
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((t) => String(t.url).startsWith('filo://newtab')).id);
+  });
+  await page.getByRole('link', { name: '↗' }).last().click();
+  await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
   await ripristina(app);
 });
 
