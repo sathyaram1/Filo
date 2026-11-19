@@ -38,7 +38,7 @@
     const H = carteHome();
     if (!H) return [];
     return [...H.CARTE, ...H.APP]
-      .filter((c) => c.url && c.id !== 'rapide' && c.id !== 'bacheca')
+      .filter((c) => c.url && !FUORI.has(c.id))
       .map((c) => ({ id: `app:${c.id}`, lettera: '', titolo: c.titolo, nomi: [String(c.titolo).toLowerCase(), ...(c.nomi || [])], url: c.url }));
   }
   const catalogo = () => [...AZIONI, ...app()];
