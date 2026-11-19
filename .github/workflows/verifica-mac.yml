@@ -47,6 +47,8 @@ on:
       # arrivano solo le modifiche vere alla ricetta o alle dipendenze, che
       # sono esattamente quelle che possono rompere la costruzione su Mac.
       - 'package.json'
+      # Il Node che costruisce il pacchetto.
+      - '.node-version'
       # Il preload delle pagine web che il pacchetto si porta dentro, e chi lo scrive.
       - 'src/main/preloadPacchetto.js'
 
