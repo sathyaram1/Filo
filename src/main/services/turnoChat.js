@@ -729,6 +729,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
     onboardingRifatta: onbActive && onbBefore.rifatta === true,
+    memoriaNascosta,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
   // SPEC-CONTESTO § La compattazione: prima di ogni richiesta, anche a metà di un giro di strumenti. Oltre la soglia (o
