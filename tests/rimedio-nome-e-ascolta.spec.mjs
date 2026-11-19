@@ -130,25 +130,27 @@ test('file trovato in chat nella home, coi crediti finiti: «Dai un nome sensato
   }
 });
 
-test('nome automatico coi crediti finiti: l’avviso «Nessun nome dato» porta «Apri Crediti»', async ({ app, shell, openTab, testServer, avvisi }) => {
-  test.setTimeout(120_000);
-  await creditiFiniti(app);
-  const pref = await openTab('filo://preferences/preferences.html');
-  await pref.locator('#nomiSensatiScaricamenti').check();
-  await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
-  const chiudi = await scarica('scan_00612.pdf', { shell, openTab, testServer });
-  try {
-    const vista = await avvisi();
-    const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato' }).last();
-    await expect(carta).toBeVisible({ timeout: 20000 });
-    await expect(carta).toContainText('crediti');
-    const tasto = carta.locator('.shell-notif-action', { hasText: 'Apri Crediti' });
-    await expect(tasto).toBeVisible();
-    await carta.screenshot({ path: join(SHOTS, '1344-2-nome-automatico.png') });
-    await tasto.click();
-    await siApre(app, 'filo://credits');
-  } finally { await chiudi(); }
-});
+for (const caso of ['senza invito', 'crediti finiti']) {
+  test(`nome automatico ${caso}: l’avviso «Nessun nome dato» porta «Apri Crediti»`, async ({ app, shell, openTab, testServer, avvisi }) => {
+    test.setTimeout(120_000);
+    if (caso === 'senza invito') await senzaChiave(app); else await creditiFiniti(app);
+    const pref = await openTab('filo://preferences/preferences.html');
+    await pref.locator('#nomiSensatiScaricamenti').check();
+    await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
+    const chiudi = await scarica('scan_00612.pdf', { shell, openTab, testServer });
+    try {
+      const vista = await avvisi();
+      const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato' }).last();
+      await expect(carta).toBeVisible({ timeout: 20000 });
+      await expect(carta).toContainText(caso === 'senza invito' ? 'invito' : 'crediti');
+      const tasto = carta.locator('.shell-notif-action', { hasText: 'Apri Crediti' });
+      await expect(tasto).toBeVisible();
+      await carta.screenshot({ path: join(SHOTS, `1344-2-nome-automatico-${caso.replace(' ', '-')}.png`) });
+      await tasto.click();
+      await siApre(app, 'filo://credits');
+    } finally { await chiudi(); }
+  });
+}
 
 for (const caso of ['senza invito', 'crediti finiti']) {
   test(`Preferenze, «Ascolta» ${caso}: la frase leggibile e «Apri Crediti» che porta lì`, async ({ app, openTab }) => {
