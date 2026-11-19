@@ -35,6 +35,7 @@ test('modifica in linea che si chiude all\'uscita: si continua a scrivere lì', 
   await page.keyboard.type('Primo pezzo ');
   await expect.poll(() => page.locator('#nota').inputValue().catch(() => ''), { timeout: 10000 }).toBe('testo che torna');
   await page.keyboard.type('secondo pezzo');
+  console.log('DOVE', await page.evaluate(() => [document.activeElement?.id || document.activeElement?.tagName, document.getElementById('nota').value, document.getElementById('titolo')?.textContent, document.getElementById('uscite').textContent]));
   await expect.poll(() => page.locator('#ed').innerText().catch(() => 'editore chiuso')).toBe('Primo pezzo secondo pezzo');
   expect(await page.locator('#uscite').innerText()).toBe('0');
 });
