@@ -27,13 +27,14 @@ test('in incognito l\'icona della pagina arriva dalla sessione della scheda, mai
   }), { timeout: 15000 }).toBe(1);
 
   // Un sito https servito dentro ciascuna sessione: chi chiede cosa, e da dove, resta registrato.
-  await app.evaluate(({ BrowserWindow, session, net }, png) => {
+  await chiudiLaRete(app);
+  await app.evaluate(({ BrowserWindow, session }, png) => {
     const incognito = session.fromPartition(BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.partition);
     const richieste = { incognito: [], normale: [] };
     globalThis.__richiesteIcona = richieste;
     const sito = (dove) => (req) => {
       const u = new URL(req.url);
-      if (u.hostname !== 'icona.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname !== 'icona.test') return globalThis.__reteChiusa.resto(req);
       richieste[dove].push(u.pathname);
       if (u.pathname === '/icona.png') return new Response(Buffer.from(png, 'base64'), { headers: { 'content-type': 'image/png' } });
       return new Response('<!doctype html><html><head><meta charset="utf-8"><title>Riservata</title>'
