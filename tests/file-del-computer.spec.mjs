@@ -78,6 +78,11 @@ test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda 
   await page.screenshot({ path: join(SHOTS, 'file-del-computer-chat.png') });
   await shell.screenshot({ path: join(SHOTS, 'file-del-computer-shell.png') });
 
+  // Il tasto destro di Filo c'è anche sulla pagina locale.
+  await pagina.locator('#t').click({ button: 'right' });
+  await expect(menuDi(pagina).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
+  await pagina.keyboard.press('Escape');
+
   // Un collegamento a un'altra pagina della stessa cartella si segue.
   await pagina.locator('#due').click();
   await expect(pagina).toHaveTitle('Seconda pagina', { timeout: 8000 });
