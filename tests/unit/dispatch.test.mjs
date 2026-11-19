@@ -1410,33 +1410,29 @@ test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
 });
 
 test('emit secaudit di un lavoro server: anche il diff del server, intero in un file fuori dal repo, e niente del feedback (#1222)', () => {
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
   const diffServer = `diff --git a/functions/index.js b/functions/index.js\n${'+una riga del server\n'.repeat(3000)}`;
   const busta = { payload: { role: 'secaudit', branch: 'worker/s', diffServer: { diff: diffServer, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) }, feedback: { text: 'SEGRETO' } } };
   const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
-  let out = '';
-  const real = process.stdout.write;
-  process.stdout.write = (s) => { out += s; return true; };
-  try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
-  const j = JSON.parse(out);
-  // Su Windows i percorsi più lunghi possono portare la stampa oltre la soglia: il ruolo allora esce nel suo file.
-  const ruolo = j.istruzioniFile ? readFileSync(j.istruzioniFile, 'utf8') : j.instructions;
-  assert.match(ruolo, /diffServerFile/, 'il testo del ruolo dice del diff del server');
-  assert.match(ruolo.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
-  assert.equal(j.payload.diffServer, undefined);
-  assert.ok(isAbsolute(j.payload.diffServerFile));
-  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  assert.ok(fuoriDa(repo, j.payload.diffServerFile), 'il file sta fuori dal repo');
-  assert.equal(readFileSync(j.payload.diffServerFile, 'utf8'), diffServer, 'il file contiene tutto il diff del server');
-  assert.equal(j.payload.diffServerHead, 'a'.repeat(40));
-  assert.deepEqual(j.payload.diffServerBase, { ref: 'main di filo-security', sha: '1'.repeat(40) });
-  assert.ok(j.payload.diffFile, 'il diff dell’app resta');
-  assert.ok(!out.includes('SEGRETO'), 'del feedback niente');
+  colContrattoVeroEGonfio(['secaudit.md'], (gonfia) => {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+    const j = JSON.parse(out);
+    if (gonfia) assert.ok(j.istruzioniFile, 'col contratto gonfio il ruolo esce nel suo file');
+    const ruolo = ruoloConsegnato(j);
+    assert.match(ruolo, /diffServerFile/, 'il testo del ruolo dice del diff del server');
+    assert.match(ruolo.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
+    assert.equal(j.payload.diffServer, undefined);
+    assert.ok(isAbsolute(j.payload.diffServerFile));
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    assert.ok(fuoriDa(repo, j.payload.diffServerFile), 'il file sta fuori dal repo');
+    assert.equal(readFileSync(j.payload.diffServerFile, 'utf8'), diffServer, 'il file contiene tutto il diff del server');
+    assert.equal(j.payload.diffServerHead, 'a'.repeat(40));
+    assert.deepEqual(j.payload.diffServerBase, { ref: 'main di filo-security', sha: '1'.repeat(40) });
+    assert.ok(j.payload.diffFile, 'il diff dell’app resta');
+    assert.ok(!out.includes('SEGRETO'), 'del feedback niente');
+  });
   // Un lavoro dell'app non porta niente del server.
   const app = buildPayload(bucket, serverCtx(bucket, { payload: {} }, 'DIFF'));
   assert.equal(app.diffServer, undefined);
