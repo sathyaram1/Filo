@@ -49,7 +49,7 @@ function foglie(o, base = '', out = []) {
 }
 const CAMPIONI = ['scuro', 'grande', 'sì', 'no', '12', '0,5', '1', 'privacy', 'automatico', 'off', 'openrouter',
   'sk-or-v1-abcdefgh1234', '20 euro', 'più vivaci', 'delicata', 'media', 'powershell', 'Rispondi breve.', 'automatica',
-  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek', 'tutto', 'sanità', 'y youtube.com'];
+  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek', 'tutto', 'sanità', 'y youtube.com', 'e editor'];
 function percorsiScrittiDa(setter) {
   const out = new Set();
   for (const v of CAMPIONI) {
