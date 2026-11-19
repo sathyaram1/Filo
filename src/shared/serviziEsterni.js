@@ -203,7 +203,7 @@
       occasione: 'quando la chat cerca immagini: Filo scarica una volta quelle che mostra, ne tiene una copia e la pagina mostra la copia',
       riceve: 'la richiesta dell’immagine, senza cookie',
       frase: 'Il sito di un\'immagine trovata dalla chat',
-      dove: ['src/main/services/immaginiDelleRisposte.js'],
+      dove: ['src/main/services/immaginiDelleRisposte.js'], prova: 'scaricaByte(v.immagine',
     },
     {
       id: 'fonti-segnaposti', nome: 'Wikipedia e Wikidata, per i segnaposti del correttore',
