@@ -12,6 +12,7 @@
       version: '0.2.294', date: '2026-11-19',
       features: [
         { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
+        { testo: 'Premi due volte Ctrl (Cmd su Mac) e poi una lettera, e Filo la fa subito, da qualunque pagina: C cerca nel filo, D cambia tema, Z riapre la scheda chiusa, L legge ad alta voce, M toglie l\'audio, B blocca il computer e altre. Se non ricordi la lettera, dopo un attimo compare l\'elenco, e lì le cambi o ne dai una alle app. Si spegne e si rallenta in Preferenze → «Lettere di Filo».', segnalazione: 2377 },
       ],
       fixes: [
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
