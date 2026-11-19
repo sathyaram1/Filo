@@ -164,6 +164,7 @@ const CONTENT_DIR = path.join(__dirname, '..', 'content');
 function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo riquadri] constants.js', e); }
   try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo riquadri] immaginiChat.js', e); }
+  try { require(path.join(SHARED_DIR, 'allegatiSegnalazione.js')); } catch (e) { console.error('[Filo riquadri] allegatiSegnalazione.js', e); }
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo riquadri] contenutoEsterno.js', e); }
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo riquadri] filoUi.js', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo riquadri] i18n.js', e); }
