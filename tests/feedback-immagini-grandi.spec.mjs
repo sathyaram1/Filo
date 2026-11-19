@@ -101,16 +101,13 @@ test('riquadro: una foto grande incollata entra anche lei', async ({ app, shell 
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await expect(page.locator('.sn-fb-modal')).toBeVisible();
   await preparaFoto(page);
-  // L'incolla vero vuole isTrusted: si passa dalla stessa strada del tasto destro «Incolla immagine».
+  // L'incolla da tastiera vuole isTrusted: si passa dalla strada del tasto destro «Incolla immagine», segnata come nostra.
   await page.evaluate(() => {
-    const modal = document.querySelector('.sn-fb-modal');
     const ev = new CustomEvent('filo:paste-image', { bubbles: true, cancelable: true, detail: { blob: window.__foto } });
-    modal.dispatchEvent(ev);
+    document.querySelector('.sn-fb-modal').dispatchEvent(window.SN_FILO_UI.nostro(ev));
   });
   const miniature = page.locator('.sn-fb-thumb img');
-  const entrata = await miniature.count().then(() => miniature.first().waitFor({ timeout: 20_000 }).then(() => true, () => false));
-  test.skip(!entrata && !(await page.evaluate(() => !!window.SN_FILO_UI?.veroONostro)), 'evento del tasto destro non riproducibile qui');
-  await expect(miniature).toHaveCount(1);
+  await expect(miniature).toHaveCount(1, { timeout: 20_000 });
   expect(byteDelData(await miniature.first().getAttribute('src'))).toBeLessThanOrEqual(TETTO);
 });
 
