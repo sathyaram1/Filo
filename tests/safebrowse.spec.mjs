@@ -458,7 +458,8 @@ test('Safe Browsing: una pagina in lista mostra l\'avviso, e a Google arrivano s
 // Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
 // tiene aperto lo script finché la prova non lo chiude, e la scheda si apre senza aspettare il DOMContentLoaded.
 async function serviInCaricamento(app, pagine, providers) {
-  await app.evaluate(async ({ session, net }, { pg, gsbListed, ospitate }) => {
+  await chiudiLaRete(app);
+  await app.evaluate(async ({ session }, { pg, gsbListed, ospitate }) => {
     globalThis.__sbLenti = [];
     const risposta = (req) => {
       const u = new URL(req.url);
