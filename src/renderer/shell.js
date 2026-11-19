@@ -906,6 +906,8 @@
     assesta(d, dx);
     // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
     if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
+    // Lasciata al suo posto è un clic con la mano che ha tremato oltre la soglia: la scheda si apre (#2382).
+    else if (d.id !== state.activeId) api.tabs.activate(d.id);
     // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
     try {
       Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
