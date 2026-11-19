@@ -434,7 +434,9 @@
       uscita: (a) => indirizzoDi(a),
       describe: (a) => {
         const url = indirizzoDi(a) || 'una pagina';
-        const file = a && typeof a._fileDelComputer === 'string' ? a._fileDelComputer : '';
+        const N0 = global.SN_URL_NAV;
+        const file = a && typeof a._fileDelComputer === 'string' && N0 && N0.fileDiQuestoComputer && N0.fileDiQuestoComputer(url)
+          ? a._fileDelComputer : '';
         if (file) {
           return a._fileNonScritto
             ? ['Aprire in una scheda il file del computer ', cit(file, true), '\n\nIl percorso non l\'hai scritto tu: apri solo se l\'hai chiesto tu.']
