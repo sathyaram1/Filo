@@ -31,7 +31,9 @@ test('r1 un indirizzo selezionato nel testo e lasciato sul centro di una scheda 
     const cb = w.getContentBounds();
     return { x: cb.x, y: cb.y, z: w.webContents.getZoomFactor() || 1 };
   });
+  await shell.evaluate(() => { window.__tipi = []; document.addEventListener('dragover', (e) => { window.__tipi = [...e.dataTransfer.types]; }, true); });
   Gesti.trascina(da, { x: Math.round(o.x + r.x * o.z), y: Math.round(o.y + r.y * o.z) });
+  console.log('TIPI', JSON.stringify(await shell.evaluate(() => window.__tipi)));
   await expect.poll(async () => (await snap(shell)).tabs.find((t) => t.id === bersaglio)?.url, { timeout: 8000 }).toBe(destinazione);
   expect((await snap(shell)).activeId).toBe(bersaglio);
 });
