@@ -101,7 +101,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, 
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
       chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
       allinea: () => {}, deployDaGitHub: () => daGitHub,
-      registraMain: async (x) => { registrati.push(x); return registro(x); }, mainPrima,
+      registraMain: async (x) => { registrati.push(x); return registro(x); }, mainPrima, stessoAlbero,
     });
     return { k, lanci, scritture, chiesti, alCancello, registrati, testo: righe.join('\n') };
   });
