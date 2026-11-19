@@ -80,7 +80,9 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
 
   // L'autorizzazione la tiene chi accende: quella che xvfb-run crea da sé, se sparisce prima di lui (la temporanea della
   // corsa se ne va all'uscita), gli fa saltare lo spegnimento di Xvfb.
-  const cartellaAuth = mkdtempSync(join(tmpdir(), 'filo-schermo-'));
+  // xvfb-run passa il cookie a Xvfb senza virgolette: con uno spazio nel percorso Xvfb non parte e il display risulta
+  // acceso lo stesso. Questo ramo è solo Linux, dove /tmp c'è sempre.
+  const cartellaAuth = mkdtempSync(join(/\s/.test(tmpdir()) ? '/tmp' : tmpdir(), 'filo-schermo-'));
   const auth = join(cartellaAuth, 'Xauthority');
   writeFileSync(auth, '', { mode: 0o600 });
   const togliAuth = () => { try { rmSync(cartellaAuth, { recursive: true, force: true }); } catch (_) {} };
