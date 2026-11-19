@@ -116,15 +116,17 @@
   }
 
   // Un messaggio del filo che non è una bolla della home (uno scambio di un'altra app, #2096): si cita col suo posto.
-  // `el`: dove sta a schermo, per citarne solo il passo selezionato.
-  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto: s = '', testo = '', el = null } = {}) {
-    if (!d || !String(testo || '').trim()) return false;
+  // `el`: dove sta a schermo, per citarne solo il passo selezionato (`sel`, quella di quando si è aperto il menu).
+  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto: s = '', testo = '', el = null, sel = null } = {}) {
+    const tutto = String(s || testo || '');
+    if (!d || !tutto.trim()) return false;
     const ruolo = role === 'user' ? 'user' : 'filo';
-    const tutto = s || testo;
-    const passo = el ? passoSelezionato(el, tutto) : null;
+    const passo = el ? passoSelezionato(el, tutto, sel) : null;
+    const Md = global.SN_MARKDOWN;
+    const intero = s ? (ruolo === 'filo' && Md && Md.testo ? Md.testo(s) : s).trim() : String(testo).trim();
     return aggiungi({
       bolla: null, chat, i: Number.isInteger(i) ? i : null, ts, role: ruolo, scritto: tutto,
-      testo: passo ? testoDelPasso(tutto.slice(passo.da, passo.a), ruolo) : String(testo).trim(),
+      testo: passo ? testoDelPasso(tutto.slice(passo.da, passo.a), ruolo) : intero,
       ...(passo ? { passo: true, da: passo.da, a: passo.a } : {}),
     });
   }
