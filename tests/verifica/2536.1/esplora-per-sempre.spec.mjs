@@ -16,6 +16,7 @@ for (let i = 1; i <= 6; i++) {
       const orig = P.streamCompleteWithFallback;
       P.streamCompleteWithFallback = async (o) => { const r = await orig(o); for (const t of (r && r.toolCalls) || []) globalThis.__tc.push(t.arguments); return r; };
     }, process.env.OPENROUTER_API_KEY);
+    await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://newtab')).length, { timeout: 15_000 }).toBeGreaterThan(0);
     const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
     await home.reload();
     await home.waitForLoadState('domcontentloaded');
