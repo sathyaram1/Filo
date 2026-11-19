@@ -1697,6 +1697,11 @@
       // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
       // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
       let label = String(a.label || a.etichetta || '').trim();
+      // Un file del computer (#1905) si chiama col suo nome; il link nudo lo rifiuterebbe Chromium, lo riapre il main.
+      const file = window.SN_URL_NAV && window.SN_URL_NAV.fileDiQuestoComputer ? window.SN_URL_NAV.fileDiQuestoComputer(a.url) : '';
+      if (!label && file) {
+        try { label = decodeURIComponent(new URL(file).pathname.split('/').pop()); } catch (_) { label = 'file'; }
+      }
       if (!label) {
         try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
       }
