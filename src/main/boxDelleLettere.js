@@ -245,6 +245,7 @@ const SCRIPT = `(() => {
   if (!api) return;
   api.onVoci((d) => {
     giro = (d && Number(d.n)) || 0;
+    sotto = null;
     document.documentElement.classList.toggle('scuro', !!(d && d.scuro));
     for (const [k, v] of Object.entries((d && d.vars) || {})) {
       if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) document.documentElement.style.setProperty(k, String(v));
