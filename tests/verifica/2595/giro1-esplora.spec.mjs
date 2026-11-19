@@ -183,6 +183,43 @@ test('la domanda di un permesso a schermo intero si vede, e risposta la pagina r
   }
 });
 
+test('dopo una domanda a schermo intero, il puntatore sulla parte alta di un riquadro di un altro sito non fa scendere le schede', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dentro = testServer.html('<!doctype html><html><body style="margin:0;background:#cde;height:100vh">Riquadro</body></html>', { pubblico: true });
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif;height:1400px">
+      <a id="exe" href="${srv.base}/setup.exe" style="display:block;height:30px">Scarica il programma</a>
+      <iframe id="emb" src="${dentro}" style="display:block;width:600px;height:300px;border:0;margin:20px 0 0 100px"></iframe></body></html>`);
+    await expect.poll(() => page.frames().length).toBeGreaterThan(1);
+    await schermoIntero(app, true);
+    await expect.poll(async () => (await stato(app)).alto).toBe(0);
+    await page.mouse.move(50, 600);
+    await page.locator('#exe').click();
+    const riga = shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: 'setup.exe' });
+    await expect(riga).toBeVisible({ timeout: 20000 });
+    await expect.poll(async () => (await stato(app)).alto).toBeGreaterThan(0);
+    const alto = (await stato(app)).alto;
+    // Il puntatore passa sul riquadro mentre la domanda aspetta.
+    await page.mouse.move(300, 250, { steps: 4 });
+    await new Promise((r) => setTimeout(r, 800));
+    await page.mouse.move(310, 260, { steps: 2 });
+    await new Promise((r) => setTimeout(r, 800));
+    await shell.locator('#dl-panel #dl-panel-close').click();
+    await expect.poll(async () => (await stato(app)).alto).toBe(0);
+    // Ora il riquadro comincia a 50 px dall'alto: il puntatore a metà della sua parte alta, lontano dal bordo.
+    const box = await page.locator('#emb').boundingBox();
+    const y = Math.round(box.y + Math.min(80, alto / 2));
+    await page.mouse.move(300, y + 40, { steps: 3 });
+    await page.mouse.move(300, y, { steps: 3 });
+    await new Promise((r) => setTimeout(r, 1500));
+    console.log('RIQUADRO', JSON.stringify({ alto, box, y, st: await stato(app) }));
+    expect((await stato(app)).visibili, 'a metà di un riquadro, lontano dal bordo, le schede non scendono').toBe(false);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('permesso in sospeso su una scheda: a schermo intero passare a un altra scheda fa risalire, tornare la riabbassa', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
