@@ -1365,6 +1365,13 @@
       if (!d || !menu) return;
       e.preventDefault();
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
+      // Su un «da fare» l'azione principale è il suo pulsante, «Fatto» (#2229.1): le stesse voci del dettaglio.
+      if (d.stato === 'aperta' && D.daFare(d) && !inCorso.has(d.id)) {
+        (d.opzioni || []).forEach((o, i) => {
+          const nome = D.etichettaOpzione(d, i, stato.riferimenti);
+          if (nome) voci.push({ testo: nome, azione: () => { apri([d.id]); disegna(); rispondi(d.id, i); } });
+        });
+      }
       const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
       if (d.stato !== 'in_smistamento') voci.push({ testo: voceDiscuti(d.id), titolo: titoloDiscuti(d.id), azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
