@@ -8,7 +8,9 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { accendiSchermo, preparaLancioElectron, senzaSchermo, xvfbDisponibile } from '../../scripts/lib/schermo-virtuale.mjs';
+import {
+  accendiSchermi, accendiSchermo, preparaLancioElectron, SCHERMI_LAVORATORI, senzaSchermo, usaSchermoDelLavoratore, xvfbDisponibile,
+} from '../../scripts/lib/schermo-virtuale.mjs';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { aspettaChe, TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { shaDelRiallineamento, cambiatiPerLaScelta } from '../../scripts/finish-local.mjs';
