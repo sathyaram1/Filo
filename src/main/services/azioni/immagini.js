@@ -1,7 +1,7 @@
 // Le azioni di Filo sulle immagini delle risposte (#2272): trovarle sul web e crearle con un modello.
-// Esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta; il lavoro vero sta in ../immaginiChat.js.
+// Esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta; il lavoro vero sta in ../immaginiDelleRisposte.js.
 
-const ImmaginiChat = require('../immaginiChat');
+const ImmaginiChat = require('../immaginiDelleRisposte');
 const { getEffectiveSettings, Gate } = require('../impostazioniEffettive');
 
 const testoDi = (action, ...campi) => String(campi.map((c) => action[c]).find((v) => v != null && String(v).trim()) ?? '').trim();
