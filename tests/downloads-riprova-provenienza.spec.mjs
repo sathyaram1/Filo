@@ -104,10 +104,12 @@ test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pa
       primo = await voce(shell, (x) => x.url.endsWith('/foto-protetta.png'));
       return primo && primo.state;
     }, { timeout: 30000 }).toBe('interrupted');
+    expect(salvataggiCaduti).toBeGreaterThanOrEqual(1);
+    riprovando = true;
     const { riga } = await riprovaDallaPagina(openTab, 'foto-protetta.png');
     await expect(riga.locator('.dl-btn', { hasText: 'Apri file' })).toBeVisible({ timeout: 20000 });
     expect((await voce(shell, (x) => x.id === primo.id))?.state).toBe('completed');
-    expect(salvataggiCaduti).toBeGreaterThanOrEqual(1);
-    expect(visti[visti.length - 1].startsWith(testServer.origin)).toBe(true);
+    expect(visti.length).toBeGreaterThanOrEqual(1);
+    for (const ref of visti) expect(ref.startsWith(testServer.origin)).toBe(true);
   } finally { await img.close(); }
 });
