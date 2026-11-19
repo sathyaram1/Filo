@@ -558,6 +558,12 @@
         for (const r of results) if (r && r.url) linkNoti.add(chiaveLink(r.url));
         daFuori(results.filter(Boolean).map((r) => `${testo(r.title)}\n${testo(r.url)}\n${testo(r.snippet)}`).join('\n'),
           'dai risultati di una ricerca');
+      } else if (type === 'IMMAGINI_WEB') {
+        // #2272 — titoli e pagine delle immagini li scrive chi le pubblica, come i risultati di una ricerca.
+        const immagini = Array.isArray(out.immagini) ? out.immagini.filter(Boolean) : [];
+        if (immagini.length) nonFidato = true;
+        for (const i of immagini) if (i.pagina) linkNoti.add(chiaveLink(i.pagina));
+        daFuori(immagini.map((i) => `${testo(i.titolo)}\n${testo(i.pagina)}`).join('\n'), 'dai risultati di una ricerca di immagini');
       }
     }
     let letto = pezzi.filter(Boolean).join('\n');
