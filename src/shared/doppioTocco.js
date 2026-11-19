@@ -122,10 +122,10 @@
     const dove = m[2].trim().replace(/^(apre|apri|a|ad|per|su)\s+/i, '');
     const H = global.SN_CARTE_HOME;
     const id = H ? H.risolvi(dove, { esatto: true }) || H.risolvi(dove.replace(/^(la|il|lo|l')\s*/i, '').replace(/^(pagina|app)\s+(de(i|gli|ll[ae']?|l)\s*)?/i, ''), { esatto: true }) : null;
-    const bersaglio = id && tastiNoti().includes(id) ? { tasto: id } : { url: dove };
+    const bersaglio = prende(id) ? { tasto: id } : { url: dove };
     const r = assegna(cfg, l, bersaglio);
     if (r.rifiuto) return r;
-    return { lettere: r.lettere, label: `Doppio tocco: ${etichetta(r.lettere[r.lettere.length - 1])}` };
+    return { lettere: r.lettere, sostituita: r.sostituita, label: conPrima(`Doppio tocco: ${etichetta(r.lettere[r.lettere.length - 1])}`, r) };
   }
 
   // Il riconoscimento, una battuta alla volta. `b`: { key, repeat, mod (Ctrl/Alt/Cmd premuti), t (ms), vuoto (il campo
