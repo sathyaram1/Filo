@@ -85,7 +85,6 @@ test('stesso nome ma un altro file (dimensione diversa): non lo prende, e la voc
   const { rec, close } = await scarica('contratto.pdf', { shell, openTab, testServer });
   try {
     renameSync(rec.savePath, join(doc, 'altro.bin'));
-    const { writeFileSync } = await import('node:fs');
     writeFileSync(join(doc, 'Bollette', 'contratto.pdf'), 'un altro contratto');
     const res = await shell.evaluate((id) => window.filoShell.downloads.openFile(id), rec.id);
     expect(res).toMatchObject({ ok: false, missing: true });
