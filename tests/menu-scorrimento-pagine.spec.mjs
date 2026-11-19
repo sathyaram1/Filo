@@ -60,7 +60,7 @@ test('Scaricamenti: il menu di una voce', async ({ app, shell, openTab, testServ
     const page = await openTab('filo://downloads/downloads.html');
     const voce = page.locator('.dl-item[data-state="completed"]').first();
     await expect(voce).toBeVisible();
-    await scorriAlGesto(page, 'contextmenu');
+    await scorriAlGesto(page, 'contextmenu', voce);
     await voce.click({ button: 'right' });
     await restaPoiSiChiude(page, page.locator('.dl-ctxmenu'));
   } finally {
