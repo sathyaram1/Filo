@@ -1,6 +1,6 @@
 // Come si apre Electron su Linux senza schermo: `xvfb-run -a` davanti a un comando (`preparaLancioElectron`, gli
-// script) o acceso dentro un processo già partito (`accendiSchermo`, il globalSetup di Playwright, #739), con la sandbox
-// spenta; senza xvfb uno stop che dice cosa manca. Windows e Mac: invariato. Unit test: tests/unit/schermoVirtuale.test.mjs.
+// script) o acceso dentro un processo già partito (`accendiSchermi`, il globalSetup di Playwright, #739: uno per lavoratore,
+// #2133), con la sandbox spenta; senza xvfb uno stop che dice cosa manca. Windows e Mac: invariato. Prove: schermoVirtuale.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
