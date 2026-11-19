@@ -5,7 +5,7 @@
 // La dettatura usa un microfono finto (un oscillatore): il resto, dalla trascrizione all'avviso, è quello vero.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, clicca, scrivi, neiRiquadri } from './helpers/riquadri.mjs';
+import { statoDi, clicca, scrivi, neiRiquadri, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
@@ -211,8 +211,21 @@ test('«Trascrivi» una zona, senza invito: l’avviso porta ai Crediti', async 
   await page.mouse.move(500, 180, { steps: 5 });
   await page.mouse.up();
 
-  const tasto = page.locator('.sn-toast .sn-msg-rimedio');
+  // La lettura parte dal riquadro di Trascrivi, nello strato sopra la scheda (#2374): l'avviso resta lì, a vista.
+  const strato = await paginaDelloStrato(app, page);
+  const tasto = strato.locator('.sn-toast .sn-msg-rimedio');
   await expect(tasto).toHaveText('Apri Crediti', { timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
+  const visibile = () => app.evaluate(({ BrowserWindow }, u) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const tm = win._filoTabs;
+      const tab = (tm?.tabs || []).find((t) => { try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; } });
+      if (tab) return !!tm.riquadri?.stato(tab.view.webContents)?.visibile;
+    }
+    return false;
+  }, page.url());
+  await expect.poll(visibile, { timeout: 5_000 }).toBe(true);
+  await strato.screenshot({ path: `${SHOTS}/rimedio-trascrivi.png` }).catch(() => {});
   await tasto.click();
   await siApre(app, 'filo://credits');
 });
