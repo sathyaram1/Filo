@@ -135,14 +135,8 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
   const zip = join(cartellaTemporanea('filo-cancella-zip-'), 'prima.zip');
   let app = null;
   let shell = null;
+  let metro = null;
   try {
-    // Il metro: un Filo appena installato, lasciato posare.
-    ({ app, shell } = await avvia(vergine));
-    await expect(shell.locator('body')).toBeAttached();
-    await new Promise((r) => setTimeout(r, 1500));
-    const appenaInstallato = await chiaviPosate(app, vergine);
-    await chiudiApp(app);
-
     ({ app, shell } = await avvia(userData));
     await semina(app, shell);
     // Un'identità dei crediti finta: resta, perché la scelta non è spuntata.
