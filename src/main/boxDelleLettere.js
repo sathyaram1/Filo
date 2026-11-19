@@ -183,9 +183,14 @@ const SCRIPT = `(() => {
     r.forEach((b, k) => b.classList.toggle('attiva', k === i));
     if (i >= 0) r[i].focus();
   };
+  // In attesa della lettera nuova la riga dice cosa aspetta, al posto del suo nome.
   const inCambio = (id) => {
     cambia = id || '';
-    righe().forEach((r) => r.classList.toggle('cambio', r.dataset.id === cambia));
+    righe().forEach((r) => {
+      const si = r.dataset.id === cambia;
+      r.classList.toggle('cambio', si);
+      r.querySelector('.lbl').textContent = si ? (r.dataset.lettera ? 'Premi la lettera nuova, Canc la toglie' : 'Premi una lettera') : r.dataset.titolo;
+    });
   };
   document.addEventListener('click', (e) => {
     const t = e.target.closest && e.target.closest('.tasto');
