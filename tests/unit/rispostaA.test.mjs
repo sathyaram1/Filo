@@ -161,7 +161,7 @@ test('#2346: il modello legge citazione e commento nell\'ordine in cui l\'utente
   // Dallo storico del filo: la finestra del modello mette ogni passo prima del suo commento.
   const conPassi = chat('c-cena', [
     cena.messages[0], { ...cena.messages[1], text: SCRITTO },
-    { role: 'user', text: 'buona\nmeglio di no', ts: '2026-10-28T10:01:00.000Z', rispostaA: [{ chat: 'c-cena', i: 1, da: 32, a: 49 }, { chat: 'c-cena', i: 1, da: 53, a: 72, pos: 6 }] },
+    { role: 'user', text: 'buona\nmeglio di no', ts: '2026-10-28T10:01:00.000Z', rispostaA: [{ chat: 'c-cena', i: 1, da: 48, a: 65 }, { chat: 'c-cena', i: 1, da: 69, a: 88, pos: 6 }] },
   ]);
   const messaggi = conPassi.messages.map((m, i) => ({ ...m, chat: conPassi.id, actions: [], _i: i }));
   messaggi[2].rispostaA = R.risolviTutte(conPassi.messages[2].rispostaA, () => conPassi, { max: R.PER_IL_MODELLO });
