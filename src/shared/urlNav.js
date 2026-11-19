@@ -309,7 +309,7 @@
   global.SN_URL_NAV = {
     isLocalHost, questoComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, fileDiQuestoComputer, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
     indirizzoRicerca, indirizzoRicercaImmagine, invioRicercaImmagine, LENS_CARICA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
