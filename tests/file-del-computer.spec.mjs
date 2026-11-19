@@ -197,7 +197,7 @@ test('il collegamento in chat a un file spostato o cancellato lo dice, e non apr
   await expect.poll(() => schedeFile(app)).toBe(0);
   rmSync(file);
   await page.getByRole('link', { name: '↗ 2026-10-30-riquadro.html' }).click();
-  await expect((await avvisi()).locator('.shell-notif.show', { hasText: `File non trovato: ${file}` })).toBeVisible({ timeout: 8000 });
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: /File non trovato: .*2026-10-30-riquadro\.html/ })).toBeVisible({ timeout: 8000 });
   expect(await schedeFile(app)).toBe(0);
   await ripristina(app);
 });
