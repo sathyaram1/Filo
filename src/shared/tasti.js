@@ -1077,7 +1077,7 @@
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA, comandoLucchettoBarra, etichettaLucchettoBarra, ACCEL_LUCCHETTO_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
-    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, letturaScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
     AZIONI_FILO, usaScorciatoieFilo, usaScorciatoiePannelli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
