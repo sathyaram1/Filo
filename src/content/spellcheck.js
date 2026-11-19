@@ -351,7 +351,8 @@
   // Una parola chiusa da un tasto vero in questa casella: si corregge da sé, o si conta per quello che Filo impara. Mai
   // dopo: il testo già superato non cambia da solo, e un testo messo da uno script non si tocca.
   function fineParolaBattuta(state, evento) {
-    if (suppressAutocorrect || !A()) return;
+    // Quello che scrive Filo (Incolla, dettatura, Modifica) arriva come una battuta ma non chiude una parola dell'utente.
+    if (suppressAutocorrect || !A() || state.filoScrive != null) return;
     const tipo = evento && evento.inputType;
     if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
     const G = global.SN_GESTO;
