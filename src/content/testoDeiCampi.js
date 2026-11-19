@@ -217,56 +217,57 @@
     return out;
   }
 
-  // Il testo rimesso deve contare per il sito come scritto (#2052): passa dalla regola del correttore, che per farlo
-  // prende il fuoco del campo. Chi intanto scrive altrove non se ne accorge (#2052.1): il fuoco torna con la sua
-  // selezione, e una parola che si sta componendo (tastiere di altre lingue) si aspetta.
+  // Il testo rimesso deve contare per il sito come scritto (#2052), e per questo la regola del correttore prende il
+  // fuoco del campo. Mai a chi sta scrivendo altrove (#2052.1): uscire dal suo campo può chiuderlo o perdergli il
+  // cursore. Lì il testo si vede subito e conta come scritto al primo momento in cui nessuno scrive.
+  const daConfermare = new Map();
+
+  function scrivibile(a) {
+    if (!a || a === document.body || a === document.documentElement) return false;
+    if (a.isContentEditable || /^(TEXTAREA|SELECT|IFRAME|FRAME|OBJECT|EMBED)$/.test(a.tagName)) return true;
+    return a.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|image|file|range|color|hidden)$/i.test(a.type || '');
+  }
+
+  // Un altro riquadro col fuoco (o la finestra lasciata) non si vede da qui: vale come qualcuno che scrive.
+  function occupato(el) {
+    if (!document.hasFocus()) return true;
+    const a = attivo();
+    return a !== el && scrivibile(a);
+  }
+
   function scriviNelCampo(el, valore) {
-    const prima = dove();
+    const prima = attivo();
+    const fuoco = !occupato(el);
     rimettendo = true;
     try {
-      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
+      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore, { fuoco })) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      if (attivo() === el && prima.attivo !== el) torna(prima, el);
+      if (!fuoco) { daConfermare.set(el, valore); return; }
+      daConfermare.delete(el);
+      if (attivo() !== el || prima === el) return;
+      if (prima && prima.isConnected && prima !== document.body) { try { prima.focus({ preventScroll: true }); } catch (_) {} } else el.blur();
     } finally { rimettendo = false; }
   }
 
-  // Una casella ritrova da sé la sua selezione col fuoco; un editor ricco no, e ripartirebbe dall'inizio.
-  function selezioneDi(a) {
-    const radice = a.getRootNode();
-    return (typeof radice.getSelection === 'function' && radice.getSelection()) || document.getSelection();
+  // Si riscrive da vuoto: lo stesso testo sopra sé stesso per il browser non è una battuta. Un campo che l'utente ha
+  // già toccato non serve: le sue battute hanno dato al sito il testo intero.
+  function conferma() {
+    for (const [el, valore] of daConfermare) {
+      if (!el.isConnected || String(el.value || '') !== valore) { daConfermare.delete(el); continue; }
+      if (occupato(el)) continue;
+      try { el.setRangeText('', 0, valore.length); } catch (_) { continue; }
+      scriviNelCampo(el, valore);
+      if (String(el.value || '') !== valore) { el.value = valore; daConfermare.delete(el); }
+    }
   }
-
-  function dove() {
-    const a = attivo();
-    const out = { attivo: a, punti: null };
-    try {
-      const s = a && a !== document.body ? selezioneDi(a) : null;
-      if (s && s.rangeCount && a.contains(s.anchorNode) && a.contains(s.focusNode)) out.punti = [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset];
-    } catch (_) {}
-    return out;
-  }
-
-  function torna({ attivo: a, punti }, el) {
-    if (!a || !a.isConnected || a === document.body) { el.blur(); return; }
-    try { a.focus({ preventScroll: true }); } catch (_) {}
-    try { if (punti) selezioneDi(a).setBaseAndExtent(...punti); } catch (_) {}
-  }
-
-  // Una parola composta con l'IME finisce col fuoco: prenderlo a metà la chiuderebbe come non era. Senza la fine, dopo
-  // un minuto si smette di aspettarla. La fine vale anche non fidata: smettere di aspettare non costa niente.
-  let componeDa = 0;
-  const compone = () => componeDa > 0 && Date.now() - componeDa < 60000;
-  document.addEventListener('compositionstart', (e) => { if (e.isTrusted) componeDa = Date.now(); }, true);
-  document.addEventListener('compositionend', () => {
-    if (!componeDa) return;
-    componeDa = 0;
-    if (rimasti.length) setTimeout(() => { rimetti(); if (Date.now() >= fineAttesa) fermaAttesa(); }, 0);
-  }, true);
+  // Sul fuoco che arriva, subito: un clic su «Invia» lo dà al pulsante prima di partire.
+  document.addEventListener('focusin', () => { if (daConfermare.size) conferma(); }, true);
+  document.addEventListener('focusout', (e) => { if (daConfermare.size && !e.relatedTarget) setTimeout(conferma, 0); }, true);
+  window.addEventListener('focus', () => { if (daConfermare.size) setTimeout(conferma, 0); });
 
   function rimetti() {
     prossimo = null;
     if (!segui || !rimasti.length) { fermaAttesa(); return; }
-    if (compone()) return;
     const presenti = [];
     const campi = [];
     // L'ordine si conta in un giro solo, per radice: un campo alla volta costerebbe un giro della pagina ciascuno.
