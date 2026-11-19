@@ -61,6 +61,22 @@ test('incollato dopo quello che si è scritto, il sito ha il testo intero', asyn
   await expect(page.locator('#esito')).toHaveText('Pubblicato: Fable è un modello per automazione, non per coding.');
 });
 
+test('un testo di migliaia di righe si incolla subito e il sito lo ha intero', async ({ app, openTab, testServer }) => {
+  const testo = Array.from({ length: 3000 }, (_, i) => `riga ${i + 1} <b>non è markup</b> 😀`).join('\n');
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), testo);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+
+  await casella(page).click({ button: 'right' });
+  const partito = Date.now();
+  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await expect.poll(() => casella(page).inputValue(), { timeout: 5000 }).toBe(testo);
+  expect(Date.now() - partito, 'l\'incolla lungo non ferma la pagina').toBeLessThan(5000);
+
+  await page.locator('#invia').click();
+  expect(await page.locator('#esito').textContent()).toBe(`Pubblicato: ${testo}`);
+});
+
 test('il commento rimesso alla ricarica si pubblica, e il fuoco non resta nella casella', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await casella(page).click();
