@@ -1829,7 +1829,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
+        const tenute = inviaFeedback ? Object.fromEntries(opts.allegati.filter((v) => v.tieni).map((v) => [v.id, v.anteprima])) : null;
+        c = await chrome.runtime.sendMessage({
+          type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente(), ...(tenute ? { immaginiAiuto: tenute } : {}),
+        });
       } catch (_) {}
       if (c && c.output && c.output.blocked === 'segreto') {
         fermata(c.output.frase || `${label}: fermata`);
