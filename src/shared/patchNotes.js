@@ -18,6 +18,7 @@
         { testo: 'Il testo che incolli o detti con Filo nella casella di un sito, e quello che ti rimette dopo una ricarica, il sito lo conta come scritto da te: su Reddit il commento non risulta più vuoto quando lo invii.', segnalazione: 2052 },
         { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
         { testo: 'A schermo intero, col puntatore in alto vedi le schede senza l\'elenco dei download che copriva mezza pagina. Scende con loro solo la domanda su un programma da scaricare, finché non rispondi.', segnalazione: 2387 },
+        { testo: 'Il modello che Filo propone per una funzione, il carattere che propone per l\'interfaccia e il nome di un file o di una cartella che un sito vuole modificare stanno nel loro riquadro anche quando la domanda chiede l\'OK: un testo che finge un avviso di Filo non si confonde più con le sue parole.', segnalazione: 592 },
       ],
     },
     {
