@@ -17,6 +17,7 @@
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
         { testo: 'Nella home un clic su un punto vuoto rimette il cursore nel campo della chat, o in quello della ricerca se è aperta: Backspace, Ctrl+V (Cmd+V su Mac), frecce e Invio funzionano come se ci avessi cliccato dentro.', segnalazione: 2372 },
         { testo: 'Se dai a un\'altra cosa una lettera della home già usata, Filo ti dice cosa apriva prima, dalle Preferenze, dal tasto destro e quando glielo chiedi a parole.', segnalazione: 2372 },
+        { testo: 'Il correttore legge quello che scrivi in una chat come risposta ai messaggi sopra: un soggetto sottinteso o un «sì, va bene» non diventano più una frase poco chiara.', segnalazione: 2132 },
       ],
     },
     {
