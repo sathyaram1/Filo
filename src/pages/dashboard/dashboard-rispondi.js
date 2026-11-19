@@ -156,6 +156,7 @@
   function campo(valore) {
     d.inputEl.value = valore;
     try { d.inputEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    if (fuori && valore.trim() && d.segnaDaFuori) d.segnaDaFuori();
   }
 
   function disegnaAnteprima() {
