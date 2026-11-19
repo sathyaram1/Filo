@@ -931,7 +931,7 @@
       render();
     }, 0);
   }
-  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; }, true);
+  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; gestoStriscia++; }, true);
   window.addEventListener('mouseup', rilascioStriscia, true);
   window.addEventListener('blur', rilascioStriscia);
 
