@@ -65,10 +65,10 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
       // Conta con la stima di Filo: una cifra scritta qui resta indietro quando la stima si ritara (#2473, #2594).
-      const perToken = globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN * (pesante ? 0.9 : 1);
-      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / perToken);
+      const stima = globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN;
+      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / (pesante ? stima * 0.9 : stima));
       const uscita = Number(attempts[0].maxTokens) || 16384;
-      if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / perToken);
+      if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / stima);
       if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
         if (anthropic) {
