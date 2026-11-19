@@ -26,7 +26,7 @@ const ARTICOLO = `<!doctype html><html lang="en"><head><title>An English article
 // Più richieste da ~3000 caratteri: serve allo stato «a metà».
 const LUNGA = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
   <h1 id="head">A very long English article about nothing in particular</h1>
-  ${Array.from({ length: 40 }, (_, i) => `<p id="p${i}">Paragraph number ${i} of the body text, deliberately long enough to take a meaningful share of the request budget so that the article needs several separate requests to be translated in full.</p>`).join('\n  ')}
+  ${Array.from({ length: 40 }, (_, i) => '<p id="p' + i + '">Paragraph number ' + i + ' of the body text, deliberately long enough to take a meaningful share of the request budget so that the article needs several separate requests to be translated in full.</p>').join('\n  ')}
 </body></html>`;
 
 // `fallisceDopo`: richieste servite prima di dare un guasto di rete (-1 mai); `ritardo` fa durare ogni richiesta.
