@@ -403,9 +403,9 @@ test('un testo lungo che il sito mette negli appunti, incollato, non copre i cod
   await sito.locator('#cp').press('Enter');
 
   const dopo = await testServer.openReady(openTab, banca('508613'));
-  await apriAiuto(shell, dopo);
-  await scriviAllAiuto(dopo, 'cosa devo fare?');
-  await expect(dopo.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
+  const aiutoDopo = await apriAiuto(app, shell, dopo);
+  await scriviAllAiuto(aiutoDopo, 'cosa devo fare?');
+  await expect(aiutoDopo.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('508613');
   expect(await lettiDopoUnRiavvio(app)).toEqual(expect.arrayContaining(['731942', '508613']));
 });
