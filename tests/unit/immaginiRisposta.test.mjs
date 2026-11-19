@@ -102,8 +102,8 @@ test('fonti e immagini nella stessa risposta tengono ognuna il proprio posto', (
 
 test('in diretta i marcatori, anche a metà, non si vedono', () => {
   assert.equal(I.nascondi('Ecco: [[immagini: i1, i2]] fatto'), 'Ecco: fatto');
-  assert.equal(I.nascondi('Ecco [[immag'), 'Ecco ');
-  assert.equal(I.nascondi('Ecco [[immagini: i1'), 'Ecco ');
+  assert.equal(I.nascondi('Ecco [[immag'), 'Ecco');
+  assert.equal(I.nascondi('Ecco [[immagini: i1'), 'Ecco');
 });
 
 test('sul disco restano solo i campi noti, e le copie usate si ritrovano dai messaggi', () => {
