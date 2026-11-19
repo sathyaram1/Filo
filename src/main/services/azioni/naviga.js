@@ -409,7 +409,7 @@ function chiediTraduzione(tab, originale) {
 }
 
 async function azioneTraduciPagina(action, { sender }) {
-  const originale = action.originale === true || String(action.originale).trim().toLowerCase() === 'true';
+  const originale = globalThis.SN_ACTION_LEVELS.alOriginale(action);
   const { win, tm, tab } = targetWebTab(sender);
   if (!tm || !tab) return { executed: false, kept: false, output: { traduzione: 'no-page', originale } };
   // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano, come nella barra laterale.
