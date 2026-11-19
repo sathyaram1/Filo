@@ -1396,9 +1396,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
   // #2383 — i marcatori di fonte si controllano qui, prima che la risposta si salvi o si mostri: resta l'etichetta solo
   // per un indirizzo letto in questo turno, con la frase cercata nella pagina intera.
-  const Fonti = globalThis.SN_FONTI_CITATE;
-  const citate = Fonti.controlla(textReply, Fonti.sorgenti(renderedActions));
+  // #2272 — lo stesso per le immagini: restano solo quelle trovate o create in questo turno, al posto del marcatore.
+  const Immagini = globalThis.SN_IMMAGINI_RISPOSTA;
+  const Fonti = { nascondi: (t) => Immagini.nascondi(globalThis.SN_FONTI_CITATE.nascondi(t)) };
+  const citate = Immagini.controllaConFonti(textReply, renderedActions);
   const fonti = citate.fonti;
+  const immagini = citate.immagini;
   textReply = citate.text || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
   if (notaRisposta) notaRisposta = Fonti.nascondi(notaRisposta).trim();
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
