@@ -136,13 +136,13 @@ async function apriBox(win) {
   if (!aperto) tocchi.chiuso();
 }
 
-// Dal box: la lettera nuova si salva come ogni impostazione toccata a mano, e il box si ridisegna aperto.
+// Dal box: la lettera nuova si salva come ogni impostazione toccata a mano, e il box si ridisegna aperto. Le lettere
+// sono una sola scelta per tutte le finestre, incognito compreso: valgono subito ovunque.
 async function cambiaLettera(win, id, l) {
   const r = D.assegna(cfg, id, l);
   if (r.rifiuto) return;
   const { applySettingsUpdate } = require('./services/handlers');
-  const scrivi = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio_ctrl' }, () => applySettingsUpdate({ doppioCtrl: { lettere: r.lettere } }));
-  await (win && win._filoIncognito ? require('./shim/storage').runIncognito(scrivi) : scrivi());
+  await require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio_ctrl' }, () => applySettingsUpdate({ doppioCtrl: { lettere: r.lettere } }));
   cfg = { ...cfg, lettere: D.normalizza({ lettere: r.lettere }).lettere };
   Box.aggiorna(win, D.ordinate(cfg, await caricaUsate()));
 }
