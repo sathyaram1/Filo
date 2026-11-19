@@ -114,7 +114,7 @@
       || (tipo.startsWith('image/') && !tipo.includes('svg'))
       || ((!tipo || tipo === 'application/octet-stream') && ALTRE_ESTENSIONI.test(nome));
     if (!daProvare) return null;
-    const url = await entroIlTetto(file, tetto, (AT.LIMITI && AT.LIMITI.lato) || 4096);
+    const url = await entroIlTetto(file, tetto, LATO_SEGNALAZIONE);
     const blob = url ? blobDa(url) : null;
     if (!blob) return { motivo: ammessa ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
     try { return { file: new File([blob], nome || 'immagine', { type: blob.type }) }; } catch (_) {
