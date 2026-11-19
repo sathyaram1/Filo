@@ -914,7 +914,6 @@ module.exports = {
   setAssistantCwd,
   cartellaDelComando,
   displayCwd,
-  senderKey,
   pendingConfirmKey,
   recordPendingConfirm,
   consumePendingConfirm,
