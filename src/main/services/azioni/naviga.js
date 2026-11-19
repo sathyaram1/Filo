@@ -62,7 +62,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
       try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
       const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
       contaPaginaDallaChat(url, win);
-      tabId = tm.openTab(url, { activate: !background, origine });
+      tabId = tm.openTab(url, { activate: !background, origine, fileDelComputer: !!file });
       // Gli schemi non web sono esclusi qui sopra: una scheda che non
       // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
       // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.
