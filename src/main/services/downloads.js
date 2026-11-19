@@ -1197,7 +1197,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     canResume: false,
     canPause: false,
     _scope: scope || '',
-    _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : null,
+    _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : sessione,
     via: via === 'streaming' ? 'streaming' : '',
     nota: '',
   };
