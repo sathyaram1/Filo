@@ -290,6 +290,8 @@
     FILE_NAME: 'file_name',
     // Un riquadro di terzi rotto dai cookie che le regole non riconoscono (#760): un modello guarda la sua immagine.
     EMBED_COOKIE_CHECK: 'embed_cookie_check',
+    // Un'immagine creata su richiesta in chat (#2272): un modello che restituisce immagini.
+    IMAGE_GEN: 'image_gen',
   };
 
   // Crediti: 1 credito = €0,0008, saldo iniziale 1000, +100 ogni mezzanotte locale.
