@@ -394,6 +394,11 @@ test('con la verifica che regge si fonde, e se main finisce su un altro sha lo s
   assert.doesNotMatch(r.testo, /Attenzione/);
   const altro = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: { ...si, server: { ramo: 'claude/x', sha: 'b'.repeat(40) } } });
   assert.match(altro.testo, /Attenzione: main del server è su aaaaaaaaa, non sullo sha verificato bbbbbbbbb/);
+  // Il commit vuoto con cui il cancello ha acceso la suite (#2574): sha diverso, stesso albero, niente allarme.
+  const vuoto = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: { ...si, server: { ramo: 'claude/x', sha: 'b'.repeat(40) } },
+    stessoAlbero: (_c, x, y) => x === 'a'.repeat(40) && y === 'b'.repeat(40) });
+  assert.equal(vuoto.k, 0, vuoto.testo);
+  assert.doesNotMatch(vuoto.testo, /Attenzione/);
   // Allo strumento del server va il ramo fermo sullo sha verificato, non quello che può ancora muoversi (#1062).
   assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`]]);
   const senzaFermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si, fissa: () => ({ ok: false, motivo: 'push rifiutato' }) });
