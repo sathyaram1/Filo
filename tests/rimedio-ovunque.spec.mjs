@@ -5,7 +5,7 @@
 // La dettatura usa un microfono finto (un oscillatore): il resto, dalla trascrizione all'avviso, è quello vero.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, clicca, scrivi, neiRiquadri } from './helpers/riquadri.mjs';
+import { statoDi, clicca, scrivi, neiRiquadri, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
