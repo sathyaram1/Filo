@@ -11,7 +11,8 @@ const EXE = 'MZ finto eseguibile di prova\n' + 'z'.repeat(2048);
 // Ogni indirizzo in `pagine` è HTML; un .exe che non c'è scende come allegato, col suo nome. Il giudice AI annota cosa
 // riceve; l'età del dominio la dà `eta`.
 async function servi(app, pagine, { eta = {} } = {}) {
-  await app.evaluate(async ({ session, net }, { pg, eta, exe }) => {
+  await chiudiLaRete(app);
+  await app.evaluate(async ({ session }, { pg, eta, exe }) => {
     globalThis.__sbMeta = [];
     const nostri = new Set(Object.keys(pg).map((k) => k.split('/')[0]));
     const risposta = (req) => {
