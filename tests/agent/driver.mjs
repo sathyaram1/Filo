@@ -500,9 +500,35 @@ export async function clickMark(app, shell, map, index, opzioni = {}) {
   if (!m) throw new Error('mark ' + index + ' inesistente');
   await clearMarks(app, shell);
   const page = m.pagina && !m.pagina.isClosed() ? m.pagina : (m.page === 'shell' ? shell : await activeView(app, shell));
+  fuocoPrimaDelClic = await bersaglioColFuoco(app);
   await page.mouse.click(m.x, m.y, opzioni);
   await sleep(400);
   return page;
+}
+
+// Il clic di Playwright non sposta il fuoco di Electron: se dopo l'ultimo clic è cambiato, l'ha spostato Filo (una home
+// nuova, una scheda aperta da un collegamento) e la tastiera va lì, come per una persona. `undefined`: nessun clic ancora.
+let fuocoPrimaDelClic;
+
+async function bersaglioColFuoco(app) {
+  try {
+    return await app.evaluate(({ webContents }) => {
+      const w = webContents.getFocusedWebContents();
+      return w && !w.isDestroyed() ? w.getOrCreateDevToolsTargetId() : null;
+    });
+  } catch (_) { return null; }
+}
+
+// La Page che riceve i tasti: quella a cui Filo ha dato il fuoco dopo l'ultimo clic, se c'è; altrimenti `dove` (la
+// superficie cliccata), altrimenti la scheda attiva. Prove: tests/prova-da-utente-filo.spec.mjs.
+async function destinatario(app, shell, dove) {
+  if (fuocoPrimaDelClic !== undefined) {
+    const ora = await bersaglioColFuoco(app);
+    if (ora && ora !== fuocoPrimaDelClic) {
+      for (const p of app.windows()) if (!p.isClosed() && (await bersaglioDi(p)) === ora) return p;
+    }
+  }
+  return (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
 }
 
 // Click libero in coordinate composite.
