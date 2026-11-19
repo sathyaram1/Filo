@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { serviSiti, richiesteVerso } from './helpers/reteChiusa.mjs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 
