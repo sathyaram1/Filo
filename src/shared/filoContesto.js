@@ -230,7 +230,31 @@
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
-    return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+    const cosa = r.passo ? `a un passo ${di.replace(/^a(l)? /, (x) => (x === 'al ' ? 'del ' : 'di '))}` : di;
+    return t ? `(l'utente risponde ${cosa}${dove}: «${t}»)` : `(l'utente risponde ${cosa}${dove})`;
+  }
+
+  // Le parole dell'utente con le citazioni al loro posto (#2346): citazione, commento, citazione, commento. `pos` dice
+  // dove comincia il commento di ogni citazione; una senza `pos` (quelle di sempre) apre il messaggio.
+  function conCitazioni(testo, citate) {
+    const t = String(testo == null ? '' : testo);
+    const lista = (Array.isArray(citate) ? citate : citate ? [citate] : []).filter((c) => c && typeof c === 'object');
+    if (!lista.length) return t;
+    const ordinate = lista
+      .map((c, k) => ({ c, k, pos: Math.min(Number.isInteger(c.pos) && c.pos > 0 ? c.pos : 0, t.length) }))
+      .sort((x, y) => x.pos - y.pos || x.k - y.k);
+    const out = [];
+    let da = 0;
+    for (const { c, pos } of ordinate) {
+      const prima = t.slice(da, pos).trim();
+      if (prima) out.push(prima);
+      const nota = notaRisposta(c);
+      if (nota) out.push(nota);
+      da = pos;
+    }
+    const resto = t.slice(da).trim();
+    if (resto) out.push(resto);
+    return out.join('\n');
   }
 
   // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
