@@ -21,8 +21,14 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
   // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
   // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
   // cliccabile per riaprirlo (kept:true).
-  const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+  let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
   if (!url) return { executed: false, kept: false };
+  // Un file del computer passa solo col giudizio scritto prima del gate (handlers.js, #1905): lì si apre com'è sul disco.
+  const file = globalThis.SN_URL_NAV.fileDiQuestoComputer(url);
+  if (file) {
+    if (typeof action._fileDelComputer !== 'string' || !action._fileDelComputer) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'rete' } };
+    url = require('../fileDelComputer').giudicato(action._fileDelComputer);
+  }
   // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
   // iniettare istruzioni nel modello (prompt injection) per fargli aprire
   // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
