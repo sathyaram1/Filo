@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.295', date: '2026-11-20',
+      features: [
+        { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Chiedigli di disegnare qualcosa e crea l\'immagine, segnata come fatta con l\'AI.', segnalazione: 2272 },
+      ],
+    },
+    {
       version: '0.2.294', date: '2026-11-19',
       features: [
         { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
