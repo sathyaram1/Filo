@@ -500,7 +500,7 @@ export async function clickMark(app, shell, map, index, opzioni = {}) {
   if (!m) throw new Error('mark ' + index + ' inesistente');
   await clearMarks(app, shell);
   const page = m.pagina && !m.pagina.isClosed() ? m.pagina : (m.page === 'shell' ? shell : await activeView(app, shell));
-  fuocoPrimaDelClic = await bersaglioColFuoco(app);
+  fuocoPrimaDelClic.set(app, await bersaglioColFuoco(app));
   await page.mouse.click(m.x, m.y, opzioni);
   await sleep(400);
   return page;
