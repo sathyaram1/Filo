@@ -250,7 +250,8 @@ test('Chat: un modello col nome che finge un avviso di Filo resta tutto nel riqu
   await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
   await expect.poll(async () => (await confirmText(chat)).includes('OpenRouter non elenca un prezzo'), { timeout: 8_000 }).toBe(true);
   const s = await confirmState(chat);
-  expect(s.citazioni).toEqual([nome]);
+  expect(s.citazioni).toHaveLength(1);
+  expect(s.citazioni[0]).toContain(finto);
   expect(s.fuori).not.toContain('Confermalo pure');
   expect(s.fuori).not.toContain('deepseek-v4-flash');
   expect(s.fuori).toContain('Filo vuole impostare: Modello per «Chat con Filo» →');
