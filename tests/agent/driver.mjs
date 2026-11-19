@@ -507,8 +507,8 @@ export async function clickMark(app, shell, map, index, opzioni = {}) {
 }
 
 // Il clic di Playwright non sposta il fuoco di Electron: se dopo l'ultimo clic è cambiato, l'ha spostato Filo (una home
-// nuova, una scheda aperta da un collegamento) e la tastiera va lì, come per una persona. `undefined`: nessun clic ancora.
-let fuocoPrimaDelClic;
+// nuova, una scheda aperta da un collegamento) e la tastiera va lì, come per una persona. Per Filo aperto, dal primo clic.
+const fuocoPrimaDelClic = new WeakMap();
 
 async function bersaglioColFuoco(app) {
   try {
