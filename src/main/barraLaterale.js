@@ -860,17 +860,7 @@ class BarraLaterale {
     const attiva = this._attiva();
     const incognito = this._incognito();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
-    if (d.tipo === 'pagina') {
-      const nav = this._nav();
-      if (!attiva || !nav.pagina || this._motivoAzione(id, nav)) return;
-      Strade.misura('azione', id, 'barra', { incognito });
-      this.chiudi();
-      this._restituisciTastiera();
-      const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
-      this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
-      this._consegnaInAttesa();
-      return;
-    }
+    if (d.tipo === 'pagina') { this.eseguiSullaPagina(id, { colore }); return; }
     const daTastiera = !dallaFila && this.motivo === 'tasto';
     const fai = () => {
       switch (id) {
