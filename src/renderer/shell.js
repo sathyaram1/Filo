@@ -2182,7 +2182,7 @@
     return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
-      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+      if (res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
     }).catch(() => {});
   }
 
