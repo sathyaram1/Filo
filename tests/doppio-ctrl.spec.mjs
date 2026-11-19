@@ -211,6 +211,16 @@ test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chi
   expect(casa.url()).not.toContain('cerca');
   await casa.screenshot({ path: `${SHOTS}/2377-cerca-dalla-home.png` });
 
+  // I apre il menu Impostazioni, lo stesso del suo tasto nella home.
+  await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('i')]);
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try { if (w.url().startsWith('data:text/html') && (await w.locator('button.item').allTextContents()).includes('Preferenze')) return true; } catch (_) {}
+    }
+    return false;
+  }, { timeout: 10_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).focus(); });
+
   // Una scheda chiusa torna con Ctrl, Ctrl, Z.
   const chiudi = await testServer.openReady(openTab, '<!doctype html><title>Da chiudere</title><p>x</p>');
   const indirizzo = chiudi.url();
