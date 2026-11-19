@@ -88,7 +88,7 @@ test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda 
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.activate(tm.tabs.find((t) => String(t.url).startsWith('filo://newtab')).id);
   });
-  await page.getByRole('link', { name: '↗' }).last().click();
+  await page.getByRole('link', { name: '↗ 2026-10-30-riquadro.html' }).click();
   await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
   await ripristina(app);
 });
