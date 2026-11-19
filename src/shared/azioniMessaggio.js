@@ -16,6 +16,8 @@
     copia: Object.freeze({ icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' }),
     rispondi: Object.freeze({ icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' }),
   });
+  // Le azioni che citano: con del testo selezionato nel messaggio citano quello.
+  const CITANO = new Set(['rispondi', 'cita']);
   // Un tasto della barra: l'etichetta (aria-label e quella che compare al passaggio) e l'icona vengono dalla definizione.
   function tasto(def, classe, size = 15) {
     const b = document.createElement('button');
