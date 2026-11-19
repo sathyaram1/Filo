@@ -135,3 +135,74 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
     spegni,
   };
 }
+
+/**
+ * Il globalSetup: `accendiSchermo` per `quanti` lavoratori di Playwright. Con più d'uno ne accende uno a testa e li elenca
+ * in `env[SCHERMI_LAVORATORI]` (#2133): su uno schermo condiviso la finestra di un altro lavoratore prende il fuoco e i
+ * menu di Filo, che si chiudono al blur, si chiudono da soli. Anche sotto un `xvfb-run` dei nostri script.
+ */
+export async function accendiSchermi({ quanti = 1, env = process.env, ...opzioni } = {}) {
+  const n = Number.isInteger(quanti) && quanti > 1 ? quanti : 1;
+  const elencoPrima = env[SCHERMI_LAVORATORI];
+  const rimettiElenco = () => { if (elencoPrima === undefined) delete env[SCHERMI_LAVORATORI]; else env[SCHERMI_LAVORATORI] = elencoPrima; };
+  // Un elenco ereditato (un Playwright lanciato da una prova) è dei lavoratori di fuori: qui non vale.
+  delete env[SCHERMI_LAVORATORI];
+  const base = { ...env };
+  if (env[SEGNO_VIRTUALE] === '1') { delete base.DISPLAY; delete base.XAUTHORITY; }
+  if (n === 1 || !senzaSchermo({ platform: opzioni.platform, env: base })) {
+    try {
+      const s = await accendiSchermo({ env, ...opzioni });
+      return { ...s, schermi: s.display ? [s.display] : [], spegni: async () => { await s.spegni(); rimettiElenco(); } };
+    } catch (e) { rimettiElenco(); throw e; }
+  }
+
+  const worker = opzioni.worker !== undefined ? opzioni.worker : datiWorker({ env, root: env === process.env ? process.cwd() : null });
+  const accesi = [];
+  try {
+    // Uno dopo l'altro: due `xvfb-run -a` dalla stessa base insieme scelgono lo stesso numero libero.
+    for (let i = 0; i < n; i++) {
+      const suo = { ...base };
+      const s = await accendiSchermo({ ...opzioni, worker, env: suo });
+      accesi.push({ s, display: suo.DISPLAY, xauthority: suo.XAUTHORITY, sandbox: suo.ELECTRON_DISABLE_SANDBOX });
+    }
+  } catch (e) {
+    await Promise.all(accesi.map((a) => a.s.spegni()));
+    rimettiElenco();
+    throw e;
+  }
+  const prima = Object.fromEntries(VARIABILI.map((k) => [k, env[k]]));
+  const [primo] = accesi;
+  env.DISPLAY = primo.display;
+  if (primo.xauthority) env.XAUTHORITY = primo.xauthority;
+  env.ELECTRON_DISABLE_SANDBOX = primo.sandbox;
+  env[SCHERMI_LAVORATORI] = JSON.stringify(accesi.map(({ display, xauthority }) => ({ display, xauthority })));
+  let spento = null;
+  const spegni = () => spento || (spento = (async () => {
+    for (const k of VARIABILI) { if (prima[k] === undefined) delete env[k]; else env[k] = prima[k]; }
+    rimettiElenco();
+    await Promise.all(accesi.map((a) => a.s.spegni()));
+  })());
+  const schermi = accesi.map((a) => a.display);
+  return {
+    display: primo.display,
+    schermi,
+    nota: `Linux senza schermo: ${n} lavoratori, uno schermo virtuale ciascuno (${schermi.join(' ')}), con ELECTRON_DISABLE_SANDBOX=1.`,
+    spegni,
+  };
+}
+
+/**
+ * In un lavoratore di Playwright (la config, che ognuno carica): DISPLAY e XAUTHORITY dello schermo suo fra quelli di
+ * `accendiSchermi`, per indice. Senza elenco o fuori da un lavoratore non tocca niente e dà ''. PURA su `env`.
+ */
+export function usaSchermoDelLavoratore(env = process.env) {
+  let schermi;
+  try { schermi = JSON.parse(env[SCHERMI_LAVORATORI] || '[]'); } catch (_) { return ''; }
+  const i = Number(env.TEST_PARALLEL_INDEX);
+  if (!Array.isArray(schermi) || !schermi.length || vuota(env.TEST_PARALLEL_INDEX) || !Number.isInteger(i) || i < 0) return '';
+  const s = schermi[i % schermi.length];
+  if (!s || !/^:\d+$/.test(String(s.display))) return '';
+  env.DISPLAY = s.display;
+  if (s.xauthority) env.XAUTHORITY = s.xauthority;
+  return s.display;
+}
