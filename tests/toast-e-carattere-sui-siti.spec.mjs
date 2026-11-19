@@ -177,7 +177,7 @@ ${FAMIGLIE_SPIA.flatMap((fam) => [...ALFABETO].map((c) => {
 
     await apriCronologia(app, page, '#campo');
     await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
-    expect(await nelMondoDiFilo(app, page, FONT, '.sn-menu-history-paste')).toBe('serif');
+    expect(await carattereCronologia(app, page)).toBe('serif');
     await page.waitForTimeout(800);
     const visti = await page.evaluate(() => window.caratteriVisti());
     for (const c of ['5', '8', '9', 'S']) {
