@@ -992,7 +992,7 @@
     'translate-selection': SOLO_A_MANO, 'edit-selection': SOLO_A_MANO, 'read-aloud': SOLO_A_MANO, dictate: SOLO_A_MANO,
     'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
     'email-nei-siti': 'impostazioni(imposta)', 'testo-dei-campi': 'impostazioni(imposta)', 'spellcheck-manage': 'scheda(apri)',
-    editor: 'file(leggi_editor)', 'translate-page': SOLO_A_MANO, 'explain-image': SOLO_A_MANO,
+    editor: 'file(leggi_editor)', 'translate-page': 'scheda(traduci)', 'explain-image': SOLO_A_MANO,
     'copy-download-image': SOLO_A_MANO, 'search-image': 'scheda(lens)', 'video-audio-controls': 'scheda(pausa_audio)',
     'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
     ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
