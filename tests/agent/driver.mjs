@@ -554,7 +554,7 @@ export async function typeText(app, shell, text, dove = null) {
 // finestra (Ctrl+T, Ctrl+W, Alt+cifra…) restavano morte per chi pilota. Passano prima da lì, come quelli di una
 // persona, e la pagina li riceve solo se Filo non li prende. Ritorna true se li ha presi Filo.
 export async function pressKey(app, shell, key, dove = null) {
-  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
+  const page = await destinatario(app, shell, dove);
   const t = leggiTasto(key);
   if (!t.ok) throw new Error(t.errore);
   const preso = await primaAlBrowser(app, page, { ...t.input, type: 'keyDown' });
