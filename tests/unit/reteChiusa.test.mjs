@@ -23,7 +23,7 @@ test('il passaggio alla rete vera dentro un gestore di protocollo sta solo nell\
 });
 
 test('una prova che intercetta un protocollo non chiama net.fetch da sé', () => {
-  const fuori = FILE.filter((f) => f !== AIUTO && /\.protocol\.handle\(|protocol\.handle\(/.test(testo(f)) && /\bnet\.fetch\(/.test(testo(f)));
+  const fuori = FILE.filter((f) => f !== AIUTO && /protocol\.handle\(/.test(testo(f)) && /\bnet\.fetch\(/.test(testo(f)));
   assert.deepEqual(fuori, [], `quello che il gestore non serve va a globalThis.__reteChiusa.resto(req) (tests/${AIUTO})`);
 });
 
