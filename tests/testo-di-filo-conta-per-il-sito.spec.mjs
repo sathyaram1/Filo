@@ -4,6 +4,7 @@
 // browser.
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { nelMondoDiFilo, statoDi, clicca } from './helpers/riquadri.mjs';
 
 const PAGINA = `<!doctype html><html><head><title>Commenti</title></head>
 <body style="margin:0;padding:32px;font-family:sans-serif;background:#fff">
