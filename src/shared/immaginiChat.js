@@ -101,21 +101,28 @@
   // Chi la legge è l'owner, non un modello: tiene più dettaglio della chat, e una foto da 12 MP ci sta già in JPEG.
   const LATO_SEGNALAZIONE = 4096;
 
+  const attach = () => global.SN_FEEDBACK_ATTACH;
+  const ammessa = (file) => !!attach() && typeof attach().classify === 'function' && attach().classify(file) === 'image';
+
+  // Un'immagine fuori dai tipi ammessi che però si può aprire e ridisegnare. L'SVG resta fuori: è un documento
+  // attivo (src/shared/feedbackAttachTypes.js).
+  function daRidisegnare(file) {
+    if (!file || !attach() || ammessa(file)) return false;
+    const tipo = String(file.type || '').toLowerCase().trim();
+    if (tipo.startsWith('image/')) return !tipo.includes('svg');
+    return (!tipo || tipo === 'application/octet-stream') && ALTRE_ESTENSIONI.test(String(file.name || ''));
+  }
+
   // Una foto del telefono passa spesso i 4 MB, e un AVIF non era fra i tipi ammessi (#1664): prima di rifiutarla si
   // rimpicciolisce o si ridisegna. Torna { file } da allegare, { motivo } se non si può, null se non è un'immagine.
-  // L'SVG resta fuori: è un documento attivo (src/shared/feedbackAttachTypes.js).
   async function perLaSegnalazione(file) {
-    const AT = global.SN_FEEDBACK_ATTACH;
-    if (!file || !AT || typeof AT.classify !== 'function') return null;
-    const tetto = (AT.LIMITI && AT.LIMITI.byte) || 4 * 1024 * 1024;
-    const tipo = String(file.type || '').toLowerCase();
+    if (!file || !attach()) return null;
+    const L = attach().LIMITI || {};
+    const tetto = L.byte || 4 * 1024 * 1024;
     const nome = String(file.name || '');
-    const ammessa = AT.classify(file) === 'image';
-    if (ammessa && file.size <= tetto) return { file };
-    const daProvare = ammessa
-      || (tipo.startsWith('image/') && !tipo.includes('svg'))
-      || ((!tipo || tipo === 'application/octet-stream') && ALTRE_ESTENSIONI.test(nome));
-    if (!daProvare) return null;
+    const buona = ammessa(file);
+    if (buona && file.size <= tetto) return { file };
+    if (!buona && !daRidisegnare(file)) return null;
     const url = await entroIlTetto(file, tetto, LATO_SEGNALAZIONE);
     const blob = url ? blobDa(url) : null;
     if (!blob) return { motivo: ammessa ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
