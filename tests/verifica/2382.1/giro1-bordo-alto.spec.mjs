@@ -63,6 +63,27 @@ async function primoPixelSopra(app, shell, sel) {
 test.describe('col puntatore vero, a finestra massimizzata', () => {
   test.skip(!Gesti.disponibili(), 'servono un display X e XTest (lo schermo virtuale delle prove su Linux)');
 
+  test('esplora', async ({ app, shell, testServer }) => {
+    const ids = await treSchede(shell, testServer);
+    await massimizzataASchermo(app, shell);
+    await shell.evaluate(() => { window.__ev = []; for (const t of ['mousedown', 'mouseup', 'click', 'mousemove']) document.addEventListener(t, (e) => window.__ev.push(`${t}@${e.clientX},${e.clientY}`), true); });
+    const info = await app.evaluate(({ BrowserWindow, screen }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      return { b: w.getBounds(), cb: w.getContentBounds(), vis: w.isVisible(), op: w.getOpacity(), foc: w.isFocused(), cur: screen.getCursorScreenPoint() };
+    });
+    console.log('INFO', JSON.stringify(info));
+    const esiti = [];
+    for (const [i, dy] of [[0, 20], [1, 10], [0, 4], [1, 0]]) {
+      const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[i]}"]`);
+      await shell.evaluate((x) => window.filoShell.tabs.activate(x), ids.at(-1));
+      await shell.waitForTimeout(300);
+      puntatore(`move:${p.x}:${p.y + dy};wait:200;down:1;wait:80;up:1;wait:300`);
+      await shell.waitForTimeout(500);
+      esiti.push({ dy, p, attiva: await attiva(shell), voluta: ids[i], ev: await shell.evaluate(() => window.__ev.splice(0).filter((e) => !e.startsWith('mousemove')).join(' ')) });
+    }
+    console.log('ESITI', JSON.stringify(esiti, null, 1));
+  });
+
   test('clic sul primo pixel dello schermo sopra una scheda la apre', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
