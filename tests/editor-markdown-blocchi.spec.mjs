@@ -44,8 +44,8 @@ test('ESPLORA undo', async ({ openTab }) => {
     await page.evaluate(() => { const d = document.getElementById('doc'); d.innerHTML = '<p>sopra</p><p><br></p>'; d.focus(); const r = document.createRange(); r.setStart(d.children[1], 0); getSelection().removeAllRanges(); getSelection().addRange(r); });
     await page.keyboard.type(seq);
     console.log('UNDO', seq, 'dopo', await html());
-    for (let i = 0; i < 4; i++) { await page.keyboard.press('Control+Z'); console.log('UNDO', seq, i, await html()); }
-    for (let i = 0; i < 4; i++) { await page.keyboard.press('Control+Shift+Z'); console.log('REDO', seq, i, await html()); }
+    for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+Z'); console.log('UNDO', seq, i, await html()); }
+    for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+Shift+Z'); console.log('REDO', seq, i, await html()); }
   }
   console.log('UNDO errori', errori);
 });
