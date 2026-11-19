@@ -1311,7 +1311,8 @@
   // La X di ogni avviso della pila (#1677) chiama la chiusura registrata in quel momento, la stessa del «Chiudi» del
   // tasto destro: chi la registra dopo il montaggio (showToast) vale anche qui. Il clic finto del sito non chiude.
   function aggiungiX(el) {
-    if (el.querySelector(':scope > .sn-toast-x')) return;
+    // Un avviso che è tutto un tasto (la pill della dettatura: premerla è chiuderla) non ne contiene un altro.
+    if (el.tagName === 'BUTTON' || el.querySelector(':scope > .sn-toast-x')) return;
     const x = document.createElement('button');
     x.type = 'button';
     // Il segno lo disegna il CSS: nel testo dell'avviso (letto, copiato, controllato) una × in coda non c'entra.
