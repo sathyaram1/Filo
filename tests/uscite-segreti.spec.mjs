@@ -327,9 +327,9 @@ test('la password che l’assistente propone e l’utente accetta nel campo non 
 for (const [dove, corpo, scrivi] of [
   ['nel corpo di un messaggio', '<div id="ed" contenteditable="true" style="min-height:80px;border:1px solid"></div>',
     async (page) => { await page.locator('#ed').click(); await page.keyboard.type(`La carta per l'abbonamento è ${CARTA_UTENTE}.`); }],
-  ['nella chat dell’assistente', '', async (page) => {
-    await scriviAllAiuto(page, `la mia carta è ${CARTA_UTENTE}, dove la metto?`);
-    await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  ['nella chat dell’assistente', '', async (_page, aiuto) => {
+    await scriviAllAiuto(aiuto, `la mia carta è ${CARTA_UTENTE}, dove la metto?`);
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
   }],
 ]) {
   test(`il numero di carta che l’utente scrive ${dove} non resta fra i segreti letti`, async ({ app, shell, openTab, testServer }) => {
