@@ -12,7 +12,15 @@ export async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
+// Con la chiave finta le chiamate fuori dal copione andavano a OpenRouter, i cambi a frankfurter.dev: il turno durava
+// diverso fra GitHub e il contenitore (#2177). Si chiude sotto ogni finto, anche quelli che la prova ha messo prima.
+export async function chiudiLaRete(app) {
+  const chiusa = await app.evaluate(() => process.mainModule.require('./test-servizi-chiusi').chiudiTuttaLaRete());
+  if (!chiusa) throw new Error('rete del main non chiusa: Filo non è aperto in modalità test');
+}
+
 export async function configureModel(app) {
+  await chiudiLaRete(app);
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
