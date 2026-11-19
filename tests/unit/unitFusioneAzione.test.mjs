@@ -101,6 +101,13 @@ test('nessun workflow usa le cache di Actions', () => {
   }
 });
 
+// L'uscita di una parte la può scrivere il codice del ramo (#2587): in `unit` entra solo come variabile, mai nella shell.
+test('le parti arrivano a `unit` solo come variabili d\'ambiente', () => {
+  const righe = LAVORI.unit.split('\n').filter((r) => r.includes('needs.'));
+  assert.equal(righe.length, 6, righe.join('\n'));
+  for (const r of righe) assert.match(r, /^ {6}(CAMPO|RISULTATO)_(LINUX|WINDOWS|SPEC): \$\{\{ needs\.(linux|windows|spec)\.(outputs\.campo|result) \}\}$/, r.trim());
+});
+
 test('argomenti: due sha interi e la cartella', () => {
   assert.deepEqual(leggiArgomenti(['--root', 'p', '--ramo', A.toUpperCase(), '--main', B]), { root: 'p', ramo: A, main: B, parte: '', unit: 'tutti', unisci: [], errori: [] });
   assert.ok(leggiArgomenti(['--root', 'p', '--ramo', 'main', '--main', B]).errori.length);
