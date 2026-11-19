@@ -1726,10 +1726,13 @@
         btn.rel = 'noopener';
         btn.title = `Riapri ${label}`;
         if (file) {
-          btn.addEventListener('click', (e) => {
+          const riapri = (e) => {
+            if (e.type === 'auxclick' && e.button !== 1) return;
             e.preventDefault();
             send({ type: MSG.OPEN_URL, url: file }).catch(() => {});
-          });
+          };
+          btn.addEventListener('click', riapri);
+          btn.addEventListener('auxclick', riapri);
         }
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
