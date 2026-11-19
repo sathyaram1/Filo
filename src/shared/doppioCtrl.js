@@ -145,8 +145,7 @@
   const etichetta = (v) => `${String(v.lettera || '').toUpperCase()} → ${v.titolo}`;
   // Le scelte dell'utente in parole, per il filo dei cambi.
   function descrivi(lettereScelte) {
-    const s = scelte(lettereScelte);
-    const righe = Object.entries(s).map(([id, l]) => {
+    const righe = scelte(lettereScelte).map(({ azione: id, lettera: l }) => {
       const a = azione(id);
       return a ? (l ? `${l.toUpperCase()} → ${a.titolo}` : `${a.titolo} senza lettera`) : '';
     }).filter(Boolean);
