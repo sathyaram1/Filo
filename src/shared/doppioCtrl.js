@@ -122,7 +122,10 @@
     }
     out[id] = nuova;
     // Una scelta uguale alla serie non è una scelta: resta pulito, e la serie torna a valere.
-    for (const v of catalogo()) if (out[v.id] === v.lettera && !voci({ lettere: out }).some((x) => x.id !== v.id && x.lettera === v.lettera)) delete out[v.id];
+    for (const v of catalogo()) {
+      if (out[v.id] !== v.lettera) continue;
+      if (!v.lettera || !voci({ lettere: out }).some((x) => x.id !== v.id && x.lettera === v.lettera)) delete out[v.id];
+    }
     return { lettere: out };
   }
 
