@@ -86,7 +86,7 @@
       pulisci();
       if (!b) return;
       let url = '';
-      try { url = primoIndirizzo(e.dataTransfer.getData('text/uri-list'), e.dataTransfer.getData('text/plain')); } catch (_) {}
+      try { url = g.SN_INDIRIZZI_TRASCINATI.primo(e.dataTransfer.getData('text/uri-list'), e.dataTransfer.getData('text/plain')); } catch (_) {}
       if (!url) return;
       e.preventDefault();
       e.stopPropagation();
