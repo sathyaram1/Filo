@@ -3,20 +3,14 @@
 // Regole: setWindowOpenHandler e _hardenAuthPopup in src/main/tabs.js.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 // Le pagine https dei test le serve Filo stesso: niente rete, e i verdetti sui siti restano fuori.
 async function servi(app, pagine) {
-  await app.evaluate(({ session, net }, pg) => {
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', risposta);
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(() => {
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, pagine);
+  });
 }
 
 const bloccoPopup = (app, acceso) => app.evaluate(({ BrowserWindow }, a) => {
