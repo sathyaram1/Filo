@@ -376,6 +376,8 @@ test('usaSchermoDelLavoratore: ogni lavoratore prende il suo per indice; fuori d
 test('npx playwright test --workers 3 senza schermo: tre lavoratori insieme, tre schermi accesi e diversi', { skip: senzaLinuxXvfb }, async () => {
   const temp = cartellaTemporanea('schermi-lavoratori-');
   const url = (...p) => JSON.stringify(pathToFileURL(resolve(...p)).href);
+  // Il pacchetto si risolve come lo risolve node: nella cartella staccata dei controlli node_modules sta più su.
+  const pw = dirname(createRequire(import.meta.url).resolve('@playwright/test/package.json'));
   try {
     const fuori = resolve(temp, 'fuori');
     mkdirSync(fuori);
