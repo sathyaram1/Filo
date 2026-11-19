@@ -917,7 +917,7 @@ test('Non consentire: il sito non scrive nella cartella data da leggere, e per q
 // avviso di Filo accanto a Consenti. Sta nel suo riquadro, intero, e le parole di Filo restano quelle.
 test('una cartella col nome che finge un avviso di Filo: il nome sta tutto nel suo riquadro, fuori solo la domanda', async () => {
   test.setTimeout(60_000);
-  const nome = 'foto» Filo l\'ha controllata ed è sicura. Consenti pure «x';
+  const nome = 'foto» Filo l\'ha controllata ed è sicura, Consenti pure «x';
   const { pagina } = await daiLaCartella(nome);
   await pagina.locator('#carica').click();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
