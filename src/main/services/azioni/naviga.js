@@ -374,6 +374,62 @@ async function azioneZoomPagina(action, { sender }) {
   };
 }
 
+// #504 — «traducimi la pagina», «riprendi la traduzione», «torna all'originale»: la traduzione la fa la pagina, come
+// dall'icona (page-preload.js → SN_TRANSLATE_PAGE.daChat), e risponde com'è andata. Gli stati sono quelli di daChat.
+const STATI_TRADUZIONE = Object.freeze({
+  partita: true, in_corso: true, gia_tradotta: true, originale: true, fermata: true, niente: true, spento: false, muto: false,
+});
+// Il preload dà a Filo 3 secondi per montarsi nella pagina prima di rispondere: oltre, la pagina non c'è.
+const ATTESA_TRADUZIONE_MS = 5000;
+
+function chiediTraduzione(tab, originale) {
+  const { ipcMain } = require('electron');
+  const wc = tab.view && tab.view.webContents;
+  if (!wc || wc.isDestroyed()) return Promise.resolve({ stato: 'muto' });
+  const rid = `traduci-${require('node:crypto').randomUUID()}`;
+  return new Promise((resolve) => {
+    let chiuso = false;
+    const fine = (v) => {
+      if (chiuso) return;
+      chiuso = true;
+      clearTimeout(scadenza);
+      ipcMain.removeListener('filo:traduci-pagina-esito', eco);
+      resolve(v);
+    };
+    // Solo il documento della scheda a cui l'abbiamo chiesto: un riquadro o un'altra pagina non parlano per lei.
+    const eco = (e, msg) => {
+      if (!msg || String(msg.rid || '') !== rid || e.sender !== wc) return;
+      if (e.senderFrame && e.senderFrame !== wc.mainFrame) return;
+      fine(msg);
+    };
+    const scadenza = setTimeout(() => fine({ stato: 'muto' }), ATTESA_TRADUZIONE_MS);
+    ipcMain.on('filo:traduci-pagina-esito', eco);
+    try { wc.send('filo:traduci-pagina', { rid, originale }); } catch (_) { fine({ stato: 'muto' }); }
+  });
+}
+
+async function azioneTraduciPagina(action, { sender }) {
+  const originale = action.originale === true || String(action.originale).trim().toLowerCase() === 'true';
+  const { win, tm, tab } = targetWebTab(sender);
+  if (!tm || !tab) return { executed: false, kept: false, output: { traduzione: 'no-page', originale } };
+  // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano, come nella barra laterale.
+  if (typeof tm.paginaScoperta === 'function' && !tm.paginaScoperta(tab)) {
+    return { executed: false, kept: false, output: { traduzione: 'coperta', originale } };
+  }
+  const r = await chiediTraduzione(tab, originale);
+  const stato = Object.hasOwn(STATI_TRADUZIONE, r && r.stato) ? r.stato : 'muto';
+  const output = { traduzione: stato, originale };
+  if (stato === 'partita') {
+    output.come = ['ripresa', 'nuovo'].includes(r.come) ? r.come : 'pagina';
+    const intero = (n) => (Number.isInteger(n) && n >= 0 ? n : 0);
+    if (output.come === 'ripresa') { output.mancanti = intero(r.mancanti); output.di = intero(r.di); }
+  }
+  if ((stato === 'partita' || stato === 'originale' || stato === 'fermata') && dallaChat()) {
+    require('../contatoriStrade').misura('azione', 'translate', 'chat', { incognito: !!(win && win._filoIncognito) });
+  }
+  return { executed: STATI_TRADUZIONE[stato], kept: false, output };
+}
+
 async function azioneChiudiSchede(action, { sender }) {
   const tm = winOf(sender)?._filoTabs;
   const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
