@@ -2711,7 +2711,7 @@
     doppioTocco: { sogliaMs: 350, lettere: [] },
     // Il doppio Ctrl (#2377): acceso, la soglia fra i due tocchi (accessibilità) e le lettere cambiate dall'utente
     // rispetto a quelle di serie (src/shared/doppioCtrl.js).
-    doppioCtrl: { acceso: true, sogliaMs: 400, lettere: {} },
+    doppioCtrl: { acceso: true, sogliaMs: 400, lettere: [] },
     ricercaFilo: { pausaMs: 500 },
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
