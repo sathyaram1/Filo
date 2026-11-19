@@ -7,18 +7,26 @@ import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
 // Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato da un'imbottitura: un figlio in
-// più lo toglierebbe la pagina che ridisegna l'elenco.
-async function preparaScorrimento(bersaglio, { finestra = false } = {}) {
-  await bersaglio.scrollIntoViewIfNeeded();
-  await bersaglio.evaluate((el, finestra) => {
+// più lo toglierebbe la pagina che ridisegna l'elenco. `su`: scorre verso l'alto, per la chat che resta attaccata al fondo.
+async function preparaScorrimento(bersaglio, { finestra = false, su = false } = {}) {
+  const page = bersaglio.page();
+  await bersaglio.evaluate((el, { finestra, su }) => {
     let chi = finestra ? null : el.parentElement;
     while (chi && chi !== document.body && !/(auto|scroll)/.test(getComputedStyle(chi).overflowY)) chi = chi.parentElement;
     if (!chi || chi === document.body) chi = document.scrollingElement;
     chi.dataset.scorreProva = '1';
-    (chi === document.scrollingElement ? document.body : chi).style.paddingBottom = '4000px';
+    chi.dataset.verso = su ? '-1' : '1';
+    (chi === document.scrollingElement ? document.body : chi).style[su ? 'paddingTop' : 'paddingBottom'] = '4000px';
+  }, { finestra, su });
+  await fotogrammi(page);
+  await bersaglio.scrollIntoViewIfNeeded();
+  await fotogrammi(page);
+  await page.evaluate(() => {
+    const chi = document.querySelector('[data-scorre-prova]');
     chi.dataset.scorreDa = String(chi.scrollTop);
-  }, finestra);
+  });
 }
+const passo = (n) => `document.querySelector('[data-scorre-prova]').scrollBy({ top: ${n} * Number(document.querySelector('[data-scorre-prova]').dataset.verso), behavior: 'instant' })`;
 // Scorre e apre col tasto destro nello stesso fotogramma, come chi porta la voce sotto il puntatore e preme subito:
 // l'evento «scroll» arriva al fotogramma dopo, quando il menu ascolta già.
 async function scorriEApri(page, bersaglio, opzioni) {
