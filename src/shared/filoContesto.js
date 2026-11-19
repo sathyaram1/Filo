@@ -497,8 +497,8 @@
     let ripresi = riprendi();
     let totale = 0;
     for (let i = inizio; i < n; i++) totale += pesa(i);
-    if (totale + ripresi.peso > token) {
-      while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
+    if (totale + ripresi.peso > tettoTratto) {
+      while (inizio < n && totale + ripresi.peso > tettoTratto * RIENTRO) {
         totale -= pesa(inizio);
         if (riprese.has(lista[inizio].chat)) { mieDavanti++; ripresi = riprendi(); }
         inizio++;
