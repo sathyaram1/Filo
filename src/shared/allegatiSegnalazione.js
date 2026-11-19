@@ -168,6 +168,14 @@
     }));
   }
 
+  // Dall'Aiuto (#1664): le immagini indicate per numero che l'utente ha tenuto, già controllate dal main ({ id: dataUrl }).
+  // File e schermata lì non ci sono.
+  function vociAiuto(action, immagini) {
+    const im = immagini && typeof immagini === 'object' ? immagini : {};
+    return richiesti(action).immagini.filter((n) => typeof im[`immagine:${n}`] === 'string')
+      .map((n) => ({ id: `immagine:${n}`, tipo: 'immagine', nome: `immagine ${n}.${estensione(im[`immagine:${n}`])}`, dataUrl: im[`immagine:${n}`] }));
+  }
+
   // Le immagini che il riquadro ha ridisegnato ({ id: dataUrl }) al posto di quelle da preparare: solo per le voci
   // segnate dal main, solo nei formati che si leggono e sotto il tetto.
   const PREPARATA = /^data:image\/(png|jpeg|webp|gif);base64,/i;
