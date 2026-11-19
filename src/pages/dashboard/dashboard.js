@@ -1396,9 +1396,9 @@
       if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
-        if (r.text) {
+        if (r.text || (Array.isArray(r.immagini) && r.immagini.length)) {
           // #418 — a fine turno il testo grezzo dello streaming diventa la risposta formattata.
-          setBubbleText(streamBubble, r.text, true, r.fonti);
+          setBubbleText(streamBubble, r.text || '', true, r.fonti, r.immagini);
           filoBubble = streamBubble;
         } else {
           // Il testo si è svuotato (es. reset non recuperato): niente bolla vuota.
