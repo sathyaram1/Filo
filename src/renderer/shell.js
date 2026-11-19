@@ -2409,6 +2409,24 @@
       if (panelOpen) renderPanel();
     }
 
+    // A schermo intero il pannello resta solo finché porta una domanda: il solo elenco farebbe scendere la pagina
+    // sotto un riquadro vuoto a ogni sguardo alle schede (#2387). L'elenco sta nella home e nella pagina Download.
+    let schermoIntero = false;
+    const portaUnaDomanda = () => !!chiusura || domandeApri.size > 0
+      || Array.from(dls.values()).some((r) => r.state === 'pending');
+    function chiudiSeSoloElenco() {
+      if (panelOpen && schermoIntero && !portaUnaDomanda()) { closePanel(); return true; }
+      return false;
+    }
+    if (typeof api.onBroadcast === 'function') {
+      api.onBroadcast((m) => {
+        const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
+        if (!m || m.type !== tipo) return;
+        schermoIntero = !!m.fullscreen;
+        chiudiSeSoloElenco();
+      });
+    }
+
     function ensurePanel() {
       if (panel) return panel;
       panel = document.createElement('div');
@@ -2472,6 +2490,7 @@
 
     function renderPanel() {
       ensurePanel();
+      if (chiudiSeSoloElenco()) return;
       const list = panel.querySelector('#dl-panel-list');
       const all = Array.from(dls.values()).sort((a, b) => {
         // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
