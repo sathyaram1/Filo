@@ -31,6 +31,25 @@ test('in un foglio nuovo «# » apre un titolo solo, senza un paragrafo vuoto so
   expect(await blocchi(page)).toEqual(['h1:Titolo', 'p:testo']);
 });
 
+test('ESPLORA', async ({ openTab }) => {
+  const page = await apriFoglioNuovo(openTab);
+  for (const [html, cmd] of [['<p>abc</p>', 'insertUnorderedList'], ['<p><br></p>', 'insertUnorderedList'], ['<div><br></div>', 'insertUnorderedList'], ['<p>x</p><p><br></p><p>y</p>', 'insertOrderedList'], ['<h1>abc</h1>', 'insertUnorderedList']]) {
+    const out = await page.evaluate(({ html, cmd }) => {
+      const d = document.getElementById('doc');
+      d.innerHTML = html;
+      d.focus();
+      const b = [...d.children].find((c) => !c.textContent) || d.firstChild;
+      const r = document.createRange();
+      r.setStart(b, 0);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      document.execCommand(cmd);
+      return d.innerHTML;
+    }, { html, cmd });
+    console.log('ESPL', html, cmd, '=>', out);
+  }
+});
+
 const CASI = [
   ['# ', 'h1'],
   ['## ', 'h2'],
