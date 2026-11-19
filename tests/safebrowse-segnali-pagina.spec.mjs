@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { chiudiLaRete } from './helpers/reteChiusa.mjs';
 
 const EXE = 'MZ finto eseguibile di prova\n' + 'z'.repeat(2048);
 
