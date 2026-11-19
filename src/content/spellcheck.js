@@ -3495,7 +3495,8 @@
 
   // Il testo che Filo mette in una casella il sito deve contarlo come scritto, o all'invio lo trova vuoto (#2052): prima
   // come una battuta; se no dal valore nativo, con un `input` che esce dall'ombra. `tipo` (un incolla) va in un evento suo.
-  function scriviNellaCasella(el, range, testo, { cursore = 'end', tipo = 'insertText' } = {}) {
+  // `fuoco` falso salta la battuta, che prende il fuoco del campo.
+  function scriviNellaCasella(el, range, testo, { cursore = 'end', tipo = 'insertText', fuoco = true } = {}) {
     if (!el || !el.isConnected) return false;
     testo = String(testo ?? '');
     const prima = el.value;
