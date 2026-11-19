@@ -218,7 +218,7 @@ test('mentre scrivi in un\'altra riga, il cursore e la selezione restano dove li
   await pubblicato(page, 'commento salvato');
 });
 
-test('mentre componi una parola con la tastiera di un\'altra lingua, il testo torna solo a parola chiusa', async ({ openTab, testServer }) => {
+test('mentre componi una parola con la tastiera di un\'altra lingua, il testo torna senza chiuderla', async ({ openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA_TARDI);
   await ricaricaColTesto(page, 'commento salvato');
@@ -226,11 +226,8 @@ test('mentre componi una parola con la tastiera di un\'altra lingua, il testo to
   const cdp = await page.context().newCDPSession(page);
   await page.locator('#ce').click();
   await cdp.send('Input.imeSetComposition', { text: 'にほ', selectionStart: 2, selectionEnd: 2 });
-  await expect(casella(page)).toHaveCount(1, { timeout: 8000 });
-  await page.waitForTimeout(1000);
-  expect(await casella(page).inputValue(), 'a parola aperta il fuoco non si tocca').toBe('');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
   await cdp.send('Input.insertText', { text: '日本' });
-  await expect.poll(() => casella(page).inputValue(), { timeout: 5000 }).toBe('commento salvato');
   await page.keyboard.type(' fine');
   await expect(page.locator('#ce')).toHaveText('日本 fine');
   await pubblicato(page, 'commento salvato');
