@@ -41,7 +41,7 @@ test('ESPLORA undo', async ({ openTab }) => {
   page.on('pageerror', (e) => errori.push(e.message));
   const html = () => page.evaluate(() => document.getElementById('doc').innerHTML.replace(/<button[^>]*>.*?<\/button>/g, ''));
   for (const seq of ['# Tit', '- voce', '- div']) {
-    await page.evaluate((seq) => { const d = document.getElementById('doc'); d.innerHTML = seq === '- div' ? '<h1>sopra</h1><div><br></div>' : '<p>sopra</p><p><br></p>'; d.focus(); const r = document.createRange(); r.setStart(d.children[1], 0); getSelection().removeAllRanges(); getSelection().addRange(r); });
+    await page.evaluate((seq) => { const d = document.getElementById('doc'); d.innerHTML = seq === '- div' ? '<h1>sopra</h1><div><br></div>' : '<p>sopra</p><p><br></p>'; d.focus(); const r = document.createRange(); r.setStart(d.children[1], 0); getSelection().removeAllRanges(); getSelection().addRange(r); }, seq);
     await page.keyboard.type(seq);
     console.log('UNDO', seq, 'dopo', await html());
     for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+Z'); console.log('UNDO', seq, i, await html()); }
