@@ -677,7 +677,7 @@ jobs:
           ATTESI=$(node "$ALLARME/release-platform-alarm.mjs" --attesi Mac)
           MANCANTI=""
           for ATTESO in $ATTESI; do
-            echo "$ELENCO" | grep -qx "$ATTESO" || MANCANTI="${MANCANTI}${ATTESO} "
+            grep -qxF "$ATTESO" <<< "$ELENCO" || MANCANTI="${MANCANTI}${ATTESO} "
           done
           # Si elencano TUTTI i mancanti, non solo il primo: chi prende il
           # feedback deve sapere quanto manca, non scoprirlo un file alla volta.
