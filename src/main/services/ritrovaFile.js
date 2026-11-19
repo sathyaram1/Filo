@@ -36,7 +36,7 @@ async function cerca(nomeFile, dimensione, radici, { tettoMs = TETTO_MS, escludi
     try { voci = await fs.promises.readdir(radice, { withFileTypes: true }); } catch (_) { continue; }
     const sotto = [];
     for (const v of voci) {
-      if (Date.now() > fine) return { trovato: '', scaduto: true };
+      if (Date.now() >= fine) return { trovato: '', scaduto: true };
       if (v.isFile() && stessoNome(v.name, nome) && await giusto(path.join(radice, v.name))) {
         return { trovato: path.join(radice, v.name), dove: etichetta || path.basename(radice) };
       }
