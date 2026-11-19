@@ -505,8 +505,7 @@ for (const caso of [
       if (caso.compatta) expect(tentate, 'la compattazione è partita e non è riuscita').toBeGreaterThan(0);
       else expect(tentate, 'nessuna compattazione').toBe(0);
       const [richiesta] = await chiamateAlModello(app);
-      const sistema = richiesta[0].content;
-      expect(sistema.length, 'la parte fissa c\'è e pesa').toBeGreaterThan(20000);
+      expect(JSON.stringify(richiesta[0]).length, 'la parte fissa c\'è e pesa').toBeGreaterThan(20000);
       expect(JSON.stringify(richiesta), 'la conversazione recente resta davanti').toContain('Messaggio 89 sul viaggio');
       expect(await tokenDi(app, richiesta), 'la richiesta intera sta sotto il listino').toBeLessThanOrEqual(100000);
     } finally {
