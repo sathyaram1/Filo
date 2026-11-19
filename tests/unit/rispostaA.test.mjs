@@ -64,11 +64,11 @@ test('#2096: un messaggio dell\'utente citato da sé si ritrova fra i suoi, e re
 test('la home ritrova la risposta citata col testo di adesso, e dice quando la sua conversazione non c\'è più', () => {
   const righe = FCoda.elementi({ chats: [cena] });
   const mia = righe.find((v) => v.k === 'msg' && v.text === 'la seconda');
-  assert.deepEqual(mia.rispostaA, { chat: 'c-cena', i: 1, ts: '2026-10-28T10:00:05.000Z', role: 'filo', testo: '**Tre idee**:\n\n1. Pasta\n2. Risotto' });
+  assert.deepEqual(mia.rispostaA, [{ chat: 'c-cena', i: 1, ts: '2026-10-28T10:00:05.000Z', role: 'filo', testo: '**Tre idee**:\n\n1. Pasta\n2. Risotto' }]);
 
   const altrove = chat('c-dopo', [{ role: 'user', text: 'e la terza?', ts: '2026-10-28T11:00:00.000Z', rispostaA: { chat: 'c-cena', i: 1 } }]);
   const sola = FCoda.elementi({ chats: [altrove] }).find((v) => v.k === 'msg');
-  assert.deepEqual(sola.rispostaA, { chat: 'c-cena', i: 1, manca: true }, 'tolta la conversazione, la citazione non ne tiene il testo');
+  assert.deepEqual(sola.rispostaA, [{ chat: 'c-cena', i: 1, manca: true }], 'tolta la conversazione, la citazione non ne tiene il testo');
 });
 
 test('il modello legge la citazione in testa alle parole dell\'utente, con l\'ora per ritrovarla', () => {
