@@ -117,7 +117,7 @@
     if (l !== '' && !nuova) return { rifiuto: 'serve una lettera dalla a alla z' };
     const c = normalizza(cfg);
     const prima = (voci(c).find((v) => v.id === id) || {}).lettera || '';
-    const out = { ...c.lettere };
+    const out = mappa(c.lettere);
     if (nuova) {
       const altra = voci(c).find((v) => v.lettera === nuova && v.id !== id);
       if (altra) out[altra.id] = prima;
@@ -126,9 +126,9 @@
     // Una scelta uguale alla serie non è una scelta: resta pulito, e la serie torna a valere.
     for (const v of catalogo()) {
       if (out[v.id] !== v.lettera) continue;
-      if (!v.lettera || !voci({ lettere: out }).some((x) => x.id !== v.id && x.lettera === v.lettera)) delete out[v.id];
+      if (!v.lettera || !voci({ lettere: elenco(out) }).some((x) => x.id !== v.id && x.lettera === v.lettera)) delete out[v.id];
     }
-    return { lettere: out };
+    return { lettere: elenco(out) };
   }
 
   const pulito = (s) => String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
