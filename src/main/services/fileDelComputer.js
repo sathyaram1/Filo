@@ -121,4 +121,4 @@ function concessoDaLink(input) {
   return dentroConcesse(percorsoDi(input));
 }
 
-module.exports = { PARTIZIONE, VISIBILI, percorsoDi, giudica, scrittoDallUtente, concedi, concessoDaLink, preparaSessione };
+module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, concessoDaLink, preparaSessione };
