@@ -267,9 +267,11 @@
       const { commento, ...resto } = c;
       return { ...resto, pos };
     });
+    const daFuori = fuori;
     citate = [];
+    fuori = false;
     disegnaAnteprima();
-    return { testo, citate: lista };
+    return { testo, citate: lista, daFuori };
   }
   // Un messaggio che non parte torna nel campo con le sue citazioni: ognuna col suo commento, l'ultimo nel campo (che
   // torna a chi chiama).
