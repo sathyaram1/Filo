@@ -1184,7 +1184,7 @@ function observationsForPrompt(tutte) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), memoriaLettaForPrompt(actions), webSearchResultsForPrompt(actions),
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
-    schedeChiuseForPrompt(actions),
+    schedeChiuseForPrompt(actions), immaginiForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), espansioniForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
