@@ -504,6 +504,7 @@
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
+    WINDOW_MAXIMIZED_CHANGED: 'window_maximized_changed', // spinta alla sola shell della finestra → { massimizzata: bool }
     // Lo stato a tutto schermo CHIESTO dalla pagina appena si monta: chi nasce a modalità già
     // accesa non sentirebbe mai l'annuncio. Aperto anche alle pagine web. → { ok, fullscreen }
     FULLSCREEN_STATE: 'fullscreen_state',
