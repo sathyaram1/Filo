@@ -187,5 +187,5 @@
     return { voci, vociMenu, messaggioDi };
   }
 
-  global.SN_AZIONI_MESSAGGIO = { attacca, tasto, AZIONI, citazione, citaNelCampo, copiaTesto, CITA_MAX };
+  global.SN_AZIONI_MESSAGGIO = { attacca, tasto, AZIONI, citazione, citaNelCampo, copiaTesto, selezioneIn, CITA_MAX };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
