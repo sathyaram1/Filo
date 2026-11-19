@@ -35,19 +35,44 @@ test('in un foglio nuovo «# » apre un titolo solo, senza un paragrafo vuoto so
   expect(await page.locator('#doc li').allTextContents()).toEqual(['voce', 'altra']);
 });
 
-test('ESPLORA undo', async ({ openTab }) => {
+// Preme il tasto finché il foglio non è `atteso`, al più `volte` volte; torna il foglio visto per ultimo.
+async function premiFinché(page, tasto, atteso, volte = 8) {
+  let visti = await blocchi(page);
+  for (let i = 0; i < volte && JSON.stringify(visti) !== JSON.stringify(atteso); i++) {
+    await page.keyboard.press(tasto);
+    visti = await blocchi(page);
+  }
+  return visti;
+}
+
+test('Annulla riporta «# » e «- » scritti com\'erano, e Ripeti rifà titolo ed elenco col loro testo', async ({ openTab }) => {
   const page = await apriFoglioNuovo(openTab);
   const errori = [];
   page.on('pageerror', (e) => errori.push(e.message));
-  const html = () => page.evaluate(() => document.getElementById('doc').innerHTML.replace(/<button[^>]*>.*?<\/button>/g, ''));
-  for (const seq of ['# Tit', '- voce', '- div']) {
-    await page.evaluate((seq) => { const d = document.getElementById('doc'); d.innerHTML = seq === '- div' ? '<h1>sopra</h1><div><br></div>' : '<p>sopra</p><p><br></p>'; d.focus(); const r = document.createRange(); r.setStart(d.children[1], 0); getSelection().removeAllRanges(); getSelection().addRange(r); }, seq);
+  // Dopo un titolo Invio apre un <div>: anche lì l'elenco prende il posto della riga, non le sta dentro.
+  for (const [html, seq, tag, riga] of [
+    ['<p>sopra</p><p><br></p>', '# Tit', 'h1', 'p'],
+    ['<p>sopra</p><p><br></p>', '- voce', 'ul', 'p'],
+    ['<h1>sopra</h1><div><br></div>', '1. voce', 'ol', 'div'],
+  ]) {
+    await page.evaluate((html) => {
+      const d = document.getElementById('doc');
+      d.innerHTML = html;
+      d.focus();
+      const r = document.createRange();
+      r.setStart(d.children[1], 0);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    }, html);
     await page.keyboard.type(seq);
-    console.log('UNDO', seq, 'dopo', await html());
-    for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+Z'); console.log('UNDO', seq, i, await html()); }
-    for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+Shift+Z'); console.log('REDO', seq, i, await html()); }
+    const primo = (await blocchi(page))[0];
+    const scritto = seq.slice(0, seq.indexOf(' '));
+    const fatto = [primo, `${tag}:${seq.slice(scritto.length + 1)}`];
+    expect(await blocchi(page), seq).toEqual(fatto);
+    expect(await premiFinché(page, 'Control+Z', [primo, `${riga}:${scritto} `]), seq).toEqual([primo, `${riga}:${scritto} `]);
+    expect(await premiFinché(page, 'Control+Shift+Z', fatto), seq).toEqual(fatto);
   }
-  console.log('UNDO errori', errori);
+  expect(errori).toEqual([]);
 });
 
 const CASI = [
