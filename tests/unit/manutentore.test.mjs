@@ -106,6 +106,37 @@ test('il ramo di un worker prende il numero del suo feedback dall\'indice', () =
   assert.deepEqual(rami.map((r) => r.feedback), [['1680', '12'], ['5']]);
 });
 
+// #2480: le voci senza id (schede del server, non fidati) davano l'ultimo numero a ogni ramo che non è un tentativo.
+test('un ramo senza numero proprio resta senza numero, anche con voci dell\'indice senza id (#2480)', () => {
+  const rami = [{ ramo: 'claude/determined-sagan-19q19b', feedback: [] }, { ramo: 'claude/bozze-fuori', feedback: ['1674'] },
+    { ramo: 'worker/HNgzAr4lreN25OPInPXq-20261029T021625Z', feedback: [] }];
+  const dalServer = M.indiceDalServer([{ num: '2470', stato: 'todo' }, { num: '2479', stato: 'unlabeled' }]);
+  assert.deepEqual(M.conNumeri(rami, dalServer).map((r) => r.feedback), [[], ['1674'], []], 'contesto: le schede del server non hanno id');
+  const locale = M.conNonFidati([{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }], [{ num: '#2479' }]);
+  assert.deepEqual(M.conNumeri(rami, locale).map((r) => r.feedback), [[], ['1674'], ['1680']], 'rami: il non fidato senza id non va a nessuno');
+  assert.deepEqual(M.numeriDellIndice(locale), { 1680: 'HNgzAr4lreN25OPInPXq' });
+  const domanda = { id: 'D-1', titolo: 'T', stato: 'aperta', legata: 'HNgzAr4lreN25OPInPXq' };
+  assert.deepEqual(M.righeDomandeFerme([domanda], { indice: locale }), ['D-1 «T» ferma #1680 (aspetta l\'owner)']);
+});
+
+test('rami: un ramo claude/ senza numeri nei commit esce senza numero accanto a un non fidato appena nato (#2480)', async (t) => {
+  const leggi = catturaConsole(t);
+  const repo = repoConRami([['claude/vecchio', 'package-lock.json', 'chore: update package-lock.json from npm install'],
+    ['worker/HNgzAr4lreN25OPInPXq-20261114T060000Z', 'src/a.js', 'lavoro']], cartellaTemporanea('manutentore-2480'));
+  const schede = cartellaTemporanea('manutentore-2480-schede');
+  t.after(() => { togliCartella(repo); togliCartella(schede); });
+  writeFileSync(join(schede, 'indice.json'), JSON.stringify([{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }]));
+  writeFileSync(join(schede, 'non-fidati.json'), JSON.stringify([{ num: '2479', perizia: { classe: 3, file: ['package-lock.json'] } }]));
+  const env = { FILO_SERVER_CLONE: join(schede, 'nessun-clone') };
+  assert.equal(await M.main(['rami', '--cartella', schede, '--senza-fetch', '--giorni', '0'], { root: repo, env }), 0);
+  const testo = leggi();
+  assert.match(testo, /^worker\/HNgzAr4lreN25OPInPXq-20261114T060000Z \(#1680\), 1 commit, /m);
+  assert.match(testo, /^claude\/\(nome non mostrato\) @[0-9a-f]{7}, 1 commit, .*: package-lock\.json$/m);
+  assert.doesNotMatch(testo, /#2479/);
+  assert.equal(await M.main(['incroci', '2479', '--cartella', schede, '--senza-fetch', '--giorni', '0'], { root: repo, env }), 0);
+  assert.doesNotMatch(leggi(), /\(#2479/, 'incroci non fa credere che #2479 abbia già un ramo');
+});
+
 test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o che nessuno li tocca', async (t) => {
   const dir = cartellaTemporanea('manutentore');
   const out = []; const err = [];
