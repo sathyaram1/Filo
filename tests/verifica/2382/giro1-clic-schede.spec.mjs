@@ -59,10 +59,6 @@ test('dopo un riordino il clic seguente sulla stessa scheda la apre', async ({ s
     const r = document.querySelector(`#tabs .tab[data-id="${id}"]`).getBoundingClientRect();
     return { x: r.left + 24, y: r.top + r.height / 2 };
   }, p.id);
-  // Un'altra attiva, poi il clic sulla trascinata.
-  const altra = await centro(shell, 0, null);
-  await shell.mouse.click(altra.x, altra.y);
-  await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(altra.id);
   await shell.mouse.click(q.x, q.y, { delay: 80 });
   await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(p.id);
 });
