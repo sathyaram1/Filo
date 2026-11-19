@@ -27,7 +27,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
   const file = globalThis.SN_URL_NAV.fileDiQuestoComputer(url);
   if (file) {
     if (typeof action._fileDelComputer !== 'string' || !action._fileDelComputer) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'rete' } };
-    url = require('../fileDelComputer').giudicato(action._fileDelComputer);
+    url = require('../fileDelComputer').indirizzoDi(action._fileDelComputer);
   }
   // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
   // iniettare istruzioni nel modello (prompt injection) per fargli aprire
