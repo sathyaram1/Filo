@@ -56,6 +56,13 @@ test('aprire un file di questo computer non manda fuori dati: niente avviso «po
   assert.equal(rete.exfil, true, 'un indirizzo web con gli stessi dati resta un\'uscita');
 });
 
+test('un file che non si apre dice il suo perché, non «bloccato per sicurezza»', () => {
+  const { avvisoFileNonAperto } = require('../../src/main/services/indirizzoFermato.js');
+  assert.equal(avvisoFileNonAperto({ motivo: 'assente', percorso: '/home/u/r.html' }).testo, 'File non trovato: /home/u/r.html');
+  assert.equal(avvisoFileNonAperto({ motivo: 'tipo', percorso: '/home/u/l.docx' }).testo, 'Questo tipo di file non si mostra in una scheda: /home/u/l.docx');
+  assert.equal(avvisoFileNonAperto({ motivo: 'rete', percorso: 'file://nas/x.html' }).testo, 'Percorso di rete bloccato per sicurezza: //nas/x.html');
+});
+
 test('un file col percorso non scritto dall\'utente chiede il suo OK, e la conferma dice quale file', () => {
   const L = globalThis.SN_ACTION_LEVELS;
   const a = { type: 'NAVIGA', url: 'file:///home/u/r.html', _fileDelComputer: '/home/u/r.html' };
