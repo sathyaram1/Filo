@@ -425,7 +425,7 @@ jobs:
           echo "Allegati nella bozza:"
           echo "$ELENCO"
           for ATTESO in Filo-Setup.exe latest.yml; do
-            echo "$ELENCO" | grep -qx "$ATTESO" || {
+            grep -qxF "$ATTESO" <<< "$ELENCO" || {
               echo "::error::manca $ATTESO nella bozza ${{ steps.bump.outputs.version }}: non la pubblico."
               {
                 echo "## Pubblicazione ferma: manca $ATTESO"
