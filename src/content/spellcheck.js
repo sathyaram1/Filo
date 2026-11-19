@@ -352,7 +352,7 @@
   // dopo: il testo già superato non cambia da solo, e un testo messo da uno script non si tocca.
   function fineParolaBattuta(state, evento) {
     // Quello che scrive Filo (Incolla, dettatura, Modifica) arriva come una battuta ma non chiude una parola dell'utente.
-    if (suppressAutocorrect || !A() || state.filoScrive != null) return;
+    if (suppressAutocorrect || !A()) return;
     const tipo = evento && evento.inputType;
     if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
     const G = global.SN_GESTO;
