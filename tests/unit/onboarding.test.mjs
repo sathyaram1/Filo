@@ -619,11 +619,41 @@ test('#2536 — intervista rifatta: il divieto di citare copre la memoria, non s
   // Detto solo delle conversazioni passate, il modello leggeva il profilo come permesso («Bene Luca, geometra»).
   const divieto = rifatta.match(/Finché dura l'intervista,[^\n]*?conta solo quello che ti dice qui/)?.[0] || '';
   assert.match(divieto, /dalla MEMORIA o dalle conversazioni passate/, 'il divieto nomina la memoria');
-  assert.match(divieto, /non lo nomini, non glielo attribuisci/, 'né citato né attribuito a lui');
+  assert.match(divieto, /non lo nomini se non è lui a chiederti cosa ricordi, non glielo attribuisci/, 'né citato di sua iniziativa né attribuito a lui');
   assert.match(divieto, /impostazione o in memoria\(impara\)/, 'né riscritto come se l’avesse detto oggi');
-  assert.match(rifatta, /MEMORIA \(profilo e preferenze\)/, 'la memoria è detta con le sue parti, come le vede nel CONTESTO');
   const primo = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
   assert.doesNotMatch(primo, /Finché dura l'intervista/, 'al primo avvio la memoria è vuota: niente divieto');
+});
+
+// #2536.1 — con la memoria tolta dal CONTESTO il modello la prendeva per vuota: «di te non so niente», «niente da
+// togliere», e la riga chiesta da togliere restava.
+test('#2536.1 — memoria nascosta nell’intervista: c’è, si legge se la chiede lui, dimentica e correggi la trovano', () => {
+  const checklist = O.renderChecklistForPrompt(O.emptyState());
+  const base = { onboarding: checklist, onboardingTurns: 1, onboardingMax: 5, onboardingRifatta: true };
+  const nascosta = C.PROMPTS.filoChatOnboarding({ ...base, memoriaNascosta: true });
+  assert.match(nascosta, /MEMORIA \(profilo, preferenze e lezioni\) non ce l'hai davanti apposta, ma c'è/);
+  assert.match(nascosta, /non dirgli che è vuota o che di lui non sai niente/);
+  assert.match(nascosta, /cosa ricordi o sai di lui, leggila con memoria\(leggi\)/);
+  assert.match(nascosta, /memoria\(dimentica\) e memoria\(correggi\) la trovano lo stesso/);
+  assert.match(C.PROMPTS.filoChatContext({ ...base, memoriaNascosta: true }), /memoria\(leggi\)/, 'anche dal ripiego senza filo');
+  // La frase segue la decisione che toglie la memoria, non il fatto che l'intervista sia rifatta.
+  const davanti = C.PROMPTS.filoChatOnboarding(base);
+  assert.match(davanti, /Non è il primo avvio/);
+  assert.doesNotMatch(davanti, /non ce l'hai davanti|memoria\(leggi\)/, 'con la memoria nel CONTESTO non le si dice che manca');
+  assert.doesNotMatch(C.PROMPTS.filoChatOnboarding({ onboarding: checklist, memoriaNascosta: true }), /Non è il primo avvio/);
+  const memoria = globalThis.SN_ACTION_TOOLS.definitions().find((t) => t.function.name === 'memoria');
+  assert.ok(memoria.function.parameters.properties.azione.enum.includes('leggi'), 'memoria(leggi) è uno strumento vero');
+});
+
+test('#2536.1 — turnoChat: la frase sulla memoria nascosta viene dalla stessa decisione che la toglie', () => {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'turnoChat.js'), 'utf8');
+  const decisioni = [...src.matchAll(/const memoriaNascosta = /g)];
+  assert.equal(decisioni.length, 1, 'una decisione sola');
+  assert.match(src, /memoriaNascosta \? \{\} : await memoriaPerModello\(\)/, 'la decisione toglie la memoria');
+  assert.match(src, /^\s+memoriaNascosta,$/m, 'e passa così com’è al payload della chat');
+  const chiamate = [...src.matchAll(/PROMPTS\.filoChatOnboarding\(\{[^)]*\}\)/g)].map((m) => m[0]);
+  assert.ok(chiamate.length >= 1);
+  for (const c of chiamate) assert.match(c, /memoriaNascosta: payloadBase\.memoriaNascosta/, c);
 });
 
 test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {
