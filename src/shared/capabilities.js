@@ -975,6 +975,7 @@
     fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
     'pannello-strumenti': 'home(pannello)', 'page-zoom': 'scheda(zoom)', 'network-error-page': SOLO_A_MANO,
     'auto-archive': 'scheda(riordina)', 'restore-tabs': SOLO_A_MANO, 'reorder-tabs': SOLO_A_MANO, 'drag-tab': SOLO_A_MANO,
+    'link-su-scheda': 'scheda(apri)',
     'tab-preview': 'impostazioni(imposta)', 'open-in-background': 'scheda(apri)', 'explain-selection': SOLO_A_MANO,
     'translate-selection': SOLO_A_MANO, 'edit-selection': SOLO_A_MANO, 'read-aloud': SOLO_A_MANO, dictate: SOLO_A_MANO,
     'search-web': 'web(cerca)', spellcheck: 'impostazioni(imposta)', 'valuta-testo': SOLO_A_MANO,
