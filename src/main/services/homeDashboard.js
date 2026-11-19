@@ -135,13 +135,16 @@ function avvisiVolati(sender) {
   return a && typeof a.colonna === 'function' ? a : null;
 }
 
-// Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
+// Dove stanno carte e tasti per il modello, come li vede la home: una funzione in pausa non si nomina (#1592), e la
+// Bacheca in pausa è il tasto delle Segnalazioni.
 function descriviCarte(layout) {
   const CH = globalThis.SN_CARTE_HOME;
   const dove = CH.descrivi(layout);
-  if (require('./inPausa').aperti().mazzi) return dove;
-  const mazzi = CH.carta('mazzi').titolo;
-  return { destra: dove.destra.filter((t) => t !== mazzi), altro: dove.altro.filter((t) => t !== mazzi) };
+  const aperti = require('./inPausa').aperti();
+  const mazzi = aperti.mazzi ? null : CH.carta('mazzi').titolo;
+  const bacheca = aperti.bacheca ? null : CH.tasto('bacheca').titolo;
+  const vista = (l) => l.filter((t) => t !== mazzi).map((t) => (t === bacheca ? CH.SEGNALAZIONI.titolo : t));
+  return { destra: vista(dove.destra), tasti: vista(dove.tasti), altro: vista(dove.altro) };
 }
 
 // null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.

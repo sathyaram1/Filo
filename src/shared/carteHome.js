@@ -33,6 +33,9 @@
     { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html', nomi: ['memorie', 'quaderno', 'quaderno delle memorie', 'cronologia'] },
     { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html', nomi: ['bacheca', 'segnalazioni'] },
   ];
+  // Con la Bacheca in pausa (#1592) il suo tasto porta alle sole segnalazioni dell'utente: così lo vedono la home e
+  // l'agente.
+  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
   // I tasti di «altro» (#2372): le app, la ricerca nel filo e i comandi che stavano in alto a destra. Il «+» non è un
   // tasto: è fisso e tiene quelli fuori vista. `fuori`: di serie sta nel «+».
   const TASTI = [
@@ -336,7 +339,7 @@
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, TASTI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
+    CARTE, APP, TASTI, SEGNALAZIONI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
     chiaveTimer, chiaveDownload, cartaDiAvviso,

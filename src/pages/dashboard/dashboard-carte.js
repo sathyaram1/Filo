@@ -668,8 +668,7 @@
   // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
   const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
   // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
-  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
-  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
+  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? C.SEGNALAZIONI : a));
 
   function carteDestra() {
     return ((layout && layout.destra) || []).filter((id) => !inPausa(id)).map((id) => {
@@ -843,7 +842,7 @@
   const letteraDi = (id) => (Tocco() ? Tocco().diTasto(dati.impostazioni && dati.impostazioni.doppioTocco, id) : null);
   // Il tasto come si vede: la Bacheca in pausa porta alle Segnalazioni.
   function tastoVisto(id) {
-    if (id === 'bacheca' && !dati.aperte.bacheca) return { ...C.tasto(id), ...SEGNALAZIONI, nomi: [] };
+    if (id === 'bacheca' && !dati.aperte.bacheca) return { ...C.tasto(id), ...C.SEGNALAZIONI, nomi: [] };
     return C.tasto(id);
   }
   // Clic e Invio su un tasto, ovunque stia (colonna, «+», doppio tocco).

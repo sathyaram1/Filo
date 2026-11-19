@@ -74,6 +74,14 @@ test('domandaOltreAlComando: «spiegami», «non l\'ho capito», la domanda senz
   for (const t of no) assert.equal(AF.domandaOltreAlComando(t), false, t);
 });
 
+// #2593: senza un comando la domanda è la richiesta, e l'azione che il modello sceglie le risponde (#1130).
+test('domandaOltreAlComando: una domanda sola non è «oltre al comando»; chi chiede di spiegare sì', () => {
+  for (const t of ['dov\'è la ricevuta dell\'assicurazione?', 'guarda lo schermo e dimmi cosa vedi', 'cosa c’è nella finestra del conto?']) {
+    assert.equal(AF.domandaOltreAlComando(t), false, t);
+  }
+  assert.equal(AF.domandaOltreAlComando('non ho capito quel feedback, spiegamelo'), true);
+});
+
 test('una domanda di parere è discussione: nessuna segnalazione; una che chiede un dato resta una richiesta', () => {
   const casi = [
     ['non trovi strano che tutti i browser abbiano le schede in alto?',
