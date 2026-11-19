@@ -3344,7 +3344,7 @@ class TabManager {
     this._sbGuardiaTastiera(tab, wc);
     // Una scheda di dietro che si carica si prende la tastiera da sola (#871.5): torna a quella davanti.
     wc.on('focus', () => setImmediate(() => {
-      if (false && tab.id !== this.activeId && tab.view.webContents === wc && this.tabs.includes(tab)) this._tastieraAllaSchedaAttiva();
+      if (tab.id !== this.activeId && tab.view.webContents === wc && this.tabs.includes(tab)) this._tastieraAllaSchedaAttiva();
     }));
     this._sbSeguiPuntatore(tab, wc);
     this.riquadri.segui(wc);
