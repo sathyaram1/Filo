@@ -1555,7 +1555,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
     return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
-  if (type === 'TRADUCI_PAGINA' && res.output && ESITI_TRADUZIONE[res.output.traduzione]) return ESITI_TRADUZIONE[res.output.traduzione](res.output);
+  if (type === 'TRADUCI_PAGINA' && res.output && ESITI_TRADUZIONE[res.output.traduzione]) {
+    const dove = res.output.dietro ? '\nLa pagina è l\'ultima scheda web che l\'utente ha usato, non quella che ha davanti: diglielo.' : '';
+    return `${ESITI_TRADUZIONE[res.output.traduzione](res.output)}${dove}`;
+  }
   if (type === 'ANNULLA_CAMBIO' && res.output) {
     const o = res.output;
     if (!res.executed) {
