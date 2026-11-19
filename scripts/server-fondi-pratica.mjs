@@ -167,6 +167,12 @@ function gitEsito(cwd, args) {
   }
 }
 
+function stessoAlbero(cartella, a, b) {
+  const r = gitEsito(cartella, ['rev-parse', `${a}^{tree}`, `${b}^{tree}`]);
+  const [x, y] = r.ok ? String(r.out).trim().split(/\s+/) : [];
+  return !!x && x === y;
+}
+
 function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
