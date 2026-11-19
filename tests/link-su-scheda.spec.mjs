@@ -109,11 +109,15 @@ test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fo
   expect(dopo.schede).toHaveLength(5);
   expect(dopo.attiva).toBe(dopo.schede.at(-1).id);
   // La miniatura lasciata dove non c'è una scheda: l'immagine va alla chat come prima (#1623), nessuna scheda nuova.
+  // La fila si è allungata: la parte vuota si rimisura, o il punto cadrebbe sulla scheda appena nata.
+  await expect(shell.locator('.tab')).toHaveCount(5);
+  const piu = await shell.locator('#tab-new').boundingBox();
+  const fondo = { x: piu.x + piu.width + 120, y: piu.y + piu.height / 2 };
   const foto = join(cartellaInCasa('filo-test-link-'), 'miniatura.png');
   writeFileSync(foto, PNG);
-  await trascina(shell, testServer.html(pagina('Tre')), { ...vuoto, fasi: ['dragEnter', 'dragOver'], file: [foto] });
+  await trascina(shell, testServer.html(pagina('Tre')), { ...fondo, fasi: ['dragEnter', 'dragOver'], file: [foto] });
   await expect(shell.locator('.link-posto')).toBeHidden();
-  await trascina(shell, testServer.html(pagina('Tre')), { ...vuoto, fasi: ['drop'], file: [foto] });
+  await trascina(shell, testServer.html(pagina('Tre')), { ...fondo, fasi: ['drop'], file: [foto] });
   await shell.waitForTimeout(800);
   expect((await stato(shell)).schede).toHaveLength(5);
 });
