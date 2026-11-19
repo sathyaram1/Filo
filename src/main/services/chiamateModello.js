@@ -819,5 +819,6 @@ module.exports = {
   maybeRunCompactor,
   compattaDaFermo,
   parteFissaChat,
+  baseDellaChat,
   stimaSogliaCompattazione,
 };
