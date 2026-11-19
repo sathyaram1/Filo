@@ -124,16 +124,13 @@ async function inFila(voci, n, fn) {
   return out;
 }
 
-function datoRiservato(q) {
-  const P = globalThis.SN_PAVIMENTO;
-  try { return Boolean(P && P.trova(q).length); } catch (_) { return true; }
-}
-
 // → { ok, provider, immagini: [{ id, src, titolo, sito, pagina?, larghezza?, altezza? }], reason? }
 async function cerca(query, { tavilyKey = '' } = {}) {
+  const WS = globalThis.SN_WEB_SEARCH;
   const q = String(query || '').trim().slice(0, MAX_QUERY);
   if (!q) return { ok: false, immagini: [], reason: 'ricerca vuota' };
-  if (datoRiservato(q)) return { ok: false, immagini: [], reason: 'La ricerca conteneva un dato riservato (una password, una carta, un codice o una chiave): Filo non l\'ha mandata.', pavimento: true };
+  const pavimento = WS ? WS.riservata(query) : 'ricerca non disponibile';
+  if (pavimento) return { ok: false, immagini: [], reason: pavimento, pavimento: true };
   const [daTavily, daCommons] = await Promise.all([
     tavilyKey ? dip.tavily(q, tavilyKey).catch(() => []) : Promise.resolve([]),
     dip.commons(q).catch(() => []),
