@@ -439,8 +439,8 @@
     if (role === 'user' && turn.daModello) out.daModello = true;
     // Scritto mentre Filo rispondeva (#1296): sta dentro quel turno, che lo rimanda col suo giro (contestoFilo.js).
     if (role === 'user' && turn.seguito === true) out.seguito = true;
-    // La risposta di Filo a cui il messaggio risponde (#1620): il suo posto nel filo, non una copia.
-    const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.riferimento(turn.rispostaA) : null;
+    // Le risposte (o i loro passi) a cui il messaggio risponde (#1620, #2346): il loro posto nel filo, non una copia.
+    const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.daSalvare(turn.rispostaA) : null;
     if (rispostaA) out.rispostaA = rispostaA;
     // Scritto nell'Aiuto sopra un sito: riletto è testo da fuori (#1508, src/shared/filoContesto.js → daFuoriDi).
     if (role === 'user' && turn.daPagina === true) out.daPagina = true;
