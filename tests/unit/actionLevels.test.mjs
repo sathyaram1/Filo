@@ -422,7 +422,7 @@ test('#592.21 — un valore che passa i controlli resta del modello: nel riquadr
     }
   }
   assert.ok(font > 0, 'nessun token accetta la frase finta: la sonda non prova i font');
-  const georgia = AL.describeParts({ type: 'IMPOSTA_ESTETICA', token: T.list().find((t) => t.type === 'font').name, valore: 'Georgia' });
+  const georgia = AL.describeParts({ type: 'IMPOSTA_ESTETICA', token: Object.keys(T.TOKENS).find((k) => T.TOKENS[k].type === 'font'), valore: 'Georgia' });
   assert.equal(neiRiquadri(georgia), 'Georgia');
 });
 
