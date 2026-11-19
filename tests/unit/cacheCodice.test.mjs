@@ -13,7 +13,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const MODULO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'main', 'cacheCodice.js');
 
-// La cache la accende il Node di Electron: quello che corre gli unit (il 20 di GitHub) non ha enableCompileCache (#2204).
+// La cache la accende il Node di Electron: quello che corre gli unit può non avere enableCompileCache (#2204).
 function motore() {
   const require = createRequire(import.meta.url);
   try {
