@@ -153,7 +153,7 @@ test('«antilope immagine»: le foto stanno nella risposta, fra un pezzo di test
 
 test('«disegnami un gatto astronauta»: l\'immagine creata compare segnata come fatta con l\'AI, anche senza marcatore', async ({ app, openTab }) => {
   test.setTimeout(120_000);
-  await stubModello(app, { chiamata: { azione: 'crea', descrizione: 'a cat astronaut floating in space, watercolor' }, finale: 'Ecco il tuo gatto astronauta.' });
+  await stubModello(app, { chiamata: { azione: 'disegna', descrizione: 'a cat astronaut floating in space, watercolor' }, finale: 'Ecco il tuo gatto astronauta.' });
   const page = await openTab(NEWTAB);
   await chiedi(page, 'disegnami un gatto astronauta');
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco il tuo gatto astronauta.' });
