@@ -22,6 +22,7 @@ Module._load = function (request, parent, isMain) {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'pavimento.js'));
+require(join(ROOT, 'src', 'main', 'services', 'webSearch.js'));
 const Chat = require(join(ROOT, 'src', 'main', 'services', 'immaginiChat.js'));
 const Copie = require(join(ROOT, 'src', 'main', 'services', 'copieIcone.js'));
 
