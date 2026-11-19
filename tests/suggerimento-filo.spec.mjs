@@ -363,14 +363,14 @@ test('un title scritto dal codice durante il passaggio esce nel fumetto, quello 
 test('lo scorrimento e la finestra che perde il fuoco chiudono il fumetto', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   await pronta(page);
-  const { el, titolo } = await unTitoloVisibile(page);
-  await el.hover();
+  const { el, titolo, passa } = await unTitoloVisibile(page);
+  await passa();
   await expect(fumetto(page)).toHaveText(titolo);
   await page.mouse.wheel(0, 200);
   await expect(fumetto(page)).toBeHidden();
   await page.mouse.move(1, 1);
   await el.scrollIntoViewIfNeeded();
-  await el.hover();
+  await passa();
   await expect(fumetto(page)).toHaveText(titolo);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   await expect(fumetto(page)).toBeHidden();
