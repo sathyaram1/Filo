@@ -94,22 +94,19 @@ test('X di una scheda dietro al primo passaggio: chiude', async ({ shell, testSe
 
 test('col menu del tasto destro aperto, il clic sulla scheda accanto la apre', async ({ app, shell, testServer }) => {
   await apri(shell, testServer, 4);
-  const a = await centro(shell, 1, null);
-  const b = await centro(shell, 2, null);
+  const b = await centro(shell, 1, null);
+  const a = await centro(shell, 2, null);
   await shell.mouse.click(b.x, b.y, { button: 'right' });
-  const pop = await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+  const geometria = () => app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x.isVisible() && x.webContents.getURL().startsWith('data:text/html') && x.getParentWindow());
     if (!w) return null;
     return { pop: w.getContentBounds(), main: w.getParentWindow().getContentBounds() };
-  }), { timeout: 5_000 }).not.toBeNull();
-  void pop;
-  const g = await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x.isVisible() && x.webContents.getURL().startsWith('data:text/html') && x.getParentWindow());
-    return { pop: w.getContentBounds(), main: w.getParentWindow().getContentBounds() };
   });
-  // Il punto del clic sulla scheda a sinistra, se cade nella cornice trasparente del menu.
-  const px = g.main.x + a.x + 40 - g.pop.x;
-  const py = g.main.y + a.y - g.pop.y;
+  await expect.poll(geometria, { timeout: 5_000 }).not.toBeNull();
+  const g = await geometria();
+  // La scheda a destra, nella fascia trasparente sopra il menu.
+  const px = g.main.x + a.x - g.pop.x;
+  const py = g.main.y + b.y - 5 - g.pop.y;
   test.skip(px < 0 || py < 0 || px >= g.pop.width || py >= g.pop.height, 'il punto non cade sulla cornice del menu');
   await app.evaluate(({ BrowserWindow }, [x, y]) => {
     const w = BrowserWindow.getAllWindows().find((v) => v.isVisible() && v.webContents.getURL().startsWith('data:text/html') && v.getParentWindow());
