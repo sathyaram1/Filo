@@ -1,25 +1,19 @@
-// Una combinazione di tasti come la scrive chi pilota Filo («Ctrl+W», «Control+t», «Cmd+Shift+T», «Esc») → il nome che
-// vuole Playwright e l'`input` di before-input-event, dove Filo ascolta le scorciatoie della finestra (driver.mjs).
-// PURA. Prove: tests/unit/provaDaUtente.test.mjs.
+// Una combinazione di tasti come la scrive chi pilota Filo («Ctrl+W», «Controllo+T», «Cmd+Shift+T», «Esc») → il nome che
+// vuole Playwright e l'`input` di before-input-event (driver.mjs). La legge il lettore di Filo (SN_TASTI.letturaScritta):
+// qui si traducono solo i nomi. PURA. Prove: tests/unit/provaDaUtente.test.mjs.
 
-const MODIFICATORI = {
-  control: 'control', ctrl: 'control', ctl: 'control',
-  meta: 'meta', cmd: 'meta', command: 'meta', super: 'meta', win: 'meta',
-  alt: 'alt', option: 'alt', opt: 'alt', altgr: 'alt',
-  shift: 'shift', maiusc: 'shift',
-};
-// «Il Ctrl di questo sistema»: Cmd su Mac, Ctrl altrove (CLAUDE.md § Mac e Linux).
-const CTRL_O_CMD = new Set(['controlormeta', 'commandorcontrol', 'cmdorctrl', 'ctrlorcmd', 'mod']);
-const NOMI_PLAYWRIGHT = { control: 'Control', meta: 'Meta', alt: 'Alt', shift: 'Shift' };
+import { createRequire } from 'node:module';
 
-const NOMI = {
-  enter: 'Enter', return: 'Enter', invio: 'Enter', escape: 'Escape', esc: 'Escape', tab: 'Tab',
-  space: 'Space', spacebar: 'Space', spazio: 'Space', backspace: 'Backspace', delete: 'Delete', del: 'Delete', canc: 'Delete',
-  home: 'Home', end: 'End', fine: 'End', pageup: 'PageUp', pagedown: 'PageDown', pgup: 'PageUp', pgdn: 'PageDown',
-  insert: 'Insert', ins: 'Insert',
-  up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
-  arrowup: 'ArrowUp', arrowdown: 'ArrowDown', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight',
-  plus: '+', minus: '-', meno: '-', piu: '+', più: '+',
+createRequire(import.meta.url)('../../src/shared/tasti.js');
+const T = globalThis.SN_TASTI;
+
+// I nomi di Electron per «il Ctrl di questo sistema»: per Filo Ctrl scritto è già Cmd su Mac.
+const CTRL_O_CMD = /^(controlormeta|commandorcontrol|cmdorctrl|ctrlorcmd|mod)$/i;
+// Il tasto canonico di Filo → il nome del DOM, che usano Playwright ed Electron.
+const NOMI_DOM = {
+  space: 'Space', enter: 'Enter', escape: 'Escape', tab: 'Tab', backspace: 'Backspace', delete: 'Delete', insert: 'Insert',
+  home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown', contextmenu: 'ContextMenu', pause: 'Pause',
+  printscreen: 'PrintScreen', '←': 'ArrowLeft', '→': 'ArrowRight', '↑': 'ArrowUp', '↓': 'ArrowDown',
 };
 const CODICI_SEGNI = {
   '-': 'Minus', '=': 'Equal', '+': 'Equal', '[': 'BracketLeft', ']': 'BracketRight', '\\': 'Backslash', ',': 'Comma',
@@ -28,28 +22,27 @@ const CODICI_SEGNI = {
 
 /**
  * `testo` → { ok, playwright, input: { key, code, control, shift, alt, meta } } o { ok: false, errore }. Un nome di
- * tasto che non conosce passa com'è: lo giudica Playwright. `piattaforma` decide «CmdOrCtrl».
+ * tasto che Filo non conosce passa com'è: lo giudica Playwright. `piattaforma` decide dove Ctrl scritto è Cmd.
  */
 export function leggiTasto(testo, piattaforma = process.platform) {
-  const t = String(testo || '').trim();
-  if (!t) return { ok: false, errore: 'tasto vuoto' };
-  let parti;
-  let tasto;
-  if (t === '+' || t.endsWith('++')) { parti = t.slice(0, -2).split('+'); tasto = '+'; }
-  else { parti = t.split('+'); tasto = parti.pop(); }
-  tasto = tasto.trim();
-  if (!tasto) return { ok: false, errore: `nella combinazione «${t}» manca il tasto` };
-  const mod = { control: false, shift: false, alt: false, meta: false };
-  for (const p of parti.map((x) => x.trim().toLowerCase()).filter(Boolean)) {
-    const m = CTRL_O_CMD.has(p) ? (piattaforma === 'darwin' ? 'meta' : 'control') : MODIFICATORI[p];
-    if (!m) return { ok: false, errore: `«${p}» non è un modificatore (Control, Shift, Alt, Meta)` };
-    mod[m] = true;
-  }
-  const nome = NOMI[tasto.toLowerCase()] || (/^f([1-9]|1[0-9]|2[0-4])$/i.test(tasto) ? tasto.toUpperCase() : tasto);
-  const lettera = /^[a-z]$/i.test(nome);
-  const cifra = /^[0-9]$/.test(nome);
-  const key = lettera ? (mod.shift ? nome.toUpperCase() : nome.toLowerCase()) : nome === 'Space' ? ' ' : nome;
-  const code = lettera ? `Key${nome.toUpperCase()}` : cifra ? `Digit${nome}` : CODICI_SEGNI[nome] || nome;
-  const playwright = [...Object.keys(NOMI_PLAYWRIGHT).filter((m) => mod[m]).map((m) => NOMI_PLAYWRIGHT[m]), lettera ? key : nome].join('+');
+  const grezzo = String(testo || '').trim();
+  if (!grezzo) return { ok: false, errore: 'tasto vuoto' };
+  const t = grezzo === '+' ? 'Plus' : grezzo.split('+').map((p) => (CTRL_O_CMD.test(p.trim()) ? 'Ctrl' : p)).join('+');
+  if (T.soloModificatori(t) || /\+\s*$/.test(t) && !/\+\s*\+$/.test(t)) return { ok: false, errore: `nella combinazione «${grezzo}» manca il tasto` };
+  const ignoto = T.pezzoSconosciuto(t);
+  if (ignoto && ignoto.modificatore) return { ok: false, errore: `«${ignoto.nome}» non è un modificatore (Control, Shift, Alt, Meta)` };
+  const l = T.letturaScritta(t);
+  if (!l) return { ok: false, errore: `«${grezzo}» non si legge come una combinazione` };
+  const mac = piattaforma === 'darwin';
+  const mod = { control: l.ctrl && (!mac || l.cmdECtrl), shift: l.shift, alt: l.alt, meta: l.ctrl && (mac || l.cmdECtrl) };
+  const c = l.tasto;
+  const lettera = /^[a-z]$/.test(c);
+  const cifra = /^[0-9]$/.test(c);
+  const funzione = /^f([1-9]|1[0-9]|2[0-4])$/.test(c);
+  // Un nome che Filo non riconosce (MediaPlayPause) resta scritto com'era.
+  const nome = NOMI_DOM[c] || (funzione ? c.toUpperCase() : [...c].length === 1 ? c : l.scritto);
+  const key = lettera ? (mod.shift ? c.toUpperCase() : c) : nome === 'Space' ? ' ' : nome;
+  const code = lettera ? `Key${c.toUpperCase()}` : cifra ? `Digit${c}` : CODICI_SEGNI[c] || nome;
+  const playwright = [mod.control && 'Control', mod.meta && 'Meta', mod.alt && 'Alt', mod.shift && 'Shift', lettera ? key : nome].filter(Boolean).join('+');
   return { ok: true, playwright, input: { key, code, ...mod } };
 }
