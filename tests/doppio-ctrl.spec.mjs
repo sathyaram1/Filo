@@ -268,6 +268,17 @@ test('M, U e B passano dalle porte della chat: muto e smuto, le cuffie preferite
   await doppio('l');
   await expect.poll(() => page.evaluate(() => window.__letto), { timeout: 10_000 }).toContain('Testo della pagina da leggere.');
   expect(await page.evaluate(() => window.__tasti)).toEqual([]);
+
+  // S e O sono le icone Cattura schermo e Trascrivi: la stessa strada della barra laterale, che le consegna alla pagina.
+  await app.evaluate(({ BrowserWindow }) => {
+    const b = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra;
+    const vera = b.eseguiSullaPagina.bind(b);
+    globalThis.__icone = [];
+    b.eseguiSullaPagina = (id, o) => { const r = vera(id, o); globalThis.__icone.push([id, r]); return r; };
+  });
+  await doppio('s');
+  await doppio('o');
+  await expect.poll(() => app.evaluate(() => globalThis.__icone)).toEqual([['screenshot', true], ['transcribe', true]]);
   await app.evaluate(() => {
     globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer(null);
     const rq = process.mainModule.require;
