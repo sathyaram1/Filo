@@ -60,7 +60,7 @@ const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
 const attesa = (page, ms) => page.evaluate((t) => new Promise((ok) => setTimeout(ok, t)), ms);
 const scorsa = (page) => page.evaluate(() => {
   const chi = document.querySelector('[data-scorre-prova]');
-  return (chi.scrollTop - Number(chi.dataset.scorreDa)) * Number(chi.dataset.verso);
+  return chi.scrollTop - Number(chi.dataset.scorreDa);
 });
 const scorriAncora = (page) => page.evaluate(() => window.__scorri(200));
 
