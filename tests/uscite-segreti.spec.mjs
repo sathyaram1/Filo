@@ -267,10 +267,10 @@ for (const [dove, carta, campo] of [
     await oltreLAvviso(app);
     await preparaModelli(app);
     await modelloFinto(app, { aiuto: '{"text":"Manca solo il pulsante Paga.","status":"done"}' });
-    await apriAiuto(shell, page);
+    const aiuto = await apriAiuto(app, shell, page);
     await campo(page).pressSequentially(CARTA_UTENTE);
-    await scriviAllAiuto(page, 'aiutami a finire il pagamento');
-    await expect(page.locator('.sn-sidebar').getByText('Manca solo il pulsante Paga.')).toBeVisible({ timeout: 20_000 });
+    await scriviAllAiuto(aiuto, 'aiutami a finire il pagamento');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Manca solo il pulsante Paga.')).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
     expect(await lettiSalvati(app)).not.toContain(CARTA_UTENTE.replace(/ /g, ''));
     const dopo = await lettiDopoUnRiavvio(app);
