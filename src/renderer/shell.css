@@ -792,6 +792,15 @@ html[data-feedback-dim="1"] .shell {
 .permesso-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .permesso-sotto { color: var(--fg-soft); }
 .permesso-cosa { display: inline-block; white-space: nowrap; }
+/* Il nome di un file o di una cartella è di chi l'ha creato: foglietto come il riquadro dei popup, filo per metà colore del testo. */
+.permesso-oggetto {
+  display: inline-block;
+  padding: 0 7px;
+  background: rgba(var(--accent-rgb), 0.09);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 50%, currentColor);
+  border-radius: 4px;
+}
 .permesso-btn {
   padding: 5px 12px;
   border-radius: 8px;
