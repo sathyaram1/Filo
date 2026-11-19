@@ -18,7 +18,7 @@ test('sonda', async ({ app, shell }) => {
     const wc = tm.tabs[0].view.webContents;
     const viste = [];
     wc.session.protocol.handle('file', async (req) => {
-      viste.push(req.url + ' ' + (req.headers.get('sec-fetch-dest') || ''));
+      if (req.url.includes('sonda-')) viste.push(req.url.split('/').pop() + ' ' + (req.headers.get('sec-fetch-dest') || ''));
       const r = await net.fetch(req, { bypassCustomProtocolHandlers: true });
       const h = new Headers(r.headers);
       h.set('Content-Security-Policy', "sandbox allow-scripts allow-forms allow-popups allow-modals");
