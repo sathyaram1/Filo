@@ -1320,6 +1320,28 @@ function conTitolo(frase, titolo) {
   return t ? `${frase}\nIl titolo della scheda:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: t })}` : frase;
 }
 
+// #504 — com'è andata la traduzione chiesta a parole: «già tradotta» o «già com'era» non sono un fatto da annunciare.
+const DILLO = ' Dillo all\'utente, e non ripetere l\'azione uguale.';
+const ESITI_TRADUZIONE = Object.freeze({
+  partita: (o) => {
+    if (o.come === 'ripresa') {
+      const quanti = o.mancanti && o.di ? ` (mancavano ${o.mancanti} blocchi su ${o.di})` : '';
+      return `Traduzione ripresa da dove si era fermata${quanti}: la parte già tradotta non si rifà. La pagina mostra a che punto è e avvisa quando ha finito.`;
+    }
+    if (o.come === 'nuovo') return 'Traduzione partita sul solo testo comparso dopo; il resto era già tradotto. La pagina avvisa quando ha finito.';
+    return 'Traduzione della pagina partita: la pagina mostra a che punto è e avvisa quando ha finito.';
+  },
+  in_corso: () => `La pagina si sta già traducendo: niente rilanciato.${DILLO}`,
+  gia_tradotta: () => `La pagina è già tradotta tutta: non c'è altro da tradurre.${DILLO} Per tornare alla lingua originale: scheda(traduci, originale).`,
+  originale: () => 'Pagina rimessa nella lingua originale.',
+  fermata: () => 'Traduzione fermata a metà e pagina rimessa nella lingua originale.',
+  niente: () => `La pagina non era tradotta: è già nella lingua originale.${DILLO}`,
+  spento: () => `Non fatto: Filo è spento su questo sito, e lì non traduce.${DILLO}`,
+  muto: () => `Non fatto: la pagina davanti non risponde (può essere una pagina di sistema, un PDF, o non aver finito di caricare).${DILLO}`,
+  'no-page': () => `Non fatto: non c'è nessuna pagina web aperta.${DILLO}`,
+  coperta: () => `Non fatto: la pagina è coperta dall'avviso di sito pericoloso, e finché l'utente non sceglie lì non si traduce.${DILLO}`,
+});
+
 function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
