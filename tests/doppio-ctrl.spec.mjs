@@ -210,6 +210,13 @@ test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chi
   await expect.poll(() => casa.evaluate(() => document.activeElement && document.activeElement.id)).toBe('cercaInput');
   expect(casa.url()).not.toContain('cerca');
   await casa.screenshot({ path: `${SHOTS}/2377-cerca-dalla-home.png` });
+  // Nella home il gesto vale lo stesso, e la C apre la ricerca della colonna sul posto.
+  await casa.keyboard.press('Escape');
+  await expect(casa.locator('#cercaInput')).toBeHidden();
+  await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('c')]);
+  await expect(casa.locator('#cercaInput')).toBeVisible();
+  await expect.poll(() => casa.evaluate(() => document.activeElement && document.activeElement.id)).toBe('cercaInput');
+  expect(await casa.locator('#input').inputValue()).toBe('');
 
   // I apre il menu Impostazioni, lo stesso del suo tasto nella home.
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('i')]);
