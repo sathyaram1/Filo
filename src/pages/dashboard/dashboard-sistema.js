@@ -647,7 +647,9 @@
     righeInfo(info, x);
     info.dataset.testo = x.dettaglio.join('\n');
     el.appendChild(info);
-    const questo = { el, info, voce: v, ancora, punto, copia: x.copia };
+    const a = punto || (() => { const r = ancora.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })();
+    const scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(a.x, a.y) || (() => true);
+    const questo = { el, info, voce: v, ancora, punto, copia: x.copia, scorsoDopo };
     const comandi = creaComandi(questo, x);
     if (comandi) { el.appendChild(comandi); questo.comandi = comandi; }
     const azioni = [['Copia', (opt) => copia(opt)], [`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
