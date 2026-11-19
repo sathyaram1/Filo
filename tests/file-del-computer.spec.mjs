@@ -7,7 +7,9 @@ import { cartellaTemporanea } from './helpers/percorsi.mjs';
 test('sonda', async ({ app, shell }) => {
   const dir = mkdtempSync(join(cartellaTemporanea(), 'sonda-'));
   writeFileSync(join(dir, 'segreto.txt'), 'SEGRETO');
-  writeFileSync(join(dir, 'p.html'), '<title>P</title><p>x</p><iframe id="f" src="segreto.txt"></iframe><img id="i" src="segreto.txt">');
+  copyFileSync('tests/fixtures/provenienza/c2pa-ufficiale-ai.png', join(dir, 'foto.png'));
+  writeFileSync(join(dir, 'stile.css'), 'p{color:rgb(1, 2, 3)}');
+  writeFileSync(join(dir, 'p.html'), '<title>P</title><link rel="stylesheet" href="stile.css"><p id="p">x</p><iframe id="f" src="segreto.txt"></iframe><img id="i" src="foto.png"><script>document.title="JS"</script>');
   const u = pathToFileURL(join(dir, 'p.html')).href;
   const s = pathToFileURL(join(dir, 'segreto.txt')).href;
   await shell.waitForFunction(() => !!window.filoShell);
