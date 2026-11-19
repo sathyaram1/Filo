@@ -109,12 +109,15 @@ test('carta in una bozza che il sito rimette dopo un riavvio di Filo', async () 
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   const apri = async (app) => {
-    let shell = null;
-    await expect.poll(() => Boolean(shell = app.windows().find((w) => w.url().startsWith('filo://shell'))), { timeout: 15_000 }).toBe(true);
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    await shell.waitForTimeout(1500);
+    const gia = await shell.evaluate(async (u) => ((await window.filoShell.tabs.snapshot()).tabs || []).find((t) => t.url === u), url);
+    let id = gia && gia.id;
+    if (id) await shell.evaluate((x) => window.filoShell.tabs.activate(x), id);
+    else id = (await shell.evaluate((u) => window.filoShell.tabs.open(u), url)).id;
     let page = null;
-    await expect.poll(() => Boolean(page = app.windows().find((w) => w.url() === url)), { timeout: 15_000 }).toBe(true);
+    await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, id, (w) => w.url() === url)), { timeout: 15_000 }).toBe(true);
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
     return { shell, page };
   };
