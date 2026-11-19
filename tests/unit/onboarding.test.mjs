@@ -636,7 +636,8 @@ test('#2536.1 — memoria nascosta nell’intervista: c’è, si legge se la chi
   assert.match(nascosta, /MEMORIA \(profilo, preferenze e lezioni\) non ce l'hai davanti apposta, ma c'è/);
   assert.match(nascosta, /non dirgli che è vuota o che di lui non sai niente/);
   assert.match(nascosta, /cosa ricordi o sai di lui, leggila con memoria\(leggi\)/);
-  assert.match(nascosta, /memoria\(dimentica\) e memoria\(correggi\) la trovano lo stesso/);
+  assert.match(nascosta, /memoria\(dimentica\) e memoria\(correggi\) funzionano come sempre: leggila prima con memoria\(leggi\)/,
+    'senza la riga davanti il modello indovinava le parole («gatto pepe») e non trovava niente');
   assert.match(C.PROMPTS.filoChatContext({ ...base, memoriaNascosta: true }), /memoria\(leggi\)/, 'anche dal ripiego senza filo');
   // La frase segue la decisione che toglie la memoria, non il fatto che l'intervista sia rifatta.
   const davanti = C.PROMPTS.filoChatOnboarding(base);
