@@ -2950,8 +2950,7 @@ class TabManager {
     // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
     // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
     // europei serve a digitare caratteri mentre si scrive nella pagina.
-    // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-    // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+    // `tab` è la scheda davanti, quella che l'utente sta guardando.
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
