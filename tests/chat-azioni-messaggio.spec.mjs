@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home } from './helpers/chatFinta.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { seleziona } from './helpers/selezione.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 import { paginaDellAiuto, statoDi, conta, clicca, tastieraDi, scrivi } from './helpers/riquadri.mjs';
 
