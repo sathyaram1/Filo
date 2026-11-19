@@ -542,6 +542,10 @@ jobs:
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          # Il Node di questa corsa: un tag vecchio il file non ce l'ha (#2207).
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "node=$V" >> "$GITHUB_OUTPUT"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -813,6 +817,10 @@ jobs:
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          # Il Node di questa corsa: un tag vecchio il file non ce l'ha (#2207).
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "node=$V" >> "$GITHUB_OUTPUT"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
