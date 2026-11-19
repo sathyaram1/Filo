@@ -1124,7 +1124,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-citazione-chi { font-size: 12px; font-weight: 600; line-height: 1.35; }
 .dash-citazione-commento {
-  width: 100%; min-width: 0;
+  box-sizing: border-box; width: 100%; min-width: 0;
   border: none; background: transparent; outline: none; resize: none;
   field-sizing: content; max-height: 30vh;
   padding: 2px 12px 4px;
