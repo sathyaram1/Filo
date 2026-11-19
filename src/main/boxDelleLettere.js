@@ -244,7 +244,7 @@ const SCRIPT = `(() => {
     e.preventDefault();
   });
   const esc = (v) => String(v == null ? '' : v).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]);
-  const riga = (v) => '<div class="riga' + (v.lettera ? '' : ' senza') + '" tabindex="-1" role="menuitem" data-id="' + esc(v.id) + '" data-lettera="' + esc(v.lettera) + '">'
+  const riga = (v) => '<div class="riga' + (v.lettera ? '' : ' senza') + '" tabindex="-1" role="menuitem" data-id="' + esc(v.id) + '" data-lettera="' + esc(v.lettera) + '" data-titolo="' + esc(v.titolo) + '">'
     + '<span class="tasto" data-tip="' + (v.lettera ? 'Cambia lettera' : 'Dai una lettera') + '" aria-label="' + (v.lettera ? 'Cambia lettera' : 'Dai una lettera') + '">' + esc(String(v.lettera || '').toUpperCase()) + '</span>'
     + '<span class="lbl">' + esc(v.titolo) + '</span></div>';
   if (!api) return;
