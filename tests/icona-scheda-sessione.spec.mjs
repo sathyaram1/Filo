@@ -3,6 +3,7 @@
 // richiesta partiva coi cookie e la cache del profilo normale.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { chiudiLaRete } from './helpers/reteChiusa.mjs';
 
 // PNG 1×1 vero: la barra lo deve ricevere coi suoi byte.
 const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
@@ -27,13 +28,14 @@ test('in incognito l\'icona della pagina arriva dalla sessione della scheda, mai
   }), { timeout: 15000 }).toBe(1);
 
   // Un sito https servito dentro ciascuna sessione: chi chiede cosa, e da dove, resta registrato.
-  await app.evaluate(({ BrowserWindow, session, net }, png) => {
+  await chiudiLaRete(app);
+  await app.evaluate(({ BrowserWindow, session }, png) => {
     const incognito = session.fromPartition(BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.partition);
     const richieste = { incognito: [], normale: [] };
     globalThis.__richiesteIcona = richieste;
     const sito = (dove) => (req) => {
       const u = new URL(req.url);
-      if (u.hostname !== 'icona.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname !== 'icona.test') return globalThis.__reteChiusa.resto(req);
       richieste[dove].push(u.pathname);
       if (u.pathname === '/icona.png') return new Response(Buffer.from(png, 'base64'), { headers: { 'content-type': 'image/png' } });
       return new Response('<!doctype html><html><head><meta charset="utf-8"><title>Riservata</title>'
@@ -73,13 +75,14 @@ test('anche nella finestra normale la barra mostra l\'icona come data: URL, pure
 });
 
 test('passando a un altro sito l\'icona di prima non resta sulla scheda mentre arriva quella nuova', async ({ app, shell }) => {
-  const icone = await app.evaluate(({ BrowserWindow, session, net, nativeImage }) => {
+  await chiudiLaRete(app);
+  const icone = await app.evaluate(({ BrowserWindow, session, nativeImage }) => {
     const png = (bgra) => nativeImage.createFromBitmap(Buffer.from(bgra), { width: 1, height: 1 }).toPNG();
     const rossa = png([0, 0, 255, 255]);
     const blu = png([255, 0, 0, 255]);
     session.defaultSession.protocol.handle('https', async (req) => {
       const u = new URL(req.url);
-      if (!/^(primo|secondo)\.test$/.test(u.hostname)) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (!/^(primo|secondo)\.test$/.test(u.hostname)) return globalThis.__reteChiusa.resto(req);
       if (u.pathname === '/icona.png') {
         // L'icona del secondo sito arriva tardi: intanto la scheda è già sul secondo sito.
         if (u.hostname === 'secondo.test') await new Promise((r) => setTimeout(r, 3000));

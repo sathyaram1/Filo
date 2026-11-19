@@ -2903,6 +2903,8 @@ class TabManager {
   // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
   tastoDelBrowser(input, tab) {
     if (!input || !tab) return false;
+    // La tastiera può restare un attimo su una scheda di dietro che si carica (#871.5): i tasti valgono per quella davanti.
+    if (tab.id !== this.activeId && this.tabs.includes(tab)) tab = this.tabs.find((t) => t.id === this.activeId) || tab;
     // I tasti di chi arriva da un altro browser, per nome (#1468): anche quelli che Filo non usa.
     if (input.type === 'keyDown') Strade.misura('tasto', input, { incognito: this.incognito });
     // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
@@ -2954,8 +2956,7 @@ class TabManager {
     // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
     // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
     // europei serve a digitare caratteri mentre si scrive nella pagina.
-    // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-    // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+    // `tab` è la scheda davanti, quella che l'utente sta guardando.
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
@@ -3347,6 +3348,10 @@ class TabManager {
     });
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
+    // Una scheda di dietro che si carica si prende la tastiera da sola (#871.5): torna a quella davanti.
+    wc.on('focus', () => setImmediate(() => {
+      if (tab.id !== this.activeId && tab.view.webContents === wc && this.tabs.includes(tab)) this._tastieraAllaSchedaAttiva();
+    }));
     this._sbSeguiPuntatore(tab, wc);
     this.riquadri.segui(wc);
     wc.on('before-input-event', (event, input) => {
