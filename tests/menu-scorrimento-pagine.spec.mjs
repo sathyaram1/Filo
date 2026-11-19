@@ -26,17 +26,22 @@ async function preparaScorrimento(bersaglio, { finestra = false, su = false } = 
     chi.dataset.scorreDa = String(chi.scrollTop);
   });
 }
-const passo = (n) => `document.querySelector('[data-scorre-prova]').scrollBy({ top: ${n} * Number(document.querySelector('[data-scorre-prova]').dataset.verso), behavior: 'instant' })`;
+// Le funzioni passate alla pagina: `scorri` sposta il contenitore preparato nel suo verso.
+const SCORRI = `window.__scorri = (n) => {
+  const chi = document.querySelector('[data-scorre-prova]');
+  chi.scrollBy({ top: n * Number(chi.dataset.verso), behavior: 'instant' });
+}; true`;
 // Scorre e apre col tasto destro nello stesso fotogramma, come chi porta la voce sotto il puntatore e preme subito:
 // l'evento «scroll» arriva al fotogramma dopo, quando il menu ascolta già.
 async function scorriEApri(page, bersaglio, opzioni) {
   await preparaScorrimento(bersaglio, opzioni);
+  await page.evaluate(SCORRI);
   await bersaglio.evaluate((el) => new Promise((ok) => {
     const r = el.getBoundingClientRect();
     const x = r.left + Math.min(r.width / 2, 40);
     const y = r.top + r.height / 2;
     requestAnimationFrame(() => {
-      document.querySelector('[data-scorre-prova]').scrollBy({ top: 300, behavior: 'instant' });
+      window.__scorri(300);
       el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 2 }));
       ok();
     });
@@ -45,9 +50,9 @@ async function scorriEApri(page, bersaglio, opzioni) {
 // Per chi apre solo a un gesto vero: la pagina scorre nello stesso compito del gesto, prima che il menu nasca.
 async function scorriAlGesto(page, gesto, bersaglio, opzioni) {
   await preparaScorrimento(bersaglio, opzioni);
+  await page.evaluate(SCORRI);
   await page.evaluate((gesto) => {
-    const chi = document.querySelector('[data-scorre-prova]');
-    window.addEventListener(gesto, () => chi.scrollBy({ top: 300, behavior: 'instant' }), { capture: true, once: true });
+    window.addEventListener(gesto, () => window.__scorri(300), { capture: true, once: true });
   }, gesto);
 }
 const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
@@ -56,11 +61,9 @@ const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
 const attesa = (page, ms) => page.evaluate((t) => new Promise((ok) => setTimeout(ok, t)), ms);
 const scorsa = (page) => page.evaluate(() => {
   const chi = document.querySelector('[data-scorre-prova]');
-  return chi.scrollTop - Number(chi.dataset.scorreDa);
+  return (chi.scrollTop - Number(chi.dataset.scorreDa)) * Number(chi.dataset.verso);
 });
-const scorriAncora = (page) => page.evaluate(() => {
-  document.querySelector('[data-scorre-prova]').scrollBy({ top: 200, behavior: 'instant' });
-});
+const scorriAncora = (page) => page.evaluate(() => window.__scorri(200));
 
 // Il menu resta dopo lo scorrimento dell'apertura, e se ne va a quello dopo.
 async function restaPoiSiChiude(page, menu) {
