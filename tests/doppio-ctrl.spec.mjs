@@ -192,14 +192,12 @@ test('dal box: la lettera la sceglie, e una lettera nuova data all\'Editor lo ap
 
 test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chiusa', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
-  const page = await sito(openTab, testServer);
-  const url = page.url();
+  await sito(openTab, testServer);
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('c')]);
-  const home = await expect.poll(async () => {
+  await expect.poll(async () => {
     for (const w of app.windows()) { try { if (/^filo:\/\/newtab\//.test(w.url()) && await w.locator('#cercaInput').isVisible()) return true; } catch (_) {} }
     return false;
   }, { timeout: 15_000 }).toBe(true);
-  void home;
   const casa = app.windows().find((w) => /^filo:\/\/newtab\//.test(w.url()));
   await expect.poll(() => casa.evaluate(() => document.activeElement && document.activeElement.id)).toBe('cercaInput');
   expect(casa.url()).not.toContain('cerca');
