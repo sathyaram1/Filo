@@ -20,6 +20,20 @@ function hostChiuso(url) {
   return HOST_CHIUSI.includes(host);
 }
 
+// Una prova col modello finto chiude anche il resto della rete del main (#2177): la chiave finta andava a OpenRouter e i
+// cambi a frankfurter.dev, e il turno durava diverso fra GitHub e il contenitore. Resta aperta solo questa macchina.
+const RETE_CHIUSA = Symbol.for('filo.test.reteChiusa');
+const AVVOLTA = Symbol.for('filo.test.fetchAvvolta');
+
+/** Vero se `url` è http(s) verso una macchina che non è questa. PURA. */
+function fuoriDaQui(url) {
+  let u;
+  try { u = new URL(String(url)); } catch (_) { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const h = u.hostname.toLowerCase().replace(/\.$/, '');
+  return !(h === 'localhost' || h.endsWith('.localhost') || h === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h));
+}
+
 function urlDi(input) {
   if (typeof input === 'string') return input;
   if (input && typeof input.url === 'string') return input.url;
@@ -36,15 +50,27 @@ function chiudiFetch(target = globalThis, avvisa = () => {}) {
   const avvisati = new Set();
   const chiusa = function fetch(input, init) {
     const url = urlDi(input);
-    if (hostChiuso(url)) {
+    const servizio = hostChiuso(url);
+    if (servizio || (target[RETE_CHIUSA] === true && fuoriDaQui(url))) {
       const host = new URL(url).hostname;
-      if (!avvisati.has(host)) { avvisati.add(host); avvisa(`[test] servizio chiuso: ${host}`); }
+      if (!avvisati.has(host)) { avvisati.add(host); avvisa(`[test] ${servizio ? 'servizio chiuso' : 'rete chiusa'}: ${host}`); }
       return Promise.reject(new TypeError('fetch failed'));
     }
     return vera.call(this, input, init);
   };
   chiusa.__filoServiziChiusi = true;
   target.fetch = chiusa;
+  target[AVVOLTA] = true;
+  return true;
+}
+
+/**
+ * Da qui in poi il fetch del main non esce da questa macchina, nemmeno sotto i finti che una prova mette dopo: la
+ * chiusura sta sotto di loro. Falso se il fetch non è avvolto (Filo non aperto per una prova): chi chiede lo dice.
+ */
+function chiudiTuttaLaRete(target = globalThis) {
+  if (!target || target[AVVOLTA] !== true) return false;
+  target[RETE_CHIUSA] = true;
   return true;
 }
 
@@ -79,4 +105,4 @@ function chiudiServiziNeiTest({
   return true;
 }
 
-module.exports = { HOST_CHIUSI, hostChiuso, chiudiFetch, serviziChiusiRichiesti, chiudiServiziNeiTest };
+module.exports = { HOST_CHIUSI, hostChiuso, fuoriDaQui, chiudiFetch, chiudiTuttaLaRete, serviziChiusiRichiesti, chiudiServiziNeiTest };

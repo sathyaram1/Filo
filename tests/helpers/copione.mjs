@@ -12,7 +12,18 @@ export async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
+// Con la chiave finta le chiamate fuori dal copione andavano a OpenRouter, i cambi a frankfurter.dev: il turno durava
+// diverso fra GitHub e il contenitore (#2177). Si chiude sotto ogni finto, anche quelli che la prova ha messo prima.
+export async function chiudiLaRete(app) {
+  const chiusa = await app.evaluate(({ app: a }) => {
+    const rq = process.mainModule.require;
+    return rq(rq('node:path').join(a.getAppPath(), 'src', 'main', 'test-servizi-chiusi.js')).chiudiTuttaLaRete();
+  });
+  if (!chiusa) throw new Error('rete del main non chiusa: Filo non è aperto in modalità test');
+}
+
 export async function configureModel(app) {
+  await chiudiLaRete(app);
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -28,6 +39,7 @@ export async function configureModel(app) {
 // prima: ms }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti e gli stop. `finoAlFermo`: la
 // chiamata degli strumenti resta a metà finché lo stop non la interrompe. `prima`: attesa prima di qualunque cosa.
 export async function copione(app, passi) {
+  await chiudiLaRete(app);
   await app.evaluate(async (_, passiJson) => {
     const passi = JSON.parse(passiJson);
     const P = globalThis.SN_PROVIDERS;
