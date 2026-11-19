@@ -2481,6 +2481,7 @@
   // Un menu di voci nello stile dei select (PATTERNS.md); uno solo aperto per volta.
   function apriMenu(x, y, voci) {
     closeSortMenu();
+    sortMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
