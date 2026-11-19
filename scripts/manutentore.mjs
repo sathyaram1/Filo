@@ -103,11 +103,20 @@ export function rigaScheda(s, f = {}) {
   return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
 }
 
+/**
+ * id → numero dalle sole voci dell'indice che hanno l'id (le schede del server e i non fidati possono non averlo): una
+ * chiave `undefined` darebbe l'ultimo numero a ogni ramo che non è un tentativo (#2480). PURA.
+ */
+export function numeroPerId(indice) {
+  return new Map((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.id), String(f.num)]));
+}
+
 /** I rami dei worker (`worker/<id del feedback>-<ora>`) prendono il numero dall'indice, davanti ai citati. PURA. */
 export function conNumeri(rami, indice) {
-  const perId = new Map((indice || []).map((f) => [f.id, f.num]));
+  const perId = numeroPerId(indice);
   return (rami || []).map((r) => {
-    const n = perId.get((leggiTentativo(r.ramo) || {}).id);
+    const t = leggiTentativo(r.ramo);
+    const n = t ? perId.get(t.id) : undefined;
     return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
   });
 }
