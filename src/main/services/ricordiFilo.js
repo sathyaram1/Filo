@@ -123,7 +123,8 @@ function indicizza(tratti, modello, e0 = epoca) {
   return corsa;
 }
 
-// Senza un modello d'indicizzazione vale per parole (regola in src/shared/filoContesto.js).
+// Senza un modello d'indicizzazione, o con troppo pochi scambi per misurare il rumore, vale per parole (regola in
+// src/shared/filoContesto.js).
 function perParole(domanda, tratti) {
   return FC().ricordiPerParole(domanda, tratti);
 }
