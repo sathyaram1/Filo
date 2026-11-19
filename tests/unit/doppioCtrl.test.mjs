@@ -78,7 +78,6 @@ test('col box aperto un tocco lo chiude; Ctrl+qualcosa no', () => {
   assert.equal(r.fase(), 'aperto');
   r.evento(giu(1500), CFG);
   assert.equal(r.evento(su(1560), CFG), 'chiudi');
-  r.chiuso();
   assert.equal(r.fase(), 'riposo');
 });
 
