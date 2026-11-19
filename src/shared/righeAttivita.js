@@ -81,6 +81,8 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    IMMAGINI_WEB: (a) => ({ icon: '🖼', text: `Cerco immagini: ${a.query || ''}` }),
+    GENERA_IMMAGINE: () => ({ icon: '🖌', text: 'Disegno un’immagine' }),
     ESPANDI_FILO: (a) => {
       const o = a._output || {};
       return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
