@@ -135,6 +135,8 @@ test('Gestione: il menu di una scheda', async ({ openTab }) => {
     window.__mgTest.setTab('inbox');
   });
   await expect(page.locator('.mg-item')).toHaveCount(1);
+  // La lista si ridisegna al suo posto dopo i dati nuovi: si scorre quando sta ferma.
+  await attesa(page, 800);
   const scheda = page.locator('.mg-item').first();
   await scorriAlGesto(page, 'contextmenu', scheda);
   await scheda.click({ button: 'right' });
