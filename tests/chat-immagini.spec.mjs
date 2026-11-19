@@ -16,7 +16,7 @@ async function preparaImmagini(app, quante) {
       for (let i = 0; i < w * h; i++) { buf[i * 4] = (40 * k) % 255; buf[i * 4 + 1] = 120; buf[i * 4 + 2] = 200 - 20 * k; buf[i * 4 + 3] = 255; }
       return nativeImage.createFromBitmap(buf, { width: w, height: h }).toPNG();
     };
-    const C = globalThis.__filoImmaginiChat;
+    const C = globalThis.__filoImmaginiDelleRisposte;
     C._dip.tavily = async () => [];
     C._dip.commons = async () => Array.from({ length: quante }, (_, k) => ({
       immagine: `https://upload.wikimedia.org/antilope-${k}.png`, titolo: `Antilope ${k + 1}`, sito: 'commons.wikimedia.org',
