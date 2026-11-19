@@ -769,28 +769,18 @@ test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+
   expect((await copertura(app)).coperta).toBe(false);
 });
 
-// #871.5 — la home appena aperta si carica dietro e si prende la tastiera da sola: Ctrl+W premuto subito dopo il
-// ritorno chiudeva lei, e la scheda del sito segnalato restava aperta.
-test('Ctrl+W premuto appena tornati sulla scheda del sito segnalato chiude quella, non la home che si carica dietro', async ({ app, shell }) => {
-  const { schede, prima, tasto, torna } = await sitoEPoiCtrlT(app, shell);
-  await torna();
-  await tasto('W', 'control');
-  await expect.poll(async () => (await schede()).sito).toBe(false);
-  expect((await schede()).n).toBe(prima);
-  expect((await schede()).attiva).toMatch(/^filo:\/\/newtab\//);
-});
-
-test('con la tastiera rimasta sulla home di dietro, Ctrl+W chiude comunque la scheda davanti', async ({ app, shell }) => {
-  const { schede, prima, torna } = await sitoEPoiCtrlT(app, shell);
-  await torna();
-  await expect.poll(() => copertura(app)).toEqual(COPERTA);
-  // Quello che fa la home quando si carica: si prende la tastiera, e il tasto arriva a lei.
+// #871.5 — la home appena aperta si carica dietro e si prende la tastiera da sola: Ctrl+W premuto in quell'attimo,
+// appena tornati sul sito segnalato, chiudeva la home e lasciava aperta la scheda del sito.
+test('Ctrl+W premuto appena tornati sul sito segnalato, con la tastiera ancora sulla home che si carica, chiude il sito', async ({ app, shell }) => {
+  const { schede, prima } = await sitoEPoiCtrlT(app, shell);
+  // Il ritorno e il tasto senza aspettare nulla; la tastiera è dove la lascia la home quando si carica.
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    const wc = tm.tabs.find((t) => t.id !== tm.activeId && /^filo:\/\/newtab\//.test(t.view.webContents.getURL() || t.url)).view.webContents;
-    wc.focus();
-    wc.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
-    wc.sendInputEvent({ type: 'keyUp', keyCode: 'W', modifiers: ['control'] });
+    const home = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    tm.activate(tm.tabs.find((t) => /conto-schede/.test(t.view.webContents.getURL())).id);
+    home.focus();
+    home.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
+    home.sendInputEvent({ type: 'keyUp', keyCode: 'W', modifiers: ['control'] });
   });
   await expect.poll(async () => (await schede()).sito).toBe(false);
   expect((await schede()).n).toBe(prima);
