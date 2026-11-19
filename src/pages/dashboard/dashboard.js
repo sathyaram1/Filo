@@ -637,7 +637,7 @@
     if (m.role === 'user') {
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
+        ...(m.rispostaA && Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) ? { rispostaA: Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
