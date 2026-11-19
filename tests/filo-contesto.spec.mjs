@@ -201,6 +201,36 @@ test('una domanda legata a un tratto vecchio lo porta nella domanda, e il blocco
   await blocco.screenshot({ path: 'tests/.shots/868-ricordo-nel-blocco.png' });
 });
 
+// #2369 — con tante conversazioni vecchie, tutte vicine fra loro, una domanda su altro non ne ripesca nessuna.
+test('una domanda che non c\'entra con le conversazioni vecchie non ne ripesca nessuna, quella che c\'entra solo la sua', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await primaScheda(app);
+  const vecchie = ['la strada di Geber su wikipedia', 'una lista di dizionari in python', 'la bolletta della luce di ottobre',
+    'il compleanno di mia sorella', 'gli orari dei treni per Torino', 'la scheda di allenamento in palestra',
+    'chi ha vinto la partita di ieri', 'un romanzo da leggere in vacanza'];
+  await semina(app, {
+    chat: [
+      ...vecchie.map((s, i) => ({ id: `vecchia-${i}`, oreFa: (5 + i) * 24, titolo: s, scambi: [[`parliamo di ${s}`, 'Certo.']] })),
+      { id: 'viaggio-lisbona', oreFa: 14 * 24, titolo: 'Viaggio a Lisbona', scambi: [['segnati il ristorante di Lisbona: Taberna da Rua', 'Fatto.']] },
+    ],
+  });
+  await preparaModello(app, [{ text: 'Apro la segnalazione.' }, { text: 'Si chiamava Taberna da Rua.' }]);
+  await scrivi(page, 'ok apri il feedback e scrivi tutto su ctrl');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Apro la segnalazione.' })).toBeVisible({ timeout: 15_000 });
+  await scrivi(page, 'come si chiamava il ristorante di Lisbona?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Si chiamava Taberna da Rua.' })).toBeVisible({ timeout: 15_000 });
+
+  const [primo, secondo] = await chiamate(app);
+  expect(testo(primo[posDomanda(primo)])).not.toContain('RICORDI DAL FILO');
+  const k = posDomanda(secondo);
+  expect(testo(secondo[k])).toContain('RICORDI DAL FILO');
+  expect(testo(secondo[k])).toContain('Taberna da Rua');
+  for (const s of vecchie) expect(testo(secondo[k])).not.toContain(s);
+  const righe = page.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' });
+  await expect(righe).toHaveCount(1);
+  await expect(righe).toContainText('Viaggio a Lisbona');
+});
+
 test('«quella pagina sulle orche che ho chiuso ieri»: la ricerca la trova nel filo e la riapre', async ({ app, testServer }) => {
   test.setTimeout(90_000);
   const page = await primaScheda(app);
