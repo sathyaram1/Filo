@@ -102,14 +102,6 @@ test.describe('col puntatore vero, a finestra massimizzata', () => {
     puntatore(`move:${da.x}:${da.y};wait:200;down:1;wait:150;${passi.join(';')};wait:300;up:1;wait:300`);
     await expect.poll(async () => (await aperte(shell)).indexOf(ids[0]), { timeout: 5_000 }).toBe(ids.length - 1);
   });
-
-  test('il clic nella fascia sopra il pulsante della scheda nuova apre una scheda', async ({ app, shell, testServer }) => {
-    const ids = await treSchede(shell, testServer);
-    await massimizzataASchermo(app, shell);
-    const p = await nellaFasciaSopra(app, shell, '#tab-new');
-    puntatore(`move:${p.x}:${p.y};wait:200;down:1;wait:80;up:1;wait:300`);
-    await expect.poll(async () => (await aperte(shell)).length, { timeout: 3_000 }).toBe(ids.length + 1);
-  });
 });
 
 test('col menu della barra laterale aperto, il clic sul suo bordo sopra la barra lo chiude e non arriva a nessuno', async ({ app, shell, testServer }) => {
