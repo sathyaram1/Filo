@@ -18,6 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
+import { serviSiti, chiudiLaRete } from './helpers/reteChiusa.mjs';
 
 const require = createRequire(import.meta.url);
 
