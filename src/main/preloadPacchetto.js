@@ -249,7 +249,7 @@ function runtime(MODULI, TESTI, richiestaDellaSandbox) {
     // Un'etichetta xn-- che non si decodifica resta com'è, come nel Node 24 di Electron.
     return ascii.split('.').map((e) => {
       if (!/^xn--/i.test(e)) return e;
-      try { return decodifica(e.slice(4)); } catch (_) { return e; }
+      try { return decodifica(e.slice(4)) || e; } catch (_) { return e; }
     }).join('.');
   };
   let indirizzi = null;
