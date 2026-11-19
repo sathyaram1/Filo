@@ -411,8 +411,8 @@
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
-      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed' && !r.missing) {
-        e.preventDefault(); openFile(r);
+      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed') {
+        e.preventDefault(); openFile(attuale());
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = row.getBoundingClientRect();
