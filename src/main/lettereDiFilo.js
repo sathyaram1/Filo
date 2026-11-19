@@ -178,7 +178,7 @@ const AZIONI = {
     const { nativeTheme } = require('electron');
     const prossimo = nativeTheme.shouldUseDarkColors ? 'light' : 'dark';
     const { applySettingsUpdate } = require('./services/handlers');
-    return require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio_ctrl' }, () => applySettingsUpdate({ theme: prossimo }));
+    return require('./services/registroCambi').con({ via: 'interfaccia', dove: 'doppio-ctrl' }, () => applySettingsUpdate({ theme: prossimo }));
   },
   schermoIntero(win) {
     const tabs = win._filoTabs;
