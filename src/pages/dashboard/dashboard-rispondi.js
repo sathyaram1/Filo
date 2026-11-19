@@ -10,6 +10,8 @@
   let anteprima = null;
   // Le citazioni nel campo, in ordine. `commento` è il testo che le segue; quello dell'ultima è il campo stesso.
   let citate = [];
+  // Un commento venuto da fuori (incollato, trascinato, o spostato dal campo che lo era): il messaggio lo è tutto.
+  let fuori = false;
 
   const R = () => global.SN_RISPOSTA_A;
   const icona = (nome, size = 16) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](size) : '');
