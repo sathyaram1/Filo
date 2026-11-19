@@ -59,6 +59,21 @@ test('a schermo intero: link portato contro il bordo alto, le schede scendono e 
   await expect.poll(async () => (await snap(shell)).tabs.find((t) => t.id === prima.tabs[1].id)?.url, { timeout: 8000 }).toBe(destinazione);
 });
 
+test('il canale rifiuta indirizzi che non sono del web', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Uno</title><p>uno'));
+  const prima = await snap(shell);
+  const id = prima.tabs[1].id;
+  for (const url of ['file:///etc/passwd', 'filo://options/options.html', 'javascript:alert(1)', 'data:text/html,<b>x</b>', 'chrome://gpu', 'view-source:http://127.0.0.1/', 'HTTP://127.0.0.1:9/ok', ' https://127.0.0.1:9/spazi ']) {
+    await shell.evaluate(([u, i]) => window.filoShell.linkSuScheda({ url: u, id: i }), [url, id]);
+    await shell.evaluate(([u]) => window.filoShell.linkSuScheda({ url: u, indice: 99 }), [url]);
+  }
+  await shell.evaluate(() => window.filoShell.linkSuScheda({ url: 'https://127.0.0.1:9/x', id: 'inesistente' }));
+  await shell.evaluate(() => window.filoShell.linkSuScheda({ url: 'https://127.0.0.1:9/y', indice: -5 }));
+  await pausa(1500);
+  const dopo = await snap(shell);
+  console.log('canale', JSON.stringify(dopo.tabs.map((t) => t.url)));
+});
+
 test('file immagine dal computer lasciato sul centro di una scheda va alla chat come prima (sintetico)', async ({ app, shell, openTab, testServer }) => {
   await openTab(testServer.html('<title>Uno</title><p>uno'));
   await openTab(testServer.html('<title>Due</title><p>due'));
