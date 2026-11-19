@@ -34,6 +34,19 @@ test('il percorso sul disco: casa, disco di Windows, niente percorsi di rete', (
   if (process.platform !== 'win32') assert.equal(F.percorsoDi('file:///tmp/a%20b/c.html'), '/tmp/a b/c.html');
 });
 
+test('una cartella montata da un altro computer (/net/<host> del Mac) è rete, e Filo non la tocca nemmeno per vedere se c\'è', { skip: process.platform === 'win32' }, async () => {
+  const fs = require('node:fs');
+  const toccati = [];
+  const stat = fs.promises.stat;
+  fs.promises.stat = async (p) => { toccati.push(String(p)); return stat(p); };
+  try {
+    const g = await F.giudica('file:///net/segreto-mario-rossi/condivisa/x.html');
+    assert.equal(g.ok, false);
+    assert.equal(g.motivo, 'rete');
+    assert.deepEqual(toccati, []);
+  } finally { fs.promises.stat = stat; }
+});
+
 test('il percorso l\'ha scritto l\'utente: con le barre all\'altro verso, con gli spazi o il %20, con la «~»', () => {
   const p = join(homedir(), 'Desktop', 'Filo report', 'r.html');
   const scritto = (parole) => F.scrittoDallUtente(p, parole);
