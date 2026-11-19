@@ -211,10 +211,9 @@
       testo = nomi.filter((f) => FOGLI_DEGLI_STRATI.includes(f))
         .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
     } catch (_) {}
-    if (!paginaDiFilo) testo += fontSoloGenerico(ambito);
     const foglio = new CSSStyleSheet();
     try { foglio.replaceSync(testo); } catch (_) {}
-    return [foglio];
+    return paginaDiFilo ? [foglio] : [foglio, foglioGenerico(ambito)];
   }
   function stratoChiuso(stileHost, fogli, { riquadro = true } = {}) {
     const host = document.createElement('div');
