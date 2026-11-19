@@ -481,6 +481,7 @@
     [ACTIONS.PROVIDER_TEST]: '',
     [ACTIONS.FILE_NAME]: '',
     [ACTIONS.EMBED_COOKIE_CHECK]: '',
+    [ACTIONS.IMAGE_GEN]: '',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
