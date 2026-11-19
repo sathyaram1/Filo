@@ -78,6 +78,7 @@
         { testo: 'A schermo intero la domanda se scaricare un programma o se dare un permesso a un sito compare subito sopra la pagina, senza dover portare il puntatore in alto; risposto, torni a tutto schermo.', segnalazione: 2595 },
         { testo: 'Con i modelli Claude le richieste della chat restano sotto i 100.000 token anche quando la compattazione non riesce o l\'hai spostata oltre il tetto: il tetto conta anche istruzioni, strumenti e memoria.', segnalazione: 2473 },
         { testo: 'Mentre rifai l\'intervista di benvenuto puoi chiedere a Filo cosa ricorda di te, e togliere o correggere una cosa dalla memoria.', segnalazione: 2536 },
+        { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che l\'assistente ti propone. Le password e le carte che metti in un modulo non arrivano al modello.', segnalazione: 810 },
       ],
     },
     {
