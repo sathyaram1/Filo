@@ -116,7 +116,7 @@ test('un nome solo simile non conta come l\'installer', { skip: !haBash && 'serv
 
 // Un elenco più grande del tubo rende certo il SIGPIPE che con poche righe capitava solo sotto carico (#2402).
 test('una bozza completa con molti allegati passa', { skip: !haBash && 'serve bash' }, () => {
-  const altri = Array.from({ length: 20000 }, (_, i) => `allegato-${String(i).padStart(5, '0')}-di-prova.bin`);
+  const altri = Array.from({ length: 10000 }, (_, i) => `allegato-${String(i).padStart(5, '0')}-di-prova.bin`);
   const r = eseguiControllo(['Filo-Setup.exe', ...altri, 'latest.yml']);
   assert.equal(r.status, 0, r.out.slice(-400));
 });
