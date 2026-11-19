@@ -2291,7 +2291,7 @@
       if (e.repeat) return;
       // Mentre Filo lavora, con qualcosa nella casella Invio manda un seguito (#1296); a casella vuota è il quadrato.
       if (sending) {
-        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) accodaSeguito();
         else if (!quadratoAppena()) fermaTurno();
         return;
       }
