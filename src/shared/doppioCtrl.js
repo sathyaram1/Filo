@@ -193,7 +193,11 @@
         const t = Number(e && e.t) || 0;
         if (fase === 'aperto' || fase === 'apertoGiu') {
           if (tipo === 'giu' && !e.repeat && fase === 'aperto') { fase = 'apertoGiu'; t0 = t; return null; }
-          if (tipo === 'su' && fase === 'apertoGiu') { fase = 'aperto'; return t - t0 <= tenuta ? 'chiudi' : null; }
+          if (tipo === 'su' && fase === 'apertoGiu') {
+            if (t - t0 > tenuta) { fase = 'aperto'; return null; }
+            azzera();
+            return 'chiudi';
+          }
           if (tipo === 'tasto' || tipo === 'mouse') fase = 'aperto';
           return null;
         }
