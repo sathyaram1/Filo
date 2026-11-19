@@ -93,7 +93,7 @@ test('Bacheca: il menu di una propria segnalazione', async ({ app, openTab }) =>
   const page = await openTab('filo://board/board.html#segnalazioni');
   const titolo = page.locator('#bdMie .bd-mia .bd-mia-titolo').first();
   await expect(titolo).toBeVisible();
-  await scorriAlGesto(page, 'contextmenu');
+  await scorriAlGesto(page, 'contextmenu', titolo);
   await titolo.click({ button: 'right' });
   await restaPoiSiChiude(page, page.locator('.bd-mia-menu'));
 });
