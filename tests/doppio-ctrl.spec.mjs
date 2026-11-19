@@ -175,17 +175,17 @@ test('dal box: la lettera la sceglie, e una lettera nuova data all\'Editor lo ap
   // La lettera nel box fa l'azione e lo chiude.
   await box.keyboard.press('e');
   await expect.poll(() => boxVisibile(app)).toBe(false);
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+  const davanti = () => app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     return w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).url;
-  }), { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
-  // E senza box: Ctrl, Ctrl, E apre un altro Editor.
-  const quante = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)
-    ._filoTabs.tabs.filter((t) => /^filo:\/\/editor\//.test(t.url || '')).length);
-  const n = await quante();
+  });
+  await expect.poll(davanti, { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
+  // E senza box: da un sito, Ctrl, Ctrl, E porta all'Editor.
   await sito(openTab, testServer);
+  await expect.poll(davanti).toMatch(/^http/);
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 60], ...lettera('e')]);
-  await expect.poll(quante, { timeout: 10_000 }).toBe(n + 1);
+  await expect.poll(davanti, { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
+  expect(await boxVisibile(app)).toBe(false);
 });
 
 test('C da un sito porta alla home con la ricerca aperta; Z riapre la scheda chiusa', async ({ app, openTab, testServer }) => {
