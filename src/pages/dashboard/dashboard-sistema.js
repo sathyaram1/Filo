@@ -227,8 +227,11 @@
     if (e.target && e.target.closest && e.target.closest('.sn-menu, .sn-confirm-host')) return;
     chiudiBox();
   }
-  // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
-  function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
+  // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo) né
+  // per uno scorrimento finito prima dell'apertura (#2452, #2586).
+  function scorre(e) {
+    if (box && !(e.target instanceof Node && box.el.contains(e.target)) && box.scorsoDopo(e)) chiudiBox();
+  }
   function tasto(e) {
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); const da = box.ancora; chiudiBox(); if (da && da.isConnected) da.focus(); return; }
