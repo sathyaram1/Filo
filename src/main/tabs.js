@@ -3120,11 +3120,11 @@ class TabManager {
   }
 
 
-  // Altezza di chrome riservata in alto: 0 a tutto schermo (salvo le schede scese dal bordo alto), solo la fila di tab
+  // Altezza di chrome riservata in alto: 0 a tutto schermo (vedi _corniceSalita), solo la fila di tab
   // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
   // A questo si somma l'eventuale topInset dei dropdown.
   _altezzaCornice() {
-    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
+    if (this._corniceSalita()) return 0;
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
