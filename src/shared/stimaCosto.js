@@ -103,6 +103,8 @@
     if (req) out.request = req;
     const cache = numeroListino(pricing.input_cache_read);
     if (cache != null) out.cacheRead = cache;
+    const immagini = numeroListino(pricing.image_output);
+    if (immagini) out.immagineUscita = immagini;
     // Il listino a scaglioni (Haiku 5.5 sopra 100.000 token di prompt costa cinque volte tanto, su tutta la richiesta).
     const sopra = (Array.isArray(pricing.overrides) ? pricing.overrides : [])
       .map((o) => ({ da: numeroListino(o && o.min_prompt_tokens), p: prezzoDaCatalogo({ ...o, overrides: null }) }))
