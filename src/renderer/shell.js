@@ -751,7 +751,11 @@
   // lo prova. La linguetta segue il puntatore con un transform e i nodi non si spostano fino al rilascio; fuori dalla
   // fila la scheda va a chi sta sotto il puntatore (una chat di Filo, un campo di testo), via main (#2084).
   let drag = null; // { id, el, startX, startY, moved, posti, da, a, fuori, pointerId }
-  let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+  // Il clic da ignorare è solo quello del gesto che ha trascinato: tenuto oltre, mangiava il clic dopo sulla
+  // stessa scheda quando il rilascio non era caduto su di lei (portata fuori, Esc, finestra lasciata) (#2382).
+  let gestoStriscia = 0;
+  let clicZittito = null; // { id, gesto }
+  const zittisciClic = (id) => { clicZittito = { id, gesto: gestoStriscia }; };
   let ultimoPointerId = null;
   const SOGLIA_TRASCINAMENTO = 4;
   // Oltre questo margine sopra o sotto la fila la scheda esce dalla barra: tirando un po' storto si riordina ancora.
@@ -851,7 +855,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     tabsEl.classList.remove('riordino');
     for (const p of d.posti) p.el.style.transform = '';
     if (ridisegnoRimandato) render();
@@ -887,8 +891,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    // Il click che segue il mouseup non deve riattivare/spostare la tab.
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     if (d.fuori) {
       tabsEl.classList.remove('riordino');
       for (const p of d.posti) p.el.style.transform = '';
@@ -903,6 +906,8 @@
     assesta(d, dx);
     // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
     if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
+    // Lasciata al suo posto è un clic con la mano che ha tremato oltre la soglia: la scheda si apre (#2382).
+    else if (d.id !== state.activeId) api.tabs.activate(d.id);
     // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
     try {
       Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
@@ -926,7 +931,7 @@
       render();
     }, 0);
   }
-  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; }, true);
+  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; gestoStriscia++; }, true);
   window.addEventListener('mouseup', rilascioStriscia, true);
   window.addEventListener('blur', rilascioStriscia);
 
@@ -1649,16 +1654,33 @@
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
   tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
+  // La X premuta: il clic arriva alla scheda se fra pressione e rilascio la mano scivola appena fuori dal tondo,
+  // e la apriva invece di chiuderla (#2382). Vale il rilascio vicino alla X; più lontano il gesto è annullato.
+  const MARGINE_CROCE = 8;
+  let crocePremuta = null; // { id, r, gesto }
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
+    const x = s && e.button === 0 ? e.target.closest('.close') : null;
+    crocePremuta = x ? { id: s.t.id, r: x.getBoundingClientRect(), gesto: gestoStriscia } : null;
     if (s) startTabDrag(e, s.t, s.el);
   });
   tabsEl.addEventListener('click', (e) => {
+    const croce = crocePremuta && crocePremuta.gesto === gestoStriscia ? crocePremuta : null;
+    crocePremuta = null;
+    if (croce) {
+      const { r } = croce;
+      const vicino = e.clientX >= r.left - MARGINE_CROCE && e.clientX <= r.right + MARGINE_CROCE
+        && e.clientY >= r.top - MARGINE_CROCE && e.clientY <= r.bottom + MARGINE_CROCE;
+      if (vicino && state.tabs.some((t) => t.id === croce.id)) api.tabs.close(croce.id, 'pulsante_x');
+      return;
+    }
     const s = schedaDellEvento(e);
     if (!s) return;
     if (e.target.closest('.close')) { api.tabs.close(s.t.id, 'pulsante_x'); return; }
     if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
-    if (suppressClickId === s.t.id) { suppressClickId = null; return; }
+    const zitto = clicZittito && clicZittito.gesto === gestoStriscia ? clicZittito : null;
+    clicZittito = null;
+    if (zitto && zitto.id === s.t.id) return;
     api.tabs.activate(s.t.id);
   });
   tabsEl.addEventListener('auxclick', (e) => {

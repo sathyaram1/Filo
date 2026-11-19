@@ -13,6 +13,9 @@
       features: [
         { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
       ],
+      fixes: [
+        { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
+      ],
     },
     {
       version: '0.2.292', date: '2026-11-18',

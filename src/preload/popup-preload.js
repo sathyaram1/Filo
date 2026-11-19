@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('popupApi', {
   select: (valore, giro) => ipcRenderer.send('popup-menu:select', String(valore == null ? '' : valore), Number(giro)),
   close: (giro) => ipcRenderer.send('popup-menu:close', Number(giro)),
+  fuori: (giro, x, y, tasto) => ipcRenderer.send('popup-menu:fuori', Number(giro), { x: Number(x), y: Number(y), tasto: Number(tasto) }),
   pronto: (giro) => ipcRenderer.send('popup-menu:pronto', Number(giro)),
   vuoto: (giro) => ipcRenderer.send('popup-menu:vuoto', Number(giro)),
   onVoci: (fn) => { ipcRenderer.on('popup-menu:voci', (_e, dati) => fn(dati)); },
