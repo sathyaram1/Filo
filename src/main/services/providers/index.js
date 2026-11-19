@@ -107,7 +107,7 @@
     try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '', provider }); } catch (_) {}
   }
 
-  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
+  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito, modalities }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -115,7 +115,7 @@
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
+          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal, modalities,
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
