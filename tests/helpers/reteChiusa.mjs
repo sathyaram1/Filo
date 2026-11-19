@@ -13,7 +13,7 @@ export async function chiudiLaRete(app) {
         richieste.push(req.url);
         let host = '';
         try { host = new URL(req.url).hostname; } catch (_) {}
-        if (host) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+        if (host === '127.0.0.1') return net.fetch(req, { bypassCustomProtocolHandlers: true });
         return Response.error();
       },
     };
