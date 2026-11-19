@@ -13,6 +13,7 @@ import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { batti } from './helpers/tastiera.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
+import { nelMondoDiFilo } from './helpers/riquadri.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -582,4 +583,45 @@ test('nell\'editor col corpo modificabile di un riquadro il lampo della correzio
   await expect(lampo.first()).toBeAttached({ timeout: 1000 });
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-lampo'))).toBe(null);
   expect(await corpo.evaluate((b) => b.innerHTML.replace(/&nbsp;/g, ' ').trim())).toBe('ok perché');
+});
+
+// #2052.1: l'Incolla e la dettatura di Filo arrivano al campo come battute vere, col gesto che chiude la parola; la
+// parola che chiudono però non l'ha battuta l'utente, e resta com'è.
+test('il testo incollato o dettato con Filo che finisce con «perchè» e un punto o uno spazio resta com\'è', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  const incolla = async (sel, testo) => {
+    await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), testo);
+    await page.locator(sel).click({ button: 'right' });
+    await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  };
+  const detta = async (sel, testo) => {
+    await page.locator(sel).click({ button: 'right' });
+    await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await nelMondoDiFilo(app, page, (t) => globalThis.SN_ACTIONS.insertDictatedText(t), testo);
+  };
+
+  await incolla('#ta', 'Non so perchè ');
+  await expect(page.locator('#ta')).toHaveValue('Non so perchè ');
+  await svuota(page);
+  await incolla('#ta', 'Non so perchè.');
+  await expect(page.locator('#ta')).toHaveValue('Non so perchè.');
+  await svuota(page);
+  await detta('#ta', 'detto perchè.');
+  await expect(page.locator('#ta')).toHaveValue('detto perchè.');
+  await svuota(page);
+  await detta('#ta', 'detto perchè ');
+  await expect(page.locator('#ta')).toHaveValue('detto perchè ');
+  // La parola che poi chiude l'utente si corregge come sempre.
+  await page.keyboard.press('End');
+  await batti(page, 'e perchè ');
+  await expect(page.locator('#ta')).toHaveValue('detto perchè e perché ');
+
+  await incolla('#ce', 'Nel campo perchè.');
+  await expect.poll(() => testoDi(page, '#ce')).toBe('Nel campo perchè.');
+  await svuota(page, '#ce');
+  await detta('#ce', 'detto perchè ');
+  await expect.poll(() => testoDi(page, '#ce')).toBe('detto perchè ');
+  await page.waitForTimeout(300);
+  expect(await testoDi(page, '#ce')).toBe('detto perchè ');
 });

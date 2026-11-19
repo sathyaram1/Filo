@@ -217,20 +217,59 @@
     return out;
   }
 
-  // Il testo rimesso deve contare per il sito come scritto (#2052): passa dalla regola del correttore, che per farlo
-  // prende il fuoco del campo; poi il fuoco torna dov'era.
+  // Il testo rimesso deve contare per il sito come scritto (#2052), e per questo la regola del correttore prende il
+  // fuoco del campo. Mai a chi sta scrivendo altrove (#2052.1): uscire dal suo campo può chiuderlo o perdergli il
+  // cursore. Lì il testo si vede subito e conta come scritto al primo momento in cui nessuno scrive.
+  const daConfermare = new Map();
+
+  function scrivibile(a) {
+    if (!a || a === document.body || a === document.documentElement) return false;
+    if (a.isContentEditable || /^(TEXTAREA|SELECT|IFRAME|FRAME|OBJECT|EMBED)$/.test(a.tagName)) return true;
+    return a.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|image|file|range|color|hidden)$/i.test(a.type || '');
+  }
+
+  // Un altro riquadro col fuoco (o la finestra lasciata) non si vede da qui: vale come qualcuno che scrive.
+  function occupato(el) {
+    if (!document.hasFocus()) return true;
+    const a = attivo();
+    return a !== el && scrivibile(a);
+  }
+
   function scriviNelCampo(el, valore) {
-    const primaAttivo = attivo();
+    const prima = attivo();
+    const fuoco = !occupato(el);
     rimettendo = true;
     try {
-      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
+      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore, { fuoco })) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      if (attivo() === el && primaAttivo !== el) {
-        if (primaAttivo && primaAttivo.isConnected && primaAttivo !== document.body) primaAttivo.focus({ preventScroll: true });
-        else el.blur();
-      }
+      if (!fuoco) { daConfermare.set(el, valore); return; }
+      daConfermare.delete(el);
+      if (attivo() !== el || prima === el) return;
+      if (prima && prima.isConnected && prima !== document.body) { try { prima.focus({ preventScroll: true }); } catch (_) {} } else el.blur();
     } finally { rimettendo = false; }
   }
+
+  // Si riscrive da vuoto: lo stesso testo sopra sé stesso per il browser non è una battuta. Un campo che l'utente ha
+  // già toccato non serve: le sue battute hanno dato al sito il testo intero.
+  let confermando = false;
+  function conferma() {
+    if (confermando) return;
+    confermando = true;
+    try { confermaTutti(); } finally { confermando = false; }
+  }
+  function confermaTutti() {
+    for (const [el, valore] of daConfermare) {
+      if (!el.isConnected || String(el.value || '') !== valore) { daConfermare.delete(el); continue; }
+      if (occupato(el)) continue;
+      try { el.setRangeText('', 0, valore.length); } catch (_) { continue; }
+      scriviNelCampo(el, valore);
+      if (String(el.value || '') !== valore) { el.value = valore; daConfermare.delete(el); }
+    }
+  }
+  // Sul fuoco che arriva, subito: un clic su «Invia» lo dà al pulsante prima di partire.
+  document.addEventListener('focusin', () => { if (daConfermare.size) conferma(); }, true);
+  document.addEventListener('focusout', (e) => { if (daConfermare.size && !e.relatedTarget) setTimeout(conferma, 0); }, true);
+  window.addEventListener('focus', () => { if (daConfermare.size) setTimeout(conferma, 0); });
 
   function rimetti() {
     prossimo = null;

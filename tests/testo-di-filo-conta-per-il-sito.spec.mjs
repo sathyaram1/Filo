@@ -145,3 +145,134 @@ test('il commento rimesso alla ricarica si pubblica, e il fuoco non resta nella 
   await page.locator('#invia').click();
   await expect(page.locator('#esito')).toHaveText('Pubblicato: Sul motore ripeti la stessa cosa senza rispondere.');
 });
+
+// #2052.1 — la casella arriva tre secondi dopo la pagina, in fondo, come in un sito fatto di script; un editor ricco e
+// una riga ci sono subito, in cima. Chi scrive lì mentre il testo torna non deve accorgersene.
+const PAGINA_TARDI = `<!doctype html><html><head><title>Tardi</title></head>
+<body style="margin:0;padding:20px;font:16px sans-serif;background:#fff">
+  <div id="ce" contenteditable="true" style="width:600px;min-height:80px;border:1px solid #999"></div>
+  <input id="riga" style="display:block;margin-top:10px;width:600px;height:28px">
+  <div id="posto" style="margin-top:1800px"></div>
+  <button id="invia">Comment</button>
+  <p id="esito"></p>
+  <script>
+    customElements.define('commento-finto', class extends HTMLElement {
+      constructor() {
+        super();
+        this.valore = '';
+        const r = this.attachShadow({ mode: 'open' });
+        r.innerHTML = '<textarea name="commento" style="width:520px;height:140px"></textarea>';
+        this.addEventListener('input', (e) => { if (e.isTrusted) this.valore = r.querySelector('textarea').value; });
+      }
+    });
+    setTimeout(() => { document.getElementById('posto').innerHTML = '<commento-finto></commento-finto>'; }, 3000);
+    document.getElementById('invia').addEventListener('click', () => {
+      const v = document.querySelector('commento-finto').valore.trim();
+      document.getElementById('esito').textContent = v ? 'Pubblicato: ' + v : 'Comment cannot be empty';
+    });
+  </script>
+</body></html>`;
+
+async function ricaricaColTesto(page, testo) {
+  await casella(page).click({ timeout: 8000 });
+  await page.keyboard.type(testo);
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  expect(await casella(page).count(), 'la casella non è ancora arrivata').toBe(0);
+}
+
+async function pubblicato(page, testo) {
+  await page.locator('#invia').click();
+  await expect(page.locator('#esito')).toHaveText(`Pubblicato: ${testo}`);
+}
+
+test('mentre scrivi in un editor ricco, il testo che torna nella casella arrivata tardi non sposta il cursore né la pagina', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA_TARDI);
+  await ricaricaColTesto(page, 'commento salvato');
+
+  await page.locator('#ce').click();
+  await page.keyboard.type('Primo pezzo ');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('secondo pezzo');
+  await expect(page.locator('#ce')).toHaveText('Primo pezzo secondo pezzo');
+  expect(await page.evaluate(() => window.scrollY), 'la pagina resta dove si scrive').toBe(0);
+  await page.screenshot({ path: 'tests/.shots/testo-tornato-editor-ricco.png' });
+  await pubblicato(page, 'commento salvato');
+});
+
+test('mentre scrivi in un\'altra riga, il cursore e la selezione restano dove li avevi messi', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA_TARDI);
+  await ricaricaColTesto(page, 'commento salvato');
+
+  await page.locator('#riga').click();
+  await page.keyboard.type('abcdef');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Shift+ArrowLeft');
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('X');
+  await expect(page.locator('#riga')).toHaveValue('abcXf');
+  await pubblicato(page, 'commento salvato');
+});
+
+test('mentre componi una parola con la tastiera di un\'altra lingua, il testo torna senza chiuderla', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA_TARDI);
+  await ricaricaColTesto(page, 'commento salvato');
+
+  const cdp = await page.context().newCDPSession(page);
+  await page.locator('#ce').click();
+  await cdp.send('Input.imeSetComposition', { text: 'にほ', selectionStart: 2, selectionEnd: 2 });
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await cdp.send('Input.insertText', { text: '日本' });
+  await page.keyboard.type(' fine');
+  await expect(page.locator('#ce')).toHaveText('日本 fine');
+  await pubblicato(page, 'commento salvato');
+});
+
+// Chi scrive altrove non perde il fuoco nemmeno dove restituirlo non basta: un editor dentro un riquadro (i classici
+// editor di posta) e una modifica in linea che si chiude quando se ne esce. La casella non vede uscite non sue.
+const paginaTardiCon = (editore, script = '') => PAGINA_TARDI
+  .replace(/<div id="ce"[^>]*><\/div>/, editore)
+  .replace("this.addEventListener('input'", "r.querySelector('textarea').addEventListener('blur', () => { window.uscite = (window.uscite || 0) + 1; });\n        this.addEventListener('input'")
+  .replace('</script>', `${script}</script>`);
+
+test('mentre scrivi in un editor dentro un riquadro, il testo che torna non ti toglie il fuoco', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, paginaTardiCon('<iframe id="fr" srcdoc="<body contenteditable=true style=&quot;min-height:60px&quot;></body>" style="width:600px;height:100px"></iframe>'));
+  await ricaricaColTesto(page, 'commento salvato');
+
+  const corpo = page.frameLocator('#fr').locator('body');
+  await corpo.click();
+  await page.keyboard.type('Primo pezzo ');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('secondo pezzo');
+  await expect(corpo).toHaveText('Primo pezzo secondo pezzo');
+  expect(await page.evaluate(() => window.uscite || 0)).toBe(0);
+  await pubblicato(page, 'commento salvato');
+});
+
+test('mentre scrivi in una modifica in linea che si chiude all\'uscita, resta aperta e il testo torna lo stesso', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const script = `
+    const h = document.getElementById('titolo');
+    h.addEventListener('click', () => {
+      const e = document.createElement('div'); e.id = 'ed'; e.contentEditable = 'true'; e.style.cssText = 'width:600px;min-height:30px;border:1px solid #999';
+      e.addEventListener('blur', () => { h.textContent = e.innerText; e.replaceWith(h); });
+      h.replaceWith(e); e.focus();
+    });`;
+  const page = await testServer.openReady(openTab, paginaTardiCon('<h2 id="titolo" style="width:600px;border:1px dashed #999">Titolo</h2>', script));
+  await ricaricaColTesto(page, 'commento salvato');
+
+  await page.locator('#titolo').click();
+  await page.keyboard.type('Primo pezzo ');
+  await expect.poll(() => casella(page).inputValue().catch(() => ''), { timeout: 10_000 }).toBe('commento salvato');
+  await page.keyboard.type('secondo pezzo');
+  await expect(page.locator('#ed')).toHaveText('Primo pezzo secondo pezzo');
+  expect(await page.evaluate(() => window.uscite || 0)).toBe(0);
+  await pubblicato(page, 'commento salvato');
+  await expect(page.locator('#titolo')).toHaveText('Primo pezzo secondo pezzo');
+});
