@@ -3,6 +3,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { premi } from '../../helpers/barra.mjs';
 
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
 const PDF = Buffer.from('%PDF-1.4\n% finto\n' + 'x'.repeat(2048));
