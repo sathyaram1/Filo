@@ -1418,7 +1418,7 @@
       Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown, chat: msg.chatId });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
-      if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
+      if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions, .filo-galleria') && !(filoBubble.textContent || '').trim()) {
         filoBubble.remove();
       }
       // #629 — la chiave OpenRouter dell'utente è stata rifiutata e ha
