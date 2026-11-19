@@ -273,7 +273,7 @@ npm run test:shoot         # cattura visiva della finestra reale
   in `patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`.
 - **I rossi d'ambiente noti** stanno in `tests/rossi-noti.json`: un rosso che
   non è lì dentro è una regressione.
-- **Nel contenitore delle routine** (Linux senza schermo) `npx playwright test` si accende da solo uno schermo virtuale con la sandbox spenta, o si ferma subito dicendo cosa manca (`scripts/lib/schermo-virtuale.mjs`, dal globalSetup); i comandi che aprono Electron fuori da Playwright (`test:shoot`, `test:smoke`) si lanciano con `node scripts/lancia-electron.mjs <comando>`.
+- **Nel contenitore delle routine** (Linux senza schermo) `npx playwright test` si accende da solo uno schermo virtuale con la sandbox spenta (uno per lavoratore con `--workers` > 1), o si ferma subito dicendo cosa manca (`scripts/lib/schermo-virtuale.mjs`, dal globalSetup); i comandi che aprono Electron fuori da Playwright (`test:shoot`, `test:smoke`) si lanciano con `node scripts/lancia-electron.mjs <comando>`.
 - Modelli per `test:explore`: open via OpenRouter, chiave in
   `tests/agent/.env`, MAI chiavi del produttore dei pesi (politica modelli).
 
