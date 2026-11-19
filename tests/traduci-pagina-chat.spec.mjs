@@ -76,7 +76,17 @@ const tradotti = (page) => page.evaluate(() => document.querySelectorAll('[data-
 const doppi = (page) => page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
   .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
 const blocchi = (app) => app.evaluate(() => globalThis.__filoBlocchi);
-const finita = (page) => expect.poll(() => page.evaluate(() => !globalThis.SN_TRANSLATE_PAGE || true), { timeout: 1000 }).toBe(true);
+
+// Gli avvisi durano pochi secondi: si raccolgono man mano che compaiono.
+const guardaAvvisi = (page) => page.evaluate(() => {
+  window.__avvisi = [];
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__avvisi.push(n.textContent || '');
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+});
+const avvisi = (page) => page.evaluate(() => window.__avvisi || []);
 
 test('«traducimi la pagina»: si traduce; chiesto di nuovo resta tradotta; «torna all\'originale» la rimette', async ({ app, openTab, testServer }) => {
   await fornitoreFinto(app);
