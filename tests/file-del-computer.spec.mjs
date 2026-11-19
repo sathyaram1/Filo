@@ -76,6 +76,7 @@ test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda 
   mkdirSync(SHOTS, { recursive: true });
   await pagina.screenshot({ path: join(SHOTS, 'file-del-computer-scheda.png') });
   await page.screenshot({ path: join(SHOTS, 'file-del-computer-chat.png') });
+  await shell.screenshot({ path: join(SHOTS, 'file-del-computer-shell.png') });
 
   // Un collegamento a un'altra pagina della stessa cartella si segue.
   await pagina.locator('#due').click();
