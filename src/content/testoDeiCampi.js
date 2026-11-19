@@ -227,7 +227,6 @@
       if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
       if (attivo() === el && prima.attivo !== el) torna(prima, el);
-      if (window.scrollX !== prima.x || window.scrollY !== prima.y) window.scrollTo(prima.x, prima.y);
     } finally { rimettendo = false; }
   }
 
