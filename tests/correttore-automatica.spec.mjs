@@ -624,5 +624,4 @@ test('il testo incollato o dettato con Filo che finisce con «perchè» e un pun
   await expect.poll(() => testoDi(page, '#ce')).toBe('detto perchè ');
   await page.waitForTimeout(300);
   expect(await testoDi(page, '#ce')).toBe('detto perchè ');
-
 });
