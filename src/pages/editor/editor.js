@@ -2006,7 +2006,7 @@
       button.setAttribute('aria-expanded', 'false');
       setHover(null);
       document.removeEventListener('mousedown', onDocDown, true);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', scorre, true);
       window.removeEventListener('resize', riposa);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', riposa);
