@@ -118,7 +118,7 @@ test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fo
   await trascina(shell, testServer.html(pagina('Tre')), { ...fondo, fasi: ['dragEnter', 'dragOver'], file: [foto] });
   await expect(shell.locator('.link-posto')).toBeHidden();
   await trascina(shell, testServer.html(pagina('Tre')), { ...fondo, fasi: ['drop'], file: [foto] });
-  await shell.waitForTimeout(800);
+  await expect.poll(() => statoAiuto(app, sito), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'miniatura.png' }] });
   expect((await stato(shell)).schede).toHaveLength(5);
 });
 
