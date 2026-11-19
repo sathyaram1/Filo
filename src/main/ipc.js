@@ -307,6 +307,12 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
   });
+  // #2393 — un collegamento lasciato sulla fila delle schede: solo dalla barra della sua finestra.
+  ipcMain.on('shell:link-su-scheda', (event, dati) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return;
+    try { LinkSuScheda.ricevi(win._filoTabs, dati); } catch (e) { console.warn('[Filo] link sulla fila', e?.message || e); }
+  });
   // #2084 — una scheda trascinata fuori dalla fila: solo dalla barra della sua finestra.
   ipcMain.on('shell:scheda-fuori', (event, dati) => {
     const win = finestraDellaBarra(event.sender);
