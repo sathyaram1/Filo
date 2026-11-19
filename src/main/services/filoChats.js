@@ -175,6 +175,8 @@
     try { global.SN_CONTESTO_FILO?.dimentica(chat.id); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(chat.id);
     await global.SN_COMPATTAZIONE?.dimenticaChat(chat.id).catch((e) => console.warn('[Filo] diario della chat cancellata:', e?.message || e));
+    // Le immagini delle sue risposte (#2272): la copia che nessun'altra chat nomina sparisce dal disco.
+    try { require('./copieIcone').togliSeOrfane(global.SN_IMMAGINI_RISPOSTA.copieDi(chat.messages)); } catch (_) {}
     const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
     if (!forme.length) return;
     const C = global.SN_AI_CACHE;
