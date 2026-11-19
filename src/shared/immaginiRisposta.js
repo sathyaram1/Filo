@@ -262,6 +262,13 @@
     if (dopo) dopo.hidden = s.scrollLeft + s.clientWidth >= s.scrollWidth - 2;
   }
 
+  // Le frecce si rileggono a fine scorrimento (anche morbido): niente ascolto dello scorrimento in cattura, che nelle
+  // pagine di Filo è dei menu (tests/unit/menuScorrimentoPrima.test.mjs).
+  function dopoLoScorrere(gal) {
+    frecce(gal);
+    setTimeout(() => frecce(gal), 400);
+  }
+
   // Le frecce compaiono solo dove si può ancora scorrere; la rotella verticale sopra il carosello lo fa scorrere di
   // lato finché c'è strada, poi torna alla pagina.
   function aggancia(root, { apriPagina, ingrandisci } = {}) {
