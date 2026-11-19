@@ -330,11 +330,11 @@
     if (!n || totalWanted > n) return { probability: 0, hits: 0, iterations: iters, seen };
 
     const rng = mulberry32(Number.isFinite(Number(seed)) ? Number(seed) : (Date.now() & 0xffffffff));
-    const keepReqs = normReqs(keep);
+    const keepReqs = cond.keep;
     const keepUnits = keepReqs.reduce((s, w) => s + w.n, 0);
     const free = g.freeMulligan ? 1 : 0;
     // Oltre h7 + free mulligan la mano è già vuota: altri giri non cambiano niente.
-    const maxMull = keepReqs.length ? Math.min(countOf(mulligans), h7 + free) : 0;
+    const maxMull = keepReqs.length ? Math.min(cond.mulligans, h7 + free) : 0;
     const idx = lib.map((_, i) => i);
     // Fisher-Yates parziale: riempie [from, to) pescando a caso fra [from, end).
     const shuffleRange = (from, to, end) => {
