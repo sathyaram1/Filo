@@ -543,6 +543,8 @@
     api.onBroadcast((m) => {
       const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
       if (m && m.type === tipo) quadratoPerSchermoIntero(!!m.fullscreen);
+      const massimizzata = globalThis.SN_MSG?.MSG?.WINDOW_MAXIMIZED_CHANGED || 'window_maximized_changed';
+      if (m && m.type === massimizzata) document.documentElement.toggleAttribute('data-massimizzata', !!m.massimizzata);
     });
   }
 
