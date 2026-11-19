@@ -1666,6 +1666,13 @@
         return 'Cambiare lo zoom della pagina';
       },
     },
+    // #504 — la traduzione della pagina chiesta a parole: la stessa dell'icona, che si disfa con «Mostra originale». Costa
+    // i token della traduzione come il clic; dopo una lettura di testo altrui, al livello Conservativo chiede.
+    TRADUCI_PAGINA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => (alOriginale(a) ? 'Rimettere la pagina nella sua lingua originale' : 'Tradurre la pagina in italiano'),
+    },
     // #1397 — riparte la scheda che suonava, o si riapre il suo indirizzo: si disfa mettendo in pausa o chiudendo.
     RIPRENDI_AUDIO: {
       costo: 1,
