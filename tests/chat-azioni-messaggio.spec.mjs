@@ -130,7 +130,13 @@ test('#2346: nell’Aiuto Rispondi cita solo il passo selezionato, e i passi dop
   // Dal tasto destro su una selezione la voce lo dice, e cita lo stesso solo il passo.
   await campo.fill('');
   await seleziona(risposta, 'capitolo sui licheni');
-  await risposta.click({ button: 'right' });
+  const r = await risposta.evaluate((el) => {
+    const radice = el.getRootNode();
+    const s = radice !== document && radice.getSelection ? radice.getSelection() : getSelection();
+    const b = s.getRangeAt(0).getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  });
+  await editor.mouse.click(r.x, r.y, { button: 'right' });
   await menuDi(editor).voce('Rispondi a questo passo').first().click();
   await expect(campo).toHaveValue('> capitolo sui licheni\n');
 });
