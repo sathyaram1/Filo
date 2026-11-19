@@ -16,6 +16,7 @@ let cfg = D.normalizza(null);
 let blocklist = [];
 let attesa = null;
 let usate = null;
+let apertoAlle = 0;
 
 function configura(settings) {
   cfg = D.normalizza(settings && settings.doppioCtrl);
