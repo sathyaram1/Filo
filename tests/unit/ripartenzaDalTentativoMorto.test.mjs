@@ -6,11 +6,12 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
 import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo, rigaDiErrore } from '../../scripts/lib/branch-integrity.mjs';
 import { leggiTentativo, tentativiSuperati } from '../../scripts/lib/tentativi.mjs';
 import { fusionePropria, fusioniSuMain, ramiInCorso } from '../../scripts/lib/su-main.mjs';
@@ -490,7 +491,7 @@ test('giro vero, il main di adesso va in conflitto col tentativo morto: non si f
     assert.equal(git(casa, 'rev-parse', 'HEAD'), morto, 'niente fusione a metà: il ramo resta sulla punta del tentativo');
     assert.equal(git(casa, 'status', '--porcelain', '--untracked-files=no'), '', 'nessun conflitto lasciato nella cartella');
     assert.deepEqual(r.json.payload.ripartenza, { ramo: ramo('20261101T000000Z'), commit: 1, conflittiConMain: ['segnaposto.txt'] });
-    const ruolo = r.json.istruzioniFile ? readFileSync(r.json.istruzioniFile, 'utf8') : String(r.json.instructions || '');
+    const ruolo = ruoloConsegnato(r.json);
     assert.match(ruolo, /conflittiConMain/, 'il ruolo dice cosa farne');
   } finally {
     srv.close();
