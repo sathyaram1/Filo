@@ -40,7 +40,7 @@ Le richieste passano da OpenRouter, che le smista ai fornitori ammessi dalla [po
 
 ## Gli altri servizi
 
-Per segnalarti i siti pericolosi, Google riceve un codice ricavato dall'indirizzo di ogni pagina, troppo corto per sapere quale pagina apri. Quando Filo cerca sul web per te, la ricerca va a Wikipedia, Tavily o DuckDuckGo, e quella che scrivi nella barra a Google. Col tasto destro su un link, Filo chiede al sito dove porta prima del tuo clic. Se ti fermi col puntatore su un link accorciato, come quelli di bit.ly, la visita la riceve chi l'ha accorciato.
+Per segnalarti i siti pericolosi, Google riceve un codice ricavato dall'indirizzo di ogni pagina, troppo corto per sapere quale pagina apri. Quando Filo cerca sul web per te, la ricerca va a Wikipedia, Tavily o DuckDuckGo (quella di immagini a Wikimedia Commons e, con la chiave, a Tavily), e quella che scrivi nella barra a Google. Col tasto destro su un link, Filo chiede al sito dove porta prima del tuo clic. Se ti fermi col puntatore su un link accorciato, come quelli di bit.ly, la visita la riceve chi l'ha accorciato.
 
 Ognuno vede da quale connessione arrivi, come sempre in rete. Filo non usa servizi esterni di pubblicità o di statistiche.
 
