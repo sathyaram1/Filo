@@ -143,6 +143,14 @@ test('la frase della chat: assegna, toglie, torna alla serie', () => {
   assert.equal(D.descrivi([{ azione: 'blocca', lettera: '' }, { azione: 'app:editor', lettera: 'e' }]), 'Blocca il computer senza lettera, E → Editor');
 });
 
+test('ogni azione del catalogo ha chi la fa nel main', () => {
+  const src = readFileSync(new URL('../../src/main/lettereDiFilo.js', import.meta.url), 'utf8');
+  const blocco = src.slice(src.indexOf('const AZIONI = {'), src.indexOf('\n};', src.indexOf('const AZIONI = {')));
+  for (const a of D.AZIONI) assert.match(blocco, new RegExp(`\\n  (async )?${a.id}(\\(|:)`), `${a.id} non ha la sua azione`);
+  // Le app si aprono dal loro indirizzo.
+  assert.ok(D.catalogo().filter((a) => a.id.startsWith('app:')).every((a) => /^filo:\/\//.test(a.url)));
+});
+
 test('la soglia sta nei suoi limiti, e l\'interruttore spento resta spento', () => {
   assert.equal(D.sogliaMs(5), 150);
   assert.equal(D.sogliaMs(99999), 1500);
