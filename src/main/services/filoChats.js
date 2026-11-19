@@ -231,10 +231,12 @@
   }
 
   async function clear() {
-    const ids = (await list({ nascoste: true })).map((c) => c.id);
+    const tutte = await list({ nascoste: true });
+    const ids = tutte.map((c) => c.id);
     if (ids.length) {
       await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
     }
+    try { require('./copieIcone').togliSeOrfane(tutte.flatMap((c) => global.SN_IMMAGINI_RISPOSTA.copieDi(c.messages))); } catch (_) {}
     try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
     await global.SN_COMPATTAZIONE?.dimenticaChat(null).catch(() => {});
