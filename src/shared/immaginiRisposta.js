@@ -80,10 +80,15 @@
     const usate = new Set();
     let out = '';
     let ultimo = 0;
+    // Un marcatore su una riga sua lascia due a capo di qua e due di là: ne restano due, un paragrafo.
+    const attacca = (pezzo) => {
+      const capi = (/\n*$/.exec(out.replace(/[ \t]+$/, ''))[0] || '').length;
+      return capi ? pezzo.replace(new RegExp(`^(?:[ \\t]*\\n){0,${Math.min(capi, 2)}}`), (s) => (capi >= 2 ? '' : s.slice(s.indexOf('\n') + 1 ? 0 : 0, 1) && '\n')) : pezzo;
+    };
     MARCATORE.lastIndex = 0;
     let m;
     while ((m = MARCATORE.exec(src))) {
-      out += src.slice(ultimo, m.index).replace(/[ \t]+$/, '');
+      out += attacca(src.slice(ultimo, m.index)).replace(/[ \t]+$/, '');
       ultimo = m.index + m[0].length;
       const voci = [];
       for (const pezzo of m[1].split(/[\s,;|]+/)) {
