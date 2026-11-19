@@ -538,12 +538,14 @@ export function esitoRiallineamento(confronto, motivo) {
   // I conflitti dichiarati contano quanto quelli che dice git: un conflitto in un file di codice chiede la verifica.
   const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : [];
   const conflitti = [...new Set([...(confronto.conflitti || []), ...dichiarati])];
-  const { giro, codice } = regola(confronto.file, { conflitti });
+  const { giro, codice, proveRosse } = regola(confronto.file, { conflitti, motivo });
   const elenco = (l) => `${l.slice(0, 5).join(', ')}${l.length > 5 ? ', …' : ''}`;
   const toccati = [...new Set([...confronto.file, ...conflitti])];
-  const righe = [giro === 'nessuno'
-    ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
-    : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
+  const righe = [proveRosse
+    ? 'Riallineamento per prove rosse: serve la verifica, che le rilancia e ne fa un rilievo per il correttore del giro dopo.'
+    : giro === 'nessuno'
+      ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
+      : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
   const taciuti = motivo && motivo.tipo === 'conflitto' ? (confronto.conflitti || []).filter((f) => !dichiarati.includes(f)) : [];
   if (taciuti.length) righe.push(`Git trova in conflitto anche ${elenco(taciuti)}, che il motivo non nomina: il server confronta da sé, e nel report va cosa hai toccato lì.`);
   return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro }, riga: righe.join(' ') };
