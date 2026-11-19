@@ -1728,8 +1728,7 @@ function openFolder(id, scope = '', opts = {}) {
   forgetExists(rec.savePath);
   const here = fileExists(rec.savePath);
   if (!here && rec.state === 'completed' && !opts.cercato) {
-    return ritrova(rec).then((c) => (c === true ? openFolder(id, scope)
-      : Promise.resolve(openFolder(id, scope, { cercato: true })).then((r) => (c === 'scaduto' && r && r.missing ? { ...r, error: CERCATO_TROPPO_TEXT, scaduto: true } : r))));
+    return ritrova(rec).then((c) => openFolder(id, scope, { cercato: true, scaduto: c === 'scaduto' }));
   }
   if (!here) broadcast('missing', rec);
   try {
@@ -1739,15 +1738,16 @@ function openFolder(id, scope = '', opts = {}) {
     const dir = path.dirname(rec.savePath);
     let dirThere = false;
     try { dirThere = fs.existsSync(dir); } catch (_) {}
-    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
+    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: opts.scaduto ? CERCATO_TROPPO_TEXT : MISSING_FOLDER_TEXT };
     const r = electron().shell.openPath(dir);
-    // ok:true + missing:true = «cartella aperta, ma il file dentro non c'è più».
+    // ok:true + missing:true = «cartella aperta, ma il file dentro non c'è più»; `avviso` lo dice alle superfici.
     // Se la cartella c'è e il sistema non l'ha aperta è un'altra storia, e va detta com'è.
+    const aperta = { ok: true, missing: true, avviso: `${opts.scaduto ? CERCATO_TROPPO_TEXT : 'Il file non c’è più'}: ho aperto la cartella dov’era` };
     const done = (msg) => (msg
       ? { ok: false, missing: true, error: 'Non è stato possibile aprire la cartella' }
-      : { ok: true, missing: true });
+      : aperta);
     if (r && typeof r.then === 'function') return r.then(done);
-    return { ok: true, missing: true };
+    return aperta;
   } catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
 }
 
