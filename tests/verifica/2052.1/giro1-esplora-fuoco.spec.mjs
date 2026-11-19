@@ -57,6 +57,7 @@ test('editore ricco dentro un riquadro della pagina (come i vecchi editor di pos
   await page.keyboard.type('Primo pezzo ');
   await torna(page);
   await page.keyboard.type('secondo pezzo');
+  console.log('DOVE', await page.evaluate(() => [document.activeElement?.id, document.getElementById('nota').value, document.getElementById('fr').contentDocument.activeElement?.tagName, document.getElementById('fr').contentDocument.hasFocus()]));
   await expect.poll(() => corpo.innerText()).toBe('Primo pezzo secondo pezzo');
 });
 
