@@ -102,3 +102,42 @@ test('dopo un trascinamento annullato con Esc sopra la vicina, il clic sulla sch
   await clicUmano(shell, await punto(shell, ids[0], null));
   await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[0]);
 });
+
+// Il clic dato nel bordo trasparente della finestra del menu, nel punto della barra che ci sta sotto.
+function clicNelBordoDelMenu(app, px, py) {
+  return app.evaluate(({ BrowserWindow }, [x, y]) => {
+    const madre = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html'));
+    const cm = madre.getContentBounds();
+    const cb = m.getContentBounds();
+    const lx = Math.round(cm.x + x - cb.x);
+    const ly = Math.round(cm.y + y - cb.y);
+    if (lx < 0 || ly < 0 || lx >= cb.width || ly >= cb.height) return { fuori: true };
+    m.webContents.sendInputEvent({ type: 'mouseMove', x: lx, y: ly });
+    m.webContents.sendInputEvent({ type: 'mouseDown', x: lx, y: ly, button: 'left', clickCount: 1 });
+    m.webContents.sendInputEvent({ type: 'mouseUp', x: lx, y: ly, button: 'left', clickCount: 1 });
+    return { fuori: false };
+  }, [px, py]);
+}
+
+test('col menu del tasto destro aperto, la X sotto il suo bordo chiude la scheda', async ({ app, shell, testServer }) => {
+  const ids = await treSchede(shell, testServer);
+  await tastoDestro(shell, `#tabs .tab[data-id="${ids[1]}"]`);
+  await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Chiudi'));
+  const x = await punto(shell, ids[1], '.close');
+  const esito = await clicNelBordoDelMenu(app, x.x, x.y);
+  expect(esito.fuori, 'la X deve stare sotto la finestra del menu').toBe(false);
+  await expect.poll(() => aperte(shell), { timeout: 3_000 }).not.toContain(ids[1]);
+  await expect.poll(() => vociDelMenu(app), { timeout: 3_000 }).toBe(null);
+});
+
+test('col menu del tasto destro aperto, il clic sulla scheda sotto il suo bordo la apre', async ({ app, shell, testServer }) => {
+  const ids = await treSchede(shell, testServer);
+  await tastoDestro(shell, `#tabs .tab[data-id="${ids[1]}"]`);
+  await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Chiudi'));
+  const p = await punto(shell, ids[1], '.title');
+  const esito = await clicNelBordoDelMenu(app, p.x, p.y - 4);
+  expect(esito.fuori, 'la scheda deve stare sotto la finestra del menu').toBe(false);
+  await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[1]);
+  await expect.poll(() => vociDelMenu(app), { timeout: 3_000 }).toBe(null);
+});
