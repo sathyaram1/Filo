@@ -111,7 +111,7 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
   const griglia = menu.locator('.sn-menu-icon-grid');
   await expect(griglia).toBeVisible();
-  expect(await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId))).toEqual(['immagine:copyLink', 'immagine:search']);
+  expect(await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId))).toEqual(['immagine:copyLink', 'immagine:search', 'immagine:transcribe']);
   await page.keyboard.press('Escape');
   await expect(menu.pannelli).toHaveCount(0);
 
