@@ -2448,10 +2448,11 @@
     if (e.key === 'Escape') closeSortMenu();
   }
   // Il menu si chiude quando scorre l'owner, non quando la lista si riallinea
-  // da sola sotto di lui.
+  // da sola sotto di lui, né per uno scorrimento finito prima dell'apertura (#2452, #2586).
   let scrollDelGiroAt = 0;
-  function onSortScroll() {
-    if (Date.now() - scrollDelGiroAt < 300) return;
+  let sortMenuScorso = () => true;
+  function onSortScroll(e) {
+    if (Date.now() - scrollDelGiroAt < 300 || !sortMenuScorso(e)) return;
     closeSortMenu();
   }
   function chooseSort(mode) {
