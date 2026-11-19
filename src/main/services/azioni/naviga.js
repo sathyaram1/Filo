@@ -7,7 +7,7 @@ const SempreAperte = require('../sempreAperte');
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
-const { contaZoomDallaChat, contaPaginaDallaChat } = require('../autonomiaFonti');
+const { contaZoomDallaChat, contaPaginaDallaChat, dallaChat } = require('../autonomiaFonti');
 const {
   schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, salvatePerChat,
   apriPaginaSalvata, leggiPaginaDa, contoRestano,
