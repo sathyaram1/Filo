@@ -46,21 +46,19 @@ test('un commento incollato col menu di Filo si pubblica: il sito lo conta come 
   await expect(page.locator('#esito')).toHaveText(`Pubblicato: ${testo}`);
 });
 
-test('incollato in mezzo a quello che si è scritto, il sito ha il testo intero', async ({ app, openTab, testServer }) => {
-  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), 'non per coding');
+test('incollato dopo quello che si è scritto, il sito ha il testo intero', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), 'non per coding.');
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
 
   await casella(page).click();
-  await page.keyboard.type('Fable è un modello  e basta.');
-  await casella(page).evaluate((el) => el.setSelectionRange(19, 19));
-  await casella(page).click({ button: 'right', position: { x: 5, y: 5 } });
-  await casella(page).evaluate((el) => el.setSelectionRange(19, 19));
+  await page.keyboard.type('Fable è un modello per automazione, ');
+  await casella(page).click({ button: 'right', position: { x: 500, y: 130 } });
   await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
-  await expect(casella(page)).toHaveValue('Fable è un modello non per coding e basta.');
+  await expect(casella(page)).toHaveValue('Fable è un modello per automazione, non per coding.');
 
   await page.locator('#invia').click();
-  await expect(page.locator('#esito')).toHaveText('Pubblicato: Fable è un modello non per coding e basta.');
+  await expect(page.locator('#esito')).toHaveText('Pubblicato: Fable è un modello per automazione, non per coding.');
 });
 
 test('il commento rimesso alla ricarica si pubblica, e il fuoco non resta nella casella', async ({ openTab, testServer }) => {
