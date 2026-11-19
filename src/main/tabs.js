@@ -915,6 +915,8 @@ class TabManager {
   // In privacy ogni sito ha la sua sessione, isolata dagli altri. Le pagine filo:// restano
   // SEMPRE su quella della finestra: lì vivono storage e protocollo.
   _partitionFor(url) {
+    // Un file del computer sta nella sessione che gli tiene chiuso il resto del disco (fileDelComputer.js).
+    if (/^file:/i.test(String(url || ''))) return FileDelComputer.PARTIZIONE;
     if (this.incognito) return this.partition || null;
     if (!url || url.startsWith('filo://')) return null;
     if (this.cookieMode === Cookies.MODES.PRIVACY) {
