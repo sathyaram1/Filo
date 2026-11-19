@@ -1923,5 +1923,11 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
+  // TRADUCI_PAGINA che torna all'originale: il popup e chi esegue leggono lo stesso campo, anche scritto come testo.
+  function alOriginale(action) {
+    const v = action && action.originale;
+    return v === true || String(v ?? '').trim().toLowerCase() === 'true';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
