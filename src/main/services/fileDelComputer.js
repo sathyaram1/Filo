@@ -104,6 +104,9 @@ function preparaSessione() {
   const { session } = require('electron');
   sessione = session.fromPartition(PARTIZIONE);
   sessione.protocol.handle('file', servi);
+  // Come le altre sessioni delle schede: le pagine d'errore di Filo, e le richieste che la pagina locale fa al web.
+  try { require('../protocol').registerFiloProtocolForSession(sessione); } catch (_) {}
+  try { const Cookies = require('./cookies'); Cookies.ensureRequestHook(sessione); Cookies.coverAdblock(sessione); } catch (_) {}
   return sessione;
 }
 
