@@ -230,7 +230,7 @@
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
-    const cosa = r.passo ? `a un passo ${di.replace(/^a(l)? /, (x) => (x === 'al ' ? 'del ' : 'di '))}` : di;
+    const cosa = !r.passo ? di : r.role === 'user' ? 'a un passo di un suo messaggio' : 'a un passo del tuo messaggio';
     return t ? `(l'utente risponde ${cosa}${dove}: «${t}»)` : `(l'utente risponde ${cosa}${dove})`;
   }
 
