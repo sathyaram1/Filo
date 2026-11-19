@@ -339,7 +339,8 @@ al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright rispo
   `apriFiloSenzaPlaywright()` di `tests/helpers/filoSenzaPlaywright.mjs`: guida il main
   dal suo ispettore, come `app.evaluate`, e lascia le pagine senza client di debug.
   Anche il Node è parte del sistema: il contenitore delle routine ha il 22, la suite e
-  gli unit su GitHub girano sul `node-version` dei workflow (oggi 20), senza il
+  gli unit su GitHub girano sul Node maggiore di Electron scritto in `.node-version`
+  (#2207, sentinella `tests/unit/nodeDeiWorkflow.test.mjs`), allora era il 20, senza il
   `WebSocket` globale. Il client dell'ispettore è perciò il `ws` di Playwright, e le
   quattro prove nate così erano rosse solo su main (#1611, sentinella
   `tests/unit/filoSenzaPlaywright.test.mjs`).

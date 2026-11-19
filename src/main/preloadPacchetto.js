@@ -246,9 +246,11 @@ function runtime(MODULI, TESTI, richiestaDellaSandbox) {
   const inUnicode = (dominio) => {
     const ascii = inAscii(dominio);
     if (!ascii) return '';
-    try {
-      return ascii.split('.').map((e) => (/^xn--/i.test(e) ? decodifica(e.slice(4)) : e)).join('.');
-    } catch (_) { return ''; }
+    // Un'etichetta xn-- che non si decodifica resta com'è, come nel Node 24 di Electron.
+    return ascii.split('.').map((e) => {
+      if (!/^xn--/i.test(e)) return e;
+      try { return decodifica(e.slice(4)) || e; } catch (_) { return e; }
+    }).join('.');
   };
   let indirizzi = null;
   const moduloUrl = () => {

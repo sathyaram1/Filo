@@ -101,6 +101,7 @@ jobs:
       actions: read
     outputs:
       sha: ${{ steps.scelta.outputs.sha }}
+      node: ${{ steps.versione-node.outputs.versione }}
     steps:
       - name: Checkout di main (con storia e tag completi)
         uses: actions/checkout@v4
@@ -108,10 +109,18 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      # Il Node lo dice main anche a `release`: il commit scelto puo' essere nato prima del file (#2207).
+      - name: Il Node di Electron
+        id: versione-node
+        run: |
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "versione=$V" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ steps.versione-node.outputs.versione }}
 
       - name: L'ultimo commit di main con la suite verde
         id: scelta
@@ -141,7 +150,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ needs.scegli.outputs.node }}
 
       - name: C'e' qualcosa di nuovo da rilasciare?
         id: check
@@ -533,6 +542,10 @@ jobs:
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          # Il Node di questa corsa: un tag vecchio il file non ce l'ha (#2207).
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "node=$V" >> "$GITHUB_OUTPUT"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -582,7 +595,7 @@ jobs:
         id: node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ steps.riparo.outputs.node }}
 
       - name: Install dipendenze
         id: dipendenze
@@ -804,6 +817,10 @@ jobs:
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          # Il Node di questa corsa: un tag vecchio il file non ce l'ha (#2207).
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "node=$V" >> "$GITHUB_OUTPUT"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -853,7 +870,7 @@ jobs:
         id: node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ steps.riparo.outputs.node }}
 
       - name: Install dipendenze
         id: dipendenze

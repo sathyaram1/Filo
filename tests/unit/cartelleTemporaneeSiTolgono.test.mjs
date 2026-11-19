@@ -187,7 +187,8 @@ test('un file di prova lanciato da solo non lascia nella temporanea quello che i
   const b = banco();
   const file = join(b.base, 'scrive.test.mjs');
   writeFileSync(file, `import ${JSON.stringify(PERCORSI)};\n${scriveDaSolo(true)}`);
-  const r = spawnSync(process.execPath, ['--test', file], { env: b.env, encoding: 'utf8' });
+  // Il TAP si chiede per nome: da Node 23 il reporter di serie è spec anche fuori dal terminale (#2207).
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', file], { env: b.env, encoding: 'utf8' });
   assert.equal(r.status, 1, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /# fail 1/, 'la prova è girata davvero');
   assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la prova');
@@ -296,7 +297,7 @@ for (const come of ['npm run test:unit', 'un file di prova lanciato da solo']) {
     const file = join(unit, 'ok.test.mjs');
     writeFileSync(file, `import ${JSON.stringify(PERCORSI)};\nimport { test } from 'node:test';\ntest('ok', () => {});\n`);
     const finto = discoPienoFinché(b, vecchia);
-    const args = come === 'npm run test:unit' ? [join(RADICE, 'scripts', 'run-unit-tests.mjs')] : ['--test', file];
+    const args = come === 'npm run test:unit' ? [join(RADICE, 'scripts', 'run-unit-tests.mjs')] : ['--test', '--test-reporter=tap', file];
     const r = spawnSync(process.execPath, ['--import', finto, ...args],
       { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, encoding: 'utf8' });
     assert.ok(!existsSync(vecchia), 'la cartella vecchia che riempie il disco è ancora lì');

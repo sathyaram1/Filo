@@ -69,7 +69,7 @@ export function perLaRiga(file, root = REPO_ROOT, p = path) {
 }
 
 // Da Node 21 `node --test` legge ogni argomento come un modello: un file con quadre o tonde nel nome non girava,
-// e l'esito restava verde. Node 20 (il runner della pubblicazione) li prende alla lettera.
+// e l'esito restava verde. Node 20 li prende alla lettera.
 export const NODE_LEGGE_MODELLI = Number(process.versions.node.split('.')[0]) >= 21;
 
 /** Il nome preso alla lettera dal modello: ogni carattere speciale chiuso fra quadre. PURA. */
