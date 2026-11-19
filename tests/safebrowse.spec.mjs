@@ -473,7 +473,7 @@ async function serviInCaricamento(app, pagine, providers) {
         return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8' } });
       }
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return globalThis.__reteChiusa.resto(req);
     };
     for (const s of ['http', 'https']) {
       try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
