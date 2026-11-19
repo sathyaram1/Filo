@@ -321,11 +321,11 @@
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : (intero ? String(m.text == null ? '' : m.text) : tienilo(m.text, tetto, m.chat));
     if (m.role === 'user') {
-      const nota = notaRisposta(m.rispostaA);
+      const corpo = conCitazioni(testo, m.rispostaA);
       const pre = String(preambolo || '').trim();
       const detto = pre
-        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${nota ? `${nota}\n` : ''}${testo}`.trim()
-        : `${intestazione(m.ts, m.chat)} ${nota ? `${nota}\n` : ''}${testo}`.trim();
+        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${corpo}`.trim()
+        : `${intestazione(m.ts, m.chat)} ${corpo}`.trim();
       const note = (Array.isArray(dopo) ? dopo : []).map((x) => String(x || '').trim()).filter(Boolean);
       const quante = numeroImmagini(m);
       if (!quante) return { role: 'user', content: note.length ? `${detto}\n\n${note.join('\n\n')}` : detto };
