@@ -237,6 +237,7 @@ test('mouse o frecce su una pagina trovata aprono la sua riga di pagine; un altr
     for (let i = 0; i < 20; i++) chat(`r${i}`, `riempitivo ${i}`, 90 - i * 3);
     await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
   }, NARVALI);
+  console.log('DEBUG', JSON.stringify(await app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).map((p) => p.url))));
   const page = await casa(app);
   const rigaAperta = () => page.evaluate((url) => [...document.querySelectorAll('.dash-pagine')]
     .filter((n) => n._gruppo && n._gruppo.pagine.some((p) => p.url === url))
