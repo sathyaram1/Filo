@@ -98,12 +98,12 @@ test('le lettere di serie: quelle scelte dall\'owner, R non c\'è finché non c\
   for (const scartata of ['n', 't', 'q', 'k', 'g', 'w', 'r']) assert.equal(D.diLettera({}, scartata), null);
   // Le app ci sono, senza lettera.
   assert.ok(v.some((x) => x.id === 'app:editor' && x.lettera === ''));
-  assert.deepEqual(D.normalizza(globalThis.SN_CONST.DEFAULT_SETTINGS.doppioCtrl), { acceso: true, sogliaMs: 400, lettere: {} });
+  assert.deepEqual(D.normalizza(globalThis.SN_CONST.DEFAULT_SETTINGS.doppioCtrl), { acceso: true, sogliaMs: 400, lettere: [] });
 });
 
 test('una lettera data a un\'app: chi l\'aveva prende quella di prima, e tornare alla serie pulisce le scelte', () => {
   const r = D.assegna({}, 'app:editor', 'c');
-  assert.deepEqual(r.lettere, { cerca: '', 'app:editor': 'c' });
+  assert.deepEqual(r.lettere, [{ azione: 'cerca', lettera: '' }, { azione: 'app:editor', lettera: 'c' }]);
   assert.equal(D.diLettera({ lettere: r.lettere }, 'c').id, 'app:editor');
   // Scambio fra due azioni con lettera: nessuna resta senza.
   const s = D.assegna({}, 'muto', 'p');
@@ -111,12 +111,16 @@ test('una lettera data a un\'app: chi l\'aveva prende quella di prima, e tornare
   assert.equal(D.diLettera({ lettere: s.lettere }, 'm').id, 'pausa');
   // Rimettere tutto com'era non lascia scelte.
   const indietro = D.assegna({ lettere: s.lettere }, 'muto', 'm');
-  assert.deepEqual(indietro.lettere, {});
-  assert.deepEqual(D.assegna({ lettere: r.lettere }, 'cerca', 'c').lettere, {});
+  assert.deepEqual(indietro.lettere, []);
+  assert.deepEqual(D.assegna({ lettere: r.lettere }, 'cerca', 'c').lettere, []);
   assert.ok(D.assegna({}, 'muto', '1').rifiuto);
   assert.ok(D.assegna({}, 'nessuna', 'x').rifiuto);
-  // Togliere una lettera: l'azione va fra quelle senza.
-  assert.deepEqual(D.assegna({}, 'blocca', '').lettere, { blocca: '' });
+  // Togliere una lettera: l'azione va fra quelle senza; rimetterla torna alla serie.
+  const tolta = D.assegna({}, 'blocca', '');
+  assert.deepEqual(tolta.lettere, [{ azione: 'blocca', lettera: '' }]);
+  assert.deepEqual(D.assegna(tolta, 'blocca', 'b').lettere, []);
+  // Scelte rovinate sul disco: si scartano, la serie resta.
+  assert.deepEqual(D.normalizza({ lettere: [{ azione: 'x', lettera: 'q' }, { azione: 'tema', lettera: '9' }, null] }).lettere, []);
 });
 
 test('il box mette prima le lettere usate da poco, in fondo quelle senza lettera', () => {
