@@ -212,6 +212,13 @@ async function azioneCorreggiMemoria(action, { rigaDaCorreggere }) {
   return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
 }
 
+// #2536.1 — la memoria per il modello che non ce l'ha nel CONTESTO (l'intervista rifatta la tiene fuori). Vuota è ''.
+async function azioneLeggiMemoria() {
+  const m = await memoriaPerModello();
+  const vuota = !['profilo', 'preferenze', 'espansioni', 'lezioni'].some((k) => String(m[k] || '').trim());
+  return { executed: true, kept: true, output: { memoria: vuota ? '' : SN_CONST.memoriaImbustata(m) } };
+}
+
 async function azioneTogliChat(action) {
   if (action.per_sempre === true) {
     const via = await cancellaChatPerSempre(action.id);
