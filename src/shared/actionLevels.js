@@ -434,6 +434,12 @@
       uscita: (a) => indirizzoDi(a),
       describe: (a) => {
         const url = indirizzoDi(a) || 'una pagina';
+        const file = a && typeof a._fileDelComputer === 'string' ? a._fileDelComputer : '';
+        if (file) {
+          return a._fileNonScritto
+            ? ['Aprire in una scheda il file del computer ', cit(file, true), '\n\nIl percorso non l\'hai scritto tu: apri solo se l\'hai chiesto tu.']
+            : ['Aprire il file ', cit(file, true)];
+        }
         if (a && a._nonCompare) {
           const primo = a._exfilReason ? `Aprire un link che ${a._exfilReason}, scritto a memoria da Filo` : 'Aprire un indirizzo scritto a memoria da Filo';
           return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
