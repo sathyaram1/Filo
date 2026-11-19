@@ -72,10 +72,28 @@ for (let i = 1; i <= RIPETI; i++) {
     const tag = `${i}-${test.info().retry}`;
     const tutte = await intervista.locator('.dash-bubble').allInnerTexts();
     mkdirSync(OUT, { recursive: true });
-    writeFileSync(join(OUT, `togli-${tag}.json`), JSON.stringify({ benvenuto, risposta: r, tutte, memoria: m, attivita: await attivita(intervista) }, null, 2));
+    const chiamate = await app.evaluate(() => globalThis.__chiamate);
+    writeFileSync(join(OUT, `togli-${tag}.json`), JSON.stringify({ benvenuto, risposta: r, tutte, memoria: m, attivita: await attivita(intervista), chiamate }, null, 2));
     await intervista.screenshot({ path: join(OUT, `togli-${tag}.png`) });
     expect(m).not.toContain('Pepe');
   });
+  test(`controllo chat normale ${i}`, async ({ app, shell }) => {
+    test.setTimeout(300_000);
+    await base(app, shell);
+    const home = await newtabPage(app, 0);
+    await home.reload();
+    await home.waitForLoadState('domcontentloaded');
+    const r = await rispostaDopo(home, 'ah il mio gatto pepe purtroppo non c\'è più, toglilo dalla memoria');
+    await home.waitForTimeout(8000);
+    const m = await memoria(app);
+    const tag = `${i}-${test.info().retry}`;
+    const chiamate = await app.evaluate(() => globalThis.__chiamate);
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(join(OUT, `controllo-${tag}.json`), JSON.stringify({ risposta: r, memoria: m, attivita: await attivita(home), chiamate }, null, 2));
+    await home.screenshot({ path: join(OUT, `controllo-${tag}.png`) });
+    expect(m).not.toContain('Pepe');
+  });
+  if (process.env.SOLO_TOGLI) continue;
   test(`cosa ricordi ${i}`, async ({ app, shell, openTab }) => {
     test.setTimeout(300_000);
     const intervista = await prepara(app, shell, openTab);
