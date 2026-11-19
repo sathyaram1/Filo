@@ -71,10 +71,21 @@ test('la rotella sulla pagina fuori dal riquadro, che la fa scorrere, lo chiude'
   await allunga(page);
   await voce(page, 'rete').click();
   await expect(riquadro(page)).toBeVisible({ timeout: 5_000 });
-  const b = await riquadro(page).boundingBox();
-  const vp = page.viewportSize() || await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
-  const x = b.x > 120 ? 40 : Math.min(vp.width - 40, b.x + b.width + 60);
-  await page.mouse.move(x, Math.min(vp.height - 40, b.y + 20));
+  // Un punto del contenitore che scorre, fuori dal riquadro.
+  const punto = await page.evaluate(() => {
+    const box = document.querySelector('.dash-sis-box').getBoundingClientRect();
+    const c = window.__chi === document.scrollingElement ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : window.__chi.getBoundingClientRect();
+    const fuori = (x, y) => x < box.left || x > box.right || y < box.top || y > box.bottom;
+    for (let y = Math.max(c.top, 0) + 10; y < Math.min(c.bottom, innerHeight) - 5; y += 20) {
+      for (let x = Math.max(c.left, 0) + 10; x < Math.min(c.right, innerWidth) - 5; x += 20) {
+        const el = document.elementFromPoint(x, y);
+        if (fuori(x, y) && el && (window.__chi === document.scrollingElement || window.__chi.contains(el))) return { x, y, el: el.tagName + '.' + el.className, chi: window.__chi.id || window.__chi.className || window.__chi.tagName, box: [box.left, box.top, box.right, box.bottom], c: [c.left, c.top, c.right, c.bottom] };
+      }
+    }
+    return null;
+  });
+  console.log('punto:', JSON.stringify(punto));
+  await page.mouse.move(punto.x, punto.y);
   const prima = await page.evaluate(() => window.__chi.scrollTop);
   await page.mouse.wheel(0, 400);
   await expect.poll(() => page.evaluate(() => window.__chi.scrollTop)).toBeGreaterThan(prima);
