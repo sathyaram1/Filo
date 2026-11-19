@@ -42,6 +42,9 @@ test('una voce con lo strumento della chat non diventa mai «non sa azionare»',
       + 'nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo e la barra si riduce.'],
     ['ingrandisci la pagina', 'Per tradurre la pagina premi Ctrl e + sulla tastiera, oppure tieni premuto Ctrl '
       + 'e usa la rotella del mouse: la pagina si ingrandisce di un passo alla volta.'],
+    // #504: la traduzione della pagina ha scheda(traduci).
+    ['traduci questa pagina in italiano', 'Per tradurre la pagina apri il menu del tasto destro e scegli "Traduci pagina": '
+      + 'la traduzione prende il posto del testo originale e puoi tornare indietro quando vuoi.'],
   ];
   for (const [u, r] of casi) assert.equal(AF.analyzeReply(r, [], u, CAPS).kind, null, u);
 });
