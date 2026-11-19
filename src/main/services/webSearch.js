@@ -106,12 +106,16 @@
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
     if (conDatoRiservato(String(query || ''))) return { ok: false, results: [], reason: FRASE_PAVIMENTO, pavimento: true };
     const r = await cerca(q, { tavilyKey, maxResults });
-    try {
-      global.SN_ACCADUTI?.ricerca({ testo: q, motore: r && r.provider, risultati: r && Array.isArray(r.results) ? r.results.length : 0 });
-    } catch (_) {}
+    annota(q, r && r.provider, r && Array.isArray(r.results) ? r.results.length : 0);
     try { global.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da, ...global.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
     return r;
   }
+
+  // Anche la ricerca di immagini della chat (#2272) entra nel filo da qui, e col suo stesso pavimento.
+  function annota(testo, motore, risultati) {
+    try { global.SN_ACCADUTI?.ricerca({ testo, motore, risultati }); } catch (_) {}
+  }
+  const riservata = (q) => (conDatoRiservato(String(q || '')) ? FRASE_PAVIMENTO : '');
 
   async function cerca(q, { tavilyKey, maxResults }) {
     // `ripiego`: Tavily c'era e non ha risposto (lo contano i contatori, #1467).
