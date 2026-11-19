@@ -142,5 +142,6 @@ module.exports = {
   BLUETOOTH: azioneVolumeBluetoothWifi,
   WIFI: azioneVolumeBluetoothWifi,
   ORDINA_DESKTOP: azioneOrdinaDesktop,
+  BLOCCA_PC: azioneBloccaPc,
   COMANDO_FINESTRA: azioneComandoFinestra,
 };
