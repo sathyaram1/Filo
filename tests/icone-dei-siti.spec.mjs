@@ -26,7 +26,7 @@ async function sitiFinti(app) {
     session.defaultSession.protocol.handle('https', (req) => {
       const u = new URL(req.url);
       const finto = /\.test$/.test(u.hostname) || /(^|\.)google\.com$/.test(u.hostname) || /gstatic\.com$/.test(u.hostname);
-      if (!finto) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (!finto) return globalThis.__reteChiusa.resto(req);
       richieste.push(`${u.hostname}${u.pathname}`);
       if (u.hostname === 'sito-con-icona.test' && u.pathname === '/favicon.ico') return png(rosso);
       if (u.hostname === 'scheda.test' && u.pathname === '/icona-della-scheda.png') return png(blu);
