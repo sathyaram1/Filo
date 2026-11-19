@@ -435,11 +435,13 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
   const sha = String(r.sha || '').slice(0, 9);
   switch (r.outcome) {
     case 'merged': return `${r.app ? `Il cancello ha portato prima la parte dell’app in attesa su main di Filo (${String(r.app).slice(0, 9)}), poi ` : 'Il cancello ha portato '}${ramo} su main di filo-security${sha ? ` (${sha})` : ''}. La pubblicazione la fa GitHub (deploy.yml).`;
-    // Le spinte sui rami di lavoro non accendono la suite (#2533): su una punta senza corse la si avvia a mano.
-    case 'aspetta_suite': return r.suite === 'assente'
-      ? `Su ${sha || 'quel commit'} la suite di filo-security non è mai partita: avviala da Actions di filo-security («Suite del server», Run workflow sul ramo ${ramo}), poi rilancia lo stesso comando.`
-      // #2540: lavori chiusi senza un passo, di solito pagamenti o limite di spesa: non è un rosso del ramo. «Suite del
-      // server» parte solo dalle spinte, senza «Run workflow» (#2540.1): la strada è rifare la corsa chiusa.
+    // «Suite del server» parte solo dalle spinte, senza «Run workflow» (#2540.1, #2574): su una punta senza corse la
+    // accende il cancello col suo commit vuoto, che la richiesta dopo porta su main al posto dello sha verificato.
+    case 'aspetta_suite': return r.suite === 'accesa'
+      ? `Su ${sha || 'quel commit'} la suite di filo-security non aveva nessuna corsa: il cancello l’ha accesa con un suo commit vuoto su ${ramo}${r.accesa ? ` (${String(r.accesa).slice(0, 9)})` : ''}. Rilancia lo stesso comando quando è verde.`
+      : r.suite === 'assente'
+      ? `Su ${sha || 'quel commit'} la suite di filo-security non ha nessuna corsa: rilancia lo stesso comando, e il cancello la accende con un suo commit vuoto su ${ramo}.`
+      // #2540: lavori chiusi senza un passo, di solito pagamenti o limite di spesa: non è un rosso del ramo.
       : r.suite === 'non_partita'
       ? `GitHub ha chiuso la suite di filo-security su ${sha || 'quel commit'} senza avviarla${r.url ? ` (${r.url})` : ''}: non è un rosso del ramo, di solito sono i pagamenti dell’account GitHub o il limite di spesa di Actions. Sistemati quelli, apri ${r.url ? 'quella corsa' : `l’ultima corsa di «Suite del server» sul ramo ${ramo} in Actions di filo-security`} e rifalla con «Re-run jobs», poi rilancia lo stesso comando.`
       : `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
