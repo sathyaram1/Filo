@@ -1314,8 +1314,8 @@
     if (el.querySelector(':scope > .sn-toast-x')) return;
     const x = document.createElement('button');
     x.type = 'button';
+    // Il segno lo disegna il CSS: nel testo dell'avviso (letto, copiato, controllato) una × in coda non c'entra.
     x.className = 'sn-toast-x';
-    x.textContent = '×';
     x.title = I18n.t('popup_close');
     x.setAttribute('aria-label', I18n.t('popup_close'));
     x.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
