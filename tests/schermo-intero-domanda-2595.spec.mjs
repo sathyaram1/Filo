@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
