@@ -424,28 +424,6 @@ test('#2096: Modifica su un messaggio con la sola foto la rimette una volta, col
 
 // ── #2346: rispondere a un passo, e a più passi nello stesso messaggio ──────────────────────────────────────────────
 
-// Seleziona `testo` nella bolla come farebbe il mouse.
-async function seleziona(bolla, testo) {
-  await bolla.evaluate((el, cosa) => {
-    const nodi = [];
-    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) nodi.push(n);
-    const tutto = nodi.map((n) => n.data).join('');
-    const k = tutto.indexOf(cosa);
-    if (k < 0) throw new Error(`non c'è: ${cosa}`);
-    const dove = (p) => {
-      let f = 0;
-      for (const n of nodi) { if (p <= f + n.data.length) return [n, p - f]; f += n.data.length; }
-      return null;
-    };
-    const r = document.createRange();
-    r.setStart(...dove(k));
-    r.setEnd(...dove(k + cosa.length));
-    const s = getSelection();
-    s.removeAllRanges();
-    s.addRange(r);
-  }, testo);
-}
 const selezionato = (home) => home.evaluate(() => getSelection().toString().trim());
 // I pezzi della bolla nell'ordine in cui si leggono: le citazioni (dai loro attributi) e le parole dell'utente.
 const pezziDellaBolla = (bolla) => bolla.evaluate((el) => [...el.childNodes]
