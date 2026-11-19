@@ -13,6 +13,7 @@
 // non c'è nessun #fonte-1, senza il runtime non c'è nessun .sn-gloss.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const URL = 'filo://transparency/transparency.html';
 
