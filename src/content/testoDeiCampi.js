@@ -310,7 +310,7 @@
     fineAttesa = Date.now() + ATTESA_CAMPI_MS;
     try {
       osservatore = new MutationObserver(() => {
-        if (Date.now() > fineAttesa && !compone()) { fermaAttesa(); return; }
+        if (Date.now() > fineAttesa) { fermaAttesa(); return; }
         if (!prossimo) prossimo = setTimeout(rimetti, 150);
       });
       osservatore.observe(document.documentElement, { childList: true, subtree: true });
