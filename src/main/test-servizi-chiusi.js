@@ -50,15 +50,27 @@ function chiudiFetch(target = globalThis, avvisa = () => {}) {
   const avvisati = new Set();
   const chiusa = function fetch(input, init) {
     const url = urlDi(input);
-    if (hostChiuso(url)) {
+    const servizio = hostChiuso(url);
+    if (servizio || (target[RETE_CHIUSA] === true && fuoriDaQui(url))) {
       const host = new URL(url).hostname;
-      if (!avvisati.has(host)) { avvisati.add(host); avvisa(`[test] servizio chiuso: ${host}`); }
+      if (!avvisati.has(host)) { avvisati.add(host); avvisa(`[test] ${servizio ? 'servizio chiuso' : 'rete chiusa'}: ${host}`); }
       return Promise.reject(new TypeError('fetch failed'));
     }
     return vera.call(this, input, init);
   };
   chiusa.__filoServiziChiusi = true;
   target.fetch = chiusa;
+  target[AVVOLTA] = true;
+  return true;
+}
+
+/**
+ * Da qui in poi il fetch del main non esce da questa macchina, nemmeno sotto i finti che una prova mette dopo: la
+ * chiusura sta sotto di loro. Falso se il fetch non è avvolto (Filo non aperto per una prova): chi chiede lo dice.
+ */
+function chiudiTuttaLaRete(target = globalThis) {
+  if (!target || target[AVVOLTA] !== true) return false;
+  target[RETE_CHIUSA] = true;
   return true;
 }
 
