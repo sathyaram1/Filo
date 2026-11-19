@@ -1253,7 +1253,7 @@
     {
       scrive: ['doppioCtrl.lettere'],
       costo: 1,
-      aiuto: 'una lettera e la sua azione: «e editor», «z riapri», «togli b», «di serie». Azioni: cerca nel filo, impostazioni, cattura schermo, tema, schermo intero, aiuto, muto, pausa, leggi ad alta voce, salva per dopo, riapri scheda chiusa, blocca il computer, cuffie preferite, trascrivi, e le app (editor, mazzi, download, memorie, aperti per dopo)',
+      aiuto: 'una lettera e la sua azione: «e editor», «z riapri», «togli b», «di serie». Azioni: cerca nel filo, impostazioni, cattura schermo, tema, schermo intero, aiuto, muto, pausa, leggi ad alta voce, salva per dopo, riapri scheda chiusa, blocca il computer, cuffie preferite, trascrivi, e le app (editor, download, memorie, aperti per dopo)',
       keys: ['lettere_doppio_ctrl', 'lettere del doppio ctrl', 'lettera doppio ctrl', 'lettera del ctrl', 'doppioctrl.lettere'],
       build(v, attuali) {
         const D = doppioCtrl();
