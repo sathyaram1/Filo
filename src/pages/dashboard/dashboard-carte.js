@@ -1434,10 +1434,11 @@
     aperta: (nome) => dati.aperte[nome] === true,
     // Il doppio tocco (#2372): un tasto fa quello che fa il suo clic, una carta apre la sua app.
     usa(id) {
-      if (C.tasto(id)) { usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`)); return true; }
-      const c = C.carta(id);
-      if (c && c.url) { apri(c.url); return true; }
-      return false;
+      const x = C.prendeLettera(id);
+      if (!x) return false;
+      if (C.tasto(id)) usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`));
+      else apri(x.url);
+      return true;
     },    setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
