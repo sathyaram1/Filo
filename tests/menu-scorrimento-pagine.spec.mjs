@@ -39,6 +39,8 @@ async function restaPoiSiChiude(page, menu) {
   await fotogrammi(page);
   await expect(menu).toBeVisible();
   expect(await scorsa(page), 'la pagina è scorsa davvero all\'apertura').toBeGreaterThan(100);
+  await attesa(page, 350);
+  await expect(menu).toBeVisible();
   await scorriAncora(page);
   await expect(menu).toBeHidden();
 }
