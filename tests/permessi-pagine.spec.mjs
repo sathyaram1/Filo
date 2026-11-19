@@ -884,7 +884,8 @@ test('una cartella data da leggere: il sito che vuole scriverci lo chiede col no
   await pagina.locator('#carica').click();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await expect(barra()).toContainText(new URL(origine).host);
-  await expect(barra()).toContainText('vuole creare, modificare e cancellare file in «foto da caricare»');
+  await expect(barra().locator('.permesso-cosa')).toHaveText('vuole creare, modificare e cancellare file in');
+  await expect(barra().locator('.permesso-oggetto')).toHaveText('foto da caricare');
   await new Promise((ok) => setTimeout(ok, 500));
   expect(esiti.slice(1), 'nessuna scrittura prima della risposta').toEqual([]);
   expect(existsSync(lasciato)).toBe(false);
