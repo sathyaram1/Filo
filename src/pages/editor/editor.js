@@ -1985,7 +1985,7 @@
       applyFilter('');
       setHover(visibleOptions()[0] || null);
       document.addEventListener('mousedown', onDocDown, true);
-      window.addEventListener('scroll', close, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', riposa);
       // Lo zoom della pagina muove il riquadro visuale senza sempre cambiare la
       // finestra: è una misura a sé, e va ascoltata a sé.
