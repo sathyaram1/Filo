@@ -206,6 +206,7 @@ function ensureHeaderHook(ses) {
     gpcState.set(ses, state);
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
+      if (/protett/.test(details.url)) console.log('DEBUGHOOK', details.url, details.resourceType, JSON.stringify(details.requestHeaders), !!refererFn);
       const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
       if (s && s.enabled && !senzaGpc(details.url) && !senzaGpc(urlDelFrame(details))) headers['Sec-GPC'] = '1';
       if (refererFn && !Object.keys(headers).some((h) => h.toLowerCase() === 'referer')) {
