@@ -157,16 +157,32 @@
     return { payload: { ...base, ...(images.length ? { images } : {}), ...(files.length ? { files } : {}) } };
   }
 
-  // Quello che il riquadro di conferma mostra: niente byte dei file, l'anteprima solo delle immagini.
+  // Quello che il riquadro di conferma mostra: niente byte dei file, l'anteprima solo delle immagini. Una `daPreparare`
+  // (oltre il tetto o fuori elenco) la ridisegna il riquadro, che ha un canvas, come la casella «Invia feedback».
   function anteprime(voci) {
     return (Array.isArray(voci) ? voci : []).map((v) => ({
       id: v.id, tipo: v.tipo, nome: v.nome,
       ...(v.tipo === 'immagine' && v.dataUrl ? { anteprima: v.dataUrl } : {}),
+      ...(v.daPreparare ? { daPreparare: true } : {}),
       ...(problemaDi(v) ? { problema: problemaDi(v) } : {}),
     }));
   }
 
+  // Le immagini che il riquadro ha ridisegnato ({ id: dataUrl }) al posto di quelle da preparare: solo per le voci
+  // segnate dal main, solo nei formati che si leggono e sotto il tetto.
+  const PREPARATA = /^data:image\/(png|jpeg|webp|gif);base64,/i;
+  function conPreparati(voci, preparati) {
+    const p = preparati && typeof preparati === 'object' ? preparati : {};
+    return (Array.isArray(voci) ? voci : []).map((v) => {
+      const u = v && v.daPreparare && Object.prototype.hasOwnProperty.call(p, v.id) ? p[v.id] : null;
+      if (typeof u !== 'string' || !PREPARATA.test(u) || byteDi(u) > limiti().byte) return v;
+      const { problema, daPreparare, byte, ...resto } = v;
+      return { ...resto, dataUrl: u };
+    });
+  }
+
   global.SN_ALLEGATI_SEGNALAZIONE = {
-    richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, nomeDi, limiti,
+    richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, conPreparati,
+    nomeDi, limiti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
