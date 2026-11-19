@@ -970,7 +970,7 @@
       const r = Tocco().assegna(dati.impostazioni && dati.impostazioni.doppioTocco, l, { tasto: id });
       if (r.rifiuto) { avviso(r.rifiuto); return; }
       scriviImpostazione({ doppioTocco: { lettere: r.lettere } });
-      avviso(`«${l}${l}» nella home: ${titolo}`);
+      avviso(Tocco().conPrima(`«${l}${l}» nella home: ${titolo}`, r));
     };
     attesaLettera = { tasto, fine: () => fineAttesaLettera() };
     global.addEventListener('keydown', tasto, true);
