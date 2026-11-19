@@ -596,7 +596,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const citateQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPaginaTutte(m.rispostaA) : [];
     const lette = citateQui.map((c) => {
       const passo = c.a != null ? c.testo.slice(c.da, c.a) : '';
-      return { role: c.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(passo || c.testo, RispostaA.PER_IL_MODELLO), ...(passo ? { passo: true } : {}), ...(c.pos ? { pos: c.pos } : {}) };
+      return { role: c.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(passo || c.testo, RispostaA.PER_IL_MODELLO), ...(passo || c.passo ? { passo: true } : {}), ...(c.pos ? { pos: c.pos } : {}) };
     }).filter((c) => c.testo);
     if (lette.length) content = FCx.conCitazioni(content, lette);
     const msg = { role, content };
