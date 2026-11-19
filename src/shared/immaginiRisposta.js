@@ -287,16 +287,14 @@
     };
     const allaRotella = (e) => {
       const s = e.target && e.target.closest && e.target.closest('.filo-galleria-scorre');
-      if (!s || !root.contains(s) || e.ctrlKey || e.metaKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      if (!s || !root.contains(s) || e.ctrlKey || e.metaKey) return;
+      dopoLoScorrere(s.parentElement);
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       const versoDestra = e.deltaY > 0;
       const strada = versoDestra ? s.scrollWidth - s.clientWidth - s.scrollLeft : s.scrollLeft;
       if (strada <= 1) return;
       e.preventDefault();
       s.scrollLeft += e.deltaY;
-    };
-    const alloScorrere = (e) => {
-      const s = e.target;
-      if (s && s.classList && s.classList.contains('filo-galleria-scorre')) frecce(s.parentElement);
     };
     const allEntrata = (e) => {
       const g = e.target && e.target.closest && e.target.closest('.filo-galleria');
@@ -304,7 +302,6 @@
     };
     root.addEventListener('click', alClic, true);
     root.addEventListener('wheel', allaRotella, { passive: false });
-    root.addEventListener('scroll', alloScorrere, true);
     root.addEventListener('mouseover', allEntrata, true);
     if (typeof apriPagina === 'function') {
       apritori.set(root, apriPagina);
