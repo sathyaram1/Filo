@@ -152,7 +152,8 @@
     const url = await entroIlTetto(file, tetto, LATO_SEGNALAZIONE);
     const blob = url ? blobDa(url) : null;
     if (!blob) return { motivo: buona ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
-    const avviso = /^image\/gif$/i.test(file.type || '') && await animata(file) ? { avviso: AVVISO_FERMA } : {};
+    const gif = /^image\/gif$/i.test(file.type || '') || /\.gif$/i.test(nome);
+    const avviso = gif && await animata(file) ? { avviso: AVVISO_FERMA } : {};
     try { return { file: new File([blob], nome || 'immagine', { type: blob.type }), ...avviso }; } catch (_) {
       blob.name = nome;
       return { file: blob, ...avviso };
