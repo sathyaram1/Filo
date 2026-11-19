@@ -421,3 +421,174 @@ test('#2096: Modifica su un messaggio con la sola foto la rimette una volta, col
   await expect(chip).toHaveCount(0);
   await expect(home.locator('#input')).toHaveValue('');
 });
+
+// ── #2346: rispondere a un passo, e a più passi nello stesso messaggio ──────────────────────────────────────────────
+
+// Seleziona `testo` nella bolla come farebbe il mouse.
+async function seleziona(bolla, testo) {
+  await bolla.evaluate((el, cosa) => {
+    const nodi = [];
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) nodi.push(n);
+    const tutto = nodi.map((n) => n.data).join('');
+    const k = tutto.indexOf(cosa);
+    if (k < 0) throw new Error(`non c'è: ${cosa}`);
+    const dove = (p) => {
+      let f = 0;
+      for (const n of nodi) { if (p <= f + n.data.length) return [n, p - f]; f += n.data.length; }
+      return null;
+    };
+    const r = document.createRange();
+    r.setStart(...dove(k));
+    r.setEnd(...dove(k + cosa.length));
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }, testo);
+}
+const selezionato = (home) => home.evaluate(() => getSelection().toString().trim());
+// I pezzi della bolla nell'ordine in cui si leggono: le citazioni (dai loro attributi) e le parole dell'utente.
+const pezziDellaBolla = (bolla) => bolla.evaluate((el) => [...el.childNodes]
+  .map((n) => (n.nodeType === 3 ? n.data.trim() : n.classList.contains('dash-citata') ? `> ${n.dataset.testo}` : ''))
+  .filter(Boolean));
+
+test('#2346: con un passo selezionato Rispondi cita solo quello, e un clic sulla citazione lo riseleziona', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: RISPOSTA }, { text: 'Ottima scelta.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'cosa cucino stasera?');
+  const risposta = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Risotto ai funghi' });
+  await expect(risposta).toHaveAttribute('data-key', /^m:/, { timeout: 20_000 });
+
+  await seleziona(risposta, 'Risotto ai funghi');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  const citazione = home.locator('#citazione');
+  await expect(citazione).toContainText('Risotto ai funghi');
+  await expect(citazione).not.toContainText('Pasta al pomodoro');
+  await expect(home.locator('#input')).toBeFocused();
+
+  await scrivi(home, 'con quali funghi?');
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'con quali funghi?' });
+  await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', 'Risotto ai funghi');
+  expect(await paroleDellaBolla(mia)).toBe('con quali funghi?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Ottima scelta.' })).toBeVisible({ timeout: 20_000 });
+
+  // Nel filo il passo è una misura sul messaggio citato, non una sua copia.
+  const salvata = await app.evaluate(async () => {
+    const chats = await globalThis.SN_IL_FILO.chats();
+    const m = chats.flatMap((c) => c.messages).find((x) => x.role === 'user' && x.text === 'con quali funghi?');
+    const r = m && m.rispostaA;
+    const citata = r && chats.find((c) => c.id === r.chat);
+    return { r, passo: citata ? citata.messages[r.i].text.slice(r.da, r.a) : null };
+  });
+  expect(salvata.r.testo).toBeUndefined();
+  expect(salvata.passo).toBe('Risotto ai funghi');
+  const detta = await ultimaDomanda(app);
+  expect(detta).toContain("l'utente risponde a un passo del tuo messaggio");
+  expect(detta).toContain('«Risotto ai funghi»');
+
+  // Riaperta la home la citazione è ancora il passo, e un clic lo ritrova selezionato.
+  await home.reload();
+  const riaperta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'con quali funghi?' });
+  await expect(riaperta.locator('.dash-citata')).toHaveAttribute('data-testo', 'Risotto ai funghi', { timeout: 15_000 });
+  await riaperta.locator('.dash-citata').click();
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Risotto ai funghi' })).toHaveClass(/dash-trovato/);
+  await expect.poll(() => selezionato(home)).toBe('Risotto ai funghi');
+});
+
+test('#2346: più passi nello stesso messaggio, ognuno col suo commento, nell\'ordine in cui sono scritti', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await preparaModello(app, [{ text: RISPOSTA }, { text: 'Capito.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'cosa cucino stasera?');
+  const risposta = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Risotto ai funghi' });
+  await expect(risposta).toHaveAttribute('data-key', /^m:/, { timeout: 20_000 });
+  const input = home.locator('#input');
+  const pezzi = home.locator('#citazione .dash-citazione-pezzo');
+
+  await seleziona(risposta, 'Pasta al pomodoro');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  await input.fill('troppo semplice');
+  // La seconda citazione va in fondo, e quello scritto finora resta sotto la prima.
+  await seleziona(risposta, 'Zuppa di lenticchie');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  await expect(pezzi).toHaveCount(2);
+  await expect(pezzi.nth(0).locator('.dash-citazione-testo')).toHaveText('Pasta al pomodoro');
+  await expect(pezzi.nth(0).locator('.dash-citazione-commento')).toHaveValue('troppo semplice');
+  await expect(pezzi.nth(1).locator('.dash-citazione-testo')).toHaveText('Zuppa di lenticchie');
+  await expect(pezzi.nth(1).locator('.dash-citazione-commento')).toHaveCount(0);
+  await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
+  await input.fill('questa mi piace');
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-campo.png' });
+
+  await input.press('Enter');
+  await expect(pezzi).toHaveCount(0);
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'questa mi piace' });
+  const attesi = ['> Pasta al pomodoro', 'troppo semplice', '> Zuppa di lenticchie', 'questa mi piace'];
+  expect(await pezziDellaBolla(mia)).toEqual(attesi);
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Capito.' })).toBeVisible({ timeout: 20_000 });
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-bolla.png' });
+  await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
+  await expect(home.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-bolla-scuro.png' });
+
+  // Il modello legge citazione e commento in ordine.
+  const detta = await ultimaDomanda(app);
+  const dove = (s) => detta.indexOf(s);
+  expect(dove('«Pasta al pomodoro»')).toBeGreaterThanOrEqual(0);
+  expect(dove('«Pasta al pomodoro»')).toBeLessThan(dove('troppo semplice'));
+  expect(dove('troppo semplice')).toBeLessThan(dove('«Zuppa di lenticchie»'));
+  expect(dove('«Zuppa di lenticchie»')).toBeLessThan(dove('questa mi piace'));
+
+  // Riaperta la home la bolla è la stessa, e Modifica rimette citazioni e commenti dov'erano.
+  await home.reload();
+  const riletta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'questa mi piace' });
+  await expect(riletta.locator('.dash-citata')).toHaveCount(2, { timeout: 15_000 });
+  expect(await pezziDellaBolla(riletta)).toEqual(attesi);
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(pezzi).toHaveCount(2);
+  await expect(pezzi.nth(0).locator('.dash-citazione-commento')).toHaveValue('troppo semplice');
+  await expect(pezzi.nth(1).locator('.dash-citazione-testo')).toHaveText('Zuppa di lenticchie');
+  await expect(input).toHaveValue('questa mi piace');
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-campo-scuro.png' });
+});
+
+test('#2346: dal tasto destro su un passo selezionato, e togliendo una citazione il suo commento resta', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: RISPOSTA }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'cosa cucino stasera?');
+  const risposta = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Risotto ai funghi' });
+  await expect(risposta).toHaveAttribute('data-key', /^m:/, { timeout: 20_000 });
+  const input = home.locator('#input');
+  const pezzi = home.locator('#citazione .dash-citazione-pezzo');
+
+  await seleziona(risposta, 'Pasta al pomodoro');
+  const r = await home.evaluate(() => { const b = getSelection().getRangeAt(0).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
+  await home.mouse.click(r.x, r.y, { button: 'right' });
+  await menuDi(home).voce('Rispondi a questo passo').first().click();
+  await expect(pezzi).toHaveCount(1);
+  await expect(pezzi.nth(0)).toContainText('Pasta al pomodoro');
+  await expect(pezzi.nth(0)).not.toContainText('Risotto');
+
+  await input.fill('primo');
+  await seleziona(risposta, 'Risotto ai funghi');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  await input.fill('secondo');
+  // Tolta la prima, il suo commento passa davanti a quello della seconda.
+  await pezzi.nth(0).getByRole('button', { name: 'Non rispondere' }).click();
+  await expect(pezzi).toHaveCount(1);
+  await expect(pezzi.nth(0)).toContainText('Risotto ai funghi');
+  await expect(input).toHaveValue('primo\nsecondo');
+  // Esc lascia l'ultima, e il testo resta nel campo.
+  await input.press('Escape');
+  await expect(pezzi).toHaveCount(0);
+  await expect(home.locator('#citazione')).toBeHidden();
+  await expect(input).toHaveValue('primo\nsecondo');
+});
