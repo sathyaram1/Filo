@@ -207,7 +207,8 @@ html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
    segno sottile dice dove nascerà quella nuova. */
 .tab.link-sopra,
 .tab.link-sopra:hover { background: color-mix(in srgb, var(--accent) 24%, var(--tab-bg-eff)); }
-.tab.link-sopra::after { display: none; }
+.tab.link-sopra:not(.active)::after,
+.tab:not(.active):has(+ .tab.link-sopra)::after { display: none; }
 .link-posto {
   position: fixed;
   width: 2px;
