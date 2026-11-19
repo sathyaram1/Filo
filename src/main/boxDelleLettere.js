@@ -231,7 +231,7 @@ const SCRIPT = `(() => {
   });
   const esc = (v) => String(v == null ? '' : v).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]);
   const riga = (v) => '<div class="riga' + (v.lettera ? '' : ' senza') + '" tabindex="-1" role="menuitem" data-id="' + esc(v.id) + '" data-lettera="' + esc(v.lettera) + '">'
-    + '<span class="tasto" title="Cambia lettera">' + esc(String(v.lettera || '').toUpperCase()) + '</span>'
+    + '<span class="tasto" data-tip="' + (v.lettera ? 'Cambia lettera' : 'Dai una lettera') + '" aria-label="' + (v.lettera ? 'Cambia lettera' : 'Dai una lettera') + '">' + esc(String(v.lettera || '').toUpperCase()) + '</span>'
     + '<span class="lbl">' + esc(v.titolo) + '</span></div>';
   if (!api) return;
   api.onVoci((d) => {
