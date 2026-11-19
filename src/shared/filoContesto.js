@@ -104,8 +104,9 @@
   // Il tetto in token vale per la richiesta intera (#2473.1): al tratto resta quello che istruzioni, strumenti e CONTESTO
   // (`fissi`) lasciano, mai meno del minimo del campo. Senza, quando la compattazione non parte, si passava il listino.
   function tettoDelTratto(token, fissi = 0) {
+    const t = Number(token);
     const f = Number(fissi) > 0 ? Number(fissi) : 0;
-    return Math.max(LIMITI.token[0], Number(token) - f);
+    return Number.isFinite(t) ? Math.max(Math.min(t, LIMITI.token[0]), t - f) : t;
   }
 
   // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
