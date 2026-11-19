@@ -502,7 +502,8 @@ export async function esegui(argv, deps = {}) {
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
     const verificato = daFondere && daFondere.server ? daFondere.server.sha : '';
-    if (verificato && sha && sha !== verificato) {
+    // Il commit vuoto con cui il cancello accende la suite (#2574) cambia lo sha, non il codice.
+    if (verificato && sha && sha !== verificato && !(deps.stessoAlbero || stessoAlbero)(cartella, sha, verificato)) {
       err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
     }
     // La fusione chiesta al cancello la registra il server; la spinta dal PC la dice questo passo.
