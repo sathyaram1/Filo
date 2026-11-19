@@ -1146,6 +1146,8 @@ function finalizeManual(rec, state, savePath) {
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina. Un video in streaming fa
   // eccezione (#1488): ci mette minuti, e la fine si dice nella finestra, dovunque sia l'utente in quel momento.
   if (rec.via === 'streaming') annunciaStreaming(rec, state);
+  else if (rec._annuncia && state === 'completed') annunciaArrivato(rec);
+  else if (rec._annuncia && state === 'interrupted') { contaNonRiuscito(rec); avvisaNonRiuscito(rec); }
   return marca;
 }
 
