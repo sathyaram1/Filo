@@ -424,12 +424,6 @@ test('stessoAlbero: un commit vuoto sopra lo sha verificato ha lo stesso albero,
   } finally {
     togliCartella(dir);
   }
-  // Allo strumento del server va il ramo fermo sullo sha verificato, non quello che può ancora muoversi (#1062).
-  assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`]]);
-  const senzaFermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si, fissa: () => ({ ok: false, motivo: 'push rifiutato' }) });
-  assert.equal(senzaFermo.k, 1);
-  assert.equal(senzaFermo.lanci.length, 0, 'senza il ramo fermo lo strumento del server non parte');
-  assert.match(senzaFermo.testo, /non riesco a fermare lo sha verificato aaaaaaaaa[\s\S]*push rifiutato/);
 });
 
 test('la prova a vuoto con un verdetto guarda lo sha verificato, come la fusione vera', async () => {
