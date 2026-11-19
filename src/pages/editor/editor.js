@@ -2048,8 +2048,8 @@
       [/^##\s$/, () => exec('formatBlock', 'H2')],
       [/^###\s$/, () => exec('formatBlock', 'H3')],
       [/^>\s$/, () => exec('formatBlock', 'BLOCKQUOTE')],
-      [/^[-*]\s$/, () => exec('insertUnorderedList')],
-      [/^1\.\s$/, () => exec('insertOrderedList')],
+      [/^[-*]\s$/, () => apriElenco('insertUnorderedList')],
+      [/^1\.\s$/, () => apriElenco('insertOrderedList')],
     ];
     for (const [re, fn] of map) {
       if (re.test(text)) {
