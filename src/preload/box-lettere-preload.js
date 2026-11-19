@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('boxLettere', {
   assegna: (id, lettera, giro) => ipcRenderer.send('box-lettere:assegna', String(id == null ? '' : id), String(lettera == null ? '' : lettera), Number(giro)),
   chiudi: (giro) => ipcRenderer.send('box-lettere:chiudi', Number(giro)),
   pronto: (giro) => ipcRenderer.send('box-lettere:pronto', Number(giro)),
+  fumetto: (testo, x, y) => ipcRenderer.send('box-lettere:fumetto', String(testo == null ? '' : testo).slice(0, 80), Number(x), Number(y)),
   onVoci: (fn) => { ipcRenderer.on('box-lettere:voci', (_e, dati) => fn(dati)); },
 });
