@@ -167,7 +167,7 @@ function gitEsito(cwd, args) {
   }
 }
 
-function stessoAlbero(cartella, a, b) {
+export function stessoAlbero(cartella, a, b) {
   const r = gitEsito(cartella, ['rev-parse', `${a}^{tree}`, `${b}^{tree}`]);
   const [x, y] = r.ok ? String(r.out).trim().split(/\s+/) : [];
   return !!x && x === y;
