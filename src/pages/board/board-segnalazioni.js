@@ -207,7 +207,7 @@
     setTimeout(() => {
       if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuori, true);
-      window.addEventListener('scroll', chiudiMenu, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);
   }
