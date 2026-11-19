@@ -87,7 +87,6 @@
     }
     doc.addEventListener('dragenter', passa, true);
     doc.addEventListener('dragover', passa, true);
-    doc.addEventListener('dragleave', (e) => { if (!e.relatedTarget) pulisci(); }, true);
     doc.addEventListener('dragend', pulisci, true);
     doc.addEventListener('drop', (e) => {
       if (!e.isTrusted) return;
