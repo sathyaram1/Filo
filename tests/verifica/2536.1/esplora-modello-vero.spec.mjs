@@ -104,3 +104,19 @@ for (let i = 1; i <= RIPETI; i++) {
     expect(r).toMatch(/geometra|Pepe|Lisbona/i);
   });
 }
+
+for (let i = 1; i <= RIPETI; i++) {
+  test(`correggi ${i}`, async ({ app, shell, openTab }) => {
+    test.setTimeout(300_000);
+    const intervista = await prepara(app, shell, openTab);
+    const r = await rispostaDopo(intervista, 'sono luca. ah non faccio più il geometra, adesso faccio l\'architetto: correggilo in memoria');
+    await intervista.waitForTimeout(8000);
+    const m = await memoria(app);
+    const tag = `${i}-${test.info().retry}`;
+    const chiamate = await app.evaluate(() => globalThis.__chiamate);
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(join(OUT, `correggi-${tag}.json`), JSON.stringify({ risposta: r, memoria: m, attivita: await attivita(intervista), chiamate }, null, 2));
+    await intervista.screenshot({ path: join(OUT, `correggi-${tag}.png`) });
+    expect(m).toContain('architetto');
+  });
+}
