@@ -73,6 +73,7 @@
     CARTA_HOME: 'home',
     BARRA_SITI: 'pin',
     ZOOM_PAGINA: 'zoomPagina',
+    TRADUCI_PAGINA: 'translate',
     VOLUME: 'volume',
     BLUETOOTH: 'bluetooth',
     WIFI: 'wifi',
