@@ -43,7 +43,7 @@ test('con il modello a copione un turno con strumenti non apre connessioni fuori
   ]);
   await page.locator('#input').fill('quanto sono 30 dollari in euro? poi metti un timer');
   await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-bubble').last()).toContainText('27 euro', { timeout: 20_000 });
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('27 euro', { timeout: 20_000 });
   // Le chiamate di contorno (titolo, memoria, suggerimenti) partono dopo la risposta.
   await page.waitForTimeout(8_000);
   const uscite = await app.evaluate(() => [...new Set(globalThis.__uscite)]);
