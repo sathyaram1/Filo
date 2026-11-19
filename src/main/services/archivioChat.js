@@ -258,9 +258,10 @@ async function unaCitazione(p, chatId) {
   // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
   if (p.chat && !chat) return { ref: null, citata: { manca: true, ...pos } };
   const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo, role: p.role }) : -1;
+  // `da`/`a` contano sul testo che la pagina manda; senza testo (una citazione riletta dal filo) sul messaggio stesso.
   const passo = p.a != null ? p.testo.slice(p.da, p.a) : '';
-  let segni = passo ? { da: p.da, a: p.a } : {};
-  if (i >= 0 && passo && String(chat.messages[i].text || '') !== p.testo) {
+  let segni = p.a != null ? { da: p.da, a: p.a } : {};
+  if (i >= 0 && passo.trim() && String(chat.messages[i].text || '') !== p.testo) {
     // Ritrovato per posto con un testo un po' diverso: il passo si rimisura sul testo dell'archivio.
     const t = RispostaA.trovaPasso(String(chat.messages[i].text || ''), passo);
     segni = t && !t.tutto ? { da: t.da, a: t.a } : {};
