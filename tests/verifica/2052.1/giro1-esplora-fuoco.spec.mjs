@@ -92,6 +92,18 @@ test('il campo tardi sta in un riquadro di un altro sito, si scrive nella pagina
   await expect.poll(() => page.locator('#ed').innerText()).toBe('Primo pezzo secondo pezzo');
 });
 
+test('campo tardi in un riquadro di un altro sito, senza scrivere altrove', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html(`<!doctype html><body style="margin:0"><div id="posto"></div><script>${TARDI}</script></body>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:20px"><iframe src="${dentro}" style="width:400px;height:120px"></iframe></body>`);
+  const riquadro = () => page.frames().find((f) => f.url() === dentro);
+  await expect.poll(() => Boolean(riquadro())).toBe(true);
+  await riquadro().locator('#nota').click({ timeout: 8000 });
+  await page.keyboard.type('testo che torna');
+  await expect.poll(() => quanti(app), { timeout: 8000 }).toBe(1);
+  await page.reload();
+  await expect.poll(() => (riquadro() ? riquadro().locator('#nota').inputValue().catch(() => '') : ''), { timeout: 15000 }).toBe('testo che torna');
+});
+
 test('casella normale con il cursore in mezzo', async ({ app, openTab, testServer }) => {
   const page = await preparaETorna(app, openTab, testServer, pagina('<input id="ed" style="width:300px">'));
   await page.locator('#ed').click();
