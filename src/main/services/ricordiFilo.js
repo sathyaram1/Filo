@@ -159,7 +159,7 @@ async function cerca(domanda, { vecchi = [], davanti = [], esiti = [] } = {}) {
     const v = indice.get(t.chiave);
     if (v && v.m === modello) punteggi.push({ tratto: t, score: app.coseno(vq, v.v) });
   }
-  return FC().scegliRicordi(punteggi);
+  return FC().ricordiPerVicinanza(punteggi) || perParole(q, tratti);
 }
 
 // Per le prove: il file e la memoria ripartono da zero.
