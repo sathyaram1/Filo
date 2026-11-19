@@ -15,7 +15,11 @@ const MIME = Object.freeze({
   txt: 'text/plain', log: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', csv: 'text/csv',
   tsv: 'text/tab-separated-values', json: 'application/json', yml: 'application/x-yaml', yaml: 'application/x-yaml',
   pdf: 'application/pdf',
+  avif: 'image/avif', jfif: 'image/jpeg', ico: 'image/x-icon', heic: 'image/heic', heif: 'image/heif',
+  tif: 'image/tiff', tiff: 'image/tiff',
 });
+const tettoLettura = () => (globalThis.SN_CONST && globalThis.SN_CONST.ALLEGATI_CHAT
+  && globalThis.SN_CONST.ALLEGATI_CHAT.tettoLetturaByte) || 64 * 1024 * 1024;
 
 async function conversazione(chatId) {
   const Chats = globalThis.SN_FILO_CHATS;
