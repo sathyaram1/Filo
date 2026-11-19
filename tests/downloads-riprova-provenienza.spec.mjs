@@ -44,9 +44,9 @@ test('«Riprova» su un link protetto presenta la pagina da cui partiva il clic,
       res.end('<!doctype html><html><body style="padding:40px"><a id="l" download href="/protetto/bolletta.pdf">bolletta</a></body></html>');
       return;
     }
+    if (!u.pathname.startsWith('/protetto/')) { res.writeHead(404); res.end(); return; }
     const ref = String(req.headers.referer || '');
     visti.push(ref);
-    console.log('DEBUG1', req.method, req.url, JSON.stringify(req.headers));
     if (ref !== pagina) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('solo dalla pagina'); return; }
     if (++buoni === 1) { res.writeHead(503, { 'Content-Type': 'text/plain' }); res.end('occupato'); return; }
     res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': PDF.length, 'Content-Disposition': 'attachment; filename="bolletta.pdf"' });
