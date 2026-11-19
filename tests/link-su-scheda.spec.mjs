@@ -104,8 +104,10 @@ test('sul bordo fra due schede ne nasce una nuova proprio lì, davanti; il segno
 
 test('nel tema scuro la scheda che riceve e il segno fra due si vedono', async ({ app, shell, openTab, testServer }) => {
   await treSchede(shell, openTab, testServer);
+  const fondo = () => shell.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const chiaro = await fondo();
   await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }, { sender: null }));
-  await expect.poll(() => shell.evaluate(() => getComputedStyle(document.body).backgroundColor)).not.toBe('rgb(245, 234, 218)');
+  await expect.poll(fondo, { timeout: 5_000 }).not.toBe(chiaro);
   const video = testServer.html(pagina('Video'));
   await trascina(shell, video, { ...(await punto(shell.locator('.tab').nth(1))), fasi: ['dragEnter', 'dragOver'] });
   await expect(shell.locator('.tab').nth(1)).toHaveClass(/link-sopra/);
