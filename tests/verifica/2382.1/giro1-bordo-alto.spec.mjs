@@ -79,7 +79,7 @@ test.describe('col puntatore vero, a finestra massimizzata', () => {
       await shell.waitForTimeout(300);
       puntatore(`move:${p.x}:${p.y + dy};wait:200;down:1;wait:80;up:1;wait:300`);
       await shell.waitForTimeout(500);
-      esiti.push({ dy, p, attiva: await attiva(shell), voluta: ids[i], ev: await shell.evaluate(() => window.__ev.splice(0).filter((e) => !e.startsWith('mousemove')).join(' ')) });
+      esiti.push({ dy, y: p.y, ok: (await attiva(shell)) === ids[i], attiva: await attiva(shell), voluta: ids[i], ev: await shell.evaluate(() => window.__ev.splice(0).filter((e) => !e.startsWith('mousemove')).join(' ')) });
     }
     console.log('ESITI', JSON.stringify(esiti, null, 1));
   });
