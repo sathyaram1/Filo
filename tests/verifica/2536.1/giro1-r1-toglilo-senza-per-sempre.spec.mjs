@@ -59,5 +59,6 @@ for (let i = 1; i <= 3; i++) {
 }
 
 test('r1 «toglilo dalla memoria» la toglie subito almeno quattro volte su sei', () => {
+  console.log('ESITI', esiti.join(', '));
   expect(esiti.filter((e) => e.endsWith('tolta')).length, esiti.join(', ')).toBeGreaterThanOrEqual(4);
 });
