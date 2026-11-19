@@ -1522,9 +1522,8 @@
     }
     let scritto = righe.join('\n');
     if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
-    const c = Rispondi.dalFilo(m.rispostaA);
-    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
-    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+    const citate = Rispondi.dalFilo(m.rispostaA).filter((c) => !c.manca);
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata: citate.length ? citate : null };
   }
   // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
   let rimesso = null;
