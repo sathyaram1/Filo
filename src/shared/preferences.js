@@ -1806,6 +1806,8 @@
         return {
           partial: { models: { [r.action]: r.refs.join(', ') } },
           label: `Modello per «${r.nome}» → ${r.refs.join(', ')}`,
+          campo: `Modello per «${r.nome}»`,
+          valore: r.refs.join(', '),
           modelloFunzione: { action: r.action, refs: r.refs, nome: r.nome },
         };
       },
