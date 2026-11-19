@@ -751,7 +751,11 @@
   // lo prova. La linguetta segue il puntatore con un transform e i nodi non si spostano fino al rilascio; fuori dalla
   // fila la scheda va a chi sta sotto il puntatore (una chat di Filo, un campo di testo), via main (#2084).
   let drag = null; // { id, el, startX, startY, moved, posti, da, a, fuori, pointerId }
-  let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+  // Il clic da ignorare è solo quello del gesto che ha trascinato: tenuto oltre, mangiava il clic dopo sulla
+  // stessa scheda quando il rilascio non era caduto su di lei (portata fuori, Esc, finestra lasciata) (#2382).
+  let gestoStriscia = 0;
+  let clicZittito = null; // { id, gesto }
+  const zittisciClic = (id) => { clicZittito = { id, gesto: gestoStriscia }; };
   let ultimoPointerId = null;
   const SOGLIA_TRASCINAMENTO = 4;
   // Oltre questo margine sopra o sotto la fila la scheda esce dalla barra: tirando un po' storto si riordina ancora.
