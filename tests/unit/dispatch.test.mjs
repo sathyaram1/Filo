@@ -1140,18 +1140,13 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
 test('secaudit: il ruolo consegnato registra il verdetto e rilascia, la fusione non la chiede più (#1207)', () => {
   // Gli unit sulla fusione li lancia un'azione di GitHub accesa dal server, che porta lui il lavoro al cancello:
   // dal prompt escono la richiesta di fusione e i suoi esiti.
-  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  const dir = resolve(TMP, 'routines', 'roles');
-  mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(vere)) {
-    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
-  }
+  ruoliVeri(['secaudit.md']);
   const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
   let out = '';
   const real = process.stdout.write;
   process.stdout.write = (s) => { out += s; return true; };
   try { emit(bucket, serverCtx(bucket, null, { diff: 'diff --git a/x b/x\n+riga\n', base: { ref: 'origin/main', sha: 'a'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
-  const istruzioni = JSON.parse(out).instructions;
+  const istruzioni = ruoloConsegnato(JSON.parse(out));
   const t = istruzioni.replace(/\s+/g, ' ');
   assert.match(t, /Ruolo: secaudit/);
   assert.match(t, /dispatch\.mjs"? --record-secaudit <id> <pass\|fail> --nota <file\.md>/);
