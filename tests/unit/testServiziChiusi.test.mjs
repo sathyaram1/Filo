@@ -78,7 +78,7 @@ test('chiusa tutta la rete, il fetch del main resta su questa macchina, anche so
   const righe = [];
   S.chiudiFetch(target, (r) => righe.push(r));
   const sotto = target.fetch;
-  target.fetch = (u, i) => (/frankfurter/.test(String(u)) ? Promise.resolve('cambi finti') : sotto(u, i));
+  target.fetch = (u, i) => (String(u).startsWith('https://api.frankfurter.dev/') ? Promise.resolve('cambi finti') : sotto(u, i));
   assert.equal(await target.fetch('https://openrouter.ai/api/v1/chat/completions'), 'ok', 'prima di chiudere passa');
   assert.equal(S.chiudiTuttaLaRete(target), true);
   for (const u of ['https://openrouter.ai/api/v1/chat/completions', 'https://api.frankfurter.dev.esempio.test/x',
