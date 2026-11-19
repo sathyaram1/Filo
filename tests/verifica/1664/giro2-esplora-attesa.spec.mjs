@@ -31,9 +31,10 @@ test('attesa della conferma con cinque foto grandi', async ({ app }) => {
   await chiedi(page, `manda queste foto\n${foto.map((f) => `File: ${f}`).join('\n')}`);
   const tChiesto = Date.now();
   const voci = [];
+  let k = 0;
   const giro = setInterval(async () => {
-    try { voci.push([Date.now() - tChiesto, await page.evaluate(() => document.querySelector('#chat, main, body').innerText.slice(-200))]); } catch (_) {}
-  }, 500);
+    try { k += 1; await page.screenshot({ path: `tests/.shots/verifica-1664-g2-attesa-${k}.png` }); voci.push([Date.now() - tChiesto, k]); } catch (_) {}
+  }, 1200);
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 90_000 });
   const tVisto = Date.now();
   clearInterval(giro);
