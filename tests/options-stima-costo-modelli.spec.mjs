@@ -4,7 +4,7 @@
 // conferma e l'esito dicono le stesse cifre. Senza il fix accanto ai modelli non c'è niente.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmText, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, confirmText, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const OPTIONS_URL = 'filo://options/options.html';
