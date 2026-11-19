@@ -60,12 +60,16 @@
     }
 
     async function aggiungi(k, files) {
-      for (const file of Array.from(files || [])) {
+      for (let file of Array.from(files || [])) {
         const no = motivoRifiuto(k, file);
         if (no) { avvisa(k, no); continue; }
         inCarico.set(k, caricando(k) + 1);
         cambia(k);
         try {
+          const IC = window.SN_IMMAGINI_CHAT;
+          const pronta = IC && typeof IC.perLaSegnalazione === 'function' ? await IC.perLaSegnalazione(file) : null;
+          if (pronta && pronta.motivo) { avvisa(k, `«${file.name || 'immagine'}»: ${pronta.motivo}.`); continue; }
+          if (pronta) file = pronta.file;
           const att = await window.SN_FEEDBACK.uploadAttachment(file, file.name);
           if (att && att.url) liste.set(k, di(k).concat([att]));
           avvisa(k, '');
