@@ -101,6 +101,13 @@
   function stimaToken(testo) {
     return Math.ceil(String(testo == null ? '' : testo).length / CARATTERI_PER_TOKEN);
   }
+  // Il tetto in token vale per la richiesta intera (#2473.1): al tratto resta quello che istruzioni, strumenti e CONTESTO
+  // (`fissi`) lasciano, mai meno del minimo del campo. Senza, quando la compattazione non parte, si passava il listino.
+  function tettoDelTratto(token, fissi = 0) {
+    const t = Number(token);
+    const f = Number(fissi) > 0 ? Number(fissi) : 0;
+    return Number.isFinite(t) ? Math.max(Math.min(t, LIMITI.token[0]), t - f) : t;
+  }
 
   // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
   const parti = (c) => (Array.isArray(c) ? c.filter((p) => p && typeof p === 'object') : null);
@@ -367,10 +374,12 @@
   // torna com'era invece di accorciarsi. `dopo` ({ da, a }): il pezzo di filo compattato (SPEC-CONTESTO § La
   // compattazione): il tratto non comincia prima di `a`, e i messaggi fra `da` e `a` non tornano nemmeno come conversazione
   // ripresa, li dicono le righe delle ore. `senzaEsiti`: oltre il listino di Haiku gli esiti dei turni passati escono per primi, e la risposta lo dice.
+  // `fissi`: i token che la richiesta porta oltre al tratto (tettoDelTratto); l'ancora resta legata a `token`.
   function finestra(messaggi, {
-    ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
+    ora = Date.now(), giorni, token, fissi = 0, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
     preambolo = null, note = null, giro = null, salta = null, intero = null, dopo = null, senzaEsiti = false,
   } = {}) {
+    const tettoTratto = tettoDelTratto(token, fissi);
     const lista0 = Array.isArray(messaggi) ? messaggi : [];
     const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
     const n = lista.length;
@@ -495,8 +504,8 @@
     let ripresi = riprendi();
     let totale = 0;
     for (let i = inizio; i < n; i++) totale += pesa(i);
-    if (totale + ripresi.peso > token) {
-      while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
+    if (totale + ripresi.peso > tettoTratto) {
+      while (inizio < n && totale + ripresi.peso > tettoTratto * RIENTRO) {
         totale -= pesa(inizio);
         if (riprese.has(lista[inizio].chat)) { mieDavanti++; ripresi = riprendi(); }
         inizio++;
@@ -951,7 +960,7 @@
   }
 
   global.SN_FILO_CONTESTO = {
-    TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
+    TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, tettoDelTratto, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
     tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, limitiAiCampi, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_RACCONTO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,

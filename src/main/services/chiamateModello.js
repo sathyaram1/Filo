@@ -753,12 +753,14 @@ function compattaDaFermo(incognito, tetti) {
   }, cacheMs + 60 * 1000, incognito);
 }
 
-// La parte fissa della richiesta della chat, in token: strumenti, istruzioni e CONTESTO (la parte dell'utente). La chat
-// e la stima accanto alla soglia la contano allo stesso modo.
-function parteFissaChat(tools, parteUtente) {
-  let strumenti = 0;
-  try { strumenti = tools ? JSON.stringify(tools).length : 0; } catch (_) {}
-  return Math.ceil((PROMPTS.filoChatStatic().length + String(parteUtente || '').length + strumenti) / globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN);
+const parteFissaChat = (tools, parteUtente) => globalThis.SN_FILO_COMPATTAZIONE.parteFissa(tools, parteUtente || '');
+// La parte fissa prima che il turno la misuri: quella dell'ultimo turno; prima del primo, gli stessi pezzi con la parte
+// dell'utente fotografata (o quella tipica, se non c'è ancora). Soglia e tetto del tratto partono da qui.
+function baseDellaChat(incognito) {
+  const Tools = globalThis.SN_ACTION_TOOLS;
+  const foto = ContestoFilo.ultimaFotografia(incognito);
+  return Compattazione.base(incognito)
+    || globalThis.SN_FILO_COMPATTAZIONE.parteFissa(Tools ? Tools.definitions() : [], foto ? foto.testo : null);
 }
 
 // La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
@@ -774,13 +776,7 @@ async function stimaSogliaCompattazione(valore) {
   };
   const chat = primo(ACTIONS.FILO_CHAT);
   const comp = primo(modelloCheCompatta(settings));
-  // La parte fissa che la chat ha misurato all'ultimo turno; prima del primo, gli stessi pezzi con la parte dell'utente di
-  // adesso (o quella tipica, se non c'è ancora).
-  const Tools = globalThis.SN_ACTION_TOOLS;
-  const foto = ContestoFilo.ultimaFotografia(false);
-  const base = Compattazione.base(false) || (foto
-    ? parteFissaChat(Tools ? Tools.definitions() : [], foto.testo)
-    : parteFissaChat(Tools ? Tools.definitions() : [], '') + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente);
+  const base = baseDellaChat(false);
   const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
     soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
   });
@@ -823,5 +819,6 @@ module.exports = {
   maybeRunCompactor,
   compattaDaFermo,
   parteFissaChat,
+  baseDellaChat,
   stimaSogliaCompattazione,
 };

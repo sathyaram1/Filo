@@ -36,7 +36,7 @@ const {
 } = require('./osservazioniPerModello');
 const {
   noteProvenienzaImmagini, ricordaOrigineInChat, origineGiaLettaInChat, buildMessages, handleAIRequest,
-  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat,
+  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat, baseDellaChat,
 } = require('./chiamateModello');
 const {
   archiviaDomanda, appendToChatArchive, citazioneDelMessaggio, affidaChat, archiviaAperturaAccoglienza,
@@ -475,6 +475,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       tettiChat = { ...tettiChat, token: finestra };
       contaSe('adattamento', ACTIONS.FILO_CHAT, modelloPrimo, 'finestra_piccola');
     }
+    // Il tetto vale per la richiesta intera: il tratto lascia il posto alla parte fissa (#2473.1).
+    try { tettiChat = { ...tettiChat, fissi: baseDellaChat(require('../shim/storage').inIncognito()) }; } catch (_) {}
     filo = await componiFilo(tettiChat);
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
@@ -763,7 +765,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // il peso dei turni: la soglia vera, il grezzo che resta e l'anticipo vengono da lì (SN_FILO_COMPATTAZIONE.limiti).
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
     if (round === 1) {
-      try { Compattazione.segnaBase(incognitoTurno, parteFissaChat(tools, payloadBase.parteUtente)); } catch (_) {}
+      try {
+        const fissi = parteFissaChat(tools, payloadBase.parteUtente);
+        Compattazione.segnaBase(incognitoTurno, fissi);
+        // Una parte fissa più grossa di quella prevista stringe il tratto subito: il tetto vale per la richiesta intera.
+        tettiChat = { ...tettiChat, fissi };
+        if (filo.token > globalThis.SN_FILO_CONTESTO.tettoDelTratto(tettiChat.token, fissi)) {
+          await ricomponi();
+          token = await stimaRichiesta();
+        }
+      } catch (e) { console.warn('[Filo] parte fissa non misurata:', e?.message || e); }
       try { limitiDelTurno = await Compattazione.limiti(incognitoTurno, { tetti: tettiChat }); } catch (_) { limitiDelTurno = null; }
     }
     const l = limitiDelTurno || {};
@@ -993,8 +1004,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiTratto = async (rifiuto, caratteri, caratteriTratto) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
-    if (token == null || token >= tettiChat.token) return false;
+    const perTratto = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
+    const fissi = tettiChat.fissi || 0;
+    if (perTratto == null || perTratto >= FC.tettoDelTratto(tettiChat.token, fissi)) return false;
+    // Il rifiuto misura il solo tratto; il tetto, che vale per la richiesta intera, ci rimette la parte fissa.
+    const token = perTratto + fissi;
     strette++;
     tettiChat = { ...tettiChat, token };
     try { filo = await componiFilo(tettiChat); } catch (_) { return false; }

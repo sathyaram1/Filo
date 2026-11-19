@@ -484,6 +484,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     senzaEsiti,
     giorni: tetti.giorni,
     token: tetti.token,
+    fissi: tetti.fissi || 0,
     ancora: ancore[lato],
     chatCorrente: chatId,
     esiti: (m) => {
