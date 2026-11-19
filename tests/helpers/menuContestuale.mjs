@@ -81,6 +81,15 @@ export function statoCronologia(app, scheda) {
   return nelMondoDelMenu(app, scheda, 'globalThis.SN_MENU?._test?.cronologia() ?? null');
 }
 
+/** Il font-family calcolato delle voci della cronologia aperta (#1342), null a pannello chiuso. */
+export function carattereCronologia(app, scheda) {
+  return nelMondoDelMenu(app, scheda, `(() => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    const el = T ? T.trova('.sn-menu-history-paste') : document.querySelector('.sn-menu-history-paste');
+    return el ? getComputedStyle(el).fontFamily : null;
+  })()`);
+}
+
 // Lo strato del menu sopra la scheda (#1053, spento di serie: `test.use({ stratoDelMenu: true })`). La sua pagina
 // filo://menu/ fuori dal documento del sito, e lo stato visto dal main: aperto, punto (px della scheda), area, e se la
 // vista è a schermo, in cima alle viste della finestra e dove dice l'area.
