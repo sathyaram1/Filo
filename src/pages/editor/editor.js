@@ -2073,11 +2073,12 @@
       if (re.test(text)) {
         // Svuotato senza segnaposto il blocco non ha dove tenere il cursore: Chromium lo sposta nel blocco
         // dopo, che diventava lui il titolo, e lasciava un <p></p> alto zero che si salvava (#2279).
-        block.innerHTML = '<br>';
         const r = document.createRange();
-        r.setStart(block, 0);
+        r.selectNodeContents(block);
         sel.removeAllRanges();
         sel.addRange(r);
+        document.execCommand('delete');
+        console.log('DOPO DELETE', docEl.innerHTML, sel.anchorNode && sel.anchorNode.nodeName, sel.anchorOffset);
         fn();
         return true;
       }
