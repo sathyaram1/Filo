@@ -1563,11 +1563,36 @@
         const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', parti: a._confirm.parti, avviso: a._confirm.avviso || '' };
         // #1668 — gli allegati di una segnalazione si vedono in miniatura prima del sì; li prende il main dalla chat.
         let allegati = null;
+        const preparati = {};
         if (type === 'INVIA_FEEDBACK') {
           try {
             const p = await send({ type: MSG.FILO_FEEDBACK_ALLEGATI, action: a, chatId: chat || chatAttuale() || '' });
             if (p && p.ok && ((p.allegati || []).length || (p.scartati || []).length)) allegati = p;
           } catch (_) {}
+          // #1664 — una foto oltre il tetto o un AVIF dal disco si ridisegna qui, con la regola della casella «Invia feedback».
+          const IC = window.SN_IMMAGINI_CHAT;
+          for (const v of (allegati && allegati.allegati) || []) {
+            if (!v.daPreparare || !v.anteprima || !IC || typeof IC.perLaSegnalazione !== 'function') continue;
+            delete v.daPreparare;
+            try {
+              const b = IC.blobDa(v.anteprima);
+              const pronta = b ? await IC.perLaSegnalazione(new File([b], v.nome || 'immagine', { type: b.type })) : null;
+              const url = pronta && pronta.file ? await new Promise((ok) => {
+                const r = new FileReader();
+                r.onload = () => ok(typeof r.result === 'string' ? r.result : '');
+                r.onerror = () => ok('');
+                r.readAsDataURL(pronta.file);
+              }) : '';
+              if (url) {
+                preparati[v.id] = url;
+                v.anteprima = url;
+                delete v.problema;
+              } else {
+                delete v.anteprima;
+                if (pronta && pronta.motivo) v.problema = pronta.motivo;
+              }
+            } catch (_) { delete v.anteprima; }
+          }
           if (allegati) Object.assign(opts, { allegati: allegati.allegati || [], scartati: allegati.scartati || [], limiti: allegati.limiti });
         }
         const ok = Ui
