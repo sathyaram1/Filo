@@ -320,7 +320,6 @@ function dalMenu(s, canale, a, b) {
     const win = s.win;
     const cb = win && !win.isDestroyed() ? win.getContentBounds() : null;
     chiudi(s);
-    nascondi(s);
     if (cb && b && typeof b === 'object') ripetiSullaBarra(s.parent, cb.x + Number(b.x), cb.y + Number(b.y), Number(b.tasto));
   }
 }
