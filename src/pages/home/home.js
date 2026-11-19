@@ -569,6 +569,7 @@
   // `items`: [{ label, run }]; `campo`: un campo da scrivere al posto delle voci (il nome di una categoria nuova).
   function openMenuAt(x, y, items, { campo = null } = {}) {
     closeCtxMenu();
+    scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop home-ctxmenu';
     menu.setAttribute('role', campo ? 'dialog' : 'menu');
