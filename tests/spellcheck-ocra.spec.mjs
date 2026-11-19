@@ -111,6 +111,37 @@ test('la contraddizione con la conversazione: ocra su «mercoledì», il tasto d
   await expect(ocra(page)).toHaveCount(0);
 });
 
+// #2132 — una chat come quelle degli assistenti: niente <main>, barra laterale, casella modificabile in fondo e un
+// pannello dopo. Il ragionato riceve l'ultimo messaggio prima del campo, e sa che il campo gli risponde.
+const CHAT_ASSISTENTE = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;font:16px sans-serif;display:flex">
+<nav style="width:180px"><p>Nuova chat</p><p>Ricette di Natale</p></nav>
+<div style="flex:1;padding:20px">
+  <div class="messaggi">
+    <div><p>Puoi fare push e merge del ramo?</p></div>
+    <div><p>Fatto. Una nota sulla sicurezza: nelle tue preferenze c'è un token GitHub in chiaro, ti conviene revocarlo.</p></div>
+  </div>
+  <form><div id="ce" contenteditable="true" spellcheck="true" lang="it" style="min-height:60px;width:600px;font:20px monospace;border:1px solid #ccc"></div></form>
+</div>
+<div style="width:200px"><p>Ambiente predefinito</p></div>
+</body>`;
+
+test('una chat senza <main>: il ragionato vede l\'ultimo messaggio prima del campo e lo legge come risposta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, JSON.stringify({ issues: [] }), CHAT_ASSISTENTE);
+  await page.locator('#ce').click();
+  await batti(page, 'ha poteri limitati, non dovrebbe essere un problema');
+  await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
+  const prompt = await app.evaluate(() => globalThis.__ocra.at(-1));
+  expect(prompt).toContain('token GitHub in chiaro');
+  expect(prompt.indexOf('token GitHub in chiaro')).toBeLessThan(prompt.indexOf('ha poteri limitati'));
+  expect(prompt).toContain('il campo risponde a loro');
+  expect(prompt).not.toContain('Ricette di Natale');
+  const sistema = await app.evaluate(() => globalThis.SN_CONST.PROMPTS.spellcheckSuggerimentiSistema({}));
+  expect(sistema).toContain('soggetto sottinteso');
+  await expect(ocra(page)).toHaveCount(0);
+});
+
 test('una citazione che nella pagina non c\'è: il modello la inventa e non compare niente', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo giovedì?'));
