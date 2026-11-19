@@ -131,17 +131,23 @@ test('«riprendi la traduzione»: riparte da dove si era fermata e non ripaga la
   test.setTimeout(120000);
   await fornitoreFinto(app, { fallisceDopo: 1 });
   const page = await testServer.openReady(openTab, LUNGA);
+  await guardaAvvisi(page);
   await traduci(app);
-  await expect.poll(() => tradotti(page), { timeout: 30000 }).toBeGreaterThan(0);
-  await expect.poll(async () => {
-    const r = await chiedi(app, { type: 'TRADUCI_PAGINA' }).catch(() => null);
-    return r && r.output.traduzione === 'in_corso' ? 'in_corso' : 'altro';
-  }, { timeout: 30000, intervals: [50] }).not.toBe('in_corso').catch(() => {});
-  // La pagina è a metà: la ripresa la finisce.
-  await app.evaluate(() => { globalThis.__filoFallisceDopo = -1; });
+  await expect.poll(async () => (await avvisi(page)).some((t) => t.startsWith('Traduzione interrotta')), { timeout: 30000 }).toBe(true);
   const prima = await tradotti(page);
+  expect(prima).toBeGreaterThan(0);
   expect(prima).toBeLessThan(41);
-  await finita(page);
+
+  await app.evaluate(() => { globalThis.__filoFallisceDopo = -1; });
+  const r = await traduci(app);
+  expect(r.executed).toBe(true);
+  expect(r.output).toMatchObject({ traduzione: 'partita', come: 'ripresa' });
+  expect(r.output.mancanti).toBeGreaterThan(0);
+  expect(r.output.di).toBeGreaterThan(r.output.mancanti);
+
+  await expect.poll(() => tradotti(page), { timeout: 60000 }).toBe(41);
+  for (const id of ['#head', '#p0', '#p39']) await expect(page.locator(id)).toHaveText(/^IT /);
+  expect(await doppi(page)).toBe(0);
 });
 
 test('«torna all\'originale» mentre traduce: si ferma e la pagina resta com\'era', async ({ app, openTab, testServer }) => {
