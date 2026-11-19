@@ -156,6 +156,14 @@ function wireWindowCommon(win, tabs) {
     if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
     else tabs.layout();
   });
+  // A finestra massimizzata la fascia sopra le schede è il bordo dello schermo: la shell la dà alle schede (#2382.1).
+  const diMassimizzata = () => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+    const type = globalThis.SN_MSG?.MSG?.WINDOW_MAXIMIZED_CHANGED || 'window_maximized_changed';
+    try { win.webContents.send('filo:broadcast', { type, massimizzata: win.isMaximized() }); } catch (_) {}
+  };
+  for (const ev of ['maximize', 'unmaximize', 'restore']) win.on(ev, diMassimizzata);
+  win.webContents.on('did-finish-load', diMassimizzata);
 
   // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì l'Esc non passa
   // dal before-input-event di nessuna scheda. La regola sta in tabs.js, qui non si decide.
