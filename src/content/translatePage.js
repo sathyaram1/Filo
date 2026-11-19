@@ -164,7 +164,6 @@
     }
     pageTranslating = true;
     clearTimeout(aperturaTimer);
-    ripiegoDelGiro = '';
     // Ripresa o nuovo giro: chi continua non è tornato all'originale.
     if (!quiet && !daSola) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
     // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
