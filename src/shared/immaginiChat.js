@@ -95,5 +95,33 @@
     }
   }
 
-  global.SN_IMMAGINI_CHAT = { perLaChat, blobDa, byteDi, LETTA };
+  // Le estensioni d'immagine che il sistema può dare senza tipo, oltre a quelle già ammesse.
+  const ALTRE_ESTENSIONI = /\.(avif|heic|heif|tiff?|ico|jfif)$/i;
+  const MOTIVO_FORMATO = 'formato che Filo non sa aprire (salvala come JPEG o PNG)';
+
+  // Una foto del telefono passa spesso i 4 MB, e un AVIF non era fra i tipi ammessi (#1664): prima di rifiutarla si
+  // rimpicciolisce o si ridisegna. Torna { file } da allegare, { motivo } se non si può, null se non è un'immagine.
+  // L'SVG resta fuori: è un documento attivo (src/shared/feedbackAttachTypes.js).
+  async function perLaSegnalazione(file) {
+    const AT = global.SN_FEEDBACK_ATTACH;
+    if (!file || !AT || typeof AT.classify !== 'function') return null;
+    const tetto = (AT.LIMITI && AT.LIMITI.byte) || 4 * 1024 * 1024;
+    const tipo = String(file.type || '').toLowerCase();
+    const nome = String(file.name || '');
+    const ammessa = AT.classify(file) === 'image';
+    if (ammessa && file.size <= tetto) return { file };
+    const daProvare = ammessa
+      || (tipo.startsWith('image/') && !tipo.includes('svg'))
+      || ((!tipo || tipo === 'application/octet-stream') && ALTRE_ESTENSIONI.test(nome));
+    if (!daProvare) return null;
+    const url = await entroIlTetto(file, tetto, (AT.LIMITI && AT.LIMITI.lato) || 4096);
+    const blob = url ? blobDa(url) : null;
+    if (!blob) return { motivo: ammessa ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
+    try { return { file: new File([blob], nome || 'immagine', { type: blob.type }) }; } catch (_) {
+      blob.name = nome;
+      return { file: blob };
+    }
+  }
+
+  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, blobDa, byteDi, LETTA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
