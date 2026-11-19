@@ -16,9 +16,10 @@ async function pronta(page) {
     null, { timeout: 15_000 });
 }
 
-// Il primo pezzo col title che si vede davvero (niente sopra di lui), marcato per ritrovarlo.
+// Il primo pezzo col title che si vede davvero (niente sopra di lui), marcato per ritrovarlo. Il puntatore va
+// all'inizio del pezzo: sulla coda di un titolo lungo, al passaggio, possono comparire i tasti della carta (#2593).
 async function unTitoloVisibile(page) {
-  const titolo = await page.evaluate(() => {
+  const trovato = await page.evaluate(() => {
     for (const el of document.querySelectorAll('[title]')) {
       const t = (el.getAttribute('title') || '').trim();
       if (!t || el.tagName === 'IFRAME') continue;
@@ -26,21 +27,23 @@ async function unTitoloVisibile(page) {
       if (r.width < 4 || r.height < 4) continue;
       if (r.top < 0 || r.bottom > innerHeight) { el.scrollIntoView({ block: 'center', behavior: 'instant' }); r = el.getBoundingClientRect(); }
       if (r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) continue;
-      const sopra = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const punto = { x: Math.min(r.width / 2, 8), y: r.height / 2 };
+      const sopra = document.elementFromPoint(r.left + punto.x, r.top + punto.y);
       if (!sopra || !(sopra === el || el.contains(sopra))) continue;
       if (sopra !== el && sopra.closest('[title],[data-tip]') !== el) continue;
       el.setAttribute('data-prova-fumetto', '');
-      return t;
+      return { titolo: t, punto };
     }
     return null;
   });
-  expect(titolo, 'nessun pezzo con un title visibile nella pagina').not.toBeNull();
-  return { el: page.locator('[data-prova-fumetto]'), titolo };
+  expect(trovato, 'nessun pezzo con un title visibile nella pagina').not.toBeNull();
+  const el = page.locator('[data-prova-fumetto]');
+  return { el, titolo: trovato.titolo, passa: () => el.hover({ position: trovato.punto }) };
 }
 
 async function provaUnTitolo(page) {
-  const { el, titolo } = await unTitoloVisibile(page);
-  await el.hover();
+  const { el, titolo, passa } = await unTitoloVisibile(page);
+  await passa();
   await expect(fumetto(page)).toBeVisible();
   await expect(fumetto(page)).toHaveText(titolo);
   expect(await haTitolo(el), 'durante il passaggio il title nativo non deve esserci').toBe(false);
