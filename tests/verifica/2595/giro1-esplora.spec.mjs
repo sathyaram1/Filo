@@ -225,6 +225,55 @@ test('dopo una domanda a schermo intero, il puntatore sulla parte alta di un riq
   }
 });
 
+test('sequenze: domanda con le schede scoperte, uscita e rientro dallo schermo intero con la domanda in sospeso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const page = await testServer.openReady(openTab, pagina(srv.base));
+    await schermoIntero(app, true);
+    await expect.poll(async () => (await stato(app)).alto).toBe(0);
+    await page.mouse.move(400, 300);
+    await page.mouse.move(400, 0);
+    await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
+    await page.evaluate(() => document.getElementById('exe').click());
+    await expect(shell.locator('#dl-panel .dl-row[data-chiede="1"]')).toBeVisible({ timeout: 20000 });
+    await page.mouse.move(400, 500);
+    await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(false);
+    expect((await domandaVisibile(app, shell, '#dl-panel')).sotto).toBe(true);
+    await schermoIntero(app, false);
+    await expect.poll(async () => (await domandaVisibile(app, shell, '#dl-panel')).sotto).toBe(true);
+    await schermoIntero(app, true);
+    await expect.poll(async () => (await domandaVisibile(app, shell, '#dl-panel')).sotto).toBe(true);
+    expect((await stato(app)).schermoIntero).toBe(true);
+    await shell.mouse.move(200, 10);
+    await shell.locator('#dl-panel .dl-row[data-chiede="1"] .dl-row-btn', { hasText: /^Non scaricare$/ }).click({ timeout: 10000 });
+    await expect(shell.locator('#dl-panel')).toBeHidden({ timeout: 10000 });
+    await expect.poll(async () => { const x = await stato(app); return x.alto === 0 || (x.visibili && x.alto === x.fila); }).toBe(true);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('schermo pieno chiesto dalla pagina: una domanda si vede, e risposta la pagina torna a tutto schermo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const page = await testServer.openReady(openTab, pagina(srv.base) + `<div id="v" style="width:300px;height:200px;background:#333"></div>`);
+    await page.locator('#v').evaluate((el) => el.requestFullscreen());
+    await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 5000 }).toBe(true);
+    await expect.poll(async () => (await stato(app)).alto).toBe(0);
+    await page.evaluate((b) => { const a = document.createElement('a'); a.href = b + '/setup.exe'; document.body.appendChild(a); a.click(); }, srv.base);
+    await expect(shell.locator('#dl-panel .dl-row[data-chiede="1"]')).toBeVisible({ timeout: 20000 });
+    await expect.poll(async () => (await domandaVisibile(app, shell, '#dl-panel')).sotto, { timeout: 5000 }).toBe(true);
+    await foto(app, 'v2595-pagina-piena.png');
+    console.log('PIENO', JSON.stringify(await stato(app)), await page.evaluate(() => !!document.fullscreenElement));
+    await shell.locator('#dl-panel #dl-panel-close').click();
+    await expect.poll(async () => (await stato(app)).alto).toBe(0);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('permesso in sospeso su una scheda: a schermo intero passare a un altra scheda fa risalire, tornare la riabbassa', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
