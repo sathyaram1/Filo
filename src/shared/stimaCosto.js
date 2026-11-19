@@ -173,21 +173,23 @@
 
   // I token di un uso tipico: la media dell'utente se ce n'è abbastanza, altrimenti quella prudente del tipo.
   function tokenTipici(action, registro) {
+    const tipo = funzione(action).tipo;
     const r = registro && registro[action];
-    if (r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
+    // I token d'uscita di un'immagine creata hanno il loro prezzo, che il registro non separa: vale la media prudente.
+    if (tipo !== 'generazione' && r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
       return { prompt: Number(r.prompt) || 0, completion: Number(r.completion) || 0, cached: Number(r.cached) || 0, fonte: 'registro' };
     }
-    const tipo = funzione(action).tipo;
     const LC = global.SN_FILO_COMPATTAZIONE;
     const t = tipo === 'compattazione' ? (LC && global.SN_FILO_CONTESTO ? LC.usoTipico() : null) : TIPI[tipo];
-    return t ? { prompt: t.prompt, completion: t.completion, cached: 0, fonte: 'prudente' } : null;
+    return t ? { prompt: t.prompt, completion: t.completion, ...(t.immagini ? { immagini: t.immagini } : {}), cached: 0, fonte: 'prudente' } : null;
   }
 
   function costoUsd(prezzo, token) {
     if (!prezzo || !token) return null;
     const cached = Math.min(token.prompt, token.cached || 0);
     const leggeCache = prezzo.cacheRead != null ? prezzo.cacheRead : prezzo.prompt;
-    return (token.prompt - cached) * prezzo.prompt + cached * leggeCache + token.completion * prezzo.completion + (prezzo.request || 0);
+    const immagini = (token.immagini || 0) * (prezzo.immagineUscita != null ? prezzo.immagineUscita : prezzo.completion);
+    return (token.prompt - cached) * prezzo.prompt + cached * leggeCache + token.completion * prezzo.completion + immagini + (prezzo.request || 0);
   }
 
   // ── Numeri in parole ─────────────────────────────────────────────────────
