@@ -1,6 +1,7 @@
 // Immagini nelle risposte della chat (#2272): «antilope immagine» porta le foto nella risposta, alternate al testo, con
 // un carosello che scorre; «disegnami…» crea un'immagine segnata come fatta con l'AI; senza un modello che disegna lo
-// si dice. Riaperta la conversazione le immagini restano. Logica pura: tests/unit/immaginiRisposta.test.mjs.
+// si dice. Riaperta la conversazione le immagini restano. Logica pura: tests/unit/immaginiRisposta.test.mjs e
+// tests/unit/immaginiDelleRisposte.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
