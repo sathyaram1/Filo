@@ -39,6 +39,8 @@
     + 'Un indirizzo inventato può portare fuori tuoi dati anche scritto con parole normali. Conferma solo se l\'hai chiesto tu.';
   function costoIndirizzo(a, base) {
     if (a && a._nonCompare) return 3;
+    // Un file del computer col percorso che l'utente non ha scritto (#1905): `_fileNonScritto` lo scrive il main.
+    if (a && a._fileNonScritto) return Math.max(base, 2);
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
