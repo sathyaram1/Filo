@@ -91,6 +91,12 @@ test.describe('la X degli avvisi (#1677)', () => {
     const avviso = page.locator('.sn-toast', { hasText: 'Avviso nel tema scuro' });
     await expect(avviso).toHaveClass(/sn-toast-visible/);
     await expect(avviso.locator('.sn-toast-x')).toBeVisible();
+    await page.waitForTimeout(400);
+    const pila = await page.evaluate(() => {
+      const p = document.querySelector('.sn-toasts');
+      return { scorre: p.classList.contains('scrolling'), sh: p.scrollHeight, ch: p.clientHeight, cls: p.className };
+    });
+    console.log('pila', JSON.stringify(pila));
     await shot(page, 'toast-x-1677-scuro');
   });
 });
