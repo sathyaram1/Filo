@@ -185,6 +185,7 @@
     vaiA: (o) => Coda.vaiA(o),
     modificabile: (b) => composizioni.has(b),
     modifica: (b) => modificaMessaggio(b),
+    campoCambiato: () => aggiornaTasto(),
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
