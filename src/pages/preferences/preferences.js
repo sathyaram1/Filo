@@ -715,10 +715,15 @@
     if (modelPreviewAudio) { try { modelPreviewAudio.pause(); } catch (_) {} modelPreviewAudio = null; }
     btn.disabled = true;
     status.textContent = '…';
+    mostraRimedioVoce(null);
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text, lang, voice });
       if (!res || !res.ok) {
-        status.textContent = (res && res.error) || 'Voce naturale non disponibile in questo momento';
+        // La frase e il tasto di «Leggi» (#1344.2): mai il motivo grezzo del servizio.
+        const CE = window.SN_CHAT_ERRORS;
+        const { frase, rimedio } = CE && res ? CE.sintesiNonRiuscita(res) : { frase: '', rimedio: null };
+        status.textContent = frase || 'Voce naturale non disponibile in questo momento';
+        mostraRimedioVoce(rimedio && CE ? CE.rimedioPagina(rimedio) : null);
         return;
       }
       const m = /rate=(\d+)/.exec(String(res.mimeType || ''));
