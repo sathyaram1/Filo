@@ -148,3 +148,27 @@ test('un indirizzo che non è del web (javascript:, file:, pagine di Filo) lasci
   const dopo = await stato(shell);
   expect(dopo.schede.map((t) => t.id)).toEqual(prima.schede.map((t) => t.id));
 });
+
+test('a schermo intero, con le schede scese dal bordo alto, il collegamento lasciato su una scheda si apre lì', async ({ app, shell, openTab, testServer }) => {
+  await treSchede(shell, openTab, testServer);
+  const page = app.windows().find((w) => w.url() === (/* la scheda davanti */ '')) || null;
+  const davanti = await stato(shell);
+  const sito = app.windows().find((w) => w.url() === davanti.schede[2].url);
+  expect(page).toBe(null);
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.setContentFullscreen(true);
+  });
+  const scese = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return tm.schedeInAlto.visibili;
+  });
+  await expect(shell.locator('.tab').first()).toBeHidden({ timeout: 4_000 }).catch(() => {});
+  await sito.mouse.move(400, 200);
+  await sito.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(scese, { timeout: 4_000 }).toBe(true);
+  const video = testServer.html(pagina('Video'));
+  await trascina(shell, video, await punto(shell.locator('.tab').nth(1)));
+  await expect.poll(async () => (await stato(shell)).schede[1].url, { timeout: 8_000 }).toBe(video);
+  expect((await stato(shell)).attiva).toBe(davanti.schede[1].id);
+  expect((await stato(shell)).schede).toHaveLength(3);
+});
