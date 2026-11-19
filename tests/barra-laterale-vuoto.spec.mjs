@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNellaBarra, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelloStrato } from './helpers/riquadri.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
