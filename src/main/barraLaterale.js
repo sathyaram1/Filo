@@ -894,6 +894,23 @@ class BarraLaterale {
     if (daTastiera) this.chiudi();
   }
 
+  // Un'icona della pagina (cattura, trascrivi…), dalla barra o da una lettera del doppio Ctrl (#2377), che non chiede
+  // all'icona di stare nella barra. `via`: la strada contata.
+  eseguiSullaPagina(id, { colore = '', via = 'barra' } = {}) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const d = D && D.noto(id) ? D.ICONE[id] : null;
+    const attiva = this._attiva();
+    const nav = this._nav();
+    if (!d || d.tipo !== 'pagina' || !attiva || !nav.pagina || this._motivoAzione(id, nav)) return false;
+    Strade.misura('azione', id, via, { incognito: this._incognito() });
+    this.chiudi();
+    this._restituisciTastiera();
+    const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
+    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+    this._consegnaInAttesa();
+    return true;
+  }
+
   // Un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: mandata prima nessuno l'ascolterebbe.
   // Vale per la scheda e l'indirizzo su cui si è premuto, finché restano davanti.
   _consegnaInAttesa() {
