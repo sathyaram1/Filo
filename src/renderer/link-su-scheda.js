@@ -81,7 +81,7 @@
         e.dataTransfer.dropEffect = /link|all|uninitialized/i.test(ammessi) ? 'link' : 'copy';
       } catch (_) {}
       mostra(b);
-      // Uscita verso la pagina: la vista sotto è un'altra, e qui non arriva sempre un dragleave.
+      // Uscita verso la pagina: è un'altra vista, e qui non arriva niente. Il dragleave di Chromium non dice verso dove.
       if (scade) clearTimeout(scade);
       scade = setTimeout(pulisci, 300);
     }
