@@ -42,6 +42,37 @@ test('una lettera ha un’azione sola, un tasto una lettera sola; «w» si può 
     [{ lettera: 'y', url: 'https://a.it/' }]);
 });
 
+test('ridare una lettera già usata dice cosa apriva prima; cambiare la lettera di un tasto no', () => {
+  const cfg = { lettere: [{ lettera: 'y', url: 'https://www.youtube.com/' }, { lettera: 'e', tasto: 'editor' }] };
+  const r = D.assegna(cfg, 'y', { url: 'example.com' });
+  assert.deepEqual(r.sostituita, { lettera: 'y', url: 'https://www.youtube.com/' });
+  assert.equal(D.conPrima('Salvato', r), 'Salvato (prima apriva youtube.com)');
+  assert.equal(D.assegna(cfg, 'y', { url: 'www.youtube.com/' }).sostituita, null, 'la stessa cosa non si perde');
+  assert.equal(D.assegna(cfg, 'k', { tasto: 'editor' }).sostituita, null, '«Cambia lettera» toglie solo la lettera vecchia del tasto');
+  assert.equal(D.assegna(cfg, 'e', { tasto: 'impostazioni' }).sostituita.tasto, 'editor');
+  // A parole la frase dell'esito lo dice, così Filo lo riferisce.
+  const chat = P.buildPreferencePartial('doppio tocco', 'e impostazioni', { attuali: { doppioTocco: cfg } });
+  assert.match(chat.label, /ee → Impostazioni \(prima apriva Editor\)$/);
+  assert.doesNotMatch(P.buildPreferencePartial('doppio tocco', 'k example.com', { attuali: { doppioTocco: cfg } }).label, /prima/);
+});
+
+test('chi può avere una lettera lo dice solo carteHome: tasti e carte che aprono un’app', async () => {
+  const H = globalThis.SN_CARTE_HOME;
+  const ids = H.conLettera().map((t) => t.id);
+  assert.deepEqual(ids, [...H.ID_TASTI, ...H.CARTE.filter((c) => c.url).map((c) => c.id)]);
+  for (const id of ids) assert.ok(!D.assegna({}, 'q', { tasto: id }).rifiuto, `${id} si salva`);
+  assert.equal(H.prendeLettera('suggerimenti'), null);
+  // Le altre tre porte (Preferenze, tasto destro e doppio tocco della home) chiedono a lei, non rifanno l'elenco.
+  const { readFileSync } = await import('node:fs');
+  const fonte = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+  for (const p of ['src/shared/doppioTocco.js', 'src/pages/preferences/preferences.js', 'src/pages/dashboard/dashboard-carte.js']) {
+    assert.doesNotMatch(fonte(p), /CARTE\.filter\(\(c\) => c\.url\)|C\.carta\(id\)\.url/, p);
+  }
+  assert.match(fonte('src/pages/preferences/preferences.js'), /H\.conLettera\(\)/);
+  assert.match(fonte('src/pages/dashboard/dashboard-carte.js'), /function vociLettera[^}]*C\.prendeLettera\(id\)/);
+  assert.match(fonte('src/pages/dashboard/dashboard-carte.js'), /usa\(id\) \{\s*const x = C\.prendeLettera\(id\)/);
+});
+
 test('la chat assegna e toglie una lettera a parole, con le impostazioni di adesso', () => {
   const attuali = { doppioTocco: { lettere: [{ lettera: 'e', tasto: 'editor' }] } };
   const yt = P.buildPreferencePartial('doppio tocco', 'yy apre youtube.com', { attuali });
