@@ -102,8 +102,7 @@ test('Aperti per dopo: il menu di una scheda', async ({ openTab }) => {
   await page.reload();
   const scheda = page.locator('#grid .sn-card[data-page-id="a"]');
   await expect(scheda).toBeVisible();
-  await scorriAlGesto(page, 'contextmenu', scheda);
-  await scheda.click({ button: 'right' });
+  await scorriEApri(page, scheda);
   await restaPoiSiChiude(page, page.locator('.home-ctxmenu'));
 });
 
