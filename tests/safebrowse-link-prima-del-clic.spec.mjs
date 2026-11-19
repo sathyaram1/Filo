@@ -17,38 +17,21 @@ async function foto(avviso, nome) {
 const MODULO = '<title>Accedi</title><form><input name="email" placeholder="Email">'
   + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>';
 
-// Ogni richiesta della sessione passa di qui e si conta; i siti finti si servono, il mini server prosegue, il resto non
-// esce: un nome finto (paypa1.com) su internet esiste davvero, e può non rispondere mai (#1456).
+// Ogni richiesta della sessione si conta, con la rete chiusa delle prove (tests/helpers/reteChiusa.mjs).
 // I fornitori di rete del rilevatore sono finti e contano le chiamate.
 async function contaLaRete(app, pagine = {}) {
-  await app.evaluate(async ({ session, net }, pg) => {
-    globalThis.__richieste = [];
+  await serviSiti(app, pagine);
+  await app.evaluate(async () => {
     globalThis.__fornitori = [];
-    const risposta = (req) => {
-      globalThis.__richieste.push(req.url);
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      if (u.hostname === '127.0.0.1') return net.fetch(req, { bypassCustomProtocolHandlers: true });
-      return Response.error();
-    };
-    for (const s of ['http', 'https']) {
-      try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
-      session.defaultSession.protocol.handle(s, risposta);
-    }
     const conta = (nome) => async (x) => { globalThis.__fornitori.push(`${nome}:${typeof x === 'string' ? x : JSON.stringify(x)}`); return null; };
     globalThis.SN_SAFEBROWSE.setProviders({
       gsb: conta('gsb'), gsbPeek: null, rdap: conta('rdap'), ct: conta('ct'), llm: conta('llm'), sandbox: conta('sandbox'),
     });
     // Il «Continua» salva il sito fra quelli fidati (#967), e ogni salvataggio rimetterebbe i fornitori veri.
     globalThis.SN_SAFEBROWSE.configure = () => {};
-  }, pagine);
+  });
 }
 
-// `host`: il nome del sito, o un'espressione sul nome quando i siti sono tanti.
-const richiesteVerso = (app, host) => app.evaluate((_, { h, re }) => globalThis.__richieste.filter((u) => {
-  try { const n = new URL(u).hostname; return re ? new RegExp(re).test(n) : n === h || n.endsWith('.' + h); } catch (_) { return false; }
-}), host instanceof RegExp ? { re: host.source } : { h: host });
 const fornitori = (app) => app.evaluate(() => globalThis.__fornitori);
 
 // Il verdetto che il main tiene pronto per un link della scheda che lo mostra (null: non esaminato o pulito).
