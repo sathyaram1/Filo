@@ -1,5 +1,6 @@
 // #2586 — i menu propri delle pagine di Filo seguono la regola del tasto destro (#2452): lo scorrimento finito
-// nell'istante dell'apertura non chiude il menu appena aperto, uno scorrimento dopo l'apertura sì.
+// nell'istante dell'apertura non chiude il menu appena aperto, uno scorrimento dopo l'apertura sì. Sentinella:
+// tests/unit/menuScorrimentoPrima.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
