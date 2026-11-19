@@ -2035,8 +2035,8 @@
     host.appendChild(pad);
   }
 
-  // Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>), e il salvataggio legge un paragrafo e
-  // perde l'elenco: quando il paragrafo non ha altro, l'elenco prende il suo posto (#2279).
+  // insertUnorderedList di Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>) e il salvataggio, che legge
+  // un paragrafo, lo perdeva: la riga già vuotata si sostituisce con l'elenco, in un passo che l'Annulla conosce (#2279).
   function apriElenco(cmd) {
     const sel = window.getSelection();
     const bloccoAlCursore = () => {
