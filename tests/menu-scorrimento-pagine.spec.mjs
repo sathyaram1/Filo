@@ -25,6 +25,7 @@ async function scorriAlGesto(page, gesto, bersaglio, { finestra = false } = {}) 
 const fotogrammi = (page) => page.evaluate(() => new Promise((ok) => {
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(ok, 150)));
 }));
+const attesa = (page, ms) => page.evaluate((t) => new Promise((ok) => setTimeout(ok, t)), ms);
 const scorsa = (page) => page.evaluate(() => {
   const chi = document.querySelector('[data-scorre-prova]');
   return chi.scrollTop - Number(chi.dataset.scorreDa);
