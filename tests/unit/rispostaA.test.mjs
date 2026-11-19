@@ -128,13 +128,13 @@ test('#2346: il passo selezionato a schermo si ritrova nello scritto, anche fra 
 });
 
 test('#2346: un passo si salva come posto e misura, mai come copia; più citazioni si salvano in ordine', () => {
-  const uno = CA.toStoredMessage({ role: 'user', text: 'questa', rispostaA: { chat: 'c-cena', i: 1, da: 32, a: 49, testo: 'Risotto ai funghi' } });
-  assert.deepEqual(uno.rispostaA, { chat: 'c-cena', i: 1, da: 32, a: 49 });
+  const uno = CA.toStoredMessage({ role: 'user', text: 'questa', rispostaA: { chat: 'c-cena', i: 1, da: 48, a: 65, testo: 'Risotto ai funghi' } });
+  assert.deepEqual(uno.rispostaA, { chat: 'c-cena', i: 1, da: 48, a: 65 });
   const due = CA.toStoredMessage({
     role: 'user', text: 'buona\nmeglio di no',
-    rispostaA: [{ chat: 'c-cena', i: 1, da: 32, a: 49 }, { chat: 'c-cena', i: 1, da: 50, a: 72, pos: 6 }, { chat: '../x', i: 1 }],
+    rispostaA: [{ chat: 'c-cena', i: 1, da: 48, a: 65 }, { chat: 'c-cena', i: 1, da: 66, a: 88, pos: 6 }, { chat: '../x', i: 1 }],
   });
-  assert.deepEqual(due.rispostaA, [{ chat: 'c-cena', i: 1, da: 32, a: 49 }, { chat: 'c-cena', i: 1, da: 50, a: 72, pos: 6 }]);
+  assert.deepEqual(due.rispostaA, [{ chat: 'c-cena', i: 1, da: 48, a: 65 }, { chat: 'c-cena', i: 1, da: 66, a: 88, pos: 6 }]);
   assert.deepEqual(R.riferimento({ chat: 'c-cena', i: 1, da: 9, a: 3 }), { chat: 'c-cena', i: 1 }, 'una misura rovesciata non vale');
   assert.equal(R.daSalvare(Array.from({ length: R.MAX_CITAZIONI + 5 }, () => ({ chat: 'c-cena', i: 1 }))).length, R.MAX_CITAZIONI);
 
