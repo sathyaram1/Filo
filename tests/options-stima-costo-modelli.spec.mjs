@@ -216,8 +216,9 @@ test('Chat: «usa opus per la chat» chiede l\'OK con il costo e l\'avviso, salv
   await scrivi(chat, 'usa opus per la chat');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
   const saldo = await saldoLocale(app);
-  const riga = `Circa 118 crediti per messaggio. Con opus i tuoi ${intero(saldo)} crediti bastano per circa ${Math.floor(saldo / OPUS_MSG)} messaggi.`;
+  const riga = `Circa 118 crediti per messaggio. Con questo modello i tuoi ${intero(saldo)} crediti bastano per circa ${Math.floor(saldo / OPUS_MSG)} messaggi.`;
   await expect.poll(() => confirmText(chat), { timeout: 8_000 }).toContain(riga);
+  expect((await confirmState(chat)).citazioni).toEqual(['opus']);
   expect((await impostazioni(app)).models.filo_chat).toBe('deepseek-flash');
   await chat.screenshot({ path: 'tests/.shots/stima-costo-chat-conferma.png' });
 
