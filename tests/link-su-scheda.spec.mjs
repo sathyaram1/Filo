@@ -151,10 +151,8 @@ test('un indirizzo che non è del web (javascript:, file:, pagine di Filo) lasci
 
 test('a schermo intero, con le schede scese dal bordo alto, il collegamento lasciato su una scheda si apre lì', async ({ app, shell, openTab, testServer }) => {
   await treSchede(shell, openTab, testServer);
-  const page = app.windows().find((w) => w.url() === (/* la scheda davanti */ '')) || null;
   const davanti = await stato(shell);
   const sito = app.windows().find((w) => w.url() === davanti.schede[2].url);
-  expect(page).toBe(null);
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.setContentFullscreen(true);
   });
