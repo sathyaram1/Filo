@@ -21,9 +21,8 @@ function corsa(albero) {
       mkdirSync(dirname(dest), { recursive: true });
       writeFileSync(dest, testo);
     }
-    // Senza togliere NODE_TEST_CONTEXT il figlio si crede una sotto-prova di
-    // questa e risponde in binario invece che in TAP: nessuna riga da leggere. Il TAP si chiede per nome: da Node 23 il
-    // reporter di serie è spec anche fuori dal terminale.
+    // Senza togliere NODE_TEST_CONTEXT il figlio si crede una sotto-prova e risponde in binario; da Node 23 il reporter
+    // di serie è spec anche fuori dal terminale: il TAP da leggere si chiede per nome.
     const env = { ...process.env, FILO_COMMENTI_ROOT: dir };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'tests/unit/commentiRegola.test.mjs'], {
