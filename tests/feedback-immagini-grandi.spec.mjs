@@ -114,7 +114,9 @@ test('riquadro: una foto grande incollata entra anche lei', async ({ app, shell 
   });
   const miniature = page.locator('.sn-fb-thumb img');
   await expect(miniature).toHaveCount(1, { timeout: 20_000 });
-  expect(byteDelData(await miniature.first().getAttribute('src'))).toBeLessThanOrEqual(TETTO);
+  const m = await miniaturaN(page, 0);
+  expect(m.size).toBeGreaterThan(0);
+  expect(m.size).toBeLessThanOrEqual(TETTO);
 });
 
 test('Gestione: una foto oltre i 4 MB allegata a una risposta sale rimpicciolita', async ({ openTab }) => {
