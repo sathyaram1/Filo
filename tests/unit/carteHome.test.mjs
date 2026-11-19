@@ -312,6 +312,43 @@ test('a sinistra i Crediti e ciò che suona sono fissi in cima; il resto no', ()
   assert.deepEqual(sx.map((v) => [v.chiave, !!v.fissa]), [['crediti', true], ['timer:t2', true], ['timer:t1', false], ['avviso:n1', false]]);
 });
 
+// #2390.1 — gli avvisi volati nella colonna sono carte dell'elenco unico: la home e la chat li vedono uguali.
+test('gli avvisi volati stanno in cima all\'elenco unico, fissi; quello di una cosa che ha già la carta non c\'è', () => {
+  const sx = C.sinistra({
+    timers: [{ id: 't2', label: 'Forno', ringing: true }],
+    cornice: [
+      { id: '7', testo: 'Errore: la pagina non si apre', azioni: ['Riprova'] },
+      { id: '6', testo: 'Timer «Forno» scaduto', carta: C.chiaveTimer('t2') },
+      { id: '5', testo: 'Scaricato: relazione.pdf', carta: C.chiaveDownload('nonCe') },
+    ],
+  }, null);
+  assert.deepEqual(sx.map((v) => [v.chiave, v.tipo, !!v.fissa]), [
+    ['cornice:7', 'cornice', true], ['cornice:5', 'cornice', true], ['timer:t2', 'timer', true],
+  ]);
+  assert.equal(sx[0].titolo, 'Errore: la pagina non si apre');
+  // «chiudi quell'avviso»: lo trova la chat col nome che usa l'utente.
+  assert.deepEqual(C.trovaSinistra('avvisi', sx).voci.map((v) => v.chiave), ['cornice:7', 'cornice:5']);
+  assert.deepEqual(C.trovaSinistra('l\'avviso della pagina che non si apre', sx).voci.map((v) => v.chiave), ['cornice:7']);
+  // Nascoste: un avviso volato non si nasconde, si chiude.
+  assert.deepEqual(C.nascosteSinistra({ cornice: [{ id: '7', testo: 'x' }] }, { nascoste: ['cornice:7'] }), []);
+});
+
+test('le chiavi delle carte che un avviso nomina vengono dal modulo che fa le carte', () => {
+  assert.equal(C.cartaDiAvviso(C.chiaveTimer('abc_1')), 'timer:abc_1');
+  assert.equal(C.cartaDiAvviso(C.chiaveDownload('d-9')), 'download:d-9');
+  for (const no of ['avviso:1', 'timer:', 'download:a b', `timer:${'x'.repeat(81)}`, 42, null, 'timer:<b>']) assert.equal(C.cartaDiAvviso(no), '', String(no));
+  // Nessuno le riscrive a mano: chi avvisa e chi controlla le chiede qui.
+  const SRC = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
+  for (const f of [['main', 'services', 'alarmWatcher.js'], ['main', 'services', 'downloads.js']]) {
+    assert.doesNotMatch(SRC(...f), /carta: `(timer|download):/, f.join('/'));
+  }
+  for (const f of [['renderer', 'shell.js'], ['main', 'avvisiSopraPagina.js']]) {
+    assert.doesNotMatch(SRC(...f), /\(timer\|download\)/, f.join('/'));
+    assert.match(SRC(...f), /cartaDiAvviso\(/, f.join('/'));
+  }
+  assert.match(SRC('renderer', 'shell.html'), /filo:\/\/shared\/carteHome\.js/);
+});
+
 // #1661 — al primo incontro la home tiene solo la colonna di sinistra.
 test('il primo incontro dura finché l’accoglienza non si chiude, e solo se la strada per cominciare è una', () => {
   assert.equal(C.primoIncontro({ done: false }, 'chiave'), true);

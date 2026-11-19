@@ -62,6 +62,27 @@ test('le icone dell\'elenco esistono nella libreria', () => {
   for (const n of F.ICONE) assert.equal(typeof globalThis.SN_ICONS[n], 'function', n);
 });
 
+// #2390.1 — il tasto destro di un avviso è uno, nell'angolo e nella carta volata nella home.
+test('il menu di un avviso: le sue azioni, il sito da cui è nato, una sola chiusura; «Chiudi tutti» solo se ce ne sono altri', () => {
+  const voci = F.menu({ azioni: ['Riprova', '', 'Dettagli'], indirizzo: 'https://www.esempio.it/pagina', quante: 1 });
+  assert.deepEqual(voci.map((v) => v && [v.etichetta, v.azione]), [['Riprova', '0'], ['Dettagli', '2'], ['Apri esempio.it', 'apri'], null, ['Chiudi', 'chiudi']]);
+  assert.deepEqual(F.menu({ quante: 3 }).map((v) => v && v.azione), ['chiudi', 'chiudi-tutti']);
+  // Un indirizzo che non è un sito non diventa una voce.
+  for (const indirizzo of ['javascript:alert(1)', 'filo://newtab/', 'file:///etc/passwd', 'https://', '']) {
+    assert.ok(!F.menu({ indirizzo }).some((v) => v && v.azione === 'apri'), indirizzo);
+  }
+});
+
+test('angolo e home costruiscono il menu dell\'avviso dal modulo condiviso, non ognuno per conto suo', () => {
+  const angolo = readFileSync(join(ROOT, 'src', 'main', 'avvisiSopraPagina.js'), 'utf8');
+  assert.match(angolo, /SN_FORMA_AVVISO', 'formaAvviso\.js'\)\.menu\(/);
+  assert.doesNotMatch(angolo, /label: `Apri \$\{/);
+  const home = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-carte.js'), 'utf8');
+  assert.match(home, /SN_FORMA_AVVISO\.menu\(/);
+  assert.doesNotMatch(home, /Chiudi tutti gli avvisi/);
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.html'), 'utf8'), /filo:\/\/shared\/formaAvviso\.js/);
+});
+
 test('la shell carica il modulo e sceglie la forma solo da lì', () => {
   const html = readFileSync(join(ROOT, 'src', 'renderer', 'shell.html'), 'utf8');
   assert.match(html, /filo:\/\/shared\/formaAvviso\.js/);

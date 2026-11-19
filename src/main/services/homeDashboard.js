@@ -122,7 +122,17 @@ async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {
     require('./carteHome').leggi(),
   ]);
   const lavori = require('./lavoriInCorso').elenco(ambito);
-  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+  const avvisi = avvisiVolati(sender);
+  const cornice = avvisi ? avvisi.colonna() : [];
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId, cornice }, layout);
+}
+
+// Gli avvisi volati nella colonna (#2390) li tiene la finestra di chi chiede: la chat li vede e li chiude come la home.
+function avvisiVolati(sender) {
+  const win = sender && sender.win;
+  let a = null;
+  try { a = win && !win.isDestroyed() && win._filoTabs ? win._filoTabs.avvisi : null; } catch (_) { a = null; }
+  return a && typeof a.colonna === 'function' ? a : null;
 }
 
 // Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
@@ -172,6 +182,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
     let avvisi = 0;
     for (const v of voci) {
       if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else if (v.tipo === 'cornice') { const a = avvisiVolati(sender); if (a) a.azioneDallaHome(v.ref.id, 'chiudi'); }
       else {
         const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
@@ -182,8 +193,8 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   }
   // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
   const v = voci[0];
-  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
-  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const fissa = (x) => `la carta «${x.titolo}» sta in cima finché ${x.tipo === 'cornice' ? 'non la chiudi' : 'suona'}: non si sposta e non si scavalca`;
+  if (v.fissa) return no(fissa(v));
   const mobili = sx.filter((x) => !x.fissa);
   const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
   const at = mobili.findIndex((x) => x.chiave === v.chiave);
@@ -191,7 +202,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (action.prima_di != null) {
     const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
     if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
-    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    if (rif.fissa) return no(fissa(rif));
     dove = ordine.indexOf(rif.chiave);
   } else if (verso === 'cima') dove = 0;
   else if (verso === 'fondo') dove = ordine.length;
@@ -210,6 +221,7 @@ function ordinaCome(sx, layout) {
   const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
   return CH.sinistra({
     timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+    cornice: per('cornice'),
   }, layout);
 }
 

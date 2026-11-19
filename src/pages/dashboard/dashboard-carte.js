@@ -140,7 +140,7 @@
     // Una sveglia che si ripete: «Ferma» la zittisce per oggi, togliere la carta la toglie del tutto.
     const togli = timerMsg(rep || !t.ringing ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, t.id);
     const base = {
-      chiave: `timer:${t.id}`, tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
+      chiave: C.chiaveTimer(t.id), tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
       titolo: nome, togli, chat: t.chat || null, suona: !!t.ringing,
       etichettaTogli: sveglia ? 'Togli la sveglia' : 'Togli il timer',
     };
@@ -198,8 +198,8 @@
     const nome = r.filename || 'download';
     const pct = percento(r);
     const base = {
-      chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
-      togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
+      chiave: C.chiaveDownload(r.id), tipo: 'download', icona: 'download', titolo: nome,
+      togli: () => muovi({ tipo: 'nascondi', chiave: C.chiaveDownload(r.id) }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
       altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
@@ -377,42 +377,37 @@
   // ===== Gli avvisi della barra volati qui (#2390) =====
   // Il modello sta nella shell della finestra: la carta ne mostra testo e azioni, e ogni gesto torna a lei.
   const TITOLO_DA_ICONA = { warning: 'Avviso', download: 'Scaricamento', timer: 'Timer', alarm: 'Sveglia' };
-  function cartaCornice(a) {
+  // `volati`: quelli nella colonna adesso, che «Chiudi tutti» toglie insieme.
+  function cartaCornice(a, volati) {
     const allaShell = (azione) => () => d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione });
     const chiudi = allaShell('chiudi');
     const azioni = (a.azioni || []).map((etichetta, i) => ({ etichetta, fai: allaShell(String(i)) })).filter((x) => x.etichetta);
+    const chiudiTutti = () => { for (const x of volati) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); };
+    // Il tasto destro è quello dell'avviso nell'angolo: le voci le decide il modulo condiviso.
+    const menu = global.SN_FORMA_AVVISO.menu({ azioni: a.azioni, indirizzo: a.indirizzo, quante: volati.length })
+      .map((v) => v && { etichetta: v.etichetta, fai: v.azione === 'chiudi-tutti' ? chiudiTutti : allaShell(v.azione) });
     return {
       chiave: `cornice:${a.id}`, tipo: 'cornice', icona: a.icona || 'bell',
       titolo: a.titolo || TITOLO_DA_ICONA[a.icona] || 'Filo', stato: a.testo, lungo: true,
       principale: azioni[0] ? { ...azioni[0], forte: true } : { etichetta: 'Chiudi', fai: chiudi },
       secondaria: azioni[0] ? (azioni[1] || { etichetta: 'Chiudi', fai: chiudi }) : null,
-      // Come «Chiudi tutti» della pila nell'angolo: più avvisi volati qui si tolgono con un gesto.
-      altreVoci: dati.cornice.length > 1
-        ? [...azioni.slice(2), { etichetta: 'Chiudi tutti gli avvisi', fai: () => { for (const x of dati.cornice) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); } }]
-        : azioni.slice(2),
+      menu,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: a.testo,
     };
   }
-  // Un avviso che racconta una cosa che ha già la sua carta non diventa una carta in più: la home fa notare quella,
-  // e solo se si vede (in una home dietro un'altra scheda l'avviso aspetta, senza doppioni).
+  // Un avviso che racconta una cosa che ha già la sua carta non diventa una carta in più (SN_CARTE_HOME.sinistra non
+  // lo mette): la home fa notare quella, e solo se si vede (in una home dietro un'altra scheda l'avviso aspetta).
   const assorbiti = new Set();
-  function separaCornice(chiavi) {
-    const nuove = [];
-    const da = [];
-    for (const a of dati.cornice) {
-      if (a.carta && chiavi.has(a.carta)) {
-        if (document.visibilityState === 'visible' && !assorbiti.has(a.id)) { assorbiti.add(a.id); da.push(a); }
-        continue;
-      }
-      nuove.push(a);
-    }
+  function assorbi(chiavi) {
+    const da = dati.cornice.filter((a) => a.carta && chiavi.has(a.carta) && !assorbiti.has(a.id));
+    if (document.visibilityState !== 'visible') return;
     for (const a of da) {
+      assorbiti.add(a.id);
       d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione: 'assorbi' });
       // Al giro dopo: il timer che suona arriva un attimo dopo il suo avviso e rifà la carta.
       setTimeout(() => fattiNotare(a.carta), 400);
     }
-    return nuove;
   }
   const movimentoRidotto = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
   function durataMoto(ms) {
@@ -485,23 +480,20 @@
   // L'ordine (urgenza di Filo, poi quello dell'utente) lo decide il modulo condiviso: la chat lo legge uguale.
   const PER_TIPO = {
     crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
-    avviso: cartaAvviso, lavoro: cartaLavoro,
+    avviso: cartaAvviso, lavoro: cartaLavoro, cornice: cartaCornice,
   };
   function datiSinistra() {
     return {
       timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: dati.lavori,
-      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
+      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(), cornice: dati.cornice,
     };
   }
-  // Gli avvisi volati qui stanno in cima, i più recenti per primi, e lì restano finché li si chiude.
   function carteSinistra() {
     programmaLavori();
     const voci = C.sinistra(datiSinistra(), layout);
-    const cornice = separaCornice(new Set(voci.map((v) => v.chiave)));
-    return [
-      ...cornice.map((a) => Object.assign(cartaCornice(a), { fissa: true })),
-      ...voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa })),
-    ];
+    assorbi(new Set(voci.map((v) => v.chiave)));
+    const volati = voci.filter((v) => v.tipo === 'cornice').map((v) => v.ref);
+    return voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref, volati), { fissa: !!v.fissa }));
   }
 
   // ===== Le carte di destra =====
@@ -1066,6 +1058,8 @@
   // ===== Menu del tasto destro =====
   function vociMenu(art) {
     const c = art._carta;
+    // Un avviso volato ha il menu che aveva nell'angolo; in più solo quello che ogni carta della home sa fare.
+    if (c.menu) return [...c.menu, null, { etichetta: 'Apri nel filo', fai: () => apriNelFilo(art) }];
     const voci = [];
     if (c.principale) voci.push({ etichetta: c.principale.etichetta, fai: () => c.principale.fai() });
     if (c.secondaria) voci.push({ etichetta: c.secondaria.etichetta, fai: () => c.secondaria.fai() });

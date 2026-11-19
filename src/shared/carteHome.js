@@ -125,15 +125,30 @@
   const scadenza = (t) => { const v = Date.parse(t && t.endsAt); return Number.isFinite(v) ? v : Infinity; };
   const nomeTimer = (t) => t.label || (t.kind === 'alarm' ? 'Sveglia' : 'Timer');
 
-  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: i Crediti e ciò che suona in cima, poi
-  // le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti in corso, timer
-  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce. `chat`: la
-  // conversazione di chi guarda.
-  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null } = {}, layout, ora = Date.now()) {
+  // Le chiavi delle carte che un avviso può nominare per farsi assorbire (#2390): chi avvisa le chiede qui, dove
+  // nascono le carte, e chi le riceve le controlla con `cartaDiAvviso`.
+  const chiaveTimer = (id) => `timer:${id}`;
+  const chiaveDownload = (id) => `download:${id}`;
+  const CARTA_DI_AVVISO = new RegExp(`^(${[chiaveTimer(''), chiaveDownload('')].join('|')})[A-Za-z0-9_-]{1,80}$`);
+  const cartaDiAvviso = (k) => (typeof k === 'string' && CARTA_DI_AVVISO.test(k) ? k : '');
+
+  // Gli avvisi volati nella colonna della home (#2390) stanno in cima, i più recenti per primi, finché li si chiude.
+  // Quello che racconta una cosa che ha già la sua carta non è una carta in più: è quella.
+  function avvisiVolati(cornice, chiavi) {
+    return lista(cornice).filter((a) => a && a.id && !(a.carta && chiavi.has(a.carta))).map((a) => ({
+      chiave: `cornice:${a.id}`, tipo: 'cornice', titolo: String(a.testo || a.titolo || 'avviso'), ref: a, fissa: true,
+    }));
+  }
+
+  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: gli avvisi volati, i Crediti e ciò che
+  // suona in cima, poi le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti
+  // in corso, timer per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce.
+  // `chat`: la conversazione di chi guarda; `cornice`: gli avvisi volati nella colonna della sua finestra.
+  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null, cornice = [] } = {}, layout, ora = Date.now()) {
     const nascoste = new Set(normalizza(layout).nascoste);
     const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
-    const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
-    const vD = (r) => voce(`download:${r.id}`, 'download', r.filename || 'download', r);
+    const vT = (t) => voce(chiaveTimer(t.id), t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
+    const vD = (r) => voce(chiaveDownload(r.id), 'download', r.filename || 'download', r);
     // `fissa`: sta in cima per regola, quindi né si sposta né la si scavalca (menu, trascinamento, chat).
     const cima = [];
     if (crediti && !nascoste.has('crediti')) cima.push(voce('crediti', 'crediti', 'Crediti', null));
@@ -148,7 +163,8 @@
       ...vis.filter((r) => !DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
     ].filter((v) => !nascoste.has(v.chiave));
     const perChiave = new Map(resto.map((v) => [v.chiave, v]));
-    return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    const voci = [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    return [...avvisiVolati(cornice, new Set(voci.map((v) => v.chiave))), ...voci];
   }
 
   // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
@@ -165,7 +181,7 @@
   function nascosteSinistra(dati, layout, ora = Date.now()) {
     const l = normalizza(layout);
     const nascoste = new Set(l.nascoste);
-    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
+    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => v.tipo !== 'cornice' && nascoste.has(v.chiave));
   }
 
   // Il primo incontro (#1661): finché l'accoglienza non si è chiusa la home tiene solo la colonna di sinistra, se la
@@ -184,6 +200,9 @@
     timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
   };
+  // Per chi parla, un avviso volato nella colonna è un avviso come gli altri.
+  const STESSO_NOME = { avviso: ['avviso', 'cornice'] };
+  const diTipo = (tipo) => (v) => (STESSO_NOME[tipo] || [tipo]).includes(v.tipo);
   // Le carte di sinistra che l'utente intende con un nome («l'avviso del backup», «gli avvisi», la chiave della
   // carta). `perTipo`: il nome era solo il tipo, quindi valgono tutte quelle di quel tipo. `tipo`: il nome ne
   // nomina uno, quindi la carta cercata è di sinistra anche se non si trova.
@@ -196,12 +215,12 @@
     const s = pulisciNome(raw).replace(/^(de(i|gli|ll[ae']?|l)|di)\s*/, '');
     if (!s) return { voci: [], perTipo: false, tipo: null };
     for (const [tipo, nomi] of Object.entries(TIPI_SINISTRA)) {
-      if (nomi.includes(s)) return { voci: tutte.filter((v) => v.tipo === tipo), perTipo: true, tipo };
+      if (nomi.includes(s)) return { voci: tutte.filter(diTipo(tipo)), perTipo: true, tipo };
     }
     const tit = (v) => senzaAccenti(v.titolo);
     const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2);
     const tipo = (Object.entries(TIPI_SINISTRA).find(([, nomi]) => nomi.some((n) => parole.includes(n) || s.includes(`${n} `))) || [null])[0];
-    const candidate = tipo ? tutte.filter((v) => v.tipo === tipo) : tutte;
+    const candidate = tipo ? tutte.filter(diTipo(tipo)) : tutte;
     let trovate = candidate.filter((v) => tit(v) === s);
     if (!trovate.length) trovate = candidate.filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
     if (!trovate.length) {
@@ -320,5 +339,6 @@
     CARTE, APP, TASTI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
+    chiaveTimer, chiaveDownload, cartaDiAvviso,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

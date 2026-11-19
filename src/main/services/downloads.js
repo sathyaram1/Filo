@@ -599,13 +599,17 @@ function avvisaNonRiuscito(rec) {
 }
 
 // #2390 — la carta della home che racconta lo stesso scaricamento: lì la home fa notare lei invece dell'avviso.
-const cartaDi = (rec) => (rec && rec.id ? { carta: `download:${rec.id}` } : {});
+function cartaDi(rec) {
+  if (!rec || !rec.id) return {};
+  if (!globalThis.SN_CARTE_HOME) require('../../shared/carteHome.js');
+  return { carta: globalThis.SN_CARTE_HOME.chiaveDownload(rec.id) };
+}
 
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
       if (!win._filoTabs) continue;
-      try { win.webContents.send('shell:toast', { text, opts }); } catch (_) {}
+      try { require('./avvisoFinestra').allaCornice(win.webContents, { text, opts }); } catch (_) {}
     }
   } catch (_) {}
 }
@@ -717,9 +721,9 @@ function annunciaPartenza(rec, webContents) {
       let url = '';
       try { url = (attiva && (attiva.view.webContents.getURL() || attiva.url)) || ''; } catch (_) { url = (attiva && attiva.url) || ''; }
       if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
-      win.webContents.send('shell:toast', {
+      require('./avvisoFinestra').allaCornice(win.webContents, {
         text: `Scaricamento avviato: ${shortName(rec.filename)}`,
-        opts: { ...chiaveAvviso(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
+        opts: { ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
       });
     } catch (_) {}
   }, ANNUNCIO_MS);
