@@ -1112,7 +1112,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex; flex-direction: column; gap: 1px;
   margin-left: 6px;
   padding: 3px 10px 4px 12px;
-  border: none; border-radius: 6px;
+  border: none; border-radius: 0 6px 6px 0;
   background: linear-gradient(var(--dash-ink-mute), var(--dash-ink-mute)) left / 2px 100% no-repeat;
   font: inherit; text-align: left; color: var(--dash-ink-mute); cursor: pointer;
   transition: background-color calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
