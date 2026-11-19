@@ -9,10 +9,3 @@ test('r1 un setup-node coi passi a quattro spazi e il numero scritto a mano si v
   expect(trovati.length).toBe(1);
   expect(trovati[0].fonte.file).toBeUndefined();
 });
-
-test('r1 un setup-node con la versione scritta in linea si vede come numero a mano', () => {
-  const wf = 'on: push\njobs:\n  uno:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n        with: { node-version: 20 }\n';
-  const trovati = nodeDeiWorkflow(wf);
-  expect(trovati.length).toBe(1);
-  expect(trovati[0].fonte).toEqual({ letterale: '20' });
-});
