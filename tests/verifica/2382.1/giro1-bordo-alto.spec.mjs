@@ -125,6 +125,8 @@ test('col menu della barra laterale aperto, il clic sul suo bordo sopra la barra
   }, spia);
   await barra.locator('#nav .ico').first().click({ button: 'right' });
   await expect.poll(() => vociDelMenu(app), { timeout: 8_000 }).not.toBe(null);
+  await barra.evaluate(() => { window.__pressioni = 0; });
+  await shell.evaluate(() => { window.__pressioni = 0; });
   // Un punto del bordo trasparente del menu (fuori dal riquadro) che cade sopra la vista della barra laterale.
   const b = await app.evaluate(async ({ BrowserWindow }) => {
     const madre = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
