@@ -8,6 +8,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { valutaCondizione, scriptDelPasso, usciteDelLavoro, eseguiPasso, haBash } from '../helpers/azioniGithub.mjs';
+import { nodeDeiWorkflow } from '../helpers/nodeDeiWorkflow.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
