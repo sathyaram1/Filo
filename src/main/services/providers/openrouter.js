@@ -578,8 +578,12 @@
     const text = message.content || '';
     const usage = data.usage || {};
     const fine = motivoFine(data.choices?.[0]?.finish_reason || null, { reasoningTokens: reasoningTokensOf(usage), completionTokens: usage.completion_tokens });
+    const images = (Array.isArray(message.images) ? message.images : [])
+      .map((i) => (i && i.image_url && typeof i.image_url.url === 'string' ? i.image_url.url : ''))
+      .filter((u) => /^data:image\//i.test(u));
     return {
       text,
+      ...(images.length ? { images } : {}),
       toolCalls: flatToolCalls(message.tool_calls),
       reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
       finishReason: fine,
