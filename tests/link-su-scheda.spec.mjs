@@ -160,7 +160,11 @@ test('a schermo intero, con le schede scese dal bordo alto, il collegamento lasc
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
     return tm.schedeInAlto.visibili;
   });
-  await expect(shell.locator('.tab').first()).toBeHidden({ timeout: 4_000 }).catch(() => {});
+  await expect.poll(async () => app.evaluate(({ BrowserWindow }, id) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return tm.tabs.find((t) => t.id === id).view.getBounds().y;
+  }, davanti.attiva)).toBe(0);
+  expect(await scese()).toBe(false);
   await sito.mouse.move(400, 200);
   await sito.mouse.move(400, 0, { steps: 4 });
   await expect.poll(scese, { timeout: 4_000 }).toBe(true);
