@@ -125,7 +125,9 @@ test('un indirizzo che non è del web (javascript:, file:, pagine di Filo) lasci
   for (const url of ['javascript:document.title="preso"', 'file:///etc/hosts', 'filo://options/options.html']) {
     await trascina(shell, url, p);
   }
-  // Un collegamento vero dopo: se arriva lui, i tre prima sono stati scartati e non solo in ritardo.
+  await shell.waitForTimeout(800);
+  expect(await stato(shell)).toEqual(prima);
+  // Un collegamento vero dopo: arriva, quindi i tre prima sono stati scartati e il rilascio era arrivato.
   const vero = testServer.html(pagina('Vero'));
   await trascina(shell, vero, p);
   await expect.poll(async () => (await stato(shell)).schede[2].url, { timeout: 8_000 }).toBe(vero);
