@@ -1589,13 +1589,15 @@ class TabManager {
   // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
   // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
   // `activate: false` per chi ne riporta più d'una insieme (il «Riapri» della pulizia).
-  async riapri(voce, { activate = true } = {}) {
+  // `fileDelComputer`: la voce viene dalla pila o dall'archivio, dove un file c'è solo se l'utente l'aveva aperto.
+  async riapri(voce, { activate = true, fileDelComputer = false } = {}) {
     const url = voce && typeof voce.url === 'string' ? voce.url : '';
     if (!url) return null;
     const prima = new Set(this.tabs.map((t) => t.id));
     // Per il giudizio sui siti la riapertura è di Filo (#814).
     const id = this.openTab(url, {
       activate,
+      fileDelComputer,
       restoreScrollPct: typeof voce.scroll === 'number' ? voce.scroll : null,
       restoreZoomLevel: typeof voce.zoom === 'number' && voce.zoom ? voce.zoom : null,
       origine: { tipo: 'filo' },
