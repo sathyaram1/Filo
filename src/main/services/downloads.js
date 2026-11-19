@@ -864,11 +864,17 @@ function senzaNome(rec, esito) {
     if (avvisatoSenzaNome) return;
     avvisatoSenzaNome = true;
   }
+  // Una frase che nomina Crediti o Opzioni porta il tasto per andarci, in evidenza (#1344.2).
+  let pagina = null;
+  try { pagina = esito.rimedio ? globalThis.SN_CHAT_ERRORS.rimedioPagina(esito.rimedio) : null; } catch (_) {}
   shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${esito.frase || 'Rinomina non riuscita'}`, {
-    durationSec: 10,
+    durationSec: pagina ? 15 : 10,
     tipo: 'download_senza_nome',
     indirizzo: rec.url,
-    actions: [{ label: 'Dai un nome', rinominaDownloadId: rec.id }],
+    actions: [
+      ...(pagina ? [{ label: pagina.label, apriFilo: pagina.url }] : []),
+      { label: 'Dai un nome', rinominaDownloadId: rec.id },
+    ],
   }, '');
 }
 
