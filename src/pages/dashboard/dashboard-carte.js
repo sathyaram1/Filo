@@ -842,7 +842,7 @@
   const letteraDi = (id) => (Tocco() ? Tocco().diTasto(dati.impostazioni && dati.impostazioni.doppioTocco, id) : null);
   // Il tasto come si vede: la Bacheca in pausa porta alle Segnalazioni.
   function tastoVisto(id) {
-    if (id === 'bacheca' && !dati.aperte.bacheca) return { ...C.tasto(id), ...SEGNALAZIONI, nomi: [] };
+    if (id === 'bacheca' && !dati.aperte.bacheca) return { ...C.tasto(id), ...C.SEGNALAZIONI, nomi: [] };
     return C.tasto(id);
   }
   // Clic e Invio su un tasto, ovunque stia (colonna, «+», doppio tocco).
