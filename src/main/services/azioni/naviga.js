@@ -455,5 +455,6 @@ module.exports = {
   STILE_PAGINA: azioneStilePagina,
   RIPRISTINA_STILE_PAGINA: azioneRipristinaStilePagina,
   ZOOM_PAGINA: azioneZoomPagina,
+  TRADUCI_PAGINA: azioneTraduciPagina,
   CHIUDI_SCHEDE: azioneChiudiSchede,
 };
