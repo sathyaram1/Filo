@@ -143,9 +143,13 @@
     if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
     // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
     const start = el.selectionStart;
-    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
-    el.setSelectionRange(start, start);
-    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
+    scriviNellaCasella(el, { start, end: el.selectionEnd }, '', 'deleteByCut');
+    try { el.setSelectionRange(start, start); } catch (_) {}
+  }
+
+  // Il testo che Filo mette nella casella di un sito lo deve contare anche il sito: la regola sta nel correttore (#2052).
+  function scriviNellaCasella(el, range, testo, tipo) {
+    return !!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, range, testo, { tipo });
   }
 
   function blobToDataUrl(blob) {
