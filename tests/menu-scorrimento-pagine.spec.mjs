@@ -160,7 +160,7 @@ test('Home: il menu di una parola spiegata', async ({ app }) => {
   await chiedi(page, 'come fa il browser a trovare un sito?');
   const parola = page.locator('.dash-bubble-md .filo-spiega', { hasText: 'cache' }).last();
   await expect(parola).toBeVisible();
-  await scorriAlGesto(page, 'contextmenu');
+  await scorriAlGesto(page, 'contextmenu', parola);
   await parola.click({ button: 'right' });
   await restaPoiSiChiude(page, page.locator('.filo-spiega-menu'));
 });
