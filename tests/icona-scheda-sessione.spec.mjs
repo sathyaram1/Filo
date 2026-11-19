@@ -3,6 +3,7 @@
 // richiesta partiva coi cookie e la cache del profilo normale.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { chiudiLaRete } from './helpers/reteChiusa.mjs';
 
 // PNG 1×1 vero: la barra lo deve ricevere coi suoi byte.
 const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
