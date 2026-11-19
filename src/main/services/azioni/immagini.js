@@ -12,7 +12,6 @@ async function azioneImmaginiWeb(action) {
   try {
     const settings = await getEffectiveSettings();
     const r = await ImmaginiChat.cerca(query, { tavilyKey: (settings.apiKeys && settings.apiKeys.tavily) || '' });
-    try { globalThis.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da: 'chat', ...globalThis.SN_CONTATORI.esitoRicerca({ ok: r.ok, results: r.immagini, provider: r.provider }) }); } catch (_) {}
     return { executed: r.ok, kept: true, output: { cerca: query, immagini: r.immagini, provider: r.provider || '', ...(r.reason ? { reason: r.reason } : {}) } };
   } catch (e) {
     return { executed: false, kept: true, output: { cerca: query, immagini: [], error: (e && e.message) || String(e) } };
