@@ -544,10 +544,14 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.equal(classifyServerMerge(403, {}).outcome, 'denied');
   assert.equal(classifyServerMerge(0, {}).outcome, 'unreachable');
   assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
-  // #2533: le spinte sui rami non accendono più la suite, e il PC non deve aspettare una corsa che non parte.
-  const senzaCorse = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'assente' });
-  assert.equal(senzaCorse.suite, 'assente');
-  assert.match(messageForServerMerge(senzaCorse, 'worker/x'), /non è mai partita: avviala da Actions di filo-security .*Run workflow sul ramo worker\/x/);
+  // #2574: senza corse sullo sha la suite la accende il cancello col suo commit vuoto; «Run workflow» lì non c'è.
+  const accesa = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'accesa', accesa: 'd'.repeat(40) });
+  assert.deepEqual(accesa, { outcome: 'aspetta_suite', sha: 'c'.repeat(40), suite: 'accesa', accesa: 'd'.repeat(40) });
+  const rigaAccesa = messageForServerMerge(accesa, 'worker/x');
+  assert.equal(rigaAccesa, 'Su ccccccccc la suite di filo-security non aveva nessuna corsa: il cancello l’ha accesa con un suo commit vuoto su worker/x (ddddddddd). Rilancia lo stesso comando quando è verde.');
+  const senzaCorse = messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'assente' }), 'worker/x');
+  assert.match(senzaCorse, /non ha nessuna corsa: rilancia lo stesso comando, e il cancello la accende con un suo commit vuoto su worker\/x/);
+  for (const m of [rigaAccesa, senzaCorse]) assert.doesNotMatch(m, /Run workflow|Re-run/);
   assert.match(messageForServerMerge(ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'in_corso' })), /non è ancora verde/);
   // #2540: una corsa che GitHub non ha avviato (pagamenti, limite di spesa) non è un rosso da correggere.
   const nonPartita = ok('aspetta_suite', { sha: 'c'.repeat(40), suite: 'non_partita', url: 'https://github.com/x/actions/runs/43709496611' });
