@@ -467,7 +467,11 @@
       return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { togliCitazione(citate.indexOf(p._citata)); d.inputEl.focus(); } }];
     }
     if (!tasti || !d.bubblesEl.contains(el)) return [];
-    return tasti.vociMenu(el);
+    // La selezione di quando il menu si apre: il clic sulla voce può averla già spenta.
+    const m = el.closest('.dash-bubble-filo, .dash-bubble-user');
+    const sel = m ? selezioneIn(m) : null;
+    fissata = sel ? { bolla: m, sel, quando: Date.now() } : null;
+    return tasti.vociMenu(el).map((v) => (sel && (v.label === 'Rispondi' || v.label === 'Cita') ? { ...v, label: `${v.label} a questo passo` } : v));
   }
 
   function init(deps) {
