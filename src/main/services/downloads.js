@@ -1721,7 +1721,7 @@ function apriScaricato(rec, opts) {
   } catch (e) { return { ok: false, error: e?.message || 'apertura fallita' }; }
 }
 
-function openFolder(id, scope = '') {
+function openFolder(id, scope = '', opts = {}) {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
