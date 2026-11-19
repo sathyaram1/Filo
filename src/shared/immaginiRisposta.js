@@ -102,7 +102,7 @@
       }
       if (voci.length && gallerie.length < MAX_GALLERIE) gallerie.push({ pos: out.length, voci });
     }
-    out += src.slice(ultimo);
+    out += attacca(src.slice(ultimo));
     const restano = [...mappa.values()].filter((v) => !usate.has(v.id) && (v.generata || !usate.size));
     for (let i = 0; i < restano.length && gallerie.length < MAX_GALLERIE; i += MAX_VOCI) {
       gallerie.push({ pos: out.length, voci: restano.slice(i, i + MAX_VOCI).map(togliId) });
