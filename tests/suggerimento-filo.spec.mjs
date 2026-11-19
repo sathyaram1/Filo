@@ -182,8 +182,8 @@ test('tema scuro: il fumetto prende la carta scura della barra', async ({ openTa
   const page = await openTab('filo://preferences/preferences.html');
   await pronta(page);
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
-  const { el, titolo } = await unTitoloVisibile(page);
-  await el.hover();
+  const { titolo, passa } = await unTitoloVisibile(page);
+  await passa();
   await expect(fumetto(page)).toHaveText(titolo);
   const stile = await fumetto(page).evaluate((e) => ({ sfondo: getComputedStyle(e).backgroundColor, testo: getComputedStyle(e).color }));
   expect(stile).toEqual({ sfondo: 'rgb(29, 26, 22)', testo: 'rgb(241, 231, 214)' });
