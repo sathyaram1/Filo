@@ -781,6 +781,10 @@ function completa(rec) {
   persist();
   broadcast('done', rec);
   contaFine(rec);
+  annunciaArrivato(rec);
+}
+
+function annunciaArrivato(rec) {
   if (!scopeOf(rec) && daRaccontare(rec, utenteDavanti())) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
