@@ -237,7 +237,9 @@ test('sequenze: domanda con le schede scoperte, uscita e rientro dallo schermo i
     await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
     await page.evaluate(() => document.getElementById('exe').click());
     await expect(shell.locator('#dl-panel .dl-row[data-chiede="1"]')).toBeVisible({ timeout: 20000 });
-    await page.mouse.move(400, 500);
+    await page.mouse.move(400, 450, { steps: 3 });
+    await new Promise((r) => setTimeout(r, 300));
+    await page.mouse.move(400, 500, { steps: 3 });
     await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(false);
     expect((await domandaVisibile(app, shell, '#dl-panel')).sotto).toBe(true);
     await schermoIntero(app, false);
