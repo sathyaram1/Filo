@@ -8,6 +8,8 @@ const Box = require('./boxDelleLettere');
 const D = globalThis.SN_DOPPIO_CTRL;
 const MAC = process.platform === 'darwin';
 const USATE = 'sn_doppio_ctrl_usate';
+// Fra la richiesta del box e la sua comparsa (la finestra si sta caricando) le lettere vanno ancora al gesto.
+const ATTESA_BOX_MS = 2000;
 
 const tocchi = D.riconoscitore();
 let cfg = D.normalizza(null);
