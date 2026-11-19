@@ -189,11 +189,12 @@
     let caricando = true;
     let confermaInAttesa = false;
 
-    const mostraStato = (testo, { carica = false, errore = false } = {}) => {
+    const mostraStato = (testo, { carica = false, errore = false, rimedio = null } = {}) => {
       statoEl.hidden = !testo;
       rotella.hidden = !carica;
       statoEl.classList.toggle('sn-rinomina-errore', !!errore);
       statoTesto.textContent = testo || '';
+      mostraRimedio(statoEl, rimedio, chiudi);
     };
 
     const fuori = (e) => { if (!el.contains(e.target) && !(ancora && ancora.contains(e.target))) chiudi(); };
