@@ -1146,9 +1146,9 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          // Nel popup solo parole di Filo: un token del registro e un colore valido, che non sa dire frasi.
           const nome = (t && t.label) || 'un elemento';
-          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          const valido = t && t.type === 'color' && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
           return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
