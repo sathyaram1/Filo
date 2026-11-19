@@ -113,7 +113,9 @@ test('Ctrl+C poi Ctrl+V, Ctrl+clic e tre tocchi non aprono niente', async ({ app
   await premi(app, ['tocco', ['attendi', 80], 'tocco', ['attendi', 80], 'tocco']);
   await page.waitForTimeout(1200);
   expect(await boxVisibile(app)).toBe(false);
-  // Dopo tre tocchi una lettera è della pagina.
+  // Ctrl+C e Ctrl+V sono arrivati alla pagina; dopo tre tocchi anche una lettera è sua.
+  expect(await page.evaluate(() => window.__tasti)).toEqual(['c', 'v']);
+  await page.evaluate(() => { window.__tasti = []; });
   await premi(app, [['attendi', 500], ...lettera('d')]);
   await expect.poll(() => page.evaluate(() => window.__tasti)).toEqual(['d']);
 });
