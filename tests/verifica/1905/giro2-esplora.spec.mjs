@@ -71,6 +71,7 @@ test('esplora: conferma per un percorso non scritto, dalla chat', async ({ app }
   console.log('ESPLORA-BOTTONI', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.offsetParent).map((b) => b.textContent.trim()).slice(0, 40))));
   if (await conferma.count()) {
     await conferma.click();
+    await page.getByRole('button', { name: 'OK', exact: true }).click();
     await new Promise((ok) => setTimeout(ok, 2500));
     console.log('ESPLORA-DOPO', JSON.stringify(await schede(app)));
     await page.screenshot({ path: join(SHOTS, 'g2-conferma-dopo.png') });
