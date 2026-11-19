@@ -200,6 +200,19 @@ test('chiesto dalla home: si traduce l\'ultima pagina usata, e Filo dice quale, 
   expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, r)).toContain('non quella che ha davanti');
 });
 
+test('sito dove l\'utente ha spento Filo: la chat non lo traduce, come non c\'è l\'icona', async ({ app, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  const host = new URL(page.url()).hostname;
+  await app.evaluate(async (_electron, host) => { await globalThis.SN_STORAGE.updateSettings({ blocklist: [host] }); }, host);
+  await expect.poll(async () => (await traduci(app)).output.traduzione, { timeout: 15000 }).toBe('spento');
+  const r = await traduci(app);
+  expect(r.executed).toBe(false);
+  await page.waitForTimeout(500);
+  await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it');
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+});
+
 test('nessuna pagina web aperta: Filo lo dice, invece di dire fatto', async ({ app, shell }) => {
   await expect(shell.locator('body')).toBeVisible();
   const r = await traduci(app);
