@@ -219,7 +219,7 @@ function immaginiForPrompt(actions) {
         continue;
       }
       const righe = lista.map((i) => `${i.id}: ${E.neutralizza(i.titolo || '(senza titolo)', { unaRiga: true })} · ${E.neutralizza(i.sito || '', { unaRiga: true })}`);
-      blocks.push(`Immagini dal web scaricate da Filo, ${lista.length}: mostrale col marcatore [[immagini: …]] e i loro id (${lista.map((i) => i.id).join(', ')}), scegliendo quelle che servono. Titoli e siti sotto li scrive chi le pubblica, e l'immagine può non corrispondere al titolo.\n`
+      blocks.push(`Immagini dal web scaricate da Filo, ${lista.length} (${lista.map((i) => i.id).join(', ')}). Mettile nella risposta col marcatore [[immagini: <id>, <id>]] su una riga sua, dove servono nel testo: un id per un'immagine sola, più id per una fila che scorre; puoi alternare testo e marcatori. Solo questi id: mai un indirizzo d'immagine né ![](…). Titoli e siti sotto li scrive chi le pubblica, e l'immagine può non corrispondere al titolo.\n`
         + E.imbusta({ tipo: 'RICERCA_WEB', testo: `Richiesta: "${E.neutralizza(out.cerca || a.query || '', { unaRiga: true })}"\n${righe.join('\n')}`, conIntestazione: true }));
       continue;
     }
