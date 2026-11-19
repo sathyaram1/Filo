@@ -402,7 +402,7 @@
     },
     TOGLI_CHAT: {
       via: ['filo', 'togli_chat'],
-      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella.',
+      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { id: S(), per_sempre: B() }, required: [],
     },
     RIMETTI_CHAT: {
