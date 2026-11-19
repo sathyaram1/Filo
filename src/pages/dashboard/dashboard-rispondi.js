@@ -32,7 +32,7 @@
       return (bolla.classList.contains('dash-bubble-md') && Md && Md.testo ? Md.testo(s) : s).trim();
     }
     const copia = bolla.cloneNode(true);
-    for (const n of copia.querySelectorAll('.dash-bubble-actions, .dash-msg-azioni, .dash-bubble-img, button')) n.remove();
+    for (const n of copia.querySelectorAll('.dash-bubble-actions, .dash-msg-azioni, .dash-bubble-img, .filo-galleria, button')) n.remove();
     return String(copia.textContent || '').trim();
   }
 
