@@ -878,7 +878,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (filo && filo.haDomanda && !internal) {
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
-      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta }) : '',
+      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta, memoriaNascosta: payloadBase.memoriaNascosta }) : '',
       ricordi, dopo: [origineImmagini, gettoniLetti, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;
