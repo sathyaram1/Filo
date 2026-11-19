@@ -59,7 +59,18 @@ test('esplora: conferma per un percorso non scritto, dalla chat', async ({ app }
   await chiedi(page, 'apri il report riquadro che sta sul desktop');
   await new Promise((ok) => setTimeout(ok, 3000));
   mkdirSync(SHOTS, { recursive: true });
+  await page.mouse.move(5, 790);
+  await new Promise((ok) => setTimeout(ok, 800));
   await page.screenshot({ path: join(SHOTS, 'g2-conferma-file.png') });
   console.log('ESPLORA', JSON.stringify(await schede(app)));
+  console.log('ESPLORA-TESTO', JSON.stringify(await page.evaluate(() => document.body.innerText.slice(0, 3000))));
+  const conferma = page.getByRole('button', { name: /^(Apri|Conferma|Sì|Esegui)/ }).first();
+  console.log('ESPLORA-BOTTONI', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.offsetParent).map((b) => b.textContent.trim()).slice(0, 40))));
+  if (await conferma.count()) {
+    await conferma.click();
+    await new Promise((ok) => setTimeout(ok, 2500));
+    console.log('ESPLORA-DOPO', JSON.stringify(await schede(app)));
+    await page.screenshot({ path: join(SHOTS, 'g2-conferma-dopo.png') });
+  }
   await ripristina(app);
 });
