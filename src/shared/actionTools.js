@@ -351,7 +351,7 @@
     },
     BLOCCA_PC: {
       via: ['computer', 'blocca'],
-      description: 'blocca subito il computer: per rientrare serve la password.',
+      description: 'blocca subito il computer.',
       properties: {}, required: [],
     },
 
