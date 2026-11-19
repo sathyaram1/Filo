@@ -915,6 +915,13 @@
       campo: null,
       describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
+    LEGGI_MEMORIA: {
+      // #2536.1 — la stessa memoria che la chat ha di solito nel CONTESTO: sola lettura, niente esce.
+      costo: 0,
+      campo: null,
+      describe: () => 'Rileggere la memoria',
+      describeDone: () => 'Riletta la memoria',
+    },
     EVENTO_CALENDARIO: {
       costo: 1,
       campo: null,
