@@ -602,6 +602,12 @@ test('fixedReplyText: il fermo lo conferma il server; una domanda non fermata si
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
+test('#2590: dopo un riallineamento la risposta dice il giro deciso dal server', () => {
+  assert.match(fixedReplyText('A', { outcome: 'fixed', status: 'revision_capability', giro: 'pieno' }), /chiede la verifica/);
+  assert.match(fixedReplyText('A', { outcome: 'fixed', status: 'revision_security', giro: 'nessuno' }), /non chiede un giro nuovo/);
+  assert.doesNotMatch(fixedReplyText('A', { outcome: 'fixed', status: 'revision_security', giro: 'nessuno' }), /torna in coda/);
+});
+
 test('la nota che lo strumento stampa dopo la critica dice che la domanda ferma, senza --ferma né --segnala', () => {
   assert.match(FERMA_NOTE, /--domanda <file\.json>/);
   assert.match(FERMA_NOTE, /almeno due opzioni con pro e contro/);

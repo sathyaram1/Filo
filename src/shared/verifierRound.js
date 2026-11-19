@@ -897,14 +897,25 @@
   /**
    * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata e da quelli che erano in conflitto con main:
    * tutti di servizio (o nessuno) → niente giro nuovo, bastano le prove del server; uno di codice → verifica intera,
-   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica.
+   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica. Un riallineamento
+   * per prove rosse (`opz.motivo`) vuole sempre la verifica, qualunque file tocchi (`riallineamentoPerProveRosse`).
    */
   function giroDopoRiallineamento(fileRiscritti, opz) {
     const conflitti = opz && opz.conflitti !== undefined ? opz.conflitti : [];
-    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return { giro: 'pieno', codice: null };
+    const rosse = riallineamentoPerProveRosse(opz && opz.motivo);
+    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return Object.assign({ giro: 'pieno', codice: null }, rosse ? { proveRosse: true } : {});
     const codice = [...new Set([...fileRiscritti, ...conflitti].map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')))]
       .filter((f) => f && !FILE_DI_SERVIZIO.includes(f)).sort();
+    if (rosse) return { giro: 'pieno', codice, proveRosse: true };
     return { giro: codice.length ? 'pieno' : 'nessuno', codice };
+  }
+
+  /**
+   * Chi riallinea per prove rosse non le corregge (le trova la verifica, le corregge il correttore del giro dopo): a
+   * modifiche identiche saltare la verifica rimanderebbe il ramo al cancello, che le ritroverebbe rosse, senza fine (#2590).
+   */
+  function riallineamentoPerProveRosse(motivo) {
+    return !!(motivo && motivo.tipo === 'prove-rosse');
   }
 
   global.SN_VERIFIER_ROUND = {
@@ -914,7 +925,7 @@
     sedeDi, livelloLetto, livelloMostrato, motivoScalaVecchia, livelloDegliInterni, decisioneFerma, destinatarioDelFermo, bloccaSuUnRilievo, missingCaps, normalizeCaps, normalizeCounts,
     livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
-    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
+    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento, riallineamentoPerProveRosse,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -87,7 +87,8 @@ verificatore.
    `src/shared/capabilities.js`, `tests/rossi-noti.json`, `PATTERNS.md`):
    niente giro nuovo, bastano le prove del server. Conflitto risolto in un file
    di codice: verifica intera, perché il correttore ha scritto logica che
-   nessuno ha guardato.
+   nessuno ha guardato. Riallineamento per prove rosse: verifica anche se
+   pulito, perché i rossi li corregge il correttore del giro dopo (#2590).
 4. **Il correttore scrive il motivo** nel biglietto: conflitto (con i file),
    prove rosse alla fusione (quali), ripresa dopo una risposta dell'owner,
    altro. Senza motivo il biglietto non si chiude. Serve a trovare la causa del

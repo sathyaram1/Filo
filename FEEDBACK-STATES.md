@@ -528,7 +528,10 @@ fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVI
 `PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
 server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
 riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
-conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). Un
+motivo «prove rosse» chiede la verifica qualunque file tocchi: chi riallinea quei rossi
+non li corregge, e saltare la verifica li riporterebbe al cancello senza fine (#2590);
+lo stesso vale per il server quando la fusione si era fermata per prove rosse. La
 regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
