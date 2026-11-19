@@ -523,7 +523,8 @@ test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto d
     delete env.FILO_UNIT_DIR;
     const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /^ok 1 - base$/m);
+    // Il reporter di serie di node: TAP fino al 22, spec dal 23 anche fuori dal terminale.
+    assert.match(r.stdout, /^(ok 1 - base|✔ base \(.*\))$/m);
   } finally {
     togliCartella(casa);
   }
