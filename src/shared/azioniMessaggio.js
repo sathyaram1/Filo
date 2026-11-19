@@ -97,7 +97,7 @@
     const cl = { ...CLASSI, ...(o.classi || {}) };
     const DEF = {
       copia: AZIONI.copia,
-      ...(typeof o.rispondi === 'function' ? { rispondi: { ...AZIONI.rispondi, fai: (m, t) => o.rispondi(m, t) } } : {}),
+      ...(typeof o.rispondi === 'function' ? { rispondi: { ...AZIONI.rispondi, fai: (m, t, sel) => o.rispondi(m, t, sel) } } : {}),
       ...(o.extra || {}),
     };
     let barra = null;
