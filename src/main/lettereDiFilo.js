@@ -187,7 +187,7 @@ const AZIONI = {
   aiuto: (win) => require('./shortcuts').dispatch('open-help-sidebar', win),
   salvaPerDopo: (win) => require('./shortcuts').dispatch('save-for-later', win),
   riapri(win) {
-    require('./services/azioniContate').azione('reopen-closed-tab', () => win._filoTabs.riapriChiusa({ tasto: 'doppio_ctrl' }).catch(() => {}), { incognito: !!win._filoIncognito });
+    require('./services/azioniContate').azione('reopen-closed-tab', () => win._filoTabs.riapriChiusa().catch(() => {}), { incognito: !!win._filoIncognito });
   },
   async muto(win) {
     const M = globalThis.SN_SISTEMA_MAIN;
