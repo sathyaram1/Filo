@@ -23,6 +23,7 @@
         { testo: 'Chiedendo all’Aiuto di mandare una segnalazione, le immagini che gli hai dato partono con lei: le vedi in miniatura prima dell’invio.', segnalazione: 1664 },
         { testo: 'Prima di rispondere Filo riprende una conversazione vecchia solo se c\'entra davvero con quello che chiedi: un saluto, o una domanda su tutt\'altro, non tirano più fuori ricordi a caso.', segnalazione: 2369 },
         { testo: 'I menu di Scaricamenti, Aperti per dopo, Bacheca, Editor e Gestione, il riquadro della batteria e della rete nella home e il menu delle parole spiegate restano aperti anche se li apri subito dopo aver fatto scorrere la pagina. Nella tendina dei font dell\'Editor puoi scorrere l\'elenco senza che si chiuda.', segnalazione: 2586 },
+        { testo: 'Il modello che Filo propone per una funzione, il carattere che propone per l\'interfaccia e il nome di un file o di una cartella che un sito vuole modificare stanno nel loro riquadro anche quando la domanda chiede l\'OK: un testo che finge un avviso di Filo non si confonde più con le sue parole.', segnalazione: 592 },
       ],
     },
     {

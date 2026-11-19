@@ -231,7 +231,7 @@
     } else {
       if (!c.listino) return nonNota('listino', 'Listino di OpenRouter non disponibile adesso: Filo non stima il costo senza.');
       const prezzo = prezzoDi(c.listino, model);
-      if (!prezzo) return nonNota('modello', `OpenRouter non elenca un prezzo per ${model}: Filo non stima il costo senza.`);
+      if (!prezzo) return nonNota('modello', 'OpenRouter non elenca un prezzo per questo modello: Filo non stima il costo senza.');
       const token = tokenTipici(action, c.registro);
       usd = costoUsd(prezzo, token);
       fonte = token.fonte;
@@ -295,12 +295,13 @@
   }
 
   // Stima e avviso di un nome della catena, contro il modello predefinito della funzione (`ctx.predefiniti[action]`).
-  function valuta(action, ref, registry, ctx) {
+  // `nome` è come l'avviso chiama il modello; '' vale «questo modello».
+  function valuta(action, ref, registry, ctx, nome = String(ref).trim()) {
     const c = ctx || {};
     const s = stima(action, voceDi(ref, registry), c);
     if (!s) return null;
     const p = c.predefiniti && c.predefiniti[action] ? stima(action, c.predefiniti[action], c) : null;
-    return { ...s, avviso: avviso({ scelta: s, predefinita: p, soglia: c.soglia, saldo: c.saldo, nome: String(ref).trim() }) };
+    return { ...s, avviso: avviso({ scelta: s, predefinita: p, soglia: c.soglia, saldo: c.saldo, nome }) };
   }
 
   global.SN_STIMA_COSTO = {

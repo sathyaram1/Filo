@@ -1146,16 +1146,14 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          // Nel popup solo parole di Filo: un token del registro e un colore valido, che non sa dire frasi.
           const nome = (t && t.label) || 'un elemento';
-          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          const valido = t && t.type === 'color' && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
           return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
-        // Fuori dal registro nome e valore sono del modello: stanno nel riquadro.
-        const valOk = !!(t && val && T.validate && T.validate(estTok(a), val));
-        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]),
-          ...(val ? (valOk ? [` a ${val}`] : [' a ', cit(val, true)]) : [])];
+        // Il valore è del modello anche quando è valido (un font può essere una frase, #592.21): sta nel riquadro.
+        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]), ...(val ? [' a ', cit(val, true)] : [])];
       },
     },
     ESEGUI_COMANDO: {
