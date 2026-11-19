@@ -163,9 +163,17 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     await expect(page.locator('#sec-wipe-hint')).toHaveText('Cancello e riavvio Filo…');
     await aspettaUscita(app);
 
-    ({ app, shell } = await avvia(userData));
+    // Il metro è un Filo appena installato acceso nello stesso momento: crediti, contatori, invito e versione vista
+    // l'avvio li scrive secondi dopo, quando capita, e un'istantanea presa prima o dopo non vale come confronto (#2585).
+    [{ app, shell }, metro] = await Promise.all([avvia(userData), avvia(vergine).then((v) => v.app)]);
     await new Promise((r) => setTimeout(r, 9000)); // PROVA TEMPORANEA: avvio lento a freddo
-    await expect.poll(() => chiaviPosate(app, userData), { timeout: 15_000 }).toEqual(appenaInstallato);
+    const scarto = async () => {
+      const [dopo, nuovo] = await Promise.all([chiaviPosate(app, userData), chiaviPosate(metro, vergine)]);
+      return { inPiu: dopo.filter((k) => !nuovo.includes(k)), mancano: nuovo.filter((k) => !dopo.includes(k)) };
+    };
+    await expect.poll(scarto, { timeout: 30_000 }).toEqual({ inPiu: [], mancano: [] });
+    await chiudiApp(metro);
+    metro = null;
     expect(contengono(userData, 'ZQX')).toEqual([]);
     expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
     expect(readdirSync(userData).some((n) => n.startsWith('identity.bin'))).toBe(true);
