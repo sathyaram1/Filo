@@ -142,6 +142,8 @@ test('«antilope immagine»: le foto stanno nella risposta, fra un pezzo di test
   await imgs.first().click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.voce('Apri la pagina dell’immagine')).toBeVisible({ timeout: 10_000 });
+  await expect(menu.locator('[data-tip="Copia immagine"], [title="Copia immagine"], :text-is("Copia immagine")').first()).toBeAttached();
+  await expect(menu.locator('[data-tip="Salva immagine"], [title="Salva immagine"], :text-is("Salva immagine come…"), :text-is("Salva immagine")').first()).toBeAttached();
   await page.keyboard.press('Escape');
 
   // Riaperta (la scheda si ricarica e rilegge il filo), le immagini sono ancora al loro posto.
