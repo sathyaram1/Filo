@@ -20,7 +20,8 @@ const carta = async (avvisi, testo) => (await avvisi()).locator('.shell-notif.sh
 
 // La home dell'avvio nasce dopo la shell: un elenco delle schede letto prima di lei la conta come scheda aperta dalla
 // prova (#2597), e `tabs[0]` può non esserci ancora.
-test.beforeEach(async ({ app }) => {
+test.beforeEach(async ({ app, shell }) => {
+  void shell;
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoPronta);
 });
 
