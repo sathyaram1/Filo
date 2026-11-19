@@ -150,6 +150,11 @@
       description: 'zoom della pagina davanti: percentuale 25-500 o verso; finché Filo non si chiude.',
       properties: { percentuale: I(), verso: S({ enum: ['in', 'out', 'reset'] }) }, required: [],
     },
+    TRADUCI_PAGINA: {
+      via: ['scheda', 'traduci'],
+      description: 'in italiano la pagina web davanti, o quello che manca; originale: torna com\'era.',
+      properties: { originale: B() }, required: [],
+    },
     STILE_PAGINA: {
       via: ['scheda', 'stile'],
       description: 'regole CSS [{selettore, css}] sulla pagina web davanti, senza url() né @import; ricaricando se ne vanno.',
