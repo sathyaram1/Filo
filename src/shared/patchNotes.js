@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.294', date: '2026-11-19',
+      fixes: [
+        { testo: 'Nella home un clic su un punto vuoto rimette il cursore nel campo della chat, o in quello della ricerca se è aperta: Backspace, Ctrl+V (Cmd+V su Mac), frecce e Invio funzionano come se ci avessi cliccato dentro.', segnalazione: 2372 },
+        { testo: 'Se dai a un\'altra cosa una lettera della home già usata, Filo ti dice cosa apriva prima, dalle Preferenze, dal tasto destro e quando glielo chiedi a parole.', segnalazione: 2372 },
+      ],
+    },
+    {
       version: '0.2.293', date: '2026-11-19',
       features: [
         { testo: 'Trascina un collegamento, o la miniatura di un video, su una scheda per aprirlo lì; fra due schede o sul + si apre in una scheda nuova in quel punto, come in Chrome.', segnalazione: 2393 },
