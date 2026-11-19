@@ -322,8 +322,6 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
-    // #1664 — le immagini date all'Aiuto, le sole che una sua segnalazione potrà allegare.
-    if (msg && msg.action === SN_CONST.ACTIONS.HELP) try { require('../immaginiAiuto').ricorda(sender, msg.payload); } catch (_) {}
     const diretta = direttaAiuto(msg, sender);
     try {
       if (diretta && diretta.signal.aborted) return { ok: false, code: 'FERMATO', error: 'fermato' };
