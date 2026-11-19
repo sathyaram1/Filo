@@ -3,7 +3,7 @@
 // finestra. Lo stato del sistema si finge dal main: sullo schermo virtuale senza gestore di finestre non si massimizza.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { tastoDestro as _nonUsato, aspettaMenu } from './helpers/menuLinguetta.mjs';
+import { aspettaMenu, scegli } from './helpers/menuLinguetta.mjs';
 
 const aperte = (shell) => shell.evaluate(() => [...document.querySelectorAll('#tabs .tab')].map((el) => el.dataset.id));
 const attiva = (shell) => shell.evaluate(() => document.querySelector('#tabs .tab.active')?.dataset.id || null);
