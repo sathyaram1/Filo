@@ -309,7 +309,7 @@
       if (menu) { chiudiMenu(); if (!fissata) chiudiDa(0); return; }
       chiudiTutto();
     };
-    const scorre = (e) => { if (catena.length) riposiziona(); if (menu && menuScorso(e)) chiudiMenu(); };
+    const scorre = (e) => { if (catena.length) riposiziona(); if (menu && (e.type !== 'scroll' || menuScorso(e))) chiudiMenu(); };
     if (radiceNodo && radiceNodo.host) radiceNodo.addEventListener('pointerdown', segnaDentro, true);
     doc.addEventListener('pointerdown', fuori);
     win.addEventListener('keydown', esc, true);
