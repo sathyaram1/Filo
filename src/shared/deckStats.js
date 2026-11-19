@@ -317,7 +317,8 @@
     const lib = Array.isArray(library) ? library : [];
     const n = lib.length;
     const reqs = normReqs(want);
-    const g = GAMES[gameOf(game)];
+    const cond = resolveConditions({ game, mulligans, keep, extraDraws });
+    const g = GAMES[cond.game];
     const t = Math.max(1, Math.floor(Number(turn) || 1));
     const iters = Math.max(1, Math.floor(Number(iterations) || 10000));
     const totalWanted = reqs.reduce((s, w) => s + w.n, 0);
