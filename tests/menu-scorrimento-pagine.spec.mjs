@@ -157,8 +157,7 @@ test('Gestione: il menu di una scheda', async ({ openTab }) => {
   // La lista si ridisegna al suo posto dopo i dati nuovi: si scorre quando sta ferma.
   await attesa(page, 800);
   const scheda = page.locator('.mg-item').first();
-  await scorriAlGesto(page, 'contextmenu', scheda);
-  await scheda.click({ button: 'right' });
+  await scorriEApri(page, scheda);
   await restaPoiSiChiude(page, page.locator('.mg-ctxmenu'));
 });
 
