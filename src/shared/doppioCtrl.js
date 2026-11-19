@@ -63,19 +63,21 @@
     return Number.isFinite(n) && v !== null && v !== '' && typeof v !== 'boolean' ? Math.max(min, Math.min(max, n)) : SOGLIA_DI_SERIE;
   }
 
-  // Le scelte dell'utente sono solo le differenze dalla serie, { azione: lettera | '' }: un'azione nuova di serie arriva
-  // con la sua lettera anche a chi ne ha già cambiate altre.
-  function scelte(raw) {
+  // Le scelte dell'utente sono solo le differenze dalla serie, [{ azione, lettera | '' }]: un'azione nuova di serie arriva
+  // con la sua lettera anche a chi ne ha già cambiate altre. Un elenco e non una mappa: le impostazioni fondono gli
+  // oggetti, e una scelta tolta resterebbe.
+  function mappa(raw) {
     const out = {};
     const ids = new Set(catalogo().map((a) => a.id));
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
-    for (const [k, v] of Object.entries(raw)) {
-      if (!ids.has(k)) continue;
-      if (v === '' || v === null) out[k] = '';
-      else if (lettera(v)) out[k] = lettera(v);
+    for (const v of Array.isArray(raw) ? raw : []) {
+      if (!v || typeof v !== 'object' || !ids.has(v.azione) || Object.prototype.hasOwnProperty.call(out, v.azione)) continue;
+      if (v.lettera === '' || v.lettera === null) out[v.azione] = '';
+      else if (lettera(v.lettera)) out[v.azione] = lettera(v.lettera);
     }
     return out;
   }
+  const elenco = (m) => catalogo().filter((a) => Object.prototype.hasOwnProperty.call(m, a.id)).map((a) => ({ azione: a.id, lettera: m[a.id] }));
+  const scelte = (raw) => elenco(mappa(raw));
 
   function normalizza(raw) {
     const r = raw && typeof raw === 'object' ? raw : {};
@@ -84,7 +86,7 @@
 
   // Le voci in vigore: [{ id, lettera, titolo, url? }]. Una lettera scelta dall'utente vince su quella di serie.
   function voci(cfg) {
-    const s = normalizza(cfg).lettere;
+    const s = mappa(normalizza(cfg).lettere);
     const prese = new Map();
     for (const [id, l] of Object.entries(s)) if (l) prese.set(l, id);
     return catalogo().map((a) => {
