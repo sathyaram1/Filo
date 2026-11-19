@@ -48,14 +48,16 @@
     if (t.length > CITA_MAX) t = `${t.slice(0, CITA_MAX).trimEnd()}…`;
     return unaRiga ? `«${t}» ` : `> ${t}\n`;
   }
-  // Mette la citazione in testa al campo, una sola: citare un altro messaggio sostituisce quella di prima.
+  // La prima citazione va in testa al campo, sopra quello che c'è già scritto; le altre in fondo, ognuna dopo il commento
+  // a quella prima (#2346). In un campo di una riga ne sta una sola: la nuova sostituisce quella di prima.
   function citaNelCampo(campo, testo) {
     if (!campo) return;
     const unaRiga = campo.tagName !== 'TEXTAREA';
     const q = citazione(testo, { unaRiga });
     if (!q) return;
-    const resto = String(campo.value || '').replace(unaRiga ? /^«[^»]*» / : /^> [^\n]*\n/, '');
-    campo.value = q + resto;
+    const valore = String(campo.value || '');
+    if (unaRiga) campo.value = q + valore.replace(/^«[^»]*» /, '');
+    else campo.value = /^> /.test(valore) ? `${valore.replace(/\s+$/, '')}\n${q}` : q + valore;
     try { campo.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     campo.focus();
     try { campo.setSelectionRange(campo.value.length, campo.value.length); } catch (_) {}
