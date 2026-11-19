@@ -950,11 +950,11 @@ class TabManager {
     // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
     // L'incognito ha il suo ambito: le sue voci non vanno su disco.
     try {
-      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+      Downloads.attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
-    require('./services/homeNetwork').attach(view.webContents.session);
+    ReteDiCasa.attach(view.webContents.session);
     return view;
   }
 
