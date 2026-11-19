@@ -301,9 +301,9 @@ test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, 
   await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti in vista' }).click();
   await expect(tasto(page, 'profilo')).toBeVisible();
   await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="profilo"] img.account-avatar')).toHaveAttribute('src', foto);
-  // Un altro ridisegno (una lettera data a un altro tasto) non la perde.
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ doppioTocco: { lettere: [{ lettera: 'y', tasto: 'cerca' }] } }));
-  await expect(tasto(page, 'cerca')).toHaveAttribute('title', /yy$/);
+  // Un altro ridisegno (il «+» richiuso) non la perde.
+  await page.locator('#altroPiu').click();
+  await expect(page.locator('#altroPiu')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="profilo"] img.account-avatar')).toHaveAttribute('src', foto);
   await page.screenshot({ path: join(SHOTS, '2372-1-profilo-foto.png') });
 });
