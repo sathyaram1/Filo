@@ -105,4 +105,4 @@ function chiudiServiziNeiTest({
   return true;
 }
 
-module.exports = { HOST_CHIUSI, hostChiuso, chiudiFetch, serviziChiusiRichiesti, chiudiServiziNeiTest };
+module.exports = { HOST_CHIUSI, hostChiuso, fuoriDaQui, chiudiFetch, chiudiTuttaLaRete, serviziChiusiRichiesti, chiudiServiziNeiTest };
