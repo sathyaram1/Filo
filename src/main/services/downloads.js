@@ -1403,6 +1403,7 @@ function ritiraReferer(indirizzo, ses) {
 }
 function refererDaPresentare(details, ses) {
   if (!details || !details.url) return '';
+  if (/protett/.test(details.url)) console.log('DEBUGREF', details.url, details.resourceType, refererAttesi.size, JSON.stringify([...refererAttesi.keys()]), [...refererAttesi.values()].map((c) => c.map((x) => [x.ses === ses, x.pagina])));
   let pagina = refererInCorso.get(details.id);
   if (!pagina) {
     const coda = refererAttesi.get(details.url);
