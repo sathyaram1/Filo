@@ -170,6 +170,7 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     await aspettaUscita(app);
 
     ({ app, shell } = await avvia(userData));
+    await new Promise((r) => setTimeout(r, 9000)); // PROVA TEMPORANEA: avvio lento a freddo
     await expect.poll(() => chiaviPosate(app, userData), { timeout: 15_000 }).toEqual(appenaInstallato);
     expect(contengono(userData, 'ZQX')).toEqual([]);
     expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
