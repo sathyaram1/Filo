@@ -2490,6 +2490,7 @@
 
     function renderPanel() {
       ensurePanel();
+      if (chiudiSeSoloElenco()) return;
       const list = panel.querySelector('#dl-panel-list');
       const all = Array.from(dls.values()).sort((a, b) => {
         // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
