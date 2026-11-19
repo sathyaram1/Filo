@@ -28,7 +28,8 @@
   ]);
 
   // Le app della home hanno una lettera che si assegna, di serie nessuna. «Filo ti suggerisce» non apre niente, le
-  // Impostazioni rapide sono già la «i».
+  // Impostazioni rapide sono già la «i»; Bacheca e Mazzi possono essere in pausa (#1592), e una lettera non li apre.
+  const FUORI = new Set(['rapide', 'bacheca', 'mazzi']);
   function carteHome() {
     if (!global.SN_CARTE_HOME && typeof require === 'function') { try { require('./carteHome.js'); } catch (_) {} }
     return global.SN_CARTE_HOME || null;
