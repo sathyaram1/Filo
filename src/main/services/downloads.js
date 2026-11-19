@@ -1503,6 +1503,7 @@ function riprova(id, scope = '') {
   persist();
   broadcast('progress', rec);
   try {
+    console.log('DEBUGRIP', indirizzo, JSON.stringify(rec._pagina), !!rec._sessione);
     attendiReferer(indirizzo, ses, rec._pagina);
     ses.downloadURL(indirizzo);
   } catch (_) {
