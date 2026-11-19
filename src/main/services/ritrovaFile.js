@@ -43,7 +43,7 @@ async function cerca(nomeFile, dimensione, radici, { tettoMs = TETTO_MS, escludi
       if (v.isDirectory() && !v.name.startsWith('.')) sotto.push(v.name);
     }
     for (const s of sotto) {
-      if (Date.now() > fine) return { trovato: '', scaduto: true };
+      if (Date.now() >= fine) return { trovato: '', scaduto: true };
       let dentro;
       try { dentro = await fs.promises.readdir(path.join(radice, s), { withFileTypes: true }); } catch (_) { continue; }
       for (const v of dentro) {
