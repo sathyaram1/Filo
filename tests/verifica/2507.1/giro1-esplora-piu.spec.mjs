@@ -14,6 +14,8 @@ test('esplora: fuoco dopo il più', async () => {
   try {
     await d.navigate(app, shell, 'data:text/html,<title>Modulo</title><h1>Modulo</h1>');
     await d.sleep(1000);
+    await d.bringToFront(app);
+    console.log('WIN', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isFocused())));
     console.log('PRIMA', JSON.stringify(await stato(app)));
     let map; let voce;
     await expect.poll(async () => { ({ map } = await d.markInteractables(app, shell)); await d.clearMarks(app, shell); voce = map.find((x) => /^Nuova scheda/.test(x.label) && x.page === 'shell'); return !!voce; }).toBe(true);
