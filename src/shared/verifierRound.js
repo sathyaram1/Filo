@@ -925,7 +925,7 @@
     sedeDi, livelloLetto, livelloMostrato, motivoScalaVecchia, livelloDegliInterni, decisioneFerma, destinatarioDelFermo, bloccaSuUnRilievo, missingCaps, normalizeCaps, normalizeCounts,
     livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
-    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
+    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento, riallineamentoPerProveRosse,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
