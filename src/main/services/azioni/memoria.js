@@ -262,6 +262,7 @@ module.exports = {
   CANCELLA_PAGINE: azioneCancellaPagine,
   CANCELLA_MEMORIA: azioneCancellaMemoria,
   CORREGGI_MEMORIA: azioneCorreggiMemoria,
+  LEGGI_MEMORIA: azioneLeggiMemoria,
   TOGLI_CHAT: azioneTogliChat,
   RIMETTI_CHAT: azioneRimettiChat,
   DIMENTICA: azioneDimentica,
