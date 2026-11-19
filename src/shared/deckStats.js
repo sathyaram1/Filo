@@ -307,7 +307,7 @@
   //   extraDraws carte pescate in più entro il turno N (default 0)
   //   mulligans  quante volte al massimo si rifà la mano finché non regge `keep`
   //   keep       [{ tag, n }] — cosa deve avere la mano per tenerla; senza, la
-  //              prima mano si tiene sempre
+  //              prima mano si tiene sempre (le metà mancanti: resolveConditions)
   //   iterations default 10000; seed per run riproducibili.
   //
   // Ritorna { probability, hits, iterations, seen }; `seen` sono le carte viste
