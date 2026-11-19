@@ -1371,8 +1371,8 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const o = res.output;
     const perche = {
       assente: 'il file non esiste a quel percorso. Controlla maiuscole, cartella e nome; se non lo trovi chiedi all\'utente il percorso giusto',
-      cartella: 'è una cartella, non un file. Per vederne il contenuto usa i comandi dei file',
-      tipo: 'una scheda mostra solo pagine HTML, PDF, immagini, testo, audio e video. Per leggerlo usa file(leggi); per aprirlo col suo programma, file(apri)',
+      cartella: 'è una cartella, non un file: chiedi all\'utente quale file dentro aprire',
+      tipo: 'una scheda mostra solo pagine HTML, PDF, immagini, testo, audio e video. Per leggerlo usa file(leggi); per farlo aprire col suo programma, file(mostra)',
       assistente: 'l\'assistente sopra una pagina web non apre i file del computer: l\'utente può chiederlo dalla chat della home',
       rete: 'un percorso su un altro computer della rete non si apre in una scheda',
     }[o.motivo] || 'non si apre in una scheda';
