@@ -24,7 +24,7 @@ async function servi(app, pagine, { eta = {} } = {}) {
         return new Response(exe, { headers: { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${nome}"` } });
       }
       if (nostri.has(u.hostname)) return new Response('', { status: 404 });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return globalThis.__reteChiusa.resto(req);
     };
     for (const s of ['http', 'https']) {
       try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
