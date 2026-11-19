@@ -292,7 +292,8 @@ html,body{background:transparent;overflow:hidden;height:100%}
 }
 .tasto:hover{border-color:rgba(var(--accento),0.7)}
 .riga.cambio .tasto{border-color:rgb(var(--accento));color:rgb(var(--accento));animation:attesa calc(900ms * var(--sn-motion, 1)) ease-in-out infinite}
-@keyframes attesa{50%{background:rgba(var(--accento),0.14)}}
+.riga.cambio .lbl{color:rgb(var(--accento))}
+@keyframes attesa{50%{background:rgba(var(--accento),0.18)}}
 .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sep{height:1px;background:var(--border);margin:4px 10px}`;
 }
