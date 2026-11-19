@@ -39,6 +39,29 @@ process.env.FILO_TOOLS_ROOT = TMP;
 const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
 Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
+const RUOLI_VERI = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+const REGOLA_LUNGA = `\n${'Una regola comune nuova, scritta per tutti i worker e lunga quanto serve. '.repeat(500)}\n`;
+// Copia nella cartella di prova i ruoli veri e i pezzi comuni; `gonfia` allunga il contratto oltre la soglia della
+// stampa, e il ruolo esce nel suo file. Una prova sul testo del ruolo lo legge con ruoloConsegnato e regge i due casi (#2572).
+function ruoliVeri(nomi, { gonfia = false } = {}) {
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(RUOLI_VERI)) {
+    if (!nomi.includes(f) && !f.startsWith('_')) continue;
+    const t = readFileSync(resolve(RUOLI_VERI, f), 'utf8');
+    writeFileSync(resolve(dir, f), gonfia && f === '_contratto-worker.md' ? t + REGOLA_LUNGA : t);
+  }
+}
+// Il testo del ruolo deve reggere anche un contratto che cresce: ogni prova gira col ruolo in stampa e col ruolo nel file.
+function colContrattoComEOGonfio(nomi, prova) {
+  try {
+    for (const gonfia of [false, true]) {
+      ruoliVeri(nomi, { gonfia });
+      prova(gonfia);
+    }
+  } finally { ruoliVeri(nomi); }
+}
+
 const {
   applyVerifierVerdict,
   applyFixed,
