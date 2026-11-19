@@ -69,6 +69,19 @@ test('a finestra massimizzata il tasto destro sul bordo alto apre il menu di que
   await expect.poll(() => aperte(shell), { timeout: 3_000 }).not.toContain(ids[1]);
 });
 
+test('a schermo intero anche la fascia sopra le schede scese dal bordo è delle schede', async ({ app, shell, testServer }) => {
+  const ids = await treSchede(shell, testServer);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.isFullScreen = () => true;
+    w.emit('enter-full-screen');
+  });
+  await expect(shell.locator('html')).toHaveAttribute('data-schede-al-bordo', '');
+  const p = await cimaSopra(shell, ids[0]);
+  expect(p.scheda).toBe(ids[0]);
+  expect(p.regione).toBe('no-drag');
+});
+
 test('a finestra normale la fascia sopra le schede resta la presa della finestra', async ({ app, shell, testServer }) => {
   const ids = await treSchede(shell, testServer);
   await fingi(app, { massimizzata: true });
