@@ -61,7 +61,7 @@ test('dopo un programma scaricato, a schermo intero le schede scoperte non porta
     await expect.poll(() => statoDi(shell, 'neoforge-installer.jar'), { timeout: 20000 }).toBe('completed');
 
     // Il passo dell'utente: schermo intero con la scorciatoia, poi il puntatore in alto per vedere le schede.
-    await page.keyboard.press('F11');
+    await premi(app, 'shell', 'F11');
     await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 5000 }).toBe(true);
     await scopriSchede(app, page);
     const s = await stato(app);
