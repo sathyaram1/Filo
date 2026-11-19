@@ -177,5 +177,7 @@ test('senza un modello che disegna Filo non chiama nessuno e il modello sa dove 
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla.locator('.filo-galleria')).toHaveCount(0);
   expect(await app.evaluate(() => globalThis.__disegni.length)).toBe(0);
-  expect(await app.evaluate(() => globalThis.__vistoDalModello)).toContain('Immagini create in chat');
+  const visto = await app.evaluate(() => globalThis.__vistoDalModello);
+  expect(visto).toContain('Immagine NON creata');
+  expect(visto).toContain('alla voce «Immagini create in chat»');
 });
