@@ -46,6 +46,8 @@ on:
       # La ricetta del pacchetto sta qui dentro (build.linux). Il commit che
       # alza il numero di versione porta `[skip ci]` e non fa scattare niente.
       - 'package.json'
+      # Il Node che costruisce il pacchetto.
+      - '.node-version'
       # Il preload delle pagine web che il pacchetto si porta dentro, e chi lo scrive.
       - 'src/main/preloadPacchetto.js'
 
