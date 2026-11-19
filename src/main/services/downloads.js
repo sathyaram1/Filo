@@ -917,7 +917,8 @@ async function rimettiNome(id, scope = '') {
   if (!rec.nomeOriginale) return { ok: false, frase: 'Ha già il nome con cui era arrivato' };
   const r = await require('./nomiFile').rinomina(rec.savePath, rec.nomeOriginale, { esatto: true });
   if (!r.ok) return { ok: false, frase: r.frase };
-  return { ok: true, nome: r.nome, cambiato: !!r.cambiato };
+  // `indirizzo`: l'avviso che ne nasce nella cornice se ne va con le pagine del sito, come «Nome dato» (#1561.6).
+  return { ok: true, nome: r.nome, cambiato: !!r.cambiato, indirizzo: rec.url || '' };
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
