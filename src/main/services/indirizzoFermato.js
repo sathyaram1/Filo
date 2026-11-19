@@ -50,7 +50,10 @@ function avvisoFileNonAperto({ motivo, percorso } = {}) {
     : motivo === 'cartella' ? `È una cartella, non un file: ${p}`
       : motivo === 'tipo' ? `Questo tipo di file non si mostra in una scheda: ${p}`
         : null;
-  if (!testo) return avvisoIndirizzoFermato(`file:${percorso || ''}`) || { testo: 'File del computer bloccato per sicurezza', chiave: 'indirizzo-fermato:file' };
+  if (!testo) {
+    const url = /^file:/i.test(String(percorso || '')) ? percorso : (globalThis.SN_URL_NAV?.normalizeUrl?.(percorso) || '');
+    return avvisoIndirizzoFermato(url) || { testo: 'File del computer bloccato per sicurezza', chiave: 'indirizzo-fermato:file' };
+  }
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
