@@ -272,7 +272,10 @@
         e.preventDefault();
         e.stopPropagation();
         const s = f.parentElement.querySelector('.filo-galleria-scorre');
-        if (s) s.scrollBy({ left: (f.classList.contains('filo-galleria-dopo') ? 1 : -1) * Math.max(160, s.clientWidth * 0.8), behavior: 'smooth' });
+        const T = global.SN_THEME_TOKENS;
+        const comeScorre = T && typeof T.scrollBehavior === 'function' ? T.scrollBehavior(root.ownerDocument || root) : 'auto';
+        if (s) s.scrollBy({ left: (f.classList.contains('filo-galleria-dopo') ? 1 : -1) * Math.max(160, s.clientWidth * 0.8), behavior: comeScorre });
+        dopoLoScorrere(f.parentElement);
         return;
       }
       const img = e.target && e.target.closest && e.target.closest('.filo-galleria-img');
