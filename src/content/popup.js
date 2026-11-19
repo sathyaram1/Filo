@@ -1000,7 +1000,12 @@
     const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
     const btn = A.tasto(A.AZIONI.rispondi, 'sn-msg-tasto sn-msg-rispondi', 14);
     btn.addEventListener('mousedown', (e) => e.preventDefault());
-    btn.addEventListener('click', (e) => { if (e.isTrusted) A.citaNelCampo(campo, testo); });
+    // Con un passo della risposta selezionato si cita quello (#2346).
+    btn.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
+      const sel = riga.parentElement && A.selezioneIn ? A.selezioneIn(riga.parentElement) : null;
+      A.citaNelCampo(campo, sel ? sel.testo.trim() : testo);
+    });
     riga.appendChild(btn);
     return btn;
   }
