@@ -1,32 +1,38 @@
 import { test, expect } from './fixtures/electron.mjs';
-import { modelloFinto, home, chiedi } from './helpers/chatFinta.mjs';
 
-test('debug spiegazioni', async ({ app }) => {
-  await modelloFinto(app, [{ text: 'Risponde subito se la risposta sta nella {{cache|Una copia vicina dei dati.}}.' }]);
-  const page = await home(app);
-  await chiedi(page, 'come fa il browser a trovare un sito?');
-  const parola = page.locator('.dash-bubble-md .filo-spiega', { hasText: 'cache' }).last();
-  await expect(parola).toBeVisible();
-  await expect(page.locator('#input')).toBeEditable();
-  await page.evaluate(() => {
-    const chi = document.getElementById('bubbles');
-    chi.style.paddingTop = '4000px';
-    window.__eventi = [];
-    window.addEventListener('scroll', (e) => window.__eventi.push(`${e.target.id || e.target.nodeName}:${e.target.scrollTop}`), true);
+test('debug spiegazioni feedback', async ({ openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForFunction(() => window.SN_MARKDOWN && window.SN_SPIEGAZIONI);
+  const info = await page.evaluate(() => {
+    const d = document.createElement('div');
+    d.id = 'prova';
+    d.innerHTML = window.SN_MARKDOWN.render('Risponde subito se la risposta sta nella {{cache|Una copia vicina dei dati.}}.');
+    document.body.prepend(d);
+    document.body.style.paddingBottom = '4000px';
+    const s = getComputedStyle(document.body);
+    return `${d.innerHTML.slice(0, 300)} | body oy=${s.overflowY} sh=${document.scrollingElement.scrollHeight} ch=${document.scrollingElement.clientHeight}`;
   });
-  await parola.scrollIntoViewIfNeeded();
-  console.log('dopo intoview', await page.evaluate(() => document.getElementById('bubbles').scrollTop));
-  await page.evaluate(() => {
-    const chi = document.getElementById('bubbles');
-    window.addEventListener('contextmenu', (e) => {
-      chi.scrollBy({ top: -300, behavior: 'instant' });
-      window.__eventi.push(`cm ${e.clientX},${e.clientY} st=${chi.scrollTop} at=${document.elementFromPoint(e.clientX, e.clientY)?.className}`);
-    }, { capture: true, once: true });
-  });
+  console.log(info);
+  const parola = page.locator('#prova .filo-spiega');
   await parola.click({ button: 'right' });
-  await page.evaluate(() => new Promise((ok) => setTimeout(ok, 300)));
-  console.log('menu', await page.locator('.filo-spiega-menu').count(), await page.evaluate(() => window.__eventi));
-  await page.evaluate(() => document.getElementById('bubbles').scrollBy({ top: -200, behavior: 'instant' }));
-  await page.evaluate(() => new Promise((ok) => setTimeout(ok, 300)));
-  console.log('menu', await page.locator('.filo-spiega-menu').count(), await page.evaluate(() => window.__eventi));
+  console.log('menu', await page.locator('.filo-spiega-menu').count());
+});
+
+test('debug manage', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate(() => {
+    window.__mgTest.setData([{ _id: 'A', seq: 10, subSeq: 0, priority: 1, name: 'Uno', clientId: 'owner:me', senderProof: 'admin', createdAt: '2026-06-20T10:00:00Z' }]);
+    window.__mgTest.setTab('inbox');
+  });
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  const info = await page.locator('.mg-item').first().evaluate((el) => {
+    const out = [];
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      const s = getComputedStyle(n);
+      out.push(`${n.tagName}.${n.className}#${n.id} oy=${s.overflowY} sh=${n.scrollHeight} ch=${n.clientHeight} st=${n.scrollTop}`);
+    }
+    return out.join('\n');
+  });
+  console.log(info);
 });
