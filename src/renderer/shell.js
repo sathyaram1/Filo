@@ -891,8 +891,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    // Il click che segue il mouseup non deve riattivare/spostare la tab.
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     if (d.fuori) {
       tabsEl.classList.remove('riordino');
       for (const p of d.posti) p.el.style.transform = '';
