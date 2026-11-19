@@ -1,88 +1,56 @@
-// Verifica #1664 giro 1, esplorazione: il riquadro della segnalazione con una foto grande, un AVIF e il selettore.
+// Verifica #1664 giro 1, esplorazione dell'Aiuto: si cancella prima della critica.
 
-import { readFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { cartellaInCasa } from '../../helpers/percorsi.mjs';
+import { neiRiquadri, paginaDellAiuto } from '../../helpers/riquadri.mjs';
 
-const TETTO = 4 * 1024 * 1024;
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const SITO = '<!doctype html><html><head><meta charset="utf-8"><title>Sito</title></head><body><p>Pagina.</p></body></html>';
 
-async function riquadro(app) {
-  let win = null;
-  await expect.poll(() => {
-    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    return !!win;
-  }, { timeout: 10_000 }).toBe(true);
-  await win.waitForLoadState('domcontentloaded');
-  await win.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
-  await win.evaluate(() => {
-    window.__inviati = [];
-    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...rest) => {
-      if (msg && msg.type === 'submit_feedback') {
-        window.__inviati.push(msg.payload);
-        return Promise.resolve({ ok: true, id: 'test-fb' });
-      }
-      return orig(msg, ...rest);
-    };
-  });
-  await win.evaluate(() => window.SN_FEEDBACK_UI.open());
-  await expect(win.locator('.sn-fb-modal')).toBeVisible();
-  return win;
+async function lascia(page, files) {
+  const s = await page.context().newCDPSession(page);
+  const data = { items: [], files, dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 200, y: 200, data });
+  await s.detach().catch(() => {});
 }
 
-async function lascia(win, crea) {
-  await win.evaluate(async (crea) => {
-    // eslint-disable-next-line no-new-func
-    const file = await (new Function(`return (${crea})`)())();
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    document.querySelector('.sn-fb-modal').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
-  }, crea.toString());
+for (const conAllegati of [true, false]) {
+  test(`diagnosi Aiuto ${conAllegati ? 'con' : 'senza'} allegati`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const foto = join(cartellaInCasa('filo-1664-d-'), 'schermata.png');
+    writeFileSync(foto, PNG);
+    await app.evaluate(() => {
+      globalThis.__depositati = [];
+      globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__depositati.push(JSON.parse(JSON.stringify(p))); return { id: 'fb-1' }; };
+    });
+    const page = await testServer.openReady(openTab, SITO);
+    await lascia(page, [foto]);
+    await expect.poll(() => neiRiquadri(app, page, () => (globalThis.__filoSidebarTest?.allegati?.() || []).length), { timeout: 8_000 }).toBe(1);
+    const A = await paginaDellAiuto(app, page);
+    await neiRiquadri(app, page, (conAllegati) => {
+      globalThis.__diag = { conferme: [], msg: [] };
+      globalThis.SN_CONFIRM_UI = { confirm: async (o) => { globalThis.__diag.conferme.push(String(o && o.text)); return true; }, confirmTyped: async () => true };
+      const filo = { type: 'INVIA_FEEDBACK', titolo: 'Menu tagliato', testo: 'Il menu esce.' };
+      if (conAllegati) filo.allegati = ['1'];
+      const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = async (m, ...r) => {
+        if (m && m.type === globalThis.SN_MSG.MSG.AI_REQUEST && m.action === globalThis.SN_CONST.ACTIONS.HELP) {
+          globalThis.__diag.msg.push('AI');
+          return { ok: true, text: JSON.stringify({ action: 'filo', filo, text: 'Ok.' }) };
+        }
+        const res = await orig(m, ...r);
+        if (m && /FILO|filo/.test(String(m.type))) globalThis.__diag.msg.push(`${m.type} -> ${JSON.stringify(res).slice(0, 300)}`);
+        return res;
+      };
+      return 1;
+    }, conAllegati);
+    await A.keyboard.type('manda questa immagine come segnalazione');
+    await A.keyboard.press('Enter');
+    await new Promise((r) => setTimeout(r, 8000));
+    const diag = await neiRiquadri(app, page, () => ({ ...globalThis.__diag, log: (document.querySelector('.sn-sidebar') || document.body).innerText.slice(-800) }));
+    console.log('DIAG', conAllegati, JSON.stringify(diag));
+    console.log('DEPOSITATI', JSON.stringify(await app.evaluate(() => (globalThis.__depositati || []).map((p) => ({ text: p.text, images: (p.images || []).length })))));
+  });
 }
-
-test('foto di rumore oltre i 4 MB lasciata nel riquadro: entra e parte sotto il tetto', async ({ app, shell }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const win = await riquadro(app);
-  const grande = await win.evaluate(async () => {
-    const c = new OffscreenCanvas(3000, 2400);
-    const g = c.getContext('2d');
-    const d = g.createImageData(3000, 2400);
-    for (let i = 0; i < d.data.length; i++) d.data[i] = (i % 4 === 3) ? 255 : Math.floor(Math.random() * 256);
-    g.putImageData(d, 0, 0);
-    const b = await c.convertToBlob({ type: 'image/jpeg', quality: 0.97 });
-    window.__grande = new File([b], 'IMG_0001.JPG', { type: 'image/jpeg' });
-    return b.size;
-  });
-  expect(grande).toBeGreaterThan(TETTO);
-  await win.evaluate(() => {
-    const dt = new DataTransfer();
-    dt.items.add(window.__grande);
-    document.querySelector('.sn-fb-modal').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
-  });
-  await expect(win.locator('.sn-fb-thumb img')).toHaveCount(1, { timeout: 20_000 });
-  await win.locator('.sn-fb-text').fill('foto grande');
-  await win.locator('.sn-fb-send').click();
-  await expect.poll(() => win.evaluate(() => window.__inviati.length), { timeout: 20_000 }).toBe(1);
-  const p = await win.evaluate(() => window.__inviati[0]);
-  expect(p.images.length).toBeGreaterThanOrEqual(1);
-  const u = p.images.find((x) => x && /IMG_0001/.test(x.name || '')) || p.images[p.images.length - 1];
-  expect(Math.floor((u.dataUrl.length - u.dataUrl.indexOf(',') - 1) * 3 / 4)).toBeLessThanOrEqual(TETTO);
-});
-
-test('AVIF lasciato nel riquadro entra; il selettore lo propone', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const win = await riquadro(app);
-  const avif = readFileSync('tests/fixtures/provenienza/xmp-ai.avif').toString('base64');
-  await win.evaluate((b64) => {
-    const bin = atob(b64);
-    const u = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    const dt = new DataTransfer();
-    dt.items.add(new File([u], 'foto.avif', { type: 'image/avif' }));
-    document.querySelector('.sn-fb-modal').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
-  }, avif);
-  await expect(win.locator('.sn-fb-thumb img')).toHaveCount(1, { timeout: 10_000 });
-  console.log('accept del selettore:', await win.locator('.sn-fb-file').getAttribute('accept'));
-  console.log('stato:', await win.locator('.sn-fb-status').textContent());
-});
