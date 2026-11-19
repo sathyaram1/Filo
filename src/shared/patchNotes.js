@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.293', date: '2026-11-19',
+      features: [
+        { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
+      ],
+    },
+    {
       version: '0.2.292', date: '2026-11-18',
       features: [
         { testo: 'Su un video di YouTube l\'Aiuto e la chat leggono la trascrizione del video: a «di cosa parla?» rispondono da quello che si dice, e se il video non ha trascrizione te lo dicono.', segnalazione: 1977 },

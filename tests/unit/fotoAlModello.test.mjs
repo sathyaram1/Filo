@@ -83,13 +83,14 @@ test('una richiesta di foto della pagina senza la copia coperta sta solo dove la
 });
 
 // Con copiaPerModello la pagina riceve anche la foto intera: verso un modello parte solo la copia coperta. L'eccezione
-// aperta è la Trascrizione di una zona, la cui scelta (coprire anche lì o no) aspetta l'owner (#1721, giro 1).
+// aperta è la Trascrizione di una zona, la cui scelta (coprire anche lì o no) aspetta l'owner (#1721, giro 1). Il
+// riquadro di Trascrivi (#2374) manda al modello l'immagine che riceve: passargli la foto è come metterla nel payload.
 const INTERE_A_UN_MODELLO = { 'src/content/actions.js': 1 };
 test('la foto intera di una pagina non entra in una richiesta a un modello, fuori dall’eccezione scritta', () => {
   const chi = {};
   for (const p of sorgenti(join(RADICE, 'src/content'))) {
     const rel = relative(RADICE, p).split('\\').join('/');
-    const n = (readFileSync(p, 'utf8').match(/payload:\s*\{[^}]*\b(?:cap|region|regione|scatto)\.dataUrl/g) || []).length;
+    const n = (readFileSync(p, 'utf8').match(/(?:payload:|SN_TRASCRIZIONE\.apri\()\s*\{[^}]*\b(?:cap|region|regione|scatto)\.dataUrl/g) || []).length;
     if (n) chi[rel] = n;
   }
   assert.deepEqual(chi, INTERE_A_UN_MODELLO);

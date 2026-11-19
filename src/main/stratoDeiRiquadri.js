@@ -10,7 +10,9 @@ const { zoomDaTasto, rotellaZoom } = require('./tabs/tabZoom');
 
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
-const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto']);
+const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto', 'trascrizione']);
+require('../shared/trascrizioneRighe.js');
+const { IMMAGINE } = globalThis.SN_TRASCRIZIONE_RIGHE;
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
 // può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
 const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
@@ -148,6 +150,8 @@ class StratoDeiRiquadri {
     const dati = d && d.dati && typeof d.dati === 'object' && !Array.isArray(d.dati) ? d.dati : {};
     if (!TIPI.has(tipo)) return { ok: false, error: 'tipo' };
     if (pesa(dati) > DATI_MAX_BYTE) return { ok: false, error: 'troppo', limite: DATI_MAX_BYTE };
+    // Un'immagine che lo strato non disegnerebbe si dice, invece di aprire un riquadro vuoto.
+    if (tipo === 'trascrizione' && !IMMAGINE.test(String(dati.dataUrl || ''))) return { ok: false, error: 'immagine' };
     const s = this._strato(wc);
     if (!s) return { ok: false };
     clearTimeout(s.timerVuoto);
@@ -195,6 +199,15 @@ class StratoDeiRiquadri {
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     let principale = true;
     try { principale = !sender.frame || !sender.frame.parent; } catch (_) { principale = true; }
+    // Trascrivi (#2374): solo un'immagine, e il punto da cui viene in px della vista; da un riquadro incorporato nessuno.
+    if (tipo === 'trascrizione') {
+      const dataUrl = IMMAGINE.test(testo(dati.dataUrl)) ? testo(dati.dataUrl) : '';
+      const r = principale && dati.rect && typeof dati.rect === 'object' ? dati.rect : null;
+      const v = r ? ['x', 'y', 'w', 'h'].map((k) => numero(r[k])) : [];
+      const rect = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
+        ? { x: v[0] * zoom, y: v[1] * zoom, w: v[2] * zoom, h: v[3] * zoom } : null;
+      return { dataUrl, rect };
+    }
     // Un riquadro incorporato conosce solo la sua finestra: l'ancora è l'ultimo punto del puntatore sulla scheda.
     let ancora = principale ? ancoraNellaVista(dati.anchor, zoom) : null;
     if (!principale) {

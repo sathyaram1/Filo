@@ -2461,6 +2461,7 @@
       { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: a.save },
       { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
       { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
+      { type: 'item', azione: 'ocr', label: I18n.t('menu_transcribe'), onClick: a.transcribe },
     ];
   }
 
@@ -2472,6 +2473,7 @@
       save: () => Actions.downloadImage(imgEl),
       copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
       search: () => Actions.searchImageOnWeb(imgEl),
+      transcribe: () => Actions.transcribeImage(imgEl),
       ask: () => chiediDellImmagine(imgEl),
     };
   }

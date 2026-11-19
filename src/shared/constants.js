@@ -1504,12 +1504,13 @@
       `{ "action": "page", "page": { "op": "<azione>", ... }, "text": "<opzionale: breve frase per l'utente>", "status": "done" | "continue" }\n` +
       `Azioni su TESTO (il testo va in "text" dentro "page", oppure usa la selezione corrente dell'utente): "copy" (copia), "cut" (taglia da una casella di testo), "search_text" (cerca sul web → chiede conferma), "read_aloud" (leggi ad alta voce), "stop_reading" (ferma la lettura), "edit_text" (apri l'editor di riscrittura).\n` +
       `  Esempio: { "action": "page", "page": { "op": "search_text", "text": "frase da cercare" } }\n` +
-      `Azioni su IMMAGINE (indica l'immagine con "selector" CSS oppure "src"; in mancanza si usa l'immagine principale visibile): "copy_image" (copia immagine), "save_image" (salva immagine), "copy_image_link" (copia il link dell'immagine), "search_image" (cerca l'immagine sul web → chiede conferma).\n` +
+      `Azioni su IMMAGINE (indica l'immagine con "selector" CSS oppure "src"; in mancanza si usa l'immagine principale visibile): "copy_image" (copia immagine), "save_image" (salva immagine), "copy_image_link" (copia il link dell'immagine), "search_image" (cerca l'immagine sul web → chiede conferma), "transcribe_image" (mostra all'utente il testo dell'immagine, selezionabile sopra di lei, per copiarne un pezzo).\n` +
       `  Esempio: { "action": "page", "page": { "op": "search_image", "selector": "img.hero" } }\n` +
       `Azioni su LINK (indica il link con "selector" CSS — lo trovi nell'outline accanto agli elementi a[href] dopo " :: " — oppure con "url"): "open_link" (apri in una nuova scheda), "copy_link" (copia il link), "save_link" (salva il link per dopo), "share_link" (condividi il link → chiede conferma).\n` +
       `  Esempio: { "action": "page", "page": { "op": "open_link", "selector": "a.cta" } }\n` +
       `Azione sulla PAGINA INTERA: "save_page" mette da parte la pagina che l'utente sta guardando in «Aperti per dopo» (titolo, indirizzo e anteprima, come «Salva per dopo» del menu) e poi CHIUDE la scheda. Usala quando l'utente chiede di salvare questa pagina per dopo ("salvala per dopo", "mettila da parte", "la leggo più tardi"); per un link della pagina c'è "save_link". Nel "text" digli che la salvi in «Aperti per dopo» e che la scheda si chiude; status "done".\n` +
       `  Esempio: { "action": "page", "page": { "op": "save_page" }, "text": "La metto in «Aperti per dopo» e chiudo la scheda.", "status": "done" }\n` +
+      `"transcribe_region": l'utente sceglie col mouse una porzione della pagina e ne vede il testo, selezionabile sopra l'immagine, per copiarne solo il pezzo che gli serve. Usala quando chiede di trascrivere o copiare il testo di una parte dello schermo che non si seleziona (un'immagine, un video in pausa, un grafico); per un'immagine precisa c'è "transcribe_image". Nel "text" digli di trascinare sulla zona; status "done".\n` +
       `Le azioni che escono verso l'esterno (cerca sul web, condividi) chiedono l'OK all'utente prima di partire; per le altre lo decide il livello di autonomia che ha scelto. Il popup lo apre il sistema da sé: tu non chiedere conferma a parole. Usa "page" SOLO per agire sul contenuto della pagina; per spiegare qualcosa rispondi semplicemente nel "text".\n\n` +
       `# Output alternativo: trovare un documento dell'utente\n` +
       `Quando l'UTENTE ti chiede un SUO documento ("mi serve la bolletta della luce di marzo", "dov'è il contratto d'affitto?", "trovami la ricevuta dell'assicurazione"), di solito per caricarlo o copiarne un dato in questa pagina, puoi cercarlo fra i documenti del suo computer, per contenuto (lo trovi anche se il file si chiama "scan_00231.pdf"). Output speciale (al posto del JSON normale):\n` +
@@ -2014,12 +2015,17 @@
       ];
     },
 
+    // Righe col loro riquadro (#2374): il testo si posa sopra l'immagine dove sta. Lo legge SN_TRASCRIZIONE_RIGHE.
     transcribeImage: () =>
-      `Trascrivi ESATTAMENTE il testo presente in questa immagine. ` +
-      `Mantieni esattamente lo stesso testo, lingua, maiuscole/minuscole, punteggiatura e a-capo. ` +
-      `Non tradurre, non riformulare, non aggiungere commenti o etichette. ` +
-      `Se ci sono più colonne o paragrafi, restituiscili nell'ordine di lettura naturale. ` +
-      `Se nell'immagine non c'è testo leggibile, rispondi con una stringa vuota.`,
+      `Trascrivi ESATTAMENTE il testo presente in questa immagine, riga per riga. ` +
+      `Mantieni esattamente lo stesso testo, lingua, maiuscole/minuscole e punteggiatura. ` +
+      `Non tradurre, non riformulare, non correggere, non aggiungere commenti o etichette. ` +
+      `Dai le righe nell'ordine di lettura naturale; se ci sono più colonne, finisci una colonna prima di passare alla successiva. ` +
+      `Testi sulla stessa altezza ma separati da uno spazio largo sono righe diverse. ` +
+      `Per ogni riga dai il riquadro che la contiene, in coordinate normalizzate da 0 a 1000 rispetto a larghezza e altezza ` +
+      `dell'immagine (non in pixel): x1,y1 angolo in alto a sinistra, x2,y2 angolo in basso a destra. ` +
+      `Rispondi SOLO con JSON: {"righe":[{"testo":"...","x1":0,"y1":0,"x2":0,"y2":0}]}. ` +
+      `Se nell'immagine non c'è testo leggibile: {"righe":[]}.`,
 
     transcribeAudio: ({ lang } = {}) =>
       `Trascrivi ESATTAMENTE le parole pronunciate in questo audio. ` +

@@ -8,8 +8,8 @@
   const S = global.SN_STRATO_RIQUADRI;
   if (!S) return;
   // L'Aiuto non c'è: Esc non lo chiude, nemmeno quando stava nella pagina, e sulla pagina sotto il tasto resta suo.
-  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-popup';
-  const MODALI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay';
+  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-tr-overlay, .sn-popup';
+  const MODALI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-tr-overlay';
 
   // La pagina sotto, per il feedback e le bozze: la manda il main con ogni apertura.
   global.SN_PAGINA_SOTTO = S.pagina || null;
@@ -46,6 +46,8 @@
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
         seguito: typeof dati.seguito === 'string' ? dati.seguito : '',
       });
+    } else if (d.tipo === 'trascrizione') {
+      if (dati.dataUrl) global.SN_TRASCRIZIONE?.apri({ dataUrl: dati.dataUrl, rect: dati.rect || null });
     } else if (d.tipo === 'aiuto') {
       const SB = global.SN_SIDEBAR;
       // Il campo da valutare resta nella pagina sotto: qui arriva il suo testo e il numero con cui chiederle il resto.

@@ -518,3 +518,75 @@
 .sn-popup-body::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 999px; }
 .sn-popup-body::-webkit-scrollbar-thumb:hover { background: var(--sn-accent); }
 .sn-popup-body::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* Trascrivi (#2374): la porzione resta dov'era, il resto si vela come durante la selezione; il testo sopra è
+   trasparente e si vede solo selezionato, come in un PDF. */
+.sn-tr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  background: rgba(0, 0, 0, 0.45);
+  outline: none;
+  font-family: var(--sn-font, system-ui, sans-serif);
+}
+.sn-tr-scena {
+  position: absolute;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 12px 48px rgba(0, 0, 0, 0.4);
+  background: #fff;
+}
+.sn-tr-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+.sn-tr-testo { position: absolute; inset: 0; cursor: text; font-size: 0; line-height: 0; white-space: pre; }
+.sn-tr-riga {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  font-family: system-ui, sans-serif;
+  transform-origin: 0 0;
+  user-select: text;
+  border-radius: 2px;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-tr-riga:hover { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.08); }
+.sn-tr-riga::selection { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.35); color: transparent; }
+.sn-tr-barra {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: 13px;
+  white-space: nowrap;
+  user-select: none;
+}
+.sn-tr-stato {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: var(--sn-overlay-bg, #f8f6f0);
+  color: var(--sn-muted, #6e6b63);
+  border-radius: var(--sn-radius, 10px);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+.sn-tr-stato:empty { display: none; }
+.sn-tr-copia {
+  padding: 8px 14px;
+  border-radius: var(--sn-radius, 10px);
+  border: 1px solid transparent;
+  background: var(--sn-btn-bg, #1a1918);
+  color: var(--sn-btn-fg, #fff);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  font: inherit;
+  cursor: pointer;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-tr-copia:hover { opacity: 0.85; }
+.sn-tr-copia:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }

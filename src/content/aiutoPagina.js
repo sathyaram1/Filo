@@ -168,6 +168,9 @@
     save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
     copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
     search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web', viaFilo: true },
+    transcribe_image: { target: 'image', costo: 1, label: 'trascrivi immagine' },
+    // La porzione la sceglie l'utente col mouse: l'Aiuto apre la scelta e basta.
+    transcribe_region: { target: 'none', costo: 1, label: 'trascrivi una porzione' },
     // `viaFilo`: passa da NAVIGA, che il dispatch decide da sé (una ricerca porta `cerca` e costa 2 anche lì).
     // Chiedere anche qui farebbe due domande per la stessa uscita.
     open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
@@ -297,6 +300,10 @@
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
+        case 'transcribe_image': await Actions?.transcribeImage(imgEl); break;
+        case 'transcribe_region':
+          Actions?.transcribeRegion();
+          return { ok: true, riga: `${label}: l'utente sceglie la porzione col mouse` };
         case 'search_image': return { filo: {
           action: { type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine' },
           etichetta: label,
