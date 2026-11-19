@@ -223,12 +223,7 @@
     const primaAttivo = attivo();
     rimettendo = true;
     try {
-      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) {
-        const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-        const d = Object.getOwnPropertyDescriptor(proto, 'value');
-        if (d && d.set) d.set.call(el, valore); else el.value = valore;
-        el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      }
+      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
       if (attivo() === el && primaAttivo !== el) {
         if (primaAttivo && primaAttivo.isConnected && primaAttivo !== document.body) primaAttivo.focus({ preventScroll: true });
