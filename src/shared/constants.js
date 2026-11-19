@@ -424,6 +424,7 @@
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
     [ACTIONS.FILE_NAME]: 'Nome sensato a un file',
     [ACTIONS.EMBED_COOKIE_CHECK]: 'Contenuti incorporati — cookie mancanti',
+    [ACTIONS.IMAGE_GEN]: 'Immagini create in chat',
   };
 
   function actionLabel(action) {
