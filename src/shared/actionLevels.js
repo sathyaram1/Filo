@@ -1152,10 +1152,8 @@
           return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
-        // Fuori dal registro nome e valore sono del modello: stanno nel riquadro.
-        const valOk = !!(t && val && T.validate && T.validate(estTok(a), val));
-        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]),
-          ...(val ? (valOk ? [` a ${val}`] : [' a ', cit(val, true)]) : [])];
+        // Il valore è del modello anche quando è valido (un font può essere una frase, #592.21): sta nel riquadro.
+        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]), ...(val ? [' a ', cit(val, true)] : [])];
       },
     },
     ESEGUI_COMANDO: {
