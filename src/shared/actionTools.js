@@ -380,7 +380,7 @@
     },
     DIMENTICA: {
       via: ['memoria', 'dimentica'],
-      description: 'nasconde una riga della memoria; per_sempre la cancella.',
+      description: 'nasconde una riga della memoria; per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { testo: S(), per_sempre: B() }, required: ['testo'],
     },
     CANCELLA_MEMORIA: {
