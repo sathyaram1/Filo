@@ -58,7 +58,7 @@ function tasto(wc, event, input, f) {
   } else return false;
   const esito = tocchi.evento(e, cfg);
   if (!esito) return false;
-  if (esito === 'chiudi') { Box.chiudi(delBox || finestra(f), 'tocco'); return false; }
+  if (esito === 'chiudi') { Box.chiudi(delBox || finestra(f), 'tocco'); tocchi.chiuso(); return false; }
   if (esito.attendi) {
     fermaAttesa();
     const win = finestra(f);
