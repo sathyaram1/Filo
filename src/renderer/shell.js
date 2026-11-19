@@ -855,7 +855,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     tabsEl.classList.remove('riordino');
     for (const p of d.posti) p.el.style.transform = '';
     if (ridisegnoRimandato) render();
