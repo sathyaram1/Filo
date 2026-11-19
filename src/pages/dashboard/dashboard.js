@@ -1953,8 +1953,9 @@
       delete entry.fermato;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
+      if (Array.isArray(r.immagini) && r.immagini.length) entry.immagini = r.immagini;
       host.hidden = false;
-      setBubbleText(host, r.text, true, r.fonti);
+      setBubbleText(host, r.text, true, r.fonti, r.immagini);
       nota.remove();
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
