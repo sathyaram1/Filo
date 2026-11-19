@@ -73,7 +73,16 @@ test.describe('col puntatore vero, a finestra massimizzata', () => {
     });
     console.log('INFO', JSON.stringify(info));
     const esiti = [];
-    for (const [i, dy] of [[0, 20], [1, 10], [0, 4], [1, 0]]) {
+    const vero = await app.evaluate(async ({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      const proto = Object.getPrototypeOf(w);
+      const m0 = proto.isMaximized.call(w);
+      w.maximize();
+      await new Promise((r) => setTimeout(r, 1500));
+      return { m0, m1: proto.isMaximized.call(w), b: w.getBounds() };
+    });
+    console.log('VERO', JSON.stringify(vero));
+    for (const [i, dy] of [[0, 20], [1, 7], [0, 6], [1, 5], [0, 4], [1, 0]]) {
       const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[i]}"]`);
       await shell.evaluate((x) => window.filoShell.tabs.activate(x), ids.at(-1));
       await shell.waitForTimeout(300);
