@@ -112,7 +112,7 @@ test('Editor: la tendina dei font resta anche quando si scorre il suo elenco', a
   await aggiungiStrumento(page, 'font');
   const mod = strumento(page, 'font');
   const pop = mod.locator('.ed-font-pop');
-  await scorriAlGesto(page, 'click');
+  await scorriAlGesto(page, 'click', mod.locator('.ed-font-button'));
   await mod.locator('.ed-font-button').click();
   await fotogrammi(page);
   await expect(pop).toBeVisible();
