@@ -143,9 +143,13 @@
     if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
     // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
     const start = el.selectionStart;
-    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
-    el.setSelectionRange(start, start);
-    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
+    scriviNellaCasella(el, { start, end: el.selectionEnd }, '', 'deleteByCut');
+    try { el.setSelectionRange(start, start); } catch (_) {}
+  }
+
+  // Il testo che Filo mette nella casella di un sito lo deve contare anche il sito: la regola sta nel correttore (#2052).
+  function scriviNellaCasella(el, range, testo, tipo) {
+    return !!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, range, testo, { tipo });
   }
 
   function blobToDataUrl(blob) {
@@ -341,13 +345,12 @@
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
-      el.value = el.value.slice(0, start) + text + el.value.slice(end);
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      scriviNellaCasella(el, { start, end }, text, 'insertFromPaste');
       const caret = start + text.length;
-      el.setSelectionRange(caret, caret);
+      try { el.setSelectionRange(caret, caret); } catch (_) {}
       ctx.start = caret;
       ctx.end = caret;
-      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
-      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // La selezione va ripristinata PRIMA di inserire: il click sul bottone sposta il fuoco,

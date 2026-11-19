@@ -217,15 +217,18 @@
     return out;
   }
 
+  // Il testo rimesso deve contare per il sito come scritto (#2052): passa dalla regola del correttore, che per farlo
+  // prende il fuoco del campo; poi il fuoco torna dov'era.
   function scriviNelCampo(el, valore) {
-    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const d = Object.getOwnPropertyDescriptor(proto, 'value');
+    const primaAttivo = attivo();
     rimettendo = true;
     try {
-      if (d && d.set) d.set.call(el, valore); else el.value = valore;
-      // Chi disegna il campo con i suoi script (React e simili) tiene il testo solo se riceve l'evento.
-      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      if (!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: String(el.value || '').length }, valore)) return;
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (attivo() === el && primaAttivo !== el) {
+        if (primaAttivo && primaAttivo.isConnected && primaAttivo !== document.body) primaAttivo.focus({ preventScroll: true });
+        else el.blur();
+      }
     } finally { rimettendo = false; }
   }
 

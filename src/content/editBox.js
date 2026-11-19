@@ -228,16 +228,9 @@
       const el = savedCtx.el;
       const start = savedCtx.start, end = savedCtx.end;
       const caret = start + testo.length;
-      // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
-      if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, testo)) {
-        el.setSelectionRange(start, caret);
-      } else {
-        el.value = el.value.slice(0, start) + testo + el.value.slice(end);
-        el.setSelectionRange(start, caret);
-        // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
-        const ev = new Event('input', { bubbles: true });
-        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
-      }
+      // Come una battuta: il rosso del correttore sulle altre parole resta (#1111), e il sito conta il testo (#2052).
+      global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start, end }, testo);
+      try { el.setSelectionRange(start, caret); } catch (_) {}
     } else if (savedCtx.kind === 'ce') {
       try { global.SN_SPELLCHECK?.scriveFilo?.(savedCtx.el || document.activeElement, testo); } catch (_) {}
       try { document.execCommand('insertText', false, testo); } catch (_) {}
