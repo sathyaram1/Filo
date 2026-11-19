@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { nelMondoDiFilo, neiRiquadri } from './helpers/riquadri.mjs';
 import { apriCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { menuDi, carattereCronologia } from './helpers/menuContestuale.mjs';
 
 const GEORGIA = "Georgia, 'Times New Roman', serif";
 const COURIER = "'Courier New', ui-monospace, monospace";
