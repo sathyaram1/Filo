@@ -14,7 +14,8 @@ let base;
 test.beforeAll(async () => {
   server = createServer((q, r) => {
     r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    r.end('<!doctype html><title>Modulo</title><h1>Modulo</h1><input aria-label="Nome" placeholder="Nome">');
+    if (q.url.startsWith('/accanto')) return r.end('<!doctype html><title>Accanto</title><input id="c" autofocus aria-label="Campo accanto">');
+    r.end('<!doctype html><title>Modulo</title><h1>Modulo</h1><a href="/accanto" target="_blank">Apri accanto</a><input aria-label="Nome" placeholder="Nome">');
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   base = `http://127.0.0.1:${server.address().port}`;
