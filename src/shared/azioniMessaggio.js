@@ -176,8 +176,11 @@
       const m = messaggioDi(target);
       if (!m) return [];
       const a = azioniDi(m);
-      return [...a.filter((x) => x !== 'copia'), ...a.filter((x) => x === 'copia')]
-        .map((x) => ({ azione: x, label: DEF[x].voce, icona: DEF[x].icona, fai: () => fai(x, m) }));
+      const sel = selezioneIn(m);
+      return [...a.filter((x) => x !== 'copia'), ...a.filter((x) => x === 'copia')].map((x) => ({
+        azione: x, label: sel && CITANO.has(x) ? `${DEF[x].voce} a questo passo` : DEF[x].voce, icona: DEF[x].icona,
+        fai: () => fai(x, m, null, sel),
+      }));
     }
     // Le stesse voci già nella forma del menu del tasto destro: ogni chat le passa così com'è.
     const vociMenu = (target) => voci(target).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
