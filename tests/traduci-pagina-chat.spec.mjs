@@ -127,6 +127,7 @@ test('«traducimi la pagina»: si traduce; chiesto di nuovo resta tradotta; «to
   const ancora = await originale(app);
   expect(ancora.executed).toBe(true);
   expect(ancora.output.traduzione).toBe('niente');
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA', originale: true }, ancora)).toMatch(/^La pagina non era tradotta/);
   await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it');
 });
 
