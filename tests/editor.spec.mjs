@@ -510,16 +510,16 @@ test('in un foglio svuotato l\'incolla lungo si annulla e lascia la storia di pr
   await selezione(page, '<p><br></p>', 'r.setStart(d.firstChild, 0);');
   await page.keyboard.type('# ');
   await expect(page.locator('#doc h1')).toHaveCount(1);
-  // «# » lascia già un paragrafo vuoto sotto il titolo: non è dell'incolla.
-  const vuoti = await page.locator('#doc > p').count();
+  // «# » non lascia un paragrafo vuoto sotto il titolo (#2279).
+  await expect(page.locator('#doc > p')).toHaveCount(0);
   await incolla(app, page, righe.join('\n'));
-  expect((await blocchi(page, '#doc > h1, #doc > p')).filter(Boolean)).toEqual(righe);
+  expect(await blocchi(page, '#doc > h1, #doc > p')).toEqual(righe);
   expect(await blocchi(page, '#doc > h1')).toEqual(['Riga 0']);
-  expect(await page.locator('#doc > p').count()).toBe(righe.length - 1 + vuoti);
+  expect(await page.locator('#doc > p').count()).toBe(righe.length - 1);
   await page.keyboard.press('Control+Z');
   await expect(page.locator('#doc > h1')).toHaveCount(1);
   await expect(page.locator('#doc')).not.toContainText('Riga');
-  expect(await page.locator('#doc > p').count()).toBe(vuoti);
+  await expect(page.locator('#doc > p')).toHaveCount(0);
 });
 
 test('l\'incolla lungo non lascia caratteri invisibili: né in una citazione appena aperta, né nel testo copiato, né dopo l\'annulla', async ({ app, openTab }) => {

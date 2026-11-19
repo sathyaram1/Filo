@@ -2044,6 +2044,28 @@
     host.appendChild(pad);
   }
 
+  // insertUnorderedList di Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>) e il salvataggio, che legge
+  // un paragrafo, lo perdeva: la riga già vuotata si sostituisce con l'elenco, in un passo che l'Annulla conosce (#2279).
+  function apriElenco(cmd) {
+    const sel = window.getSelection();
+    const bloccoAlCursore = () => {
+      let b = sel.anchorNode;
+      while (b && b !== docEl && !/^(P|DIV)$/.test(b.tagName || '')) b = b.parentNode;
+      return b && b !== docEl && b.parentNode === docEl ? b : null;
+    };
+    let block = bloccoAlCursore();
+    if (!block) { exec(cmd); return; }
+    // Su un <div> (quello che apre Invio) l'elenco incollato resterebbe dentro il div.
+    if (block.tagName === 'DIV') { document.execCommand('formatBlock', false, 'P'); block = bloccoAlCursore(); }
+    if (!block) { exec(cmd); return; }
+    const tag = cmd === 'insertOrderedList' ? 'ol' : 'ul';
+    const r = document.createRange();
+    r.selectNode(block);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    exec('insertHTML', `<${tag}><li><br></li></${tag}>`);
+  }
+
   // Shortcut markdown a livello blocco
   function handleMarkdownBlock() {
     const sel = window.getSelection();
@@ -2057,12 +2079,18 @@
       [/^##\s$/, () => exec('formatBlock', 'H2')],
       [/^###\s$/, () => exec('formatBlock', 'H3')],
       [/^>\s$/, () => exec('formatBlock', 'BLOCKQUOTE')],
-      [/^[-*]\s$/, () => exec('insertUnorderedList')],
-      [/^1\.\s$/, () => exec('insertOrderedList')],
+      [/^[-*]\s$/, () => apriElenco('insertUnorderedList')],
+      [/^1\.\s$/, () => apriElenco('insertOrderedList')],
     ];
     for (const [re, fn] of map) {
       if (re.test(text)) {
-        block.textContent = '';
+        // Svuotato a mano il blocco restava senza segnaposto: il cursore scivolava nel blocco dopo, che diventava lui
+        // il titolo, e un <p></p> alto zero si salvava (#2279). La cancellazione dell'editor tiene il <br> e l'Annulla.
+        const r = document.createRange();
+        r.selectNodeContents(block);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        document.execCommand('delete');
         fn();
         return true;
       }
@@ -2196,9 +2224,10 @@
     maybeAutoSummary();
   }
 
-  docEl.addEventListener('input', () => {
+  docEl.addEventListener('input', (e) => {
     if (ancorePiantate) togliAncore();
-    handleMarkdownBlock();
+    // Annulla e Ripeti che rimettono «# » non riconvertono: il Ripeti rifaceva la conversione e perdeva il resto della storia.
+    if (!/^history/.test(e.inputType || '')) handleMarkdownBlock();
     onDocInput();
   });
   // ── Incolla come testo semplice ─────────────────────────────────────
