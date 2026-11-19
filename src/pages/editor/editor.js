@@ -2218,8 +2218,8 @@
 
   docEl.addEventListener('input', (e) => {
     if (ancorePiantate) togliAncore();
-    // Solo la digitazione: il Ripeti che rimette lo spazio di «# » rifarebbe la conversione e si mangerebbe il resto della storia.
-    if (e.inputType === 'insertText') handleMarkdownBlock();
+    // Annulla e Ripeti che rimettono «# » non riconvertono: il Ripeti rifaceva la conversione e perdeva il resto della storia.
+    if (!/^history/.test(e.inputType || '')) handleMarkdownBlock();
     onDocInput();
   });
   // ── Incolla come testo semplice ─────────────────────────────────────
