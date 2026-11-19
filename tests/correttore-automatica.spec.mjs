@@ -597,7 +597,7 @@ test('il testo incollato o dettato con Filo che finisce con «perchè» e un pun
     await page.locator(sel).click({ button: 'right' });
     await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
     await page.keyboard.press('Escape');
-    await nelMondoDelMenu(app, page, `globalThis.SN_ACTIONS.insertDictatedText(${JSON.stringify(testo)})`);
+    await nelMondoDiFilo(app, page, (t) => globalThis.SN_ACTIONS.insertDictatedText(t), testo);
   };
 
   await incolla('#ta', 'Non so perchè ');
