@@ -1755,7 +1755,7 @@ class TabManager {
     const pila = typeof e.id === 'string' && !this.incognito ? this._pilaChiuse() : null;
     if (pila) pila.segnaRiaperta(e.id);
     let id = null;
-    try { id = await this.riapri(SchedeChiuse.daArchivio(e), opts); } catch (_) {}
+    try { id = await this.riapri(SchedeChiuse.daArchivio(e), { ...opts, fileDelComputer: true }); } catch (_) {}
     if (pila && id) this._contaTornata(e);
     else if (pila) pila.annullaRiaperta(e.id);
     return id;
