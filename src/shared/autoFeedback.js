@@ -208,9 +208,12 @@
   // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?», «apri youtube, quanti video ho
   // visto?»): un'azione secca non le risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
   // Sbagliare per eccesso costa una chiamata al modello in più; per difetto, una domanda senza risposta.
+  // Senza un comando la domanda è la richiesta stessa, e l'azione scelta le risponde: «dov'è la ricevuta?» col file
+  // mostrato chiude il turno (#1130).
   function domandaOltreAlComando(text) {
     const norm = normalizzaDomanda(text);
     if (SPIEGAZIONE_RE.test(norm)) return true;
+    if (!chiedeAzione(text)) return false;
     return norm.split(/(?<=[.!?\n;])\s*/).map((s) => s.trim()).filter(Boolean).some((f) => {
       const corpo = f.replace(/[.!?;\s]+$/, '');
       const parti = corpo.split(/[,:]|\s+(?:e|ma|poi)\s+/).map((s) => s.trim()).filter(Boolean);
