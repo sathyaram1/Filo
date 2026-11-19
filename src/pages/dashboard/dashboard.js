@@ -1409,7 +1409,7 @@
       } else {
         // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
         if (r.text && !r.notaRisposta) pending.dropNote(r.text);
-        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true, fonti: r.fonti });
+        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true, fonti: r.fonti, immagini: r.immagini });
         bubblesEl.appendChild(filoBubble);
       }
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
