@@ -366,9 +366,9 @@ for (const [come, mette] of [
     await modelloFinto(app);
     await ostile.locator('#t').click();
     await ostile.keyboard.type('a');
-    await apriAiuto(shell, ostile);
-    await scriviAllAiuto(ostile, 'che gioco è?');
-    await expect(ostile.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
+    const aiutoOstile = await apriAiuto(app, shell, ostile);
+    await scriviAllAiuto(aiutoOstile, 'che gioco è?');
+    await expect(aiutoOstile.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => ostile.locator('#t').evaluate((t) => t.value.length), { timeout: 5_000 }).toBeGreaterThan(1_000_000);
     const banca = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>${campoDelSito('731942')}</body></html>`);
     await apriAiuto(shell, banca);
