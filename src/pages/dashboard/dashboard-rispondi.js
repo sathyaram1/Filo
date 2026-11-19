@@ -468,9 +468,9 @@
       copia: (_testo, b) => copia(b),
       classi: { barra: 'dash-msg-azioni', tasto: 'dash-msg-azione', ok: 'dash-copiato', no: 'dash-non-copiato', destra: '' },
       extra: {
-        rispondi: { ...global.SN_AZIONI_MESSAGGIO.AZIONI.rispondi, fai: (b) => rispondi(b) },
+        rispondi: { ...global.SN_AZIONI_MESSAGGIO.AZIONI.rispondi, fai: (b, _t, sel) => rispondi(b, sel) },
         modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica', fai: (b) => { if (d.modifica) d.modifica(b); } },
-        cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita', fai: (b) => rispondi(b) },
+        cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita', fai: (b, _t, sel) => rispondi(b, sel) },
       },
     });
     d.bubblesEl.addEventListener('click', (e) => {
