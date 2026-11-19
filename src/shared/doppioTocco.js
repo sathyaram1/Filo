@@ -160,6 +160,6 @@
 
   global.SN_DOPPIO_TOCCO = {
     SOGLIA_LIMITI, SOGLIA_DI_SERIE, TETTO_LETTERE,
-    lettera, indirizzo, normalizza, sogliaMs, diLettera, diTasto, assegna, togli, daTesto, etichetta, nomeBersaglio, riconoscitore,
+    lettera, indirizzo, normalizza, sogliaMs, diLettera, diTasto, assegna, conPrima, togli, daTesto, etichetta, nomeBersaglio, riconoscitore,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
