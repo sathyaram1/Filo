@@ -62,7 +62,7 @@ test('incollato in chat il percorso di un file HTML, Filo lo apre in una scheda 
   await expect(pagina.locator('body')).toHaveAttribute('data-js', 'si');
   await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth), { message: 'l\'immagine della sua cartella si vede' }).toBeGreaterThan(0);
   expect(await pagina.evaluate(() => getComputedStyle(document.getElementById('t')).color)).toBe('rgb(1, 2, 3)');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il report.' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('1 pagina: Report locale')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText('Potrebbe inviare tuoi dati')).toHaveCount(0);
 
   // La pagina locale non legge i file: né gli altri del disco, né quelli della sua cartella, né un'immagine fuori di lì.
