@@ -125,9 +125,10 @@
       ]
     },
     "pittore": {
-      "label": "Gemini Flash Image (disegna)",
+      "label": "Qwen Image (pesi aperti, disegna)",
       "provider": "openrouter",
-      "model": "google/gemini-2.5-flash-image",
+      "model": "qwen/qwen-image",
+      "weights": "open",
       "inputs": [
         "text"
       ],
