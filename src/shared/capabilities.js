@@ -1003,7 +1003,7 @@
     'spiegazioni-al-passaggio': SOLO_A_MANO,
     history: 'scheda(apri)', 'downloads-list': 'scheda(apri)', 'help-sidebar': 'scheda(finestra)',
     'chat-schede-trascinate': SOLO_A_MANO, 'chat-immagini-trascinate': SOLO_A_MANO, 'voice-chat': SOLO_A_MANO,
-    'web-search-assistant': 'web(cerca)', feedback: 'filo_su_di_se(feedback)', 'transparency-docs': 'filo_su_di_se(documento)',
+    'web-search-assistant': 'web(cerca)', 'chat-images': 'web(immagini)', feedback: 'filo_su_di_se(feedback)', 'transparency-docs': 'filo_su_di_se(documento)',
     'filo-assistant': SOLO_A_MANO, 'read-user-documents': 'file(leggi)', 'find-user-documents': 'file(cerca)',
     'file-names': 'file(rinomina)', 'delete-files': 'file(elimina)', 'terminal-mode': 'computer(comando)',
     'read-web-pages': 'web(leggi)', 'look-at-screen': 'computer(guarda)', 'generate-dashboard': 'impostazioni(imposta)',
