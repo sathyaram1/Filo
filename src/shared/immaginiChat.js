@@ -98,6 +98,8 @@
   // Le estensioni d'immagine che il sistema può dare senza tipo, oltre a quelle già ammesse.
   const ALTRE_ESTENSIONI = /\.(avif|heic|heif|tiff?|ico|jfif)$/i;
   const MOTIVO_FORMATO = 'formato che Filo non sa aprire (salvala come JPEG o PNG)';
+  // Chi la legge è l'owner, non un modello: tiene più dettaglio della chat, e una foto da 12 MP ci sta già in JPEG.
+  const LATO_SEGNALAZIONE = 4096;
 
   // Una foto del telefono passa spesso i 4 MB, e un AVIF non era fra i tipi ammessi (#1664): prima di rifiutarla si
   // rimpicciolisce o si ridisegna. Torna { file } da allegare, { motivo } se non si può, null se non è un'immagine.
