@@ -170,7 +170,7 @@ test('«disegnami un gatto astronauta»: l\'immagine creata compare segnata come
 
 test('senza un modello che disegna Filo non chiama nessuno e il modello sa dove si sceglie', async ({ app, openTab }) => {
   test.setTimeout(120_000);
-  await stubModello(app, { chiamata: { azione: 'crea', descrizione: 'un drago' }, finale: 'Non posso disegnarlo: manca il modello.', conPittore: false });
+  await stubModello(app, { chiamata: { azione: 'disegna', descrizione: 'un drago' }, finale: 'Non posso disegnarlo: manca il modello.', conPittore: false });
   const page = await openTab(NEWTAB);
   await chiedi(page, 'disegnami un drago');
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'Non posso disegnarlo' });
