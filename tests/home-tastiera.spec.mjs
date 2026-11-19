@@ -81,12 +81,13 @@ test('dopo un clic su un punto vuoto il campo ha il fuoco: Backspace, Ctrl+V, fr
   expect(await fuoco()).toBe('');
   await page.keyboard.press('Control+C');
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('altro');
+  // Il cursore è rimasto dov'era, dopo «cii».
   await page.keyboard.press('Backspace');
-  await expect(campo).toHaveValue('ciia incollat');
+  await expect(campo).toHaveValue('cia incollato');
   await modelloFinto(app, [{ text: 'Eccomi.' }]);
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('Enter');
-  await expect(page.locator('.dash-bubble-user', { hasText: 'ciia incollat' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-user', { hasText: 'cia incollato' })).toBeVisible({ timeout: 10_000 });
   await expect(campo).toHaveValue('');
 });
 
