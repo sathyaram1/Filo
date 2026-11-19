@@ -208,7 +208,43 @@ test.describe('utente già accolto', () => {
     await expect(carb.locator('.dash-bubble-filo', { hasText: 'Per quattro' })).toBeVisible({ timeout: 30_000 });
     const dopo = await ultimo();
     expect(dopo).not.toContain('DA SCOPRIRE');
+    expect(dopo).not.toContain('non ce l\'hai davanti apposta');
     for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(dopo, fatto).toContain(fatto);
+  });
+
+  // #2536.1 — con la memoria fuori dal CONTESTO il modello la prendeva per vuota: «di te non so niente», «niente da
+  // togliere», e la riga chiesta da togliere restava.
+  test('nell’intervista rifatta la memoria si legge quando la chiede l’utente, e una riga si toglie', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Fa il geometra in uno studio tecnico.\nHa un gatto, Pepe.', PREFERENZE: 'Preferisce risposte brevi.' });
+      await globalThis.SN_FILO_MEMORY.appendLesson('Ha prenotato un volo per Lisbona.');
+    });
+    await pronta(app, shell);
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+    const prompts = () => app.evaluate(() => globalThis.__chatPrompts.slice());
+
+    await queueChat(app, { toolCalls: [{ id: 'm1', name: 'LEGGI_MEMORIA', arguments: '{}' }] },
+      { text: 'Fai il geometra e hai un gatto, Pepe.', actions: [] });
+    const prima = (await prompts()).length;
+    await scrivi(intervista, 'sono luca. prima di andare avanti: cosa ti ricordi già di me?');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'hai un gatto, Pepe' })).toBeVisible({ timeout: 30_000 });
+    const [domanda, conLaMemoria] = (await prompts()).slice(prima);
+    expect(domanda).toContain('DA SCOPRIRE');
+    expect(domanda).toContain('memoria(leggi)');
+    for (const fatto of ['geometra', 'Pepe', 'Lisbona']) expect(domanda, `${fatto}: prima di chiederla non c’è`).not.toContain(fatto);
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(conLaMemoria, `${fatto}: letta, arriva intera`).toContain(fatto);
+    await expect(intervista.locator('.dash-activity').last()).toContainText('Rileggo la memoria');
+
+    await queueChat(app, { toolCalls: [{ id: 'm2', name: 'DIMENTICA', arguments: JSON.stringify({ testo: 'Pepe' }) }] },
+      { text: 'L’ho tolto dalla memoria.', actions: [] });
+    await scrivi(intervista, 'ah il mio gatto pepe purtroppo non c\'è più, toglilo dalla memoria');
+    const memoria = () => app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
+    await expect.poll(memoria, { timeout: 30_000 }).not.toContain('Pepe');
+    expect(await memoria(), 'il resto resta').toContain('geometra');
+    await expect(intervista.locator('.dash-activity').last()).toContainText('Dimenticato');
+    mkdirSync(SHOTS, { recursive: true });
+    await intervista.screenshot({ path: join(SHOTS, 'accoglienza-rifatta-memoria-letta-e-tolta.png') });
   });
 
   test('con l’intervista rifatta aperta altrove, «stop» nella chat della carbonara va al modello e non chiude l’intervista', async ({ app, shell, openTab }) => {
