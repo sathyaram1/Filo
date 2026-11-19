@@ -177,6 +177,7 @@
   }
   function apriMenu(x, y, items) {
     chiudiMenu();
+    scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop bd-mia-menu';
     menu.setAttribute('role', 'menu');
