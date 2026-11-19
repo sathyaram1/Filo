@@ -12,7 +12,7 @@
       version: '0.2.293', date: '2026-11-19',
       features: [],
       fixes: [
-        { testo: 'Il clic su una scheda e sulla sua X arriva anche se la mano si muove un poco mentre premi, e anche subito dopo aver trascinato quella scheda fuori dalla fila.', segnalazione: 2382 },
+        { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
       ],
     },
     {
