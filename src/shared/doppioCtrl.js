@@ -157,7 +157,7 @@
   function daTesto(testo, attuali) {
     const s = String(testo == null ? '' : testo).trim();
     const cfg = attuali && attuali.doppioCtrl;
-    if (/^(di serie|ripristina|quelle di serie|lettere di serie|reset)$/i.test(s)) return { lettere: {}, label: 'Lettere del doppio Ctrl: quelle di serie' };
+    if (/^(di serie|ripristina|quelle di serie|lettere di serie|reset)$/i.test(s)) return { lettere: [], label: 'Lettere del doppio Ctrl: quelle di serie' };
     const via = s.match(/^(?:togli|rimuovi|cancella|libera)\s+(?:la\s+lettera\s+)?[«"']?([a-z])[»"']?$/i)
       || s.match(/^[«"']?([a-z])[»"']?\s*(?:[:=→>-]+\s*)?(?:nessuna|niente|nulla|off)$/i);
     if (via) {
