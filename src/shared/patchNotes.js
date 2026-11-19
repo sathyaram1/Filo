@@ -16,6 +16,7 @@
       fixes: [
         { testo: 'Il clic su una scheda e sulla sua X funziona anche se la mano si muove un poco mentre premi, subito dopo aver trascinato quella scheda fuori dalla fila e quando c\'è un menu del tasto destro aperto lì accanto: il menu si chiude e il clic arriva.', segnalazione: 2382 },
         { testo: 'A schermo intero, col puntatore in alto vedi le schede senza l\'elenco dei download che copriva mezza pagina. Scende con loro solo la domanda su un programma da scaricare, finché non rispondi.', segnalazione: 2387 },
+        { testo: 'Prima di rispondere Filo riprende una conversazione vecchia solo se c\'entra davvero con quello che chiedi: un saluto, o una domanda su tutt\'altro, non tirano più fuori ricordi a caso.', segnalazione: 2369 },
       ],
     },
     {
