@@ -132,5 +132,5 @@
     }
   }
 
-  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, blobDa, byteDi, LETTA };
+  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, daRidisegnare, blobDa, byteDi, LETTA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
