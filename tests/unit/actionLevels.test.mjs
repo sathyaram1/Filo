@@ -412,7 +412,7 @@ test('#592.21 — un valore che passa i controlli resta del modello: nel riquadr
   assert.ok(accettate.has('modello_funzione'), 'la sonda non arriva al modello di una funzione');
   const T = globalThis.SN_THEME_TOKENS;
   let font = 0;
-  for (const token of T.list().map((t) => t.name)) {
+  for (const token of Object.keys(T.TOKENS)) {
     for (const coda of CODE) {
       const valore = `Georgia${coda}Georgia`;
       if (T.validate(token, valore)) font++;
