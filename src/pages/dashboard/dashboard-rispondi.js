@@ -1,6 +1,6 @@
-// Le azioni sui messaggi della home (#1620, #2096): quali tasti ha ogni bolla, la citazione sopra il campo e in
-// testa alla bolla che parte, il salto alla risposta citata. Non tocca il DOM al caricamento. Cosa si salva della
-// citazione e come la legge il modello: src/shared/rispostaA.js.
+// Le azioni sui messaggi della home (#1620, #2096): quali tasti ha ogni bolla, le citazioni sopra il campo e dentro la
+// bolla che parte (citazione, commento, citazione, commento: #2346), il salto al testo citato. Non tocca il DOM al
+// caricamento. Cosa si salva di una citazione e come la legge il modello: src/shared/rispostaA.js.
 (function (global) {
   'use strict';
 
@@ -8,10 +8,13 @@
   // Il testo come l'ha scritto Filo, bolla per bolla: a schermo è già formattato, e il posto nel filo si ritrova da lui.
   const scritti = new WeakMap();
   let anteprima = null;
-  let citata = null;
+  // Le citazioni nel campo, in ordine. `commento` è il testo che le segue; quello dell'ultima è il campo stesso.
+  let citate = [];
 
+  const R = () => global.SN_RISPOSTA_A;
   const icona = (nome, size = 16) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](size) : '');
   const elDi = (t) => (t && t.nodeType === 1 ? t : (t && t.parentElement) || null);
+  const unisci = (...parti) => parti.map((p) => String(p || '').trim()).filter(Boolean).join('\n');
 
   function ricorda(bolla, testo) {
     if (bolla) scritti.set(bolla, String(testo == null ? '' : testo));
@@ -29,6 +32,13 @@
     const copia = bolla.cloneNode(true);
     for (const n of copia.querySelectorAll('.dash-bubble-actions, .dash-msg-azioni, .dash-bubble-img, button')) n.remove();
     return String(copia.textContent || '').trim();
+  }
+
+  // Un passo come si legge: dello scritto di Filo restano le parole, senza i segni rimasti a metà del taglio.
+  function testoDelPasso(pezzo, role) {
+    const Md = global.SN_MARKDOWN;
+    if (role === 'user' || !Md || !Md.testo) return String(pezzo || '').trim();
+    return Md.testo(pezzo).replace(/\]\([^)\s]*\)?/g, '').replace(/\*\*|__|~~|`/g, '').replace(/^[\s[*_]+|[\s*_]+$/g, '').trim();
   }
 
   const diUtente = (b) => b.classList.contains('dash-bubble-user');
@@ -65,113 +75,258 @@
     return ok;
   }
 
-  // ── La citazione sopra il campo ───────────────────────────────────────────
+  // ── Il testo selezionato ──────────────────────────────────────────────────
+  // I nodi di testo che si leggono nella bolla, senza la barra dei tasti.
+  function nodiDiTesto(el) {
+    const out = [];
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.parentElement && n.parentElement.closest('.dash-msg-azioni, button, .dash-citata') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    for (let n = w.nextNode(); n; n = w.nextNode()) out.push(n);
+    return out;
+  }
+  // La parte della selezione che sta in `el`, e quello che la precede in `el`. `null` se non ne tocca niente.
+  function selezioneIn(el) {
+    const sel = global.getSelection ? global.getSelection() : null;
+    if (!el || !sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const r = sel.getRangeAt(0).cloneRange();
+    if (!r.intersectsNode(el)) return null;
+    const tutto = document.createRange();
+    tutto.selectNodeContents(el);
+    if (r.compareBoundaryPoints(Range.START_TO_START, tutto) < 0) r.setStart(tutto.startContainer, tutto.startOffset);
+    if (r.compareBoundaryPoints(Range.END_TO_END, tutto) > 0) r.setEnd(tutto.endContainer, tutto.endOffset);
+    const testo = r.toString();
+    if (!testo.trim()) return null;
+    const prima = document.createRange();
+    prima.setStart(tutto.startContainer, tutto.startOffset);
+    prima.setEnd(r.startContainer, r.startOffset);
+    return { testo, prima: prima.toString() };
+  }
+  // Il passo selezionato misurato sullo scritto del messaggio; `null` se la selezione è il messaggio intero o non c'è.
+  function passoSelezionato(el, scrittoDelMessaggio) {
+    const sel = selezioneIn(el);
+    const Ra = R();
+    if (!sel || !Ra || !scrittoDelMessaggio) return null;
+    const t = Ra.trovaPasso(scrittoDelMessaggio, sel.testo, Ra.lettere(sel.prima));
+    return t && !t.tutto ? { da: t.da, a: t.a } : null;
+  }
+
+  // ── Le citazioni sopra il campo ───────────────────────────────────────────
   // Il posto nel filo lo sa la bolla quando il filo l'ha riconosciuta (`data-key`); appena scritta no, e il main la
-  // ritrova dal testo nella chat di adesso.
+  // ritrova dal testo nella chat di adesso. Con del testo selezionato nella bolla si cita quel passo soltanto.
   function rispondi(b) {
     const k = /^m:(.+):(\d+)$/.exec(b.dataset.key || '');
-    citata = {
+    const role = diUtente(b) ? 'user' : 'filo';
+    const s = scritto(b) ?? testoDi(b);
+    const passo = passoSelezionato(b, s);
+    return aggiungi({
       bolla: b,
       chat: k ? k[1] : '',
       i: k ? Number(k[2]) : null,
       ts: b.dataset.ts || '',
-      role: diUtente(b) ? 'user' : 'filo',
-      scritto: scritto(b) ?? testoDi(b),
-      testo: testoDi(b),
-    };
-    disegnaAnteprima();
-    d.inputEl.focus();
+      role,
+      scritto: s,
+      testo: passo ? testoDelPasso(s.slice(passo.da, passo.a), role) : testoDi(b),
+      ...(passo ? { passo: true, da: passo.da, a: passo.a } : {}),
+    });
   }
 
   // Un messaggio del filo che non è una bolla della home (uno scambio di un'altra app, #2096): si cita col suo posto.
-  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto = '', testo = '' } = {}) {
+  // `el`: dove sta a schermo, per citarne solo il passo selezionato.
+  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto: s = '', testo = '', el = null } = {}) {
     if (!d || !String(testo || '').trim()) return false;
-    citata = { bolla: null, chat, i: Number.isInteger(i) ? i : null, ts, role: role === 'user' ? 'user' : 'filo', scritto: scritto || testo, testo: String(testo).trim() };
+    const ruolo = role === 'user' ? 'user' : 'filo';
+    const tutto = s || testo;
+    const passo = el ? passoSelezionato(el, tutto) : null;
+    return aggiungi({
+      bolla: null, chat, i: Number.isInteger(i) ? i : null, ts, role: ruolo, scritto: tutto,
+      testo: passo ? testoDelPasso(tutto.slice(passo.da, passo.a), ruolo) : String(testo).trim(),
+      ...(passo ? { passo: true, da: passo.da, a: passo.a } : {}),
+    });
+  }
+
+  const stessa = (x, y) => !!x && !!y && x.chat === y.chat && x.i === y.i && x.da === y.da && x.a === y.a
+    && (x.chat ? true : x.bolla === y.bolla && x.scritto === y.scritto);
+
+  // Una citazione nuova va in fondo: quello che l'utente ha scritto finora diventa il commento di quella prima.
+  function aggiungi(c) {
+    const ultima = citate[citate.length - 1];
+    const scrittoOra = d.inputEl.value;
+    if (ultima && stessa(ultima, c) && !scrittoOra.trim()) { d.inputEl.focus(); return true; }
+    if (citate.length >= (R() ? R().MAX_CITAZIONI : 200)) return false;
+    if (ultima && scrittoOra.trim()) {
+      ultima.commento = scrittoOra;
+      campo('');
+    }
+    citate.push({ ...c, commento: '' });
     disegnaAnteprima();
     d.inputEl.focus();
     return true;
   }
 
-  function disegnaAnteprima() {
-    if (!anteprima) return;
-    anteprima.hidden = !citata;
-    if (!citata) return;
-    anteprima.querySelector('.dash-citazione-testo').textContent = citata.testo;
-    anteprima.querySelector('.dash-citazione-chi').textContent = citata.role === 'user' ? 'Tu' : 'Filo';
+  function campo(valore) {
+    d.inputEl.value = valore;
+    try { d.inputEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
   }
 
-  function creaAnteprima(host) {
-    host.innerHTML = '';
+  function disegnaAnteprima() {
+    if (!anteprima) return;
+    anteprima.hidden = !citate.length;
+    anteprima.replaceChildren(...citate.map((c, k) => pezzo(c, k)));
+  }
+
+  function pezzo(c, k) {
+    const el = document.createElement('div');
+    el.className = 'dash-citazione-pezzo';
+    el._citata = c;
+    const riga = document.createElement('div');
+    riga.className = 'dash-citazione-riga';
     const vai = document.createElement('button');
     vai.type = 'button';
     vai.className = 'dash-citazione-vai';
     vai.title = 'Vai al messaggio';
-    const chi = document.createElement('span');
-    chi.className = 'dash-citazione-chi';
+    if (c.role === 'user') {
+      const chi = document.createElement('span');
+      chi.className = 'dash-citazione-chi';
+      chi.textContent = 'Tu';
+      vai.append(chi);
+    }
     const testo = document.createElement('span');
     testo.className = 'dash-citazione-testo';
-    vai.append(chi, testo);
-    vai.addEventListener('click', () => { if (citata) vaiA(citata).catch(() => {}); });
+    testo.textContent = c.testo;
+    vai.append(testo);
+    vai.addEventListener('click', () => { vaiA(c).catch(() => {}); });
     const togli = document.createElement('button');
     togli.type = 'button';
     togli.className = 'dash-citazione-togli';
     togli.setAttribute('aria-label', 'Non rispondere');
     togli.title = 'Non rispondere';
     togli.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    togli.addEventListener('click', () => { annulla(); d.inputEl.focus(); });
-    host.append(vai, togli);
+    togli.addEventListener('click', () => { togliCitazione(citate.indexOf(c)); d.inputEl.focus(); });
+    riga.append(vai, togli);
+    el.append(riga);
+    // Il commento di una citazione che non è l'ultima: si scrive dove sta, e Invio manda il messaggio come dal campo.
+    if (k < citate.length - 1 && String(c.commento || '').trim()) {
+      const t = document.createElement('textarea');
+      t.className = 'dash-citazione-commento';
+      t.rows = 1;
+      t.value = c.commento;
+      t.setAttribute('aria-label', 'Commento alla citazione');
+      t.addEventListener('input', () => { c.commento = t.value; d.campoCambiato && d.campoCambiato(); });
+      t.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+        e.preventDefault();
+        d.formEl.requestSubmit();
+      });
+      el.append(t);
+    }
+    return el;
+  }
+
+  function creaAnteprima(host) {
+    host.innerHTML = '';
     anteprima = host;
     disegnaAnteprima();
   }
 
-  function annulla() {
-    if (!citata) return false;
-    citata = null;
+  // Tolta una citazione, il suo commento resta: va a quella prima (o, se era la prima, a quella dopo).
+  function togliCitazione(k) {
+    if (k < 0 || k >= citate.length) return false;
+    const c = citate[k];
+    const ultima = k === citate.length - 1;
+    if (ultima) {
+      const prima = citate[k - 1];
+      if (prima && String(prima.commento || '').trim()) campo(unisci(prima.commento, d.inputEl.value));
+      if (prima) prima.commento = '';
+    } else if (String(c.commento || '').trim()) {
+      if (k > 0) citate[k - 1].commento = unisci(citate[k - 1].commento, c.commento);
+      else if (k + 1 === citate.length - 1) campo(unisci(c.commento, d.inputEl.value));
+      else citate[k + 1].commento = unisci(c.commento, citate[k + 1].commento);
+    }
+    citate.splice(k, 1);
     disegnaAnteprima();
     return true;
   }
 
-  // Quello che parte col messaggio, preso dal campo che si svuota.
-  function prendi() {
-    const c = citata;
-    annulla();
-    return c;
-  }
-  // Un messaggio che non parte torna nel campo con la sua citazione.
-  function rimetti(c) {
-    if (!c) return;
-    citata = c;
+  // Lascia tutte le citazioni; i commenti restano nel campo, in ordine.
+  function annulla() {
+    if (!citate.length) return false;
+    const testi = citate.slice(0, -1).map((c) => c.commento);
+    citate = [];
+    campo(unisci(...testi, d.inputEl.value));
     disegnaAnteprima();
+    return true;
+  }
+
+  const commenti = () => citate.some((c, k) => k < citate.length - 1 && String(c.commento || '').trim());
+
+  // Quello che parte col messaggio: le parole, commento dopo commento, e le citazioni col posto del loro commento. Il
+  // campo l'ha già letto chi chiama (`ultimo`).
+  function prendi(ultimo = '') {
+    if (!citate.length) return null;
+    let testo = '';
+    const lista = citate.map((c, k) => {
+      const parole = String(k === citate.length - 1 ? ultimo : c.commento || '').trim();
+      if (parole && testo) testo += '\n';
+      const pos = testo.length;
+      testo += parole;
+      const { commento, ...resto } = c;
+      return { ...resto, pos };
+    });
+    citate = [];
+    disegnaAnteprima();
+    return { testo, citate: lista };
+  }
+  // Un messaggio che non parte torna nel campo con le sue citazioni: ognuna col suo commento, l'ultimo nel campo (che
+  // torna a chi chiama).
+  function rimetti(l, testo = '') {
+    const lista = (Array.isArray(l) ? l : l ? [l] : []).filter((c) => c && typeof c === 'object' && !c.manca);
+    const t = String(testo || '');
+    if (!lista.length) return t.trim();
+    const ord = lista.map((c, k) => ({ c, k, pos: Math.min(Number.isInteger(c.pos) && c.pos > 0 ? c.pos : 0, t.length) }))
+      .sort((x, y) => x.pos - y.pos || x.k - y.k);
+    citate = ord.map(({ c, pos }, j) => {
+      const fine = j + 1 < ord.length ? ord[j + 1].pos : t.length;
+      const { pos: _p, ...resto } = c;
+      return { ...resto, commento: t.slice(pos, fine).trim() };
+    });
+    const testa = t.slice(0, ord[0].pos).trim();
+    if (testa) citate[0].commento = unisci(testa, citate[0].commento);
+    const ultimo = citate[citate.length - 1].commento;
+    citate[citate.length - 1].commento = '';
+    disegnaAnteprima();
+    return ultimo;
   }
 
   // Quello che il main riceve: il posto se si sa, e il testo per ritrovarlo o per stare al suo posto.
-  function perIlMain(c) {
-    const R = global.SN_RISPOSTA_A;
-    if (!c || !R) return null;
-    return R.daPagina({ chat: c.chat, i: c.i, testo: c.scritto, role: c.role });
+  function perIlMain(l) {
+    const Ra = R();
+    const lista = (Array.isArray(l) ? l : l ? [l] : []).filter(Boolean);
+    if (!lista.length || !Ra) return null;
+    const out = lista.map((c) => Ra.daPagina({ chat: c.chat, i: c.i, testo: c.scritto, role: c.role, da: c.da, a: c.a, pos: c.pos })).filter(Boolean);
+    return out.length ? out : null;
   }
-  // Quello che resta nello storico della scheda: al main serve solo se il filo non si legge, e ne basta l'inizio.
-  function perLoStorico(c) {
-    const p = perIlMain(c);
-    const R = global.SN_RISPOSTA_A;
-    return p ? { ...p, testo: R.taglia(p.testo, R.PER_IL_MODELLO) } : null;
+  // Quello che resta nello storico della scheda: al main serve solo se il filo non si legge, e ne basta quello che si legge.
+  function perLoStorico(l) {
+    const Ra = R();
+    const lista = (Array.isArray(l) ? l : l ? [l] : []).filter((c) => c && !c.manca);
+    if (!lista.length || !Ra) return null;
+    const out = lista.map((c) => Ra.daPagina({
+      chat: c.chat, i: c.i, role: c.role, testo: Ra.taglia(c.testo, Ra.PER_IL_MODELLO), passo: c.passo === true, pos: c.pos,
+    })).filter(Boolean);
+    return out.length ? out : null;
   }
 
-  // ── La citazione in testa alla bolla che parte ────────────────────────────
+  // ── Le citazioni dentro la bolla che parte ────────────────────────────────
   // Il testo sta in attributi disegnati dal CSS: la bolla resta fatta delle sole parole dell'utente, che è come il filo
-  // la riconosce, la cerca e la copia.
-  // `c.testo` è già quello che si legge: dalla bolla citata (rispondi) o dal filo (dalFilo).
-  function citaIn(bolla, c) {
-    if (!bolla || !c) return null;
-    const vecchia = bolla.querySelector(':scope > .dash-citata');
-    if (vecchia) vecchia.remove();
+  // la riconosce, la cerca e la copia. Ognuna sta prima del suo commento (`pos` sulle parole dell'utente).
+  function citazione(c) {
     const q = document.createElement('span');
     q.className = 'dash-citata';
-    const chi = c.role === 'user' ? 'Tu' : 'Filo';
     const testo = c.manca ? 'Messaggio non più nel filo' : (String(c.testo || '').trim() || '…');
-    q.dataset.chi = chi;
+    if (c.role === 'user') q.dataset.chi = 'Tu';
     q.dataset.testo = testo;
-    q.setAttribute('aria-label', `In risposta a ${chi}: ${testo}`);
+    q.setAttribute('aria-label', `In risposta a ${c.role === 'user' ? 'te' : 'Filo'}: ${testo}`);
     if (c.manca) q.classList.add('dash-citata-manca');
     else {
       q.setAttribute('role', 'button');
@@ -179,44 +334,124 @@
       q.title = 'Vai al messaggio';
     }
     q._citata = c;
-    bolla.insertBefore(q, bolla.firstChild);
     return q;
   }
-
-  // La citazione come la manda il filo (src/shared/rispostaA.js, risolvi): il testo è quello scritto da Filo.
-  function dalFilo(r) {
-    if (!r || typeof r !== 'object') return null;
-    const Md = global.SN_MARKDOWN;
-    const scritto = String(r.testo == null ? '' : r.testo);
-    return {
-      chat: typeof r.chat === 'string' ? r.chat : '', i: Number.isInteger(r.i) ? r.i : null, ts: r.ts || '',
-      role: r.role === 'user' ? 'user' : 'filo', manca: r.manca === true,
-      testo: (Md && Md.testo ? Md.testo(scritto) : scritto).trim(),
-    };
+  // Dove inserire una citazione a `pos` caratteri dalle parole della bolla: un figlio diretto, spezzando il testo.
+  function punto(bolla, pos) {
+    if (pos <= 0) return bolla.firstChild;
+    let fatti = 0;
+    for (const n of nodiDiTesto(bolla)) {
+      const l = n.data.length;
+      if (fatti + l >= pos) {
+        let figlio = n;
+        while (figlio.parentNode && figlio.parentNode !== bolla) figlio = figlio.parentNode;
+        if (figlio !== n) return pos - fatti < l / 2 ? figlio : figlio.nextSibling;
+        return pos - fatti >= l ? n.nextSibling : n.splitText(pos - fatti);
+      }
+      fatti += l;
+    }
+    const azioni = bolla.querySelector(':scope > .dash-msg-azioni');
+    return azioni || null;
+  }
+  // `l`: l'elenco (o una sola, come prima di #2346) con `testo` già da leggere.
+  function citaIn(bolla, l) {
+    const lista = (Array.isArray(l) ? l : l ? [l] : []).filter((c) => c && typeof c === 'object');
+    if (!bolla || !lista.length) return null;
+    for (const v of bolla.querySelectorAll(':scope > .dash-citata')) v.remove();
+    const ord = lista.map((c, k) => ({ c, k, pos: Number.isInteger(c.pos) && c.pos > 0 ? c.pos : 0 }))
+      .sort((x, y) => y.pos - x.pos || y.k - x.k);
+    let prima = null;
+    for (const { c, pos } of ord) {
+      const q = citazione(c);
+      bolla.insertBefore(q, punto(bolla, pos));
+      // L'a capo fra due commenti lo fa già la citazione, che sta su una riga sua.
+      const p = q.previousSibling;
+      if (p && p.nodeType === 3 && p.data.endsWith('\n')) p.data = p.data.slice(0, -1);
+      const n = q.nextSibling;
+      if (n && n.nodeType === 3 && n.data.startsWith('\n')) n.data = n.data.slice(1);
+      prima = q;
+    }
+    return prima;
   }
 
+  // Le citazioni come le manda il filo (src/shared/rispostaA.js, risolviTutte): il testo è quello scritto.
+  function dalFilo(r) {
+    const Md = global.SN_MARKDOWN;
+    return (Array.isArray(r) ? r : r && typeof r === 'object' ? [r] : []).filter((x) => x && typeof x === 'object').map((x) => {
+      const role = x.role === 'user' ? 'user' : 'filo';
+      const s = String(x.testo == null ? '' : x.testo);
+      return {
+        chat: typeof x.chat === 'string' ? x.chat : '', i: Number.isInteger(x.i) ? x.i : null, ts: x.ts || '',
+        role, manca: x.manca === true, scritto: '',
+        ...(x.passo === true && Number.isInteger(x.da) && Number.isInteger(x.a) ? { passo: true, da: x.da, a: x.a } : {}),
+        ...(Number.isInteger(x.pos) && x.pos > 0 ? { pos: x.pos } : {}),
+        testo: x.passo === true ? testoDelPasso(s, role) : (Md && Md.testo ? Md.testo(s) : s).trim(),
+      };
+    });
+  }
+
+  // ── Il salto al testo citato ──────────────────────────────────────────────
   function luce(n) {
     n.classList.remove('dash-trovato');
     void n.offsetWidth;
     n.classList.add('dash-trovato');
   }
+  // Seleziona nella bolla il testo citato: il passo, o tutto il messaggio. Il campo lascia il fuoco, o la selezione
+  // resterebbe spenta.
+  function seleziona(bolla, c) {
+    const nodi = nodiDiTesto(bolla);
+    const dom = nodi.map((n) => n.data).join('');
+    if (!dom.trim()) return false;
+    let da = dom.length - dom.trimStart().length;
+    let a = dom.trimEnd().length;
+    const s = scritto(bolla);
+    if (c.passo && s != null && Number.isInteger(c.da) && Number.isInteger(c.a)) {
+      const Ra = R();
+      const t = Ra ? Ra.trovaPasso(dom, s.slice(c.da, c.a), Ra.lettere(s.slice(0, c.da))) : null;
+      if (t) ({ da, a } = t);
+    }
+    const dove = (k, fine) => {
+      let fatti = 0;
+      for (const n of nodi) {
+        if (k < fatti + n.data.length || (fine && k === fatti + n.data.length)) return [n, k - fatti];
+        fatti += n.data.length;
+      }
+      const u = nodi[nodi.length - 1];
+      return [u, u.data.length];
+    };
+    const range = document.createRange();
+    range.setStart(...dove(da, false));
+    range.setEnd(...dove(a, true));
+    const att = document.activeElement;
+    if (att && d.formEl.contains(att) && typeof att.blur === 'function') att.blur();
+    const sel = global.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const vista = elDi(range.startContainer);
+    if (vista && vista !== bolla) vista.scrollIntoView({ block: 'center' });
+    return true;
+  }
+  const bollaDi = (chiave) => (chiave ? [...d.bubblesEl.querySelectorAll('[data-key]')].find((n) => n.dataset.key === chiave) : null);
   async function vaiA(c) {
     const chiave = c.chat && c.i != null ? `m:${c.chat}:${c.i}` : '';
-    const qui = (c.bolla && c.bolla.isConnected ? c.bolla : null)
-      || (chiave ? [...d.bubblesEl.querySelectorAll('[data-key]')].find((n) => n.dataset.key === chiave) : null);
+    let qui = (c.bolla && c.bolla.isConnected ? c.bolla : null) || bollaDi(chiave);
     if (qui) {
       qui.scrollIntoView({ block: 'center' });
       luce(qui);
-      return true;
+    } else {
+      if (!chiave || !(await d.vaiA({ chat: c.chat, i: c.i, ts: c.ts || null }))) return false;
+      qui = bollaDi(chiave);
     }
-    return chiave ? d.vaiA({ chat: c.chat, i: c.i, ts: c.ts || null }) : false;
+    if (qui) seleziona(qui, c);
+    return true;
   }
   async function vaiDallaCitazione(q) {
     const c = q && q._citata;
     if (!c || c.manca) return;
     if (await vaiA(c)) return;
     // Non c'è più (la sua conversazione è stata tolta o nascosta): la citazione lo dice, invece di non fare niente.
-    citaIn(q.parentElement, { ...c, manca: true, bolla: null });
+    const nuova = citazione({ ...c, manca: true, bolla: null });
+    q.replaceWith(nuova);
   }
 
   // ── Tasto destro ──────────────────────────────────────────────────────────
@@ -227,8 +462,9 @@
     if (q && d.bubblesEl.contains(q) && q._citata && !q._citata.manca) {
       return [{ type: 'item', icon: icona('reply', 16), label: 'Vai al messaggio citato', onClick: () => { vaiDallaCitazione(q).catch(() => {}); } }];
     }
-    if (anteprima && anteprima.contains(el) && citata) {
-      return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
+    const p = anteprima && anteprima.contains(el) ? el.closest('.dash-citazione-pezzo') : null;
+    if (p && citate.includes(p._citata)) {
+      return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { togliCitazione(citate.indexOf(p._citata)); d.inputEl.focus(); } }];
     }
     if (!tasti || !d.bubblesEl.contains(el)) return [];
     return tasti.vociMenu(el);
@@ -259,12 +495,12 @@
       const q = e.target && e.target.classList && e.target.classList.contains('dash-citata') ? e.target : null;
       if (q && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); vaiDallaCitazione(q).catch(() => {}); }
     });
-    // Esc nel campo lascia la risposta, dopo chi l'ha già preso (la dettatura che ascolta).
+    // Esc nel campo lascia l'ultima citazione, dopo chi l'ha già preso (la dettatura che ascolta).
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || !citata) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || !citate.length) return;
       if (!d.formEl.contains(document.activeElement)) return;
       e.preventDefault();
-      annulla();
+      togliCitazione(citate.length - 1);
     });
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
@@ -272,6 +508,6 @@
 
   global.SN_DASH_RISPONDI = {
     init, ricorda, scritto, testoDi, prendi, rimetti, annulla, citaIn, dalFilo, perIlMain, perLoStorico, rispondi, copia, cita,
-    inCorso: () => !!citata,
+    commenti, inCorso: () => citate.length > 0,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
