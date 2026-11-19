@@ -284,6 +284,18 @@ html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
   width: 8px;
   background: radial-gradient(circle at top right, transparent 8px, var(--tab-active) 8px);
 }
+/* Con la fila sul bordo alto dello schermo la fascia sopra la scheda è sua, come in Chrome: la mano la prende senza
+   mirare (#2382.1). Altrove la fascia resta la presa della finestra. */
+.tab-cima { display: none; }
+html[data-schede-al-bordo] .tabs { margin-top: -8px; padding-top: 8px; }
+html[data-schede-al-bordo] .tab-cima {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 8px;
+}
 .tab .title {
   flex: 1;
   overflow: hidden;

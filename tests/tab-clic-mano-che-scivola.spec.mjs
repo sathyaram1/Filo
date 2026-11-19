@@ -120,6 +120,65 @@ function clicNelBordoDelMenu(app, px, py) {
   }, [px, py]);
 }
 
+// Un punto del bordo trasparente del menu che cade sopra la pagina (sotto il riquadro), in coordinate della barra, con
+// la vista che lo copre: è lì che il clic non deve andare a nessuno (#2382.1).
+function bordoSopraLaPagina(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const madre = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html'));
+    const r = JSON.parse(await m.webContents.executeJavaScript('JSON.stringify(document.querySelector(".menu").getBoundingClientRect())'));
+    const cm = madre.getContentBounds();
+    const cb = m.getContentBounds();
+    const lx = Math.round(r.left + r.width / 2);
+    const ly = Math.round(r.bottom + (cb.height - r.bottom) / 2);
+    const x = cb.x + lx - cm.x;
+    const y = cb.y + ly - cm.y;
+    const coperta = madre.contentView.children.some((v) => {
+      if (typeof v.getVisible === 'function' && !v.getVisible()) return false;
+      const b = v.getBounds();
+      return b.width > 0 && b.height > 0 && x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
+    });
+    return { x, y, coperta, fuoriDalMenu: ly > r.bottom && ly < cb.height };
+  });
+}
+
+test('col menu aperto sopra la pagina, il clic sul suo bordo lo chiude e non va né alla pagina né alla barra', async ({ app, shell, testServer }) => {
+  const ids = await treSchede(shell, testServer);
+  await app.evaluate(({ BrowserWindow }) => {
+    const madre = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const t = madre._filoTabs.tabs.find((x) => x.id === madre._filoTabs.activeId);
+    return t.view.webContents.executeJavaScript(`window.__pressioni = 0;
+      for (const ev of ['mousedown', 'mouseup', 'click', 'contextmenu']) document.addEventListener(ev, () => { window.__pressioni++; }, true);
+      true`);
+  });
+  await shell.evaluate(() => {
+    window.__pressioni = [];
+    for (const ev of ['mousedown', 'mouseup', 'click', 'contextmenu']) {
+      document.addEventListener(ev, (e) => { window.__pressioni.push(`${ev}@${e.clientX},${e.clientY}`); }, true);
+    }
+  });
+  await tastoDestro(shell, `#tabs .tab[data-id="${ids[1]}"]`);
+  await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Chiudi'));
+  const b = await bordoSopraLaPagina(app);
+  expect(b.fuoriDalMenu, 'il punto deve stare nel bordo trasparente, fuori dal riquadro').toBe(true);
+  expect(b.coperta, 'sotto il punto deve esserci la pagina').toBe(true);
+  // Il tasto destro di prima è passato dalla barra: da qui conta solo il clic sul bordo.
+  await shell.evaluate(() => { window.__pressioni = []; });
+  const esito = await clicNelBordoDelMenu(app, b.x, b.y);
+  expect(esito.fuori).toBe(false);
+  await expect.poll(() => vociDelMenu(app), { timeout: 3_000 }).toBe(null);
+  await shell.waitForTimeout(400);
+  expect(await shell.evaluate(() => window.__pressioni), 'il clic non deve arrivare alla barra coperta dalla pagina').toEqual([]);
+  const allaPagina = await app.evaluate(({ BrowserWindow }) => {
+    const madre = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const t = madre._filoTabs.tabs.find((x) => x.id === madre._filoTabs.activeId);
+    return t.view.webContents.executeJavaScript('window.__pressioni');
+  });
+  expect(allaPagina, 'il clic non deve arrivare alla pagina').toBe(0);
+  expect(await aperte(shell)).toEqual(ids);
+  expect(await attiva(shell)).toBe(ids.at(-1));
+});
+
 test('col menu del tasto destro aperto, la X sotto il suo bordo chiude la scheda', async ({ app, shell, testServer }) => {
   const ids = await treSchede(shell, testServer);
   await tastoDestro(shell, `#tabs .tab[data-id="${ids[1]}"]`);

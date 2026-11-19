@@ -156,6 +156,15 @@ function wireWindowCommon(win, tabs) {
     if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
     else tabs.layout();
   });
+  // Massimizzata o a schermo intero la fila tocca il bordo alto dello schermo: lì la fascia sopra le schede non
+  // sposta la finestra, è delle schede (#2382.1).
+  const diBordo = () => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+    const type = globalThis.SN_MSG?.MSG?.WINDOW_AT_SCREEN_EDGE || 'window_at_screen_edge';
+    try { win.webContents.send('filo:broadcast', { type, alBordo: win.isMaximized() || win.isFullScreen() }); } catch (_) {}
+  };
+  for (const ev of ['maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']) win.on(ev, diBordo);
+  win.webContents.on('did-finish-load', diBordo);
 
   // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì l'Esc non passa
   // dal before-input-event di nessuna scheda. La regola sta in tabs.js, qui non si decide.
