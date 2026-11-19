@@ -491,6 +491,7 @@
     file: 'File del computer (percorsi come in IL COMPUTER DELL\'UTENTE, o con ~) e dell\'Editor.',
     computer: 'Il computer dell\'utente.',
     web: 'Il web.',
+    immagini: 'Immagini da mostrare nella risposta.',
     memoria: 'Quello che Filo ricorda dell\'utente.',
     filo: 'Tutto quello che l\'utente ha fatto con Filo.',
     filo_su_di_se: 'Filo su di sé.',
