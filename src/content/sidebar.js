@@ -1803,6 +1803,19 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
       const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti, avviso: res.avviso || '' };
+      // #1664 — le immagini date all'Aiuto che la segnalazione indica, in miniatura come nella chat della home: partono
+      // quelle tenute, e il main le accetta solo se erano davvero arrivate al modello.
+      const AS = global.SN_ALLEGATI_SEGNALAZIONE;
+      const inviaFeedback = String(action.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(action);
+      if (inviaFeedback) {
+        const date = history.filter((m) => m && m.role === 'user' && Array.isArray(m.immagini)).flatMap((m) => m.immagini);
+        const r = AS.richiesti(action);
+        const voci = r.immagini.filter((n) => typeof date[n - 1] === 'string')
+          .map((n) => ({ id: `immagine:${n}`, tipo: 'immagine', nome: `immagine ${n}`, anteprima: date[n - 1] }));
+        const scartati = [...r.immagini.filter((n) => typeof date[n - 1] !== 'string').map((n) => `immagine ${n}`),
+          ...r.file.map(AS.nomeDi), ...(r.schermata ? ['schermata'] : [])];
+        Object.assign(opts, { allegati: voci, scartati, limiti: AS.limiti() });
+      }
       let ok = false;
       try {
         ok = Ui
