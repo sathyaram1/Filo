@@ -91,6 +91,7 @@ const avvisi = (page) => page.evaluate(() => window.__avvisi || []);
 test('«traducimi la pagina»: si traduce; chiesto di nuovo resta tradotta; «torna all\'originale» la rimette', async ({ app, openTab, testServer }) => {
   await fornitoreFinto(app);
   const page = await testServer.openReady(openTab, ARTICOLO);
+  await guardaAvvisi(page);
 
   const r = await traduci(app);
   expect(r.executed).toBe(true);
@@ -98,6 +99,8 @@ test('«traducimi la pagina»: si traduce; chiesto di nuovo resta tradotta; «to
   await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30000 });
   await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
   await expect.poll(() => page.title(), { timeout: 30000 }).toMatch(/^IT /);
+  // Sulla pagina gli stessi avvisi del clic: a che punto è, poi com'è finita.
+  await expect.poll(async () => (await avvisi(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
   await page.screenshot({ path: 'tests/.shots/traduci-pagina-chat-tradotta.png' }).catch(() => {});
 
   // L'icona su una pagina tradotta torna all'originale; la frase no: Filo dice che è già fatto.
