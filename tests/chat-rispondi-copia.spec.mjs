@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { seleziona } from './helpers/selezione.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
