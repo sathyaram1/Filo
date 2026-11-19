@@ -72,7 +72,10 @@ irraggiungibili.
   prendersi il clic seguente (#954). La durata delle Preferenze è quella dell'avviso standard e porta in
   scala quelle scelte da chi mostra; 0 = restano finché l'utente non li chiude,
   quindi un avviso visibile prende il puntatore e si chiude col clic (il vuoto
-  attorno resta della pagina). Una pila nuova prende tempi e hover da
+  attorno resta della pagina). Ogni avviso della pila delle pagine ha anche la
+  sua X, che chiama la chiusura registrata con `SN_AVVISI.chiudibile`, la stessa
+  del «Chiudi» del tasto destro (#1677, `mountToast` in `src/content/popup.js`;
+  prova `tests/toast-e-carattere-sui-siti.spec.mjs`). Una pila nuova prende tempi e hover da
   `SN_AVVISI` (`src/shared/avvisiTempo.js`), mai da un `setTimeout` suo:
   sentinella `tests/unit/avvisiTempo.test.mjs`.
 - **Dove:** il modello è `NOTIFS` (`disponi`) in `src/renderer/shell.js`; a
