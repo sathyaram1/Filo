@@ -596,9 +596,9 @@ test('l’assistente vede l’indirizzo che l’utente ha scritto in un campo, n
   await modelloFinto(app);
   await page.locator('#e').pressSequentially('mario.rossi@gmial.com');
   await page.locator('#c').pressSequentially(CARTA_UTENTE);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'ho scritto giusto la mia email?');
-  await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'ho scritto giusto la mia email?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
   const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
   // Un campo col nome si chiama col nome (#810.7): l'email scritta il modello la legge nella foto, che copre solo i segreti.
   expect(visti, 'il modello sa quale campo è').toContain('input \\"Email\\" :: #e');
