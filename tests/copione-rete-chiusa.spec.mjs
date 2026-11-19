@@ -23,8 +23,7 @@ test('un turno a copione con uno strumento arriva alla risposta senza che il mai
   await spiaLaRete(app);
   await configureModel(app);
   await copione(app, [
-    { strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Pasta"}' }] },
-    { testo: 'Timer della pasta messo.' },
+    { strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Pasta"}' }], testo: 'Timer della pasta messo.' },
   ]);
   try {
     const page = await openTab('filo://newtab/');
