@@ -1632,7 +1632,7 @@
     $('doppioToccoDove').value = '';
     await salvaLettere(r.lettere);
     // Ridata a un'altra cosa, la lettera dice cosa apriva: la riga di prima è sparita dall'elenco.
-    if (r.sostituita) avvisoLettere(D.conPrima('Salvato', r), 6000);
+    avvisoLettere(D.conPrima('Salvato', r), r.sostituita ? 6000 : 1200);
   }
   function avvisoLettere(testo, ms) {
     const hint = $('doppioToccoHint');
