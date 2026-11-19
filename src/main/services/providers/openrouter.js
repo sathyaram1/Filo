@@ -560,12 +560,14 @@
     throw await httpError(second.res, { ...opts, maxTokens: b2.max_tokens, tettoProvato: tettoChiesto });
   }
 
-  async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+  // `modalities`: ['image', 'text'] per un modello che disegna (#2272); le immagini tornano in `images` come data: URL.
+  async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal, modalities }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
     const inviati = messaggiDaMandare(model, messages, cache, tools);
     const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    if (Array.isArray(modalities) && modalities.length) body.modalities = modalities.map(String);
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
