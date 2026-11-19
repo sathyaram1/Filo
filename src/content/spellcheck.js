@@ -3555,19 +3555,7 @@
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
         return;
       }
-      if (!sostituisciComeBattuta(el, range, safeReplacement, cursorMode)) {
-        try {
-          el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
-        } catch (_) {
-          const before = v.slice(0, range.start);
-          const after = v.slice(range.end);
-          el.value = before + safeReplacement + after;
-          const caret = before.length + safeReplacement.length;
-          try { el.setSelectionRange(caret, caret); } catch (_) {}
-        }
-        // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
-        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
-      }
+      scriviNellaCasella(el, range, safeReplacement, { cursore: cursorMode });
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
