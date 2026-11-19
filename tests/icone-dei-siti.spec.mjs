@@ -137,10 +137,11 @@ test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dalla copia dell\'
 // #848.2 — la riga disegnata mentre la scheda del sito si apre, per un sito senza /favicon.ico: prima restava senza
 // icona anche quando la scheda, poco dopo, aveva la sua.
 test('la riga di un sito che si sta aprendo prende l\'icona appena la scheda la trova, senza ridisegnarsi', async ({ app, openTab }) => {
-  await app.evaluate(({ session, net }, blu) => {
+  await chiudiLaRete(app);
+  await app.evaluate(({ session }, blu) => {
     session.defaultSession.protocol.handle('https', (req) => {
       const u = new URL(req.url);
-      if (u.hostname.replace(/^www\./, '') !== 'lento.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname.replace(/^www\./, '') !== 'lento.test') return globalThis.__reteChiusa.resto(req);
       if (u.pathname === '/icona.png') return new Response(Buffer.from(blu, 'base64'), { headers: { 'content-type': 'image/png' } });
       if (u.pathname === '/favicon.ico') return new Response('no', { status: 404 });
       // La pagina arriva dopo un attimo, come un sito vero: la riga della chat è già disegnata.
