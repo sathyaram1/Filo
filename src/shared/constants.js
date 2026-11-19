@@ -2114,7 +2114,7 @@
       [
         ...(soloSegnaposti ? [] : [
           `contraddizione: il testo dice una cosa diversa da quella che la pagina ha già stabilito (giorni, date, orari, nomi, numeri, luoghi, cose concordate). Nella conversazione si era detto martedì e l'utente scrive «sì, ci vediamo mercoledì». Non è una contraddizione chi propone di cambiare, chi fa una domanda, chi parla d'altro.`,
-          `frase poco chiara o fuori tono: rotta, che si legge in due modi, o con un tono che stona con dove si scrive (brusca in una mail di lavoro, solenne in una chat fra amici). Mai per gusto, lunghezza o punteggiatura.`,
+          `frase poco chiara o fuori tono: rotta, che si legge in due modi, o con un tono che stona con dove si scrive (brusca in una mail di lavoro, solenne in una chat fra amici). Mai per gusto, lunghezza o punteggiatura. Una frase che risponde alla conversazione o continua la pagina si legge con lei: un soggetto sottinteso («ha poteri limitati» dopo un messaggio su un token), «lui», «quello», «sì, va bene» sono chiari se sopra il campo si capisce di chi o di cosa si parla, e anche quando la pagina non ti arriva.`,
           ...(ripetizioni ? [`ripetizione di una parola piena a breve distanza che non sembra voluta. L'italiano ripete apposta («piano piano», «quasi quasi», «sì sì»): quelle no.`] : []),
           `fatti: un fatto noto sbagliato («l'America scoperta nel 1429», «il virus della peste») o un valore impossibile («un filo di rame spesso 2 m»).`,
         ]),
