@@ -1484,7 +1484,7 @@
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    const citata = Rispondi.prendi();
+    const citata = conCitate ? conCitate.citate : null;
     const schede = Gettoni ? Gettoni.schede() : [];
     if (Gettoni) Gettoni.svuota();
     return composizione(text, { immagini, daFuori, scritto, incollato, file, percorsi, citata, schede });
