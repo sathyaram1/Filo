@@ -72,14 +72,14 @@ test('«Riprova» su un link protetto presenta la pagina da cui partiva il clic,
 test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pagina di provenienza, e l’immagine arriva', async ({ shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const visti = [];
-  let salvataggi = 0;
+  let richieste = 0;
   const img = await ascolta((req, res) => {
     const ref = String(req.headers.referer || '');
-    const perMostrarla = String(req.headers['sec-fetch-dest'] || '') === 'image';
-    if (!perMostrarla) visti.push(ref);
+    visti.push(ref);
     if (!ref.startsWith(testServer.origin)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('hotlink'); return; }
-    // Il primo salvataggio cade a metà, dopo le intestazioni: la riga nasce e resta «non riuscita».
-    if (!perMostrarla && ++salvataggi === 1) {
+    // La prima richiesta la mostra nella pagina; il primo salvataggio cade a metà, dopo le intestazioni: la riga nasce e
+    // resta «non riuscita».
+    if (++richieste === 2) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': PNG.length * 10 });
       res.write(PNG);
       setTimeout(() => res.destroy(), 100);
