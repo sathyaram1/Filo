@@ -1215,6 +1215,9 @@
   // Menu contestuale proprio, con preventDefault e le classi .sn-select-*. Pattern in
   // patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md.
   let titleMenuEl = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let titleMenuScorso = () => true;
+  function onTitleMenuScroll(e) { if (titleMenuScorso(e)) closeTitleMenu(); }
   function closeTitleMenu() {
     if (!titleMenuEl) return;
     titleMenuEl.remove();
@@ -1222,7 +1225,7 @@
     staleClick.arm(); // il menu sparisce da sotto il cursore
     document.removeEventListener('mousedown', onTitleMenuOutside, true);
     document.removeEventListener('keydown', onTitleMenuKeydown, true);
-    window.removeEventListener('scroll', closeTitleMenu, true);
+    window.removeEventListener('scroll', onTitleMenuScroll, true);
     window.removeEventListener('resize', closeTitleMenu);
   }
   function onTitleMenuOutside(e) {
