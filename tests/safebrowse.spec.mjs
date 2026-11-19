@@ -726,7 +726,9 @@ for (const [nome, js] of [
   });
 }
 
-test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+T, il ritorno, Ctrl+W', async ({ app, shell }) => {
+// Il sito segnalato, poi Ctrl+T dalla tastiera dell'avviso: la scheda nuova (la home, che si sta ancora caricando) è
+// davanti e ha la tastiera. `torna` riporta davanti la scheda del sito, `tasto` preme dove sta la tastiera.
+async function sitoEPoiCtrlT(app, shell) {
   await serviInCaricamento(app, { 'conto-schede.com/login': MODULO }, { gsbListed: true });
   await apriSenzaAspettare(app, shell, 'https://conto-schede.com/login');
   const avviso = await vistaAvviso(app);
@@ -734,7 +736,7 @@ test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   const schede = () => app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    return { n: tm.tabs.length, attiva: tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL() };
+    return { n: tm.tabs.length, attiva: tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL(), sito: tm.tabs.some((t) => /conto-schede/.test(t.view.webContents.getURL())) };
   });
   const prima = (await schede()).n;
   const tasto = (key, mod) => app.evaluate(({ webContents }, { key, mod }) => {
@@ -747,16 +749,50 @@ test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+
   // Sulla scheda nuova l'avviso non c'è e la tastiera è sua.
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
   await expect.poll(async () => (await copertura(app)).tastiera).toBe('pagina');
-  // Tornati sulla scheda del sito, l'avviso la copre di nuovo e si riprende la tastiera.
-  await app.evaluate(({ BrowserWindow }) => {
+  const torna = () => app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.activate(tm.tabs.find((t) => /conto-schede/.test(t.view.webContents.getURL())).id);
   });
+  return { schede, prima, tasto, torna };
+}
+
+test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+T, il ritorno, Ctrl+W', async ({ app, shell }) => {
+  const { schede, prima, tasto, torna } = await sitoEPoiCtrlT(app, shell);
+  // Tornati sulla scheda del sito, l'avviso la copre di nuovo e si riprende la tastiera.
+  await torna();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   await tasto('W', 'control');
   await expect.poll(async () => (await schede()).n).toBe(prima);
-  expect((await schede()).attiva).not.toContain('conto-schede');
+  expect((await schede()).sito).toBe(false);
   expect((await copertura(app)).coperta).toBe(false);
+});
+
+// #871.5 — la home appena aperta si carica dietro e si prende la tastiera da sola: Ctrl+W premuto subito dopo il
+// ritorno chiudeva lei, e la scheda del sito segnalato restava aperta.
+test('Ctrl+W premuto appena tornati sulla scheda del sito segnalato chiude quella, non la home che si carica dietro', async ({ app, shell }) => {
+  const { schede, prima, tasto, torna } = await sitoEPoiCtrlT(app, shell);
+  await torna();
+  await tasto('W', 'control');
+  await expect.poll(async () => (await schede()).sito).toBe(false);
+  expect((await schede()).n).toBe(prima);
+  expect((await schede()).attiva).toMatch(/^filo:\/\/newtab\//);
+});
+
+test('con la tastiera rimasta sulla home di dietro, Ctrl+W chiude comunque la scheda davanti', async ({ app, shell }) => {
+  const { schede, prima, torna } = await sitoEPoiCtrlT(app, shell);
+  await torna();
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // Quello che fa la home quando si carica: si prende la tastiera, e il tasto arriva a lei.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => /^filo:\/\/newtab\//.test(t.view.webContents.getURL())).view.webContents;
+    wc.focus();
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'W', modifiers: ['control'] });
+  });
+  await expect.poll(async () => (await schede()).sito).toBe(false);
+  expect((await schede()).n).toBe(prima);
+  expect((await schede()).attiva).toMatch(/^filo:\/\/newtab\//);
 });
 
 // Il menu di Filo si apre sopra l'avviso: chiedere a Filo del sito e segnalare il falso allarme si fanno in una scheda di
